@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * Food ↔ Shelter Integration Module
  *
@@ -834,4 +837,203 @@ export function qualifiesForEmergencyAssistance(
     assessment.combinedSecurityIndex < 30 ||
     assessment.riskFactors.some((f) => f.severity === 'Critical')
   );
+}
+
+// ============================================================================
+// Holochain Conductor Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Food-Shelter cross-domain operations */
+export class FoodShelterBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    }
+  ) {}
+
+  // ---- Food Production (commons_land role) ----
+
+  async createFoodProduction(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-production',
+      fn_name: 'create_production',
+      payload,
+    });
+  }
+
+  async getFoodProduction(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-production',
+      fn_name: 'get_production',
+      payload,
+    });
+  }
+
+  async listFoodProductions(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-production',
+      fn_name: 'list_productions',
+      payload: payload ?? null,
+    });
+  }
+
+  async updateFoodProduction(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-production',
+      fn_name: 'update_production',
+      payload,
+    });
+  }
+
+  // ---- Food Distribution (commons_land role) ----
+
+  async createDistribution(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-distribution',
+      fn_name: 'create_distribution',
+      payload,
+    });
+  }
+
+  async getDistribution(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-distribution',
+      fn_name: 'get_distribution',
+      payload,
+    });
+  }
+
+  async listDistributions(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-distribution',
+      fn_name: 'list_distributions',
+      payload: payload ?? null,
+    });
+  }
+
+  // ---- Food Preservation (commons_land role) ----
+
+  async createPreservation(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-preservation',
+      fn_name: 'create_preservation',
+      payload,
+    });
+  }
+
+  async getPreservation(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-preservation',
+      fn_name: 'get_preservation',
+      payload,
+    });
+  }
+
+  async listPreservations(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-preservation',
+      fn_name: 'list_preservations',
+      payload: payload ?? null,
+    });
+  }
+
+  // ---- Food Knowledge (commons_land role) ----
+
+  async createKnowledgeEntry(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-knowledge',
+      fn_name: 'create_knowledge_entry',
+      payload,
+    });
+  }
+
+  async getKnowledgeEntry(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-knowledge',
+      fn_name: 'get_knowledge_entry',
+      payload,
+    });
+  }
+
+  async listKnowledgeEntries(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'food-knowledge',
+      fn_name: 'list_knowledge_entries',
+      payload: payload ?? null,
+    });
+  }
+
+  // ---- Emergency Shelters (civic role) ----
+
+  async registerShelter(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'civic',
+      zome_name: 'emergency-shelters',
+      fn_name: 'register_shelter',
+      payload,
+    });
+  }
+
+  async getShelter(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'civic',
+      zome_name: 'emergency-shelters',
+      fn_name: 'get_shelter',
+      payload,
+    });
+  }
+
+  async listShelters(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'civic',
+      zome_name: 'emergency-shelters',
+      fn_name: 'list_shelters',
+      payload: payload ?? null,
+    });
+  }
+
+  async updateShelterStatus(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'civic',
+      zome_name: 'emergency-shelters',
+      fn_name: 'update_shelter_status',
+      payload,
+    });
+  }
+
+  async updateShelterCapacity(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'civic',
+      zome_name: 'emergency-shelters',
+      fn_name: 'update_shelter_capacity',
+      payload,
+    });
+  }
+
+  async findNearbyShelters(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'civic',
+      zome_name: 'emergency-shelters',
+      fn_name: 'find_nearby_shelters',
+      payload,
+    });
+  }
 }

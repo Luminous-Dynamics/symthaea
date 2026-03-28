@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Civic Bridge Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Civic Bridge Coordinator Zome
 //!
 //! Unified cross-domain dispatch for the Civic cluster.
 //! Provides three integration patterns:
@@ -336,6 +337,58 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
         action_hash: action_hash.clone(),
     };
     emit_signal(&signal)?;
+
+    // Cross-cluster notification fanout
+    // Dispatch notification to other clusters for events that cross boundaries
+    {
+        let notification = mycelix_bridge_entry_types::CrossClusterNotification {
+            schema_version: 1,
+            source_cluster: "civic".into(),
+            source_zome: event.domain.clone(),
+            event_type: event.event_type.clone(),
+            target_clusters: vec![], // broadcast to all
+            target_agents: vec![],
+            payload: event.payload.clone(),
+            priority: 1, // Normal priority
+            created_at: sys_time()?,
+            expires_at: None,
+        };
+
+        let payload_bytes = ExternIO::encode(&notification)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0;
+
+        // Fan out to connected clusters (best-effort, don't fail on dispatch errors)
+        let targets: &[(CrossClusterRole, &str)] = &[
+            (CrossClusterRole::Commons, "commons_bridge"),
+            (CrossClusterRole::Identity, "identity_bridge"),
+            (CrossClusterRole::Finance, "finance_bridge"),
+            (CrossClusterRole::Hearth, "hearth_bridge"),
+        ];
+
+        for (target_role, zome) in targets {
+            let allowed = routing_registry::get_allowed_zomes(
+                CrossClusterRole::Civic,
+                *target_role,
+            );
+            // Skip if the target zome isn't in the allowed list for this route
+            if allowed.is_empty() || !allowed.iter().any(|z| *z == *zome) {
+                continue;
+            }
+            let dispatch = CrossClusterDispatchInput {
+                role: target_role.as_str().to_string(),
+                zome: zome.to_string(),
+                fn_name: "receive_notification".into(),
+                payload: payload_bytes.clone(),
+            };
+            // Best-effort: log errors but don't fail the broadcast
+            if let Ok(result) = bridge::dispatch_call_cross_cluster(&dispatch, allowed) {
+                if !result.success {
+                    debug!("Notification fanout to {} failed: {:?}", target_role.as_str(), result.error);
+                }
+            }
+        }
+    }
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
@@ -1533,6 +1586,241 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
             e
         )))
     })
+}
+
+// ============================================================================
+// Notification Service
+// ============================================================================
+
+/// Receive a cross-cluster notification and store it locally.
+#[hdk_extern]
+pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
+    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+    let all_anchor = ensure_anchor("all_notifications")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+    let signal = mycelix_bridge_common::notifications::NotificationSignal {
+        signal_type: "cross_cluster_notification".into(),
+        source_cluster: notification.source_cluster,
+        event_type: notification.event_type,
+        payload: notification.payload,
+        priority: notification.priority,
+    };
+    emit_signal(&signal)?;
+    Ok(action_hash)
+}
+
+/// Get notifications for the calling agent.
+#[hdk_extern]
+pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
+        GetStrategy::default(),
+    )?;
+    let limit = input.limit
+        .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
+        .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
+    let mut records = Vec::new();
+    for link in links.iter().rev().take(limit) {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get unread notification count for the calling agent.
+#[hdk_extern]
+pub fn get_unread_count(_: ()) -> ExternResult<u32> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
+        GetStrategy::default(),
+    )?;
+    Ok(links.len() as u32)
+}
+
+// ============================================================================
+// Saga Workflow Orchestrator
+// ============================================================================
+
+/// Execute a multi-step cross-cluster saga workflow.
+///
+/// The saga state machine drives dispatch to target clusters. On any step
+/// failure, compensation actions are executed in reverse order.
+///
+/// ## Example: Emergency Response Saga
+///
+/// ```ignore
+/// use mycelix_bridge_common::saga::emergency_response_saga;
+/// let saga = emergency_response_saga("inc-001".into(), 32.9, -96.7, now_us);
+/// execute_saga(saga)?;
+/// ```
+#[hdk_extern]
+pub fn execute_saga(mut saga: mycelix_bridge_common::saga::SagaDefinition) -> ExternResult<Record> {
+    use mycelix_bridge_common::saga::{self, SagaAction};
+
+    let now_us = sys_time()?.as_micros() as u64;
+
+    // Execute steps until completion, failure, or timeout
+    loop {
+        let action = saga::advance(&mut saga, now_us);
+        match action {
+            SagaAction::Dispatch { role, zome, fn_name, payload } => {
+                let dispatch = CrossClusterDispatchInput {
+                    role: role.clone(),
+                    zome: zome.clone(),
+                    fn_name: fn_name.clone(),
+                    payload: payload.clone(),
+                };
+
+                // Determine allowed zomes for this route
+                let target_role = match role.as_str() {
+                    "commons" => CrossClusterRole::Commons,
+                    "finance" => CrossClusterRole::Finance,
+                    "governance" => CrossClusterRole::Governance,
+                    "identity" => CrossClusterRole::Identity,
+                    "hearth" => CrossClusterRole::Hearth,
+                    "personal" => CrossClusterRole::Personal,
+                    "health" => CrossClusterRole::Health,
+                    "energy" => CrossClusterRole::Energy,
+                    _ => {
+                        saga::record_failure(&mut saga, format!("Unknown role: {}", role));
+                        continue;
+                    }
+                };
+
+                // Check if this is a local or cross-cluster call
+                let result = if role == "civic" {
+                    let local_dispatch = DispatchInput {
+                        zome: zome.clone(),
+                        fn_name: fn_name.clone(),
+                        payload,
+                    };
+                    bridge::dispatch_call_checked(&local_dispatch, ALLOWED_ZOMES)
+                } else {
+                    let allowed = routing_registry::get_allowed_zomes(
+                        CrossClusterRole::Civic,
+                        target_role,
+                    );
+                    bridge::dispatch_call_cross_cluster(&dispatch, allowed)
+                };
+
+                match result {
+                    Ok(r) if r.success => {
+                        saga::record_success(&mut saga, r.response);
+                    }
+                    Ok(r) => {
+                        saga::record_failure(
+                            &mut saga,
+                            r.error.unwrap_or_else(|| "Unknown dispatch error".into()),
+                        );
+                    }
+                    Err(e) => {
+                        saga::record_failure(&mut saga, format!("{:?}", e));
+                    }
+                }
+            }
+            SagaAction::Compensate(actions) => {
+                // Execute compensations best-effort
+                for comp in &actions {
+                    let dispatch = CrossClusterDispatchInput {
+                        role: comp.role.clone(),
+                        zome: comp.zome.clone(),
+                        fn_name: comp.fn_name.clone(),
+                        payload: comp.payload.clone(),
+                    };
+                    let _ = bridge::dispatch_call_cross_cluster(
+                        &dispatch,
+                        &[&comp.zome],
+                    );
+                }
+                saga::mark_compensated(&mut saga);
+                break;
+            }
+            SagaAction::Complete | SagaAction::Timeout => break,
+        }
+    }
+
+    // Store saga result on DHT as a BridgeEventEntry
+    let saga_json = serde_json::to_string(&saga)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+    let caller = agent_info()?.agent_initial_pubkey;
+    let event = mycelix_bridge_entry_types::BridgeEventEntry {
+        schema_version: 1,
+        domain: "saga".into(),
+        event_type: saga.name.clone(),
+        source_agent: caller.clone(),
+        payload: saga_json,
+        created_at: sys_time()?,
+        related_hashes: vec![],
+    };
+    let action_hash = create_entry(&EntryTypes::Event(event))?;
+
+    // Index by agent
+    let agent_anchor = ensure_anchor(&format!("sagas:{:?}", caller))?;
+    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToSaga, ())?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not read saga entry".into())))
+}
+
+/// Get the status of a saga by its action hash.
+#[hdk_extern]
+pub fn get_saga_status(hash: ActionHash) -> ExternResult<Record> {
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Saga not found".into())))
+}
+
+/// Get all sagas initiated by the calling agent.
+#[hdk_extern]
+pub fn get_my_sagas(_: ()) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let agent_anchor = ensure_anchor(&format!("sagas:{:?}", caller))?;
+    let links = get_links(
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToSaga)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links.iter().rev().take(50) {
+        if let Ok(hash) = ActionHash::try_from(link.target.clone()) {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
+}
+
+/// Start an emergency response saga for a declared disaster.
+///
+/// Convenience wrapper that creates and executes the pre-built
+/// emergency response saga template.
+#[hdk_extern]
+pub fn start_emergency_saga(input: EmergencySagaInput) -> ExternResult<Record> {
+    let now_us = sys_time()?.as_micros() as u64;
+    let saga = mycelix_bridge_common::saga::emergency_response_saga(
+        input.incident_id,
+        input.latitude,
+        input.longitude,
+        now_us,
+    );
+    execute_saga(saga)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EmergencySagaInput {
+    pub incident_id: String,
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 // ============================================================================

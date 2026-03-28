@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Learning Coordinator Zome
 //!
 //! Implements business logic for learning courses and progress tracking.
@@ -10,6 +13,13 @@ use learning_integrity::{Course, LearnerProgress, LearningActivity, EntryTypes, 
 /// Create a new course
 #[hdk_extern]
 pub fn create_course(course: Course) -> ExternResult<ActionHash> {
+    // Trust tier gate: requires Steward tier to create courses
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_constitutional(),
+        "create_course",
+    )?;
+
     let action_hash = create_entry(EntryTypes::Course(course))?;
 
     // Create a path anchor for listing all courses

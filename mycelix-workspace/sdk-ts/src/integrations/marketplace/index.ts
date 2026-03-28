@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Marketplace Integration
  *
@@ -406,6 +409,278 @@ export class MarketplaceReputationService {
       averageParticipation: stats.averageParticipation,
     };
   }
+}
+
+// ============================================================================
+// Bridge Client (Holochain Zome Calls)
+// ============================================================================
+
+import { type MycelixClient } from '../../client/index.js';
+
+const MARKETPLACE_ROLE = 'marketplace';
+
+/**
+ * MarketplaceBridgeClient - Direct Holochain zome calls for marketplace operations
+ *
+ * Provides the same capabilities as MarketplaceReputationService but backed by the
+ * Holochain conductor instead of in-memory Maps.
+ */
+export class MarketplaceBridgeClient {
+  constructor(private client: MycelixClient) {}
+
+  // --- transactions zome ---
+
+  async createTransaction(input: {
+    listing_hash: Uint8Array;
+    seller: Uint8Array;
+    amount: number;
+    currency: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'create_transaction',
+      payload: input,
+    });
+  }
+
+  async getTransaction(transactionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'get_transaction',
+      payload: transactionHash,
+    });
+  }
+
+  async getMyTransactions(): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'get_my_transactions',
+      payload: null,
+    });
+  }
+
+  async confirmTransaction(transactionHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'confirm_transaction',
+      payload: transactionHash,
+    });
+  }
+
+  async markShipped(input: {
+    transaction_hash: Uint8Array;
+    tracking_info?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'mark_shipped',
+      payload: input,
+    });
+  }
+
+  async confirmDelivery(transactionHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'confirm_delivery',
+      payload: transactionHash,
+    });
+  }
+
+  async completeTransaction(transactionHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'complete_transaction',
+      payload: transactionHash,
+    });
+  }
+
+  async disputeTransaction(input: {
+    transaction_hash: Uint8Array;
+    reason: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'dispute_transaction',
+      payload: input,
+    });
+  }
+
+  async cancelTransaction(transactionHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'cancel_transaction',
+      payload: transactionHash,
+    });
+  }
+
+  async getListingTransactions(listingHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'transactions',
+      fn_name: 'get_listing_transactions',
+      payload: listingHash,
+    });
+  }
+
+  // --- reputation zome ---
+
+  async getAgentMatlScore(agent: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'get_agent_matl_score',
+      payload: agent,
+    });
+  }
+
+  async getAgentMatlScoreFast(agent: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'get_agent_matl_score_fast',
+      payload: agent,
+    });
+  }
+
+  async getCombinedReputation(agent: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'get_combined_reputation',
+      payload: agent,
+    });
+  }
+
+  async getCrossAppReputation(agent: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'get_cross_app_reputation',
+      payload: agent,
+    });
+  }
+
+  async updateMatlScore(input: {
+    agent: Uint8Array;
+    quality: number;
+    consistency: number;
+    reputation: number;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'update_matl_score',
+      payload: input,
+    });
+  }
+
+  async isByzantine(agent: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'is_byzantine',
+      payload: agent,
+    });
+  }
+
+  async submitReview(input: {
+    seller: Uint8Array;
+    transaction_hash: Uint8Array;
+    rating: number;
+    comment?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'submit_review',
+      payload: input,
+    });
+  }
+
+  async getSellerReviews(seller: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'reputation',
+      fn_name: 'get_seller_reviews',
+      payload: seller,
+    });
+  }
+
+  // --- arbitration zome ---
+
+  async fileDispute(input: {
+    transaction_hash: Uint8Array;
+    reason: string;
+    evidence?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'arbitration',
+      fn_name: 'file_dispute',
+      payload: input,
+    });
+  }
+
+  async submitArbitrationVote(input: {
+    dispute_hash: Uint8Array;
+    vote: string;
+    reasoning?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'arbitration',
+      fn_name: 'submit_arbitration_vote',
+      payload: input,
+    });
+  }
+
+  async finalizeArbitration(disputeHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'arbitration',
+      fn_name: 'finalize_arbitration',
+      payload: disputeHash,
+    });
+  }
+
+  async getArbitrationOpportunities(): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'arbitration',
+      fn_name: 'get_arbitration_opportunities',
+      payload: null,
+    });
+  }
+
+  async getDispute(disputeHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: MARKETPLACE_ROLE,
+      zome_name: 'arbitration',
+      fn_name: 'get_dispute',
+      payload: disputeHash,
+    });
+  }
+}
+
+// Bridge client singleton
+let marketplaceBridgeInstance: MarketplaceBridgeClient | null = null;
+
+export function getMarketplaceBridgeClient(client: MycelixClient): MarketplaceBridgeClient {
+  if (!marketplaceBridgeInstance) marketplaceBridgeInstance = new MarketplaceBridgeClient(client);
+  return marketplaceBridgeInstance;
+}
+
+export function resetMarketplaceBridgeClient(): void {
+  marketplaceBridgeInstance = null;
 }
 
 // ============================================================================

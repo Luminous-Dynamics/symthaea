@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk SupplyChain Integration
  *
@@ -608,6 +611,135 @@ export {
   recordNegative,
   reputationValue,
 };
+
+// ============================================================================
+// SupplyChain Holochain Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for SupplyChain cluster */
+export class SupplyChainBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    },
+  ) {}
+
+  // -- Bridge zome (cross-cluster dispatch) --
+
+  async healthCheck(): Promise<{ cluster: string; agent: string; zome_count: number; healthy: boolean }> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'bridge',
+      fn_name: 'health_check',
+      payload: null,
+    });
+  }
+
+  // -- Inventory zome (product & checkpoint management) --
+
+  async recordCheckpoint(params: {
+    productId: string;
+    batchId?: string;
+    location: string;
+    coordinates?: { lat: number; lng: number };
+    handler: string;
+    action: 'received' | 'processed' | 'shipped' | 'delivered' | 'inspected';
+    evidence: CheckpointEvidence[];
+  }): Promise<Checkpoint> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'inventory',
+      fn_name: 'record_checkpoint',
+      payload: {
+        product_id: params.productId,
+        batch_id: params.batchId ?? null,
+        location: params.location,
+        coordinates: params.coordinates ?? null,
+        handler: params.handler,
+        action: params.action,
+        evidence: params.evidence,
+      },
+    });
+  }
+
+  async getCheckpoint(checkpointId: string): Promise<Checkpoint | null> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'inventory',
+      fn_name: 'get_checkpoint',
+      payload: checkpointId,
+    });
+  }
+
+  async getProvenanceChain(productId: string): Promise<ProvenanceChain | null> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'inventory',
+      fn_name: 'get_provenance_chain',
+      payload: productId,
+    });
+  }
+
+  async listCheckpoints(params?: {
+    productId?: string;
+    handler?: string;
+    limit?: number;
+  }): Promise<Checkpoint[]> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'inventory',
+      fn_name: 'list_checkpoints',
+      payload: {
+        product_id: params?.productId ?? null,
+        handler: params?.handler ?? null,
+        limit: params?.limit ?? null,
+      },
+    });
+  }
+
+  // -- Logistics zome (chain verification & handler trust) --
+
+  async verifyChain(productId: string): Promise<ChainVerification> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'logistics',
+      fn_name: 'verify_chain',
+      payload: productId,
+    });
+  }
+
+  async getHandlerProfile(handlerId: string): Promise<HandlerProfile> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'logistics',
+      fn_name: 'get_handler_profile',
+      payload: handlerId,
+    });
+  }
+
+  async isHandlerTrusted(handlerId: string, minimumScore?: number): Promise<boolean> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'logistics',
+      fn_name: 'is_handler_trusted',
+      payload: { handler_id: handlerId, minimum_score: minimumScore ?? 0.5 },
+    });
+  }
+
+  async updateHandler(handlerId: string, updates: Partial<HandlerProfile>): Promise<HandlerProfile> {
+    return this.client.callZome({
+      role_name: 'supplychain',
+      zome_name: 'logistics',
+      fn_name: 'update_handler',
+      payload: { handler_id: handlerId, ...updates },
+    });
+  }
+}
 
 // Default service instance
 let defaultService: SupplyChainProvenanceService | null = null;

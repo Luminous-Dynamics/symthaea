@@ -1,0 +1,1070 @@
+{
+  "metadata": {
+    "title": "CEFR Language Proficiency Framework",
+    "framework": "CEFR",
+    "source": "https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions",
+    "grade_level": "Grade5",
+    "subject_area": "Foreign Language",
+    "domain": "Foreign Language",
+    "version": "2020",
+    "total_standards": 30,
+    "domains": [
+      "Listening",
+      "Reading",
+      "Spoken Interaction",
+      "Spoken Production",
+      "Writing"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "CEFR (Council of Europe, 2001/2020 Companion Volume). 6 levels × 5 skills = 30 competency nodes."
+  },
+  "nodes": [
+    {
+      "id": "CEFR.A1.Listening",
+      "title": "A1 Listening (Breakthrough)",
+      "description": "Listening — Can understand and use familiar everyday expressions and very basic phrases at A1 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Listening",
+      "tags": [
+        "language",
+        "cefr",
+        "listening",
+        "a1"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A1",
+          "description": "Can understand and use familiar everyday expressions and very basic phrases",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A1.Reading",
+      "title": "A1 Reading (Breakthrough)",
+      "description": "Reading — Can understand and use familiar everyday expressions and very basic phrases at A1 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Reading",
+      "tags": [
+        "language",
+        "cefr",
+        "reading",
+        "a1"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A1",
+          "description": "Can understand and use familiar everyday expressions and very basic phrases",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A1.SpokenInteraction",
+      "title": "A1 Spoken Interaction (Breakthrough)",
+      "description": "Spoken Interaction — Can understand and use familiar everyday expressions and very basic phrases at A1 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Interaction",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken interaction",
+        "a1"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A1",
+          "description": "Can understand and use familiar everyday expressions and very basic phrases",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A1.SpokenProduction",
+      "title": "A1 Spoken Production (Breakthrough)",
+      "description": "Spoken Production — Can understand and use familiar everyday expressions and very basic phrases at A1 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Production",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken production",
+        "a1"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A1",
+          "description": "Can understand and use familiar everyday expressions and very basic phrases",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A1.Writing",
+      "title": "A1 Writing (Breakthrough)",
+      "description": "Writing — Can understand and use familiar everyday expressions and very basic phrases at A1 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Writing",
+      "tags": [
+        "language",
+        "cefr",
+        "writing",
+        "a1"
+      ],
+      "estimated_hours": 20,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A1",
+          "description": "Can understand and use familiar everyday expressions and very basic phrases",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A2.Listening",
+      "title": "A2 Listening (Waystage)",
+      "description": "Listening — Can understand sentences and frequently used expressions related to areas of most immediate relevance at A2 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Listening",
+      "tags": [
+        "language",
+        "cefr",
+        "listening",
+        "a2"
+      ],
+      "estimated_hours": 40,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A2",
+          "description": "Can understand sentences and frequently used expressions related to areas of most immediate relevance",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A2.Reading",
+      "title": "A2 Reading (Waystage)",
+      "description": "Reading — Can understand sentences and frequently used expressions related to areas of most immediate relevance at A2 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Reading",
+      "tags": [
+        "language",
+        "cefr",
+        "reading",
+        "a2"
+      ],
+      "estimated_hours": 40,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A2",
+          "description": "Can understand sentences and frequently used expressions related to areas of most immediate relevance",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A2.SpokenInteraction",
+      "title": "A2 Spoken Interaction (Waystage)",
+      "description": "Spoken Interaction — Can understand sentences and frequently used expressions related to areas of most immediate relevance at A2 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Interaction",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken interaction",
+        "a2"
+      ],
+      "estimated_hours": 40,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A2",
+          "description": "Can understand sentences and frequently used expressions related to areas of most immediate relevance",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A2.SpokenProduction",
+      "title": "A2 Spoken Production (Waystage)",
+      "description": "Spoken Production — Can understand sentences and frequently used expressions related to areas of most immediate relevance at A2 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Production",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken production",
+        "a2"
+      ],
+      "estimated_hours": 40,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A2",
+          "description": "Can understand sentences and frequently used expressions related to areas of most immediate relevance",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.A2.Writing",
+      "title": "A2 Writing (Waystage)",
+      "description": "Writing — Can understand sentences and frequently used expressions related to areas of most immediate relevance at A2 level.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Foreign Language",
+      "subdomain": "Writing",
+      "tags": [
+        "language",
+        "cefr",
+        "writing",
+        "a2"
+      ],
+      "estimated_hours": 40,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.A2",
+          "description": "Can understand sentences and frequently used expressions related to areas of most immediate relevance",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B1.Listening",
+      "title": "B1 Listening (Threshold)",
+      "description": "Listening — Can deal with most situations likely to arise while travelling in an area where the language is spoken at B1 level.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Foreign Language",
+      "subdomain": "Listening",
+      "tags": [
+        "language",
+        "cefr",
+        "listening",
+        "b1"
+      ],
+      "estimated_hours": 80,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B1",
+          "description": "Can deal with most situations likely to arise while travelling in an area where the language is spoken",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B1.Reading",
+      "title": "B1 Reading (Threshold)",
+      "description": "Reading — Can deal with most situations likely to arise while travelling in an area where the language is spoken at B1 level.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Foreign Language",
+      "subdomain": "Reading",
+      "tags": [
+        "language",
+        "cefr",
+        "reading",
+        "b1"
+      ],
+      "estimated_hours": 80,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B1",
+          "description": "Can deal with most situations likely to arise while travelling in an area where the language is spoken",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B1.SpokenInteraction",
+      "title": "B1 Spoken Interaction (Threshold)",
+      "description": "Spoken Interaction — Can deal with most situations likely to arise while travelling in an area where the language is spoken at B1 level.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Interaction",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken interaction",
+        "b1"
+      ],
+      "estimated_hours": 80,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B1",
+          "description": "Can deal with most situations likely to arise while travelling in an area where the language is spoken",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B1.SpokenProduction",
+      "title": "B1 Spoken Production (Threshold)",
+      "description": "Spoken Production — Can deal with most situations likely to arise while travelling in an area where the language is spoken at B1 level.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Production",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken production",
+        "b1"
+      ],
+      "estimated_hours": 80,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B1",
+          "description": "Can deal with most situations likely to arise while travelling in an area where the language is spoken",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B1.Writing",
+      "title": "B1 Writing (Threshold)",
+      "description": "Writing — Can deal with most situations likely to arise while travelling in an area where the language is spoken at B1 level.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Foreign Language",
+      "subdomain": "Writing",
+      "tags": [
+        "language",
+        "cefr",
+        "writing",
+        "b1"
+      ],
+      "estimated_hours": 80,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B1",
+          "description": "Can deal with most situations likely to arise while travelling in an area where the language is spoken",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B2.Listening",
+      "title": "B2 Listening (Vantage)",
+      "description": "Listening — Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible at B2 level.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Foreign Language",
+      "subdomain": "Listening",
+      "tags": [
+        "language",
+        "cefr",
+        "listening",
+        "b2"
+      ],
+      "estimated_hours": 120,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B2",
+          "description": "Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible",
+          "grade_level": "Grade11"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B2.Reading",
+      "title": "B2 Reading (Vantage)",
+      "description": "Reading — Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible at B2 level.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Foreign Language",
+      "subdomain": "Reading",
+      "tags": [
+        "language",
+        "cefr",
+        "reading",
+        "b2"
+      ],
+      "estimated_hours": 120,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B2",
+          "description": "Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible",
+          "grade_level": "Grade11"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B2.SpokenInteraction",
+      "title": "B2 Spoken Interaction (Vantage)",
+      "description": "Spoken Interaction — Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible at B2 level.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Interaction",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken interaction",
+        "b2"
+      ],
+      "estimated_hours": 120,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B2",
+          "description": "Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible",
+          "grade_level": "Grade11"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B2.SpokenProduction",
+      "title": "B2 Spoken Production (Vantage)",
+      "description": "Spoken Production — Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible at B2 level.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Production",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken production",
+        "b2"
+      ],
+      "estimated_hours": 120,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B2",
+          "description": "Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible",
+          "grade_level": "Grade11"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.B2.Writing",
+      "title": "B2 Writing (Vantage)",
+      "description": "Writing — Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible at B2 level.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Foreign Language",
+      "subdomain": "Writing",
+      "tags": [
+        "language",
+        "cefr",
+        "writing",
+        "b2"
+      ],
+      "estimated_hours": 120,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.B2",
+          "description": "Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers possible",
+          "grade_level": "Grade11"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C1.Listening",
+      "title": "C1 Listening (Effective Proficiency)",
+      "description": "Listening — Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes at C1 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Listening",
+      "tags": [
+        "language",
+        "cefr",
+        "listening",
+        "c1"
+      ],
+      "estimated_hours": 160,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C1",
+          "description": "Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes",
+          "grade_level": "Undergraduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C1.Reading",
+      "title": "C1 Reading (Effective Proficiency)",
+      "description": "Reading — Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes at C1 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Reading",
+      "tags": [
+        "language",
+        "cefr",
+        "reading",
+        "c1"
+      ],
+      "estimated_hours": 160,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C1",
+          "description": "Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes",
+          "grade_level": "Undergraduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C1.SpokenInteraction",
+      "title": "C1 Spoken Interaction (Effective Proficiency)",
+      "description": "Spoken Interaction — Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes at C1 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Interaction",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken interaction",
+        "c1"
+      ],
+      "estimated_hours": 160,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C1",
+          "description": "Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes",
+          "grade_level": "Undergraduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C1.SpokenProduction",
+      "title": "C1 Spoken Production (Effective Proficiency)",
+      "description": "Spoken Production — Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes at C1 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Production",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken production",
+        "c1"
+      ],
+      "estimated_hours": 160,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C1",
+          "description": "Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes",
+          "grade_level": "Undergraduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C1.Writing",
+      "title": "C1 Writing (Effective Proficiency)",
+      "description": "Writing — Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes at C1 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Writing",
+      "tags": [
+        "language",
+        "cefr",
+        "writing",
+        "c1"
+      ],
+      "estimated_hours": 160,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C1",
+          "description": "Can express ideas fluently and spontaneously without much searching for expressions; use language flexibly for social, academic, and professional purposes",
+          "grade_level": "Undergraduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C2.Listening",
+      "title": "C2 Listening (Mastery)",
+      "description": "Listening — Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently at C2 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Listening",
+      "tags": [
+        "language",
+        "cefr",
+        "listening",
+        "c2"
+      ],
+      "estimated_hours": 200,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C2",
+          "description": "Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently",
+          "grade_level": "Graduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C2.Reading",
+      "title": "C2 Reading (Mastery)",
+      "description": "Reading — Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently at C2 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Reading",
+      "tags": [
+        "language",
+        "cefr",
+        "reading",
+        "c2"
+      ],
+      "estimated_hours": 200,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C2",
+          "description": "Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently",
+          "grade_level": "Graduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C2.SpokenInteraction",
+      "title": "C2 Spoken Interaction (Mastery)",
+      "description": "Spoken Interaction — Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently at C2 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Interaction",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken interaction",
+        "c2"
+      ],
+      "estimated_hours": 200,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C2",
+          "description": "Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently",
+          "grade_level": "Graduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C2.SpokenProduction",
+      "title": "C2 Spoken Production (Mastery)",
+      "description": "Spoken Production — Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently at C2 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Spoken Production",
+      "tags": [
+        "language",
+        "cefr",
+        "spoken production",
+        "c2"
+      ],
+      "estimated_hours": 200,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C2",
+          "description": "Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently",
+          "grade_level": "Graduate"
+        }
+      ]
+    },
+    {
+      "id": "CEFR.C2.Writing",
+      "title": "C2 Writing (Mastery)",
+      "description": "Writing — Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently at C2 level.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "Foreign Language",
+      "subdomain": "Writing",
+      "tags": [
+        "language",
+        "cefr",
+        "writing",
+        "c2"
+      ],
+      "estimated_hours": 200,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Foreign Language",
+      "academic_standards": [
+        {
+          "framework": "CEFR",
+          "code": "CEFR.C2",
+          "description": "Can understand with ease virtually everything heard or read; summarize information from different sources, reconstructing arguments coherently",
+          "grade_level": "Graduate"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CEFR.A1.Listening",
+      "to": "CEFR.A2.Listening",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "A2 Listening requires A1 proficiency"
+    },
+    {
+      "from": "CEFR.A1.Reading",
+      "to": "CEFR.A2.Reading",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "A2 Reading requires A1 proficiency"
+    },
+    {
+      "from": "CEFR.A1.SpokenInteraction",
+      "to": "CEFR.A2.SpokenInteraction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "A2 Spoken Interaction requires A1 proficiency"
+    },
+    {
+      "from": "CEFR.A1.SpokenProduction",
+      "to": "CEFR.A2.SpokenProduction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "A2 Spoken Production requires A1 proficiency"
+    },
+    {
+      "from": "CEFR.A1.Writing",
+      "to": "CEFR.A2.Writing",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "A2 Writing requires A1 proficiency"
+    },
+    {
+      "from": "CEFR.A2.Listening",
+      "to": "CEFR.B1.Listening",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B1 Listening requires A2 proficiency"
+    },
+    {
+      "from": "CEFR.A2.Reading",
+      "to": "CEFR.B1.Reading",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B1 Reading requires A2 proficiency"
+    },
+    {
+      "from": "CEFR.A2.SpokenInteraction",
+      "to": "CEFR.B1.SpokenInteraction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B1 Spoken Interaction requires A2 proficiency"
+    },
+    {
+      "from": "CEFR.A2.SpokenProduction",
+      "to": "CEFR.B1.SpokenProduction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B1 Spoken Production requires A2 proficiency"
+    },
+    {
+      "from": "CEFR.A2.Writing",
+      "to": "CEFR.B1.Writing",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B1 Writing requires A2 proficiency"
+    },
+    {
+      "from": "CEFR.B1.Listening",
+      "to": "CEFR.B2.Listening",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B2 Listening requires B1 proficiency"
+    },
+    {
+      "from": "CEFR.B1.Reading",
+      "to": "CEFR.B2.Reading",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B2 Reading requires B1 proficiency"
+    },
+    {
+      "from": "CEFR.B1.SpokenInteraction",
+      "to": "CEFR.B2.SpokenInteraction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B2 Spoken Interaction requires B1 proficiency"
+    },
+    {
+      "from": "CEFR.B1.SpokenProduction",
+      "to": "CEFR.B2.SpokenProduction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B2 Spoken Production requires B1 proficiency"
+    },
+    {
+      "from": "CEFR.B1.Writing",
+      "to": "CEFR.B2.Writing",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "B2 Writing requires B1 proficiency"
+    },
+    {
+      "from": "CEFR.B2.Listening",
+      "to": "CEFR.C1.Listening",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C1 Listening requires B2 proficiency"
+    },
+    {
+      "from": "CEFR.B2.Reading",
+      "to": "CEFR.C1.Reading",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C1 Reading requires B2 proficiency"
+    },
+    {
+      "from": "CEFR.B2.SpokenInteraction",
+      "to": "CEFR.C1.SpokenInteraction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C1 Spoken Interaction requires B2 proficiency"
+    },
+    {
+      "from": "CEFR.B2.SpokenProduction",
+      "to": "CEFR.C1.SpokenProduction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C1 Spoken Production requires B2 proficiency"
+    },
+    {
+      "from": "CEFR.B2.Writing",
+      "to": "CEFR.C1.Writing",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C1 Writing requires B2 proficiency"
+    },
+    {
+      "from": "CEFR.C1.Listening",
+      "to": "CEFR.C2.Listening",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C2 Listening requires C1 proficiency"
+    },
+    {
+      "from": "CEFR.C1.Reading",
+      "to": "CEFR.C2.Reading",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C2 Reading requires C1 proficiency"
+    },
+    {
+      "from": "CEFR.C1.SpokenInteraction",
+      "to": "CEFR.C2.SpokenInteraction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C2 Spoken Interaction requires C1 proficiency"
+    },
+    {
+      "from": "CEFR.C1.SpokenProduction",
+      "to": "CEFR.C2.SpokenProduction",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C2 Spoken Production requires C1 proficiency"
+    },
+    {
+      "from": "CEFR.C1.Writing",
+      "to": "CEFR.C2.Writing",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "C2 Writing requires C1 proficiency"
+    }
+  ]
+}

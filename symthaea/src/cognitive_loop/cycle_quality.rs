@@ -168,7 +168,7 @@ impl CognitiveLoopService {
         // nudges can pin it to 0.0 or 1.0. Science: Homeostatic control of exploration.
         let start64 = exploration_urge_start as f64;
         let clamped = self
-            .curiosity_drive
+            .curiosity_drive()
             .exploration_urge
             .clamp((start64 - 0.5).max(0.0), (start64 + 0.5).min(1.0));
         self.set_exploration("homeostasis_budget_clamp", clamped as f32);

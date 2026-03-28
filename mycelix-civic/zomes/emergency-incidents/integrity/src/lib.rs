@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Incidents Integrity Zome
 //! Defines entry types and validation for disaster incidents
 
@@ -142,6 +145,8 @@ pub enum LinkTypes {
     DisasterByType,
     DisasterToUpdate,
     AgentToDisaster,
+    /// Geohash anchor to entry for spatial indexing
+    GeoIndex,
 }
 
 #[hdk_extern]
@@ -213,6 +218,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if tag_len > 256 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::GeoIndex => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "GeoIndex link tag too long (max 256 bytes)".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -1544,6 +1557,14 @@ mod tests {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "GeoIndex link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         }
     }
 
@@ -1689,6 +1710,10 @@ mod tests {
         )));
         assert!(is_invalid(validate_create_link_tag(
             LinkTypes::AgentToDisaster,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(validate_create_link_tag(
+            LinkTypes::GeoIndex,
             huge_tag.clone()
         )));
     }

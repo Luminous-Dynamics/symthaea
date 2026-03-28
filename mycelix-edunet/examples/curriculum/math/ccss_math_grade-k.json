@@ -1,0 +1,681 @@
+{
+  "metadata": {
+    "title": "Grade K",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Kindergarten",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 22,
+    "domains": [
+      "Geometry",
+      "Measurement and Data",
+      "Number and Operations in Base Ten",
+      "Operations and Algebraic Thinking",
+      "Counting and Cardinality",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-k). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.K.G.B.6",
+      "title": "Compose simple shapes to form larger shapes",
+      "description": "Compose simple shapes to form larger shapes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.G.B.6",
+          "description": "Compose simple shapes to form larger shapes.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.G.B.5",
+      "title": "Model shapes in the world by building shapes from components (e",
+      "description": "Model shapes in the world by building shapes from components (e.g., sticks and clay balls) and drawing shapes.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.G.B.5",
+          "description": "Model shapes in the world by building shapes from components (e.g., sticks and clay balls) and drawing shapes.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.G.B.4",
+      "title": "Analyze and compare two- and three-dimensional shapes, in different sizes and...",
+      "description": "Analyze and compare two- and three-dimensional shapes, in different sizes and orientations, using informal language to describe their similarities, differences, parts (e.g., number of sides and vertices/\"corners\") and other attributes (e.g., having sides of equal length).",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.G.B.4",
+          "description": "Analyze and compare two- and three-dimensional shapes, in different sizes and orientations, using informal language to describe their similarities, differences, parts (e.g., number of sides and vertices/\"corners\") and other attributes (e.g., having sides of equal length).",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.G.A.3",
+      "title": "Identify shapes as two-dimensional (lying in a plane, \"flat\") or three-dimens...",
+      "description": "Identify shapes as two-dimensional (lying in a plane, \"flat\") or three-dimensional (\"solid\").",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.G.A.3",
+          "description": "Identify shapes as two-dimensional (lying in a plane, \"flat\") or three-dimensional (\"solid\").",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.G.A.2",
+      "title": "Correctly name shapes regardless of their orientations or overall size",
+      "description": "Correctly name shapes regardless of their orientations or overall size.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.G.A.2",
+          "description": "Correctly name shapes regardless of their orientations or overall size.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.G.A.1",
+      "title": "Describe objects in the environment using names of shapes, and describe the r...",
+      "description": "Describe objects in the environment using names of shapes, and describe the relative positions of these objects using terms such as above, below, beside, in front of, behind, and next to.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.G.A.1",
+          "description": "Describe objects in the environment using names of shapes, and describe the relative positions of these objects using terms such as above, below, beside, in front of, behind, and next to.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.MD.B.3",
+      "title": "Classify objects into given categories",
+      "description": "Classify objects into given categories; count the numbers of objects in each category and sort the categories by count.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.MD.B.3",
+          "description": "Classify objects into given categories; count the numbers of objects in each category and sort the categories by count.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.MD.A.2",
+      "title": "Directly compare two objects with a measurable attribute in common, to see wh...",
+      "description": "Directly compare two objects with a measurable attribute in common, to see which object has \"more of\"/\"less of\" the attribute, and describe the difference.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.MD.A.2",
+          "description": "Directly compare two objects with a measurable attribute in common, to see which object has \"more of\"/\"less of\" the attribute, and describe the difference.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.MD.A.1",
+      "title": "Describe measurable attributes of objects, such as length or weight",
+      "description": "Describe measurable attributes of objects, such as length or weight. Describe several measurable attributes of a single object.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.MD.A.1",
+          "description": "Describe measurable attributes of objects, such as length or weight. Describe several measurable attributes of a single object.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.NBT.A.1",
+      "title": "Compose and decompose numbers from 11 to 19 into ten ones and some further on...",
+      "description": "Compose and decompose numbers from 11 to 19 into ten ones and some further ones, e.g., by using objects or drawings, and record each composition or decomposition by a drawing or equation (e.g., 18 = 10 + 8); understand that these numbers are composed of ten ones and one, two, three, four, five, six, seven, eight, or nine ones.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.NBT.A.1",
+          "description": "Compose and decompose numbers from 11 to 19 into ten ones and some further ones, e.g., by using objects or drawings, and record each composition or decomposition by a drawing or equation (e.g., 18 = 10 + 8); understand that these numbers are composed of ten ones and one, two, three, four, five, six, seven, eight, or nine ones.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.OA.A.5",
+      "title": "Fluently add and subtract within 5",
+      "description": "Fluently add and subtract within 5.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.OA.A.5",
+          "description": "Fluently add and subtract within 5.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.OA.A.4",
+      "title": "For any number from 1 to 9, find the number that makes 10 when added to the g...",
+      "description": "For any number from 1 to 9, find the number that makes 10 when added to the given number, e.g., by using objects or drawings, and record the answer with a drawing or equation.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.OA.A.4",
+          "description": "For any number from 1 to 9, find the number that makes 10 when added to the given number, e.g., by using objects or drawings, and record the answer with a drawing or equation.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.OA.A.3",
+      "title": "Decompose numbers less than or equal to 10 into pairs in more than one way, e",
+      "description": "Decompose numbers less than or equal to 10 into pairs in more than one way, e.g., by using objects or drawings, and record each decomposition by a drawing or equation (e.g., 5 = 2 + 3 and 5 = 4 + 1).",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.OA.A.3",
+          "description": "Decompose numbers less than or equal to 10 into pairs in more than one way, e.g., by using objects or drawings, and record each decomposition by a drawing or equation (e.g., 5 = 2 + 3 and 5 = 4 + 1).",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.OA.A.2",
+      "title": "Solve addition and subtraction word problems, and add and subtract within 10, e",
+      "description": "Solve addition and subtraction word problems, and add and subtract within 10, e.g., by using objects or drawings to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.OA.A.2",
+          "description": "Solve addition and subtraction word problems, and add and subtract within 10, e.g., by using objects or drawings to represent the problem.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.OA.A.1",
+      "title": "Represent addition and subtraction with objects, fingers, mental images, draw...",
+      "description": "Represent addition and subtraction with objects, fingers, mental images, drawings, sounds (e.g., claps), acting out situations, verbal explanations, expressions, or equations.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "addition",
+        "subtraction",
+        "equations",
+        "expressions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.OA.A.1",
+          "description": "Represent addition and subtraction with objects, fingers, mental images, drawings, sounds (e.g., claps), acting out situations, verbal explanations, expressions, or equations.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.C.7",
+      "title": "Compare two numbers between 1 and 10 presented as written numerals",
+      "description": "Compare two numbers between 1 and 10 presented as written numerals.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.C.7",
+          "description": "Compare two numbers between 1 and 10 presented as written numerals.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.C.6",
+      "title": "Identify whether the number of objects in one group is greater than, less tha...",
+      "description": "Identify whether the number of objects in one group is greater than, less than, or equal to the number of objects in another group, e.g., by using matching and counting strategies.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.C.6",
+          "description": "Identify whether the number of objects in one group is greater than, less than, or equal to the number of objects in another group, e.g., by using matching and counting strategies.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.B.5",
+      "title": "Count to answer \"how many?\" questions about as many as 20 things arranged in ...",
+      "description": "Count to answer \"how many?\" questions about as many as 20 things arranged in a line, a rectangular array, or a circle, or as many as 10 things in a scattered configuration; given a number from 1—20, count out that many objects.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.B.5",
+          "description": "Count to answer \"how many?\" questions about as many as 20 things arranged in a line, a rectangular array, or a circle, or as many as 10 things in a scattered configuration; given a number from 1—20, count out that many objects.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.B.4",
+      "title": "Understand the relationship between numbers and quantities",
+      "description": "Understand the relationship between numbers and quantities; connect counting to cardinality.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.B.4",
+          "description": "Understand the relationship between numbers and quantities; connect counting to cardinality.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.A.3",
+      "title": "Write numbers from 0 to 20",
+      "description": "Write numbers from 0 to 20. Represent a number of objects with a written numeral 0-20 (with 0 representing a count of no objects).",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.A.3",
+          "description": "Write numbers from 0 to 20. Represent a number of objects with a written numeral 0-20 (with 0 representing a count of no objects).",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.A.2",
+      "title": "Count forward beginning from a given number within the known sequence (instea...",
+      "description": "Count forward beginning from a given number within the known sequence (instead of having to begin at 1).",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.A.2",
+          "description": "Count forward beginning from a given number within the known sequence (instead of having to begin at 1).",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.K.CC.A.1",
+      "title": "Count to 100 by ones and by tens",
+      "description": "Count to 100 by ones and by tens.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Counting and Cardinality",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.K.CC.A.1",
+          "description": "Count to 100 by ones and by tens.",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.K.OA.A.1",
+      "to": "CCSS.Math.Content.K.OA.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.OA.A.1 is a prerequisite for CCSS.Math.Content.K.OA.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.OA.A.2",
+      "to": "CCSS.Math.Content.K.OA.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.OA.A.2 is a prerequisite for CCSS.Math.Content.K.OA.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.OA.A.3",
+      "to": "CCSS.Math.Content.K.OA.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.OA.A.3 is a prerequisite for CCSS.Math.Content.K.OA.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.OA.A.4",
+      "to": "CCSS.Math.Content.K.OA.A.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.OA.A.4 is a prerequisite for CCSS.Math.Content.K.OA.A.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.CC.A.1",
+      "to": "CCSS.Math.Content.K.CC.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.CC.A.1 is a prerequisite for CCSS.Math.Content.K.CC.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.CC.A.2",
+      "to": "CCSS.Math.Content.K.CC.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.CC.A.2 is a prerequisite for CCSS.Math.Content.K.CC.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.CC.A.3",
+      "to": "CCSS.Math.Content.K.CC.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.CC.A.3 is a prerequisite for CCSS.Math.Content.K.CC.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.CC.B.4",
+      "to": "CCSS.Math.Content.K.CC.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.CC.B.4 is a prerequisite for CCSS.Math.Content.K.CC.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.CC.B.5",
+      "to": "CCSS.Math.Content.K.CC.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.CC.B.5 is a prerequisite for CCSS.Math.Content.K.CC.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.CC.C.6",
+      "to": "CCSS.Math.Content.K.CC.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.CC.C.6 is a prerequisite for CCSS.Math.Content.K.CC.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.MD.A.1",
+      "to": "CCSS.Math.Content.K.MD.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.MD.A.1 is a prerequisite for CCSS.Math.Content.K.MD.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.MD.A.2",
+      "to": "CCSS.Math.Content.K.MD.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.MD.A.2 is a prerequisite for CCSS.Math.Content.K.MD.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.G.A.1",
+      "to": "CCSS.Math.Content.K.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.G.A.1 is a prerequisite for CCSS.Math.Content.K.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.G.A.2",
+      "to": "CCSS.Math.Content.K.G.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.G.A.2 is a prerequisite for CCSS.Math.Content.K.G.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.G.A.3",
+      "to": "CCSS.Math.Content.K.G.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.G.A.3 is a prerequisite for CCSS.Math.Content.K.G.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.G.B.4",
+      "to": "CCSS.Math.Content.K.G.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.G.B.4 is a prerequisite for CCSS.Math.Content.K.G.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.K.G.B.5",
+      "to": "CCSS.Math.Content.K.G.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.K.G.B.5 is a prerequisite for CCSS.Math.Content.K.G.B.6 within the same domain."
+    }
+  ]
+}

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Incidents Coordinator Zome
 //! Business logic for disaster declaration and lifecycle management
 
@@ -45,6 +48,10 @@ pub fn declare_disaster(input: DeclareDisasterInput) -> ExternResult<Record> {
 
     let agent_info = agent_info()?;
     let now = sys_time()?;
+
+    // Capture geo coordinates before affected_area is moved
+    let disaster_center_lat = input.affected_area.center_lat;
+    let disaster_center_lon = input.affected_area.center_lon;
 
     let disaster = Disaster {
         id: input.id.clone(),
@@ -96,6 +103,22 @@ pub fn declare_disaster(input: DeclareDisasterInput) -> ExternResult<Record> {
         action_hash.clone(),
         LinkTypes::AgentToDisaster,
         (),
+    )?;
+
+    // Geo-spatial index for disaster center
+    // Coordinates captured before affected_area was moved into the disaster entry
+    let geo_hash = commons_types::geo::geohash_encode(
+        disaster_center_lat,
+        disaster_center_lon,
+        6,
+    );
+    let geo_anchor_str = format!("geo:{}", geo_hash);
+    create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+    create_link(
+        anchor_hash(&geo_anchor_str)?,
+        action_hash.clone(),
+        LinkTypes::GeoIndex,
+        geo_hash.as_bytes().to_vec(),
     )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(

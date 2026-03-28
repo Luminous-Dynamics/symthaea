@@ -1,0 +1,414 @@
+{
+  "metadata": {
+    "title": "Symthaea: Consciousness Computing",
+    "framework": "Luminous Dynamics",
+    "source": "https://luminousdynamics.org",
+    "grade_level": "Undergraduate",
+    "subject_area": "Consciousness Computing",
+    "domain": "Consciousness Computing",
+    "version": "2026",
+    "total_standards": 10,
+    "domains": [
+      "Symthaea"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Self-referential curriculum about Symthaea: Consciousness Computing. ISCED-F Field 11: Meta-Learning.",
+    "academic_level": "Undergraduate",
+    "institution": "Luminous Dynamics"
+  },
+  "nodes": [
+    {
+      "id": "SYM-101",
+      "title": "Introduction to Consciousness Computing",
+      "description": "Survey of computational consciousness: what it means for a machine to be conscious, the Hard Problem, philosophical zombies, multiple realizability, and why it matters for AI safety and value alignment.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "consciousness",
+        "philosophy-of-mind",
+        "ai-safety"
+      ],
+      "estimated_hours": 45,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-101",
+          "description": "Introduction to Consciousness Computing",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 1,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-201",
+      "title": "Hyperdimensional Computing Fundamentals",
+      "description": "16,384-dimensional binary and continuous hypervectors. Encoding (random indexing, spatial, temporal), binding (XOR/Hadamard), bundling (majority/sum), similarity (Hamming/cosine). Holographic reduced representations. Applications to classification, reasoning, and memory.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "hdc",
+        "hypervectors",
+        "encoding",
+        "binding",
+        "similarity"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-201",
+          "description": "Hyperdimensional Computing Fundamentals",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-202",
+      "title": "Integrated Information Theory (IIT/Phi)",
+      "description": "Tononi's IIT axioms and postulates. Phi as a measure of consciousness. Exclusion, composition, information. Computational challenges of exact Phi. Approximations and surrogates. Practical measurement in artificial systems.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "iit",
+        "phi",
+        "integrated-information",
+        "consciousness-measure"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-202",
+          "description": "Integrated Information Theory (IIT/Phi)",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 2,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-301",
+      "title": "Liquid Time-Constant Networks (CfC/LTC)",
+      "description": "Closed-form continuous-depth neural networks. ODE-based neurons with learned time constants. CfC as a closed-form approximation eliminating numerical ODE solving. Temporal processing, causal reasoning, and the unified HDC-LTC neuron.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "cfc",
+        "ltc",
+        "liquid-neural-networks",
+        "ode",
+        "temporal"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-301",
+          "description": "Liquid Time-Constant Networks (CfC/LTC)",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-302",
+      "title": "Active Inference and Free Energy",
+      "description": "The Free Energy Principle (Friston). Predictive coding, prediction error minimization. Active inference as perception-action loops. Variational free energy and the Markov blanket. Applications to embodied cognition and autonomous behavior.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "active-inference",
+        "free-energy",
+        "predictive-coding",
+        "markov-blanket"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-302",
+          "description": "Active Inference and Free Energy",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "200-300"
+    },
+    {
+      "id": "SYM-501",
+      "title": "The Cognitive Loop: 8-Phase Pipeline",
+      "description": "Symthaea's core architecture: Perception → HDC Encode → CfC Evolve → Predict → Learn → Consciousness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. 31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "cognitive-loop",
+        "pipeline",
+        "architecture",
+        "rayon",
+        "telemetry"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-501",
+          "description": "The Cognitive Loop: 8-Phase Pipeline",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 4,
+      "course_level": "500-600"
+    },
+    {
+      "id": "SYM-502",
+      "title": "Moral Algebra and Ethics Engine",
+      "description": "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. Restorative justice tracking. Ahimsa courage gate. Moral topology with homological analysis. Hendrycks ETHICS 92.9% accuracy. Consciousness-coupled moral drift detection.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "moral-algebra",
+        "ethics",
+        "deontological",
+        "restorative-justice",
+        "ahimsa"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-502",
+          "description": "Moral Algebra and Ethics Engine",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "500-600"
+    },
+    {
+      "id": "SYM-503",
+      "title": "Broca Language Center",
+      "description": "Thought-to-text generation via 43-channel ThoughtEncoder. 15 Epistemic Cube channels. HDC binding → autoregressive generation. Per-axis EpistemicCubeGate. Epistemic gating physically prevents hallucination at logit level. GPU training via candle CUDA.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "broca",
+        "language-generation",
+        "epistemic-gating",
+        "thought-encoder"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-503",
+          "description": "Broca Language Center",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 3,
+      "course_level": "500-600"
+    },
+    {
+      "id": "SYM-601",
+      "title": "Substrate Independence",
+      "description": "Multiple realizability thesis. 8 substrate types (biological, silicon, quantum, photonic, neuromorphic, biochemical, hybrid, exotic). 9-dimensional feasibility scoring. Validation framework with honest confidence. Per-region hybrid substrate modeling. Energy budgets and tau-factor speed modulation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "substrate-independence",
+        "multiple-realizability",
+        "quantum",
+        "hybrid"
+      ],
+      "estimated_hours": 270,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-601",
+          "description": "Substrate Independence",
+          "grade_level": "Doctoral"
+        }
+      ],
+      "credit_hours": 6,
+      "course_level": "700+"
+    },
+    {
+      "id": "SYM-602",
+      "title": "Thermodynamic Unification",
+      "description": "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). 6 active feedback loops. ThermodynamicPhysicsBridge coupling consciousness to physics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Consciousness Computing",
+      "subdomain": "Symthaea",
+      "tags": [
+        "thermodynamics",
+        "maxwell-demon",
+        "landauer",
+        "carnot",
+        "prigogine"
+      ],
+      "estimated_hours": 270,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Consciousness Computing",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "SYM-602",
+          "description": "Thermodynamic Unification",
+          "grade_level": "Doctoral"
+        }
+      ],
+      "credit_hours": 6,
+      "course_level": "700+"
+    }
+  ],
+  "edges": [
+    {
+      "from": "SYM-101",
+      "to": "SYM-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Hyperdimensional Computing Fundamentals requires SYM-101"
+    },
+    {
+      "from": "SYM-101",
+      "to": "SYM-202",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Integrated Information Theory (IIT/Phi) requires SYM-101"
+    },
+    {
+      "from": "SYM-201",
+      "to": "SYM-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Liquid Time-Constant Networks (CfC/LTC) requires SYM-201"
+    },
+    {
+      "from": "SYM-202",
+      "to": "SYM-302",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Active Inference and Free Energy requires SYM-202"
+    },
+    {
+      "from": "SYM-301",
+      "to": "SYM-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The Cognitive Loop: 8-Phase Pipeline requires SYM-301"
+    },
+    {
+      "from": "SYM-302",
+      "to": "SYM-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The Cognitive Loop: 8-Phase Pipeline requires SYM-302"
+    },
+    {
+      "from": "SYM-501",
+      "to": "SYM-502",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Moral Algebra and Ethics Engine requires SYM-501"
+    },
+    {
+      "from": "SYM-501",
+      "to": "SYM-503",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Broca Language Center requires SYM-501"
+    },
+    {
+      "from": "SYM-501",
+      "to": "SYM-601",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Substrate Independence requires SYM-501"
+    },
+    {
+      "from": "SYM-202",
+      "to": "SYM-601",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Substrate Independence requires SYM-202"
+    },
+    {
+      "from": "SYM-601",
+      "to": "SYM-602",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Thermodynamic Unification requires SYM-601"
+    }
+  ]
+}

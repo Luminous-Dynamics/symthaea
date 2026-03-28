@@ -274,6 +274,7 @@ impl CognitiveLoopService {
         let dissipative_health = consciousness_metrics.dissipative_health
             * (1.0
                 - self
+                    .sensorimotor
                     .somatic_bridge
                     .to_interoceptive_signals()
                     .dissipative_health_penalty);

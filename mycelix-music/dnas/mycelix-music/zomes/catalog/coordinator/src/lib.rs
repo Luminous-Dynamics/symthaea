@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Catalog Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Catalog Coordinator Zome
 //!
 //! Provides the callable functions for managing the music catalog.
 //! Handles song uploads, album creation, and artist profile management.
@@ -17,7 +18,7 @@ fn require_consciousness(
     requirement: &GovernanceRequirement,
     action_name: &str,
 ) -> ExternResult<()> {
-    gate_consciousness("music_bridge", requirement, action_name)
+    gate_consciousness("music_bridge", requirement, action_name).map(|_| ())
 }
 
 /// Helper to ensure a path exists and return its entry hash

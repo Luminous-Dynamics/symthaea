@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Sovereign Name Resolution — Decentralized DNS Alternative
 //!
 //! Resolves human-readable mesh names (e.g., `mycelix://joburg/water/tank-7`)
@@ -25,6 +28,9 @@ pub const DEFAULT_CACHE_SIZE: usize = 256;
 pub const DEFAULT_NAME_TTL_SECS: u64 = 365 * 24 * 3600;
 
 /// Resolved endpoint types.
+///
+/// Represents the transport-level address that a mesh name resolves to.
+/// New variants can be added as additional naming systems are integrated.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ResolvedEndpoint {
     /// Iroh node address (QUIC transport).
@@ -35,6 +41,15 @@ pub enum ResolvedEndpoint {
     HolochainAgent(String),
     /// IP address (fallback for hybrid networks).
     IpAddr(String),
+    /// ENS name (e.g., "mycelix.eth") — resolved via Ethereum Name Service.
+    ///
+    /// Integration point for decentralized naming. The string contains either
+    /// the raw ENS name (for deferred resolution) or the resolved address.
+    EnsName(String),
+    /// Content-addressed resource (IPFS CID, IPLD link, etc.).
+    ///
+    /// Used for immutable content references resolved via decentralized storage.
+    ContentAddress(String),
 }
 
 impl ResolvedEndpoint {
@@ -48,6 +63,8 @@ impl ResolvedEndpoint {
             }
             Self::HolochainAgent(key) => format!("hc:{}", &key[..8.min(key.len())]),
             Self::IpAddr(addr) => format!("ip:{}", addr),
+            Self::EnsName(name) => format!("ens:{}", name),
+            Self::ContentAddress(cid) => format!("cid:{}", &cid[..12.min(cid.len())]),
         }
     }
 }
@@ -348,6 +365,28 @@ impl NameResolver {
     pub fn expire_cache(&mut self, now_secs: u64) {
         self.cache.retain(|_, entry| !entry.is_expired(now_secs));
     }
+
+    /// Attempt external name resolution (ENS, Handshake, etc.).
+    ///
+    /// This is the **4th tier** in the resolution chain:
+    /// 1. Cache lookup (instant)
+    /// 2. Mesh broadcast (LAN peers)
+    /// 3. DHT query (Holochain)
+    /// 4. External decentralized naming (ENS, HNS) — **this method**
+    ///
+    /// Currently returns `None` — wiring to an Ethereum provider or HNS
+    /// resolver is out of scope. This establishes the integration point
+    /// for future ENS/Handshake resolution.
+    ///
+    /// When implemented, this should:
+    /// - Check if the name ends in `.eth` → resolve via ENS
+    /// - Check if the name ends in a Handshake TLD → resolve via HNS
+    /// - Cache successful resolutions with appropriate TTL
+    pub fn resolve_external(&mut self, _name: &MeshName, _now_secs: u64) -> Option<ResolvedEndpoint> {
+        // Integration point for ENS/Handshake resolution.
+        // Requires an Ethereum provider dependency (ethers-rs or alloy).
+        None
+    }
 }
 
 impl Default for NameResolver {
@@ -516,6 +555,12 @@ mod tests {
         assert!(ResolvedEndpoint::IpAddr("1.2.3.4".to_string())
             .display()
             .starts_with("ip:"));
+        assert!(ResolvedEndpoint::EnsName("mycelix.eth".to_string())
+            .display()
+            .starts_with("ens:"));
+        assert!(ResolvedEndpoint::ContentAddress("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string())
+            .display()
+            .starts_with("cid:"));
     }
 
     #[test]
@@ -531,5 +576,32 @@ mod tests {
         resolver.cache_resolution(&name, ResolvedEndpoint::IpAddr("x".to_string()), 60, 1000);
         resolver.expire_cache(1100);
         assert_eq!(resolver.cache_size(), 0);
+    }
+
+    #[test]
+    fn test_ens_endpoint_cache() {
+        let mut resolver = NameResolver::new(16);
+        let name = MeshName::parse("defi/bridge").unwrap();
+        let endpoint = ResolvedEndpoint::EnsName("mycelix.eth".to_string());
+        resolver.cache_resolution(&name, endpoint.clone(), 3600, 1000);
+        let resolved = resolver.resolve_cached(&name, 1000);
+        assert_eq!(resolved, Some(endpoint));
+    }
+
+    #[test]
+    fn test_content_address_endpoint() {
+        let cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG".to_string();
+        let endpoint = ResolvedEndpoint::ContentAddress(cid.clone());
+        let display = endpoint.display();
+        assert!(display.starts_with("cid:"));
+        assert_eq!(display.len(), 4 + 12); // "cid:" + 12 chars truncated
+    }
+
+    #[test]
+    fn test_resolve_external_stub() {
+        let mut resolver = NameResolver::new(16);
+        let name = MeshName::parse("test/external").unwrap();
+        // Stub returns None — integration point for future ENS/HNS
+        assert!(resolver.resolve_external(&name, 1000).is_none());
     }
 }

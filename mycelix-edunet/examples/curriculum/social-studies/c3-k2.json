@@ -1,0 +1,416 @@
+{
+  "metadata": {
+    "title": "C3 Social Studies K-2",
+    "framework": "C3 Framework",
+    "source": "https://www.socialstudies.org/standards/c3",
+    "grade_level": "Kindergarten",
+    "subject_area": "Social Studies",
+    "domain": "Social Studies",
+    "version": "2013",
+    "total_standards": 12,
+    "domains": [
+      "Civics",
+      "Economics",
+      "Geography",
+      "History"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Curated from C3 Framework for Social Studies State Standards (NCSS, 2013)."
+  },
+  "nodes": [
+    {
+      "id": "C3.Civics.K-2.1",
+      "title": "Civic ideals and practices",
+      "description": "Understand the foundations of government and civic participation",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Civics",
+      "tags": [
+        "civics",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Civics.K-2.1",
+          "description": "Understand the foundations of government and civic participation",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Civics.K-2.2",
+      "title": "Rights and responsibilities",
+      "description": "Analyze rights, responsibilities, and roles of citizens",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Civics",
+      "tags": [
+        "civics",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Civics.K-2.2",
+          "description": "Analyze rights, responsibilities, and roles of citizens",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Civics.K-2.3",
+      "title": "Government structures",
+      "description": "Examine how governments are organized and function",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Civics",
+      "tags": [
+        "civics",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Civics.K-2.3",
+          "description": "Examine how governments are organized and function",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Economics.K-2.1",
+      "title": "Economic decision making",
+      "description": "Apply economic reasoning to personal and societal decisions",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Economics.K-2.1",
+          "description": "Apply economic reasoning to personal and societal decisions",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Economics.K-2.2",
+      "title": "Markets and exchange",
+      "description": "Understand how markets coordinate economic activity",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Economics.K-2.2",
+          "description": "Understand how markets coordinate economic activity",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Economics.K-2.3",
+      "title": "National and global economy",
+      "description": "Analyze economic systems and their interconnections",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Economics.K-2.3",
+          "description": "Analyze economic systems and their interconnections",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Geography.K-2.1",
+      "title": "Spatial thinking",
+      "description": "Use geographic tools to analyze spatial patterns",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Geography",
+      "tags": [
+        "geography",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Geography.K-2.1",
+          "description": "Use geographic tools to analyze spatial patterns",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Geography.K-2.2",
+      "title": "Human-environment interaction",
+      "description": "Examine relationships between people and their environment",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Geography",
+      "tags": [
+        "geography",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Geography.K-2.2",
+          "description": "Examine relationships between people and their environment",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.Geography.K-2.3",
+      "title": "Movement and regions",
+      "description": "Understand migration, trade, and cultural diffusion",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "Geography",
+      "tags": [
+        "geography",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.Geography.K-2.3",
+          "description": "Understand migration, trade, and cultural diffusion",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.History.K-2.1",
+      "title": "Historical thinking",
+      "description": "Analyze change and continuity over time",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "History",
+      "tags": [
+        "history",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.History.K-2.1",
+          "description": "Analyze change and continuity over time",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.History.K-2.2",
+      "title": "Historical sources",
+      "description": "Evaluate primary and secondary sources for evidence",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "History",
+      "tags": [
+        "history",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.History.K-2.2",
+          "description": "Evaluate primary and secondary sources for evidence",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    },
+    {
+      "id": "C3.History.K-2.3",
+      "title": "Causation and context",
+      "description": "Explain historical events through multiple perspectives",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Social Studies",
+      "subdomain": "History",
+      "tags": [
+        "history",
+        "social-studies",
+        "c3-framework"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Kindergarten"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies",
+      "academic_standards": [
+        {
+          "framework": "C3 Framework",
+          "code": "C3.History.K-2.3",
+          "description": "Explain historical events through multiple perspectives",
+          "grade_level": "Kindergarten"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "C3.Civics.K-2.1",
+      "to": "C3.Civics.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within Civics discipline"
+    },
+    {
+      "from": "C3.Civics.K-2.2",
+      "to": "C3.Civics.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within Civics discipline"
+    },
+    {
+      "from": "C3.Economics.K-2.1",
+      "to": "C3.Economics.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within Economics discipline"
+    },
+    {
+      "from": "C3.Economics.K-2.2",
+      "to": "C3.Economics.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within Economics discipline"
+    },
+    {
+      "from": "C3.Geography.K-2.1",
+      "to": "C3.Geography.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within Geography discipline"
+    },
+    {
+      "from": "C3.Geography.K-2.2",
+      "to": "C3.Geography.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within Geography discipline"
+    },
+    {
+      "from": "C3.History.K-2.1",
+      "to": "C3.History.K-2.2",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within History discipline"
+    },
+    {
+      "from": "C3.History.K-2.2",
+      "to": "C3.History.K-2.3",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Sequential within History discipline"
+    }
+  ]
+}

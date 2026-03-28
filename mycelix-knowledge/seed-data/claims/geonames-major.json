@@ -1,0 +1,1802 @@
+[
+  {
+    "id": "geonames:e310b7157b99c3bd",
+    "content": "Tokyo is a major city in Japan with a metropolitan population of approximately 13,960,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Tokyo"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:8bc7617cf7f3ff1e",
+    "content": "Tokyo (Japan) is located at approximately 35.68° latitude, 139.69° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Tokyo"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:0955ab5218efd7d1",
+    "content": "Delhi is a major city in India with a metropolitan population of approximately 32,940,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Delhi"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:08504fff31d367cf",
+    "content": "Delhi (India) is located at approximately 28.61° latitude, 77.23° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Delhi"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:1a64fcec8dcf38b5",
+    "content": "Shanghai is a major city in China with a metropolitan population of approximately 28,520,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Shanghai"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:861f17892c2bc4e2",
+    "content": "Shanghai (China) is located at approximately 31.23° latitude, 121.47° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Shanghai"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:70d1e0042aac335d",
+    "content": "São Paulo is a major city in Brazil with a metropolitan population of approximately 22,430,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=S%C3%A3o%20Paulo"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:2e77dbd0676a145d",
+    "content": "São Paulo (Brazil) is located at approximately -23.55° latitude, -46.63° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=S%C3%A3o%20Paulo"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:8d37e20c27361e8b",
+    "content": "Mexico City is a major city in Mexico with a metropolitan population of approximately 21,920,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Mexico%20City"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:103ee3dc3224136f",
+    "content": "Mexico City (Mexico) is located at approximately 19.43° latitude, -99.13° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Mexico%20City"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:a1f31a99f40c9689",
+    "content": "Cairo is a major city in Egypt with a metropolitan population of approximately 21,750,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Cairo"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:3a22ac4bba9f12de",
+    "content": "Cairo (Egypt) is located at approximately 30.04° latitude, 31.24° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Cairo"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:40c559d96ad3347c",
+    "content": "Mumbai is a major city in India with a metropolitan population of approximately 21,670,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Mumbai"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:d7edd22eb7d811c4",
+    "content": "Mumbai (India) is located at approximately 19.08° latitude, 72.88° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Mumbai"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:1a13c5d5b2d6852b",
+    "content": "Beijing is a major city in China with a metropolitan population of approximately 21,540,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Beijing"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:5330752fb71f0a45",
+    "content": "Beijing (China) is located at approximately 39.90° latitude, 116.40° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Beijing"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:97e42875e4c0934b",
+    "content": "Dhaka is a major city in Bangladesh with a metropolitan population of approximately 22,480,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Dhaka"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:40c0883f85f1362f",
+    "content": "Dhaka (Bangladesh) is located at approximately 23.81° latitude, 90.41° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Dhaka"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:f428bdcbe8810834",
+    "content": "Osaka is a major city in Japan with a metropolitan population of approximately 19,060,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Osaka"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:a14907f10c4d97c6",
+    "content": "Osaka (Japan) is located at approximately 34.69° latitude, 135.50° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Osaka"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:39893e1726d643db",
+    "content": "New York City is a major city in United States with a metropolitan population of approximately 18,820,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=New%20York%20City"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:bf1201f2250c4cc0",
+    "content": "New York City (United States) is located at approximately 40.71° latitude, -74.01° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=New%20York%20City"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:6ec7cb7475cd1d82",
+    "content": "Karachi is a major city in Pakistan with a metropolitan population of approximately 16,840,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Karachi"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:719f00052039635b",
+    "content": "Karachi (Pakistan) is located at approximately 24.86° latitude, 67.01° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Karachi"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:32fd72a4ddedfddd",
+    "content": "Buenos Aires is a major city in Argentina with a metropolitan population of approximately 15,370,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Buenos%20Aires"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:484080ea17c36359",
+    "content": "Buenos Aires (Argentina) is located at approximately -34.60° latitude, -58.38° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Buenos%20Aires"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:36ee89bff3e33dac",
+    "content": "Istanbul is a major city in Turkey with a metropolitan population of approximately 15,640,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Istanbul"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:14ffd9acef3ac503",
+    "content": "Istanbul (Turkey) is located at approximately 41.01° latitude, 28.98° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Istanbul"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:5c639459a70b864e",
+    "content": "Lagos is a major city in Nigeria with a metropolitan population of approximately 15,390,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Lagos"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:071470dd8b71e624",
+    "content": "Lagos (Nigeria) is located at approximately 6.52° latitude, 3.38° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Lagos"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:456ecfc9cfab1986",
+    "content": "Kinshasa is a major city in DR Congo with a metropolitan population of approximately 14,970,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Kinshasa"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:fc7dcbf24753b41f",
+    "content": "Kinshasa (DR Congo) is located at approximately -4.44° latitude, 15.27° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Kinshasa"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:69729806cbfc4fff",
+    "content": "Manila is a major city in Philippines with a metropolitan population of approximately 14,400,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Manila"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:f4b9d7bc56e75503",
+    "content": "Manila (Philippines) is located at approximately 14.60° latitude, 120.98° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Manila"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:088cc4d142f7ce55",
+    "content": "Rio de Janeiro is a major city in Brazil with a metropolitan population of approximately 13,540,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Rio%20de%20Janeiro"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:3aee4c40aa31ef87",
+    "content": "Rio de Janeiro (Brazil) is located at approximately -22.91° latitude, -43.17° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Rio%20de%20Janeiro"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:21a87ea033808e30",
+    "content": "Guangzhou is a major city in China with a metropolitan population of approximately 13,640,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Guangzhou"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:e4c31e8a21ae146e",
+    "content": "Guangzhou (China) is located at approximately 23.13° latitude, 113.26° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Guangzhou"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:dce4cd958f61f1ce",
+    "content": "Moscow is a major city in Russia with a metropolitan population of approximately 12,640,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Moscow"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:d9844bd2a7bfe9d2",
+    "content": "Moscow (Russia) is located at approximately 55.76° latitude, 37.62° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Moscow"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:20f5b2ab16c40503",
+    "content": "Paris is a major city in France with a metropolitan population of approximately 11,020,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Paris"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:65c3517e1f4e7ee0",
+    "content": "Paris (France) is located at approximately 48.86° latitude, 2.35° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Paris"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:e97cd22b74bac64c",
+    "content": "London is a major city in United Kingdom with a metropolitan population of approximately 9,540,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=London"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:d6f11a82b5359d8f",
+    "content": "London (United Kingdom) is located at approximately 51.51° latitude, -0.13° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=London"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:04ff1faf2c778223",
+    "content": "Lima is a major city in Peru with a metropolitan population of approximately 10,880,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Lima"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:2e817b14a5826158",
+    "content": "Lima (Peru) is located at approximately -12.05° latitude, -77.04° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Lima"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:f0b2c949d66349b5",
+    "content": "Bangkok is a major city in Thailand with a metropolitan population of approximately 10,720,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Bangkok"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:0facfe3a57092837",
+    "content": "Bangkok (Thailand) is located at approximately 13.76° latitude, 100.50° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Bangkok"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:93bab9faa7e1c04f",
+    "content": "Seoul is a major city in South Korea with a metropolitan population of approximately 9,776,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Seoul"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:87c1f516ef73d863",
+    "content": "Seoul (South Korea) is located at approximately 37.57° latitude, 126.98° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Seoul"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:357eb44b75a90f3b",
+    "content": "Jakarta is a major city in Indonesia with a metropolitan population of approximately 10,560,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Jakarta"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:29cd680f91831954",
+    "content": "Jakarta (Indonesia) is located at approximately -6.21° latitude, 106.85° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Jakarta"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:2eed8ef5914167af",
+    "content": "Tehran is a major city in Iran with a metropolitan population of approximately 9,260,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Tehran"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:7d267543f43805cf",
+    "content": "Tehran (Iran) is located at approximately 35.69° latitude, 51.39° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Tehran"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:d1da48441496ea02",
+    "content": "Berlin is a major city in Germany with a metropolitan population of approximately 3,645,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Berlin"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:030ff4429282ea0a",
+    "content": "Berlin (Germany) is located at approximately 52.52° latitude, 13.41° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Berlin"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:50fa477976e1f846",
+    "content": "Sydney is a major city in Australia with a metropolitan population of approximately 5,310,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Sydney"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:c6581d771a3464e6",
+    "content": "Sydney (Australia) is located at approximately -33.87° latitude, 151.21° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Sydney"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:9acf761442044b6d",
+    "content": "Toronto is a major city in Canada with a metropolitan population of approximately 6,200,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Toronto"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:f466850f03f85448",
+    "content": "Toronto (Canada) is located at approximately 43.65° latitude, -79.38° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Toronto"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:830f41a985a976a7",
+    "content": "Singapore is a major city in Singapore with a metropolitan population of approximately 5,690,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Singapore"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:db9b1ee9424ca61e",
+    "content": "Singapore (Singapore) is located at approximately 1.35° latitude, 103.82° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Singapore"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:ec74a6a0d0986031",
+    "content": "Nairobi is a major city in Kenya with a metropolitan population of approximately 4,920,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Nairobi"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:3180b986ad1687f4",
+    "content": "Nairobi (Kenya) is located at approximately -1.29° latitude, 36.82° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Nairobi"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:10c4760888852b10",
+    "content": "Johannesburg is a major city in South Africa with a metropolitan population of approximately 5,780,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Johannesburg"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:88deaab084a6db3b",
+    "content": "Johannesburg (South Africa) is located at approximately -26.20° latitude, 28.04° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Johannesburg"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:55afc3de4154e278",
+    "content": "Rome is a major city in Italy with a metropolitan population of approximately 4,260,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Rome"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:750f353eb0a9d09d",
+    "content": "Rome (Italy) is located at approximately 41.90° latitude, 12.50° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Rome"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:ff56d6f98bc7e4a6",
+    "content": "Madrid is a major city in Spain with a metropolitan population of approximately 6,640,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Madrid"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:bc53463253ef145b",
+    "content": "Madrid (Spain) is located at approximately 40.42° latitude, -3.70° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Madrid"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:1ae8bdfae33422f6",
+    "content": "Riyadh is a major city in Saudi Arabia with a metropolitan population of approximately 7,680,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Riyadh"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:ee6ff37aa69919e0",
+    "content": "Riyadh (Saudi Arabia) is located at approximately 24.69° latitude, 46.72° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Riyadh"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:9a888a8ca8ae2f77",
+    "content": "Taipei is a major city in Taiwan with a metropolitan population of approximately 2,650,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Taipei"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:ad604975cb573dce",
+    "content": "Taipei (Taiwan) is located at approximately 25.03° latitude, 121.57° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Taipei"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:9ca14e3c2dad619d",
+    "content": "Bogotá is a major city in Colombia with a metropolitan population of approximately 11,340,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Bogot%C3%A1"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:ebd5d6f5ba93f285",
+    "content": "Bogotá (Colombia) is located at approximately 4.71° latitude, -74.07° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Bogot%C3%A1"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:8902a393271d251f",
+    "content": "Warsaw is a major city in Poland with a metropolitan population of approximately 1,790,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Warsaw"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:448b745a8bb241ee",
+    "content": "Warsaw (Poland) is located at approximately 52.23° latitude, 21.01° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Warsaw"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:734ff911e39f2e7e",
+    "content": "Hanoi is a major city in Vietnam with a metropolitan population of approximately 8,050,000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Hanoi"
+    ],
+    "tags": [
+      "geography",
+      "cities",
+      "population"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "geonames:c0d7ba11cace0f51",
+    "content": "Hanoi (Vietnam) is located at approximately 21.03° latitude, 105.85° longitude.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.geonames.org/search?q=Hanoi"
+    ],
+    "tags": [
+      "geography",
+      "coordinates"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  }
+]

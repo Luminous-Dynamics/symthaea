@@ -120,6 +120,12 @@
           # C++ standard library (libstdc++.so.6 for neural bridge tests)
           stdenv.cc.cc.lib
 
+          # BLAS for candle ML (gemm crate)
+          openblas
+
+          # CUDA toolkit for candle GPU training (RTX 2070)
+          cudaPackages.cudatoolkit
+
           # LaTeX for paper compilation
           (texliveSmall.withPackages (tp: with tp; [
             collection-latexrecommended
@@ -180,7 +186,9 @@
           inherit buildInputs nativeBuildInputs;
 
           shellHook = ''
-            export LD_LIBRARY_PATH="${libPath}:${onnxPath}:${mujocoPath}:$LD_LIBRARY_PATH"
+            # /run/opengl-driver/lib MUST come first — contains real libcuda.so driver.
+            # Without this, cudarc finds CUDA stubs from nix store → CUDA_ERROR_STUB_LIBRARY.
+            export LD_LIBRARY_PATH="/run/opengl-driver/lib:${libPath}:${onnxPath}:${mujocoPath}:$LD_LIBRARY_PATH"
             export MUJOCO_PATH="${mujoco337}"
             export MUJOCO_DYNAMIC_LINK_DIR="${mujoco337}/lib"
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib}/lib/pkgconfig:${pkgs.dbus}/lib/pkgconfig:$PKG_CONFIG_PATH"
@@ -188,9 +196,24 @@
             # ONNX Runtime dynamic loading
             export ORT_DYLIB_PATH="${onnxPath}/libonnxruntime.so"
 
+            # CUDA for candle GPU training
+            export CUDA_PATH="${pkgs.cudaPackages.cudatoolkit}"
+            # Force real CUDA driver over toolkit stubs (cudarc picks up $CUDA_PATH/lib/stubs/libcuda.so otherwise)
+            export LD_PRELOAD="/run/opengl-driver/lib/libcuda.so.1"
+
             # Rust environment
             export RUST_BACKTRACE=1
             export RUST_LOG=info
+
+            # Preserve CARGO_TARGET_DIR from parent shell for build isolation.
+            # nix develop creates a clean env, but the parent's CARGO_TARGET_DIR
+            # is readable from /proc/$PPID/environ (Linux-specific).
+            if [[ -z "''${CARGO_TARGET_DIR:-}" ]] && [[ -r "/proc/$PPID/environ" ]]; then
+              _parent_target=$(tr '\0' '\n' < /proc/$PPID/environ 2>/dev/null | grep '^CARGO_TARGET_DIR=' | head -1 | cut -d= -f2-)
+              if [[ -n "$_parent_target" ]] && [[ -d "$_parent_target" ]]; then
+                export CARGO_TARGET_DIR="$_parent_target"
+              fi
+            fi
 
             # Python path for PyPhi
             export PYTHONPATH="${pythonEnv}/${pythonEnv.sitePackages}:$PYTHONPATH"

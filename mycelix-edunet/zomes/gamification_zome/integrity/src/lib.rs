@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Gamification Integrity Zome
 //!
 //! Implements a comprehensive gamification system including:
@@ -655,6 +658,22 @@ pub fn validate_badge_definition(badge: &BadgeDefinition) -> ExternResult<Valida
         ));
     }
 
+    if badge.badge_id.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Badge ID too long (max 100 characters)".to_string()));
+    }
+    if badge.name.len() > 200 {
+        return Ok(ValidateCallbackResult::Invalid("Badge name too long (max 200 characters)".to_string()));
+    }
+    if badge.description.len() > 5000 {
+        return Ok(ValidateCallbackResult::Invalid("Badge description too long (max 5000 characters)".to_string()));
+    }
+    if badge.criteria_json.len() > 10000 {
+        return Ok(ValidateCallbackResult::Invalid("Badge criteria too long (max 10000 characters)".to_string()));
+    }
+    if badge.icon.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Badge icon too long (max 100 characters)".to_string()));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -667,6 +686,16 @@ pub fn validate_leaderboard(lb: &Leaderboard) -> ExternResult<ValidateCallbackRe
         ));
     }
 
+    if lb.name.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Leaderboard name cannot be empty".to_string()));
+    }
+    if lb.name.len() > 200 {
+        return Ok(ValidateCallbackResult::Invalid("Leaderboard name too long (max 200 characters)".to_string()));
+    }
+    if lb.description.len() > 5000 {
+        return Ok(ValidateCallbackResult::Invalid("Leaderboard description too long (max 5000 characters)".to_string()));
+    }
+
     // Max entries should be reasonable
     if lb.max_entries > 10000 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -674,6 +703,16 @@ pub fn validate_leaderboard(lb: &Leaderboard) -> ExternResult<ValidateCallbackRe
         ));
     }
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+pub fn validate_reward(reward: &Reward) -> ExternResult<ValidateCallbackResult> {
+    if reward.reward_id.is_empty() { return Ok(ValidateCallbackResult::Invalid("Reward ID cannot be empty".to_string())); }
+    if reward.reward_id.len() > 100 { return Ok(ValidateCallbackResult::Invalid("Reward ID too long (max 100 characters)".to_string())); }
+    if reward.name.is_empty() { return Ok(ValidateCallbackResult::Invalid("Reward name cannot be empty".to_string())); }
+    if reward.name.len() > 200 { return Ok(ValidateCallbackResult::Invalid("Reward name too long (max 200 characters)".to_string())); }
+    if reward.description.len() > 5000 { return Ok(ValidateCallbackResult::Invalid("Reward description too long (max 5000 characters)".to_string())); }
+    if reward.badges_required.len() > 50 { return Ok(ValidateCallbackResult::Invalid("Too many required badges (max 50)".to_string())); }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -692,12 +731,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::XpTransaction(tx) => validate_xp_transaction(&tx),
                 EntryTypes::BadgeDefinition(badge) => validate_badge_definition(&badge),
                 EntryTypes::Leaderboard(lb) => validate_leaderboard(&lb),
+                EntryTypes::Reward(reward) => validate_reward(&reward),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::XpTransaction(tx) => validate_xp_transaction(&tx),
                 EntryTypes::BadgeDefinition(badge) => validate_badge_definition(&badge),
                 EntryTypes::Leaderboard(lb) => validate_leaderboard(&lb),
+                EntryTypes::Reward(reward) => validate_reward(&reward),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -764,5 +805,46 @@ mod tests {
         // (250-100)/(400-100) = 150/300 = 50%
         let progress = level_progress_permille(250);
         assert_eq!(progress, 500);
+    }
+
+    #[test]
+    fn test_badge_valid() {
+        let badge = BadgeDefinition { badge_id: "b1".to_string(), name: "Test".to_string(), description: "Test".to_string(), icon: "s".to_string(), rarity: BadgeRarity::Common, category: BadgeCategory::Learning, xp_reward: 50, criteria_json: "{}".to_string(), is_active: true, is_secret: false, created_at: 0 };
+        assert!(matches!(validate_badge_definition(&badge).unwrap(), ValidateCallbackResult::Valid));
+    }
+    #[test]
+    fn test_badge_id_too_long() {
+        let badge = BadgeDefinition { badge_id: "x".repeat(101), name: "T".to_string(), description: "T".to_string(), icon: "s".to_string(), rarity: BadgeRarity::Common, category: BadgeCategory::Learning, xp_reward: 50, criteria_json: "{}".to_string(), is_active: true, is_secret: false, created_at: 0 };
+        assert!(matches!(validate_badge_definition(&badge).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_badge_description_too_long() {
+        let badge = BadgeDefinition { badge_id: "b1".to_string(), name: "T".to_string(), description: "x".repeat(5001), icon: "s".to_string(), rarity: BadgeRarity::Common, category: BadgeCategory::Learning, xp_reward: 50, criteria_json: "{}".to_string(), is_active: true, is_secret: false, created_at: 0 };
+        assert!(matches!(validate_badge_definition(&badge).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_badge_criteria_too_long() {
+        let badge = BadgeDefinition { badge_id: "b1".to_string(), name: "T".to_string(), description: "T".to_string(), icon: "s".to_string(), rarity: BadgeRarity::Common, category: BadgeCategory::Learning, xp_reward: 50, criteria_json: "x".repeat(10001), is_active: true, is_secret: false, created_at: 0 };
+        assert!(matches!(validate_badge_definition(&badge).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_leaderboard_valid() {
+        let lb = Leaderboard { leaderboard_id: "lb1".to_string(), name: "Top".to_string(), description: "T".to_string(), ranking_type: LeaderboardType::TotalXp, time_period: LeaderboardPeriod::Weekly, max_entries: 100, is_active: true, scope: LeaderboardScope::Global, scope_hash: None, created_at: 0 };
+        assert!(matches!(validate_leaderboard(&lb).unwrap(), ValidateCallbackResult::Valid));
+    }
+    #[test]
+    fn test_leaderboard_name_too_long() {
+        let lb = Leaderboard { leaderboard_id: "lb1".to_string(), name: "x".repeat(201), description: "T".to_string(), ranking_type: LeaderboardType::TotalXp, time_period: LeaderboardPeriod::AllTime, max_entries: 100, is_active: true, scope: LeaderboardScope::Global, scope_hash: None, created_at: 0 };
+        assert!(matches!(validate_leaderboard(&lb).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_reward_valid() {
+        let reward = Reward { reward_id: "r1".to_string(), name: "Freeze".to_string(), description: "T".to_string(), reward_type: RewardType::StreakFreeze, cost_xp: 500, level_required: 5, badges_required: vec![], is_available: true, quantity_limit: 0, quantity_claimed: 0, created_at: 0 };
+        assert!(matches!(validate_reward(&reward).unwrap(), ValidateCallbackResult::Valid));
+    }
+    #[test]
+    fn test_reward_name_too_long() {
+        let reward = Reward { reward_id: "r1".to_string(), name: "x".repeat(201), description: "T".to_string(), reward_type: RewardType::Custom, cost_xp: 100, level_required: 1, badges_required: vec![], is_available: true, quantity_limit: 0, quantity_claimed: 0, created_at: 0 };
+        assert!(matches!(validate_reward(&reward).unwrap(), ValidateCallbackResult::Invalid(_)));
     }
 }

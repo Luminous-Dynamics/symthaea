@@ -28,5 +28,8 @@ serde_json.workspace = true
 # Cryptographic hashing
 blake3.workspace = true
 
+# Cross-cluster bridge (consciousness gating)
+mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }
+
 # Note: For randomness in Holochain zomes, use hdk::prelude::random_bytes()
 # Do NOT add getrandom - it requires wasm-bindgen which Holochain doesn't provide

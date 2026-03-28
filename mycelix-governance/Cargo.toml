@@ -1,7 +1,4 @@
 [workspace]
-
-[workspace.package]
-license = "AGPL-3.0-or-later"
 resolver = "2"
 members = [
     "zomes/proposals/integrity",
@@ -20,9 +17,14 @@ members = [
     "zomes/councils/coordinator",
     "zomes/jurisdiction/integrity",
     "zomes/jurisdiction/coordinator",
+    "zomes/budgeting/integrity",
+    "zomes/budgeting/coordinator",
     "crates/governance-utils",
 ]
 exclude = ["tests"]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible (per official compatibility table)
@@ -37,6 +39,7 @@ serde_json = "1.0"
 
 # Bridge
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 
 # Utilities
 thiserror = "1.0"

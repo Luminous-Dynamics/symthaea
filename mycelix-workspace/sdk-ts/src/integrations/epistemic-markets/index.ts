@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Epistemic Markets Integration
  *
@@ -1117,4 +1120,152 @@ export function getEpistemicMarketsService(): EpistemicMarketsService {
     defaultService = new EpistemicMarketsService();
   }
   return defaultService;
+}
+
+// ============================================================================
+// Holochain Conductor Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Epistemic Markets */
+export class EpistemicMarketsBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    }
+  ) {}
+
+  // ---- Claims ----
+
+  async createClaim(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'create_claim',
+      payload,
+    });
+  }
+
+  async getClaim(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'get_claim',
+      payload,
+    });
+  }
+
+  async updateClaim(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'update_claim',
+      payload,
+    });
+  }
+
+  async listClaims(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'list_claims',
+      payload,
+    });
+  }
+
+  async submitEvidence(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'submit_evidence',
+      payload,
+    });
+  }
+
+  async resolveClaim(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'resolve_claim',
+      payload,
+    });
+  }
+
+  // ---- Markets Integration ----
+
+  async createMarket(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'create_market',
+      payload,
+    });
+  }
+
+  async getMarket(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'get_market',
+      payload,
+    });
+  }
+
+  async listOpenMarkets(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'list_open_markets',
+      payload: payload ?? null,
+    });
+  }
+
+  async submitPrediction(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'submit_prediction',
+      payload,
+    });
+  }
+
+  async updatePrediction(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'update_prediction',
+      payload,
+    });
+  }
+
+  async resolveMarket(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'resolve_market',
+      payload,
+    });
+  }
+
+  async closeMarket(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'close_market',
+      payload,
+    });
+  }
+
+  async getPredictionsForMarket(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'markets_integration',
+      fn_name: 'get_predictions_for_market',
+      payload,
+    });
+  }
 }

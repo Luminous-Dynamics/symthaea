@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cognitive loop statistics.
 //!
 //! The `LoopStats` struct accumulates metrics across cognitive cycles.
@@ -119,10 +122,12 @@ pub struct LoopStats {
     /// Learning boost from flow state
     pub flow_learning_boost: f32,
 
-    /// Emotional valence from content (-1.0 to 1.0)
+    /// Emotional valence from unified emotional state (-1.0 to 1.0)
+    /// (Canonical source: UnifiedEmotionalState, not EmotionContagion)
     pub emotional_valence: f32,
 
-    /// Emotional arousal (0.0 to 1.0)
+    /// Emotional arousal from unified emotional state (0.0 to 1.0)
+    /// (Canonical source: UnifiedEmotionalState, not EmotionContagion)
     pub emotional_arousal: f32,
 
     /// Suggested pattern from emotion contagion

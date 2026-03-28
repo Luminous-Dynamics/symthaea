@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Food Production Coordinator Zome
 //! Business logic for plot management, crop tracking, and harvest recording.
 
@@ -93,6 +96,14 @@ pub fn register_plot(plot: Plot) -> ExternResult<Record> {
         LinkTypes::StewardToPlot,
         (),
     )?;
+
+    // Geohash spatial index
+    {
+        let geo_hash = commons_types::geo::geohash_encode(plot.location_lat, plot.location_lon, 6);
+        let geo_anchor_str = format!("geo:{}", geo_hash);
+        create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+        create_link(anchor_hash(&geo_anchor_str)?, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
+    }
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created plot".into()
@@ -444,6 +455,40 @@ pub fn get_nutrient_summary(_: ()) -> ExternResult<NutrientSummary> {
         total_potassium_kg: total_k,
         total_contributions: records.len(),
     })
+}
+
+// ============================================================================
+// GEO QUERIES
+// ============================================================================
+
+/// Get food production plots near a geographic location using geohash-based indexing.
+#[hdk_extern]
+pub fn get_nearby_food(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+    let center_hash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
+    let mut all_cells = vec![center_hash.clone()];
+    all_cells.extend(commons_types::geo::geohash_neighbors(&center_hash));
+
+    let mut records = Vec::new();
+    for cell in &all_cells {
+        let anchor_str = format!("geo:{}", cell);
+        let anchor_entry = Anchor(anchor_str);
+        let anchor_hash = hash_entry(&anchor_entry)?;
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(anchor_hash, LinkTypes::GeoIndex)?,
+            GetStrategy::Local,
+        ) {
+            for link in links {
+                if let Ok(action_hash) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(action_hash, GetOptions::default())? {
+                        records.push(record);
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = input.radius_km;
+    Ok(records)
 }
 
 #[cfg(test)]

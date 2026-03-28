@@ -1,0 +1,690 @@
+{
+  "metadata": {
+    "title": "National Core Arts Standards 6-12",
+    "framework": "National Core Arts Standards",
+    "source": "https://www.nationalartsstandards.org/",
+    "grade_level": "Grade9",
+    "subject_area": "Arts",
+    "domain": "Arts",
+    "version": "2014",
+    "total_standards": 20,
+    "domains": [
+      "Dance",
+      "Media Arts",
+      "Music",
+      "Theatre",
+      "Visual Arts"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Curated from National Core Arts Standards (NCCAS, 2014). 5 art forms × 4 processes."
+  },
+  "nodes": [
+    {
+      "id": "NCAS.Dance.Creating.HS",
+      "title": "Dance: Creating (HS)",
+      "description": "Creating in Dance. Generate and conceptualize artistic ideas and work",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Dance",
+      "tags": [
+        "arts",
+        "dance",
+        "creating"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Dance.Creating.HS",
+          "description": "Generate and conceptualize artistic ideas and work",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Dance.Performing.HS",
+      "title": "Dance: Performing (HS)",
+      "description": "Performing in Dance. Realize artistic ideas and work through interpretation and presentation",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Dance",
+      "tags": [
+        "arts",
+        "dance",
+        "performing"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Dance.Performing.HS",
+          "description": "Realize artistic ideas and work through interpretation and presentation",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Dance.Responding.HS",
+      "title": "Dance: Responding (HS)",
+      "description": "Responding in Dance. Understand and evaluate how the arts convey meaning",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Dance",
+      "tags": [
+        "arts",
+        "dance",
+        "responding"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Dance.Responding.HS",
+          "description": "Understand and evaluate how the arts convey meaning",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Dance.Connecting.HS",
+      "title": "Dance: Connecting (HS)",
+      "description": "Connecting in Dance. Relate artistic ideas and work with personal meaning and external context",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Dance",
+      "tags": [
+        "arts",
+        "dance",
+        "connecting"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Dance.Connecting.HS",
+          "description": "Relate artistic ideas and work with personal meaning and external context",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.MediaArts.Creating.HS",
+      "title": "Media Arts: Creating (HS)",
+      "description": "Creating in Media Arts. Generate and conceptualize artistic ideas and work",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Media Arts",
+      "tags": [
+        "arts",
+        "media arts",
+        "creating"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.MediaArts.Creating.HS",
+          "description": "Generate and conceptualize artistic ideas and work",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.MediaArts.Performing.HS",
+      "title": "Media Arts: Performing (HS)",
+      "description": "Performing in Media Arts. Realize artistic ideas and work through interpretation and presentation",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Media Arts",
+      "tags": [
+        "arts",
+        "media arts",
+        "performing"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.MediaArts.Performing.HS",
+          "description": "Realize artistic ideas and work through interpretation and presentation",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.MediaArts.Responding.HS",
+      "title": "Media Arts: Responding (HS)",
+      "description": "Responding in Media Arts. Understand and evaluate how the arts convey meaning",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Media Arts",
+      "tags": [
+        "arts",
+        "media arts",
+        "responding"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.MediaArts.Responding.HS",
+          "description": "Understand and evaluate how the arts convey meaning",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.MediaArts.Connecting.HS",
+      "title": "Media Arts: Connecting (HS)",
+      "description": "Connecting in Media Arts. Relate artistic ideas and work with personal meaning and external context",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Media Arts",
+      "tags": [
+        "arts",
+        "media arts",
+        "connecting"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.MediaArts.Connecting.HS",
+          "description": "Relate artistic ideas and work with personal meaning and external context",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Music.Creating.HS",
+      "title": "Music: Creating (HS)",
+      "description": "Creating in Music. Generate and conceptualize artistic ideas and work",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Music",
+      "tags": [
+        "arts",
+        "music",
+        "creating"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Music.Creating.HS",
+          "description": "Generate and conceptualize artistic ideas and work",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Music.Performing.HS",
+      "title": "Music: Performing (HS)",
+      "description": "Performing in Music. Realize artistic ideas and work through interpretation and presentation",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Music",
+      "tags": [
+        "arts",
+        "music",
+        "performing"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Music.Performing.HS",
+          "description": "Realize artistic ideas and work through interpretation and presentation",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Music.Responding.HS",
+      "title": "Music: Responding (HS)",
+      "description": "Responding in Music. Understand and evaluate how the arts convey meaning",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Music",
+      "tags": [
+        "arts",
+        "music",
+        "responding"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Music.Responding.HS",
+          "description": "Understand and evaluate how the arts convey meaning",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Music.Connecting.HS",
+      "title": "Music: Connecting (HS)",
+      "description": "Connecting in Music. Relate artistic ideas and work with personal meaning and external context",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Music",
+      "tags": [
+        "arts",
+        "music",
+        "connecting"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Music.Connecting.HS",
+          "description": "Relate artistic ideas and work with personal meaning and external context",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Theatre.Creating.HS",
+      "title": "Theatre: Creating (HS)",
+      "description": "Creating in Theatre. Generate and conceptualize artistic ideas and work",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Theatre",
+      "tags": [
+        "arts",
+        "theatre",
+        "creating"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Theatre.Creating.HS",
+          "description": "Generate and conceptualize artistic ideas and work",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Theatre.Performing.HS",
+      "title": "Theatre: Performing (HS)",
+      "description": "Performing in Theatre. Realize artistic ideas and work through interpretation and presentation",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Theatre",
+      "tags": [
+        "arts",
+        "theatre",
+        "performing"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Theatre.Performing.HS",
+          "description": "Realize artistic ideas and work through interpretation and presentation",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Theatre.Responding.HS",
+      "title": "Theatre: Responding (HS)",
+      "description": "Responding in Theatre. Understand and evaluate how the arts convey meaning",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Theatre",
+      "tags": [
+        "arts",
+        "theatre",
+        "responding"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Theatre.Responding.HS",
+          "description": "Understand and evaluate how the arts convey meaning",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.Theatre.Connecting.HS",
+      "title": "Theatre: Connecting (HS)",
+      "description": "Connecting in Theatre. Relate artistic ideas and work with personal meaning and external context",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Theatre",
+      "tags": [
+        "arts",
+        "theatre",
+        "connecting"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.Theatre.Connecting.HS",
+          "description": "Relate artistic ideas and work with personal meaning and external context",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.VisualArts.Creating.HS",
+      "title": "Visual Arts: Creating (HS)",
+      "description": "Creating in Visual Arts. Generate and conceptualize artistic ideas and work",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "arts",
+        "visual arts",
+        "creating"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.VisualArts.Creating.HS",
+          "description": "Generate and conceptualize artistic ideas and work",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.VisualArts.Performing.HS",
+      "title": "Visual Arts: Performing (HS)",
+      "description": "Performing in Visual Arts. Realize artistic ideas and work through interpretation and presentation",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "arts",
+        "visual arts",
+        "performing"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.VisualArts.Performing.HS",
+          "description": "Realize artistic ideas and work through interpretation and presentation",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.VisualArts.Responding.HS",
+      "title": "Visual Arts: Responding (HS)",
+      "description": "Responding in Visual Arts. Understand and evaluate how the arts convey meaning",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "arts",
+        "visual arts",
+        "responding"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.VisualArts.Responding.HS",
+          "description": "Understand and evaluate how the arts convey meaning",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "NCAS.VisualArts.Connecting.HS",
+      "title": "Visual Arts: Connecting (HS)",
+      "description": "Connecting in Visual Arts. Relate artistic ideas and work with personal meaning and external context",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Arts",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "arts",
+        "visual arts",
+        "connecting"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Arts",
+      "academic_standards": [
+        {
+          "framework": "National Core Arts Standards",
+          "code": "NCAS.VisualArts.Connecting.HS",
+          "description": "Relate artistic ideas and work with personal meaning and external context",
+          "grade_level": "Grade9"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "NCAS.Dance.Creating.HS",
+      "to": "NCAS.Dance.Performing.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Dance"
+    },
+    {
+      "from": "NCAS.Dance.Performing.HS",
+      "to": "NCAS.Dance.Responding.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Dance"
+    },
+    {
+      "from": "NCAS.Dance.Responding.HS",
+      "to": "NCAS.Dance.Connecting.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Dance"
+    },
+    {
+      "from": "NCAS.MediaArts.Creating.HS",
+      "to": "NCAS.MediaArts.Performing.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Media Arts"
+    },
+    {
+      "from": "NCAS.MediaArts.Performing.HS",
+      "to": "NCAS.MediaArts.Responding.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Media Arts"
+    },
+    {
+      "from": "NCAS.MediaArts.Responding.HS",
+      "to": "NCAS.MediaArts.Connecting.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Media Arts"
+    },
+    {
+      "from": "NCAS.Music.Creating.HS",
+      "to": "NCAS.Music.Performing.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Music"
+    },
+    {
+      "from": "NCAS.Music.Performing.HS",
+      "to": "NCAS.Music.Responding.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Music"
+    },
+    {
+      "from": "NCAS.Music.Responding.HS",
+      "to": "NCAS.Music.Connecting.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Music"
+    },
+    {
+      "from": "NCAS.Theatre.Creating.HS",
+      "to": "NCAS.Theatre.Performing.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Theatre"
+    },
+    {
+      "from": "NCAS.Theatre.Performing.HS",
+      "to": "NCAS.Theatre.Responding.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Theatre"
+    },
+    {
+      "from": "NCAS.Theatre.Responding.HS",
+      "to": "NCAS.Theatre.Connecting.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Theatre"
+    },
+    {
+      "from": "NCAS.VisualArts.Creating.HS",
+      "to": "NCAS.VisualArts.Performing.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Visual Arts"
+    },
+    {
+      "from": "NCAS.VisualArts.Performing.HS",
+      "to": "NCAS.VisualArts.Responding.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Visual Arts"
+    },
+    {
+      "from": "NCAS.VisualArts.Responding.HS",
+      "to": "NCAS.VisualArts.Connecting.HS",
+      "edge_type": "Recommends",
+      "strength_permille": 600,
+      "rationale": "Artistic process progression in Visual Arts"
+    }
+  ]
+}

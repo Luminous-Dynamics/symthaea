@@ -1,0 +1,23 @@
+[package]
+name = "classroom_integrity"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Classroom integrity zome - defines Classroom, ClassroomMember, GuardianLink, and JoinCode entry types"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "classroom_integrity"
+
+[dependencies]
+# Holochain Integrity (HDI) for entry definitions
+hdi.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true

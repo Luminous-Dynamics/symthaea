@@ -1,0 +1,356 @@
+{
+  "metadata": {
+    "title": "PhD in History",
+    "framework": "CIP:54.0101",
+    "source": "",
+    "grade_level": "Doctoral",
+    "subject_area": "History",
+    "domain": "History",
+    "version": "2024",
+    "total_standards": 11,
+    "domains": [
+      "Coursework",
+      "Examination",
+      "Research"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "PhD progression template for History. Milestones represent canonical doctoral program stages.",
+    "academic_level": "Doctoral",
+    "cip_code": "54.0101",
+    "duration_semesters": 10
+  },
+  "nodes": [
+    {
+      "id": "phd-history/coursework",
+      "title": "Core Coursework",
+      "description": "Complete required doctoral-level courses in the field. Typically 4-6 courses covering foundational theory, research methods, and specialized topics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 1",
+      "tags": [
+        "history",
+        "phd",
+        "year-1"
+      ],
+      "estimated_hours": 810,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/seminar",
+      "title": "Research Seminar Participation",
+      "description": "Attend and present in departmental research seminars. Develop ability to critically analyze current research.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 1",
+      "tags": [
+        "history",
+        "phd",
+        "year-1"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/teaching",
+      "title": "Teaching Requirement",
+      "description": "Serve as teaching assistant for undergraduate courses. Develop pedagogy skills and demonstrate mastery of foundational material.",
+      "node_type": "Skill",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 2",
+      "tags": [
+        "history",
+        "phd",
+        "year-2"
+      ],
+      "estimated_hours": 360,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/qualifying-exam",
+      "title": "Qualifying Examination",
+      "description": "Pass written and/or oral comprehensive examinations demonstrating breadth and depth of knowledge in the field. Advancement to candidacy upon passing.",
+      "node_type": "Assessment",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 2",
+      "tags": [
+        "history",
+        "phd",
+        "year-2"
+      ],
+      "estimated_hours": 450,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/literature-review",
+      "title": "Comprehensive Literature Review",
+      "description": "Survey and synthesize existing research to identify gaps and position the dissertation within the scholarly landscape.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 2",
+      "tags": [
+        "history",
+        "phd",
+        "year-2"
+      ],
+      "estimated_hours": 360,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/proposal",
+      "title": "Dissertation Proposal Defense",
+      "description": "Present and defend the dissertation proposal before the committee. Define research questions, methodology, and expected contributions.",
+      "node_type": "Assessment",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 3",
+      "tags": [
+        "history",
+        "phd",
+        "year-3"
+      ],
+      "estimated_hours": 270,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/research",
+      "title": "Independent Research",
+      "description": "Conduct original research contributing new knowledge to the field. Design and execute experiments, collect and analyze data, iterate on methodology.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 4",
+      "tags": [
+        "history",
+        "phd",
+        "year-4"
+      ],
+      "estimated_hours": 2700,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/publication",
+      "title": "Peer-Reviewed Publication",
+      "description": "Publish research findings in peer-reviewed journals or top-tier conference proceedings. Demonstrate ability to contribute to the scholarly record.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 4",
+      "tags": [
+        "history",
+        "phd",
+        "year-4"
+      ],
+      "estimated_hours": 360,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/dissertation-writing",
+      "title": "Dissertation Writing",
+      "description": "Write the doctoral dissertation: introduction, literature review, methodology, results, discussion, and conclusions. Integrate all research into a coherent scholarly work.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 5",
+      "tags": [
+        "history",
+        "phd",
+        "year-5"
+      ],
+      "estimated_hours": 900,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/defense",
+      "title": "Dissertation Defense",
+      "description": "Present and defend the completed dissertation before the committee and academic community. Respond to questions and demonstrate mastery of the research.",
+      "node_type": "Assessment",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 5",
+      "tags": [
+        "history",
+        "phd",
+        "year-5"
+      ],
+      "estimated_hours": 90,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    },
+    {
+      "id": "phd-history/archival-research",
+      "title": "Archival Research",
+      "description": "Conduct primary source research in archives. Travel to relevant collections and develop expertise in paleography and source analysis.",
+      "node_type": "Project",
+      "difficulty": "Expert",
+      "domain": "History",
+      "subdomain": "Year 3",
+      "tags": [
+        "history",
+        "phd",
+        "year-3"
+      ],
+      "estimated_hours": 720,
+      "grade_levels": [
+        "Doctoral"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "History",
+      "academic_standards": [],
+      "course_level": "900",
+      "cip_code": "54.0101"
+    }
+  ],
+  "edges": [
+    {
+      "from": "phd-history/coursework",
+      "to": "phd-history/teaching",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/coursework must be completed before Teaching Requirement."
+    },
+    {
+      "from": "phd-history/coursework",
+      "to": "phd-history/qualifying-exam",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/coursework must be completed before Qualifying Examination."
+    },
+    {
+      "from": "phd-history/qualifying-exam",
+      "to": "phd-history/literature-review",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/qualifying-exam must be completed before Comprehensive Literature Review."
+    },
+    {
+      "from": "phd-history/qualifying-exam",
+      "to": "phd-history/proposal",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/qualifying-exam must be completed before Dissertation Proposal Defense."
+    },
+    {
+      "from": "phd-history/literature-review",
+      "to": "phd-history/proposal",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/literature-review must be completed before Dissertation Proposal Defense."
+    },
+    {
+      "from": "phd-history/proposal",
+      "to": "phd-history/research",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/proposal must be completed before Independent Research."
+    },
+    {
+      "from": "phd-history/research",
+      "to": "phd-history/publication",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/research must be completed before Peer-Reviewed Publication."
+    },
+    {
+      "from": "phd-history/research",
+      "to": "phd-history/dissertation-writing",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/research must be completed before Dissertation Writing."
+    },
+    {
+      "from": "phd-history/publication",
+      "to": "phd-history/dissertation-writing",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/publication must be completed before Dissertation Writing."
+    },
+    {
+      "from": "phd-history/dissertation-writing",
+      "to": "phd-history/defense",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/dissertation-writing must be completed before Dissertation Defense."
+    },
+    {
+      "from": "phd-history/proposal",
+      "to": "phd-history/archival-research",
+      "edge_type": "LeadsTo",
+      "strength_permille": 950,
+      "rationale": "phd-history/proposal must be completed before Archival Research."
+    }
+  ]
+}

@@ -1,0 +1,1872 @@
+{
+  "metadata": {
+    "title": "Grade 5",
+    "framework": "Next Generation Science Standards",
+    "source": "http://www.nextgenscience.org/sites/ngss/files/NGSS%20DCI%20Combined%2011.6.13.pdf",
+    "grade_level": "Grade5",
+    "subject_area": "Science",
+    "domain": "Science",
+    "version": "2013",
+    "total_standards": 57,
+    "domains": [
+      "Crosscutting Concepts",
+      "Disciplinary Core Ideas",
+      "Science and Engineering Practices",
+      "Engineering Design",
+      "Earth and Human Activity",
+      "Earth's Systems",
+      "Earth's Place in the Universe",
+      "Ecosystems: Interactions, Energy, and Dynamics",
+      "From Molecules to Organisms: Structures and Processes",
+      "Energy",
+      "Motion and Stability: Forces and Interactions",
+      "Matter and Its Interactions"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 71E5AA409D894EB0B43A8CD82F727BFE_D2454348_grade-05). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCC.11.3-5.3",
+      "title": "Science assumes consistent patterns in natural systems",
+      "description": "Science assumes consistent patterns in natural systems.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.11.3-5.3",
+          "description": "Science assumes consistent patterns in natural systems.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.10.3-5.2",
+      "title": "Science findings are limited to questions that can be answered with empirical...",
+      "description": "Science findings are limited to questions that can be answered with empirical evidence.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.10.3-5.2",
+          "description": "Science findings are limited to questions that can be answered with empirical evidence.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.8.3-5.8",
+      "title": "Engineers improve existing technologies or develop new ones to increase their...",
+      "description": "Engineers improve existing technologies or develop new ones to increase their benefits, to decrease known risks, and to meet societal demands.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.8.3-5.8",
+          "description": "Engineers improve existing technologies or develop new ones to increase their benefits, to decrease known risks, and to meet societal demands.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.8.3-5.5",
+      "title": "People's needs and wants change over time, as do their demands for new and im...",
+      "description": "People's needs and wants change over time, as do their demands for new and improved technologies.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.8.3-5.5",
+          "description": "People's needs and wants change over time, as do their demands for new and improved technologies.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.5.3-5.3",
+      "title": "Matter is transported into, out of, and within systems",
+      "description": "Matter is transported into, out of, and within systems.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "matter"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.5.3-5.3",
+          "description": "Matter is transported into, out of, and within systems.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.5.3-5.2",
+      "title": "Energy can be transferred in various ways and between objects",
+      "description": "Energy can be transferred in various ways and between objects.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "energy"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.5.3-5.2",
+          "description": "Energy can be transferred in various ways and between objects.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.4.3-5.2",
+      "title": "A system can be described in terms of its components and their interactions",
+      "description": "A system can be described in terms of its components and their interactions.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.4.3-5.2",
+          "description": "A system can be described in terms of its components and their interactions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.3.3-5.4",
+      "title": "Standard units are used to measure and describe physical quantities such as w...",
+      "description": "Standard units are used to measure and describe physical quantities such as weight and volume.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "volume"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.3.3-5.4",
+          "description": "Standard units are used to measure and describe physical quantities such as weight and volume.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.3.3-5.3",
+      "title": "Standard units are used to measure and describe physical quantities such as w...",
+      "description": "Standard units are used to measure and describe physical quantities such as weight, time, temperature, and volume.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "volume"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.3.3-5.3",
+          "description": "Standard units are used to measure and describe physical quantities such as weight, time, temperature, and volume.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.3.3-5.2",
+      "title": "Natural objects exist from the very small to the immensely large",
+      "description": "Natural objects exist from the very small to the immensely large.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.3.3-5.2",
+          "description": "Natural objects exist from the very small to the immensely large.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.2.3-5.5",
+      "title": "Cause and effect relationships are routinely identified and used to explain c...",
+      "description": "Cause and effect relationships are routinely identified and used to explain change.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.2.3-5.5",
+          "description": "Cause and effect relationships are routinely identified and used to explain change.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.2.3-5.4",
+      "title": "Cause and effect relationships are routinely identified, tested, and used to ...",
+      "description": "Cause and effect relationships are routinely identified, tested, and used to explain change.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.2.3-5.4",
+          "description": "Cause and effect relationships are routinely identified, tested, and used to explain change.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "CCC.1.3-5.9",
+      "title": "Similarities and differences in patterns can be used to sort, classify, commu...",
+      "description": "Similarities and differences in patterns can be used to sort, classify, communicate and analyze simple rates of change for natural phenomena.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Crosscutting Concepts",
+      "tags": [
+        "patterns"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "CCC.1.3-5.9",
+          "description": "Similarities and differences in patterns can be used to sort, classify, communicate and analyze simple rates of change for natural phenomena.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.C.3-5.2",
+      "title": "Different solutions need to be tested in order to determine which of them bes...",
+      "description": "Different solutions need to be tested in order to determine which of them best solves the problem, given the criteria and the constraints.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.C.3-5.2",
+          "description": "Different solutions need to be tested in order to determine which of them best solves the problem, given the criteria and the constraints.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.B.3-5.4",
+      "title": "Tests are often designed to identify failure points or difficulties, which su...",
+      "description": "Tests are often designed to identify failure points or difficulties, which suggest the elements of the design that need to be improved.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.B.3-5.4",
+          "description": "Tests are often designed to identify failure points or difficulties, which suggest the elements of the design that need to be improved.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.B.3-5.3",
+      "title": "At whatever stage, communicating with peers about proposed solutions is an im...",
+      "description": "At whatever stage, communicating with peers about proposed solutions is an important part of the design process, and shared ideas can lead to improved designs.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.B.3-5.3",
+          "description": "At whatever stage, communicating with peers about proposed solutions is an important part of the design process, and shared ideas can lead to improved designs.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.B.3-5.2",
+      "title": "Research on a problem should be carried out before beginning to design a solu...",
+      "description": "Research on a problem should be carried out before beginning to design a solution. Testing a solution involves investigating how well it performs under a range of likely conditions.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "research"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.B.3-5.2",
+          "description": "Research on a problem should be carried out before beginning to design a solution. Testing a solution involves investigating how well it performs under a range of likely conditions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ETS1.A.3-5.1",
+      "title": "Possible solutions to a problem are limited by available materials and resour...",
+      "description": "Possible solutions to a problem are limited by available materials and resources (constraints). The success of a designed solution is determined by considering the desired features of a solution (criteria). Different proposals for solutions can be compared on the basis of how well each one meets the specified criteria for success or how well each takes the constraints into account.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ETS1.A.3-5.1",
+          "description": "Possible solutions to a problem are limited by available materials and resources (constraints). The success of a designed solution is determined by considering the desired features of a solution (criteria). Different proposals for solutions can be compared on the basis of how well each one meets the specified criteria for success or how well each takes the constraints into account.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS3.C.3-5.2",
+      "title": "Human activities in agriculture, industry, and everyday life have had major e...",
+      "description": "Human activities in agriculture, industry, and everyday life have had major effects on the land, vegetation, streams, ocean, air, and even outer space. But individuals and communities are doing things to help protect Earth's resources and environments.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "earth"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS3.C.3-5.2",
+          "description": "Human activities in agriculture, industry, and everyday life have had major effects on the land, vegetation, streams, ocean, air, and even outer space. But individuals and communities are doing things to help protect Earth's resources and environments.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS2.C.3-5.2",
+      "title": "Nearly all of Earth's available water is in the ocean",
+      "description": "Nearly all of Earth's available water is in the ocean. Most fresh water is in glaciers or underground; only a tiny fraction is in streams, lakes, wetlands, and the atmosphere.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "earth"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS2.C.3-5.2",
+          "description": "Nearly all of Earth's available water is in the ocean. Most fresh water is in glaciers or underground; only a tiny fraction is in streams, lakes, wetlands, and the atmosphere.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS2.A.3-5.3",
+      "title": "Earth's major systems are the geosphere (solid and molten rock, soil, and sed...",
+      "description": "Earth's major systems are the geosphere (solid and molten rock, soil, and sediments), the hydrosphere (water and ice), the atmosphere (air), and the biosphere (living things, including humans). These systems interact in multiple ways to affect Earth's surface materials and processes. The ocean supports a variety of ecosystems and organisms, shapes landforms, and influences climate. Winds and clouds in the atmosphere interact with the landforms to determine patterns of weather.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "patterns",
+        "ecosystem",
+        "earth",
+        "weather",
+        "climate"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS2.A.3-5.3",
+          "description": "Earth's major systems are the geosphere (solid and molten rock, soil, and sediments), the hydrosphere (water and ice), the atmosphere (air), and the biosphere (living things, including humans). These systems interact in multiple ways to affect Earth's surface materials and processes. The ocean supports a variety of ecosystems and organisms, shapes landforms, and influences climate. Winds and clouds in the atmosphere interact with the landforms to determine patterns of weather.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS1.B.3-5.2",
+      "title": "The orbits of Earth around the sun and of the moon around Earth, together wit...",
+      "description": "The orbits of Earth around the sun and of the moon around Earth, together with the rotation of Earth about an axis between its North and South poles, cause observable patterns. These include day and night; daily changes in the length and direction of shadows; and different positions of the sun, moon, and stars at different times of the day, month, and year.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "patterns",
+        "earth"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS1.B.3-5.2",
+          "description": "The orbits of Earth around the sun and of the moon around Earth, together with the rotation of Earth about an axis between its North and South poles, cause observable patterns. These include day and night; daily changes in the length and direction of shadows; and different positions of the sun, moon, and stars at different times of the day, month, and year.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.ESS1.A.3-5.2",
+      "title": "The sun is a star that appears larger and brighter than other stars because i...",
+      "description": "The sun is a star that appears larger and brighter than other stars because it is closer. Stars range greatly in their distance from Earth.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "earth"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.ESS1.A.3-5.2",
+          "description": "The sun is a star that appears larger and brighter than other stars because it is closer. Stars range greatly in their distance from Earth.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS2.B.3-5.1",
+      "title": "Matter cycles between the air and soil and among plants, animals, and microbe...",
+      "description": "Matter cycles between the air and soil and among plants, animals, and microbes as these organisms live and die. Organisms obtain gases, and water, from the environment, and release waste matter (gas, liquid, or solid) back into the environment.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "matter"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS2.B.3-5.1",
+          "description": "Matter cycles between the air and soil and among plants, animals, and microbes as these organisms live and die. Organisms obtain gases, and water, from the environment, and release waste matter (gas, liquid, or solid) back into the environment.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS2.A.3-5.3",
+      "title": "The food of almost any kind of animal can be traced back to plants",
+      "description": "The food of almost any kind of animal can be traced back to plants. Organisms are related in food webs in which some animals eat plants for food and other animals eat the animals that eat plants. Some organisms, such as fungi and bacteria, break down dead organisms (both plants or plants parts and animals) and therefore operate as \"decomposers.\" Decomposition eventually restores (recycles) some materials back to the soil. Organisms can survive only in environments in which their particular needs are met. A healthy ecosystem is one in which multiple species of different types are each able to meet their needs in a relatively stable web of life. Newly introduced species can damage the balance of an ecosystem.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "ecosystem"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS2.A.3-5.3",
+          "description": "The food of almost any kind of animal can be traced back to plants. Organisms are related in food webs in which some animals eat plants for food and other animals eat the animals that eat plants. Some organisms, such as fungi and bacteria, break down dead organisms (both plants or plants parts and animals) and therefore operate as \"decomposers.\" Decomposition eventually restores (recycles) some materials back to the soil. Organisms can survive only in environments in which their particular needs are met. A healthy ecosystem is one in which multiple species of different types are each able to meet their needs in a relatively stable web of life. Newly introduced species can damage the balance of an ecosystem.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS1.C.3-5.3",
+      "title": "Plants acquire their material for growth chiefly from air and water",
+      "description": "Plants acquire their material for growth chiefly from air and water.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS1.C.3-5.3",
+          "description": "Plants acquire their material for growth chiefly from air and water.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.LS1.C.3-5.2",
+      "title": "Food provides animals with the materials they need for body repair and growth...",
+      "description": "Food provides animals with the materials they need for body repair and growth and the energy they need to maintain body warmth and for motion.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "energy",
+        "motion"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.LS1.C.3-5.2",
+          "description": "Food provides animals with the materials they need for body repair and growth and the energy they need to maintain body warmth and for motion.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS3.D.3-5.2",
+      "title": "The energy released [from] food was once energy from the sun that was capture...",
+      "description": "The energy released [from] food was once energy from the sun that was captured by plants in the chemical process that forms plant matter (from air and water).",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "energy",
+        "matter"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS3.D.3-5.2",
+          "description": "The energy released [from] food was once energy from the sun that was captured by plants in the chemical process that forms plant matter (from air and water).",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS2.B.3-5.3",
+      "title": "The gravitational force of Earth acting on an object near Earth's surface pul...",
+      "description": "The gravitational force of Earth acting on an object near Earth's surface pulls that object toward the planet's center.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "force",
+        "earth"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS2.B.3-5.3",
+          "description": "The gravitational force of Earth acting on an object near Earth's surface pulls that object toward the planet's center.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.B.3-5.2",
+      "title": "No matter what reaction or change in properties occurs, the total weight of t...",
+      "description": "No matter what reaction or change in properties occurs, the total weight of the substances does not change. (Boundary: Mass and weight are not distinguished at this grade level.)",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "matter"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.B.3-5.2",
+          "description": "No matter what reaction or change in properties occurs, the total weight of the substances does not change. (Boundary: Mass and weight are not distinguished at this grade level.)",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.B.3-5.1",
+      "title": "When two or more different substances are mixed, a new substance with differe...",
+      "description": "When two or more different substances are mixed, a new substance with different properties may be formed.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.B.3-5.1",
+          "description": "When two or more different substances are mixed, a new substance with different properties may be formed.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.A.3-5.3",
+      "title": "Measurements of a variety of properties can be used to identify materials",
+      "description": "Measurements of a variety of properties can be used to identify materials. (Boundary: At this grade level, mass and weight are not distinguished, and no attempt is made to define the unseen particles or explain the atomic-scale mechanism of evaporation and condensation.)",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "measurement"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.A.3-5.3",
+          "description": "Measurements of a variety of properties can be used to identify materials. (Boundary: At this grade level, mass and weight are not distinguished, and no attempt is made to define the unseen particles or explain the atomic-scale mechanism of evaporation and condensation.)",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.A.3-5.2",
+      "title": "The amount (weight) of matter is conserved when it changes form, even in tran...",
+      "description": "The amount (weight) of matter is conserved when it changes form, even in transitions in which it seems to vanish.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "matter"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.A.3-5.2",
+          "description": "The amount (weight) of matter is conserved when it changes form, even in transitions in which it seems to vanish.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "DCI.PS1.A.3-5.1",
+      "title": "Matter of any type can be subdivided into particles that are too small to see...",
+      "description": "Matter of any type can be subdivided into particles that are too small to see, but even then the matter still exists and can be detected by other means. A model showing that gases are made from matter particles that are too small to see and are moving freely around in space can explain many observations, including the inflation and shape of a balloon and the effects of air on larger particles or objects.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Disciplinary Core Ideas",
+      "tags": [
+        "observation",
+        "matter"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "DCI.PS1.A.3-5.1",
+          "description": "Matter of any type can be subdivided into particles that are too small to see, but even then the matter still exists and can be detected by other means. A model showing that gases are made from matter particles that are too small to see and are moving freely around in space can explain many observations, including the inflation and shape of a balloon and the effects of air on larger particles or objects.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.12.5.2",
+      "title": "Describe and graph quantities such as area and volume to address scientific q...",
+      "description": "Describe and graph quantities such as area and volume to address scientific questions.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "area",
+        "volume",
+        "scientific"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.12.5.2",
+          "description": "Describe and graph quantities such as area and volume to address scientific questions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.12.5.1",
+      "title": "Measure and graph quantities such as weight to address scientific and enginee...",
+      "description": "Measure and graph quantities such as weight to address scientific and engineering questions and problems.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "scientific"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.12.5.1",
+          "description": "Measure and graph quantities such as weight to address scientific and engineering questions and problems.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.12.5",
+      "title": "Mathematical and computational thinking in 3–5 builds on K–2 experiences ...",
+      "description": "Mathematical and computational thinking in 3–5 builds on K–2 experiences and progresses to extending quantitative measurements to a variety of physical properties and using computation and mathematics to analyze data and compare alternative design solutions.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "measurement",
+        "data"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.12.5",
+          "description": "Mathematical and computational thinking in 3–5 builds on K–2 experiences and progresses to extending quantitative measurements to a variety of physical properties and using computation and mathematics to analyze data and compare alternative design solutions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.11.2",
+      "title": "Science explanations describe the mechanisms for natural events",
+      "description": "Science explanations describe the mechanisms for natural events.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.11.2",
+          "description": "Science explanations describe the mechanisms for natural events.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.3-5.6",
+      "title": "Make observations and measurements to produce data to serve as the basis for ...",
+      "description": "Make observations and measurements to produce data to serve as the basis for evidence for an explanation of a phenomenon.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "measurement",
+        "data",
+        "evidence",
+        "observation"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.3-5.6",
+          "description": "Make observations and measurements to produce data to serve as the basis for evidence for an explanation of a phenomenon.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.3-5.5",
+      "title": "Conduct an investigation collaboratively to produce data to serve as the basi...",
+      "description": "Conduct an investigation collaboratively to produce data to serve as the basis for evidence, using fair tests in which variables are controlled and the number of trials considered.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "evidence"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.3-5.5",
+          "description": "Conduct an investigation collaboratively to produce data to serve as the basis for evidence, using fair tests in which variables are controlled and the number of trials considered.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.3-5.1",
+      "title": "Plan and conduct an investigation collaboratively to produce data to serve as...",
+      "description": "Plan and conduct an investigation collaboratively to produce data to serve as the basis for evidence, using fair tests in which variables are controlled and the number of trials considered.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "evidence"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.3-5.1",
+          "description": "Plan and conduct an investigation collaboratively to produce data to serve as the basis for evidence, using fair tests in which variables are controlled and the number of trials considered.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.7.3-5",
+      "title": "Planning and carrying out investigations to answer questions or test solution...",
+      "description": "Planning and carrying out investigations to answer questions or test solutions to problems in 3–5 builds on K–2 experiences and progresses to include investigations that control variables and provide evidence to support explanations or design solutions.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.7.3-5",
+          "description": "Planning and carrying out investigations to answer questions or test solutions to problems in 3–5 builds on K–2 experiences and progresses to include investigations that control variables and provide evidence to support explanations or design solutions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.6.3-5.2",
+      "title": "Obtain and combine information from books and/or other reliable media to expl...",
+      "description": "Obtain and combine information from books and/or other reliable media to explain phenomena or solutions to a design problem.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.6.3-5.2",
+          "description": "Obtain and combine information from books and/or other reliable media to explain phenomena or solutions to a design problem.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.6.3-5",
+      "title": "Obtaining, evaluating, and communicating information in 3–5 builds on K–2...",
+      "description": "Obtaining, evaluating, and communicating information in 3–5 builds on K–2 experiences and progresses to evaluating the merit and accuracy of ideas and methods.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.6.3-5",
+          "description": "Obtaining, evaluating, and communicating information in 3–5 builds on K–2 experiences and progresses to evaluating the merit and accuracy of ideas and methods.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.5.3-5.4",
+      "title": "Support an argument with evidence, data, or a model",
+      "description": "Support an argument with evidence, data, or a model.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "argument",
+        "evidence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.5.3-5.4",
+          "description": "Support an argument with evidence, data, or a model.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.5.3-5",
+      "title": "Engaging in argument from evidence in 3–5 builds on K–2 experiences and p...",
+      "description": "Engaging in argument from evidence in 3–5 builds on K–2 experiences and progresses to critiquing the scientific explanations or solutions proposed by peers by citing relevant evidence about the natural and designed world(s).",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "argument",
+        "evidence",
+        "scientific"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.5.3-5",
+          "description": "Engaging in argument from evidence in 3–5 builds on K–2 experiences and progresses to critiquing the scientific explanations or solutions proposed by peers by citing relevant evidence about the natural and designed world(s).",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.3-5.6",
+      "title": "Develop a model using an example to describe a scientific principle",
+      "description": "Develop a model using an example to describe a scientific principle.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "scientific"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.3-5.6",
+          "description": "Develop a model using an example to describe a scientific principle.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.3-5.5",
+      "title": "Use models to describe phenomena",
+      "description": "Use models to describe phenomena.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.3-5.5",
+          "description": "Use models to describe phenomena.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.3-5.4",
+      "title": "Develop a model to describe phenomena",
+      "description": "Develop a model to describe phenomena.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.3-5.4",
+          "description": "Develop a model to describe phenomena.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.4.3-5",
+      "title": "Modeling in 3–5 builds on K–2 experiences and progresses to building and ...",
+      "description": "Modeling in 3–5 builds on K–2 experiences and progresses to building and revising simple models and using models to represent events and design solutions.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.4.3-5",
+          "description": "Modeling in 3–5 builds on K–2 experiences and progresses to building and revising simple models and using models to represent events and design solutions.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.3-5.7",
+      "title": "Generate and compare multiple solutions to a problem based on how well they m...",
+      "description": "Generate and compare multiple solutions to a problem based on how well they meet the criteria and constraints of the design problem.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.3-5.7",
+          "description": "Generate and compare multiple solutions to a problem based on how well they meet the criteria and constraints of the design problem.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.3-5.5",
+      "title": "Generate and compare multiple solutions to a problem based on how well they m...",
+      "description": "Generate and compare multiple solutions to a problem based on how well they meet the criteria and constraints of the design solution.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.3-5.5",
+          "description": "Generate and compare multiple solutions to a problem based on how well they meet the criteria and constraints of the design solution.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.3.3-5",
+      "title": "Constructing explanations and designing solutions in 3–5 builds on K–2 ex...",
+      "description": "Constructing explanations and designing solutions in 3–5 builds on K–2 experiences and progresses to the use of evidence in constructing explanations that specify variables that describe and predict phenomena and in designing multiple solutions to design problems.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.3.3-5",
+          "description": "Constructing explanations and designing solutions in 3–5 builds on K–2 experiences and progresses to the use of evidence in constructing explanations that specify variables that describe and predict phenomena and in designing multiple solutions to design problems.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.2.3-5.4",
+      "title": "Define a simple design problem that can be solved through the development of ...",
+      "description": "Define a simple design problem that can be solved through the development of an object, tool, process, or system and includes several criteria for success and constraints on materials, time, or cost.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.2.3-5.4",
+          "description": "Define a simple design problem that can be solved through the development of an object, tool, process, or system and includes several criteria for success and constraints on materials, time, or cost.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.2.3-5",
+      "title": "Asking questions and defining problems in grades 3–5 builds on grades K–2...",
+      "description": "Asking questions and defining problems in grades 3–5 builds on grades K–2 experiences and progresses to specifying qualitative relationships.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.2.3-5",
+          "description": "Asking questions and defining problems in grades 3–5 builds on grades K–2 experiences and progresses to specifying qualitative relationships.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.1.3-5.3",
+      "title": "Represent data in graphical displays (bar graphs, pictographs and/or pie char...",
+      "description": "Represent data in graphical displays (bar graphs, pictographs and/or pie charts) to reveal patterns that indicate relationships.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "patterns",
+        "graphs"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.1.3-5.3",
+          "description": "Represent data in graphical displays (bar graphs, pictographs and/or pie charts) to reveal patterns that indicate relationships.",
+          "grade_level": "Grade5"
+        }
+      ]
+    },
+    {
+      "id": "SEP.1.3-5",
+      "title": "Analyzing data in 3–5 builds on K–2 experiences and progresses to introdu...",
+      "description": "Analyzing data in 3–5 builds on K–2 experiences and progresses to introducing quantitative approaches to collecting data and conducting multiple trials of qualitative observations. When possible and feasible, digital tools should be used.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Science and Engineering Practices",
+      "tags": [
+        "data",
+        "observation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Science",
+      "academic_standards": [
+        {
+          "framework": "Next Generation Science Standards",
+          "code": "SEP.1.3-5",
+          "description": "Analyzing data in 3–5 builds on K–2 experiences and progresses to introducing quantitative approaches to collecting data and conducting multiple trials of qualitative observations. When possible and feasible, digital tools should be used.",
+          "grade_level": "Grade5"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "SEP.1.3-5",
+      "to": "SEP.1.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.1.3-5 is a prerequisite for SEP.1.3-5.3 within the same domain."
+    },
+    {
+      "from": "SEP.1.3-5.3",
+      "to": "SEP.2.3-5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.1.3-5.3 is a prerequisite for SEP.2.3-5 within the same domain."
+    },
+    {
+      "from": "SEP.2.3-5",
+      "to": "SEP.2.3-5.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.2.3-5 is a prerequisite for SEP.2.3-5.4 within the same domain."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "SEP.3.3-5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.2.3-5.4 is a prerequisite for SEP.3.3-5 within the same domain."
+    },
+    {
+      "from": "SEP.3.3-5",
+      "to": "SEP.3.3-5.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.3-5 is a prerequisite for SEP.3.3-5.5 within the same domain."
+    },
+    {
+      "from": "SEP.3.3-5.5",
+      "to": "SEP.3.3-5.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.3-5.5 is a prerequisite for SEP.3.3-5.7 within the same domain."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "SEP.4.3-5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.3.3-5.7 is a prerequisite for SEP.4.3-5 within the same domain."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "SEP.4.3-5.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.3-5 is a prerequisite for SEP.4.3-5.4 within the same domain."
+    },
+    {
+      "from": "SEP.4.3-5.4",
+      "to": "SEP.4.3-5.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.3-5.4 is a prerequisite for SEP.4.3-5.5 within the same domain."
+    },
+    {
+      "from": "SEP.4.3-5.5",
+      "to": "SEP.4.3-5.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.3-5.5 is a prerequisite for SEP.4.3-5.6 within the same domain."
+    },
+    {
+      "from": "SEP.4.3-5.6",
+      "to": "SEP.5.3-5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.4.3-5.6 is a prerequisite for SEP.5.3-5 within the same domain."
+    },
+    {
+      "from": "SEP.5.3-5",
+      "to": "SEP.5.3-5.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.5.3-5 is a prerequisite for SEP.5.3-5.4 within the same domain."
+    },
+    {
+      "from": "SEP.5.3-5.4",
+      "to": "SEP.6.3-5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.5.3-5.4 is a prerequisite for SEP.6.3-5 within the same domain."
+    },
+    {
+      "from": "SEP.6.3-5",
+      "to": "SEP.6.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.6.3-5 is a prerequisite for SEP.6.3-5.2 within the same domain."
+    },
+    {
+      "from": "SEP.6.3-5.2",
+      "to": "SEP.7.3-5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.6.3-5.2 is a prerequisite for SEP.7.3-5 within the same domain."
+    },
+    {
+      "from": "SEP.7.3-5",
+      "to": "SEP.7.3-5.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.3-5 is a prerequisite for SEP.7.3-5.1 within the same domain."
+    },
+    {
+      "from": "SEP.7.3-5.1",
+      "to": "SEP.7.3-5.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.3-5.1 is a prerequisite for SEP.7.3-5.5 within the same domain."
+    },
+    {
+      "from": "SEP.7.3-5.5",
+      "to": "SEP.7.3-5.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.3-5.5 is a prerequisite for SEP.7.3-5.6 within the same domain."
+    },
+    {
+      "from": "SEP.7.3-5.6",
+      "to": "SEP.11.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.7.3-5.6 is a prerequisite for SEP.11.2 within the same domain."
+    },
+    {
+      "from": "SEP.11.2",
+      "to": "SEP.12.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.11.2 is a prerequisite for SEP.12.5 within the same domain."
+    },
+    {
+      "from": "SEP.12.5",
+      "to": "SEP.12.5.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.12.5 is a prerequisite for SEP.12.5.1 within the same domain."
+    },
+    {
+      "from": "SEP.12.5.1",
+      "to": "SEP.12.5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "SEP.12.5.1 is a prerequisite for SEP.12.5.2 within the same domain."
+    },
+    {
+      "from": "CCC.1.3-5.9",
+      "to": "CCC.2.3-5.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.1.3-5.9 is a prerequisite for CCC.2.3-5.4 within the same domain."
+    },
+    {
+      "from": "CCC.2.3-5.4",
+      "to": "CCC.2.3-5.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.2.3-5.4 is a prerequisite for CCC.2.3-5.5 within the same domain."
+    },
+    {
+      "from": "CCC.2.3-5.5",
+      "to": "CCC.3.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.2.3-5.5 is a prerequisite for CCC.3.3-5.2 within the same domain."
+    },
+    {
+      "from": "CCC.3.3-5.2",
+      "to": "CCC.3.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.3.3-5.2 is a prerequisite for CCC.3.3-5.3 within the same domain."
+    },
+    {
+      "from": "CCC.3.3-5.3",
+      "to": "CCC.3.3-5.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.3.3-5.3 is a prerequisite for CCC.3.3-5.4 within the same domain."
+    },
+    {
+      "from": "CCC.3.3-5.4",
+      "to": "CCC.4.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.3.3-5.4 is a prerequisite for CCC.4.3-5.2 within the same domain."
+    },
+    {
+      "from": "CCC.4.3-5.2",
+      "to": "CCC.5.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.4.3-5.2 is a prerequisite for CCC.5.3-5.2 within the same domain."
+    },
+    {
+      "from": "CCC.5.3-5.2",
+      "to": "CCC.5.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.5.3-5.2 is a prerequisite for CCC.5.3-5.3 within the same domain."
+    },
+    {
+      "from": "CCC.5.3-5.3",
+      "to": "CCC.8.3-5.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.5.3-5.3 is a prerequisite for CCC.8.3-5.5 within the same domain."
+    },
+    {
+      "from": "CCC.8.3-5.5",
+      "to": "CCC.8.3-5.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.8.3-5.5 is a prerequisite for CCC.8.3-5.8 within the same domain."
+    },
+    {
+      "from": "CCC.8.3-5.8",
+      "to": "CCC.10.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.8.3-5.8 is a prerequisite for CCC.10.3-5.2 within the same domain."
+    },
+    {
+      "from": "CCC.10.3-5.2",
+      "to": "CCC.11.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCC.10.3-5.2 is a prerequisite for CCC.11.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.A.3-5.1",
+      "to": "DCI.PS1.A.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.A.3-5.1 is a prerequisite for DCI.PS1.A.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.A.3-5.2",
+      "to": "DCI.PS1.A.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.A.3-5.2 is a prerequisite for DCI.PS1.A.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.A.3-5.3",
+      "to": "DCI.PS1.B.3-5.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.A.3-5.3 is a prerequisite for DCI.PS1.B.3-5.1 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.B.3-5.1",
+      "to": "DCI.PS1.B.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.B.3-5.1 is a prerequisite for DCI.PS1.B.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.PS1.B.3-5.2",
+      "to": "DCI.PS2.B.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS1.B.3-5.2 is a prerequisite for DCI.PS2.B.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.PS2.B.3-5.3",
+      "to": "DCI.PS3.D.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS2.B.3-5.3 is a prerequisite for DCI.PS3.D.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.PS3.D.3-5.2",
+      "to": "DCI.LS1.C.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.PS3.D.3-5.2 is a prerequisite for DCI.LS1.C.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.LS1.C.3-5.2",
+      "to": "DCI.LS1.C.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS1.C.3-5.2 is a prerequisite for DCI.LS1.C.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.LS1.C.3-5.3",
+      "to": "DCI.LS2.A.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS1.C.3-5.3 is a prerequisite for DCI.LS2.A.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.LS2.A.3-5.3",
+      "to": "DCI.LS2.B.3-5.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS2.A.3-5.3 is a prerequisite for DCI.LS2.B.3-5.1 within the same domain."
+    },
+    {
+      "from": "DCI.LS2.B.3-5.1",
+      "to": "DCI.ESS1.A.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.LS2.B.3-5.1 is a prerequisite for DCI.ESS1.A.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.ESS1.A.3-5.2",
+      "to": "DCI.ESS1.B.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS1.A.3-5.2 is a prerequisite for DCI.ESS1.B.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.ESS1.B.3-5.2",
+      "to": "DCI.ESS2.A.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS1.B.3-5.2 is a prerequisite for DCI.ESS2.A.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.ESS2.A.3-5.3",
+      "to": "DCI.ESS2.C.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS2.A.3-5.3 is a prerequisite for DCI.ESS2.C.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.ESS2.C.3-5.2",
+      "to": "DCI.ESS3.C.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS2.C.3-5.2 is a prerequisite for DCI.ESS3.C.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.ESS3.C.3-5.2",
+      "to": "DCI.ETS1.A.3-5.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ESS3.C.3-5.2 is a prerequisite for DCI.ETS1.A.3-5.1 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.A.3-5.1",
+      "to": "DCI.ETS1.B.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.A.3-5.1 is a prerequisite for DCI.ETS1.B.3-5.2 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.B.3-5.2",
+      "to": "DCI.ETS1.B.3-5.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.B.3-5.2 is a prerequisite for DCI.ETS1.B.3-5.3 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.B.3-5.3",
+      "to": "DCI.ETS1.B.3-5.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.B.3-5.3 is a prerequisite for DCI.ETS1.B.3-5.4 within the same domain."
+    },
+    {
+      "from": "DCI.ETS1.B.3-5.4",
+      "to": "DCI.ETS1.C.3-5.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "DCI.ETS1.B.3-5.4 is a prerequisite for DCI.ETS1.C.3-5.2 within the same domain."
+    }
+  ]
+}

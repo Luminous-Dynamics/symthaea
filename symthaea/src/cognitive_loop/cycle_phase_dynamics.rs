@@ -392,7 +392,7 @@ impl CognitiveLoopService {
             self.behavior.emotion_contagion.valence,
             self.thermodynamic_load,
             self.carryover.quality.last_dissipative_health,
-            self.somatic_bridge.systemic_stress(),
+            self.sensorimotor.somatic_bridge.systemic_stress(),
             urgency,
             false, // attention_budget_exceeded not yet known at this point
             &perception.encoding.compressed_state,
@@ -551,10 +551,70 @@ impl CognitiveLoopService {
                         .record("swarm_manager", swarm_output);
                 }
 
+                // ── Muse Manager (interval 1, every cycle) ──────────
+                // Streaming consciousness-driven music synthesis with
+                // allostatic sonification and peer distress resonance.
+                #[cfg(feature = "muse")]
+                {
+                    use super::subsystem_trait::CognitiveSubsystem;
+                    self.muse_manager.inject_neuromod(
+                        self.neuromod.bath.dopamine.effective(),
+                        self.neuromod.bath.serotonin.effective(),
+                        self.neuromod.bath.noradrenaline.effective(),
+                        self.neuromod.bath.allostatic_load,
+                    );
+                    let energy_ratio = if self.substrate_manager.consciousness_viable {
+                        0.0
+                    } else {
+                        1.0
+                    };
+                    self.muse_manager.inject_substrate(
+                        self.substrate_manager.feasibility,
+                        energy_ratio,
+                    );
+                    let safety_u8 = if snapshot.unified_psi > 0.6 {
+                        0
+                    } else if snapshot.unified_psi > 0.3 {
+                        1
+                    } else if snapshot.unified_psi > 0.1 {
+                        2
+                    } else {
+                        3
+                    };
+                    self.muse_manager.inject_safety(safety_u8);
+
+                    if self.muse_manager.should_run(cycle_num, urgency_u8) {
+                        let muse_output = self.muse_manager.process(snapshot);
+                        self.subsystem_collector
+                            .record("muse_manager", muse_output);
+                    }
+                }
+
+                // ── Thermodynamic Manager (interval 43, co-prime) ─────
+                // Unified thermodynamics: cross-couples dissipative,
+                // analyzer, HFE, physics bridge. Inputs set by cycle_consciousness,
+                // integration, monitors, and cycle phases.
+                {
+                    use super::subsystem_trait::CognitiveSubsystem;
+                    if self.thermodynamic_mgr.should_run(cycle_num, urgency_u8) {
+                        let thermo_output = self.thermodynamic_mgr.process(snapshot);
+                        self.subsystem_collector
+                            .record("thermodynamic_manager", thermo_output);
+                    }
+                }
+
                 // ── Holon Receiver (every cycle — low cost) ────────────
-                // Process inbound messages from connected Soma devices.
+                // Drain HTTP channel into HolonReceiver, then process all queued messages.
                 // Routes tasks, knowledge, and peer state into the existing managers.
                 {
+                    // Drain mpsc channel from HTTP handlers (HolonHttpState) into HolonReceiver.
+                    if let Ok(guard) = self.holon_inbound_rx.lock() {
+                        if let Some(ref rx) = *guard {
+                            while let Ok((device_id, msg)) = rx.try_recv() {
+                                self.holon_receiver.enqueue_message(device_id, msg);
+                            }
+                        }
+                    }
                     let processed = self.holon_receiver.process_inbound(cycle_num as u64);
                     if processed > 0 {
                         // Collect peer data into local vec (avoid borrow conflict with swarm_manager)
@@ -1265,7 +1325,11 @@ impl CognitiveLoopService {
         let goal_attention_bias = mem_bind.goal_attention_bias;
 
         // Re-derive reflection thresholds (also used in FEP decomposition below)
-        let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
+        let reflection_thresholds = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .get_thresholds();
 
         // 1b. Analyze emotional content for simple contagion (keyword-based)
         self.behavior.emotion_contagion.analyze(input);
@@ -1349,8 +1413,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
         // ═══════════════════════════════════════════════════════════════════════
-        let simple_valence = self.behavior.emotion_contagion.prosody_valence() as f64;
-        let simple_arousal = self.behavior.emotion_contagion.prosody_arousal() as f64;
+        // Feed raw text-derived affect into unified bridge (EmotionContagion
+        // is a stateless preprocessor; smoothing happens in UnifiedEmotionalState).
+        let simple_valence = self.behavior.emotion_contagion.valence as f64;
+        let simple_arousal = self.behavior.emotion_contagion.arousal as f64;
         let dominance = if self.behavior.flow_state.in_flow {
             DOMINANCE_FLOW_BASE + DOMINANCE_FLOW_SCALE * self.behavior.flow_state.intensity as f64
         } else if self.prediction_confidence > DOMINANCE_CONFIDENCE_THRESHOLD {
@@ -1465,7 +1531,8 @@ impl CognitiveLoopService {
 
         self.behavior.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
         if wm_sensory_mismatch {
-            self.behavior.adaptive_behavior.attention_sensitivity *= ATTENTION_SENSITIVITY_BOOST_FACTOR;
+            self.behavior.adaptive_behavior.attention_sensitivity *=
+                ATTENTION_SENSITIVITY_BOOST_FACTOR;
             // Sensory-abstract mismatch → slow consolidation + dampen confidence.
             // Hierarchical decomposition is breaking → protect abstract representations.
             // Science: Friston (2010) — hierarchical level misalignment = high free energy.
@@ -1704,7 +1771,8 @@ impl CognitiveLoopService {
         }
 
         // ── Track 5e: Causal graph → attention weighting ─────────────────
-        let causal_attention_edges: usize = if let Some(ref enhancer) = self.memory.causal_enhancer {
+        let causal_attention_edges: usize = if let Some(ref enhancer) = self.memory.causal_enhancer
+        {
             let graph = enhancer.current_graph();
             let edge_count = graph.edges.len();
             if edge_count > 0 {
@@ -1773,11 +1841,12 @@ impl CognitiveLoopService {
                 FEP_COMPLEXITY_PAUSE_MULT,
             };
             self.behavior.adaptive_behavior.learning_rate_multiplier =
-                (self.behavior.adaptive_behavior.learning_rate_multiplier * FEP_COMPLEXITY_LR_DAMPEN)
+                (self.behavior.adaptive_behavior.learning_rate_multiplier
+                    * FEP_COMPLEXITY_LR_DAMPEN)
                     .max(FEP_COMPLEXITY_LR_FLOOR);
-            self.behavior.adaptive_behavior.pause_multiplier = (self.behavior.adaptive_behavior.pause_multiplier
-                * FEP_COMPLEXITY_PAUSE_MULT)
-                .min(FEP_COMPLEXITY_PAUSE_MAX);
+            self.behavior.adaptive_behavior.pause_multiplier =
+                (self.behavior.adaptive_behavior.pause_multiplier * FEP_COMPLEXITY_PAUSE_MULT)
+                    .min(FEP_COMPLEXITY_PAUSE_MAX);
             self.behavior.adaptive_behavior.action_hint = ActionHint::SlowDown;
         }
 
@@ -2095,6 +2164,73 @@ impl CognitiveLoopService {
         let guiding_priority_category = neuromod_result.guiding_priority_category;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // 10d.6a Markov Blanket Permeability (Friston 2013; Kirchhoff et al. 2018)
+        // ═══════════════════════════════════════════════════════════════════════
+        // Feed neuromodulator bath + sentinel threat + flow state into the
+        // boundary operator BEFORE the FEP cycle. This gates how much external
+        // surprise enters (sensory permeability) and how much internal state
+        // leaks outward (active permeability).
+        {
+            let blanket_inputs = crate::consciousness::fep_active_inference::PermeabilityInputs {
+                acetylcholine: self.neuromod.bath.acetylcholine.effective() as f64,
+                noradrenaline: self.neuromod.bath.noradrenaline.effective() as f64,
+                serotonin: self.neuromod.bath.serotonin.effective() as f64,
+                oxytocin: self.neuromod.bath.oxytocin.effective() as f64,
+                threat_level: self.sentinel_manager.threat_level() as f64,
+                peer_trust: self.swarm_manager.telemetry().connectivity_ema,
+                flow_state: self.behavior.flow_state.intensity as f64,
+            };
+            self.fep
+                .enhanced_bridge
+                .update_blanket_permeability(&blanket_inputs);
+        }
+
+        // Blanket → neuromodulator feedback (closed loop).
+        // The blanket state feeds back into neuromod bath:
+        // isolation → NE spike, coalescence → oxytocin, opening → 5-HT, closing → NE.
+        {
+            let perm = self.fep.enhanced_bridge.blanket.permeability();
+            let trend = self.fep.enhanced_bridge.blanket.trend();
+            if perm.effective < 0.2 {
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .produce((0.2 - perm.effective) as f32 * 0.3);
+            }
+            if self.fep.enhanced_bridge.blanket.coalescence_ready(0.6) {
+                self.neuromod.bath.oxytocin.produce(0.02);
+            }
+            if trend > 0.01 {
+                self.neuromod
+                    .bath
+                    .serotonin
+                    .produce((trend * 0.15).min(0.03) as f32);
+            }
+            if trend < -0.01 {
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .produce((-trend * 0.1).min(0.02) as f32);
+            }
+        }
+
+        // Topology → blanket constraint: coherence proxies boundary quality.
+        {
+            let boundary_thickness_proxy = (1.0 - coherence as f64).clamp(0.0, 1.0);
+            let fiedler_proxy = self.prediction_confidence.clamp(0.0, 2.0);
+            let boundary_components = if self.carryover.quality.subsystem_veto {
+                3
+            } else {
+                1
+            };
+            self.fep.apply_topology_constraints(
+                boundary_thickness_proxy,
+                fiedler_proxy,
+                boundary_components,
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // 10d.6b Enhanced FEP Bridge
         // ═══════════════════════════════════════════════════════════════════════
         let run_enhanced = surprise_triggered
@@ -2162,7 +2298,10 @@ impl CognitiveLoopService {
                 MotorCommandType::ReflectionInitiate => {
                     let intensity = enhanced_result.motor_command.intensity as f32;
                     if intensity > super::thresholds::MOTOR_REFLECTION_THRESHOLD {
-                        self.consciousness.self_model_tier.self_reflection.force_reflection();
+                        self.consciousness
+                            .self_model_tier
+                            .self_reflection
+                            .force_reflection();
                         // Boost meta-awareness proportional to intensity
                         self.adjust_confidence(
                             "motor_reflection",
@@ -2208,7 +2347,86 @@ impl CognitiveLoopService {
                                     .to_string(),
                             ),
                         };
-                        self.motor_rendering.last_result = Some(result);
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
+                    } else if self.carryover.quality.safety_motor_halt {
+                        // Safety enforcement Red: consciousness < 0.1 — hard motor halt.
+                        // This is the physical boundary of the consciousness safety cascade.
+                        // No motor output of any kind may execute at Red level.
+                        tracing::warn!(
+                            cycle = self.stats.total_cycles,
+                            "Motor output HALTED by safety enforcement (Red level) \
+                             — consciousness below critical threshold"
+                        );
+                        let result = super::motor_output_bridge::MotorOutputResult {
+                            success: false,
+                            action_type: None,
+                            prediction_error: 1.0,
+                            outcome: None,
+                            error: Some(
+                                "Motor output halted — safety level Red \
+                                 (consciousness below 0.1)"
+                                    .to_string(),
+                            ),
+                        };
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
+                    } else if self.carryover.quality.safety_motor_readonly {
+                        // Safety enforcement Orange: only read-only actions permitted.
+                        // Write, execute, and destructive actions are blocked.
+                        let is_readonly = enhanced_result
+                            .motor_command
+                            .parameters
+                            .first()
+                            .and_then(|&v| super::motor_output_bridge::ActionType::from_param(v))
+                            .map_or(false, |at| matches!(
+                                at,
+                                super::motor_output_bridge::ActionType::Read
+                                | super::motor_output_bridge::ActionType::List
+                                | super::motor_output_bridge::ActionType::Parse
+                            ));
+                        if is_readonly {
+                            // Read-only action: permitted at Orange level
+                            if let Some(ref mut bridge) =
+                                self.sensorimotor.motor_rendering.output_bridge
+                            {
+                                let request = self
+                                    .sensorimotor
+                                    .motor_rendering
+                                    .pending_request
+                                    .take()
+                                    .unwrap_or_default();
+                                let motor_phi =
+                                    if self.carryover.history.consciousness_level > 0.0 {
+                                        self.carryover.history.consciousness_level
+                                    } else {
+                                        coherence as f64
+                                    };
+                                let result = bridge.execute(
+                                    &enhanced_result.motor_command.parameters,
+                                    enhanced_result.motor_command.confidence,
+                                    motor_phi,
+                                    &request,
+                                );
+                                self.sensorimotor.motor_rendering.last_phi = motor_phi;
+                                self.sensorimotor.motor_rendering.last_result = Some(result);
+                            }
+                        } else {
+                            tracing::warn!(
+                                cycle = self.stats.total_cycles,
+                                "Non-read motor output blocked by safety enforcement \
+                                 (Orange level — read-only mode)"
+                            );
+                            let result = super::motor_output_bridge::MotorOutputResult {
+                                success: false,
+                                action_type: None,
+                                prediction_error: 1.0,
+                                outcome: None,
+                                error: Some(
+                                    "Motor output restricted to read-only — safety level Orange"
+                                        .to_string(),
+                                ),
+                            };
+                            self.sensorimotor.motor_rendering.last_result = Some(result);
+                        }
                     } else if self.carryover.quality.subsystem_veto {
                         // Subsystem veto: sentinel/safety manager flagged this cycle unsafe
                         tracing::warn!(
@@ -2226,9 +2444,12 @@ impl CognitiveLoopService {
                                     .to_string(),
                             ),
                         };
-                        self.motor_rendering.last_result = Some(result);
-                    } else if let Some(ref mut bridge) = self.motor_rendering.output_bridge {
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
+                    } else if let Some(ref mut bridge) =
+                        self.sensorimotor.motor_rendering.output_bridge
+                    {
                         let request = self
+                            .sensorimotor
                             .motor_rendering
                             .pending_request
                             .take()
@@ -2274,8 +2495,8 @@ impl CognitiveLoopService {
                         );
                         self.fep.agent.perceive(&motor_obs);
 
-                        self.motor_rendering.last_phi = motor_phi;
-                        self.motor_rendering.last_result = Some(result);
+                        self.sensorimotor.motor_rendering.last_phi = motor_phi;
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
                     }
                 }
                 MotorCommandType::NoOp => {}
@@ -2619,7 +2840,7 @@ impl CognitiveLoopService {
                     cycle_id: self.stats.total_cycles as u64,
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
-                    code_context: None,
+                    code_context: self.carryover.injected_code_context.take(),
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -2936,11 +3157,13 @@ impl CognitiveLoopService {
             fep_tau_factor,
             prediction_horizon_tau,
             causal_world_model_edges: if self
+                .memory
                 .causal_enhancer
                 .as_ref()
                 .map_or(false, |e| e.has_causal_structure())
             {
-                self.memory.causal_enhancer
+                self.memory
+                    .causal_enhancer
                     .as_ref()
                     .map_or(0, |e| e.current_graph().edges.len())
             } else {
@@ -3073,7 +3296,11 @@ impl CognitiveLoopService {
         };
 
         // Coherence gate: skip resonator recall during unstable CfC dynamics
-        let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
+        let reflection_thresholds = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .get_thresholds();
         let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < DYNAMICS_STARTUP_WARMUP_CYCLES;
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
@@ -3285,6 +3512,7 @@ impl CognitiveLoopService {
             .unwrap_or(Cow::Borrowed(&perception.encoding.compressed_state));
         let current_phi_for_lr = pre_update_coherence as f64;
         let mut semantic_lr_factor = self
+            .memory
             .memory_consol
             .semantic_memory
             .compute_lr_factor_phi_weighted(
@@ -3466,7 +3694,7 @@ impl CognitiveLoopService {
 
         // 10th factor: Thermal bridge — platform heat → CfC slowdown.
         // Science: Angilletta (2009) thermal performance curves.
-        let thermal_tau_factor = self.thermal_bridge.signals().tau_factor as f32;
+        let thermal_tau_factor = self.sensorimotor.thermal_bridge.signals().tau_factor as f32;
 
         // 11th factor: Neuroevolution champion τ — evolved tau_base ratio.
         // When neuroevolution discovers a better tau_base, blend it toward the
@@ -3515,6 +3743,7 @@ impl CognitiveLoopService {
             * coherence_velocity_tau_factor
             * prediction_horizon_tau
             * self
+                .sensorimotor
                 .somatic_bridge
                 .to_interoceptive_signals()
                 .tau_slowdown_factor as f32
@@ -4040,7 +4269,7 @@ impl CognitiveLoopService {
 
         let pp_total_cycles = self.stats.total_cycles;
         let pp_in_flow = self.behavior.flow_state.in_flow;
-        let pp_emotional_valence = self.behavior.emotion_contagion.prosody_valence();
+        let pp_emotional_valence = self.unification_engine.emotional.state().valence as f32;
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = coherence as f64;
         let pp_wm_importance_boost =
@@ -4155,8 +4384,10 @@ impl CognitiveLoopService {
         let had_semantic_eviction = evicted_semantic.is_some();
         if let Some(evicted) = evicted_semantic {
             let steps_survived = pp_total_cycles.saturating_sub(evicted.timestamp as usize) as u64;
-            self.memory.memory_consol.memory_coordinator.queue_graduation(
-                crate::memory::memory_coordinator::GraduationEvent {
+            self.memory
+                .memory_consol
+                .memory_coordinator
+                .queue_graduation(crate::memory::memory_coordinator::GraduationEvent {
                     content: symthaea_core::hdc::ContinuousHV::from_vec(evicted.hdc_vector),
                     label: evicted.category.unwrap_or_default(),
                     steps_survived,
@@ -4165,8 +4396,7 @@ impl CognitiveLoopService {
                     coherence_at_graduation: coherence as f64,
                     source: crate::memory::memory_coordinator::MemorySource::SemanticEviction,
                     is_verified: false,
-                },
-            );
+                });
         }
 
         // Apply memory context boost to confidence after rayon::join (deferred from parallel branch)
@@ -4176,16 +4406,31 @@ impl CognitiveLoopService {
 
         module_timings.core_parallel_postprocess = _t_core.elapsed().as_micros() as u64;
 
-        self.stats.semantic_hits = self.memory.memory_consol.semantic_memory.stats().semantic_hits;
-        self.stats.semantic_misses = self.memory.memory_consol.semantic_memory.stats().semantic_misses;
+        self.stats.semantic_hits = self
+            .memory
+            .memory_consol
+            .semantic_memory
+            .stats()
+            .semantic_hits;
+        self.stats.semantic_misses = self
+            .memory
+            .memory_consol
+            .semantic_memory
+            .stats()
+            .semantic_misses;
         self.stats.semantic_lr_factor = semantic_lr_factor;
         self.stats.semantic_avg_retrieved_error = self
+            .memory
             .memory_consol
             .semantic_memory
             .stats()
             .avg_retrieved_error;
-        self.stats.semantic_entries_stored =
-            self.memory.memory_consol.semantic_memory.stats().total_stored;
+        self.stats.semantic_entries_stored = self
+            .memory
+            .memory_consol
+            .semantic_memory
+            .stats()
+            .total_stored;
 
         TrainingPostResult {
             learning_occurred,
@@ -4219,7 +4464,8 @@ impl CognitiveLoopService {
         // High fatigue → widen spacing (don't generate when attention depleted).
         // Science: Mackworth (1948) — vigilance decrement degrades production quality.
         let fatigue_spacing_boost = if self
-            .consciousness.self_model_tier
+            .consciousness
+            .self_model_tier
             .attention_schema
             .as_ref()
             .map(|s| s.fatigue_level())
@@ -4379,8 +4625,10 @@ impl CognitiveLoopService {
                 epistemic_confidence: (self.carryover.quality.last_epistemic_confidence
                     - math_epistemic_penalty)
                     .clamp(0.0, 1.0),
-                emotional_valence: self.behavior.emotion_contagion.prosody_valence() + mode_valence_nudge,
-                emotional_arousal: self.behavior.emotion_contagion.prosody_arousal() + mode_arousal_nudge,
+                emotional_valence: self.unification_engine.emotional.state().valence as f32
+                    + mode_valence_nudge,
+                emotional_arousal: self.unification_engine.emotional.state().arousal as f32
+                    + mode_arousal_nudge,
                 emotional_warmth: mode_warmth,
                 consciousness_level: broca_psi,
                 meta_awareness: self.carryover.learning.self_model_accuracy as f32,
@@ -4453,6 +4701,7 @@ impl CognitiveLoopService {
                 cube_m_tier: self.carryover.quality.last_cube_m_tier,
                 cube_h_value: self.carryover.quality.last_cube_h_value,
                 cube_quality: self.carryover.quality.last_cube_quality,
+                code_channels: self.language_comm.broca_code_channels.take(),
 
                 // Compute HDC encoding of the epistemic cube via cached NSM grounding.
                 // Semantically encodes the cube position so the thought HV
@@ -4507,6 +4756,23 @@ impl CognitiveLoopService {
                     #[cfg(not(feature = "therapeutic"))]
                     let text = std::mem::take(&mut result.text);
                     self.language_comm.last_broca_text = Some(text);
+                }
+
+                // ── Factcheck bridge: extract claims from Broca output ──
+                #[cfg(all(feature = "mycelix", feature = "ssm_language"))]
+                if let Some(ref broca_text) = self.language_comm.last_broca_text {
+                    let _modulation = self
+                        .factcheck_bridge
+                        .on_broca_generation(broca_text, cycle_num);
+                    // If factcheck says suppress, clear the output
+                    if _modulation.suppress {
+                        self.language_comm.last_broca_text = None;
+                        tracing::info!(
+                            target: "cognitive_loop::factcheck",
+                            cycle = cycle_num,
+                            "Broca output suppressed by factcheck bridge (high-confidence False verdict)"
+                        );
+                    }
                 }
 
                 #[cfg(feature = "liquid-mamba")]
@@ -4668,8 +4934,9 @@ impl CognitiveLoopService {
     ///
     /// Returns (valence_pull, arousal_pull, pull_strength).
     fn apply_emotional_homeostasis(&mut self) -> (f32, f32, f32) {
-        let curr_v = self.behavior.emotion_contagion.valence;
-        let curr_a = self.behavior.emotion_contagion.prosody_arousal();
+        let unified_emo = self.unification_engine.emotional.state();
+        let curr_v = unified_emo.valence as f32;
+        let curr_a = unified_emo.arousal as f32;
 
         // Emotional inertia: resist rapid swings by blending toward previous state.
         // This closes the feedback loop — last_emotion_valence/arousal (written at

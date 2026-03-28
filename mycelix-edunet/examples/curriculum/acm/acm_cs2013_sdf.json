@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "title": "CS2013: Software Development Fundamentals",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Software Development Fundamentals",
+    "domain": "CS2013: Software Development Fundamentals",
+    "version": "2024",
+    "total_standards": 3,
+    "domains": [
+      "variables",
+      "problem solving",
+      "IDE"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Software Development Fundamentals. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 2
+  },
+  "nodes": [
+    {
+      "id": "SDF/Algorithms",
+      "title": "Algorithms and Design",
+      "description": "Algorithms and Design (Tier1, 11 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "problem solving",
+      "tags": [
+        "problem solving",
+        "algorithm design",
+        "pseudocode",
+        "testing",
+        "debugging"
+      ],
+      "estimated_hours": 33,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:SDF"
+    },
+    {
+      "id": "SDF/FundProg",
+      "title": "Fundamental Programming Concepts",
+      "description": "Fundamental Programming Concepts (Tier1, 10 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "variables",
+      "tags": [
+        "variables",
+        "expressions",
+        "control flow",
+        "functions",
+        "I/O",
+        "arrays"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:SDF"
+    },
+    {
+      "id": "SDF/DevMethods",
+      "title": "Development Methods",
+      "description": "Development Methods (Tier1, 10 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "IDE",
+      "tags": [
+        "IDE",
+        "version control",
+        "pair programming",
+        "code review",
+        "refactoring"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:SDF"
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,77 @@
+{
+  "metadata": {
+    "title": "CS2013: Networking and Communication",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Networking and Communication",
+    "domain": "CS2013: Networking and Communication",
+    "version": "2024",
+    "total_standards": 2,
+    "domains": [
+      "OSI model",
+      "sockets"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Networking and Communication. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 0
+  },
+  "nodes": [
+    {
+      "id": "NC/Intro",
+      "title": "Introduction to Networking",
+      "description": "Introduction to Networking (Tier1, 1 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "OSI model",
+      "tags": [
+        "OSI model",
+        "TCP/IP",
+        "protocols",
+        "network topologies"
+      ],
+      "estimated_hours": 3,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:NC"
+    },
+    {
+      "id": "NC/NetworkApps",
+      "title": "Networked Applications",
+      "description": "Networked Applications (Tier2, 3 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "sockets",
+      "tags": [
+        "sockets",
+        "HTTP",
+        "DNS",
+        "client-server",
+        "peer-to-peer"
+      ],
+      "estimated_hours": 9,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:NC"
+    }
+  ],
+  "edges": []
+}

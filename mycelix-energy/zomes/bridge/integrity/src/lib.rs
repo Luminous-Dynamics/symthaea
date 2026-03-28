@@ -1,11 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Energy Bridge Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Energy Bridge Integrity Zome
 //!
 //! Entry types for Terra Atlas integration, investment tracking,
 //! and regenerative exit coordination.
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::CrossClusterNotification;
 
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
@@ -541,6 +543,7 @@ pub enum EntryTypes {
     PerformanceBond(PerformanceBond),
     InsurancePool(InsurancePool),
     RiskAssessment(RiskAssessment),
+    Notification(CrossClusterNotification),
 }
 
 #[hdk_link_types]
@@ -570,6 +573,9 @@ pub enum LinkTypes {
     ProjectToBonds,
     PoolToMembers,
     ProjectToRiskAssessments,
+    AgentToNotification,
+    AllNotifications,
+    NotificationSubscription,
 }
 
 #[hdk_extern]
@@ -838,6 +844,11 @@ fn validate_entry(entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
                 return Ok(ValidateCallbackResult::Invalid("Meta awareness must be 0.0-1.0".into()));
             }
             Ok(ValidateCallbackResult::Valid)
+        }
+        EntryTypes::Notification(n) => {
+            mycelix_bridge_entry_types::validate_notification(&n)
+                .map(|()| ValidateCallbackResult::Valid)
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))
         }
         _ => Ok(ValidateCallbackResult::Valid),
     }

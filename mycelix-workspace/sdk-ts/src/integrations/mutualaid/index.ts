@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Mutual Aid Integration
  *
@@ -341,6 +344,303 @@ export class MutualAidService {
     const summary = this.getMemberSummary(memberId);
     return summary.hoursGiven - summary.hoursReceived;
   }
+}
+
+// ============================================================================
+// Bridge Client (Holochain Zome Calls)
+// ============================================================================
+
+import { type MycelixClient } from '../../client/index.js';
+
+const COMMONS_CARE_ROLE = 'commons_care';
+
+/**
+ * MutualAidBridgeClient - Direct Holochain zome calls for mutual aid operations
+ *
+ * Provides the same capabilities as MutualAidService but backed by the
+ * Holochain conductor instead of in-memory Maps.
+ */
+export class MutualAidBridgeClient {
+  constructor(private client: MycelixClient) {}
+
+  // --- mutualaid_needs zome ---
+
+  async createNeed(input: {
+    circle_id: string;
+    requester_id: string;
+    title: string;
+    description?: string;
+    category: NeedCategory;
+    estimated_hours: number;
+    urgent?: boolean;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'create_need',
+      payload: input,
+    });
+  }
+
+  async getNeed(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'get_need',
+      payload: actionHash,
+    });
+  }
+
+  async getMyNeeds(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'get_my_needs',
+      payload: null,
+    });
+  }
+
+  async searchNeeds(input: {
+    category?: NeedCategory;
+    urgent_only?: boolean;
+    circle_id?: string;
+  }): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'search_needs',
+      payload: input,
+    });
+  }
+
+  async getEmergencyNeeds(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'get_emergency_needs',
+      payload: null,
+    });
+  }
+
+  async withdrawNeed(needHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'withdraw_need',
+      payload: needHash,
+    });
+  }
+
+  async createOffer(input: {
+    need_hash: Uint8Array;
+    description?: string;
+    estimated_hours: number;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'create_offer',
+      payload: input,
+    });
+  }
+
+  async getOffer(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'get_offer',
+      payload: actionHash,
+    });
+  }
+
+  async proposeMatch(input: {
+    need_hash: Uint8Array;
+    offer_hash: Uint8Array;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'propose_match',
+      payload: input,
+    });
+  }
+
+  async acceptMatch(matchHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'accept_match',
+      payload: matchHash,
+    });
+  }
+
+  async fulfillMatch(input: {
+    match_hash: Uint8Array;
+    hours_spent: number;
+    note?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'fulfill_match',
+      payload: input,
+    });
+  }
+
+  async confirmFulfillment(fulfillmentHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_needs',
+      fn_name: 'confirm_fulfillment',
+      payload: fulfillmentHash,
+    });
+  }
+
+  // --- mutualaid_requests zome ---
+
+  async createRequest(input: {
+    request_type: string;
+    title: string;
+    description: string;
+    urgency: string;
+    requester_did: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_requests',
+      fn_name: 'create_request',
+      payload: input,
+    });
+  }
+
+  async getRequest(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_requests',
+      fn_name: 'get_request',
+      payload: actionHash,
+    });
+  }
+
+  async getOpenRequests(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_requests',
+      fn_name: 'get_open_requests',
+      payload: null,
+    });
+  }
+
+  async updateRequestStatus(input: {
+    request_hash: Uint8Array;
+    new_status: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_requests',
+      fn_name: 'update_request_status',
+      payload: input,
+    });
+  }
+
+  async cancelRequest(requestHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_requests',
+      fn_name: 'cancel_request',
+      payload: requestHash,
+    });
+  }
+
+  // --- mutualaid_resources zome ---
+
+  async createResource(input: {
+    name: string;
+    description: string;
+    resource_type: string;
+    owner: Uint8Array;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'create_resource',
+      payload: input,
+    });
+  }
+
+  async getResource(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'get_resource',
+      payload: actionHash,
+    });
+  }
+
+  async getMyResources(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'get_my_resources',
+      payload: null,
+    });
+  }
+
+  async searchResources(input: {
+    resource_type?: string;
+    available_only?: boolean;
+  }): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'search_resources',
+      payload: input,
+    });
+  }
+
+  async createBooking(input: {
+    resource_hash: Uint8Array;
+    start_time: number;
+    end_time: number;
+    purpose?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'create_booking',
+      payload: input,
+    });
+  }
+
+  async confirmBooking(bookingHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'confirm_booking',
+      payload: bookingHash,
+    });
+  }
+
+  async cancelBooking(bookingHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: COMMONS_CARE_ROLE,
+      zome_name: 'mutualaid_resources',
+      fn_name: 'cancel_booking',
+      payload: bookingHash,
+    });
+  }
+}
+
+// Bridge client singleton
+let mutualAidBridgeInstance: MutualAidBridgeClient | null = null;
+
+export function getMutualAidBridgeClient(client: MycelixClient): MutualAidBridgeClient {
+  if (!mutualAidBridgeInstance) mutualAidBridgeInstance = new MutualAidBridgeClient(client);
+  return mutualAidBridgeInstance;
+}
+
+export function resetMutualAidBridgeClient(): void {
+  mutualAidBridgeInstance = null;
 }
 
 // ============================================================================

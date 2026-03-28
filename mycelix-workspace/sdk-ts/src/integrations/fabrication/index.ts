@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Fabrication Integration
  *
@@ -1266,4 +1269,248 @@ export function getFabricationService(): FabricationService {
     defaultService = new FabricationService();
   }
   return defaultService;
+}
+
+// ============================================================================
+// Holochain Conductor Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Fabrication */
+export class FabricationBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    }
+  ) {}
+
+  // ---- BOM (Bill of Materials) ----
+
+  async createBom(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'bom',
+      fn_name: 'create_bom',
+      payload,
+    });
+  }
+
+  async getBom(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'bom',
+      fn_name: 'get_bom',
+      payload,
+    });
+  }
+
+  async updateBom(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'bom',
+      fn_name: 'update_bom',
+      payload,
+    });
+  }
+
+  async deleteBom(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'bom',
+      fn_name: 'delete_bom',
+      payload,
+    });
+  }
+
+  async listBoms(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'bom',
+      fn_name: 'list_boms',
+      payload,
+    });
+  }
+
+  // ---- Machines ----
+
+  async registerMachine(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'machines',
+      fn_name: 'register_machine',
+      payload,
+    });
+  }
+
+  async getMachine(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'machines',
+      fn_name: 'get_machine',
+      payload,
+    });
+  }
+
+  async updateMachine(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'machines',
+      fn_name: 'update_machine',
+      payload,
+    });
+  }
+
+  async listMachines(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'machines',
+      fn_name: 'list_machines',
+      payload,
+    });
+  }
+
+  async updateMachineStatus(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'machines',
+      fn_name: 'update_machine_status',
+      payload,
+    });
+  }
+
+  // ---- Operations ----
+
+  async createOperation(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'operations',
+      fn_name: 'create_operation',
+      payload,
+    });
+  }
+
+  async getOperation(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'operations',
+      fn_name: 'get_operation',
+      payload,
+    });
+  }
+
+  async updateOperation(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'operations',
+      fn_name: 'update_operation',
+      payload,
+    });
+  }
+
+  async completeOperation(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'operations',
+      fn_name: 'complete_operation',
+      payload,
+    });
+  }
+
+  async listOperations(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'operations',
+      fn_name: 'list_operations',
+      payload,
+    });
+  }
+
+  // ---- Planning ----
+
+  async createProductionPlan(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'planning',
+      fn_name: 'create_production_plan',
+      payload,
+    });
+  }
+
+  async getProductionPlan(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'planning',
+      fn_name: 'get_production_plan',
+      payload,
+    });
+  }
+
+  async updateProductionPlan(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'planning',
+      fn_name: 'update_production_plan',
+      payload,
+    });
+  }
+
+  async listProductionPlans(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'planning',
+      fn_name: 'list_production_plans',
+      payload,
+    });
+  }
+
+  // ---- Work Orders ----
+
+  async createWorkOrder(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'workorders',
+      fn_name: 'create_work_order',
+      payload,
+    });
+  }
+
+  async getWorkOrder(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'workorders',
+      fn_name: 'get_work_order',
+      payload,
+    });
+  }
+
+  async updateWorkOrder(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'workorders',
+      fn_name: 'update_work_order',
+      payload,
+    });
+  }
+
+  async completeWorkOrder(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'workorders',
+      fn_name: 'complete_work_order',
+      payload,
+    });
+  }
+
+  async listWorkOrders(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'manufacturing',
+      zome_name: 'workorders',
+      fn_name: 'list_work_orders',
+      payload,
+    });
+  }
 }

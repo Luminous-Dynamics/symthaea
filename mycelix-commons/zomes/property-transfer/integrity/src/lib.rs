@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Property Transfer Integrity Zome
 use hdi::prelude::*;
 use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};

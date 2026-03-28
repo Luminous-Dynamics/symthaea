@@ -1,0 +1,585 @@
+[
+  {
+    "id": "noaa:eeded146d0cbea71",
+    "content": "The global average surface temperature has increased by approximately 1.1°C since the pre-industrial era (1850-1900).",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/time-series"
+    ],
+    "tags": [
+      "climate",
+      "temperature",
+      "global-warming"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.95,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:1e5e83c6db9f8c8c",
+    "content": "The year 2023 was the warmest year on record according to NOAA global temperature data.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/time-series"
+    ],
+    "tags": [
+      "climate",
+      "temperature",
+      "records"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:788d37a838e90a81",
+    "content": "The 10 warmest years on record have all occurred since 2010.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/time-series"
+    ],
+    "tags": [
+      "climate",
+      "temperature",
+      "trends"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.97,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:8b83777083666fae",
+    "content": "Global sea level has risen approximately 21-24 cm since 1880, with the rate of rise accelerating.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.climate.gov/news-features/understanding-climate/climate-change-global-sea-level"
+    ],
+    "tags": [
+      "climate",
+      "sea-level",
+      "oceans"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:effa6df8a0a3b3a5",
+    "content": "Arctic sea ice extent has declined approximately 13% per decade since satellite records began in 1979.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://nsidc.org/arcticseaicenews/"
+    ],
+    "tags": [
+      "climate",
+      "arctic",
+      "sea-ice"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.94,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:faacd72861c0c2c8",
+    "content": "Atmospheric CO2 concentration reached 421 ppm in 2023, the highest in at least 800,000 years.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://gml.noaa.gov/ccgg/trends/"
+    ],
+    "tags": [
+      "climate",
+      "co2",
+      "greenhouse-gases"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.98,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:3d62f7654946bccc",
+    "content": "Pre-industrial atmospheric CO2 concentration was approximately 280 ppm.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://gml.noaa.gov/ccgg/trends/"
+    ],
+    "tags": [
+      "climate",
+      "co2",
+      "historical"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.97,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:a07c032d3139b203",
+    "content": "Methane (CH4) concentration in the atmosphere reached 1,922 ppb in 2023.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://gml.noaa.gov/ccgg/trends_ch4/"
+    ],
+    "tags": [
+      "climate",
+      "methane",
+      "greenhouse-gases"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.95,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:2599308dc914ee83",
+    "content": "The ocean absorbs approximately 30% of anthropogenic CO2 emissions, leading to ocean acidification.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://oceanservice.noaa.gov/facts/acidification.html"
+    ],
+    "tags": [
+      "climate",
+      "oceans",
+      "co2",
+      "acidification"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:5692adf304e97eb9",
+    "content": "The number of billion-dollar weather and climate disasters in the US has been increasing, with 28 events in 2023.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/billions/"
+    ],
+    "tags": [
+      "climate",
+      "extreme-weather",
+      "disasters",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.96,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:e5214061e8afd97c",
+    "content": "Global ocean heat content has been increasing consistently since the 1950s and reached record levels in 2023.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/global-ocean-heat-content/"
+    ],
+    "tags": [
+      "climate",
+      "ocean-heat",
+      "trends"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.95,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:a4ca448faf0799ea",
+    "content": "The frequency of Category 4 and 5 hurricanes in the Atlantic has increased since the 1980s.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.gfdl.noaa.gov/global-warming-and-hurricanes/"
+    ],
+    "tags": [
+      "climate",
+      "hurricanes",
+      "extreme-weather"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.85,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:1ce646e00595019d",
+    "content": "The contiguous United States has warmed approximately 1.0°C since the beginning of the 20th century.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/national/time-series"
+    ],
+    "tags": [
+      "climate",
+      "temperature",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.94,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:020a949dcdf173d9",
+    "content": "Alaska has warmed at approximately twice the rate of the contiguous United States.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/statewide/time-series/50"
+    ],
+    "tags": [
+      "climate",
+      "temperature",
+      "alaska",
+      "arctic"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:ea0ddad0e622b17f",
+    "content": "Annual precipitation in the contiguous US has increased by approximately 4% since 1901.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/national/time-series"
+    ],
+    "tags": [
+      "climate",
+      "precipitation",
+      "united-states"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.88,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:c80fa1c1a010dd57",
+    "content": "The Greenland ice sheet has been losing mass at an accelerating rate, losing approximately 270 billion metric tons per year since 2002.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://climate.nasa.gov/vital-signs/ice-sheets/"
+    ],
+    "tags": [
+      "climate",
+      "greenland",
+      "ice-sheet",
+      "sea-level"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:85e8fc677e89d783",
+    "content": "Antarctic ice sheet mass loss has tripled in the last decade compared to the previous decade.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://climate.nasa.gov/vital-signs/ice-sheets/"
+    ],
+    "tags": [
+      "climate",
+      "antarctica",
+      "ice-sheet"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:c6c7118f0ecf6436",
+    "content": "Global glacier volume has decreased significantly since the 1970s, with the rate of loss accelerating.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://wgms.ch/global-glacier-state/"
+    ],
+    "tags": [
+      "climate",
+      "glaciers",
+      "cryosphere"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:a2be794939b8b41e",
+    "content": "El Niño events cause temporary increases of 0.1-0.3°C in global average surface temperature.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.climate.gov/enso"
+    ],
+    "tags": [
+      "climate",
+      "enso",
+      "el-nino",
+      "oceans"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:957d531582aebe4e",
+    "content": "The Atlantic Meridional Overturning Circulation (AMOC) has shown signs of weakening since the mid-20th century.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.nature.com/articles/s41558-021-01097-4"
+    ],
+    "tags": [
+      "climate",
+      "amoc",
+      "ocean-circulation"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.8,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:90aebd82f797a059",
+    "content": "The Medieval Warm Period (approximately 900-1300 CE) was characterized by regional warmth in parts of the Northern Hemisphere.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/paleo-search/"
+    ],
+    "tags": [
+      "climate",
+      "historical",
+      "medieval"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.85,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:8ef4e735accc47f7",
+    "content": "The Little Ice Age (approximately 1300-1850 CE) was a period of regional cooling, particularly in Europe and North America.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/paleo-search/"
+    ],
+    "tags": [
+      "climate",
+      "historical",
+      "little-ice-age"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.87,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:75b5d5b2eca9a2e3",
+    "content": "Ice core records from Antarctica show CO2 levels fluctuated between 180 and 280 ppm over the past 800,000 years before industrialization.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.ncei.noaa.gov/access/paleo-search/"
+    ],
+    "tags": [
+      "climate",
+      "ice-cores",
+      "co2",
+      "paleoclimate"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.96,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:7f6d56031232e05c",
+    "content": "Coral bleaching events have become approximately 5 times more frequent since the 1980s due to ocean warming.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://coralreefwatch.noaa.gov/"
+    ],
+    "tags": [
+      "climate",
+      "coral-reefs",
+      "biodiversity",
+      "oceans"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.88,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "noaa:287531a9ddeab635",
+    "content": "Spring plant blooming dates have advanced by an average of 2-3 days per decade across the Northern Hemisphere since the 1970s.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.usanpn.org/"
+    ],
+    "tags": [
+      "climate",
+      "phenology",
+      "biodiversity",
+      "seasons"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.85,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  }
+]

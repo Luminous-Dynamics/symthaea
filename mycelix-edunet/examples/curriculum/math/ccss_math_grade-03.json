@@ -1,0 +1,821 @@
+{
+  "metadata": {
+    "title": "Grade 3",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade3",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 25,
+    "domains": [
+      "Number and Operations—Fractions",
+      "Geometry",
+      "Measurement and Data",
+      "Number and Operations in Base Ten",
+      "Operations and Algebraic Thinking",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-03). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.3.NF.A.3",
+      "title": "Explain equivalence of fractions in special cases, and compare fractions by r...",
+      "description": "Explain equivalence of fractions in special cases, and compare fractions by reasoning about their size.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.NF.A.3",
+          "description": "Explain equivalence of fractions in special cases, and compare fractions by reasoning about their size.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.NF.A.2",
+      "title": "Understand a fraction as a number on the number line",
+      "description": "Understand a fraction as a number on the number line; represent fractions on a number line diagram.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.NF.A.2",
+          "description": "Understand a fraction as a number on the number line; represent fractions on a number line diagram.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.NF.A.1",
+      "title": "Understand a fraction 1/b as the quantity formed by 1 part when a whole is pa...",
+      "description": "Understand a fraction 1/b as the quantity formed by 1 part when a whole is partitioned into b equal parts; understand a fraction a/b as the quantity formed by a parts of size 1/b.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.NF.A.1",
+          "description": "Understand a fraction 1/b as the quantity formed by 1 part when a whole is partitioned into b equal parts; understand a fraction a/b as the quantity formed by a parts of size 1/b.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.G.A.2",
+      "title": "Partition shapes into parts with equal areas",
+      "description": "Partition shapes into parts with equal areas. Express the area of each part as a unit fraction of the whole.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "area"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.G.A.2",
+          "description": "Partition shapes into parts with equal areas. Express the area of each part as a unit fraction of the whole.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.G.A.1",
+      "title": "Understand that shapes in different categories (e",
+      "description": "Understand that shapes in different categories (e.g., rhombuses, rectangles, and others) may share attributes (e.g., having four sides), and that the shared attributes can define a larger category (e.g., quadrilaterals). Recognize rhombuses, rectangles, and squares as examples of quadrilaterals, and draw examples of quadrilaterals that do not belong to any of these subcategories.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.G.A.1",
+          "description": "Understand that shapes in different categories (e.g., rhombuses, rectangles, and others) may share attributes (e.g., having four sides), and that the shared attributes can define a larger category (e.g., quadrilaterals). Recognize rhombuses, rectangles, and squares as examples of quadrilaterals, and draw examples of quadrilaterals that do not belong to any of these subcategories.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.D.8",
+      "title": "Solve real world and mathematical problems involving perimeters of polygons, ...",
+      "description": "Solve real world and mathematical problems involving perimeters of polygons, including finding the perimeter given the side lengths, finding an unknown side length, and exhibiting rectangles with the same perimeter and different areas or with the same area and different perimeters.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "area",
+        "perimeter",
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.D.8",
+          "description": "Solve real world and mathematical problems involving perimeters of polygons, including finding the perimeter given the side lengths, finding an unknown side length, and exhibiting rectangles with the same perimeter and different areas or with the same area and different perimeters.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.C.7",
+      "title": "Relate area to the operations of multiplication and addition",
+      "description": "Relate area to the operations of multiplication and addition.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "addition",
+        "multiplication",
+        "area"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.C.7",
+          "description": "Relate area to the operations of multiplication and addition.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.C.6",
+      "title": "Measure areas by counting unit squares (square cm, square m, square in, squar...",
+      "description": "Measure areas by counting unit squares (square cm, square m, square in, square ft, and improvised units).",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "area"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.C.6",
+          "description": "Measure areas by counting unit squares (square cm, square m, square in, square ft, and improvised units).",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.C.5",
+      "title": "Recognize area as an attribute of plane figures and understand concepts of ar...",
+      "description": "Recognize area as an attribute of plane figures and understand concepts of area measurement.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement",
+        "area"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.C.5",
+          "description": "Recognize area as an attribute of plane figures and understand concepts of area measurement.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.B.4",
+      "title": "Generate measurement data by measuring lengths using rulers marked with halve...",
+      "description": "Generate measurement data by measuring lengths using rulers marked with halves and fourths of an inch. Show the data by making a line plot, where the horizontal scale is marked off in appropriate units— whole numbers, halves, or quarters.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement",
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.B.4",
+          "description": "Generate measurement data by measuring lengths using rulers marked with halves and fourths of an inch. Show the data by making a line plot, where the horizontal scale is marked off in appropriate units— whole numbers, halves, or quarters.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.B.3",
+      "title": "Draw a scaled picture graph and a scaled bar graph to represent a data set wi...",
+      "description": "Draw a scaled picture graph and a scaled bar graph to represent a data set with several categories. Solve one- and two-step \"how many more\" and \"how many less\" problems using information presented in scaled bar graphs.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "data",
+        "graphs"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.B.3",
+          "description": "Draw a scaled picture graph and a scaled bar graph to represent a data set with several categories. Solve one- and two-step \"how many more\" and \"how many less\" problems using information presented in scaled bar graphs.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.A.2",
+      "title": "Measure and estimate liquid volumes and masses of objects using standard unit...",
+      "description": "Measure and estimate liquid volumes and masses of objects using standard units of grams (g), kilograms (kg), and liters (l). Add, subtract, multiply, or divide to solve one-step word problems involving masses or volumes that are given in the same units, e.g., by using drawings (such as a beaker with a measurement scale) to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement",
+        "volume"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.A.2",
+          "description": "Measure and estimate liquid volumes and masses of objects using standard units of grams (g), kilograms (kg), and liters (l). Add, subtract, multiply, or divide to solve one-step word problems involving masses or volumes that are given in the same units, e.g., by using drawings (such as a beaker with a measurement scale) to represent the problem.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.MD.A.1",
+      "title": "Tell and write time to the nearest minute and measure time intervals in minutes",
+      "description": "Tell and write time to the nearest minute and measure time intervals in minutes. Solve word problems involving addition and subtraction of time intervals in minutes, e.g., by representing the problem on a number line diagram.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.MD.A.1",
+          "description": "Tell and write time to the nearest minute and measure time intervals in minutes. Solve word problems involving addition and subtraction of time intervals in minutes, e.g., by representing the problem on a number line diagram.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.NBT.A.3",
+      "title": "Multiply one-digit whole numbers by multiples of 10 in the range 10—90 (e",
+      "description": "Multiply one-digit whole numbers by multiples of 10 in the range 10—90 (e.g., 9 × 80, 5 × 60) using strategies based on place value and properties of operations.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.NBT.A.3",
+          "description": "Multiply one-digit whole numbers by multiples of 10 in the range 10—90 (e.g., 9 × 80, 5 × 60) using strategies based on place value and properties of operations.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.NBT.A.2",
+      "title": "Fluently add and subtract within 1000 using strategies and algorithms based o...",
+      "description": "Fluently add and subtract within 1000 using strategies and algorithms based on place value, properties of operations, and/or the relationship between addition and subtraction.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.NBT.A.2",
+          "description": "Fluently add and subtract within 1000 using strategies and algorithms based on place value, properties of operations, and/or the relationship between addition and subtraction.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.NBT.A.1",
+      "title": "Use place value understanding to round whole numbers to the nearest 10 or 100",
+      "description": "Use place value understanding to round whole numbers to the nearest 10 or 100.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.NBT.A.1",
+          "description": "Use place value understanding to round whole numbers to the nearest 10 or 100.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.D.9",
+      "title": "Identify arithmetic patterns (including patterns in the addition table or mul...",
+      "description": "Identify arithmetic patterns (including patterns in the addition table or multiplication table), and explain them using properties of operations.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "addition",
+        "multiplication",
+        "patterns"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.D.9",
+          "description": "Identify arithmetic patterns (including patterns in the addition table or multiplication table), and explain them using properties of operations.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.D.8",
+      "title": "Solve two-step word problems using the four operations",
+      "description": "Solve two-step word problems using the four operations. Represent these problems using equations with a letter standing for the unknown quantity. Assess the reasonableness of answers using mental computation and estimation strategies including rounding.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.D.8",
+          "description": "Solve two-step word problems using the four operations. Represent these problems using equations with a letter standing for the unknown quantity. Assess the reasonableness of answers using mental computation and estimation strategies including rounding.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.C.7",
+      "title": "Fluently multiply and divide within 100, using strategies such as the relatio...",
+      "description": "Fluently multiply and divide within 100, using strategies such as the relationship between multiplication and division (e.g., knowing that 8 × 5 = 40, one knows 40 ÷ 5 = 8) or properties of operations. By the end of Grade 3, know from memory all products of two one-digit numbers.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "multiplication",
+        "division"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.C.7",
+          "description": "Fluently multiply and divide within 100, using strategies such as the relationship between multiplication and division (e.g., knowing that 8 × 5 = 40, one knows 40 ÷ 5 = 8) or properties of operations. By the end of Grade 3, know from memory all products of two one-digit numbers.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.B.6",
+      "title": "Understand division as an unknown-factor problem",
+      "description": "Understand division as an unknown-factor problem.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "division"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.B.6",
+          "description": "Understand division as an unknown-factor problem.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.B.5",
+      "title": "Apply properties of operations as strategies to multiply and divide",
+      "description": "Apply properties of operations as strategies to multiply and divide.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.B.5",
+          "description": "Apply properties of operations as strategies to multiply and divide.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.A.4",
+      "title": "Determine the unknown whole number in a multiplication or division equation r...",
+      "description": "Determine the unknown whole number in a multiplication or division equation relating three whole numbers.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "multiplication",
+        "division"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.A.4",
+          "description": "Determine the unknown whole number in a multiplication or division equation relating three whole numbers.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.A.3",
+      "title": "Use multiplication and division within 100 to solve word problems in situatio...",
+      "description": "Use multiplication and division within 100 to solve word problems in situations involving equal groups, arrays, and measurement quantities, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "multiplication",
+        "division",
+        "measurement",
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.A.3",
+          "description": "Use multiplication and division within 100 to solve word problems in situations involving equal groups, arrays, and measurement quantities, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.A.2",
+      "title": "Interpret whole-number quotients of whole numbers, e",
+      "description": "Interpret whole-number quotients of whole numbers, e.g., interpret 56 ÷ 8 as the number of objects in each share when 56 objects are partitioned equally into 8 shares, or as a number of shares when 56 objects are partitioned into equal shares of 8 objects each.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.A.2",
+          "description": "Interpret whole-number quotients of whole numbers, e.g., interpret 56 ÷ 8 as the number of objects in each share when 56 objects are partitioned equally into 8 shares, or as a number of shares when 56 objects are partitioned into equal shares of 8 objects each.",
+          "grade_level": "Grade3"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.3.OA.A.1",
+      "title": "Interpret products of whole numbers, e",
+      "description": "Interpret products of whole numbers, e.g., interpret 5 × 7 as the total number of objects in 5 groups of 7 objects each.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade3"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.3.OA.A.1",
+          "description": "Interpret products of whole numbers, e.g., interpret 5 × 7 as the total number of objects in 5 groups of 7 objects each.",
+          "grade_level": "Grade3"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.3.NBT.A.1",
+      "to": "CCSS.Math.Content.3.NBT.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.NBT.A.1 is a prerequisite for CCSS.Math.Content.3.NBT.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.NBT.A.2",
+      "to": "CCSS.Math.Content.3.NBT.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.NBT.A.2 is a prerequisite for CCSS.Math.Content.3.NBT.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.NF.A.1",
+      "to": "CCSS.Math.Content.3.NF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.NF.A.1 is a prerequisite for CCSS.Math.Content.3.NF.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.NF.A.2",
+      "to": "CCSS.Math.Content.3.NF.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.NF.A.2 is a prerequisite for CCSS.Math.Content.3.NF.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.A.1",
+      "to": "CCSS.Math.Content.3.OA.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.A.1 is a prerequisite for CCSS.Math.Content.3.OA.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.A.2",
+      "to": "CCSS.Math.Content.3.OA.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.A.2 is a prerequisite for CCSS.Math.Content.3.OA.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.A.3",
+      "to": "CCSS.Math.Content.3.OA.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.A.3 is a prerequisite for CCSS.Math.Content.3.OA.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.A.4",
+      "to": "CCSS.Math.Content.3.OA.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.A.4 is a prerequisite for CCSS.Math.Content.3.OA.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.B.5",
+      "to": "CCSS.Math.Content.3.OA.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.B.5 is a prerequisite for CCSS.Math.Content.3.OA.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.B.6",
+      "to": "CCSS.Math.Content.3.OA.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.B.6 is a prerequisite for CCSS.Math.Content.3.OA.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.C.7",
+      "to": "CCSS.Math.Content.3.OA.D.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.C.7 is a prerequisite for CCSS.Math.Content.3.OA.D.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.OA.D.8",
+      "to": "CCSS.Math.Content.3.OA.D.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.OA.D.8 is a prerequisite for CCSS.Math.Content.3.OA.D.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.G.A.1",
+      "to": "CCSS.Math.Content.3.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.G.A.1 is a prerequisite for CCSS.Math.Content.3.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.A.1",
+      "to": "CCSS.Math.Content.3.MD.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.A.1 is a prerequisite for CCSS.Math.Content.3.MD.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.A.2",
+      "to": "CCSS.Math.Content.3.MD.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.A.2 is a prerequisite for CCSS.Math.Content.3.MD.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.B.3",
+      "to": "CCSS.Math.Content.3.MD.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.B.3 is a prerequisite for CCSS.Math.Content.3.MD.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.B.4",
+      "to": "CCSS.Math.Content.3.MD.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.B.4 is a prerequisite for CCSS.Math.Content.3.MD.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.C.5",
+      "to": "CCSS.Math.Content.3.MD.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.C.5 is a prerequisite for CCSS.Math.Content.3.MD.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.C.6",
+      "to": "CCSS.Math.Content.3.MD.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.C.6 is a prerequisite for CCSS.Math.Content.3.MD.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.3.MD.C.7",
+      "to": "CCSS.Math.Content.3.MD.D.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.3.MD.C.7 is a prerequisite for CCSS.Math.Content.3.MD.D.8 within the same domain."
+    }
+  ]
+}

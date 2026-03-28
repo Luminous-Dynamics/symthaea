@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Units Integrity Zome
 //! Defines entry types and validation for buildings and housing units.
 
@@ -105,6 +108,8 @@ pub enum LinkTypes {
     OccupantToUnit,
     /// Building type index
     BuildingTypeToBuilding,
+    /// Geohash spatial index
+    GeoIndex,
 }
 
 #[hdk_extern]
@@ -175,6 +180,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { action, .. } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
@@ -1185,7 +1191,8 @@ mod tests {
             LinkTypes::AllBuildings
             | LinkTypes::BuildingToUnit
             | LinkTypes::AvailableUnits
-            | LinkTypes::OccupantToUnit => {
+            | LinkTypes::OccupantToUnit
+            | LinkTypes::GeoIndex => {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(format!(
                         "{:?} link tag too long (max 256 bytes)",

@@ -1014,7 +1014,7 @@ fn test_coherence_field_wired_when_enabled() {
     .unwrap();
 
     assert!(
-        service.vision_sensory.coherence_field.is_some(),
+        service.sensorimotor.vision_sensory.coherence_field.is_some(),
         "CoherenceField should be Some"
     );
 
@@ -1023,7 +1023,7 @@ fn test_coherence_field_wired_when_enabled() {
     assert!(r.prediction_error.is_finite());
 
     // Coherence should remain bounded
-    let cf = service.vision_sensory.coherence_field.as_ref().unwrap();
+    let cf = service.sensorimotor.vision_sensory.coherence_field.as_ref().unwrap();
     assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
 }
 
@@ -1035,7 +1035,7 @@ fn test_coherence_field_none_when_disabled() {
     })
     .unwrap();
 
-    assert!(service.vision_sensory.coherence_field.is_none());
+    assert!(service.sensorimotor.vision_sensory.coherence_field.is_none());
 }
 
 #[test]
@@ -1088,7 +1088,7 @@ fn test_coherence_field_modulates_consciousness() {
         );
     }
     // Verify the coherence field has a valid value
-    let cf = service.vision_sensory.coherence_field.as_ref().unwrap();
+    let cf = service.sensorimotor.vision_sensory.coherence_field.as_ref().unwrap();
     assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
 }
 

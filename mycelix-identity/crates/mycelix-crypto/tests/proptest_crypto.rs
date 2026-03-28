@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Property-based tests for mycelix-crypto sign/verify round-trips.
 //!
 //! Uses proptest to verify that sign→verify holds for all algorithms

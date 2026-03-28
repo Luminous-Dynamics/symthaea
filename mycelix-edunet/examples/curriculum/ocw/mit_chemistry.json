@@ -1,0 +1,882 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Chemistry",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=5&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Chemistry",
+    "domain": "Chemistry",
+    "version": "2024",
+    "total_standards": 20,
+    "domains": [
+      "Chemical Engineering",
+      "Systems Engineering",
+      "Engineering",
+      "Chemistry",
+      "Physics",
+      "Science & Math",
+      "Mathematics",
+      "Biology"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 5). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "40.05"
+  },
+  "nodes": [
+    {
+      "id": "10.675J",
+      "title": "Computational Quantum Mechanics of Molecular and Extended Systems",
+      "description": "The theoretical frameworks of Hartree-Fock theory and density functional theory are presented in this course as approximate methods to solve the many-electron problem. A variety of ways to incorporate electron correlation are discussed. The application of these techniques to calculate the reactivity and spectroscopic properties of chemical systems, in addition to the thermodynamics and kinetics of chemical processes, is emphasized. This course also focuses on cutting edge methods to sample co...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Chemistry",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "physics",
+        "chemistry",
+        "systems engineering",
+        "chemical engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "10.675J",
+          "description": "Computational Quantum Mechanics of Molecular and Extended Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.067",
+      "title": "Crystal Structure Refinement",
+      "description": "This course in crystal structure refinement examines the practical aspects of crystal structure determination from data collection strategies to data reduction and basic and advanced refinement problems of organic and inorganic molecules.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.067",
+          "description": "Crystal Structure Refinement",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.069",
+      "title": "Crystal Structure Analysis",
+      "description": "This course covers the following topics: X-ray diffraction: symmetry, space groups, geometry of diffraction, structure factors, phase problem, direct methods, Patterson methods, electron density maps, structure refinement, how to grow good crystals, powder methods, limits of X-ray diffraction methods, and structure data bases.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.069",
+          "description": "Crystal Structure Analysis",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.08J",
+      "title": "Biological Chemistry II",
+      "description": "This course is an advanced treatment of biochemical mechanisms that underlie biological processes. Topics include macromolecular machines such as the ribosome, the proteasome, fatty acid synthases as a paradigm for polyketide synthases and non-ribosomal polypeptide synthases, and polymerases. Emphasis will be given to the experimental methods used to unravel how these processes fit into the cellular context as well as the coordinated regulation of these processes.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.08J",
+          "description": "Biological Chemistry II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.111SC",
+      "title": "Principles of Chemical Science",
+      "description": "<p>This course provides an introduction to the chemistry of biological, inorganic, and organic molecules. The emphasis is on basic principles of atomic and molecular electronic structure, thermodynamics, acid-base and redox equilibria, chemical kinetics, and catalysis. One year of high school chemistry is the expected background for this freshman-level course.</p>\n<p>The aims include developing a unified and intuitive view of how electronic structure controls the three-dimensional shape of mo...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.111SC",
+          "description": "Principles of Chemical Science",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.112",
+      "title": "Principles of Chemical Science",
+      "description": "5.112 is an introductory chemistry course for students with an unusually strong background in chemistry. Knowledge of calculus equivalent to MIT course 18.01 is recommended. Emphasis is on basic principles of atomic and molecular electronic structure, thermodynamics, acid-base and redox equilibria, chemical kinetics, and catalysis. The course also covers applications of basic principles to problems in metal coordination chemistry, organic chemistry, and biological chemistry.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.112",
+          "description": "Principles of Chemical Science",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.12",
+      "title": "Organic Chemistry I",
+      "description": "5.12 is an introduction to organic chemistry, focusing primarily on the basic principles to understand the structure and reactivity of organic molecules. Emphasis is on substitution and elimination reactions and chemistry of the carbonyl group. The course also provides an introduction to the chemistry of aromatic compounds.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.12",
+          "description": "Organic Chemistry I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.12",
+      "title": "Organic Chemistry I",
+      "description": "This subject deals primarily with the basic principles to understand the structure and reactivity of organic molecules. Emphasis is on substitution and elimination reactions and chemistry of the carbonyl group. The course also provides an introduction to the chemistry of aromatic compounds.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.12",
+          "description": "Organic Chemistry I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.13",
+      "title": "Organic Chemistry II",
+      "description": "This intermediate organic chemistry course focuses on the methods used to identify the structure of organic molecules, advanced principles of organic stereochemistry, organic reaction mechanisms, and methods used for the synthesis of organic compounds. Additional special topics include illustrating the role of organic chemistry in biology, medicine, and industry.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.13",
+          "description": "Organic Chemistry II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.13",
+      "title": "Organic Chemistry II",
+      "description": "This intermediate organic chemistry course focuses on the methods used to identify the structure of organic molecules, advanced principles of organic stereochemistry, organic reaction mechanisms, and methods used for the synthesis of organic compounds. Additional special topics include illustrating the role of organic chemistry in biology, medicine, and industry.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.13",
+          "description": "Organic Chemistry II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.301",
+      "title": "Chemistry Laboratory Techniques",
+      "description": "<p>This course is an intensive introduction to the techniques of experimental chemistry and gives first year students an opportunity to learn and master the basic chemistry lab techniques for carrying out experiments. Students who successfully complete the course and obtain a “Competent Chemist” (CC) or “Expert Experimentalist” (EE) rating are likely to secure opportunities for research work in a chemistry lab at MIT.</p>\nAcknowledgements\n<p>The laboratory manual and materials for thi...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.301",
+          "description": "Chemistry Laboratory Techniques",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.35",
+      "title": "Introduction to Experimental Chemistry",
+      "description": "<p>This course is the first part of a modular sequence of increasingly sophisticated (and challenging) laboratory courses required of all Chemistry majors: 5.35 Introduction to Experimental Chemistry, 5.36&nbsp;Biochemistry and Organic Laboratory, 5.37&nbsp;Organic and Inorganic Laboratory, and 5.38&nbsp;Physical Chemistry Laboratory. This course provides students with a survey of spectroscopy, and introduces synthesis of coordination compounds and kinetics.</p>\n<p>This class is part of the n...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.35",
+          "description": "Introduction to Experimental Chemistry",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.36",
+      "title": "Biochemistry Laboratory",
+      "description": "<p>The course, which spans two thirds of a semester, provides students with a research-inspired laboratory experience that introduces standard biochemical techniques in the context of investigating a current and exciting research topic, acquired resistance to the cancer drug Gleevec. Techniques include protein expression, purification, and gel analysis, PCR, site-directed mutagenesis, kinase activity assays, and protein structure viewing.</p>\n<p>This class is part of the new laboratory curric...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.36",
+          "description": "Biochemistry Laboratory",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.37",
+      "title": "Introduction to Organic Synthesis Laboratory",
+      "description": "<p>This course, which spans a third of a semester, provides students with experience&nbsp;using techniques employed in synthetic organic chemistry. It also&nbsp;introduces them to the exciting research area of catalytic chiral catalysis.</p>\n<p>This class is part of the new laboratory curriculum in the MIT Department of Chemistry. Undergraduate Research-Inspired Experimental Chemistry Alternatives (URIECA) introduces students to cutting edge research topics in a modular format.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "chemistry",
+        "chemical engineering",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.37",
+          "description": "Introduction to Organic Synthesis Laboratory",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.60",
+      "title": "Thermodynamics & Kinetics",
+      "description": "<p>This subject deals primarily with equilibrium properties of macroscopic systems, basic thermodynamics, chemical equilibrium of reactions in gas and solution phase, and rates of chemical reactions.</p>\nAcknowledgements\n<p>The material for 5.60 has evolved over a period of many years, and therefore several faculty members have contributed to the development of the course contents. The following are known to have assisted in preparing the lecture notes available on OpenCourseWare: Emeritus Pr...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.60",
+          "description": "Thermodynamics & Kinetics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.61",
+      "title": "Physical Chemistry",
+      "description": "<p>This course presents an introduction to quantum mechanics. It begins with an examination of the historical development of quantum theory, properties of particles and waves, wave mechanics and applications to simple systems — the particle in a box, the harmonic oscillator, the rigid rotor and the hydrogen atom. The lectures continue with a discussion of atomic structure and the Periodic Table. The final lectures cover applications to chemical bonding including valence bond and molecular o...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.61",
+          "description": "Physical Chemistry",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.61",
+      "title": "Physical Chemistry",
+      "description": "This course is an introduction to quantum mechanics for <em>use</em> by chemists. Topics include particles and waves, wave mechanics, semi-classical quantum mechanics, matrix mechanics, perturbation theory, molecular orbital theory, molecular structure, molecular spectroscopy, and photochemistry. Emphasis is on creating and building confidence in the use of intuitive pictures.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Chemistry",
+      "tags": [
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.61",
+          "description": "Physical Chemistry",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.72",
+      "title": "Non-Equilibrium Statistical Mechanics",
+      "description": "This course discusses the principles and methods of non-equilibrium statistical mechanics. Basic topics covered are stochastic processes, regression and response theory, molecular hydrodynamics, and complex liquids. Selected applications, including fluctuation theorems, condensed phase reaction rate theory, electron transfer dynamics, enzymatic networks, photon counting statistics, single molecule kinetics, reaction-controlled diffusion, may also be discussed.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mathematics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.72",
+          "description": "Non-Equilibrium Statistical Mechanics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.73",
+      "title": "Introductory Quantum Mechanics I",
+      "description": "5.73 covers fundamental concepts of quantum mechanics: wave properties, uncertainty principles, Schrödinger equation, and operator and matrix methods. Basic applications of the following are discussed: one-dimensional potentials (harmonic oscillator), three-dimensional centrosymmetric potentials (hydrogen atom), and angular momentum and spin. The course also examines approximation methods: variational principle and perturbation theory.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.73",
+          "description": "Introductory Quantum Mechanics I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    },
+    {
+      "id": "5.74",
+      "title": "Introductory Quantum Mechanics II",
+      "description": "This course covers topics in time-dependent quantum mechanics, spectroscopy, and relaxation, with an emphasis on descriptions applicable to condensed phase problems and a statistical description of ensembles.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Chemistry",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "5.74",
+          "description": "Introductory Quantum Mechanics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.05"
+    }
+  ],
+  "edges": [
+    {
+      "from": "5.08J",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.08J typically precedes 5.111SC."
+    },
+    {
+      "from": "5.08J",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.08J typically precedes 5.112."
+    },
+    {
+      "from": "5.12",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.12 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.12",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.12 typically precedes 5.112."
+    },
+    {
+      "from": "5.12",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.12 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.12",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.12 typically precedes 5.112."
+    },
+    {
+      "from": "5.13",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.13 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.13",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.13 typically precedes 5.112."
+    },
+    {
+      "from": "5.13",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.13 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.13",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.13 typically precedes 5.112."
+    },
+    {
+      "from": "5.35",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.35 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.35",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.35 typically precedes 5.112."
+    },
+    {
+      "from": "5.36",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.36 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.36",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.36 typically precedes 5.112."
+    },
+    {
+      "from": "5.37",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.37 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.37",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.37 typically precedes 5.112."
+    },
+    {
+      "from": "5.60",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.60 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.60",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.60 typically precedes 5.112."
+    },
+    {
+      "from": "5.61",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.61 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.61",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.61 typically precedes 5.112."
+    },
+    {
+      "from": "5.61",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.61 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.61",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.61 typically precedes 5.112."
+    },
+    {
+      "from": "5.067",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.067 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.067",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.067 typically precedes 5.112."
+    },
+    {
+      "from": "5.069",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.069 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.069",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.069 typically precedes 5.112."
+    },
+    {
+      "from": "5.72",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.72 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.72",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.72 typically precedes 5.112."
+    },
+    {
+      "from": "5.73",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.73 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.73",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.73 typically precedes 5.112."
+    },
+    {
+      "from": "5.74",
+      "to": "5.111SC",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.74 typically precedes 5.111SC."
+    },
+    {
+      "from": "5.74",
+      "to": "5.112",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 5.74 typically precedes 5.112."
+    },
+    {
+      "from": "5.112",
+      "to": "5.301",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 5.112 typically precedes 5.301."
+    },
+    {
+      "from": "5.301",
+      "to": "10.675J",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 5.301 typically precedes graduate course 10.675J."
+    }
+  ]
+}

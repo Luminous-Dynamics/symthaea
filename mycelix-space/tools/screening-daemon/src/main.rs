@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Automated Conjunction Screening Daemon
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Automated Conjunction Screening Daemon
 //!
 //! Periodically screens tracked objects for potential conjunctions using
 //! the orbital-mechanics library. Designed to run alongside a Holochain

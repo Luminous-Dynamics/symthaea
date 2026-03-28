@@ -1,0 +1,453 @@
+\documentclass[11pt,twocolumn]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=green!40!black,urlcolor=blue!60!black}
+
+\lstset{
+  language=Rust,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{red!60!black},
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+
+\title{Post-Quantum Decentralized Identity: DID Registry, MFA, and Trust Credentials on Holochain}
+\author{Tristan Stoltz \\ Luminous Dynamics \\ \texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
+\date{March 2026}
+
+\begin{document}
+
+\twocolumn[
+\begin{@twocolumnfalse}
+\maketitle
+
+\begin{abstract}
+We present a decentralized identity system implemented on Holochain with 13 zomes
+spanning DID management, multi-factor authentication, trust credentials, verifiable
+credentials, social recovery, and a web-of-trust. The system is distinguished by
+three innovations: (1) a 5-level MFA assurance scheme that maps directly to the
+identity dimension of a consciousness-gated governance profile; (2) post-quantum
+key support via ML-KEM-768 alongside classical Ed25519, providing quantum resistance
+without sacrificing current interoperability; and (3) a web-of-trust zome that computes
+transitive trust for Sybil detection and community trust scoring. The identity cluster
+serves as the foundation for a 16-cluster civic operating system, with 100+ sweettest
+integration tests and 23+ unit tests validating the complete identity lifecycle from
+DID creation through credential issuance, social recovery, and revocation.
+\end{abstract}
+\end{@twocolumnfalse}
+]
+
+\section{Introduction}
+
+Identity is the foundation of governance. Every governance action---voting,
+proposing, delegating, judging---requires knowing \emph{who} is acting and
+\emph{how much} to trust them. Centralized identity systems (government IDs,
+corporate SSO) concentrate this power in institutions that can revoke identity
+at will. Self-sovereign identity (SSI) aims to return control to the
+individual~\cite{tobin2016}.
+
+Existing SSI implementations face several challenges:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Blockchain dependency}: Most DID methods (did:ethr, did:ion)
+    depend on blockchain infrastructure with its associated costs and latency.
+  \item \textbf{Quantum vulnerability}: Classical cryptographic keys (RSA,
+    Ed25519) are vulnerable to quantum computers~\cite{shor1994}. Most SSI
+    systems have no quantum migration path.
+  \item \textbf{Trust bootstrapping}: SSI systems provide identity but not
+    trust. A verifiable credential proves an attribute but not whether the
+    issuer should be trusted.
+  \item \textbf{Recovery}: Key loss in SSI typically means permanent identity
+    loss. Social recovery mechanisms are rare.
+\end{enumerate}
+
+We present the Mycelix Identity cluster: a 13-zome Holochain implementation
+that addresses all four challenges.
+
+\section{Architecture}
+
+\subsection{The did:mycelix Method}
+
+Each agent registers a DID using the method-specific scheme:
+
+\begin{lstlisting}[language={}]
+did:mycelix:<base58-encoded-pubkey>
+\end{lstlisting}
+
+The DID document, stored on the agent's source chain and replicated to the
+DHT, contains:
+
+\begin{lstlisting}
+{
+  "id": "did:mycelix:5GrwvaEF...",
+  "authentication": [{
+    "type": "Ed25519VerificationKey2020",
+    "publicKeyMultibase": "z6Mk..."
+  }],
+  "keyAgreement": [{
+    "type": "ML-KEM-768-2024",
+    "publicKeyMultibase": "z7Mk..."
+  }],
+  "service": [{
+    "type": "MycelixCluster",
+    "serviceEndpoint": ["commons", "governance"]
+  }]
+}
+\end{lstlisting}
+
+\subsection{Zome Overview}
+
+The 13 zomes form a layered architecture:
+
+\textbf{Foundation layer:}
+\begin{enumerate}[nosep]
+  \item \texttt{did\_registry}: DID CRUD, key rotation, document resolution
+  \item \texttt{mfa}: Multi-factor authentication with 5 assurance levels
+  \item \texttt{recovery}: Social $m$-of-$n$ key recovery
+  \item \texttt{revocation}: Key and credential revocation with DHT propagation
+\end{enumerate}
+
+\textbf{Credential layer:}
+\begin{enumerate}[nosep,start=5]
+  \item \texttt{trust\_credential}: Peer-to-peer trust attestations
+  \item \texttt{verifiable\_credential}: W3C VC issuance and verification
+  \item \texttt{credential\_schema}: Schema registry for credential types
+  \item \texttt{education}: Educational credential management
+\end{enumerate}
+
+\textbf{Network layer:}
+\begin{enumerate}[nosep,start=9]
+  \item \texttt{name-registry}: Human-readable name resolution
+  \item \texttt{web-of-trust}: Transitive trust computation
+\end{enumerate}
+
+\textbf{Integration:}
+\begin{enumerate}[nosep,start=11]
+  \item \texttt{bridge}: Cross-cluster identity dispatch
+\end{enumerate}
+
+\section{Multi-Factor Authentication}
+
+\subsection{Five Assurance Levels}
+
+The MFA zome defines five assurance levels that map directly to the identity
+dimension ($I$) of the consciousness profile:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llc}
+\toprule
+\textbf{Level} & \textbf{Requirements} & $I$ \\
+\midrule
+Anonymous & Key only & 0.00 \\
+Basic & Email/phone & 0.25 \\
+Verified & 2+ factors & 0.50 \\
+HighlyAssured & HW key + biometric & 0.75 \\
+Critical & In-person proofing & 1.00 \\
+\bottomrule
+\end{tabular}
+\caption{MFA assurance levels and identity scores.}
+\end{table}
+
+Each assurance level is \emph{additive}: an agent can upgrade their level
+by adding verification factors without re-verifying existing ones. The MFA
+zome maintains an attestation chain linking each factor to the DID.
+
+\subsection{Sybil Cost Curve}
+
+The assurance levels create an exponential Sybil cost curve. An attacker
+creating $n$ Sybil identities at level $l$ faces cost:
+
+\begin{equation}
+  \text{Cost}(n, l) = n \cdot c(l)
+\end{equation}
+
+where $c(\text{Anonymous}) \approx 0$ (just a keypair), $c(\text{Basic}) \approx$
+cost of a phone number, and $c(\text{Critical}) \approx$ cost of in-person
+social engineering of trusted community members.
+
+At the Critical level, creating 10 Sybil identities requires convincing 10
+separate groups of trusted community members to perform in-person identity
+proofing---a cost that scales linearly with $n$ and is bounded by the
+attacker's social capacity.
+
+\section{Post-Quantum Cryptography}
+
+\subsection{Hybrid Key Architecture}
+
+Each DID document can contain both classical and post-quantum keys:
+
+\begin{description}[nosep]
+  \item[Authentication] Ed25519 (classical) --- used for source chain signing,
+    DHT entry validation, and all current Holochain operations.
+  \item[Key Agreement] ML-KEM-768 (post-quantum) --- used for encrypted
+    communication channels, future-proofing against quantum adversaries.
+\end{description}
+
+The hybrid approach ensures:
+\begin{itemize}[nosep]
+  \item Current compatibility with Holochain's Ed25519 infrastructure
+  \item Quantum resistance for key agreement (encrypted mail, private channels)
+  \item Forward secrecy: messages encrypted today remain secure against future
+    quantum computers
+\end{itemize}
+
+\subsection{ML-KEM-768 Integration}
+
+ML-KEM-768 (Module Lattice Key Encapsulation Mechanism)~\cite{nist2024pqc}
+was standardized by NIST in 2024 as FIPS 203. Key properties:
+
+\begin{itemize}[nosep]
+  \item Security level: AES-192 equivalent (NIST Category 3)
+  \item Public key size: 1,184 bytes
+  \item Ciphertext size: 1,088 bytes
+  \item Encapsulation/decapsulation: $<1$ ms
+\end{itemize}
+
+The larger key sizes (compared to 32-byte Ed25519 keys) are stored in the
+DID document on the agent's source chain. DHT replication propagates the
+full document to the storage neighborhood.
+
+\subsection{Key Rotation Protocol}
+
+When an agent upgrades from classical-only to hybrid (classical + PQ) keys:
+
+\begin{enumerate}[nosep]
+  \item Generate ML-KEM-768 key pair locally
+  \item Create a DID document update entry signed by the existing Ed25519 key
+  \item The update includes the new ML-KEM-768 public key in \texttt{keyAgreement}
+  \item DHT validators verify the Ed25519 signature on the update
+  \item The new document replaces the old in the DHT neighborhood
+\end{enumerate}
+
+This protocol ensures that quantum key addition is authenticated by the
+classical key, maintaining the chain of trust.
+
+\section{Trust Credentials}
+
+\subsection{Peer-to-Peer Attestation}
+
+The \texttt{trust\_credential} zome enables agents to attest to each other's
+trustworthiness. A trust attestation contains:
+
+\begin{lstlisting}
+pub struct TrustAttestation {
+    pub subject: AgentPubKey,
+    pub attestor: AgentPubKey,
+    pub trust_level: f64,  // [0, 1]
+    pub domain: Option<String>,
+    pub evidence: Option<String>,
+    pub created_at: Timestamp,
+}
+\end{lstlisting}
+
+Trust attestations feed the community dimension ($C$) of the consciousness
+profile. The aggregation weights attestations by the attestor's own
+consciousness tier:
+
+\begin{equation}
+  C = \frac{\sum_{j} \tau_j \cdot w(\text{tier}_j)}{\sum_{j} w(\text{tier}_j)}
+\end{equation}
+
+This prevents Sybil identities (all at Observer tier, weight 0) from
+bootstrapping each other's community scores.
+
+\subsection{Verifiable Credentials}
+
+The \texttt{verifiable\_credential} zome implements W3C Verifiable
+Credentials~\cite{w3cvc} with Holochain-native verification:
+
+\begin{enumerate}[nosep]
+  \item Credentials are stored on the holder's source chain (holder-controlled)
+  \item Verification uses the DHT to resolve the issuer's DID and public key
+  \item Selective disclosure is supported via derived credentials
+  \item Credential schemas are registered in the \texttt{credential\_schema} zome
+\end{enumerate}
+
+\section{Social Recovery}
+
+\subsection{$m$-of-$n$ Recovery Protocol}
+
+The \texttt{recovery} zome implements social key recovery:
+
+\begin{enumerate}[nosep]
+  \item An agent designates $n$ \emph{recovery guardians} (trusted peers)
+  \item The agent's recovery secret is split into $n$ shares using Shamir's
+    Secret Sharing
+  \item Each guardian stores one share on their source chain
+  \item To recover: $m$ guardians provide their shares to reconstruct the
+    recovery secret
+  \item The recovery secret authorizes a key rotation on the DID document
+\end{enumerate}
+
+\begin{definition}[Recovery threshold]
+The recovery threshold $m$ is chosen such that $m > n/2$ (majority required)
+and $m < n$ (not all guardians needed). A typical configuration is $m = 3$
+of $n = 5$.
+\end{definition}
+
+\subsection{Guardian Selection}
+
+Guardian selection is guided by the web-of-trust: agents with higher trust
+scores are recommended as guardians. The system warns if:
+
+\begin{itemize}[nosep]
+  \item Selected guardians are too closely connected (correlated failure risk)
+  \item Selected guardians have low consciousness tiers (low reliability)
+  \item The $m/n$ ratio is too low (easy to compromise) or too high (hard to
+    recover)
+\end{itemize}
+
+\section{Web of Trust}
+
+\subsection{Transitive Trust Computation}
+
+The \texttt{web-of-trust} zome computes transitive trust across the network.
+Given direct trust edges $t(A, B) \in [0, 1]$, the transitive trust from
+$A$ to $C$ through $B$ is:
+
+\begin{equation}
+  t(A \to B \to C) = t(A, B) \cdot t(B, C) \cdot d
+\end{equation}
+
+where $d \in (0, 1)$ is the per-hop decay factor (default 0.8). Multi-path
+trust uses the maximum across all paths up to a configurable depth limit.
+
+\subsection{Sybil Detection}
+
+The web-of-trust enables structural Sybil detection. A cluster of Sybil
+identities creates a dense subgraph with few connections to the legitimate
+network. The web-of-trust zome identifies such clusters by computing:
+
+\begin{equation}
+  \text{isolation}(G) = 1 - \frac{|\text{edges}(G, \bar{G})|}{|G| \cdot |\bar{G}|}
+\end{equation}
+
+where $G$ is the suspected cluster and $\bar{G}$ is the rest of the network.
+High isolation scores flag potential Sybil clusters for community review.
+
+\section{Name Registry}
+
+The \texttt{name-registry} zome provides human-readable name resolution:
+
+\begin{lstlisting}[language={}]
+alice.mycelix -> did:mycelix:5Grwva...
+cooperative-housing.mycelix -> did:mycelix:7Xbf...
+\end{lstlisting}
+
+Names are first-come-first-served with consciousness tier requirements
+(Participant+ to register, Steward+ to claim premium names). Name disputes
+use the Justice domain in the Civic cluster.
+
+\section{Revocation}
+
+The \texttt{revocation} zome handles two types of revocation:
+
+\begin{description}[nosep]
+  \item[Key revocation] Marks a key as compromised. The DID document is updated
+    with a new key, and the revocation entry propagates through the DHT.
+  \item[Credential revocation] Marks a specific credential as invalid. Verifiers
+    check the revocation status during credential verification.
+\end{description}
+
+Revocation is immediate on the agent's source chain and eventually consistent
+across the DHT (typically seconds to minutes depending on network size).
+
+\section{Integration with Consciousness Gating}
+
+The Identity cluster feeds two dimensions of the consciousness profile:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Identity dimension} ($I$): Directly from the MFA assurance level
+  \item \textbf{Community dimension} ($C$): Aggregated from trust credential
+    attestations, weighted by attestor tier
+\end{enumerate}
+
+The bridge zome provides \texttt{get\_consciousness\_credential}, which queries
+the MFA zome for the current assurance level, the trust credential zome for
+community attestations, and the reputation bridge for behavioral history, then
+constructs a \texttt{ConsciousnessProfile} and issues a 24-hour
+\texttt{ConsciousnessCredential}.
+
+\section{Evaluation}
+
+\subsection{Test Coverage}
+
+\begin{itemize}[nosep]
+  \item 23+ unit tests covering DID lifecycle, MFA level transitions, trust
+    aggregation, and recovery protocol
+  \item 100+ sweettest integration tests with real Holochain conductor,
+    covering multi-agent scenarios, DHT propagation, cross-zome calls
+  \item Governance audit: 7 previously missing \texttt{\#[ignore]} annotations
+    fixed for tests requiring conductor
+\end{itemize}
+
+\subsection{Key Size Trade-offs}
+
+ML-KEM-768 public keys (1,184 bytes) are 37$\times$ larger than Ed25519 keys
+(32 bytes). For source chain storage, this is negligible (source chains routinely
+store multi-KB entries). For DHT bandwidth, the impact is proportional to
+replication factor---with 3$\times$ replication, each DID document update
+transmits $\sim$3.5 KB of key material.
+
+\section{Related Work}
+
+\textbf{did:web}~\cite{didweb}: DNS-based DID resolution. Simple but centralized
+(DNS dependency). No quantum resistance.
+
+\textbf{did:ion} (Sidetree/Bitcoin): Bitcoin-anchored DIDs. Quantum-vulnerable
+and depends on Bitcoin's continued operation.
+
+\textbf{did:key}: Ephemeral DIDs from public keys. No recovery, no MFA, no
+trust network.
+
+\textbf{Spruce/SpruceID}: SSI toolkit with multiple DID methods. Provides
+credential infrastructure but not the integrated web-of-trust or
+consciousness gating.
+
+\section{Conclusion}
+
+The Mycelix Identity cluster demonstrates that decentralized identity can be
+both comprehensive (13 zomes covering the full identity lifecycle) and
+future-proof (ML-KEM-768 post-quantum keys). The integration with
+consciousness-gated governance---where identity verification strength directly
+determines governance capability---creates a natural incentive for strong
+identity practices without coercion.
+
+The web-of-trust and social recovery mechanisms address the two most common
+criticisms of self-sovereign identity: ``how do I know who to trust?'' and
+``what if I lose my keys?'' By embedding these solutions in the same DHT
+that hosts the identity records, Mycelix provides answers that are
+decentralized, privacy-preserving, and operationally practical.
+
+\begin{thebibliography}{99}
+  \bibitem{tobin2016} Tobin, A. and Reed, D. (2016). The Inevitable Rise of
+    Self-Sovereign Identity. Sovrin Foundation.
+  \bibitem{shor1994} Shor, P. W. (1994). Algorithms for Quantum Computation.
+    \textit{FOCS}.
+  \bibitem{nist2024pqc} NIST (2024). Module-Lattice-Based Key-Encapsulation
+    Mechanism Standard. FIPS 203.
+  \bibitem{w3cdid} W3C (2022). Decentralized Identifiers (DIDs) v1.0.
+  \bibitem{w3cvc} W3C (2022). Verifiable Credentials Data Model v1.1.
+  \bibitem{didweb} did:web Method Specification. W3C CCG.
+  \bibitem{brock2018} Brock, A. and Harris-Braun, E. (2018). Holochain:
+    Scalable Agent-Centric Distributed Computing.
+  \bibitem{shamir1979} Shamir, A. (1979). How to Share a Secret.
+    \textit{Communications of the ACM}, 22(11).
+\end{thebibliography}
+
+\end{document}

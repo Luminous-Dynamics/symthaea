@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Moral Algebra in Hyperdimensional Space
 //!
 //! This module implements compositional moral reasoning using HDC primitives.
@@ -1415,8 +1418,11 @@ impl MoralAlgebra {
                 Some("deontology") => (0.15, 0.20, 0.30, 0.35),
                 // Virtue: never reaches here (skip_learned), but just in case
                 Some("virtue") => (0.3, 0.4, 0.3, 0.0),
-                // Default (Social Chemistry, Moral Stories, etc.)
-                _ => (0.15, 0.25, 0.20, 0.40),
+                // Default (Social Chemistry, Moral Stories, SCRUPLES, etc.):
+                // Learned classifier gets low weight without a category hint
+                // because the Social Chemistry-trained classifier is domain-mismatched
+                // for long narrative text (e.g. SCRUPLES).
+                _ => (0.25, 0.35, 0.30, 0.10),
             }
         } else {
             (0.3, 0.4, 0.3, 0.0)

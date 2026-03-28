@@ -1,0 +1,167 @@
+{
+  "metadata": {
+    "title": "SHAPE America PE Standards 6-12",
+    "framework": "SHAPE America",
+    "source": "https://www.shapeamerica.org/standards/pe/",
+    "grade_level": "Grade9",
+    "subject_area": "Physical Education",
+    "domain": "Physical Education",
+    "version": "2024",
+    "total_standards": 5,
+    "domains": [
+      "Motor Skills",
+      "Fitness",
+      "Personal Behavior"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Curated from SHAPE America National Standards for K-12 Physical Education (2024 revision)."
+  },
+  "nodes": [
+    {
+      "id": "SHAPE.PE.1.HS",
+      "title": "Motor competency (Secondary)",
+      "description": "Demonstrate competency in a variety of motor skills and movement patterns",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Physical Education",
+      "subdomain": "Health & Fitness",
+      "tags": [
+        "physical-education",
+        "fitness",
+        "motor-skills",
+        "health"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Education",
+      "academic_standards": [
+        {
+          "framework": "SHAPE America",
+          "code": "SHAPE.PE.1",
+          "description": "Demonstrate competency in a variety of motor skills and movement patterns",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "SHAPE.PE.2.HS",
+      "title": "Movement concepts (Secondary)",
+      "description": "Apply knowledge of concepts, principles, strategies, and tactics related to movement and performance",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Physical Education",
+      "subdomain": "Health & Fitness",
+      "tags": [
+        "physical-education",
+        "fitness",
+        "motor-skills",
+        "health"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Education",
+      "academic_standards": [
+        {
+          "framework": "SHAPE America",
+          "code": "SHAPE.PE.2",
+          "description": "Apply knowledge of concepts, principles, strategies, and tactics related to movement and performance",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "SHAPE.PE.3.HS",
+      "title": "Physical activity (Secondary)",
+      "description": "Demonstrate the knowledge and skills to achieve and maintain a health-enhancing level of physical activity and fitness",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Physical Education",
+      "subdomain": "Health & Fitness",
+      "tags": [
+        "physical-education",
+        "fitness",
+        "motor-skills",
+        "health"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Education",
+      "academic_standards": [
+        {
+          "framework": "SHAPE America",
+          "code": "SHAPE.PE.3",
+          "description": "Demonstrate the knowledge and skills to achieve and maintain a health-enhancing level of physical activity and fitness",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "SHAPE.PE.4.HS",
+      "title": "Responsible behavior (Secondary)",
+      "description": "Exhibit responsible personal and social behavior that respects self and others in physical activity settings",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Education",
+      "subdomain": "Health & Fitness",
+      "tags": [
+        "physical-education",
+        "fitness",
+        "motor-skills",
+        "health"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Education",
+      "academic_standards": [
+        {
+          "framework": "SHAPE America",
+          "code": "SHAPE.PE.4",
+          "description": "Exhibit responsible personal and social behavior that respects self and others in physical activity settings",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "SHAPE.PE.5.HS",
+      "title": "Value of activity (Secondary)",
+      "description": "Recognize the value of physical activity for health, enjoyment, challenge, self-expression, and social interaction",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Education",
+      "subdomain": "Health & Fitness",
+      "tags": [
+        "physical-education",
+        "fitness",
+        "motor-skills",
+        "health"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Physical Education",
+      "academic_standards": [
+        {
+          "framework": "SHAPE America",
+          "code": "SHAPE.PE.5",
+          "description": "Recognize the value of physical activity for health, enjoyment, challenge, self-expression, and social interaction",
+          "grade_level": "Grade9"
+        }
+      ]
+    }
+  ],
+  "edges": []
+}

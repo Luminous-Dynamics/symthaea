@@ -1,0 +1,825 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Unified learner dashboard -- the most valuable page in EduNet.
+//!
+//! Shows XP/level, streak, due reviews, skill mastery, recommendations,
+//! and recent activity. Integrated with the adaptivity engine to show
+//! sovereignty level, cognitive state, and active adaptations.
+
+use leptos::prelude::*;
+
+use crate::adaptivity_provider::use_adaptivity;
+use crate::cognitive_adaptivity::*;
+use crate::components::suggestion_overlay::{SuggestionOverlay, CognitiveStateMirror};
+use crate::holochain::use_holochain;
+
+// ---------------------------------------------------------------------------
+// Data types
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LearnerStats {
+    pub xp_total: u64,
+    pub xp_today: u64,
+    pub xp_this_week: u64,
+    pub level: u32,
+    pub xp_to_next_level: u64,
+    pub xp_in_current_level: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StreakInfo {
+    pub current_days: u32,
+    pub freeze_count: u32,
+    pub bonus_multiplier: f32,
+    pub longest_streak: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DueReviews {
+    pub total_due: u32,
+    pub overdue: u32,
+    pub new_available: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SkillMastery {
+    pub name: String,
+    pub level: f32,
+    pub domain: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Recommendation {
+    pub title: String,
+    pub reason: String,
+    pub course_domain: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ActivityEvent {
+    pub description: String,
+    pub timestamp: String,
+    pub kind: ActivityKind,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ActivityKind {
+    CourseProgress,
+    ReviewCompleted,
+    BadgeEarned,
+    LevelUp,
+    StreakMilestone,
+}
+
+// ---------------------------------------------------------------------------
+// Mock data generators
+// ---------------------------------------------------------------------------
+
+fn mock_stats() -> LearnerStats {
+    LearnerStats {
+        xp_total: 4_280,
+        xp_today: 120,
+        xp_this_week: 680,
+        level: 7,
+        xp_to_next_level: 500,
+        xp_in_current_level: 280,
+    }
+}
+
+fn mock_streak() -> StreakInfo {
+    StreakInfo {
+        current_days: 12,
+        freeze_count: 1,
+        bonus_multiplier: 1.5,
+        longest_streak: 21,
+    }
+}
+
+fn mock_due_reviews() -> DueReviews {
+    DueReviews {
+        total_due: 18,
+        overdue: 3,
+        new_available: 5,
+    }
+}
+
+fn mock_skills() -> Vec<SkillMastery> {
+    vec![
+        SkillMastery { name: "Multiplication".into(), level: 0.85, domain: "Math".into() },
+        SkillMastery { name: "Fractions".into(), level: 0.72, domain: "Math".into() },
+        SkillMastery { name: "Word Problems".into(), level: 0.63, domain: "Math".into() },
+        SkillMastery { name: "Geometry".into(), level: 0.58, domain: "Math".into() },
+        SkillMastery { name: "Rounding".into(), level: 0.45, domain: "Math".into() },
+    ]
+}
+
+fn mock_recommendations() -> Vec<Recommendation> {
+    vec![
+        Recommendation {
+            title: "Division Practice".into(),
+            reason: "You're great at multiplication -- try dividing next!".into(),
+            course_domain: "Math".into(),
+        },
+        Recommendation {
+            title: "Fraction Fun".into(),
+            reason: "Keep practicing fractions with pizza and pie slices".into(),
+            course_domain: "Math".into(),
+        },
+        Recommendation {
+            title: "Shape Explorer".into(),
+            reason: "Learn about triangles, circles, and more shapes".into(),
+            course_domain: "Math".into(),
+        },
+    ]
+}
+
+fn mock_activity() -> Vec<ActivityEvent> {
+    vec![
+        ActivityEvent {
+            description: "Finished the Multiplication quiz".into(),
+            timestamp: "2 hours ago".into(),
+            kind: ActivityKind::CourseProgress,
+        },
+        ActivityEvent {
+            description: "Reviewed 12 flashcards (11 correct!)".into(),
+            timestamp: "5 hours ago".into(),
+            kind: ActivityKind::ReviewCompleted,
+        },
+        ActivityEvent {
+            description: "Earned the 'Fraction Star' badge".into(),
+            timestamp: "Yesterday".into(),
+            kind: ActivityKind::BadgeEarned,
+        },
+        ActivityEvent {
+            description: "Reached Level 7!".into(),
+            timestamp: "2 days ago".into(),
+            kind: ActivityKind::LevelUp,
+        },
+        ActivityEvent {
+            description: "10 days in a row! Amazing!".into(),
+            timestamp: "4 days ago".into(),
+            kind: ActivityKind::StreakMilestone,
+        },
+    ]
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard page (layout)
+// ---------------------------------------------------------------------------
+
+#[component]
+pub fn DashboardPage() -> impl IntoView {
+    view! {
+        <div class="dashboard">
+            <h2>"My Learning"</h2>
+            <p class="dashboard-encouragement">
+                "You're doing great! 3 skills improving this week."
+            </p>
+
+            // Suggestion overlay -- available on dashboard too
+            <SuggestionOverlay />
+
+            // Mirror mode cognitive state display
+            <CognitiveStateMirror />
+
+            <div class="dashboard-grid">
+                <SovereigntyCard />
+                <LearningReadinessCard />
+                <XpLevelCard />
+                <StreakCard />
+                <DueReviewsCard />
+                <SkillsCard />
+            </div>
+            <ActiveAdaptationSection />
+            <RecommendationsSection />
+            <RecentActivitySection />
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sovereignty card (NEW -- shows independence level and growth)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn SovereigntyCard() -> impl IntoView {
+    let adaptivity = use_adaptivity();
+
+    view! {
+        <div class="dash-card sovereignty-card">
+            <h3>"Your Learning Independence"</h3>
+            {move || {
+                let sov = adaptivity.sovereignty.get();
+                let mode = sov.mode();
+                let (mode_label, mode_icon, mode_description) = match mode {
+                    InteractionMode::Guardian => (
+                        "Helper Mode",
+                        "\u{1f6e1}\u{fe0f}",
+                        "I help guide your learning and explain what I'm doing",
+                    ),
+                    InteractionMode::Guide => (
+                        "Guide Mode",
+                        "\u{1f331}",
+                        "I suggest options and you choose what works for you",
+                    ),
+                    InteractionMode::Mirror => (
+                        "Mirror Mode",
+                        "\u{1fa9e}",
+                        "I show you how you're doing -- you decide what to do",
+                    ),
+                    InteractionMode::Autonomous => (
+                        "Independent Mode",
+                        "\u{2b50}",
+                        "You're in charge! I'm here if you need me",
+                    ),
+                };
+
+                let progress_pct = ((sov.level as f64 / 1000.0) * 100.0) as u32;
+
+                // Last few growth events (most recent first)
+                let recent_events: Vec<_> = sov.growth_events.iter().rev().take(3).cloned().collect();
+
+                view! {
+                    <div class="sovereignty-display">
+                        <div class="sovereignty-mode">
+                            <span class="sovereignty-icon">{mode_icon}</span>
+                            <span class="sovereignty-mode-label">{mode_label}</span>
+                        </div>
+                        <p class="sovereignty-description">{mode_description}</p>
+
+                        <div class="sovereignty-progress">
+                            <div class="sovereignty-bar-container">
+                                <div class="sovereignty-bar"
+                                    style=format!("width: {}%", progress_pct)>
+                                </div>
+                            </div>
+                            <span class="sovereignty-level-text">
+                                {format!("{}/1000", sov.level)}
+                            </span>
+                        </div>
+                    </div>
+
+                    // Recent sovereignty growth events
+                    {if !recent_events.is_empty() {
+                        view! {
+                            <div class="sovereignty-history">
+                                <p class="sovereignty-history-label">"How you earned independence:"</p>
+                                <ul class="sovereignty-events">
+                                    {recent_events.into_iter().map(|event| {
+                                        let icon = match event.event_type {
+                                            SovereigntyGrowthType::SelfRegulatedBreak => "\u{1f9d8}",
+                                            SovereigntyGrowthType::PerseveranceSuccess => "\u{1f4aa}",
+                                            SovereigntyGrowthType::AskedForHelp => "\u{1f91d}",
+                                            SovereigntyGrowthType::PlannedAndExecuted => "\u{1f4cb}",
+                                            SovereigntyGrowthType::ReflectiveResponse => "\u{1f4ad}",
+                                            SovereigntyGrowthType::DifficultyCalibration => "\u{1f3af}",
+                                            SovereigntyGrowthType::PeerTeaching => "\u{1f9d1}\u{200d}\u{1f3eb}",
+                                            SovereigntyGrowthType::IndependentSuccess => "\u{1f680}",
+                                        };
+                                        view! {
+                                            <li class="sovereignty-event">
+                                                <span class="event-icon">{icon}</span>
+                                                <span class="event-desc">{event.description.clone()}</span>
+                                                <span class="event-delta">{format!("+{}", event.delta)}</span>
+                                            </li>
+                                        }
+                                    }).collect_view()}
+                                </ul>
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <p class="sovereignty-hint">
+                                <small>"Keep learning and you'll earn more independence!"</small>
+                            </p>
+                        }.into_any()
+                    }}
+                }
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Active Adaptation section (NEW -- shows what the system is doing)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn ActiveAdaptationSection() -> impl IntoView {
+    let adaptivity = use_adaptivity();
+
+    view! {
+        <div class="dash-section active-adaptation">
+            {move || {
+                let adapt = adaptivity.adaptation.get();
+                let sov = adaptivity.sovereignty.get();
+                let mode = sov.mode();
+
+                // Only show in Guardian or Guide mode
+                if matches!(mode, InteractionMode::Mirror | InteractionMode::Autonomous) {
+                    return view! { <div class="adaptation-hidden"></div> }.into_any();
+                }
+
+                let complexity_text = match &adapt.text_complexity {
+                    TextComplexity::Standard => "Standard difficulty",
+                    TextComplexity::Simplified => "Simplified wording",
+                    TextComplexity::Minimal => "Numbers only",
+                    TextComplexity::Personalized { interest_topic } => {
+                        // Can't return a &str from a match arm with borrowed data easily,
+                        // so we'll handle this in the view
+                        return view! {
+                            <div class="adaptation-status">
+                                <h3>"How I'm Helping"</h3>
+                                <div class="adaptation-items">
+                                    <div class="adaptation-item">
+                                        <span class="adaptation-label">"Content"</span>
+                                        <span class="adaptation-value">
+                                            {format!("Personalized with {}", interest_topic)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        }.into_any();
+                    }
+                };
+
+                let diff_text = if adapt.difficulty_delta > 0.1 {
+                    "Making problems a bit harder"
+                } else if adapt.difficulty_delta < -0.1 {
+                    "Making problems a bit easier"
+                } else {
+                    "Just right"
+                };
+
+                let accuracy = adaptivity.recent_accuracy.get();
+                let accuracy_pct = (accuracy * 100.0) as u32;
+
+                view! {
+                    <div class="adaptation-status">
+                        <h3>"How I'm Helping"</h3>
+                        <div class="adaptation-items">
+                            <div class="adaptation-item">
+                                <span class="adaptation-label">"Content"</span>
+                                <span class="adaptation-value">{complexity_text}</span>
+                            </div>
+                            <div class="adaptation-item">
+                                <span class="adaptation-label">"Difficulty"</span>
+                                <span class="adaptation-value">{diff_text}</span>
+                            </div>
+                            <div class="adaptation-item">
+                                <span class="adaptation-label">"Your accuracy"</span>
+                                <span class="adaptation-value">{format!("{}%", accuracy_pct)}</span>
+                            </div>
+                        </div>
+                    </div>
+                }.into_any()
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Learning Readiness card (kid-friendly consciousness wrapper)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn LearningReadinessCard() -> impl IntoView {
+    let ctx = crate::consciousness::use_consciousness();
+    let (show_details, set_show_details) = signal(false);
+
+    view! {
+        <div class="dash-card readiness-card">
+            <h3>"Learning Readiness"</h3>
+            <div class="readiness-display">
+                {move || {
+                    let s = ctx.state.get();
+                    // Map consciousness state to kid-friendly readiness
+                    let (indicator, status_text, hint, css_class) = if s.phi > 0.5 && s.neuromod_norepinephrine < 0.7 {
+                        ("\u{1f7e2}", "Ready to learn!", "Your brain is warmed up and ready for new challenges", "readiness-green")
+                    } else if s.phi > 0.3 {
+                        ("\u{1f7e1}", "Warming up...", "Almost there! Try a quick review to get going", "readiness-yellow")
+                    } else if s.neuromod_norepinephrine > 0.7 || s.neuromod_dopamine < 0.3 {
+                        ("\u{1f7e0}", "Time for a break", "Maybe stretch, get some water, or take a walk", "readiness-orange")
+                    } else {
+                        ("\u{1f534}", "Let's rest", "It's okay to take a break and come back later", "readiness-red")
+                    };
+
+                    // Focus bar: map phi (0-1) to a simple percentage
+                    let focus_pct = ((s.phi * 100.0) as u32).min(100);
+                    let focus_label = if focus_pct > 70 { "Great" }
+                        else if focus_pct > 50 { "Good" }
+                        else if focus_pct > 30 { "Okay" }
+                        else { "Low" };
+
+                    view! {
+                        <div class=format!("readiness-status {}", css_class)>
+                            <span class="readiness-indicator">{indicator}</span>
+                            <span class="readiness-text">{status_text}</span>
+                        </div>
+                        <div class="readiness-focus">
+                            <div class="readiness-focus-bar-container">
+                                <div class="readiness-focus-bar"
+                                    style=format!("width: {}%", focus_pct)>
+                                </div>
+                            </div>
+                            <span class="readiness-focus-label">"Focus: " {focus_label}</span>
+                        </div>
+                        <p class="readiness-hint">{hint}</p>
+                    }
+                }}
+            </div>
+
+            // Toggle for teacher/advanced view
+            <button
+                class="details-toggle"
+                on:click=move |_| set_show_details.update(|v| *v = !*v)
+            >
+                {move || if show_details.get() { "Hide details" } else { "Show details" }}
+            </button>
+
+            // Advanced panel (hidden by default)
+            {move || {
+                if show_details.get() {
+                    let s = ctx.state.get();
+                    view! {
+                        <div class="readiness-details">
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Phi"</span>
+                                <span class="detail-metric-value">{format!("{:.3}", s.phi)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Coherence"</span>
+                                <span class="detail-metric-value">{format!("{:.3}", s.coherence)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Free Energy"</span>
+                                <span class="detail-metric-value">{format!("{:.3}", s.free_energy)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"DA"</span>
+                                <span class="detail-metric-value">{format!("{:.2}", s.neuromod_dopamine)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"NE"</span>
+                                <span class="detail-metric-value">{format!("{:.2}", s.neuromod_norepinephrine)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"5-HT"</span>
+                                <span class="detail-metric-value">{format!("{:.2}", s.neuromod_serotonin)}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Workspace"</span>
+                                <span class="detail-metric-value">
+                                    {if s.workspace_ignited { "Ignited" } else { "Sub-threshold" }}
+                                </span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Harmony"</span>
+                                <span class="detail-metric-value">{s.dominant_harmony.clone()}</span>
+                            </div>
+                            <div class="detail-metric">
+                                <span class="detail-metric-label">"Cycle"</span>
+                                <span class="detail-metric-value">{s.cycle_count}</span>
+                            </div>
+                            <div class="consciousness-disclaimer">
+                                <small>"Simulated \u{2014} real Spore WASM integration pending"</small>
+                            </div>
+                        </div>
+                    }.into_any()
+                } else {
+                    view! { <div></div> }.into_any()
+                }
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// XP & Level card
+// ---------------------------------------------------------------------------
+
+#[component]
+fn XpLevelCard() -> impl IntoView {
+    let hc = use_holochain();
+
+    let stats = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc.call_zome::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
+                Ok(s) => s,
+                Err(_) => mock_stats(),
+            }
+        }
+    });
+
+    view! {
+        <div class="dash-card xp-card">
+            <h3>"XP & Level"</h3>
+            <Suspense fallback=move || view! { <CardLoading /> }>
+                {move || {
+                    stats.get().map(|s| {
+                        let s: LearnerStats = (*s).clone();
+                        let progress_pct = if s.xp_to_next_level > 0 {
+                            (s.xp_in_current_level as f64 / s.xp_to_next_level as f64 * 100.0).min(100.0)
+                        } else {
+                            100.0
+                        };
+                        view! {
+                            <div class="stat-big">
+                                <span class="level-badge">"Lv. " {s.level}</span>
+                                <span class="xp-total">{format!("{} XP", s.xp_total)}</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar"
+                                    style=format!("width: {}%", progress_pct)>
+                                </div>
+                            </div>
+                            <div class="xp-details">
+                                <span>"Today: " <strong>{format!("+{}", s.xp_today)}</strong></span>
+                                <span>"This week: " <strong>{format!("+{}", s.xp_this_week)}</strong></span>
+                            </div>
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Streak card
+// ---------------------------------------------------------------------------
+
+#[component]
+fn StreakCard() -> impl IntoView {
+    let hc = use_holochain();
+
+    let streak = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc.call_zome::<(), StreakInfo>("gamification", "get_streak", &()).await {
+                Ok(s) => s,
+                Err(_) => mock_streak(),
+            }
+        }
+    });
+
+    view! {
+        <div class="dash-card streak-card">
+            <h3>"Streak"</h3>
+            <Suspense fallback=move || view! { <CardLoading /> }>
+                {move || {
+                    streak.get().map(|s| {
+                        let s: StreakInfo = (*s).clone();
+                        view! {
+                            <div class="stat-big">
+                                <span class="streak-count">{s.current_days} " days"</span>
+                            </div>
+                            <div class="streak-details">
+                                <div class="streak-row">
+                                    <span class="label">"Bonus"</span>
+                                    <span class="value">{format!("{:.1}x", s.bonus_multiplier)}</span>
+                                </div>
+                                <div class="streak-row">
+                                    <span class="label">"Freezes left"</span>
+                                    <span class="value">{s.freeze_count}</span>
+                                </div>
+                                <div class="streak-row">
+                                    <span class="label">"Best"</span>
+                                    <span class="value">{s.longest_streak} " days"</span>
+                                </div>
+                            </div>
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Due reviews card
+// ---------------------------------------------------------------------------
+
+#[component]
+fn DueReviewsCard() -> impl IntoView {
+    let hc = use_holochain();
+
+    let reviews = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc.call_zome::<(), DueReviews>("srs", "get_due_summary", &()).await {
+                Ok(r) => r,
+                Err(_) => mock_due_reviews(),
+            }
+        }
+    });
+
+    view! {
+        <div class="dash-card reviews-card">
+            <h3>"Due Reviews"</h3>
+            <Suspense fallback=move || view! { <CardLoading /> }>
+                {move || {
+                    reviews.get().map(|r| {
+                        let r: DueReviews = (*r).clone();
+                        view! {
+                            <div class="stat-big">
+                                <span class="due-count">{r.total_due}</span>
+                                <span class="due-label">" cards due"</span>
+                            </div>
+                            <div class="review-breakdown">
+                                <span class="overdue">{r.overdue} " overdue"</span>
+                                <span class="new-cards">{r.new_available} " new"</span>
+                            </div>
+                            <a href="/review" class="btn-primary">"Start Review"</a>
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Skills card
+// ---------------------------------------------------------------------------
+
+#[component]
+fn SkillsCard() -> impl IntoView {
+    let hc = use_holochain();
+
+    let skills = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc.call_zome::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
+                Ok(s) => s,
+                Err(_) => mock_skills(),
+            }
+        }
+    });
+
+    view! {
+        <div class="dash-card skills-card">
+            <h3>"What I'm Learning"</h3>
+            <Suspense fallback=move || view! { <CardLoading /> }>
+                {move || {
+                    skills.get().map(|data| {
+                        let data: Vec<SkillMastery> = (*data).clone();
+                        view! {
+                            <div class="skills-list">
+                                {data.into_iter().map(|skill| {
+                                    let pct = (skill.level * 100.0) as u32;
+                                    view! {
+                                        <div class="skill-row">
+                                            <div class="skill-info">
+                                                <span class="skill-name">{skill.name}</span>
+                                                <span class="skill-domain">{skill.domain}</span>
+                                            </div>
+                                            <div class="skill-bar-container">
+                                                <div class="skill-bar"
+                                                    style=format!("width: {}%", pct)>
+                                                </div>
+                                            </div>
+                                            <span class="skill-pct">{pct} "%"</span>
+                                        </div>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations section
+// ---------------------------------------------------------------------------
+
+#[component]
+fn RecommendationsSection() -> impl IntoView {
+    let hc = use_holochain();
+
+    let recs = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc
+                .call_zome::<(), Vec<Recommendation>>(
+                    "adaptive",
+                    "get_recommendations",
+                    &(),
+                )
+                .await
+            {
+                Ok(r) => r,
+                Err(_) => mock_recommendations(),
+            }
+        }
+    });
+
+    view! {
+        <div class="dash-section recommendations">
+            <h3>"What's Next"</h3>
+            <Suspense fallback=move || view! { <CardLoading /> }>
+                {move || {
+                    recs.get().map(|data| {
+                        let data: Vec<Recommendation> = (*data).clone();
+                        view! {
+                            <div class="rec-grid">
+                                {data.into_iter().map(|rec| {
+                                    view! {
+                                        <div class="rec-card">
+                                            <h4>{rec.title}</h4>
+                                            <p>{rec.reason}</p>
+                                            <span class="domain-tag">{rec.course_domain}</span>
+                                        </div>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Recent activity section
+// ---------------------------------------------------------------------------
+
+#[component]
+fn RecentActivitySection() -> impl IntoView {
+    let hc = use_holochain();
+
+    let activity = LocalResource::new(move || {
+        let hc = hc.clone();
+        async move {
+            match hc
+                .call_zome::<(), Vec<ActivityEvent>>(
+                    "gamification",
+                    "get_recent_activity",
+                    &(),
+                )
+                .await
+            {
+                Ok(a) => a,
+                Err(_) => mock_activity(),
+            }
+        }
+    });
+
+    view! {
+        <div class="dash-section activity">
+            <h3>"What I Did Today"</h3>
+            <Suspense fallback=move || view! { <CardLoading /> }>
+                {move || {
+                    activity.get().map(|data| {
+                        let data: Vec<ActivityEvent> = (*data).clone();
+                        view! {
+                            <ul class="activity-feed">
+                                {data.into_iter().map(|event| {
+                                    let icon = match event.kind {
+                                        ActivityKind::CourseProgress => "^",
+                                        ActivityKind::ReviewCompleted => "*",
+                                        ActivityKind::BadgeEarned => "#",
+                                        ActivityKind::LevelUp => "+",
+                                        ActivityKind::StreakMilestone => "~",
+                                    };
+                                    view! {
+                                        <li class="activity-item">
+                                            <span class="activity-icon">{icon}</span>
+                                            <div class="activity-content">
+                                                <span class="activity-desc">{event.description}</span>
+                                                <span class="activity-time">{event.timestamp}</span>
+                                            </div>
+                                        </li>
+                                    }
+                                }).collect_view()}
+                            </ul>
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shared loading skeleton
+// ---------------------------------------------------------------------------
+
+#[component]
+fn CardLoading() -> impl IntoView {
+    view! {
+        <div class="card-loading">
+            <div class="skeleton-line wide"></div>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line narrow"></div>
+        </div>
+    }
+}

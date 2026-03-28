@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Substrate independence manager.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Substrate independence manager.
 //!
 //! Consolidates the 6 substrate-related fields from CognitiveLoopService
 //! into a single cohesive manager. Handles feasibility computation,

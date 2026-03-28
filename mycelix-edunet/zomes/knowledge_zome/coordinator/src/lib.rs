@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Knowledge Roots Coordinator Zome
 //!
 //! Implements the decentralized curriculum graph - community-built learning pathways.
@@ -16,7 +19,7 @@ use knowledge_integrity::{
     EntryTypes, LinkTypes, KnowledgeNode, LearningEdge, LearningPath,
     SkillTree, NodeProgress, EdgeVote, PathRecommendation,
     DifficultyLevel, EdgeType, EdgeStatus, NodeStatus,
-    ProgressStatus, VoteDirection,
+    ProgressStatus, VoteDirection, GradeLevel, SubjectArea,
 };
 
 // Helper function to ensure a path exists and return its entry hash
@@ -56,6 +59,31 @@ pub fn create_node(node: KnowledgeNode) -> ExternResult<ActionHash> {
             LinkTypes::NodeToCourses,
             (),
         )?;
+    }
+
+    // Link by grade levels
+    for grade in &node.grade_levels {
+        let grade_path = Path::from(format!("grade.{}", grade.ordinal()));
+        let grade_hash = ensure_path(grade_path, LinkTypes::GradeToNodes)?;
+        create_link(grade_hash, action_hash.clone(), LinkTypes::GradeToNodes, ())?;
+    }
+
+    // Link by subject area
+    if let Some(ref subject) = node.subject_area {
+        let subject_key = match subject {
+            SubjectArea::Mathematics => "mathematics".to_string(),
+            SubjectArea::EnglishLanguageArts => "english_language_arts".to_string(),
+            SubjectArea::Science => "science".to_string(),
+            SubjectArea::SocialStudies => "social_studies".to_string(),
+            SubjectArea::ForeignLanguage => "foreign_language".to_string(),
+            SubjectArea::Arts => "arts".to_string(),
+            SubjectArea::PhysicalEducation => "physical_education".to_string(),
+            SubjectArea::Technology => "technology".to_string(),
+            SubjectArea::Custom(name) => name.to_lowercase(),
+        };
+        let subject_path = Path::from(format!("subject.{}", subject_key));
+        let subject_hash = ensure_path(subject_path, LinkTypes::SubjectToNodes)?;
+        create_link(subject_hash, action_hash.clone(), LinkTypes::SubjectToNodes, ())?;
     }
 
     Ok(action_hash)
@@ -139,6 +167,31 @@ pub fn search_nodes(query: SearchNodesInput) -> ExternResult<Vec<Record>> {
                 // Match by domain
                 if let Some(ref domain) = query.domain {
                     if !node.domain.to_lowercase().contains(&domain.to_lowercase()) {
+                        return false;
+                    }
+                }
+                // Match by grade level
+                if let Some(ref grade) = query.grade_level {
+                    if !node.grade_levels.contains(grade) {
+                        return false;
+                    }
+                }
+                // Match by subject area
+                if let Some(ref subject) = query.subject_area {
+                    let subject_lower = subject.to_lowercase();
+                    let matches = match &node.subject_area {
+                        Some(SubjectArea::Mathematics) => "mathematics".contains(&subject_lower),
+                        Some(SubjectArea::EnglishLanguageArts) => "english_language_arts".contains(&subject_lower),
+                        Some(SubjectArea::Science) => "science".contains(&subject_lower),
+                        Some(SubjectArea::SocialStudies) => "social_studies".contains(&subject_lower),
+                        Some(SubjectArea::ForeignLanguage) => "foreign_language".contains(&subject_lower),
+                        Some(SubjectArea::Arts) => "arts".contains(&subject_lower),
+                        Some(SubjectArea::PhysicalEducation) => "physical_education".contains(&subject_lower),
+                        Some(SubjectArea::Technology) => "technology".contains(&subject_lower),
+                        Some(SubjectArea::Custom(name)) => name.to_lowercase().contains(&subject_lower),
+                        None => false,
+                    };
+                    if !matches {
                         return false;
                     }
                 }
@@ -270,20 +323,78 @@ pub fn vote_on_edge(vote: EdgeVote) -> ExternResult<ActionHash> {
         VoteDirection::Abstain => {}
     }
 
-    // Check if voting threshold met for approval/rejection
-    let total_votes = edge.upvotes + edge.downvotes;
-    if total_votes >= 5 {
-        let approval_ratio = edge.upvotes as f64 / total_votes as f64;
-        if approval_ratio >= 0.6 {
-            edge.status = EdgeStatus::Approved;
-        } else if approval_ratio < 0.4 && total_votes >= 10 {
-            edge.status = EdgeStatus::Rejected;
-        }
-    }
+    // Determine new edge status using pure function
+    edge.status = determine_edge_status(edge.upvotes, edge.downvotes, edge.status.clone());
 
     update_entry(vote.edge_hash, EntryTypes::LearningEdge(edge))?;
 
     Ok(action_hash)
+}
+
+// ============== Pure Business Logic (HDK-free, unit-testable) ==============
+
+use std::collections::{HashMap, VecDeque, HashSet};
+
+/// Find shortest path via BFS on a pre-built adjacency list.
+///
+/// Returns `Some(path)` including both start and end, or `None` if unreachable.
+/// If `start == end`, returns `Some(vec![start])`.
+pub fn find_path_bfs(
+    adjacency: &HashMap<ActionHash, Vec<ActionHash>>,
+    start: &ActionHash,
+    end: &ActionHash,
+) -> Option<Vec<ActionHash>> {
+    if start == end {
+        return Some(vec![start.clone()]);
+    }
+
+    let mut visited = HashSet::new();
+    let mut queue: VecDeque<(ActionHash, Vec<ActionHash>)> = VecDeque::new();
+    queue.push_back((start.clone(), vec![start.clone()]));
+    visited.insert(start.clone());
+
+    while let Some((current, path)) = queue.pop_front() {
+        if let Some(neighbors) = adjacency.get(&current) {
+            for neighbor in neighbors {
+                if neighbor == end {
+                    let mut result = path.clone();
+                    result.push(neighbor.clone());
+                    return Some(result);
+                }
+                if visited.insert(neighbor.clone()) {
+                    let mut new_path = path.clone();
+                    new_path.push(neighbor.clone());
+                    queue.push_back((neighbor.clone(), new_path));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Determine edge status after a vote is applied.
+///
+/// Rules:
+/// - Needs >= 5 total votes (upvotes + downvotes) to change status
+/// - Approval: ratio >= 0.6 and total >= 5
+/// - Rejection: ratio < 0.4 and total >= 10
+/// - Otherwise: remains in current status
+pub fn determine_edge_status(
+    upvotes: u32,
+    downvotes: u32,
+    current_status: EdgeStatus,
+) -> EdgeStatus {
+    let total = upvotes + downvotes;
+    if total >= 5 {
+        let approval_ratio = upvotes as f64 / total as f64;
+        if approval_ratio >= 0.6 {
+            return EdgeStatus::Approved;
+        } else if approval_ratio < 0.4 && total >= 10 {
+            return EdgeStatus::Rejected;
+        }
+    }
+    current_status
 }
 
 // ============== Learning Path Functions ==============
@@ -591,6 +702,84 @@ pub fn list_skill_trees(_: ()) -> ExternResult<Vec<Record>> {
     Ok(trees)
 }
 
+// ============== Grade & Subject Query Functions ==============
+
+/// Get all knowledge nodes tagged for a specific grade level
+#[hdk_extern]
+pub fn get_nodes_by_grade(grade: GradeLevel) -> ExternResult<Vec<Record>> {
+    let path = Path::from(format!("grade.{}", grade.ordinal()));
+    let path_hash = ensure_path(path, LinkTypes::GradeToNodes)?;
+
+    let links = get_links(
+        LinkQuery::try_new(path_hash, LinkTypes::GradeToNodes)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!("Failed to convert link target"))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get all knowledge nodes in a specific subject area
+#[hdk_extern]
+pub fn get_nodes_by_subject(subject: String) -> ExternResult<Vec<Record>> {
+    let path = Path::from(format!("subject.{}", subject.to_lowercase()));
+    let path_hash = ensure_path(path, LinkTypes::SubjectToNodes)?;
+
+    let links = get_links(
+        LinkQuery::try_new(path_hash, LinkTypes::SubjectToNodes)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!("Failed to convert link target"))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get nodes matching a grade range (inclusive)
+#[hdk_extern]
+pub fn get_nodes_by_grade_range(input: GradeRangeInput) -> ExternResult<Vec<Record>> {
+    let min = input.min_grade.ordinal();
+    let max = input.max_grade.ordinal();
+
+    let mut all_records = Vec::new();
+    let mut seen_hashes = std::collections::HashSet::new();
+
+    for ordinal in min..=max {
+        let path = Path::from(format!("grade.{}", ordinal));
+        let path_hash = ensure_path(path, LinkTypes::GradeToNodes)?;
+
+        let links = get_links(
+            LinkQuery::try_new(path_hash, LinkTypes::GradeToNodes)?,
+            GetStrategy::Local,
+        )?;
+
+        for link in links {
+            let action_hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!("Failed to convert link target"))?;
+            if seen_hashes.insert(action_hash.clone()) {
+                if let Some(record) = get(action_hash, GetOptions::default())? {
+                    all_records.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(all_records)
+}
+
 // ============== Input/Output Types ==============
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -598,6 +787,10 @@ pub struct SearchNodesInput {
     pub tag: Option<String>,
     pub domain: Option<String>,
     pub difficulty: Option<DifficultyLevel>,
+    #[serde(default)]
+    pub grade_level: Option<GradeLevel>,
+    #[serde(default)]
+    pub subject_area: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -626,4 +819,170 @@ pub struct RecommendationInput {
     pub target_skill: String,
     pub max_hours: Option<u32>,
     pub preferred_difficulty: Option<DifficultyLevel>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GradeRangeInput {
+    pub min_grade: GradeLevel,
+    pub max_grade: GradeLevel,
+}
+
+// ============================================================================
+// Tests -- pure business logic only (no HDK required)
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a fake ActionHash from a byte for test convenience
+    fn fake_hash(id: u8) -> ActionHash {
+        ActionHash::from_raw_36(vec![id; 36])
+    }
+
+    // ---- find_path_bfs ----
+
+    #[test]
+    fn test_bfs_simple_path() {
+        // A -> B -> C
+        let a = fake_hash(1);
+        let b = fake_hash(2);
+        let c = fake_hash(3);
+
+        let mut adj = HashMap::new();
+        adj.insert(a.clone(), vec![b.clone()]);
+        adj.insert(b.clone(), vec![c.clone()]);
+
+        let path = find_path_bfs(&adj, &a, &c);
+        assert_eq!(path, Some(vec![a.clone(), b.clone(), c.clone()]));
+    }
+
+    #[test]
+    fn test_bfs_no_path() {
+        // A -> B, C is disconnected
+        let a = fake_hash(1);
+        let b = fake_hash(2);
+        let c = fake_hash(3);
+
+        let mut adj = HashMap::new();
+        adj.insert(a.clone(), vec![b.clone()]);
+
+        let path = find_path_bfs(&adj, &a, &c);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn test_bfs_start_equals_end() {
+        let a = fake_hash(1);
+        let adj = HashMap::new();
+
+        let path = find_path_bfs(&adj, &a, &a);
+        assert_eq!(path, Some(vec![a.clone()]));
+    }
+
+    #[test]
+    fn test_bfs_cycle_handling() {
+        // A -> B -> C -> A (cycle), target D not reachable
+        let a = fake_hash(1);
+        let b = fake_hash(2);
+        let c = fake_hash(3);
+        let d = fake_hash(4);
+
+        let mut adj = HashMap::new();
+        adj.insert(a.clone(), vec![b.clone()]);
+        adj.insert(b.clone(), vec![c.clone()]);
+        adj.insert(c.clone(), vec![a.clone()]); // cycle back
+
+        let path = find_path_bfs(&adj, &a, &d);
+        assert_eq!(path, None);
+    }
+
+    #[test]
+    fn test_bfs_shortest_path() {
+        // A -> B -> D (length 2)
+        // A -> C -> D (length 2)
+        // A -> D     (length 1, shortest)
+        let a = fake_hash(1);
+        let b = fake_hash(2);
+        let c = fake_hash(3);
+        let d = fake_hash(4);
+
+        let mut adj = HashMap::new();
+        adj.insert(a.clone(), vec![b.clone(), c.clone(), d.clone()]);
+        adj.insert(b.clone(), vec![d.clone()]);
+        adj.insert(c.clone(), vec![d.clone()]);
+
+        let path = find_path_bfs(&adj, &a, &d);
+        assert_eq!(path, Some(vec![a.clone(), d.clone()]));
+    }
+
+    #[test]
+    fn test_bfs_cycle_with_reachable_target() {
+        // A -> B -> C -> A (cycle), but B -> D exists
+        let a = fake_hash(1);
+        let b = fake_hash(2);
+        let c = fake_hash(3);
+        let d = fake_hash(4);
+
+        let mut adj = HashMap::new();
+        adj.insert(a.clone(), vec![b.clone()]);
+        adj.insert(b.clone(), vec![c.clone(), d.clone()]);
+        adj.insert(c.clone(), vec![a.clone()]);
+
+        let path = find_path_bfs(&adj, &a, &d);
+        assert_eq!(path, Some(vec![a.clone(), b.clone(), d.clone()]));
+    }
+
+    #[test]
+    fn test_bfs_empty_graph() {
+        let a = fake_hash(1);
+        let b = fake_hash(2);
+        let adj = HashMap::new();
+
+        let path = find_path_bfs(&adj, &a, &b);
+        assert_eq!(path, None);
+    }
+
+    // ---- determine_edge_status ----
+
+    #[test]
+    fn test_edge_approved_at_threshold() {
+        // 3 up, 2 down = 5 total, ratio 0.6 => Approved
+        let status = determine_edge_status(3, 2, EdgeStatus::Proposed);
+        assert_eq!(status, EdgeStatus::Approved);
+    }
+
+    #[test]
+    fn test_edge_stays_proposed_below_quorum() {
+        // 2 up, 1 down = 3 total < 5 => stays Proposed
+        let status = determine_edge_status(2, 1, EdgeStatus::Proposed);
+        assert_eq!(status, EdgeStatus::Proposed);
+    }
+
+    #[test]
+    fn test_edge_rejected_at_threshold() {
+        // 3 up, 7 down = 10 total, ratio 0.3 < 0.4 and total >= 10 => Rejected
+        let status = determine_edge_status(3, 7, EdgeStatus::Proposed);
+        assert_eq!(status, EdgeStatus::Rejected);
+    }
+
+    #[test]
+    fn test_edge_not_rejected_below_10_total() {
+        // 1 up, 4 down = 5 total, ratio 0.2 < 0.4 but total < 10 => stays Proposed
+        let status = determine_edge_status(1, 4, EdgeStatus::Proposed);
+        assert_eq!(status, EdgeStatus::Proposed);
+    }
+
+    #[test]
+    fn test_edge_indeterminate_middle_ratio() {
+        // 4 up, 6 down = 10 total, ratio 0.4 (not < 0.4, not >= 0.6) => stays current
+        let status = determine_edge_status(4, 6, EdgeStatus::Proposed);
+        assert_eq!(status, EdgeStatus::Proposed);
+    }
+
+    #[test]
+    fn test_edge_zero_votes() {
+        let status = determine_edge_status(0, 0, EdgeStatus::Proposed);
+        assert_eq!(status, EdgeStatus::Proposed);
+    }
 }

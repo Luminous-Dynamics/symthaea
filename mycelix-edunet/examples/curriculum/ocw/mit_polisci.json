@@ -1,0 +1,738 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Political Science",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=17&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Political Science",
+    "domain": "Political Science",
+    "version": "2024",
+    "total_standards": 20,
+    "domains": [
+      "Anthropology",
+      "Humanities",
+      "Policy and Administration",
+      "Earth Science",
+      "Business & Management",
+      "Strategy & Innovation",
+      "Philosophy",
+      "Social Sciences",
+      "History",
+      "Science & Math"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 17). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "45.10"
+  },
+  "nodes": [
+    {
+      "id": "11.491J",
+      "title": "Economic Development, Policy Analysis, and Industrialization",
+      "description": "This class analyzes the theoretical and historical reasons why governments in latecomer countries have intervened with a wide array of policies to foster industrial development at various turning points: the initiation of industrial activity; the diversification of the industrial base; the restructuring of major industrial institutions; and the entry into high-technology sectors.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "11.491J",
+          "description": "Economic Development, Policy Analysis, and Industrialization",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.100J",
+      "title": "Political Economy I",
+      "description": "Political Economy I explores the major social science paradigms for analyzing relations among state, economy, and society. Through readings, lectures and discussion of original texts in political liberalism and individualism, neo-classical economics, Marxism, sociological and cultural theories, and neo-institutionalism, the seminar examines the fundamental assumptions on which our understanding of the social world and our research are based.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.100J",
+          "description": "Political Economy I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.407",
+      "title": "Chinese Foreign Policy",
+      "description": "This lecture course provides students with a comprehensive introduction to the international relations of the People’s Republic of China. China’s foreign relations during the Cold War as well as contemporary diplomatic, security and economic issues will be examined to identify and explain China’s foreign policy goals and their implementation since 1949. Throughout, this course will investigate the sources of conflict and cooperation in China’s behavior, assessing competing explanation...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "sociology",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.407",
+          "description": "Chinese Foreign Policy",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.410",
+      "title": "Globalization, Migration, and International Relations",
+      "description": "Tracing the evolution of international interactions, this course examines the dimensions of globalization in terms of scale and scope. It is divided into three parts; together they are intended to provide theoretical, empirical, and policy perspectives on source and consequences of globalization, focusing on emergent structures and processes, and on the implications of flows of goods and services across national boundaries – with special attention to the issue of migration, on the assumptio...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "economics",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.410",
+          "description": "Globalization, Migration, and International Relations",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.462",
+      "title": "Innovation in Military Organizations",
+      "description": "This seminar has three purposes. One, it inquires into the causes of military innovation by examining a number of the most outstanding historical cases. Two, it views military innovations through the lens of organization theory to develop generalizations about the innovation process within militaries. Three, it uses the empirical study of military innovations as a way to examine the strength and credibility of hypotheses that organization theorists have generated about innovation in non-milit...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "History",
+      "tags": [
+        "history",
+        "policy and administration",
+        "organizations & leadership",
+        "strategy & innovation",
+        "humanities",
+        "business & management",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.462",
+          "description": "Innovation in Military Organizations",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.482",
+      "title": "U.S. Military Power",
+      "description": "The purpose of this course is to acquaint the student with the missions, capabilities, and costs of the largely non-nuclear forces that make up the bulk of the U.S. military establishment. The course will also introduce the student to basic techniques for the assessment of relative military capabilities between adversaries in given theaters of military action. Central to the course will be an examination of historical cases of military action that shed light on current defence issues. Many of...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "urban studies",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.482",
+          "description": "U.S. Military Power",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.484",
+      "title": "Comparative Grand Strategy and Military Doctrine",
+      "description": "This course will conduct a comparative study of the grand strategies of the great powers (Britain, France, Germany and Russia) competing for mastery of Europe from the late nineteenth to the mid-twentieth century. Grand strategy is the collection of political and military means and ends with which a state attempts to achieve security. We will examine strategic developments in the years preceding World Wars I and II, and how those developments played themselves out in these wars. The following...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "history",
+        "political science",
+        "organizations & leadership",
+        "policy and administration",
+        "social sciences",
+        "business & management"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.484",
+          "description": "Comparative Grand Strategy and Military Doctrine",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.506",
+      "title": "Ethnic Politics II",
+      "description": "This course is designed mainly for political science graduate students conducting or considering conducting research on identity politics. While 17.504 Ethnic Politics I is designed as a primarily theoretical course, Ethnic Politics II switches the focus to methods. It aims to familiarize the student with the current conventional approaches as well as major challenges to them. The course discusses definition and measurement issues as well as briefly addressing survey techniques and modeling.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Anthropology",
+      "tags": [
+        "anthropology",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.506",
+          "description": "Ethnic Politics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.509",
+      "title": "Social Movements in Comparative Perspective",
+      "description": "This course seeks to provide students with a general understanding of the form of collective action known as the social movement. Our task will be guided by the close examination of several twentieth century social movements in the United States. We will read about the U.S. civil rights, the unemployed workers’, welfare rights, pro-choice / pro-life and gay rights movements. We will compare and contrast certain of these movements with their counterparts in other countries. For all, we will ...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "History",
+      "tags": [
+        "history",
+        "sociology",
+        "philosophy",
+        "political science",
+        "humanities",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.509",
+          "description": "Social Movements in Comparative Perspective",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.522",
+      "title": "Politics and Religion",
+      "description": "This graduate reading seminar explores the role of religious groups, institutions, and ideas in politics using social science theories. It is open to advanced undergraduate students with permission of the instructor.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Sociology",
+      "tags": [
+        "sociology",
+        "anthropology",
+        "political science",
+        "religion",
+        "humanities",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.522",
+          "description": "Politics and Religion",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.523",
+      "title": "Ethnicity and Race in World Politics",
+      "description": "Discerning the ethnic and racial dimensions of politics is considered by some indispensable to understanding contemporary world politics. This course seeks to answer fundamental questions about racial and ethnic politics. To begin, what are the bases of ethnic and racial identities? What accounts for political mobilization based upon such identities? What are the political claims and goals of such mobilization and is conflict between groups and/or with government forces inevitable? How do eth...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Anthropology",
+      "tags": [
+        "anthropology",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.523",
+          "description": "Ethnicity and Race in World Politics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.559",
+      "title": "Comparative Security and Sustainability",
+      "description": "This course focuses on the complexities associated with security and sustainability of states in international relations. Covering aspects of theory, methods and empirical analysis, the course is in three parts, and each consists of seminar sessions focusing on specific topics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "political science",
+        "earth science",
+        "adaptation and resilience",
+        "climate science",
+        "social sciences",
+        "science & math",
+        "energy, climate & sustainability"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.559",
+          "description": "Comparative Security and Sustainability",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.953",
+      "title": "U.S. Budgets for National Security",
+      "description": "This course is for students who want to know how the dollars we spend on national security relate to military forces, systems, and policy choices, and who wish to develop a personal tool kit for framing and assessing defense policy alternatives.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.953",
+          "description": "U.S. Budgets for National Security",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.955",
+      "title": "Civil Society, Social Capital, and the State in Comparative Perspective",
+      "description": "In recent years both scholars and policymakers have expressed a remarkable amount of interest in the concepts of social capital and civil society. A growing body of research suggests that the social networks, community norms, and associational activities signified by these concepts can have important effects on social welfare, political stability, economic development, and governmental performance. This discussion based course examines the roles played by these networks, norms, and organizati...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Sociology",
+      "tags": [
+        "sociology",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.955",
+          "description": "Civil Society, Social Capital, and the State in Comparative Perspective",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.S914",
+      "title": "Conversations You Can't Have on Campus: Race, Ethnicity, Gender and Identity",
+      "description": "What is race? What is ethnicity? How can communication and relationships between men and women be improved? What causes segregation in our society? How do stereotypes develop and why do they persist? How do an individual’s racial, ethnic, and sexual identities form and develop? This course explores these topics and more.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Sociology",
+      "tags": [
+        "sociology",
+        "anthropology",
+        "gender studies",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.S914",
+          "description": "Conversations You Can't Have on Campus: Race, Ethnicity, Gender and Identity",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.S916",
+      "title": "All the President's Generals: Civil-Military Relations in the US and Beyond",
+      "description": "This course introduces the unique characteristics of militaries and explores the roles they play in the societies they are constructed to defend, with a special focus on the relationships between the military and their civilian leaders and popular publics. Topics include a modern history of relations between US presidents and the military, coups and military governments, public trust in the military, racial integration of the military, and the military-industrial (and tech!) complex.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.S916",
+          "description": "All the President's Generals: Civil-Military Relations in the US and Beyond",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "17.S950",
+      "title": "Social Science and the Iraq and Syrian Wars",
+      "description": "The wars in Iraq and Syria have changed the course of international relations in the 21st century. During these conflicts, hundreds of thousands have died and millions have been displaced. After 13 years, these conflicts continue with no end in sight. The central question of this course is: How do political science theories and methods help us understand the course of these wars? In this course, you will answer this question by integrating three elements: theory, data/description, and applica...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Political Science",
+      "subdomain": "Political Science",
+      "tags": [
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.S950",
+          "description": "Social Science and the Iraq and Syrian Wars",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "21A.219",
+      "title": "Law and Society",
+      "description": "<p>Law is a common and yet distinct aspect of everyday life in modern societies.&nbsp;This course examines the central features of law as a social institution and as a feature of popular culture.&nbsp;We will explore the nature of law as a set of social systems, central actors in the systems, legal reasoning, and the relationship of the legal form and reasoning to social change. The course emphasizes the relationship between the internal logic of legal devices and economic, political and soci...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Sociology",
+      "tags": [
+        "sociology",
+        "philosophy",
+        "anthropology",
+        "law",
+        "humanities",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "21A.219",
+          "description": "Law and Society",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "21G.084J",
+      "title": "Introduction to Latin American Studies",
+      "description": "This course is designed as an introduction to Latin American politics and society for undergraduates at MIT. No background on the region is required. Overall workload (reading, writing, class participation, and examinations) is similar to that of other HASS-D courses. Many of the themes raised here are covered in greater detail in other courses: 21G.020J (New World Literature), 21G.716 (Introduction to Contemporary Hispanic Literature), 21G.730 (Twentieth and Twentyfirst-Century Spanish Ameri...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Social Sciences",
+      "tags": [
+        "social sciences",
+        "sociology",
+        "international development",
+        "philosophy",
+        "political science",
+        "humanities"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "21G.084J",
+          "description": "Introduction to Latin American Studies",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.10"
+    },
+    {
+      "id": "24.235J",
+      "title": "Philosophy of Law",
+      "description": "This course examines fundamental issues in the philosophy of law, including the nature and content of law, its relation to morality, theories of legal interpretation, and the obligation to obey the law, as well as philosophical issues and problems associated with punishment and responsibility, liberty, and legal ethics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Political Science",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "philosophy",
+        "law",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Political Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "24.235J",
+          "description": "Philosophy of Law",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.10"
+    }
+  ],
+  "edges": [
+    {
+      "from": "21G.084J",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 21G.084J typically precedes 17.100J."
+    },
+    {
+      "from": "21G.084J",
+      "to": "21A.219",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 21G.084J typically precedes 21A.219."
+    },
+    {
+      "from": "21G.084J",
+      "to": "24.235J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 21G.084J typically precedes 24.235J."
+    },
+    {
+      "from": "24.235J",
+      "to": "17.407",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 24.235J typically precedes 17.407."
+    },
+    {
+      "from": "24.235J",
+      "to": "17.410",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 24.235J typically precedes 17.410."
+    },
+    {
+      "from": "24.235J",
+      "to": "17.462",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 24.235J typically precedes 17.462."
+    },
+    {
+      "from": "11.491J",
+      "to": "17.506",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 11.491J typically precedes graduate course 17.506."
+    },
+    {
+      "from": "11.491J",
+      "to": "17.509",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 11.491J typically precedes graduate course 17.509."
+    }
+  ]
+}

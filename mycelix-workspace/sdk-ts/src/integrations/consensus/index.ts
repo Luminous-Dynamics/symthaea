@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Consensus Integration
  *
@@ -662,6 +665,152 @@ export {
   isTrustworthy,
   AggregationMethod,
 };
+
+// ============================================================================
+// Consensus Holochain Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Consensus cluster */
+export class ConsensusBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    },
+  ) {}
+
+  // -- Topics --
+
+  async createTopic(input: Omit<ConsensusTopic, 'createdAt' | 'status'>): Promise<ConsensusTopic> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'create_topic',
+      payload: input,
+    });
+  }
+
+  async getTopic(topicId: string): Promise<ConsensusTopic | null> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'get_topic',
+      payload: topicId,
+    });
+  }
+
+  async listTopics(params?: { status?: string; limit?: number }): Promise<ConsensusTopic[]> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'list_topics',
+      payload: params ?? {},
+    });
+  }
+
+  // -- Participants --
+
+  async registerParticipant(participantId: string): Promise<ConsensusParticipant> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'register_participant',
+      payload: participantId,
+    });
+  }
+
+  async getParticipant(participantId: string): Promise<ConsensusParticipant | null> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'get_participant',
+      payload: participantId,
+    });
+  }
+
+  // -- Voting --
+
+  async submitVote(input: {
+    topicId: string;
+    participantId: string;
+    choice: string;
+    conviction?: number;
+  }): Promise<Vote> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'submit_vote',
+      payload: {
+        topic_id: input.topicId,
+        participant_id: input.participantId,
+        choice: input.choice,
+        conviction: input.conviction ?? 1.0,
+      },
+    });
+  }
+
+  async checkConsensus(topicId: string): Promise<ConsensusResult> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'check_consensus',
+      payload: topicId,
+    });
+  }
+
+  // -- Threshold Signatures --
+
+  async initThresholdSignature(input: {
+    topicId: string;
+    threshold: number;
+    totalSigners: number;
+  }): Promise<ThresholdSignature> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'init_threshold_signature',
+      payload: {
+        topic_id: input.topicId,
+        threshold: input.threshold,
+        total_signers: input.totalSigners,
+      },
+    });
+  }
+
+  async submitSignatureShard(input: {
+    topicId: string;
+    signerId: string;
+    shard: string;
+    index: number;
+  }): Promise<boolean> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'submit_signature_shard',
+      payload: {
+        topic_id: input.topicId,
+        signer_id: input.signerId,
+        shard: input.shard,
+        index: input.index,
+      },
+    });
+  }
+
+  // -- Trust --
+
+  async isParticipantTrustworthy(participantId: string, threshold?: number): Promise<boolean> {
+    return this.client.callZome({
+      role_name: 'consensus',
+      zome_name: 'consensus',
+      fn_name: 'is_participant_trustworthy',
+      payload: { participant_id: participantId, threshold: threshold ?? 0.7 },
+    });
+  }
+}
 
 // Default service instance
 let defaultService: ConsensusService | null = null;

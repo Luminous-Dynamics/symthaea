@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! DNS-DID Verification with DNSSEC
 //!
 //! Verifies DNS-DID linkage by querying DNS TXT records and
@@ -6,8 +9,10 @@
 use anyhow::{Context, Result};
 use console::style;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr};
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use trust_dns_resolver::config::{
+    NameServerConfig, Protocol, ResolverConfig, ResolverOpts,
+};
 use trust_dns_resolver::TokioAsyncResolver;
 
 /// DNSSEC validation status
@@ -37,7 +42,35 @@ pub struct DnsDidVerification {
     pub error: Option<String>,
 }
 
+/// Resolver fallback chain for censorship resistance.
+///
+/// Tries multiple independent DNS providers to avoid single-provider dependency.
+/// Order: Cloudflare (1.1.1.1) -> Google (8.8.8.8) -> Quad9 (9.9.9.9)
+fn resolver_configs() -> Vec<(&'static str, ResolverConfig)> {
+    vec![
+        ("1.1.1.1 (Cloudflare)", ResolverConfig::cloudflare()),
+        ("8.8.8.8 (Google)", ResolverConfig::google()),
+        ("9.9.9.9 (Quad9)", {
+            let quad9 = NameServerConfig::new(
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(9, 9, 9, 9)), 853),
+                Protocol::Tls,
+            );
+            let quad9_v6 = NameServerConfig::new(
+                SocketAddr::new(
+                    IpAddr::V6("2620:fe::fe".parse().unwrap()),
+                    853,
+                ),
+                Protocol::Tls,
+            );
+            ResolverConfig::from_parts(None, vec![], vec![quad9, quad9_v6])
+        }),
+    ]
+}
+
 /// Verify DNS-DID linkage for a domain
+///
+/// Uses a resolver fallback chain (Cloudflare -> Google -> Quad9) for resilience
+/// against single-provider outages or censorship.
 pub async fn verify_dns_did(
     domain: &str,
     expected_did: Option<&str>,
@@ -49,12 +82,6 @@ pub async fn verify_dns_did(
         style(domain).cyan()
     );
 
-    // Create resolver with DNSSEC enabled
-    let mut opts = ResolverOpts::default();
-    opts.validate = true; // Enable DNSSEC validation
-
-    let resolver = TokioAsyncResolver::tokio(ResolverConfig::cloudflare(), opts);
-
     // Build TXT record name
     let txt_name = format!("_did.{}", domain);
 
@@ -62,33 +89,57 @@ pub async fn verify_dns_did(
         println!("  Querying TXT record: {}", txt_name);
     }
 
-    // Query TXT records
-    let txt_result = resolver.txt_lookup(&txt_name).await;
+    // Try each resolver in the fallback chain until one succeeds
+    let mut opts = ResolverOpts::default();
+    opts.validate = true; // Enable DNSSEC validation
 
-    let (txt_records, dnssec_status, error): (Vec<String>, DnssecStatus, Option<String>) = match txt_result {
-        Ok(response) => {
-            let records: Vec<String> = response
-                .iter()
-                .map(|txt| txt.to_string())
-                .collect();
+    let resolvers = resolver_configs();
+    let mut txt_records: Vec<String> = Vec::new();
+    let mut dnssec_status = DnssecStatus::Unknown;
+    let mut error: Option<String> = None;
+    let mut resolver_used = resolvers[0].0;
 
-            // Check DNSSEC status
-            // Note: trust-dns sets AD flag in response when validated
-            // For now, we simplify and assume validated if we got records
-            let dnssec = if !records.is_empty() {
-                // In production, check the AD (Authenticated Data) flag
-                DnssecStatus::Validated
-            } else {
-                DnssecStatus::Unknown
-            };
+    for (name, config) in &resolvers {
+        let resolver = TokioAsyncResolver::tokio(config.clone(), opts.clone());
 
-            (records, dnssec, None)
+        if verbose {
+            println!("  Trying resolver: {}", name);
         }
-        Err(e) => {
-            let error_msg = format!("DNS lookup failed: {}", e);
-            (Vec::new(), DnssecStatus::Unknown, Some(error_msg))
+
+        match resolver.txt_lookup(&txt_name).await {
+            Ok(response) => {
+                txt_records = response.iter().map(|txt| txt.to_string()).collect();
+                resolver_used = name;
+                error = None;
+
+                // Check DNSSEC status
+                // Note: trust-dns sets AD flag in response when validated
+                dnssec_status = if !txt_records.is_empty() {
+                    // In production, check the AD (Authenticated Data) flag
+                    DnssecStatus::Validated
+                } else {
+                    DnssecStatus::Unknown
+                };
+
+                if verbose {
+                    println!(
+                        "  {} Resolved via {}",
+                        style("✓").green(),
+                        name
+                    );
+                }
+                break;
+            }
+            Err(e) => {
+                let error_msg = format!("DNS lookup via {} failed: {}", name, e);
+                if verbose {
+                    println!("  {} {}", style("✗").red(), error_msg);
+                }
+                error = Some(error_msg);
+                // Continue to next resolver in the chain
+            }
         }
-    };
+    }
 
     println!(
         "{} Found {} TXT record(s)",
@@ -189,7 +240,7 @@ pub async fn verify_dns_did(
         resolved_did,
         dnssec_status,
         txt_records,
-        resolver_used: "1.1.1.1 (Cloudflare)".to_string(),
+        resolver_used: resolver_used.to_string(),
         verified,
         error,
     })

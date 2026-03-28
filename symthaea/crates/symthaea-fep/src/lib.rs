@@ -1,4 +1,7 @@
 #![deny(unsafe_code)]
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #![allow(clippy::needless_range_loop, clippy::manual_clamp)]
 //! # Full Active Inference Implementation (FEP Integration)
 //!
@@ -138,6 +141,7 @@ mod agent;
 mod bridge;
 mod free_energy;
 mod generative_model;
+pub mod markov_blanket;
 mod motor;
 mod td_learning;
 mod types;
@@ -167,3 +171,8 @@ pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 pub use motor::MotorSystem;
 
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
+
+pub use markov_blanket::{
+    identify_coalitions, BlanketPermeability, BlanketTelemetry, MarkovBoundaryOperator,
+    MarkovPartition, PermeabilityInputs, SwarmCoalition, TopologyBoundaryInputs,
+};

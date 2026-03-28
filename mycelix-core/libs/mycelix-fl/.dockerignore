@@ -1,0 +1,9 @@
+target/
+target-native/
+.git/
+*.md
+!README.md
+!DEPLOYMENT.md
+tests/
+benches/
+examples/

@@ -1,0 +1,432 @@
+{
+  "title": "Cross-Level Learning Pathway Bridge",
+  "description": "Bridges 12 curriculum documents across 3 academic levels.",
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "18.01",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → MIT OCW: Mathematics (Undergraduate)."
+    },
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "AL/BasicAnalysis",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
+    },
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "DS/SetsRelations",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Discrete Structures (Undergraduate)."
+    },
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Mathematics (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "14.15J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Networks (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "6.011",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Signals, Systems and Inference (Undergraduate)."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "8.01SC",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Classical Mechanics (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5",
+      "to": "22.52J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Constructing explanations and designing solutions in 3–5 builds on K–2 ex... (K-12) → Statistical Thermodynamics of Complex Liquids (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.5",
+      "to": "22.52J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Statistical Thermodynamics of Complex Liquids (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "22.52J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Statistical Thermodynamics of Complex Liquids (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "8.01SC",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Classical Mechanics (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "8.02T",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Electricity and Magnetism (Undergraduate)."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "15.136J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Principles and Practice of Drug Development (Undergraduate)."
+    },
+    {
+      "from": "SEP.2.3-5.4",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Define a simple design problem that can be solved through the development of ... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Constructing explanations and designing solutions in 3–5 builds on K–2 ex... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.5",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.3.3-5.7",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Generate and compare multiple solutions to a problem based on how well they m... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "20.400J",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Modeling in 3–5 builds on K–2 experiences and progresses to building and ... (K-12) → Perspectives in Biological Engineering (Undergraduate)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Computer Science (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Physics (Doctoral)."
+    },
+    {
+      "from": "SEP.4.3-5",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → PhD in Biological Sciences (Doctoral)."
+    },
+    {
+      "from": "HST.950J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Medical Computing (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "HST.950J",
+      "to": "phd-cs/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Medical Computing (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-cs/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "7.90J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "7.90J",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "CMS.611J",
+      "to": "phd-biology/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Creating Video Games (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "7.90J",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Computational Functional Genomics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.18-009",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Learn Differential Equations: Up Close with Gilbert Strang and Cleve Moler (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Calculus for Beginners and Artists (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.18-003",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Calculus for Beginners and Artists (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "6.856J",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Randomized Algorithms (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "6.856J",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Randomized Algorithms (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "6.854J",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Advanced Algorithms (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "6.042J",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Mathematics for Computer Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "6.042J",
+      "to": "phd-math/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Mathematics for Computer Science (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-cs/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "9.29J",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.8-007",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.8-007",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Cosmic Origin of the Chemical Elements  (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "9.29J",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "8.962",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: General Relativity (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "8.962",
+      "to": "phd-physics/seminar",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: General Relativity (Undergraduate) → Research Seminar Participation (Doctoral)."
+    },
+    {
+      "from": "MAS.865J",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Quantum Information Science (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "9.29J",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: Introduction to Computational Neuroscience (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "phd-physics/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "RES.7-006",
+      "to": "phd-biology/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 750,
+      "rationale": "Cross-level bridge: 7.03x Genetics (Undergraduate) → Core Coursework (Doctoral)."
+    },
+    {
+      "from": "AL/Automata",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: CS2013: Algorithms and Complexity (Undergraduate) → PhD in Computer Science (Doctoral)."
+    },
+    {
+      "from": "AL/Automata",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: CS2013: Algorithms and Complexity (Undergraduate) → PhD in Mathematics (Doctoral)."
+    },
+    {
+      "from": "DS/ProofTechniques",
+      "to": "phd-cs/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Computer Science (Doctoral)."
+    },
+    {
+      "from": "DS/ProofTechniques",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Mathematics (Doctoral)."
+    }
+  ],
+  "statistics": {
+    "total_edges": 58,
+    "k12_to_undergrad": 21,
+    "undergrad_to_grad": 0,
+    "grad_to_phd": 37,
+    "levels_bridged": [
+      "Undergraduate",
+      "K-12",
+      "Doctoral"
+    ],
+    "subjects_bridged": [
+      "Science",
+      "Computer Science",
+      "CS2013: Discrete Structures",
+      "Physics",
+      "CS2013: Algorithms and Complexity",
+      "Mathematics",
+      "Biological Sciences"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+[package]
+name = "tool_library_integrity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "tool_library_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+mycelix-bridge-entry-types = { workspace = true }
+commons-types = { workspace = true }

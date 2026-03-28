@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "title": "CS2013: Programming Languages",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Programming Languages",
+    "domain": "CS2013: Programming Languages",
+    "version": "2024",
+    "total_standards": 3,
+    "domains": [
+      "first-class functions",
+      "encapsulation",
+      "static typing"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Programming Languages. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 1
+  },
+  "nodes": [
+    {
+      "id": "PL/OOP",
+      "title": "Object-Oriented Programming",
+      "description": "Object-Oriented Programming (Tier1, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "encapsulation",
+      "tags": [
+        "encapsulation",
+        "inheritance",
+        "polymorphism",
+        "interfaces",
+        "generics"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:PL"
+    },
+    {
+      "id": "PL/FunctionalProg",
+      "title": "Functional Programming",
+      "description": "Functional Programming (Tier1, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "first-class functions",
+      "tags": [
+        "first-class functions",
+        "closures",
+        "recursion",
+        "immutability",
+        "pattern matching"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:PL"
+    },
+    {
+      "id": "PL/TypeSystems",
+      "title": "Type Systems",
+      "description": "Type Systems (Tier2, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "static typing",
+      "tags": [
+        "static typing",
+        "dynamic typing",
+        "type inference",
+        "parametric polymorphism",
+        "generics"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:PL"
+    }
+  ],
+  "edges": []
+}

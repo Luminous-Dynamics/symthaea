@@ -29,7 +29,7 @@ members = [
     "zomes/housing-governance/integrity",
     "zomes/housing-governance/coordinator",
 
-    # Care domain (5 zomes)
+    # Care domain (5 zomes + wellbeing + boundary-contracts)
     "zomes/care-timebank/integrity",
     "zomes/care-timebank/coordinator",
     "zomes/care-circles/integrity",
@@ -40,6 +40,10 @@ members = [
     "zomes/care-plans/coordinator",
     "zomes/care-credentials/integrity",
     "zomes/care-credentials/coordinator",
+    "zomes/wellbeing/integrity",
+    "zomes/wellbeing/coordinator",
+    "zomes/boundary-contracts/integrity",
+    "zomes/boundary-contracts/coordinator",
 
     # Mutual Aid domain (7 zomes)
     "zomes/mutualaid-needs/integrity",
@@ -107,6 +111,14 @@ members = [
     # Resource-Mesh domain (2 zomes)
     "zomes/resource-mesh/coordinator",
     "zomes/resource-mesh/integrity",
+
+    # Tool Library domain (2 zomes)
+    "zomes/tool-library/integrity",
+    "zomes/tool-library/coordinator",
+
+    # Community Calendar (1 zome)
+    "zomes/community-calendar/integrity",
+    "zomes/community-calendar/coordinator",
 
     # Waste/Circular domain (8 zomes)
     "zomes/waste-registry/integrity",

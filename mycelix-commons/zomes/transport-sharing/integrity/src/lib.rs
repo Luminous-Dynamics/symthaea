@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Transport Sharing Integrity Zome
 //! Entry types and validation for ride offers, requests, matches, and cargo.
 
@@ -143,6 +146,8 @@ pub enum LinkTypes {
     RequestToMatch,
     MatchToReviews,
     AgentToReviews,
+    /// Geohash anchor to entry for spatial indexing
+    GeoIndex,
 }
 
 // ============================================================================
@@ -229,6 +234,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "AgentToReviews link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::GeoIndex => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "GeoIndex link tag too long (max 256 bytes)".into(),
                     ));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -1103,7 +1116,8 @@ mod tests {
             | LinkTypes::DriverToOffer
             | LinkTypes::RequesterToRequest
             | LinkTypes::MatchToReviews
-            | LinkTypes::AgentToReviews => 256,
+            | LinkTypes::AgentToReviews
+            | LinkTypes::GeoIndex => 256,
             LinkTypes::OfferToMatch | LinkTypes::RequestToMatch => 512,
         };
         let name = match link_type {
@@ -1115,6 +1129,7 @@ mod tests {
             LinkTypes::RequestToMatch => "RequestToMatch",
             LinkTypes::MatchToReviews => "MatchToReviews",
             LinkTypes::AgentToReviews => "AgentToReviews",
+            LinkTypes::GeoIndex => "GeoIndex",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(format!(

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Hearth Bridge Integrity Zome
 //!
 //! Validates bridge queries and events for the Hearth cluster.
@@ -6,7 +9,9 @@
 use hdi::prelude::*;
 pub use mycelix_bridge_entry_types::CachedCredentialEntry;
 use mycelix_bridge_entry_types::{
-    check_author_match, check_link_author_match,validate_cached_credential, BridgeEventEntry, BridgeQueryEntry};
+    check_author_match, check_link_author_match, validate_cached_credential, BridgeEventEntry,
+    BridgeQueryEntry, CrossClusterNotification,
+};
 
 /// Anchor entry for deterministic link bases.
 #[hdk_entry_helper]
@@ -26,6 +31,7 @@ pub enum EntryTypes {
     BridgeQuery(BridgeQueryEntry),
     BridgeEvent(BridgeEventEntry),
     CachedCredential(CachedCredentialEntry),
+    Notification(CrossClusterNotification),
 }
 
 #[hdk_link_types]
@@ -39,6 +45,12 @@ pub enum LinkTypes {
     DomainToEvent,
     DispatchRateLimit,
     AgentToCredentialCache,
+    /// Agent → their notifications
+    AgentToNotification,
+    /// Global notifications anchor
+    AllNotifications,
+    /// Agent → notification subscription preferences
+    NotificationSubscription,
 }
 
 #[hdk_extern]
@@ -57,6 +69,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::BridgeQuery(query) => validate_query(&query),
             EntryTypes::BridgeEvent(event) => validate_event(&event),
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
+            EntryTypes::Notification(_) => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreEntry(OpEntry::UpdateEntry {
             app_entry,
@@ -75,6 +88,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 validate_event_immutable_fields(&event, &original_action_hash)
             }
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
+            EntryTypes::Notification(_) => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterCreateLink {

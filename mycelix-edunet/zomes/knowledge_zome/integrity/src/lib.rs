@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Knowledge Roots Integrity Zome
 //!
 //! Defines the decentralized curriculum graph - a community-built knowledge structure.
@@ -60,6 +63,148 @@ impl Default for DifficultyLevel {
     }
 }
 
+/// Grade level for PreK through post-doctoral
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GradeLevel {
+    PreK,
+    Kindergarten,
+    Grade1, Grade2, Grade3, Grade4, Grade5, Grade6,
+    Grade7, Grade8, Grade9, Grade10, Grade11, Grade12,
+    College,
+    /// Undergraduate (associate/bachelor's degree)
+    Undergraduate,
+    /// Graduate (master's degree)
+    Graduate,
+    /// Doctoral (PhD)
+    Doctoral,
+    /// Post-doctoral research
+    PostDoctoral,
+    /// Professional degree (JD, MD, PharmD, etc.)
+    Professional,
+    Adult,
+}
+
+impl GradeLevel {
+    /// Numeric value for ordering (PreK=0, K=1, Grade1=2, ..., Grade12=13)
+    pub fn ordinal(&self) -> u8 {
+        match self {
+            GradeLevel::PreK => 0,
+            GradeLevel::Kindergarten => 1,
+            GradeLevel::Grade1 => 2,
+            GradeLevel::Grade2 => 3,
+            GradeLevel::Grade3 => 4,
+            GradeLevel::Grade4 => 5,
+            GradeLevel::Grade5 => 6,
+            GradeLevel::Grade6 => 7,
+            GradeLevel::Grade7 => 8,
+            GradeLevel::Grade8 => 9,
+            GradeLevel::Grade9 => 10,
+            GradeLevel::Grade10 => 11,
+            GradeLevel::Grade11 => 12,
+            GradeLevel::Grade12 => 13,
+            GradeLevel::College => 14,
+            GradeLevel::Undergraduate => 15,
+            GradeLevel::Graduate => 16,
+            GradeLevel::Doctoral => 17,
+            GradeLevel::PostDoctoral => 18,
+            GradeLevel::Professional => 19,
+            GradeLevel::Adult => 20,
+        }
+    }
+
+    /// Age range for this grade level
+    pub fn age_range(&self) -> (u8, u8) {
+        match self {
+            GradeLevel::PreK => (3, 5),
+            GradeLevel::Kindergarten => (5, 6),
+            GradeLevel::Grade1 => (6, 7),
+            GradeLevel::Grade2 => (7, 8),
+            GradeLevel::Grade3 => (8, 9),
+            GradeLevel::Grade4 => (9, 10),
+            GradeLevel::Grade5 => (10, 11),
+            GradeLevel::Grade6 => (11, 12),
+            GradeLevel::Grade7 => (12, 13),
+            GradeLevel::Grade8 => (13, 14),
+            GradeLevel::Grade9 => (14, 15),
+            GradeLevel::Grade10 => (15, 16),
+            GradeLevel::Grade11 => (16, 17),
+            GradeLevel::Grade12 => (17, 18),
+            GradeLevel::College => (18, 22),
+            GradeLevel::Undergraduate => (18, 22),
+            GradeLevel::Graduate => (22, 26),
+            GradeLevel::Doctoral => (22, 30),
+            GradeLevel::PostDoctoral => (28, 40),
+            GradeLevel::Professional => (22, 30),
+            GradeLevel::Adult => (18, 99),
+        }
+    }
+}
+
+impl Default for GradeLevel {
+    fn default() -> Self { GradeLevel::Adult }
+}
+
+/// Bloom's Taxonomy level
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BloomLevel {
+    Remember,
+    Understand,
+    Apply,
+    Analyze,
+    Evaluate,
+    Create,
+}
+
+impl Default for BloomLevel {
+    fn default() -> Self { BloomLevel::Understand }
+}
+
+/// Academic standards framework
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StandardFramework {
+    CommonCore,
+    NGSS,
+    StateSpecific(String),
+    InternationalBaccalaureate,
+    Cambridge,
+    /// ACM/IEEE Computing Curricula (e.g., "CS2013", "CC2020")
+    ACM(String),
+    /// ABET accreditation criteria (e.g., "EAC", "CAC")
+    ABET(String),
+    /// NCES Classification of Instructional Programs
+    CIP,
+    /// Professional certification (e.g., "CompTIA-Security+", "AWS-SAA")
+    ProfessionalCertification(String),
+    Custom(String),
+}
+
+/// Standards alignment for a knowledge node
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcademicStandard {
+    pub framework: StandardFramework,
+    pub code: String,
+    pub description: String,
+    pub grade_level: GradeLevel,
+}
+
+/// Subject area classification
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SubjectArea {
+    Mathematics,
+    EnglishLanguageArts,
+    Science,
+    SocialStudies,
+    ForeignLanguage,
+    Arts,
+    PhysicalEducation,
+    Technology,
+    Custom(String),
+}
+
+impl Default for SubjectArea {
+    fn default() -> Self { SubjectArea::Custom("General".to_string()) }
+}
+
 /// Knowledge Node - a single concept/skill in the knowledge graph
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq, Eq)]
@@ -94,6 +239,18 @@ pub struct KnowledgeNode {
     pub modified_at: i64,
     /// Version number (for updates)
     pub version: u32,
+    /// Grade levels this node targets
+    #[serde(default)]
+    pub grade_levels: Vec<GradeLevel>,
+    /// Bloom's taxonomy level
+    #[serde(default)]
+    pub bloom_level: Option<BloomLevel>,
+    /// Subject area
+    #[serde(default)]
+    pub subject_area: Option<SubjectArea>,
+    /// Academic standards this node aligns to
+    #[serde(default)]
+    pub academic_standards: Vec<AcademicStandard>,
 }
 
 /// External skill framework alignment
@@ -414,6 +571,10 @@ pub enum LinkTypes {
     SkillTreeToNodes,
     /// Node -> Related courses
     NodeToCourses,
+    /// Grade level -> Nodes at that grade
+    GradeToNodes,
+    /// Subject -> Nodes in that subject
+    SubjectToNodes,
 }
 
 // ============== Validation Functions ==============
@@ -439,6 +600,41 @@ pub fn validate_create_node(node: &KnowledgeNode) -> ExternResult<ValidateCallba
         return Ok(ValidateCallbackResult::Invalid(
             "Estimated hours seems unreasonable (>10000)".to_string(),
         ));
+    }
+
+    if node.description.len() > 10000 { return Ok(ValidateCallbackResult::Invalid("Node description too long (max 10000 characters)".to_string())); }
+    if node.domain.len() > 200 { return Ok(ValidateCallbackResult::Invalid("Domain name too long (max 200 characters)".to_string())); }
+    if let Some(ref sub) = node.subdomain { if sub.len() > 200 { return Ok(ValidateCallbackResult::Invalid("Subdomain name too long (max 200 characters)".to_string())); } }
+    if node.tags.len() > 50 { return Ok(ValidateCallbackResult::Invalid("Too many tags (max 50)".to_string())); }
+    for tag in &node.tags { if tag.len() > 100 { return Ok(ValidateCallbackResult::Invalid("Tag too long (max 100 characters)".to_string())); } }
+    if node.related_courses.len() > 100 { return Ok(ValidateCallbackResult::Invalid("Too many related courses (max 100)".to_string())); }
+    if node.skill_alignments.len() > 50 { return Ok(ValidateCallbackResult::Invalid("Too many skill alignments (max 50)".to_string())); }
+
+    // Grade levels must not be excessive
+    if node.grade_levels.len() > 21 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many grade levels (max 21)".to_string(),
+        ));
+    }
+
+    // Academic standards must be bounded
+    if node.academic_standards.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many academic standards (max 50)".to_string(),
+        ));
+    }
+
+    for std in &node.academic_standards {
+        if std.code.len() > 100 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Standard code too long (max 100 characters)".to_string(),
+            ));
+        }
+        if std.description.len() > 500 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Standard description too long (max 500 characters)".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -512,5 +708,121 @@ mod tests {
     #[test]
     fn test_edge_type_default() {
         assert_eq!(EdgeType::default(), EdgeType::Recommends);
+    }
+
+    #[test]
+    fn test_node_valid() {
+        let node = KnowledgeNode { title: "Rust".to_string(), description: "Learn Rust".to_string(), node_type: NodeType::Course, difficulty: DifficultyLevel::Beginner, domain: "Programming".to_string(), subdomain: None, tags: vec!["rust".to_string()], estimated_hours: 40, skill_alignments: vec![], related_courses: vec![], creator: AgentPubKey::from_raw_36(vec![0u8; 36]), status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1, grade_levels: vec![], bloom_level: None, subject_area: None, academic_standards: vec![] };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Valid));
+    }
+    #[test]
+    fn test_node_description_too_long() {
+        let node = KnowledgeNode { title: "T".to_string(), description: "x".repeat(10001), node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner, domain: "T".to_string(), subdomain: None, tags: vec![], estimated_hours: 10, skill_alignments: vec![], related_courses: vec![], creator: AgentPubKey::from_raw_36(vec![0u8; 36]), status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1, grade_levels: vec![], bloom_level: None, subject_area: None, academic_standards: vec![] };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_node_too_many_tags() {
+        let node = KnowledgeNode { title: "T".to_string(), description: "T".to_string(), node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner, domain: "T".to_string(), subdomain: None, tags: (0..51).map(|i| format!("t{}", i)).collect(), estimated_hours: 10, skill_alignments: vec![], related_courses: vec![], creator: AgentPubKey::from_raw_36(vec![0u8; 36]), status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1, grade_levels: vec![], bloom_level: None, subject_area: None, academic_standards: vec![] };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+    #[test]
+    fn test_edge_self_loop() {
+        let h = ActionHash::from_raw_36(vec![1u8; 36]);
+        let edge = LearningEdge { source_node: h.clone(), target_node: h, edge_type: EdgeType::Requires, strength_permille: 800, rationale: "T".to_string(), proposer: AgentPubKey::from_raw_36(vec![0u8; 36]), status: EdgeStatus::Proposed, upvotes: 0, downvotes: 0, created_at: 0 };
+        assert!(matches!(validate_create_edge(&edge).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_grade_level_ordinal() {
+        assert_eq!(GradeLevel::PreK.ordinal(), 0);
+        assert_eq!(GradeLevel::Kindergarten.ordinal(), 1);
+        assert_eq!(GradeLevel::Grade3.ordinal(), 4);
+        assert_eq!(GradeLevel::Grade12.ordinal(), 13);
+        assert_eq!(GradeLevel::College.ordinal(), 14);
+        assert_eq!(GradeLevel::Undergraduate.ordinal(), 15);
+        assert_eq!(GradeLevel::Graduate.ordinal(), 16);
+        assert_eq!(GradeLevel::Doctoral.ordinal(), 17);
+        assert_eq!(GradeLevel::PostDoctoral.ordinal(), 18);
+        assert_eq!(GradeLevel::Professional.ordinal(), 19);
+        assert_eq!(GradeLevel::Adult.ordinal(), 20);
+    }
+
+    #[test]
+    fn test_grade_level_age_range() {
+        assert_eq!(GradeLevel::Grade3.age_range(), (8, 9));
+        assert_eq!(GradeLevel::PreK.age_range(), (3, 5));
+        assert_eq!(GradeLevel::College.age_range(), (18, 22));
+    }
+
+    #[test]
+    fn test_bloom_level_default() {
+        assert_eq!(BloomLevel::default(), BloomLevel::Understand);
+    }
+
+    #[test]
+    fn test_grade_level_default() {
+        assert_eq!(GradeLevel::default(), GradeLevel::Adult);
+    }
+
+    #[test]
+    fn test_subject_area_default() {
+        assert_eq!(SubjectArea::default(), SubjectArea::Custom("General".to_string()));
+    }
+
+    #[test]
+    fn test_node_with_grade_levels_valid() {
+        let node = KnowledgeNode {
+            title: "Fractions".to_string(), description: "Learn fractions".to_string(),
+            node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner,
+            domain: "Math".to_string(), subdomain: None, tags: vec![],
+            estimated_hours: 10, skill_alignments: vec![], related_courses: vec![],
+            creator: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1,
+            grade_levels: vec![GradeLevel::Grade3, GradeLevel::Grade4, GradeLevel::Grade5],
+            bloom_level: Some(BloomLevel::Understand),
+            subject_area: Some(SubjectArea::Mathematics),
+            academic_standards: vec![AcademicStandard {
+                framework: StandardFramework::CommonCore,
+                code: "3.NF.A.1".to_string(),
+                description: "Understand a fraction 1/b".to_string(),
+                grade_level: GradeLevel::Grade3,
+            }],
+        };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_node_too_many_grade_levels() {
+        let node = KnowledgeNode {
+            title: "T".to_string(), description: "T".to_string(),
+            node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner,
+            domain: "T".to_string(), subdomain: None, tags: vec![],
+            estimated_hours: 1, skill_alignments: vec![], related_courses: vec![],
+            creator: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1,
+            grade_levels: vec![GradeLevel::PreK; 22],
+            bloom_level: None, subject_area: None, academic_standards: vec![],
+        };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_node_standard_code_too_long() {
+        let node = KnowledgeNode {
+            title: "T".to_string(), description: "T".to_string(),
+            node_type: NodeType::Concept, difficulty: DifficultyLevel::Beginner,
+            domain: "T".to_string(), subdomain: None, tags: vec![],
+            estimated_hours: 1, skill_alignments: vec![], related_courses: vec![],
+            creator: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            status: NodeStatus::Proposed, created_at: 0, modified_at: 0, version: 1,
+            grade_levels: vec![], bloom_level: None, subject_area: None,
+            academic_standards: vec![AcademicStandard {
+                framework: StandardFramework::CommonCore,
+                code: "x".repeat(101),
+                description: "T".to_string(),
+                grade_level: GradeLevel::Grade1,
+            }],
+        };
+        assert!(matches!(validate_create_node(&node).unwrap(), ValidateCallbackResult::Invalid(_)));
     }
 }

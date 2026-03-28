@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Mail Integration
  *
@@ -337,6 +340,291 @@ export class MailTrustService {
     if (verification.spfPassed) return 'spf';
     return 'unknown';
   }
+}
+
+// ============================================================================
+// Bridge Client (Holochain Zome Calls)
+// ============================================================================
+
+import { type MycelixClient } from '../../client/index.js';
+
+const MAIL_ROLE = 'mail';
+
+/**
+ * MailBridgeClient - Direct Holochain zome calls for mail operations
+ *
+ * Provides the same capabilities as MailTrustService but backed by the
+ * Holochain conductor instead of in-memory Maps.
+ */
+export class MailBridgeClient {
+  constructor(private client: MycelixClient) {}
+
+  // --- messages zome ---
+
+  async sendEmail(input: {
+    to: Uint8Array[];
+    cc?: Uint8Array[];
+    bcc?: Uint8Array[];
+    subject: string;
+    body: string;
+    reply_to?: Uint8Array;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'send_email',
+      payload: input,
+    });
+  }
+
+  async getInbox(query: {
+    limit?: number;
+    offset?: number;
+    unread_only?: boolean;
+  }): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'get_inbox',
+      payload: query,
+    });
+  }
+
+  async getSent(query: {
+    limit?: number;
+    offset?: number;
+  }): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'get_sent',
+      payload: query,
+    });
+  }
+
+  async getEmail(emailHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'get_email',
+      payload: emailHash,
+    });
+  }
+
+  async markAsRead(input: { hash: Uint8Array; read: boolean }): Promise<Uint8Array | null> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'mark_as_read',
+      payload: [input.hash, input.read],
+    });
+  }
+
+  async saveDraft(input: {
+    subject: string;
+    body: string;
+    to?: Uint8Array[];
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'save_draft',
+      payload: input,
+    });
+  }
+
+  async getDrafts(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'get_drafts',
+      payload: null,
+    });
+  }
+
+  async deleteDraft(draftHash: Uint8Array): Promise<void> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'delete_draft',
+      payload: draftHash,
+    });
+  }
+
+  async getFolders(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'get_folders',
+      payload: null,
+    });
+  }
+
+  async moveToFolder(input: { email_hash: Uint8Array; folder_hash: Uint8Array }): Promise<void> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'move_to_folder',
+      payload: [input.email_hash, input.folder_hash],
+    });
+  }
+
+  async getAttachments(emailHash: Uint8Array): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'messages',
+      fn_name: 'get_attachments',
+      payload: emailHash,
+    });
+  }
+
+  // --- trust zome ---
+
+  async getTrustScore(agent: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'trust',
+      fn_name: 'get_trust_score',
+      payload: agent,
+    });
+  }
+
+  async createAttestation(input: {
+    subject: Uint8Array;
+    attestation_type: string;
+    confidence: number;
+    evidence?: string;
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'trust',
+      fn_name: 'create_attestation',
+      payload: input,
+    });
+  }
+
+  async revokeAttestation(attestationHash: Uint8Array): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'trust',
+      fn_name: 'revoke_attestation',
+      payload: attestationHash,
+    });
+  }
+
+  async getAttestationsAbout(agent: Uint8Array): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'trust',
+      fn_name: 'get_attestations_about',
+      payload: agent,
+    });
+  }
+
+  async getSenderTrustForDelivery(sender: Uint8Array): Promise<[number, number]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'trust',
+      fn_name: 'get_sender_trust_for_delivery',
+      payload: sender,
+    });
+  }
+
+  // --- contacts zome ---
+
+  async createContact(contact: {
+    display_name: string;
+    email?: string;
+    agent_pub_key?: Uint8Array;
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'contacts',
+      fn_name: 'create_contact',
+      payload: contact,
+    });
+  }
+
+  async getAllContacts(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'contacts',
+      fn_name: 'get_all_contacts',
+      payload: null,
+    });
+  }
+
+  async getContactByEmail(email: string): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'contacts',
+      fn_name: 'get_contact_by_email',
+      payload: email,
+    });
+  }
+
+  async blockContact(contactHash: Uint8Array): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'contacts',
+      fn_name: 'block_contact',
+      payload: contactHash,
+    });
+  }
+
+  async unblockContact(contactHash: Uint8Array): Promise<void> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'contacts',
+      fn_name: 'unblock_contact',
+      payload: contactHash,
+    });
+  }
+
+  async getBlockedContacts(): Promise<Uint8Array[]> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'contacts',
+      fn_name: 'get_blocked_contacts',
+      payload: null,
+    });
+  }
+
+  // --- profiles zome ---
+
+  async getMyProfile(): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'profiles',
+      fn_name: 'get_my_profile',
+      payload: null,
+    });
+  }
+
+  async setProfile(profile: {
+    display_name: string;
+    avatar_url?: string;
+    signature?: string;
+  }): Promise<Uint8Array> {
+    return this.client.callZome({
+      role_name: MAIL_ROLE,
+      zome_name: 'profiles',
+      fn_name: 'set_profile',
+      payload: profile,
+    });
+  }
+}
+
+// Bridge client singleton
+let mailBridgeInstance: MailBridgeClient | null = null;
+
+export function getMailBridgeClient(client: MycelixClient): MailBridgeClient {
+  if (!mailBridgeInstance) mailBridgeInstance = new MailBridgeClient(client);
+  return mailBridgeInstance;
+}
+
+export function resetMailBridgeClient(): void {
+  mailBridgeInstance = null;
 }
 
 // ============================================================================

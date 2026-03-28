@@ -1,4 +1,8 @@
 #![allow(clippy::manual_range_contains, clippy::useless_vec)]
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Governance Bridge Integrity Zome
 //!
 //! Entry types for cross-hApp governance queries and voting verification.
@@ -18,6 +22,7 @@
 //! Updated to use HDI 0.7 patterns
 
 use hdi::prelude::*;
+use mycelix_bridge_entry_types::CrossClusterNotification;
 
 // Canonical consciousness gate constants — must match mycelix_bridge_common::consciousness_gates defaults.
 // Source of truth: crates/mycelix-bridge-common/src/consciousness_gates.rs
@@ -1460,6 +1465,7 @@ pub enum EntryTypes {
     ConsensusRound(ConsensusRound),
     SlashingRecord(SlashingRecord),
     GovernanceConsciousnessConfig(GovernanceConsciousnessConfig),
+    Notification(CrossClusterNotification),
 }
 
 #[hdk_link_types]
@@ -1491,6 +1497,9 @@ pub enum LinkTypes {
     ExecutionById,
     /// Consciousness config anchor → config record
     ConsciousnessConfigIndex,
+    AgentToNotification,
+    AllNotifications,
+    NotificationSubscription,
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -1541,6 +1550,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         Ok(()) => Ok(ValidateCallbackResult::Valid),
                         Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
                     }
+                }
+                EntryTypes::Notification(n) => {
+                    mycelix_bridge_entry_types::validate_notification(&n)
+                        .map(|()| ValidateCallbackResult::Valid)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))
                 }
             },
             OpEntry::UpdateEntry {
@@ -1598,6 +1612,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
                     }
                 }
+                EntryTypes::Notification(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Notifications cannot be updated".into(),
+                )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -1632,6 +1649,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::ActiveRounds => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ExecutionById => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ConsciousnessConfigIndex => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AgentToNotification => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllNotifications => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::NotificationSubscription => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,

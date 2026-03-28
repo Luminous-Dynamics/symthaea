@@ -1,0 +1,911 @@
+{
+  "metadata": {
+    "title": "High School — Functions",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade9",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 28,
+    "domains": [
+      "Trigonometric Functions",
+      "Linear, Quadratic, and Exponential Models",
+      "Building Functions",
+      "Interpreting Functions",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_high-school-functions). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.HSF-TF.C.9",
+      "title": "(+) Prove the addition and subtraction formulas for sine, cosine, and tangent...",
+      "description": "(+) Prove the addition and subtraction formulas for sine, cosine, and tangent and use them to solve problems.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [
+        "addition",
+        "subtraction"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.C.9",
+          "description": "(+) Prove the addition and subtraction formulas for sine, cosine, and tangent and use them to solve problems.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.C.8",
+      "title": "Prove the Pythagorean identity sin²(θ) + cos²(θ) = 1 and use it to find s...",
+      "description": "Prove the Pythagorean identity sin²(θ) + cos²(θ) = 1 and use it to find sin(θ), cos(θ), or tan(θ) given sin(θ), cos(θ), or tan(θ) and the quadrant of the angle.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.C.8",
+          "description": "Prove the Pythagorean identity sin²(θ) + cos²(θ) = 1 and use it to find sin(θ), cos(θ), or tan(θ) given sin(θ), cos(θ), or tan(θ) and the quadrant of the angle.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.B.7",
+      "title": "(+) Use inverse functions to solve trigonometric equations that arise in mode...",
+      "description": "(+) Use inverse functions to solve trigonometric equations that arise in modeling contexts; evaluate the solutions using technology, and interpret them in terms of the context.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [
+        "equations",
+        "functions",
+        "modeling"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.B.7",
+          "description": "(+) Use inverse functions to solve trigonometric equations that arise in modeling contexts; evaluate the solutions using technology, and interpret them in terms of the context.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.B.6",
+      "title": "(+) Understand that restricting a trigonometric function to a domain on which...",
+      "description": "(+) Understand that restricting a trigonometric function to a domain on which it is always increasing or always decreasing allows its inverse to be constructed.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.B.6",
+          "description": "(+) Understand that restricting a trigonometric function to a domain on which it is always increasing or always decreasing allows its inverse to be constructed.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.B.5",
+      "title": "Choose trigonometric functions to model periodic phenomena with specified amp...",
+      "description": "Choose trigonometric functions to model periodic phenomena with specified amplitude, frequency, and midline.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [
+        "functions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.B.5",
+          "description": "Choose trigonometric functions to model periodic phenomena with specified amplitude, frequency, and midline.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.A.4",
+      "title": "(+) Use the unit circle to explain symmetry (odd and even) and periodicity of...",
+      "description": "(+) Use the unit circle to explain symmetry (odd and even) and periodicity of trigonometric functions.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [
+        "symmetry",
+        "functions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.A.4",
+          "description": "(+) Use the unit circle to explain symmetry (odd and even) and periodicity of trigonometric functions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.A.3",
+      "title": "(+) Use special triangles to determine geometrically the values of sine, cosi...",
+      "description": "(+) Use special triangles to determine geometrically the values of sine, cosine, tangent for π/3, π/4 and π/6, and use the unit circle to express the values of sine, cosine, and tangent for π-x, π+x, and 2π-x in terms of their values for x, where x is any real number.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.A.3",
+          "description": "(+) Use special triangles to determine geometrically the values of sine, cosine, tangent for π/3, π/4 and π/6, and use the unit circle to express the values of sine, cosine, and tangent for π-x, π+x, and 2π-x in terms of their values for x, where x is any real number.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.A.2",
+      "title": "Explain how the unit circle in the coordinate plane enables the extension of ...",
+      "description": "Explain how the unit circle in the coordinate plane enables the extension of trigonometric functions to all real numbers, interpreted as radian measures of angles traversed counterclockwise around the unit circle.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [
+        "angles",
+        "functions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.A.2",
+          "description": "Explain how the unit circle in the coordinate plane enables the extension of trigonometric functions to all real numbers, interpreted as radian measures of angles traversed counterclockwise around the unit circle.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-TF.A.1",
+      "title": "Understand radian measure of an angle as the length of the arc on the unit ci...",
+      "description": "Understand radian measure of an angle as the length of the arc on the unit circle subtended by the angle.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometric Functions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-TF.A.1",
+          "description": "Understand radian measure of an angle as the length of the arc on the unit circle subtended by the angle.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-LE.B.5",
+      "title": "Interpret the parameters in a linear or exponential function in terms of a co...",
+      "description": "Interpret the parameters in a linear or exponential function in terms of a context.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Linear, Quadratic, and Exponential Models",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-LE.B.5",
+          "description": "Interpret the parameters in a linear or exponential function in terms of a context.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-LE.A.4",
+      "title": "For exponential models, express as a logarithm the solution to ab<sup>ct</sup...",
+      "description": "For exponential models, express as a logarithm the solution to ab<sup>ct</sup> = d where a, c, and d are numbers and the base b is 2, 10, or e; evaluate the logarithm using technology.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Linear, Quadratic, and Exponential Models",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-LE.A.4",
+          "description": "For exponential models, express as a logarithm the solution to ab<sup>ct</sup> = d where a, c, and d are numbers and the base b is 2, 10, or e; evaluate the logarithm using technology.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-LE.A.3",
+      "title": "Observe using graphs and tables that a quantity increasing exponentially even...",
+      "description": "Observe using graphs and tables that a quantity increasing exponentially eventually exceeds a quantity increasing linearly, quadratically, or (more generally) as a polynomial function.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Linear, Quadratic, and Exponential Models",
+      "tags": [
+        "graphs"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-LE.A.3",
+          "description": "Observe using graphs and tables that a quantity increasing exponentially eventually exceeds a quantity increasing linearly, quadratically, or (more generally) as a polynomial function.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-LE.A.2",
+      "title": "Construct linear and exponential functions, including arithmetic and geometri...",
+      "description": "Construct linear and exponential functions, including arithmetic and geometric sequences, given a graph, a description of a relationship, or two input-output pairs (include reading these from a table).",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Linear, Quadratic, and Exponential Models",
+      "tags": [
+        "functions",
+        "reading"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-LE.A.2",
+          "description": "Construct linear and exponential functions, including arithmetic and geometric sequences, given a graph, a description of a relationship, or two input-output pairs (include reading these from a table).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-LE.A.1",
+      "title": "Distinguish between situations that can be modeled with linear functions and ...",
+      "description": "Distinguish between situations that can be modeled with linear functions and with exponential functions.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Linear, Quadratic, and Exponential Models",
+      "tags": [
+        "functions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-LE.A.1",
+          "description": "Distinguish between situations that can be modeled with linear functions and with exponential functions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-BF.B.5",
+      "title": "(+) Understand the inverse relationship between exponents and logarithms and ...",
+      "description": "(+) Understand the inverse relationship between exponents and logarithms and use this relationship to solve problems involving logarithms and exponents.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Building Functions",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-BF.B.5",
+          "description": "(+) Understand the inverse relationship between exponents and logarithms and use this relationship to solve problems involving logarithms and exponents.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-BF.B.4",
+      "title": "Find inverse functions",
+      "description": "Find inverse functions.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Building Functions",
+      "tags": [
+        "functions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-BF.B.4",
+          "description": "Find inverse functions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-BF.B.3",
+      "title": "Identify the effect on the graph of replacing f(x) by f(x) + k, k f(x), f(kx)...",
+      "description": "Identify the effect on the graph of replacing f(x) by f(x) + k, k f(x), f(kx), and f(x + k) for specific values of k (both positive and negative); find the value of k given the graphs. Experiment with cases and illustrate an explanation of the effects on the graph using technology. Include recognizing even and odd functions from their graphs and algebraic expressions for them.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Building Functions",
+      "tags": [
+        "algebra",
+        "graphs",
+        "functions",
+        "expressions",
+        "experiment"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-BF.B.3",
+          "description": "Identify the effect on the graph of replacing f(x) by f(x) + k, k f(x), f(kx), and f(x + k) for specific values of k (both positive and negative); find the value of k given the graphs. Experiment with cases and illustrate an explanation of the effects on the graph using technology. Include recognizing even and odd functions from their graphs and algebraic expressions for them.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-BF.A.2",
+      "title": "Write arithmetic and geometric sequences both recursively and with an explici...",
+      "description": "Write arithmetic and geometric sequences both recursively and with an explicit formula, use them to model situations, and translate between the two forms.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Building Functions",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-BF.A.2",
+          "description": "Write arithmetic and geometric sequences both recursively and with an explicit formula, use them to model situations, and translate between the two forms.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-BF.A.1",
+      "title": "Write a function that describes a relationship between two quantities",
+      "description": "Write a function that describes a relationship between two quantities",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Building Functions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-BF.A.1",
+          "description": "Write a function that describes a relationship between two quantities",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.C.9",
+      "title": "Compare properties of two functions each represented in a different way (alge...",
+      "description": "Compare properties of two functions each represented in a different way (algebraically, graphically, numerically in tables, or by verbal descriptions).",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [
+        "algebra",
+        "functions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.C.9",
+          "description": "Compare properties of two functions each represented in a different way (algebraically, graphically, numerically in tables, or by verbal descriptions).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.C.8",
+      "title": "Write a function defined by an expression in different but equivalent forms t...",
+      "description": "Write a function defined by an expression in different but equivalent forms to reveal and explain different properties of the function.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.C.8",
+          "description": "Write a function defined by an expression in different but equivalent forms to reveal and explain different properties of the function.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.C.7",
+      "title": "Graph functions expressed symbolically and show key features of the graph, by...",
+      "description": "Graph functions expressed symbolically and show key features of the graph, by hand in simple cases and using technology for more complicated cases.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [
+        "functions"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.C.7",
+          "description": "Graph functions expressed symbolically and show key features of the graph, by hand in simple cases and using technology for more complicated cases.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.B.6",
+      "title": "Calculate and interpret the average rate of change of a function (presented s...",
+      "description": "Calculate and interpret the average rate of change of a function (presented symbolically or as a table) over a specified interval. Estimate the rate of change from a graph.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.B.6",
+          "description": "Calculate and interpret the average rate of change of a function (presented symbolically or as a table) over a specified interval. Estimate the rate of change from a graph.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.B.5",
+      "title": "Relate the domain of a function to its graph and, where applicable, to the qu...",
+      "description": "Relate the domain of a function to its graph and, where applicable, to the quantitative relationship it describes.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [
+        "quantitative"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.B.5",
+          "description": "Relate the domain of a function to its graph and, where applicable, to the quantitative relationship it describes.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.B.4",
+      "title": "For a function that models a relationship between two quantities, interpret k...",
+      "description": "For a function that models a relationship between two quantities, interpret key features of graphs and tables in terms of the quantities, and sketch graphs showing key features given a verbal description of the relationship.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [
+        "graphs"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.B.4",
+          "description": "For a function that models a relationship between two quantities, interpret key features of graphs and tables in terms of the quantities, and sketch graphs showing key features given a verbal description of the relationship.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.A.3",
+      "title": "Recognize that sequences are functions, sometimes defined recursively, whose ...",
+      "description": "Recognize that sequences are functions, sometimes defined recursively, whose domain is a subset of the integers.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [
+        "functions",
+        "integers"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.A.3",
+          "description": "Recognize that sequences are functions, sometimes defined recursively, whose domain is a subset of the integers.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.A.2",
+      "title": "Use function notation, evaluate functions for inputs in their domains, and in...",
+      "description": "Use function notation, evaluate functions for inputs in their domains, and interpret statements that use function notation in terms of a context.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [
+        "functions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.A.2",
+          "description": "Use function notation, evaluate functions for inputs in their domains, and interpret statements that use function notation in terms of a context.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSF-IF.A.1",
+      "title": "Understand that a function from one set (called the domain) to another set (c...",
+      "description": "Understand that a function from one set (called the domain) to another set (called the range) assigns to each element of the domain exactly one element of the range. If f is a function and x is an element of its domain, then f(x) denotes the output of f corresponding to the input x. The graph of f is the graph of the equation y = f(x).",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Functions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSF-IF.A.1",
+          "description": "Understand that a function from one set (called the domain) to another set (called the range) assigns to each element of the domain exactly one element of the range. If f is a function and x is an element of its domain, then f(x) denotes the output of f corresponding to the input x. The graph of f is the graph of the equation y = f(x).",
+          "grade_level": "Grade9"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.HSF-LE.A.1",
+      "to": "CCSS.Math.Content.HSF-LE.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-LE.A.1 is a prerequisite for CCSS.Math.Content.HSF-LE.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-LE.A.2",
+      "to": "CCSS.Math.Content.HSF-LE.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-LE.A.2 is a prerequisite for CCSS.Math.Content.HSF-LE.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-LE.A.3",
+      "to": "CCSS.Math.Content.HSF-LE.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-LE.A.3 is a prerequisite for CCSS.Math.Content.HSF-LE.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-LE.A.4",
+      "to": "CCSS.Math.Content.HSF-LE.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-LE.A.4 is a prerequisite for CCSS.Math.Content.HSF-LE.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.A.1",
+      "to": "CCSS.Math.Content.HSF-TF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.A.1 is a prerequisite for CCSS.Math.Content.HSF-TF.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.A.2",
+      "to": "CCSS.Math.Content.HSF-TF.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.A.2 is a prerequisite for CCSS.Math.Content.HSF-TF.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.A.3",
+      "to": "CCSS.Math.Content.HSF-TF.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.A.3 is a prerequisite for CCSS.Math.Content.HSF-TF.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.A.4",
+      "to": "CCSS.Math.Content.HSF-TF.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.A.4 is a prerequisite for CCSS.Math.Content.HSF-TF.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.B.5",
+      "to": "CCSS.Math.Content.HSF-TF.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.B.5 is a prerequisite for CCSS.Math.Content.HSF-TF.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.B.6",
+      "to": "CCSS.Math.Content.HSF-TF.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.B.6 is a prerequisite for CCSS.Math.Content.HSF-TF.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.B.7",
+      "to": "CCSS.Math.Content.HSF-TF.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.B.7 is a prerequisite for CCSS.Math.Content.HSF-TF.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-TF.C.8",
+      "to": "CCSS.Math.Content.HSF-TF.C.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-TF.C.8 is a prerequisite for CCSS.Math.Content.HSF-TF.C.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.A.1",
+      "to": "CCSS.Math.Content.HSF-IF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.A.1 is a prerequisite for CCSS.Math.Content.HSF-IF.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.A.2",
+      "to": "CCSS.Math.Content.HSF-IF.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.A.2 is a prerequisite for CCSS.Math.Content.HSF-IF.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.A.3",
+      "to": "CCSS.Math.Content.HSF-IF.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.A.3 is a prerequisite for CCSS.Math.Content.HSF-IF.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.B.4",
+      "to": "CCSS.Math.Content.HSF-IF.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.B.4 is a prerequisite for CCSS.Math.Content.HSF-IF.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.B.5",
+      "to": "CCSS.Math.Content.HSF-IF.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.B.5 is a prerequisite for CCSS.Math.Content.HSF-IF.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.B.6",
+      "to": "CCSS.Math.Content.HSF-IF.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.B.6 is a prerequisite for CCSS.Math.Content.HSF-IF.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.C.7",
+      "to": "CCSS.Math.Content.HSF-IF.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.C.7 is a prerequisite for CCSS.Math.Content.HSF-IF.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-IF.C.8",
+      "to": "CCSS.Math.Content.HSF-IF.C.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-IF.C.8 is a prerequisite for CCSS.Math.Content.HSF-IF.C.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-BF.A.1",
+      "to": "CCSS.Math.Content.HSF-BF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-BF.A.1 is a prerequisite for CCSS.Math.Content.HSF-BF.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-BF.A.2",
+      "to": "CCSS.Math.Content.HSF-BF.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-BF.A.2 is a prerequisite for CCSS.Math.Content.HSF-BF.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-BF.B.3",
+      "to": "CCSS.Math.Content.HSF-BF.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-BF.B.3 is a prerequisite for CCSS.Math.Content.HSF-BF.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSF-BF.B.4",
+      "to": "CCSS.Math.Content.HSF-BF.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSF-BF.B.4 is a prerequisite for CCSS.Math.Content.HSF-BF.B.5 within the same domain."
+    }
+  ]
+}

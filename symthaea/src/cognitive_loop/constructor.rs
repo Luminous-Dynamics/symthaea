@@ -62,6 +62,66 @@ use super::{
     WorldModelBridge,
 };
 
+/// Adapter: wraps HelicopterEmbodiment to implement the main crate's EmbodimentBridge trait.
+/// Needed because the helicopter crate can't depend on the main crate (circular dep).
+#[cfg(feature = "helicopter")]
+struct HelicopterBridgeAdapter(crate::helicopter::embodiment::HelicopterEmbodiment);
+
+#[cfg(feature = "helicopter")]
+impl super::motor_bridge::EmbodimentBridge for HelicopterBridgeAdapter {
+    fn step(
+        &mut self,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+        dt: f32,
+        phi: f64,
+    ) -> super::motor_bridge::EmbodimentResult {
+        let r = self.0.step(thought_hv, dt, phi);
+        super::motor_bridge::EmbodimentResult {
+            num_actuators: r.num_actuators,
+            control_effort: r.control_effort,
+            success: r.success,
+            prediction_error: r.prediction_error,
+            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
+        }
+    }
+
+    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
+        self.0.encode_perception()
+    }
+
+    fn reset(&mut self) {
+        self.0.reset();
+    }
+
+    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
+        super::motor_bridge::MotorSafetyLevel::from_phi(0.5) // Default; updated on step()
+    }
+
+    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
+        super::motor_bridge::EmbodimentPlatform::Helicopter
+    }
+
+    fn num_actuators(&self) -> usize {
+        6
+    }
+
+    fn total_steps(&self) -> usize {
+        self.0.total_steps()
+    }
+
+    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
+        let t = self.0.telemetry();
+        super::motor_bridge::EmbodimentTelemetry {
+            total_steps: t.total_steps,
+            control_effort: t.control_effort,
+            prediction_error: t.prediction_error,
+            safety_level: t.safety_level,
+            platform: t.platform,
+            num_actuators: t.num_actuators,
+        }
+    }
+}
+
 impl CognitiveLoopService {
     /// Create a new cognitive loop service
     pub fn new(mut config: CognitiveLoopConfig) -> Result<Self> {
@@ -500,6 +560,16 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        // Create safety alert channel — bounded (32) so the cognitive loop never blocks.
+        // Host application drains via take_safety_alert_receiver().
+        let (safety_alert_tx, safety_alert_rx) = std::sync::mpsc::sync_channel(
+            super::safety_alert::SAFETY_ALERT_CHANNEL_CAPACITY,
+        );
+
+        // Create Holon inbound channel eagerly so the sender is always available.
+        // HTTP handlers (HolonHttpState) clone the tx to inject SomaMessages.
+        let (holon_inbound_tx, holon_inbound_rx) = std::sync::mpsc::channel();
+
         // Create mesh outbound channel for sovereign beacon/name/content emission.
         #[cfg(feature = "mesh")]
         let (mesh_outbound_tx, mesh_outbound_rx) = std::sync::mpsc::channel();
@@ -530,6 +600,89 @@ impl CognitiveLoopService {
         let trajectory_planning_enabled = config.enable_trajectory_planning;
         let trajectory_horizon_seconds = config.trajectory_horizon_seconds;
         let trajectory_planning_interval = config.trajectory_planning_interval;
+        let enable_hodge_decomposition = config.enable_hodge_decomposition;
+
+        // ── Build SensoriMotorExecution before struct literal ─────────────
+        let sensorimotor_built = {
+            let vision_sensory = super::vision_sensory_manager::VisionAndSensoryManager {
+                coherence_field: if enable_coherence_field {
+                    Some(crate::physiology::CoherenceField::new())
+                } else {
+                    None
+                },
+                virtual_body,
+                #[cfg(feature = "vision-manifold")]
+                vision_bridge: if vision_manifold_enabled {
+                    let vm_config = symthaea_vision_manifold::VisionConfig::default();
+                    Some(symthaea_vision_manifold::VisionBridge::new(
+                        vm_config,
+                        vision_frame_width,
+                        vision_frame_height,
+                    ))
+                } else {
+                    None
+                },
+                #[cfg(feature = "vision-manifold")]
+                vision_frame_buffer: None,
+                #[cfg(feature = "vision-manifold")]
+                cross_manifold_predictor: cross_manifold_predictor_init,
+                #[cfg(feature = "foveation")]
+                foveation_manager: {
+                    let fov_config = symthaea_foveation::FoveationConfig::default();
+                    Some(std::sync::Mutex::new(
+                        symthaea_foveation::FoveationManager::new(fov_config, 8),
+                    ))
+                },
+            };
+
+            #[cfg(feature = "humanoid")]
+            let embodiment_bridge_init = {
+                use super::motor_bridge::EmbodimentPlatform;
+                match config.embodiment_platform {
+                    EmbodimentPlatform::Humanoid => {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let bridge = super::motor_bridge::MotorBridge::new(
+                            &genesis.unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            }),
+                        );
+                        Some(Box::new(bridge) as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "helicopter")]
+                    EmbodimentPlatform::Helicopter => {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let inner = crate::helicopter::embodiment::HelicopterEmbodiment::new(
+                            &genesis.unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            }),
+                        );
+                        Some(Box::new(HelicopterBridgeAdapter(inner))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    _ => None,
+                }
+            };
+
+            super::sensorimotor_execution::SensoriMotorExecution::new(
+                vision_sensory,
+                super::motor_rendering_manager::MotorRenderingManager::new(),
+                somatic_bridge_instance,
+                Some(pain_sender),
+                thermal_bridge_instance,
+                Some(thermal_sender),
+                #[cfg(feature = "humanoid")]
+                embodiment_bridge_init,
+                #[cfg(feature = "humanoid")]
+                None,
+                #[cfg(feature = "humanoid")]
+                super::motor_bridge::EmbodimentTelemetry::default(),
+            )
+        };
+
         let mut service = Self {
             config,
             encoder,
@@ -571,6 +724,7 @@ impl CognitiveLoopService {
                 } else {
                     None
                 },
+                broca_code_channels: None,
             },
             behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
                 FlowState::default(),
@@ -621,7 +775,8 @@ impl CognitiveLoopService {
             },
             feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
-            memory_consol: super::memory_consolidation_manager::MemoryAndConsolidationManager {
+            memory: super::memory_execution::MemoryExecution {
+                memory_consol: super::memory_consolidation_manager::MemoryAndConsolidationManager {
                 stability_regime: StabilityRegimeProcessor::new(),
                 discovery_service: PrimitiveDiscoveryService::new(DiscoveryServiceConfig::default()),
                 semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
@@ -682,6 +837,30 @@ impl CognitiveLoopService {
                     phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
                     mem.add_codebook(phi_cb);
                     Some(mem)
+                } else {
+                    None
+                },
+                },
+                causal_enhancer,
+                episodic_persistence:
+                    super::episodic_persistence_manager::EpisodicPersistenceManager::new(
+                        phi_episodic_replay,
+                    ),
+                knowledge_manager: if enable_knowledge_engine {
+                    let km_config = crate::knowledge::manager::KnowledgeManagerConfig {
+                        graph_capacity: knowledge_graph_capacity,
+                        causal_capacity: knowledge_causal_capacity,
+                        search_top_k: knowledge_search_top_k,
+                        ontology_config: crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
+                            max_primitives: knowledge_ontology_max,
+                            ..Default::default()
+                        },
+                        db_path: knowledge_db_path.clone(),
+                        ..Default::default()
+                    };
+                    let mut km = crate::knowledge::KnowledgeManager::new(km_config);
+                    km.bootstrap_entities();
+                    Some(km)
                 } else {
                     None
                 },
@@ -747,11 +926,6 @@ impl CognitiveLoopService {
                 physics_integration,
             },
             async_trainer,
-            causal_enhancer,
-            episodic_persistence:
-                super::episodic_persistence_manager::EpisodicPersistenceManager::new(
-                    phi_episodic_replay,
-                ),
             #[cfg(feature = "reasoning_engine")]
             reasoning_engine: Some(
                 crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
@@ -796,6 +970,7 @@ impl CognitiveLoopService {
                 affective_bridge,
             },
             primitive_tier,
+            thermodynamic_mgr: super::managers::thermodynamic_manager::ThermodynamicManager::default(),
             #[cfg(feature = "support")]
             support: super::support_manager::SupportManager::new(),
             carryover: CycleCarryover::default(),
@@ -810,36 +985,8 @@ impl CognitiveLoopService {
                 None
             },
             // social_mgr moved to behavior (BehavioralSynthesis)
-            vision_sensory: super::vision_sensory_manager::VisionAndSensoryManager {
-                coherence_field: if enable_coherence_field {
-                    Some(crate::physiology::CoherenceField::new())
-                } else {
-                    None
-                },
-                virtual_body,
-                #[cfg(feature = "vision-manifold")]
-                vision_bridge: if vision_manifold_enabled {
-                    let vm_config = symthaea_vision_manifold::VisionConfig::default();
-                    Some(symthaea_vision_manifold::VisionBridge::new(
-                        vm_config,
-                        vision_frame_width,
-                        vision_frame_height,
-                    ))
-                } else {
-                    None
-                },
-                #[cfg(feature = "vision-manifold")]
-                vision_frame_buffer: None,
-                #[cfg(feature = "vision-manifold")]
-                cross_manifold_predictor: cross_manifold_predictor_init,
-                #[cfg(feature = "foveation")]
-                foveation_manager: {
-                    let fov_config = symthaea_foveation::FoveationConfig::default();
-                    Some(std::sync::Mutex::new(
-                        symthaea_foveation::FoveationManager::new(fov_config, 8),
-                    ))
-                },
-            },
+            // vision_sensory, motor_rendering, somatic/thermal/embodiment moved to sensorimotor
+            sensorimotor: sensorimotor_built,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())
@@ -864,34 +1011,13 @@ impl CognitiveLoopService {
             enactive: EnactiveCognition::new(),
             biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
-            knowledge_manager: if enable_knowledge_engine {
-                let km_config = crate::knowledge::manager::KnowledgeManagerConfig {
-                    graph_capacity: knowledge_graph_capacity,
-                    causal_capacity: knowledge_causal_capacity,
-                    search_top_k: knowledge_search_top_k,
-                    ontology_config: crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
-                        max_primitives: knowledge_ontology_max,
-                        ..Default::default()
-                    },
-                    db_path: knowledge_db_path.clone(),
-                    ..Default::default()
-                };
-                let mut km = crate::knowledge::KnowledgeManager::new(km_config);
-                km.bootstrap_entities();
-                Some(km)
-            } else {
-                None
-            },
             // last_reasoning_context moved to episodic_persistence manager
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
             // school_bridge + causal_consciousness moved to feature_integ manager
             thermodynamic_load: 0.0,
             mood_temperature: 1.0,
             neuromod: super::neuromod_manager::NeuromodManager::default(),
-            somatic_bridge: somatic_bridge_instance,
-            pain_tx: Some(pain_sender),
-            thermal_bridge: thermal_bridge_instance,
-            thermal_tx: Some(thermal_sender),
+            // somatic_bridge, pain_tx, thermal_bridge, thermal_tx moved to sensorimotor_built
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),
             last_snapshot: None,
 
@@ -1000,6 +1126,7 @@ impl CognitiveLoopService {
                     engine_hi,
                     moral_anomaly_config.clone(),
                     dense_basis,
+                    enable_hodge_decomposition,
                 )
             },
             last_ethics_verdict: super::ethics_engine::EthicalVerdict::Safe,
@@ -1016,10 +1143,18 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "mycelix")]
             governance_mgr: super::managers::GovernanceManager::default(),
+            #[cfg(feature = "mycelix")]
+            factcheck_bridge: super::broca_factcheck::BrocaFactcheckBridge::new(),
             swarm_manager: super::managers::SwarmManager::default(),
+            #[cfg(feature = "muse")]
+            muse_manager: super::managers::MuseManager::new(),
             holon_receiver: crate::consciousness::holon_receiver::HolonReceiver::new(),
+            holon_inbound_rx: std::sync::Mutex::new(Some(holon_inbound_rx)),
+            holon_inbound_tx,
             swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
             swarm_event_tx,
+            safety_alert_tx,
+            safety_alert_rx: std::sync::Mutex::new(Some(safety_alert_rx)),
             federation_handle,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),
@@ -1129,7 +1264,7 @@ impl CognitiveLoopService {
                 crate::integrity::install_panic_hook();
                 im
             },
-            motor_rendering: super::motor_rendering_manager::MotorRenderingManager::new(),
+            // motor_rendering moved to sensorimotor_built
             hierarchical_bundler: if enable_hierarchical_bundling {
                 Some(
                     symthaea_core::hdc::hierarchical_bundle::HierarchicalBundler::new(
@@ -1166,6 +1301,8 @@ impl CognitiveLoopService {
             defense_actions_approved: 0,
             #[cfg(feature = "safety-agents")]
             civic_crisis_detector: super::civic_crisis_detector::CivicCrisisDetector::new(),
+            #[cfg(feature = "safety-agents")]
+            pending_crisis_events: Vec::new(),
             #[cfg(feature = "neuroevolution")]
             neuroevolution_manager: super::managers::NeuroevolutionManager::default(),
             #[cfg(feature = "reasoning_engine")]
@@ -1175,6 +1312,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             vision_manager: super::managers::VisionManager::default(),
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
+            // embodiment_bridge, last_proprioceptive_hv, embodiment_telemetry moved to sensorimotor_built
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: if enable_streaming_inference {
                 // Cycle-aligned config: batch=1, max_latency=32ms (~31Hz loop)

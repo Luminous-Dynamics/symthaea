@@ -1,10 +1,10 @@
 # Cargo configuration for Holochain zome development
+#
+# getrandom v0.3 backend: HDK 0.6 provides __getrandom_v03_custom.
+# Do NOT use "wasm_js" — it pulls in wasm-bindgen which is incompatible
+# with Holochain's WASM runtime.
 
 [target.wasm32-unknown-unknown]
 rustflags = [
-    # Enable getrandom 0.3.x wasm_js backend
-    "--cfg", "getrandom_backend=\"wasm_js\"",
+    "--cfg", "getrandom_backend=\"custom\"",
 ]
-
-[build]
-target = "wasm32-unknown-unknown"

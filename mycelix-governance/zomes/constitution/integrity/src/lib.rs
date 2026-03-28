@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Constitution Integrity Zome
 //! Defines entry types and validation for charter and amendments
 //!
@@ -200,6 +203,98 @@ pub fn check_update_charter(original: &Charter, updated: &Charter) -> Result<(),
 }
 
 /// Check amendment validity on creation.
+///
+/// Immutable Core rights — aligned with Constitution Art. IV, Sec. 2.
+/// These are NOT absolutely unamendable but require the enhanced
+/// amendment process: 90% supermajority in both Global DAO houses,
+/// ratified by 3/4 of all Sector and Regional DAOs.
+///
+/// At the integrity level, amendments targeting these rights are
+/// FLAGGED (not rejected) — the coordinator must verify that the
+/// enhanced process was followed before allowing the amendment.
+const IMMUTABLE_CORE_RIGHTS: &[&str] = &[
+    "veto override",
+    "consciousness gating",
+    "term limits",
+    "emergency power limits",
+    "permission-less enforcement",
+    "fork rights",
+    "right to exit",
+    // Constitutional Immutable Core (Art. IV, Sec. 2):
+    "core principles",
+    "sovereignty",
+    "golden veto sunset",
+    "oversight funding",
+];
+
+/// Check if an amendment targets the Immutable Core (Art. IV, Sec. 2).
+///
+/// Returns Some(reason) if the amendment targets a protected right.
+/// The amendment is not REJECTED at the integrity level — instead,
+/// the coordinator must verify the enhanced amendment process
+/// (90% supermajority + 3/4 ratification) was followed.
+///
+/// This aligns with the Constitution: the Immutable Core is not
+/// absolutely unamendable, but requires an extraordinary process.
+pub fn targets_immutable_core(amendment: &Amendment) -> Option<String> {
+    let text_lower = amendment.new_text.to_lowercase();
+    let original_lower = amendment
+        .original_text
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+    let article_lower = amendment
+        .article
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+
+    // Check RemoveRight/ModifyRight against immutable core rights
+    if matches!(
+        amendment.amendment_type,
+        AmendmentType::RemoveRight | AmendmentType::ModifyRight
+    ) {
+        for right in IMMUTABLE_CORE_RIGHTS {
+            if original_lower.contains(right) || text_lower.contains(right) {
+                return Some(format!(
+                    "Amendment targets Immutable Core right: '{}'. \
+                     Requires enhanced process: 90% supermajority + 3/4 DAO ratification \
+                     (Constitution Art. IV, Sec. 2).",
+                    right
+                ));
+            }
+        }
+    }
+
+    // Check RemoveArticle against immutable core topics
+    if matches!(amendment.amendment_type, AmendmentType::RemoveArticle) {
+        for right in IMMUTABLE_CORE_RIGHTS {
+            if article_lower.contains(right) {
+                return Some(format!(
+                    "Amendment targets Immutable Core article: '{}'. \
+                     Requires enhanced process (Art. IV, Sec. 2).",
+                    right
+                ));
+            }
+        }
+    }
+
+    // ModifyProcess cannot strip override mechanisms without enhanced process
+    if matches!(amendment.amendment_type, AmendmentType::ModifyProcess) {
+        for right in IMMUTABLE_CORE_RIGHTS {
+            if original_lower.contains(right) && !text_lower.contains(right) {
+                return Some(format!(
+                    "Amendment removes '{}' from process — requires enhanced process \
+                     (Art. IV, Sec. 2).",
+                    right
+                ));
+            }
+        }
+    }
+
+    None
+}
+
 pub fn check_create_amendment(amendment: &Amendment) -> Result<(), String> {
     if !amendment.proposer.starts_with("did:") {
         return Err("Proposer must be a valid DID".into());
@@ -210,6 +305,19 @@ pub fn check_create_amendment(amendment: &Amendment) -> Result<(), String> {
     if amendment.rationale.is_empty() {
         return Err("Amendment must have rationale".into());
     }
+
+    // ── IMMUTABLE CORE CHECK (Art. IV, Sec. 2) ──
+    // Flag amendments targeting the Immutable Core. These are not rejected
+    // at the integrity level — the coordinator verifies the enhanced process
+    // (90% supermajority + 3/4 ratification) was followed.
+    //
+    // The amendment is VALID to create (so it can enter deliberation),
+    // but the coordinator must check targets_immutable_core() before
+    // transitioning to Ratified status.
+    //
+    // This aligns with the Constitution: even the Immutable Core can be
+    // amended through an extraordinary democratic process.
+
     match amendment.amendment_type {
         AmendmentType::ModifyArticle
         | AmendmentType::ModifyRight

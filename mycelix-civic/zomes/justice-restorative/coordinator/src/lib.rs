@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Restorative Coordinator Zome
 //!
 //! Manages restorative justice circles, community healing processes,
@@ -307,6 +310,186 @@ pub fn get_circles_by_status(status: CircleStatus) -> ExternResult<Vec<Record>> 
     }
 
     Ok(records)
+}
+
+// ============================================================================
+// RESTITUTION — Structured Economic Justice via TEND
+// ============================================================================
+
+/// Input for creating a restitution agreement.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateRestitutionInput {
+    pub circle_hash: ActionHash,
+    pub agreement_id: String,
+    pub description: String,
+    pub restitution_type: RestitutionType,
+    pub amount_hours: Option<f32>,
+    pub from_did: String,
+    pub to_did: String,
+    pub deadline: Timestamp,
+}
+
+/// Input for recording a restitution payment.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordRestitutionPaymentInput {
+    pub agreement_hash: ActionHash,
+    pub tend_exchange_id: String,
+}
+
+/// Status of restitution completion for a circle.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RestitutionCompletionStatus {
+    pub circle_hash: ActionHash,
+    pub total_agreements: u32,
+    pub completed: u32,
+    pub pending: u32,
+    pub defaulted: u32,
+    pub all_complete: bool,
+}
+
+/// Create a structured restitution agreement linked to a restorative circle.
+///
+/// The circle must be in `AgreementReached` status or later. This replaces
+/// the informal `agreements: Vec<String>` with tracked, verifiable terms
+/// linked to the TEND mutual credit system.
+#[hdk_extern]
+pub fn create_restitution_agreement(input: CreateRestitutionInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_proposal(), "create_restitution_agreement")?;
+
+    // Verify circle exists and is in appropriate status
+    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Circle not found".into())),
+    )?;
+    let circle: RestorativeCircle = circle_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
+
+    // Gate: restitution can only be created when agreement is reached
+    match circle.status {
+        CircleStatus::AgreementReached | CircleStatus::Monitoring | CircleStatus::Completed => {}
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Circle must be in AgreementReached/Monitoring/Completed status, got {:?}",
+                circle.status
+            ))));
+        }
+    }
+
+    // Validate hours if provided
+    if let Some(hours) = input.amount_hours {
+        if hours <= 0.0 || !hours.is_finite() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Restitution hours must be positive and finite".into()
+            )));
+        }
+    }
+
+    let agreement = RestitutionAgreement {
+        circle_hash: input.circle_hash.clone(),
+        agreement_id: input.agreement_id,
+        description: input.description,
+        restitution_type: input.restitution_type,
+        amount_hours: input.amount_hours,
+        from_did: input.from_did,
+        to_did: input.to_did,
+        deadline: input.deadline,
+        tend_exchange_id: None,
+        status: RestitutionStatus::Pending,
+        created_at: sys_time()?,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RestitutionAgreement(agreement))?;
+
+    // Link circle → restitution
+    create_link(
+        input.circle_hash,
+        action_hash.clone(),
+        LinkTypes::CircleToRestitution,
+        (),
+    )?;
+
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get created restitution agreement".into()
+    )))
+}
+
+/// Record a TEND payment against a restitution agreement.
+///
+/// Updates the agreement status to `PaymentRecorded` and stores
+/// the TEND exchange ID for cross-reference verification.
+#[hdk_extern]
+pub fn record_restitution_payment(input: RecordRestitutionPaymentInput) -> ExternResult<Record> {
+    require_consciousness(&requirement_for_basic(), "record_restitution_payment")?;
+
+    let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest(
+            "Restitution agreement not found".into()
+        )),
+    )?;
+    let mut agreement: RestitutionAgreement = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid agreement entry".into()
+        )))?;
+
+    agreement.tend_exchange_id = Some(input.tend_exchange_id);
+    agreement.status = RestitutionStatus::PaymentRecorded;
+
+    let new_hash = update_entry(input.agreement_hash, &agreement)?;
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated agreement".into()
+    )))
+}
+
+/// Check the restitution completion status for all agreements in a circle.
+#[hdk_extern]
+pub fn check_restitution_completion(circle_hash: ActionHash) -> ExternResult<RestitutionCompletionStatus> {
+    let links = get_links(
+        LinkQuery::try_new(circle_hash.clone(), LinkTypes::CircleToRestitution)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut total = 0u32;
+    let mut completed = 0u32;
+    let mut pending = 0u32;
+    let mut defaulted = 0u32;
+
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(agreement) = record
+                    .entry()
+                    .to_app_option::<RestitutionAgreement>()
+                    .ok()
+                    .flatten()
+                {
+                    total += 1;
+                    match agreement.status {
+                        RestitutionStatus::Completed | RestitutionStatus::Verified => {
+                            completed += 1;
+                        }
+                        RestitutionStatus::Defaulted => defaulted += 1,
+                        _ => pending += 1,
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(RestitutionCompletionStatus {
+        circle_hash,
+        total_agreements: total,
+        completed,
+        pending,
+        defaulted,
+        all_complete: total > 0 && completed == total,
+    })
 }
 
 #[cfg(test)]

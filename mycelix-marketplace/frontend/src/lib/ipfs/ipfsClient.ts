@@ -1,8 +1,24 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * IPFS Client Wrapper
  *
  * Handles file uploads to IPFS via Pinata
  */
+
+/**
+ * Default IPFS gateway fallback chain for censorship-resistant content retrieval.
+ *
+ * If the primary gateway (Pinata) is down, reads fall through to public gateways.
+ * Uploads always go to Pinata (the only authenticated gateway).
+ */
+const DEFAULT_FALLBACK_GATEWAYS: string[] = [
+  'https://w3s.link',
+  'https://dweb.link',
+  'https://ipfs.io',
+  'https://cloudflare-ipfs.com',
+];
 
 /**
  * Pinata configuration
@@ -101,6 +117,58 @@ export async function uploadFiles(files: File[], configOverride?: PinataConfig):
 export function getIpfsUrl(cid: string): string {
   const config = getPinataConfig();
   return `${config.gateway}/ipfs/${cid}`;
+}
+
+/**
+ * Get all IPFS gateway URLs for a CID (for retry logic).
+ *
+ * Returns the primary gateway first, then all fallback gateways.
+ *
+ * @param cid - IPFS content identifier
+ * @returns Array of IPFS gateway URLs, ordered by preference
+ */
+export function getIpfsUrls(cid: string): string[] {
+  const config = getPinataConfig();
+  const urls = [`${config.gateway}/ipfs/${cid}`];
+  for (const gw of DEFAULT_FALLBACK_GATEWAYS) {
+    urls.push(`${gw}/ipfs/${cid}`);
+  }
+  return urls;
+}
+
+/**
+ * Fetch content from IPFS with automatic gateway fallback.
+ *
+ * Tries the primary Pinata gateway first, then falls through to public
+ * gateways. Each gateway gets a 10-second timeout before the next is tried.
+ *
+ * @param cid - IPFS content identifier
+ * @returns Response from the first successful gateway
+ * @throws Error if all gateways fail
+ */
+export async function fetchFromIpfs(cid: string): Promise<Response> {
+  const urls = getIpfsUrls(cid);
+  let lastError: Error | undefined;
+
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        return response;
+      }
+      lastError = new Error(`Gateway ${url} returned ${response.status}`);
+    } catch (error) {
+      lastError =
+        error instanceof Error ? error : new Error(`Gateway ${url} failed`);
+    }
+  }
+
+  throw lastError ?? new Error(`All ${urls.length} IPFS gateways failed for CID: ${cid}`);
 }
 
 /**

@@ -28,6 +28,9 @@ members = [
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
     "crates/symthaea-flight",
+    "crates/symthaea-helicopter",
+    "crates/symthaea-auv",
+    "crates/symthaea-manipulator",
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
     "crates/symthaea-physics-bridge",
@@ -62,6 +65,7 @@ members = [
     "crates/symthaea-aesthetic",
     "crates/symthaea-atelier",
     "crates/symthaea-muse",
+    "crates/symthaea-biometrics",
     "crates/symthaea-gallery",
     "crates/symthaea-circular",
     "crates/symthaea-clinical",
@@ -84,6 +88,10 @@ default-members = [
     ".",
     "symthaea-core",
 ]
+
+[workspace.package]
+edition = "2021"
+license = "AGPL-3.0-or-later"
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
 # These lints apply on top of any crate-level #![deny/allow/warn] attributes.
@@ -125,6 +133,8 @@ nalgebra = "0.34"
 rustfft = "6.2"
 clap = { version = "4.4", features = ["derive"] }
 hound = "3.5"
+flacenc = "0.4"
+rubato = "0.14"
 petgraph = { version = "0.6", features = ["serde-1"] }
 regex = "1.10"
 strsim = "0.11"
@@ -224,6 +234,9 @@ symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
 # Symthaea Flight - HDC-LTC + FEP Active Inference quadrotor flight control
 symthaea-flight = { path = "crates/symthaea-flight", optional = true }
 
+# Symthaea Helicopter - HDC-LTC + FEP Active Inference SAR helicopter control
+symthaea-helicopter = { path = "crates/symthaea-helicopter", optional = true }
+
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
 symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
 
@@ -241,6 +254,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
+# Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
+symthaea-muse = { path = "crates/symthaea-muse", optional = true }
 
 # Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
 symthaea-geodesic = { path = "crates/symthaea-geodesic", optional = true }
@@ -400,6 +416,7 @@ rodio = { version = "0.19", default-features = false, optional = true }  # Audio
 cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
 ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
 hound = { workspace = true, optional = true }
+rubato = { workspace = true }
 lz4_flex = { version = "0.11", default-features = false, optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
 zeroize = { version = "1.8", features = ["derive"], optional = true }
@@ -457,6 +474,14 @@ demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal h
 full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
 
+# ── Sovereign RDP ──────────────────────────────────────────────────
+rdp = []                                   # Core RDP protocol + codec + session
+rdp-server = ["rdp"]                       # RDP server with screen capture
+rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (x11rb TODO)
+rdp-client = ["rdp"]                       # RDP client with frame reconstruction
+rdp-support = ["rdp"]                      # Mycelix support integration
+rdp-full = ["rdp-server", "rdp-client", "rdp-support"]  # Everything
+
 # ── Voice & Audio ───────────────────────────────────────────────────
 # Voice Pipeline (hierarchy):
 #   voice-tts       → base TTS with Kokoro ONNX + espeak-ng G2P
@@ -472,6 +497,7 @@ vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
 neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI matrix; GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
+muse = ["dep:symthaea-muse"]                             # Consciousness-driven music synthesis in cognitive loop (streaming PCM)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
@@ -529,6 +555,7 @@ flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control v
 flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
 flight-mujoco-renderer = ["flight-mujoco", "symthaea-flight/mujoco-renderer"]  # Offscreen MuJoCo rendering for video capture
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
+helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
@@ -721,6 +748,11 @@ name = "code-gen-smoke"
 path = "src/bin/code_gen_smoke.rs"
 required-features = ["code_generation"]
 
+[[bin]]
+name = "symthaea-holon"
+path = "src/bin/symthaea-holon.rs"
+required-features = ["api_module"]
+
 # Examples
 # Examples that need cfg-gated modules are marked with required-features
 # They won't be built by default until the required modules are fixed
@@ -766,6 +798,14 @@ required-features = ["flight-mujoco"]
 [[test]]
 name = "humanoid_integration"
 required-features = ["humanoid"]
+
+[[test]]
+name = "embodiment_integration"
+required-features = ["humanoid"]
+
+[[example]]
+name = "helicopter_phi_benchmark"
+required-features = ["helicopter"]
 
 [[example]]
 name = "dmc_humanoid_stand"

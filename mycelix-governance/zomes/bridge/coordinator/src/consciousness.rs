@@ -9,10 +9,24 @@ use serde::{Deserialize, Serialize};
 // CONSCIOUSNESS METRICS COORDINATOR FUNCTIONS
 // =============================================================================
 
-/// Record a consciousness snapshot from Symthaea
+/// Maximum self-reported consciousness level for unsigned snapshots.
+///
+/// ANTI-TYRANNY: Self-reported (unsigned) snapshots are capped below the
+/// Guardian threshold (0.8) to prevent consciousness score gaming.
+/// Only Ed25519-signed attestations can reach Guardian tier.
+/// This means self-reported scores can never unlock veto power.
+const UNSIGNED_SNAPSHOT_PHI_CAP: f64 = 0.6;
+
+/// Record a consciousness snapshot from Symthaea (DEPRECATED for governance).
 ///
 /// Stores the Φ measurement and related metrics for an agent at a point in time.
-/// Used to establish consciousness state before governance actions.
+///
+/// WARNING: This function accepts self-reported values without cryptographic
+/// verification. For governance actions requiring Guardian tier (0.8+), use
+/// `record_consciousness_attestation` instead, which requires Ed25519 signatures.
+///
+/// Self-reported consciousness_level is capped at 0.6 (Steward tier) to prevent
+/// gaming. Only signed attestations can unlock Guardian-tier governance powers.
 #[hdk_extern]
 pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult<Record> {
     check_snapshot_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
@@ -21,10 +35,14 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
+    // Cap self-reported consciousness level to prevent gaming.
+    // Guardian-tier (0.8+) requires signed attestation.
+    let capped_level = input.consciousness_level.min(UNSIGNED_SNAPSHOT_PHI_CAP);
+
     let snapshot = ConsciousnessSnapshot {
         id: format!("snapshot:{}:{}", agent_did, now.as_micros()),
         agent_did: agent_did.clone(),
-        consciousness_level: input.consciousness_level,
+        consciousness_level: capped_level,
         meta_awareness: input.meta_awareness,
         self_model_accuracy: input.self_model_accuracy,
         coherence: input.coherence,

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Spaced Repetition System (SRS) Coordinator Zome
 //!
 //! Implements the SuperMemo SM-2 algorithm for optimal learning retention.
@@ -97,6 +100,53 @@ fn sm2_algorithm(
 
         (new_ease_permille, modified_interval, new_repetitions, new_status)
     }
+}
+
+// ============== Pure Business Logic (HDK-free, testable) ==============
+
+/// Pure SM-2 ease factor update. Returns new ease factor as permille (1300-5000).
+///
+/// Implements: EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+pub fn sm2_ease_factor(current_ease_permille: u16, quality: u8) -> u16 {
+    let q = quality.min(5) as f64;
+    let current_ef = current_ease_permille as f64 / 1000.0;
+    let adjustment = 0.1 - (5.0 - q) * (0.08 + (5.0 - q) * 0.02);
+    let new_ef = (current_ef + adjustment)
+        .max(MIN_EASE_PERMILLE as f64 / 1000.0)
+        .min(MAX_EASE_PERMILLE as f64 / 1000.0);
+    (new_ef * 1000.0) as u16
+}
+
+/// Pure SM-2 interval calculation (in minutes).
+///
+/// For repetitions == 0: graduating_interval_days * 1440
+/// For repetitions == 1: 6 * 1440
+/// For repetitions >= 2: previous_interval * ease_factor, capped at max_interval_days
+///
+/// The result is further scaled by interval_modifier_permille / 1000.
+pub fn sm2_interval(
+    repetitions: u32,
+    current_interval_minutes: u32,
+    ease_factor_permille: u16,
+    graduating_interval_days: u32,
+    max_interval_days: u32,
+    interval_modifier_permille: u16,
+) -> u32 {
+    let ef = ease_factor_permille as f64 / 1000.0;
+    let raw = if repetitions == 0 {
+        graduating_interval_days * MINUTES_PER_DAY
+    } else if repetitions == 1 {
+        6 * MINUTES_PER_DAY
+    } else {
+        let interval_days = (current_interval_minutes as f64 / MINUTES_PER_DAY as f64 * ef) as u32;
+        interval_days.min(max_interval_days) * MINUTES_PER_DAY
+    };
+    (raw as f64 * (interval_modifier_permille as f64 / 1000.0)) as u32
+}
+
+/// Check if a card qualifies as a leech (too many lapses).
+pub fn is_leech(lapses: u32, threshold: u32) -> bool {
+    lapses >= threshold
 }
 
 // ============== Card Management ==============
@@ -1109,5 +1159,101 @@ mod tests {
         let err = srs_errors::session_not_found("session123");
         assert_eq!(err.entity_type, "ReviewSession");
         assert!(err.context.as_ref().unwrap().contains("session123"));
+    }
+
+    // ---- Pure SM-2 helper tests ----
+
+    #[test]
+    fn test_sm2_ease_factor_quality_0() {
+        // Quality 0 (complete blackout): adjustment = 0.1 - 5*(0.08 + 5*0.02) = 0.1 - 0.9 = -0.8
+        let ef = sm2_ease_factor(2500, 0);
+        // 2.5 - 0.8 = 1.7 => 1700
+        assert_eq!(ef, 1700);
+    }
+
+    #[test]
+    fn test_sm2_ease_factor_quality_3() {
+        // Quality 3 (correct with difficulty): adjustment = 0.1 - 2*(0.08 + 2*0.02) = 0.1 - 0.24 = -0.14
+        let ef = sm2_ease_factor(2500, 3);
+        // 2.5 - 0.14 = 2.36 => 2360
+        assert_eq!(ef, 2360);
+    }
+
+    #[test]
+    fn test_sm2_ease_factor_quality_5() {
+        // Quality 5 (perfect): adjustment = 0.1 - 0*(0.08 + 0*0.02) = 0.1
+        let ef = sm2_ease_factor(2500, 5);
+        // 2.5 + 0.1 = 2.6 => 2600
+        assert_eq!(ef, 2600);
+    }
+
+    #[test]
+    fn test_sm2_ease_factor_clamps_at_minimum() {
+        // Even with quality 0 from already-low ease, should not go below 1300
+        let ef = sm2_ease_factor(MIN_EASE_PERMILLE, 0);
+        assert_eq!(ef, MIN_EASE_PERMILLE);
+    }
+
+    #[test]
+    fn test_sm2_ease_factor_clamps_at_maximum() {
+        let ef = sm2_ease_factor(MAX_EASE_PERMILLE, 5);
+        assert_eq!(ef, MAX_EASE_PERMILLE);
+    }
+
+    #[test]
+    fn test_sm2_interval_first_review() {
+        // First successful review (rep 0) -> graduating interval (1 day)
+        let interval = sm2_interval(0, 0, 2500, 1, 365, 1000);
+        assert_eq!(interval, 1 * MINUTES_PER_DAY);
+    }
+
+    #[test]
+    fn test_sm2_interval_second_review() {
+        // Second successful review (rep 1) -> 6 days
+        let interval = sm2_interval(1, MINUTES_PER_DAY, 2500, 1, 365, 1000);
+        assert_eq!(interval, 6 * MINUTES_PER_DAY);
+    }
+
+    #[test]
+    fn test_sm2_interval_progression() {
+        // Third review (rep 2): 6 days * 2.5 = 15 days
+        let interval = sm2_interval(2, 6 * MINUTES_PER_DAY, 2500, 1, 365, 1000);
+        assert_eq!(interval, 15 * MINUTES_PER_DAY);
+    }
+
+    #[test]
+    fn test_sm2_interval_respects_max() {
+        // Even with high ease and long interval, should not exceed max_interval_days
+        let interval = sm2_interval(5, 300 * MINUTES_PER_DAY, 3000, 1, 365, 1000);
+        assert!(interval <= 365 * MINUTES_PER_DAY);
+    }
+
+    #[test]
+    fn test_sm2_interval_modifier_scales() {
+        // With 1200 permille modifier (1.2x), interval should be 20% longer
+        let base = sm2_interval(0, 0, 2500, 1, 365, 1000);
+        let modified = sm2_interval(0, 0, 2500, 1, 365, 1200);
+        assert_eq!(modified, (base as f64 * 1.2) as u32);
+    }
+
+    #[test]
+    fn test_is_leech_at_threshold() {
+        assert!(is_leech(8, 8));
+    }
+
+    #[test]
+    fn test_is_leech_below_threshold() {
+        assert!(!is_leech(7, 8));
+    }
+
+    #[test]
+    fn test_is_leech_above_threshold() {
+        assert!(is_leech(10, 8));
+    }
+
+    #[test]
+    fn test_is_leech_zero_threshold() {
+        // Edge case: threshold 0 means every card is a leech
+        assert!(is_leech(0, 0));
     }
 }

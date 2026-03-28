@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Identity Bridge Coordinator Zome
 //!
 //! Cross-hApp communication for identity verification, DID queries,
@@ -10,6 +13,7 @@ use identity_bridge_integrity::*;
 use mycelix_bridge_common::consciousness_profile::{
     ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
 };
+use mycelix_bridge_common::{check_rate_limit_count, RATE_LIMIT_WINDOW_SECS};
 
 // Local type definition for DID document data we receive from cross-zome calls
 // This mirrors the did_registry_integrity::DidDocument but avoids importing that crate
@@ -247,6 +251,54 @@ fn has_mfa_enrolled(did: &str) -> ExternResult<bool> {
     }
 }
 
+// ==================== ANCHOR HELPERS ====================
+
+fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    create_entry(&EntryTypes::Anchor(anchor))?;
+    anchor_hash(anchor_str)
+}
+
+// ==================== RATE LIMITING ====================
+
+/// Check rate limit and log the dispatch. Returns error if limit exceeded.
+///
+/// Enforces a maximum of 100 dispatches per 60 seconds per agent.
+/// Each call creates a `DispatchRateLimit` link from the agent to the
+/// rate-limit anchor, tagged with the target function name.
+fn enforce_rate_limit(target_fn: &str) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let anchor = ensure_anchor("dispatch_rate_limit")?;
+
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::DispatchRateLimit)?,
+        GetStrategy::Local,
+    )?;
+
+    let now = sys_time()?;
+    let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
+    let window_start = Timestamp::from_micros(window_start_micros);
+
+    let recent_count = links.iter().filter(|l| l.timestamp >= window_start).count();
+
+    check_rate_limit_count(recent_count).map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+
+    // Log this dispatch
+    create_link(
+        agent,
+        anchor,
+        LinkTypes::DispatchRateLimit,
+        target_fn.as_bytes().to_vec(),
+    )?;
+
+    Ok(())
+}
+
 // ==================== API VERSION ====================
 
 /// Returns the API version of this coordinator zome.
@@ -265,6 +317,7 @@ pub fn get_api_version(_: ()) -> ExternResult<u16> {
 /// Register a hApp with the identity bridge
 #[hdk_extern]
 pub fn register_happ(input: RegisterHappInput) -> ExternResult<Record> {
+    enforce_rate_limit("register_happ")?;
     let now = sys_time()?;
 
     let registration = HappRegistration {
@@ -334,6 +387,7 @@ const QUERY_RATE_LIMIT_MICROS: i64 = 60 * 1_000_000;
 /// Query a DID from another hApp (cross-hApp identity lookup)
 #[hdk_extern]
 pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerificationResult> {
+    enforce_rate_limit("query_identity")?;
     let now = sys_time()?;
 
     // Rate-limit audit trail entries: skip if the same DID was queried
@@ -634,6 +688,7 @@ fn is_did_deactivated(did: &str) -> ExternResult<bool> {
 /// Report reputation for a DID from another hApp
 #[hdk_extern]
 pub fn report_reputation(input: ReportReputationInput) -> ExternResult<Record> {
+    enforce_rate_limit("report_reputation")?;
     // Validate DID format
     if !input.did.starts_with("did:mycelix:") {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -802,6 +857,7 @@ pub struct ReputationSource {
 /// Broadcast an event to all listening hApps
 #[hdk_extern]
 pub fn broadcast_event(input: BroadcastEventInput) -> ExternResult<Record> {
+    enforce_rate_limit("broadcast_event")?;
     let now = sys_time()?;
 
     let event = BridgeEvent {
@@ -950,6 +1006,7 @@ pub struct MfaAssuranceChangedInput {
 pub fn query_identity_selective(
     input: SelectiveQueryInput,
 ) -> ExternResult<SelectiveIdentityResult> {
+    enforce_rate_limit("query_identity_selective")?;
     let now = sys_time()?;
 
     if input.did.is_empty() || !input.did.starts_with("did:mycelix:") {
@@ -1400,6 +1457,7 @@ pub struct MfaAssuranceLevelResult {
 /// the calling cluster bridge fills it in locally from its own DHT data.
 #[hdk_extern]
 pub fn issue_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    enforce_rate_limit("issue_consciousness_credential")?;
     if !did.starts_with("did:mycelix:") {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Invalid DID format — must start with did:mycelix:".into()

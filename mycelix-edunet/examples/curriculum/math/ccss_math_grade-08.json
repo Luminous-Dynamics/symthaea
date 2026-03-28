@@ -1,0 +1,919 @@
+{
+  "metadata": {
+    "title": "Grade 8",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade8",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 28,
+    "domains": [
+      "Functions",
+      "Statistics and Probability",
+      "Expressions and Equations",
+      "The Number System",
+      "Geometry",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-08). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.8.F.B.5",
+      "title": "Describe qualitatively the functional relationship between two quantities by ...",
+      "description": "Describe qualitatively the functional relationship between two quantities by analyzing a graph (e.g., where the function is increasing or decreasing, linear or nonlinear). Sketch a graph that exhibits the qualitative features of a function that has been described verbally.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "qualitative"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.F.B.5",
+          "description": "Describe qualitatively the functional relationship between two quantities by analyzing a graph (e.g., where the function is increasing or decreasing, linear or nonlinear). Sketch a graph that exhibits the qualitative features of a function that has been described verbally.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.F.B.4",
+      "title": "Construct a function to model a linear relationship between two quantities",
+      "description": "Construct a function to model a linear relationship between two quantities. Determine the rate of change and initial value of the function from a description of a relationship or from two (x, y) values, including reading these from a table or from a graph. Interpret the rate of change and initial value of a linear function in terms of the situation it models, and in terms of its graph or a table of values.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "reading"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.F.B.4",
+          "description": "Construct a function to model a linear relationship between two quantities. Determine the rate of change and initial value of the function from a description of a relationship or from two (x, y) values, including reading these from a table or from a graph. Interpret the rate of change and initial value of a linear function in terms of the situation it models, and in terms of its graph or a table of values.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.F.A.3",
+      "title": "Interpret the equation y = mx + b as defining a linear function, whose graph ...",
+      "description": "Interpret the equation y = mx + b as defining a linear function, whose graph is a straight line; give examples of functions that are not linear.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "functions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.F.A.3",
+          "description": "Interpret the equation y = mx + b as defining a linear function, whose graph is a straight line; give examples of functions that are not linear.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.F.A.2",
+      "title": "Compare properties of two functions each represented in a different way (alge...",
+      "description": "Compare properties of two functions each represented in a different way (algebraically, graphically, numerically in tables, or by verbal descriptions).",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "algebra",
+        "functions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.F.A.2",
+          "description": "Compare properties of two functions each represented in a different way (algebraically, graphically, numerically in tables, or by verbal descriptions).",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.F.A.1",
+      "title": "Understand that a function is a rule that assigns to each input exactly one o...",
+      "description": "Understand that a function is a rule that assigns to each input exactly one output. The graph of a function is the set of ordered pairs consisting of an input and the corresponding output.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.F.A.1",
+          "description": "Understand that a function is a rule that assigns to each input exactly one output. The graph of a function is the set of ordered pairs consisting of an input and the corresponding output.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.SP.A.4",
+      "title": "Understand that patterns of association can also be seen in bivariate categor...",
+      "description": "Understand that patterns of association can also be seen in bivariate categorical data by displaying frequencies and relative frequencies in a two-way table. Construct and interpret a two-way table summarizing data on two categorical variables collected from the same subjects. Use relative frequencies calculated for rows or columns to describe possible association between the two variables.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data",
+        "patterns"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.SP.A.4",
+          "description": "Understand that patterns of association can also be seen in bivariate categorical data by displaying frequencies and relative frequencies in a two-way table. Construct and interpret a two-way table summarizing data on two categorical variables collected from the same subjects. Use relative frequencies calculated for rows or columns to describe possible association between the two variables.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.SP.A.3",
+      "title": "Use the equation of a linear model to solve problems in the context of bivari...",
+      "description": "Use the equation of a linear model to solve problems in the context of bivariate measurement data, interpreting the slope and intercept.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "measurement",
+        "data"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.SP.A.3",
+          "description": "Use the equation of a linear model to solve problems in the context of bivariate measurement data, interpreting the slope and intercept.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.SP.A.2",
+      "title": "Know that straight lines are widely used to model relationships between two q...",
+      "description": "Know that straight lines are widely used to model relationships between two quantitative variables. For scatter plots that suggest a linear association, informally fit a straight line, and informally assess the model fit by judging the closeness of the data points to the line.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "data",
+        "quantitative"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.SP.A.2",
+          "description": "Know that straight lines are widely used to model relationships between two quantitative variables. For scatter plots that suggest a linear association, informally fit a straight line, and informally assess the model fit by judging the closeness of the data points to the line.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.SP.A.1",
+      "title": "Construct and interpret scatter plots for bivariate measurement data to inves...",
+      "description": "Construct and interpret scatter plots for bivariate measurement data to investigate patterns of association between two quantities. Describe patterns such as clustering, outliers, positive or negative association, linear association, and nonlinear association.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics and Probability",
+      "tags": [
+        "measurement",
+        "data",
+        "patterns"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.SP.A.1",
+          "description": "Construct and interpret scatter plots for bivariate measurement data to investigate patterns of association between two quantities. Describe patterns such as clustering, outliers, positive or negative association, linear association, and nonlinear association.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.C.8",
+      "title": "Analyze and solve pairs of simultaneous linear equations",
+      "description": "Analyze and solve pairs of simultaneous linear equations.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.C.8",
+          "description": "Analyze and solve pairs of simultaneous linear equations.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.C.7",
+      "title": "Solve linear equations in one variable",
+      "description": "Solve linear equations in one variable.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.C.7",
+          "description": "Solve linear equations in one variable.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.B.6",
+      "title": "Use similar triangles to explain why the slope m is the same between any two ...",
+      "description": "Use similar triangles to explain why the slope m is the same between any two distinct points on a non-vertical line in the coordinate plane; derive the equation y = mx for a line through the origin and the equation y = mx + b for a line intercepting the vertical axis at b.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.B.6",
+          "description": "Use similar triangles to explain why the slope m is the same between any two distinct points on a non-vertical line in the coordinate plane; derive the equation y = mx for a line through the origin and the equation y = mx + b for a line intercepting the vertical axis at b.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.B.5",
+      "title": "Graph proportional relationships, interpreting the unit rate as the slope of ...",
+      "description": "Graph proportional relationships, interpreting the unit rate as the slope of the graph. Compare two different proportional relationships represented in different ways.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.B.5",
+          "description": "Graph proportional relationships, interpreting the unit rate as the slope of the graph. Compare two different proportional relationships represented in different ways.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.A.4",
+      "title": "Perform operations with numbers expressed in scientific notation, including p...",
+      "description": "Perform operations with numbers expressed in scientific notation, including problems where both decimal and scientific notation are used. Use scientific notation and choose units of appropriate size for measurements of very large or very small quantities (e.g., use millimeters per year for seafloor spreading). Interpret scientific notation that has been generated by technology.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "measurement",
+        "reading",
+        "scientific"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.A.4",
+          "description": "Perform operations with numbers expressed in scientific notation, including problems where both decimal and scientific notation are used. Use scientific notation and choose units of appropriate size for measurements of very large or very small quantities (e.g., use millimeters per year for seafloor spreading). Interpret scientific notation that has been generated by technology.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.A.3",
+      "title": "Use numbers expressed in the form of a single digit times an integer power of...",
+      "description": "Use numbers expressed in the form of a single digit times an integer power of 10 to estimate very large or very small quantities, and to express how many times as much one is than the other.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.A.3",
+          "description": "Use numbers expressed in the form of a single digit times an integer power of 10 to estimate very large or very small quantities, and to express how many times as much one is than the other.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.A.2",
+      "title": "Use square root and cube root symbols to represent solutions to equations of ...",
+      "description": "Use square root and cube root symbols to represent solutions to equations of the form x² = p and x³ = p, where p is a positive rational number. Evaluate square roots of small perfect squares and cube roots of small perfect cubes. Know that √2 is irrational.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.A.2",
+          "description": "Use square root and cube root symbols to represent solutions to equations of the form x² = p and x³ = p, where p is a positive rational number. Evaluate square roots of small perfect squares and cube roots of small perfect cubes. Know that √2 is irrational.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.EE.A.1",
+      "title": "Know and apply the properties of integer exponents to generate equivalent num...",
+      "description": "Know and apply the properties of integer exponents to generate equivalent numerical expressions.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Expressions and Equations",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.EE.A.1",
+          "description": "Know and apply the properties of integer exponents to generate equivalent numerical expressions.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.NS.A.2",
+      "title": "Use rational approximations of irrational numbers to compare the size of irra...",
+      "description": "Use rational approximations of irrational numbers to compare the size of irrational numbers, locate them approximately on a number line diagram, and estimate the value of expressions (e.g., π²).",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.NS.A.2",
+          "description": "Use rational approximations of irrational numbers to compare the size of irrational numbers, locate them approximately on a number line diagram, and estimate the value of expressions (e.g., π²).",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.NS.A.1",
+      "title": "Know that numbers that are not rational are called irrational",
+      "description": "Know that numbers that are not rational are called irrational. Understand informally that every number has a decimal expansion; for rational numbers show that the decimal expansion repeats eventually, and convert a decimal expansion which repeats eventually into a rational number.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "The Number System",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.NS.A.1",
+          "description": "Know that numbers that are not rational are called irrational. Understand informally that every number has a decimal expansion; for rational numbers show that the decimal expansion repeats eventually, and convert a decimal expansion which repeats eventually into a rational number.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.C.9",
+      "title": "Know the formulas for the volumes of cones, cylinders, and spheres and use th...",
+      "description": "Know the formulas for the volumes of cones, cylinders, and spheres and use them to solve real-world and mathematical problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "volume"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.C.9",
+          "description": "Know the formulas for the volumes of cones, cylinders, and spheres and use them to solve real-world and mathematical problems.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.B.8",
+      "title": "Apply the Pythagorean Theorem to find the distance between two points in a co...",
+      "description": "Apply the Pythagorean Theorem to find the distance between two points in a coordinate system.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "theorem"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.B.8",
+          "description": "Apply the Pythagorean Theorem to find the distance between two points in a coordinate system.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.B.7",
+      "title": "Apply the Pythagorean Theorem to determine unknown side lengths in right tria...",
+      "description": "Apply the Pythagorean Theorem to determine unknown side lengths in right triangles in real-world and mathematical problems in two and three dimensions.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles",
+        "theorem"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.B.7",
+          "description": "Apply the Pythagorean Theorem to determine unknown side lengths in right triangles in real-world and mathematical problems in two and three dimensions.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.B.6",
+      "title": "Explain a proof of the Pythagorean Theorem and its converse",
+      "description": "Explain a proof of the Pythagorean Theorem and its converse.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "proof",
+        "theorem"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.B.6",
+          "description": "Explain a proof of the Pythagorean Theorem and its converse.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.A.5",
+      "title": "Use informal arguments to establish facts about the angle sum and exterior an...",
+      "description": "Use informal arguments to establish facts about the angle sum and exterior angle of triangles, about the angles created when parallel lines are cut by a transversal, and the angle-angle criterion for similarity of triangles.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles",
+        "similarity",
+        "argument"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.A.5",
+          "description": "Use informal arguments to establish facts about the angle sum and exterior angle of triangles, about the angles created when parallel lines are cut by a transversal, and the angle-angle criterion for similarity of triangles.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.A.4",
+      "title": "Understand that a two-dimensional figure is similar to another if the second ...",
+      "description": "Understand that a two-dimensional figure is similar to another if the second can be obtained from the first by a sequence of rotations, reflections, translations, and dilations; given two similar two-dimensional figures, describe a sequence that exhibits the similarity between them.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "similarity"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.A.4",
+          "description": "Understand that a two-dimensional figure is similar to another if the second can be obtained from the first by a sequence of rotations, reflections, translations, and dilations; given two similar two-dimensional figures, describe a sequence that exhibits the similarity between them.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.A.3",
+      "title": "Describe the effect of dilations, translations, rotations, and reflections on...",
+      "description": "Describe the effect of dilations, translations, rotations, and reflections on two-dimensional figures using coordinates.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "coordinates"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.A.3",
+          "description": "Describe the effect of dilations, translations, rotations, and reflections on two-dimensional figures using coordinates.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.A.2",
+      "title": "Understand that a two-dimensional figure is congruent to another if the secon...",
+      "description": "Understand that a two-dimensional figure is congruent to another if the second can be obtained from the first by a sequence of rotations, reflections, and translations; given two congruent figures, describe a sequence that exhibits the congruence between them.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "congruence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.A.2",
+          "description": "Understand that a two-dimensional figure is congruent to another if the second can be obtained from the first by a sequence of rotations, reflections, and translations; given two congruent figures, describe a sequence that exhibits the congruence between them.",
+          "grade_level": "Grade8"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.8.G.A.1",
+      "title": "Verify experimentally the properties of rotations, reflections, and translati...",
+      "description": "Verify experimentally the properties of rotations, reflections, and translations:",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "experiment"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.8.G.A.1",
+          "description": "Verify experimentally the properties of rotations, reflections, and translations:",
+          "grade_level": "Grade8"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.8.F.A.1",
+      "to": "CCSS.Math.Content.8.F.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.F.A.1 is a prerequisite for CCSS.Math.Content.8.F.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.F.A.2",
+      "to": "CCSS.Math.Content.8.F.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.F.A.2 is a prerequisite for CCSS.Math.Content.8.F.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.F.A.3",
+      "to": "CCSS.Math.Content.8.F.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.F.A.3 is a prerequisite for CCSS.Math.Content.8.F.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.F.B.4",
+      "to": "CCSS.Math.Content.8.F.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.F.B.4 is a prerequisite for CCSS.Math.Content.8.F.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.A.1",
+      "to": "CCSS.Math.Content.8.EE.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.A.1 is a prerequisite for CCSS.Math.Content.8.EE.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.A.2",
+      "to": "CCSS.Math.Content.8.EE.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.A.2 is a prerequisite for CCSS.Math.Content.8.EE.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.A.3",
+      "to": "CCSS.Math.Content.8.EE.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.A.3 is a prerequisite for CCSS.Math.Content.8.EE.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.A.4",
+      "to": "CCSS.Math.Content.8.EE.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.A.4 is a prerequisite for CCSS.Math.Content.8.EE.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.B.5",
+      "to": "CCSS.Math.Content.8.EE.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.B.5 is a prerequisite for CCSS.Math.Content.8.EE.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.B.6",
+      "to": "CCSS.Math.Content.8.EE.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.B.6 is a prerequisite for CCSS.Math.Content.8.EE.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.EE.C.7",
+      "to": "CCSS.Math.Content.8.EE.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.EE.C.7 is a prerequisite for CCSS.Math.Content.8.EE.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.A.1",
+      "to": "CCSS.Math.Content.8.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.A.1 is a prerequisite for CCSS.Math.Content.8.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.A.2",
+      "to": "CCSS.Math.Content.8.G.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.A.2 is a prerequisite for CCSS.Math.Content.8.G.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.A.3",
+      "to": "CCSS.Math.Content.8.G.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.A.3 is a prerequisite for CCSS.Math.Content.8.G.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.A.4",
+      "to": "CCSS.Math.Content.8.G.A.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.A.4 is a prerequisite for CCSS.Math.Content.8.G.A.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.A.5",
+      "to": "CCSS.Math.Content.8.G.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.A.5 is a prerequisite for CCSS.Math.Content.8.G.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.B.6",
+      "to": "CCSS.Math.Content.8.G.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.B.6 is a prerequisite for CCSS.Math.Content.8.G.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.B.7",
+      "to": "CCSS.Math.Content.8.G.B.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.B.7 is a prerequisite for CCSS.Math.Content.8.G.B.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.G.B.8",
+      "to": "CCSS.Math.Content.8.G.C.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.G.B.8 is a prerequisite for CCSS.Math.Content.8.G.C.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.NS.A.1",
+      "to": "CCSS.Math.Content.8.NS.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.NS.A.1 is a prerequisite for CCSS.Math.Content.8.NS.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.SP.A.1",
+      "to": "CCSS.Math.Content.8.SP.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.SP.A.1 is a prerequisite for CCSS.Math.Content.8.SP.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.SP.A.2",
+      "to": "CCSS.Math.Content.8.SP.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.SP.A.2 is a prerequisite for CCSS.Math.Content.8.SP.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.8.SP.A.3",
+      "to": "CCSS.Math.Content.8.SP.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.8.SP.A.3 is a prerequisite for CCSS.Math.Content.8.SP.A.4 within the same domain."
+    }
+  ]
+}

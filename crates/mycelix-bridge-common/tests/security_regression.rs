@@ -28,6 +28,10 @@ const BASE_US: u64 = 1_767_225_600_000_000;
 /// One hour in microseconds.
 const HOUR_US: u64 = 3_600_000_000;
 
+/// Clock skew tolerance: 15 minutes in microseconds.
+/// Must match CLOCK_SKEW_TOLERANCE_US in offline_credential.rs.
+const TOLERANCE_US: u64 = 900 * 1_000_000;
+
 /// 24 hours in microseconds.
 const DAY_US: u64 = 86_400_000_000;
 
@@ -150,16 +154,16 @@ fn test_future_timestamp_beyond_tolerance_degrades_tier() {
     );
 }
 
-/// A reference time within the +-1 hour clock skew tolerance should not
+/// A reference time within the 15-minute clock skew tolerance should not
 /// trigger degradation. This accommodates NTP drift during loadshedding
 /// recovery in South Africa.
 #[test]
 fn test_future_timestamp_within_tolerance_safe() {
     let cred = make_credential(ConsciousnessTier::Guardian, BASE_US);
     let mut offline = OfflineCredential::new(cred);
-    // Set last_online_verification 30 minutes ahead — within tolerance
+    // Set last_online_verification 10 minutes ahead — within 15-min tolerance
     let now = BASE_US + DAY_US / 2;
-    offline.last_online_verification = now + 30 * 60 * 1_000_000;
+    offline.last_online_verification = now + 10 * 60 * 1_000_000;
 
     let tier = offline.effective_tier(now);
     assert_eq!(
@@ -169,7 +173,7 @@ fn test_future_timestamp_within_tolerance_safe() {
     );
 }
 
-/// Test the exact boundary of the 1-hour clock skew tolerance.
+/// Test the exact boundary of the 15-minute clock skew tolerance.
 /// At exactly tolerance, the credential should still be safe (tolerance is
 /// checked as > not >=). One microsecond beyond should degrade.
 #[test]
@@ -179,7 +183,7 @@ fn test_clock_skew_tolerance_boundary() {
 
     // Exactly at tolerance boundary (reference_time == now + TOLERANCE)
     let mut offline_at = OfflineCredential::new(cred.clone());
-    offline_at.last_online_verification = now + HOUR_US;
+    offline_at.last_online_verification = now + TOLERANCE_US;
     let tier_at = offline_at.effective_tier(now);
     assert_eq!(
         tier_at,
@@ -189,7 +193,7 @@ fn test_clock_skew_tolerance_boundary() {
 
     // One microsecond beyond tolerance
     let mut offline_beyond = OfflineCredential::new(cred);
-    offline_beyond.last_online_verification = now + HOUR_US + 1;
+    offline_beyond.last_online_verification = now + TOLERANCE_US + 1;
     let tier_beyond = offline_beyond.effective_tier(now);
     assert_eq!(
         tier_beyond,

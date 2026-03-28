@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ML-DSA (Dilithium) signer/verifier using pqcrypto-dilithium.
 //!
 //! Supports ML-DSA-65 (Dilithium3, NIST Level 3) and ML-DSA-87 (Dilithium5, NIST Level 5).

@@ -113,6 +113,7 @@ impl CognitiveLoopService {
             && self.stats.total_cycles > 0
         {
             let top_eps = self
+                .memory
                 .episodic_persistence
                 .replay
                 .as_ref()
@@ -362,7 +363,7 @@ impl CognitiveLoopService {
                 current_phi,
                 self.stats.total_cycles as u64,
                 prediction_error,
-                self.behavior.emotion_contagion.smoothed_valence(),
+                self.unification_engine.emotional.state().valence as f32,
                 coherence_summary.coherence,
             )
             .with_dopamine(self.neuromod.bath.dopamine.effective())
@@ -672,6 +673,7 @@ impl CognitiveLoopService {
 
             if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 let graduated = self
+                    .memory
                     .memory_consol
                     .memory_coordinator
                     .process_graduations(replay);
@@ -696,6 +698,7 @@ impl CognitiveLoopService {
             use std::sync::atomic::Ordering;
 
             if !self
+                .memory
                 .episodic_persistence
                 .flush_in_progress
                 .load(Ordering::Relaxed)

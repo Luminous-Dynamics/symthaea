@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Credential Integrity Zome
 //!
 //! Defines entry types and validation rules for W3C Verifiable Credentials.
@@ -105,8 +108,120 @@ pub struct VerifiableCredential {
     pub epistemic_materiality: Option<u8>,
 }
 
+// =============================================================================
+// Assessment Entry Types
+// =============================================================================
+
+/// Assessment definition (created by teacher)
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Assessment {
+    /// Knowledge node this assesses
+    pub node_hash: ActionHash,
+    /// Type of assessment
+    pub assessment_type: AssessmentType,
+    /// Title
+    pub title: String,
+    /// Instructions
+    pub instructions: Option<String>,
+    /// Maximum score
+    pub max_score: u32,
+    /// Passing score
+    pub passing_score: u32,
+    /// Rubric criteria
+    pub rubric: Vec<RubricCriterion>,
+    /// Bloom's level being assessed
+    pub bloom_level: Option<String>,
+    /// Time limit in minutes (None = untimed)
+    pub time_limit_minutes: Option<u32>,
+    /// Creator
+    pub creator: AgentPubKey,
+    /// Creation timestamp
+    pub created_at: i64,
+}
+
+/// Types of assessment
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AssessmentType {
+    Quiz,
+    UnitTest,
+    Project,
+    Portfolio,
+    Observation,
+    Performance,
+    SelfAssessment,
+}
+
+impl Default for AssessmentType {
+    fn default() -> Self {
+        AssessmentType::Quiz
+    }
+}
+
+/// Rubric criterion for assessment
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RubricCriterion {
+    pub name: String,
+    pub description: String,
+    pub max_points: u32,
+    pub levels: Vec<RubricLevel>,
+}
+
+/// Performance level within a rubric criterion
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RubricLevel {
+    /// Label e.g. "Exceeds", "Meets", "Approaching", "Beginning"
+    pub label: String,
+    pub points: u32,
+    pub description: String,
+}
+
+/// Student's result on an assessment
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct StudentResult {
+    pub assessment_hash: ActionHash,
+    pub student: AgentPubKey,
+    pub score: u32,
+    pub rubric_scores: Vec<u32>,
+    pub attempt_number: u32,
+    pub reasoning_trace: Option<String>,
+    pub consciousness_level_permille: Option<u16>,
+    pub feedback: Option<String>,
+    pub graded_by: Option<AgentPubKey>,
+    pub completed_at: i64,
+}
+
+/// Report card for a student in a period
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq, Eq)]
+pub struct ReportCard {
+    pub student: AgentPubKey,
+    pub classroom_hash: Option<ActionHash>,
+    pub period: String,
+    pub subject_grades: Vec<SubjectGrade>,
+    pub total_mastery_permille: u16,
+    pub attendance_days: u32,
+    pub absence_days: u32,
+    pub teacher_narrative: Option<String>,
+    pub generated_at: i64,
+}
+
+/// Grade for a subject
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubjectGrade {
+    pub subject: String,
+    /// Grade band e.g. "A", "B", "C", "D", "F" or "4", "3", "2", "1"
+    pub grade_band: String,
+    pub mastery_permille: u16,
+    pub standards_met: u32,
+    pub standards_total: u32,
+}
+
+// =============================================================================
 // Helper structs for coordinator zome (not HDI entry types)
 // These are used for input/output but not stored directly
+// =============================================================================
 
 /// Subject of the credential (learner's achievement)
 /// Used by coordinator zome for construction/parsing
@@ -149,6 +264,12 @@ pub struct Proof {
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     VerifiableCredential(VerifiableCredential),
+    #[entry_type(required_validations = 3, visibility = "public")]
+    Assessment(Assessment),
+    #[entry_type(required_validations = 1, visibility = "private")]
+    StudentResult(StudentResult),
+    #[entry_type(required_validations = 1, visibility = "private")]
+    ReportCard(ReportCard),
 }
 
 /// All link types for this integrity zome
@@ -160,6 +281,14 @@ pub enum LinkTypes {
     CourseToCredentials,
     /// Links from issuer to credentials they issued
     IssuerToCredentials,
+    /// Node -> Assessments for that node
+    NodeToAssessments,
+    /// Student -> Their assessment results
+    StudentToResults,
+    /// Student -> Their report cards
+    StudentToReportCards,
+    /// Assessment -> Student results
+    AssessmentToResults,
 }
 
 /// Validation function for VerifiableCredential entries
@@ -205,9 +334,9 @@ pub fn validate_verifiable_credential(
 
     // Validate score if present
     if let Some(score) = credential.score {
-        if score < 0.0 || score > 100.0 {
+        if !score.is_finite() || score < 0.0 || score > 100.0 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Score must be between 0 and 100".to_string(),
+                "Score must be a finite number between 0 and 100".to_string(),
             ));
         }
     }
@@ -284,6 +413,92 @@ pub fn validate_verifiable_credential(
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Validation function for Assessment entries
+pub fn validate_assessment(assessment: &Assessment) -> ExternResult<ValidateCallbackResult> {
+    if assessment.title.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Assessment title cannot be empty".to_string(),
+        ));
+    }
+    if assessment.title.len() > 200 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Assessment title too long (max 200)".to_string(),
+        ));
+    }
+    if assessment.passing_score > assessment.max_score {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Passing score cannot exceed max score".to_string(),
+        ));
+    }
+    if assessment.rubric.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many rubric criteria (max 20)".to_string(),
+        ));
+    }
+    for criterion in &assessment.rubric {
+        if criterion.name.len() > 100 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Rubric criterion name too long (max 100)".to_string(),
+            ));
+        }
+        if criterion.levels.len() > 10 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Too many rubric levels (max 10)".to_string(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validation function for StudentResult entries
+pub fn validate_student_result(result: &StudentResult) -> ExternResult<ValidateCallbackResult> {
+    if result.attempt_number == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Attempt number must be at least 1".to_string(),
+        ));
+    }
+    if let Some(cl) = result.consciousness_level_permille {
+        if cl > 1000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Consciousness level permille must be 0-1000".to_string(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validation function for ReportCard entries
+pub fn validate_report_card(card: &ReportCard) -> ExternResult<ValidateCallbackResult> {
+    if card.period.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Report card period cannot be empty".to_string(),
+        ));
+    }
+    if card.total_mastery_permille > 1000 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total mastery permille must be 0-1000".to_string(),
+        ));
+    }
+    for grade in &card.subject_grades {
+        if grade.subject.is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Subject name cannot be empty".to_string(),
+            ));
+        }
+        if grade.mastery_permille > 1000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Subject mastery permille must be 0-1000".to_string(),
+            ));
+        }
+        if grade.standards_met > grade.standards_total {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Standards met cannot exceed standards total".to_string(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 /// Main validation dispatcher
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
@@ -298,6 +513,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )? {
                     Some(EntryTypes::VerifiableCredential(credential)) => {
                         validate_verifiable_credential(credential)
+                    }
+                    Some(EntryTypes::Assessment(assessment)) => {
+                        validate_assessment(&assessment)
+                    }
+                    Some(EntryTypes::StudentResult(result)) => {
+                        validate_student_result(&result)
+                    }
+                    Some(EntryTypes::ReportCard(card)) => {
+                        validate_report_card(&card)
                     }
                     None => Ok(ValidateCallbackResult::Valid),
                 }

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Climate Integration
  *
@@ -311,6 +314,155 @@ export class ClimateService {
       .filter((c) => c.status === 'retired' && c.unit === 'tCO2e')
       .reduce((sum, c) => sum + c.amount, 0);
   }
+}
+
+// ============================================================================
+// Bridge Client (Holochain Zome Calls)
+// ============================================================================
+
+import { type MycelixClient } from '../../client/index.js';
+
+const CLIMATE_ROLE = 'climate';
+
+/**
+ * ClimateBridgeClient - Direct Holochain zome calls for climate operations
+ *
+ * Provides the same capabilities as ClimateService but backed by the
+ * Holochain conductor instead of in-memory Maps.
+ */
+export class ClimateBridgeClient {
+  constructor(private client: MycelixClient) {}
+
+  // --- Projects zome ---
+
+  async registerProject(input: Omit<ClimateProject, 'verified' | 'registeredAt'>): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'projects',
+      fn_name: 'create_climate_project',
+      payload: input,
+    });
+  }
+
+  async getProject(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'projects',
+      fn_name: 'get_climate_project',
+      payload: actionHash,
+    });
+  }
+
+  async getAllProjects(): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'projects',
+      fn_name: 'get_all_projects',
+      payload: null,
+    });
+  }
+
+  async verifyProject(projectHash: Uint8Array, verifierDid: string): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'projects',
+      fn_name: 'verify_project',
+      payload: { project_hash: projectHash, verifier_did: verifierDid },
+    });
+  }
+
+  // --- Carbon zome ---
+
+  async createCarbonFootprint(input: {
+    entity_did: string;
+    period_start: number;
+    period_end: number;
+    scope1: number;
+    scope2: number;
+    scope3: number;
+    methodology: string;
+    verified_by?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'carbon',
+      fn_name: 'create_carbon_footprint',
+      payload: input,
+    });
+  }
+
+  async getFootprintsByEntity(entityDid: string): Promise<Record<string, unknown>[]> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'carbon',
+      fn_name: 'get_footprints_by_entity',
+      payload: entityDid,
+    });
+  }
+
+  async issueCredits(input: {
+    project_id: string;
+    amount: number;
+    unit: CreditUnit;
+    vintage?: number;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'carbon',
+      fn_name: 'issue_carbon_credits',
+      payload: input,
+    });
+  }
+
+  async retireCredits(input: {
+    batch_id: string;
+    retired_by: string;
+    reason?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'carbon',
+      fn_name: 'retire_carbon_credits',
+      payload: input,
+    });
+  }
+
+  // --- Bridge zome ---
+
+  async createClimateQuery(input: {
+    purpose: string;
+    requester_did: string;
+    target_id: string;
+    parameters?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'bridge',
+      fn_name: 'create_climate_query',
+      payload: input,
+    });
+  }
+
+  async getClimateQuery(actionHash: Uint8Array): Promise<Record<string, unknown> | null> {
+    return this.client.callZome({
+      role_name: CLIMATE_ROLE,
+      zome_name: 'bridge',
+      fn_name: 'get_climate_query',
+      payload: actionHash,
+    });
+  }
+}
+
+// Bridge client singleton
+let climateBridgeInstance: ClimateBridgeClient | null = null;
+
+export function getClimateBridgeClient(client: MycelixClient): ClimateBridgeClient {
+  if (!climateBridgeInstance) climateBridgeInstance = new ClimateBridgeClient(client);
+  return climateBridgeInstance;
+}
+
+export function resetClimateBridgeClient(): void {
+  climateBridgeInstance = null;
 }
 
 // ============================================================================

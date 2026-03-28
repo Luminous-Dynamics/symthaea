@@ -1,0 +1,50 @@
+{
+  "title": "Cross-Level Learning Pathway Bridge",
+  "description": "Bridges 4 curriculum documents across 3 academic levels.",
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "DS/SetsRelations",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Discrete Structures (Undergraduate)."
+    },
+    {
+      "from": "CCSS.Math.Content.5.OA.A.1",
+      "to": "AL/BasicAnalysis",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: Grade 5 (K-12) → CS2013: Algorithms and Complexity (Undergraduate)."
+    },
+    {
+      "from": "DS/ProofTechniques",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: CS2013: Discrete Structures (Undergraduate) → PhD in Mathematics (Doctoral)."
+    },
+    {
+      "from": "AL/Automata",
+      "to": "phd-math/coursework",
+      "edge_type": "LeadsTo",
+      "strength_permille": 600,
+      "rationale": "General bridge: CS2013: Algorithms and Complexity (Undergraduate) → PhD in Mathematics (Doctoral)."
+    }
+  ],
+  "statistics": {
+    "total_edges": 4,
+    "k12_to_undergrad": 2,
+    "undergrad_to_grad": 0,
+    "grad_to_phd": 2,
+    "levels_bridged": [
+      "Doctoral",
+      "Undergraduate",
+      "K-12"
+    ],
+    "subjects_bridged": [
+      "CS2013: Discrete Structures",
+      "CS2013: Algorithms and Complexity",
+      "Mathematics"
+    ]
+  }
+}

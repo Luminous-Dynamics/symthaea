@@ -362,10 +362,11 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
     let agent = agent_info()?.agent_initial_pubkey;
     Ok(BridgeHealth {
-        cluster: "music".to_string(),
-        agent: agent.to_string(),
-        zome_count: ALLOWED_ZOMES.len() as u32,
         healthy: true,
+        agent: agent.to_string(),
+        total_events: 0,
+        total_queries: 0,
+        domains: ALLOWED_ZOMES.iter().map(|z| z.to_string()).collect(),
     })
 }
 
@@ -430,16 +431,19 @@ pub fn cross_cluster_dispatch(input: CrossClusterInput) -> ExternResult<Dispatch
             success: true,
             response: Some(output.0),
             error: None,
+            error_code: None,
         }),
         ZomeCallResponse::NetworkError(err) => Ok(DispatchResult {
             success: false,
             response: None,
             error: Some(format!("Network error: {}", err)),
+            error_code: None,
         }),
         other => Ok(DispatchResult {
             success: false,
             response: None,
             error: Some(format!("Call failed: {:?}", other)),
+            error_code: None,
         }),
     }
 }

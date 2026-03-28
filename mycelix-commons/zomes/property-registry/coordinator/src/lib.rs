@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Property Registry Coordinator Zome
 use commons_types::batch::links_to_records;
 use hdk::prelude::*;
@@ -46,7 +49,7 @@ pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
     )?;
 
     // Link by location if available
-    if let Some(geo) = input.geolocation {
+    if let Some(ref geo) = input.geolocation {
         let geo_key = format!(
             "geo:{}:{}",
             (geo.latitude * 1000.0) as i64,
@@ -58,6 +61,11 @@ pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
             LinkTypes::LocationToProperty,
             (),
         )?;
+
+        // Geohash spatial index
+        let geo_hash = commons_types::geo::geohash_encode(geo.latitude, geo.longitude, 6);
+        let geo_anchor = anchor_hash(&format!("geo:{}", geo_hash))?;
+        create_link(geo_anchor, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
     }
 
     // Create initial title deed
@@ -677,6 +685,44 @@ pub fn verify_ownership(input: VerifyOwnershipInput) -> ExternResult<bool> {
 pub struct VerifyOwnershipInput {
     pub property_id: String,
     pub did: String,
+}
+
+/// Get properties near a given location using geohash-based proximity search.
+///
+/// Queries the geo-index anchors created by `register_property()` to find
+/// all properties within the geohash neighborhood (9 cells at precision 6,
+/// approximately 3.6km x 1.8km coverage).
+#[hdk_extern]
+pub fn get_nearby_properties(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+    let center_hash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
+    let mut all_cells = vec![center_hash.clone()];
+    all_cells.extend(commons_types::geo::geohash_neighbors(&center_hash));
+
+    let mut records = Vec::new();
+    for cell in &all_cells {
+        let anchor_str = format!("geo:{}", cell);
+        let anchor_entry = Anchor(anchor_str);
+        let anchor_hash = hash_entry(&anchor_entry)?;
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(anchor_hash, LinkTypes::GeoIndex)?,
+            GetStrategy::Local,
+        ) {
+            for link in links {
+                if let Ok(action_hash) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(action_hash, GetOptions::default())? {
+                        records.push(record);
+                    }
+                }
+            }
+        }
+    }
+
+    // Geohash precision 6 covers ~1.2km x 0.6km per cell.
+    // 9 cells (center + 8 neighbors) covers ~3.6km x 1.8km.
+    // For finer filtering, callers can deserialize entries and check haversine distance.
+    let _ = input.radius_km; // Available for future post-filtering
+
+    Ok(records)
 }
 
 #[cfg(test)]

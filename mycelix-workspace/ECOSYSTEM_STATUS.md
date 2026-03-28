@@ -238,8 +238,9 @@ All 37 integration modules have real implementations (types + classes + methods)
 5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 10 ready-to-build hApps have v0 manifest format.
 6. **Scope sprawl**: 24 hApps total, 12 with bundles, 10 scaffolded (ready to build), 2 REST APIs.
 7. ~~**SDK-TS bundle size**~~: Re-audited 2026-03-06. All 37 integration modules have real implementations (0 stubs). 22 are zome-connected (callZome), 15 are local-only (in-memory Map + LocalBridge). Total ~37,500 LOC.
-8. ~~**Cross-hApp bridges**~~: Unified hApp now has 8 roles (personal, identity, hearth, commons_land, commons_care, civic, attribution, finance). 6 new E2E tests for full 8-role mesh.
-9. **WASM builds pending**: 6 hApps (climate, mutualaid, consensus, music, food, transport) need `nix develop` + WASM compilation.
+8. ~~**Cross-hApp bridges**~~: Unified hApp expanded to 17 roles (added energy, knowledge, climate, edunet). `CrossClusterRole` expanded 8→16 variants. 36 cross-cluster routes registered (was 13). 102 route tests pass. Notification fanout, saga orchestrator, geo-spatial queries, reputation aggregator, participatory budgeting all wired.
+9. ~~**WASM builds pending**~~: Climate and music have happ.yaml + dna.yaml ready. Others (mutualaid, food, transport) are commons domain zomes — already built as part of commons DNA. Needs `nix develop` for `hc dna pack`.
+10. ~~**TS SDK local-only modules**~~: All 15 local-only modules now have BridgeClient classes for callZome access (alongside existing LocalBridge for offline-first mode).
 10. ~~**FL consciousness integration**~~: `ConsciousnessAwareByzantinePlugin` added 2026-02-15. Uses Phi scores for weight adjustment (boost/dampen/veto). 110 tests pass.
 11. ~~**Emergency domain status**~~: Promoted from "stub" to "complete". 6 zomes, ~12,700 LOC, cross-domain bridges validated.
 12. ~~**Health scope**~~: Reduced from 37 to 7 MVP zomes. 22 archived. 9 deferred (commented out).

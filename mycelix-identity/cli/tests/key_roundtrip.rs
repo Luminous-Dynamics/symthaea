@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Integration tests for CLI key file round-trip: keygen → write → read → sign → verify.
 //!
 //! These tests exercise the full file I/O pipeline using tempfiles,

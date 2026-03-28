@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Councils Integrity Zome
 //! Defines entry types and validation for nested governance councils
 //!
@@ -84,6 +87,10 @@ pub enum CouncilStatus {
     Suspended,
 }
 
+/// Default membership term: 365 days in microseconds.
+/// Members must be re-elected/renewed after this period.
+pub const DEFAULT_MEMBERSHIP_TERM_US: i64 = 365 * 24 * 3600 * 1_000_000;
+
 /// Membership in a council
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -108,6 +115,10 @@ pub struct CouncilMembership {
     pub joined_at: Timestamp,
     /// Last participation
     pub last_participation: Timestamp,
+    /// When this membership expires.
+    /// None = legacy entry (treated as joined_at + DEFAULT_MEMBERSHIP_TERM_US).
+    #[serde(default)]
+    pub expires_at: Option<Timestamp>,
 }
 
 /// Roles within a council
@@ -330,6 +341,122 @@ pub struct CouncilDecision {
     pub executed_at: Option<Timestamp>,
 }
 
+// ============================================================================
+// EMERGENCY COUNCIL LIMITS
+// Thermodynamic metaphor: Adiabatic isolation has a maximum duration —
+// the system must periodically equilibrate with the democratic thermal bath.
+// ============================================================================
+
+/// Maximum consecutive emergency sessions before mandatory cooldown.
+pub const MAX_CONSECUTIVE_EMERGENCY_SESSIONS: u32 = 3;
+
+/// Maximum duration of a single emergency session: 14 days in microseconds.
+pub const MAX_EMERGENCY_SESSION_DURATION_US: i64 = 14 * 24 * 3600 * 1_000_000;
+
+/// Mandatory cooldown after max consecutive sessions: 30 days in microseconds.
+pub const EMERGENCY_COOLDOWN_DURATION_US: i64 = 30 * 24 * 3600 * 1_000_000;
+
+/// Tracks an emergency council session for consecutive-session enforcement.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EmergencySession {
+    /// Unique session identifier
+    pub id: String,
+    /// Council ID this session belongs to
+    pub council_id: String,
+    /// Session number in the consecutive chain (1, 2, or 3)
+    pub session_number: u32,
+    /// When this session started
+    pub started_at: Timestamp,
+    /// When this session expires
+    pub expires_at: Timestamp,
+    /// Previous session ID (for chain verification)
+    pub preceding_session_id: Option<String>,
+    /// Session status
+    pub status: EmergencySessionStatus,
+}
+
+/// Status of an emergency session
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum EmergencySessionStatus {
+    /// Currently active
+    Active,
+    /// Expired naturally
+    Expired,
+    /// Extended to the next session (1→2 or 2→3)
+    ExtendedToNext,
+    /// Cooldown started (after session 3)
+    CooldownStarted,
+}
+
+/// Mandatory cooldown period after max consecutive emergency sessions.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EmergencyCooldown {
+    /// Unique cooldown identifier
+    pub id: String,
+    /// Council ID (or parent council scope)
+    pub council_id: String,
+    /// Last emergency session ID that triggered cooldown
+    pub last_session_id: String,
+    /// When cooldown started
+    pub cooldown_started: Timestamp,
+    /// When cooldown ends (started + 30 days)
+    pub cooldown_ends: Timestamp,
+    /// Whether a non-emergency council approved early renewal
+    pub override_approved: bool,
+}
+
+/// Check emergency session creation invariants
+pub fn check_create_emergency_session(session: &EmergencySession) -> Result<(), String> {
+    if session.council_id.is_empty() {
+        return Err("Council ID cannot be empty".into());
+    }
+    if session.session_number == 0 || session.session_number > MAX_CONSECUTIVE_EMERGENCY_SESSIONS {
+        return Err(format!(
+            "Session number must be 1-{}, got {}",
+            MAX_CONSECUTIVE_EMERGENCY_SESSIONS, session.session_number
+        ));
+    }
+    if session.session_number > 1 && session.preceding_session_id.is_none() {
+        return Err("Sessions 2+ must reference the preceding session".into());
+    }
+    if session.session_number == 1 && session.preceding_session_id.is_some() {
+        return Err("Session 1 must not have a preceding session".into());
+    }
+    // Verify duration doesn't exceed maximum
+    let duration_us = session.expires_at.as_micros() as i64 - session.started_at.as_micros() as i64;
+    if duration_us > MAX_EMERGENCY_SESSION_DURATION_US {
+        return Err(format!(
+            "Emergency session duration exceeds maximum of 14 days ({} us > {} us)",
+            duration_us, MAX_EMERGENCY_SESSION_DURATION_US
+        ));
+    }
+    if duration_us <= 0 {
+        return Err("Emergency session must have positive duration".into());
+    }
+    Ok(())
+}
+
+/// Check cooldown creation invariants
+pub fn check_create_emergency_cooldown(cooldown: &EmergencyCooldown) -> Result<(), String> {
+    if cooldown.council_id.is_empty() {
+        return Err("Council ID cannot be empty".into());
+    }
+    if cooldown.last_session_id.is_empty() {
+        return Err("Last session ID cannot be empty".into());
+    }
+    let duration_us =
+        cooldown.cooldown_ends.as_micros() as i64 - cooldown.cooldown_started.as_micros() as i64;
+    if duration_us < EMERGENCY_COOLDOWN_DURATION_US {
+        return Err(format!(
+            "Cooldown must be at least 30 days ({} us < {} us)",
+            duration_us, EMERGENCY_COOLDOWN_DURATION_US
+        ));
+    }
+    Ok(())
+}
+
 /// Types of council decisions
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum DecisionType {
@@ -370,6 +497,8 @@ pub enum EntryTypes {
     CouncilMembership(CouncilMembership),
     HolonicReflection(HolonicReflection),
     CouncilDecision(CouncilDecision),
+    EmergencySession(EmergencySession),
+    EmergencyCooldown(EmergencyCooldown),
 }
 
 #[hdk_link_types]
@@ -388,6 +517,10 @@ pub enum LinkTypes {
     CouncilToReflection,
     /// Council type anchor to councils
     TypeToCouncil,
+    /// Council to emergency sessions
+    CouncilToEmergencySession,
+    /// Council to emergency cooldown
+    CouncilToCooldown,
 }
 
 // ============================================================================
@@ -534,6 +667,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_create_reflection(action, reflection)
                 }
                 EntryTypes::CouncilDecision(decision) => validate_create_decision(action, decision),
+                EntryTypes::EmergencySession(session) => {
+                    match check_create_emergency_session(&session) {
+                        Ok(()) => Ok(ValidateCallbackResult::Valid),
+                        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
+                    }
+                }
+                EntryTypes::EmergencyCooldown(cooldown) => {
+                    match check_create_emergency_cooldown(&cooldown) {
+                        Ok(()) => Ok(ValidateCallbackResult::Valid),
+                        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
+                    }
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -550,6 +695,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::HolonicReflection(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::CouncilDecision(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::EmergencySession(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::EmergencyCooldown(_) => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -678,6 +825,7 @@ mod tests {
             status: MembershipStatus::Active,
             joined_at: ts(1000),
             last_participation: ts(2000),
+            expires_at: Some(ts(1000 + DEFAULT_MEMBERSHIP_TERM_US)),
         }
     }
 
@@ -848,6 +996,118 @@ mod tests {
         decision.phi_weighted_result = -0.1;
         let err = check_create_decision(&decision).unwrap_err();
         assert!(err.contains("Phi-weighted result must be between 0 and 1"));
+    }
+
+    // --- Emergency session tests ---
+
+    fn make_emergency_session() -> EmergencySession {
+        EmergencySession {
+            id: "es-1".into(),
+            council_id: "council-1".into(),
+            session_number: 1,
+            started_at: ts(1_000_000),
+            expires_at: ts(1_000_000 + 7 * 24 * 3600 * 1_000_000), // 7 days
+            preceding_session_id: None,
+            status: EmergencySessionStatus::Active,
+        }
+    }
+
+    #[test]
+    fn test_valid_emergency_session() {
+        assert!(check_create_emergency_session(&make_emergency_session()).is_ok());
+    }
+
+    #[test]
+    fn test_emergency_session_number_range() {
+        let mut es = make_emergency_session();
+        es.session_number = 0;
+        assert!(check_create_emergency_session(&es)
+            .unwrap_err()
+            .contains("Session number must be 1-3"));
+
+        es.session_number = 4;
+        assert!(check_create_emergency_session(&es)
+            .unwrap_err()
+            .contains("Session number must be 1-3"));
+    }
+
+    #[test]
+    fn test_emergency_session_preceding_chain() {
+        // Session 2 must have preceding
+        let mut es = make_emergency_session();
+        es.session_number = 2;
+        es.preceding_session_id = None;
+        assert!(check_create_emergency_session(&es)
+            .unwrap_err()
+            .contains("must reference the preceding"));
+
+        // Session 2 with preceding is OK
+        es.preceding_session_id = Some("es-1".into());
+        assert!(check_create_emergency_session(&es).is_ok());
+
+        // Session 1 must NOT have preceding
+        let mut es1 = make_emergency_session();
+        es1.session_number = 1;
+        es1.preceding_session_id = Some("bogus".into());
+        assert!(check_create_emergency_session(&es1)
+            .unwrap_err()
+            .contains("must not have a preceding"));
+    }
+
+    #[test]
+    fn test_emergency_session_max_duration() {
+        let mut es = make_emergency_session();
+        // 15 days exceeds 14-day max
+        es.expires_at = ts(es.started_at.as_micros() as i64 + 15 * 24 * 3600 * 1_000_000);
+        assert!(check_create_emergency_session(&es)
+            .unwrap_err()
+            .contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn test_emergency_cooldown_duration() {
+        let cooldown = EmergencyCooldown {
+            id: "ec-1".into(),
+            council_id: "council-1".into(),
+            last_session_id: "es-3".into(),
+            cooldown_started: ts(1_000_000),
+            cooldown_ends: ts(1_000_000 + EMERGENCY_COOLDOWN_DURATION_US),
+            override_approved: false,
+        };
+        assert!(check_create_emergency_cooldown(&cooldown).is_ok());
+
+        // Too short cooldown rejected
+        let mut short = cooldown.clone();
+        short.cooldown_ends = ts(1_000_000 + 29 * 24 * 3600 * 1_000_000); // 29 days < 30
+        assert!(check_create_emergency_cooldown(&short)
+            .unwrap_err()
+            .contains("at least 30 days"));
+    }
+
+    #[test]
+    fn test_membership_term_is_365_days() {
+        assert_eq!(
+            DEFAULT_MEMBERSHIP_TERM_US,
+            365 * 24 * 3600 * 1_000_000_i64
+        );
+    }
+
+    #[test]
+    fn test_membership_expires_at_default() {
+        let m = make_membership();
+        assert!(m.expires_at.is_some());
+        let expected = ts(1000 + DEFAULT_MEMBERSHIP_TERM_US);
+        assert_eq!(m.expires_at.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_emergency_constants() {
+        assert_eq!(MAX_CONSECUTIVE_EMERGENCY_SESSIONS, 3);
+        assert_eq!(
+            MAX_EMERGENCY_SESSION_DURATION_US,
+            14 * 24 * 3600 * 1_000_000
+        );
+        assert_eq!(EMERGENCY_COOLDOWN_DURATION_US, 30 * 24 * 3600 * 1_000_000);
     }
 
     // --- Serde round-trip tests (verify TS SDK compatibility) ---

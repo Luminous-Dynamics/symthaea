@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Reputation-Based Byzantine Fault Tolerant consensus for Mycelix - 45% Byzantine tolerance"
 license = "MIT OR Apache-2.0"
+authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
 repository = "https://github.com/luminous-dynamics/mycelix"
+readme = "README.md"
 
 [features]
 default = ["std"]
@@ -17,7 +19,7 @@ threshold = ["frost-ed25519"]
 full-crypto = ["bls", "vrf", "pq", "threshold"]
 
 [dependencies]
-mycelix-core-types = { path = "../mycelix-core-types", features = ["serde"] }
+mycelix-core-types = { version = "0.1.0", path = "../mycelix-core-types", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # Error handling (standardized to 2.0 across workspace)

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /*!
 # Symthaea: Holographic Liquid Brain
 
@@ -469,6 +472,10 @@ pub use symthaea_flight as flight;
 // Humanoid: HDC-LTC + FEP Active Inference bipedal humanoid control (DMC benchmark)
 #[cfg(feature = "humanoid")]
 pub use symthaea_humanoid as humanoid;
+
+// Helicopter: HDC-LTC + FEP Active Inference SAR helicopter control
+#[cfg(feature = "helicopter")]
+pub use symthaea_helicopter as helicopter;
 
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Food Distribution Integrity Zome
 //! Entry types and validation for local food markets, listings, and orders.
 
@@ -100,6 +103,7 @@ pub enum LinkTypes {
     ProducerToListing,
     BuyerToOrder,
     ListingToOrder,
+    GeoIndex,
 }
 
 // ============================================================================
@@ -165,6 +169,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { action, .. } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
@@ -817,7 +822,8 @@ mod tests {
             | LinkTypes::MarketToListing
             | LinkTypes::ProducerToListing
             | LinkTypes::BuyerToOrder
-            | LinkTypes::ListingToOrder => 256,
+            | LinkTypes::ListingToOrder
+            | LinkTypes::GeoIndex => 256,
         };
         let name = match link_type {
             LinkTypes::AllMarkets => "AllMarkets",
@@ -825,6 +831,7 @@ mod tests {
             LinkTypes::ProducerToListing => "ProducerToListing",
             LinkTypes::BuyerToOrder => "BuyerToOrder",
             LinkTypes::ListingToOrder => "ListingToOrder",
+            LinkTypes::GeoIndex => "GeoIndex",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(format!(

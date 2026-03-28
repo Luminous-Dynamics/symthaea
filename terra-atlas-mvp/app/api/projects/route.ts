@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository rootexport const dynamic = 'force-dynamic';
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server'
 import logger from '@/lib/logger'
 import { ProjectsQuerySchema } from '@/lib/schemas/projects'

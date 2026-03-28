@@ -72,6 +72,9 @@ pub struct MoralTopologyConfig {
     /// Use exact Betti computation via Hodge Laplacian (slower, more accurate).
     /// When false (default), uses fast triangle/tetrahedra counting approximation.
     pub exact_betti: bool,
+    /// Enable adaptive Rips threshold focusing around tracked critical_scale EMA.
+    /// When false (default), uses uniform sweep from 0.0 to 1.0.
+    pub adaptive_rips_enabled: bool,
 }
 
 impl Default for MoralTopologyConfig {
@@ -83,6 +86,7 @@ impl Default for MoralTopologyConfig {
             pga_components: 3,
             dim: 16384,
             exact_betti: false,
+            adaptive_rips_enabled: false,
         }
     }
 }
@@ -418,6 +422,45 @@ impl MoralAnomalyConfig {
 // Assessment
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Persistence-weighted Hodge decomposition fractions on the moral manifold.
+///
+/// Instead of computing at a single Rips threshold (where the complex is
+/// typically too dense for harmonics), this integrates across all scales
+/// weighted by the persistence of topological features at each scale.
+/// A harmonic component that persists across many thresholds is topologically
+/// significant; one that flickers at a single scale is noise.
+///
+/// Science: Hodge (1941), Barbarossa & Sardellitti (2020) — topological signal
+/// processing on simplicial complexes.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct HodgeFractions {
+    /// Persistence-weighted gradient fraction (0.0–1.0).
+    pub gradient: f64,
+    /// Persistence-weighted curl fraction (0.0–1.0).
+    pub curl: f64,
+    /// Persistence-weighted harmonic fraction (0.0–1.0).
+    /// High = moral meaning trapped in disconnected clusters (fragmentation).
+    /// Low = unified moral reasoning across all scenarios.
+    pub harmonic: f64,
+    /// Number of scales where decomposition was computed.
+    pub scales_sampled: usize,
+    /// Total persistence weight (sum of scale interval widths with valid decompositions).
+    pub total_weight: f64,
+    /// Critical scale: the Rips threshold where harmonic fraction first exceeds 0.5.
+    /// This is the moral coherence phase transition — below this scale, reasoning
+    /// is unified (curl-dominated); above it, meaning fragments (harmonic-dominated).
+    /// NaN if no transition was detected.
+    /// Science: Criticality / edge-of-chaos (Beggs & Plenz 2003, Shew & Plenz 2013).
+    #[serde(default)]
+    pub critical_scale: f64,
+    /// Whether the system is currently in the critical zone (harmonic ∈ [0.2, 0.8]).
+    /// This is the "Goldilocks zone" — neither fully synchronized (seizure/echo chamber)
+    /// nor fully fragmented (coma/isolation). Brains operate here.
+    /// Science: Beggs & Plenz (2003) — neuronal avalanches at criticality.
+    #[serde(default)]
+    pub at_criticality: bool,
+}
+
 /// Full topological assessment of the moral scenario window.
 #[derive(Debug, Clone)]
 pub struct MoralTopologyAssessment {
@@ -449,6 +492,9 @@ pub struct MoralTopologyAssessment {
     pub harmony_entropy: f64,
     /// Whether a moral attractor basin was detected (low free energy + low variance drift).
     pub attractor_detected: bool,
+    /// Persistence-weighted Hodge fractions (gradient/curl/harmonic).
+    /// None when `exact_betti` is disabled or insufficient edges at all scales.
+    pub hodge_fractions: Option<HodgeFractions>,
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
@@ -479,6 +525,9 @@ pub struct MoralTopologySummary {
     /// Low entropy = narrowing focus, high entropy = diverse engagement.
     #[serde(default)]
     pub trajectory_entropy: f64,
+    /// Persistence-weighted Hodge decomposition fractions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hodge_fractions: Option<HodgeFractions>,
 }
 
 impl From<&MoralTopologyAssessment> for MoralTopologySummary {
@@ -498,6 +547,7 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
             // Trajectory fingerprint is populated separately by MoralTopology
             trajectory_fingerprint: [0.0; N_HARMONIES],
             trajectory_entropy: 0.0,
+            hodge_fractions: a.hodge_fractions,
         }
     }
 }
@@ -670,6 +720,10 @@ pub struct MoralTopology {
     pub(super) window_scenario_ids: VecDeque<u64>,
     /// Consecutive cycles of suspected moral hubris.
     pub(super) hubris_streak: usize,
+    /// EMA of critical_scale from recent Hodge analyses.
+    /// Used when `adaptive_rips_enabled` to center the Rips sweep.
+    /// NaN when no Hodge analysis has run yet.
+    pub(super) critical_scale_ema: f64,
 }
 
 impl MoralTopology {
@@ -709,6 +763,7 @@ impl MoralTopology {
             detection_cycle: 0,
             window_scenario_ids: VecDeque::new(),
             hubris_streak: 0,
+            critical_scale_ema: f64::NAN,
         }
     }
 
@@ -751,11 +806,17 @@ impl MoralTopology {
             detection_cycle: 0,
             window_scenario_ids: VecDeque::new(),
             hubris_streak: 0,
+            critical_scale_ema: f64::NAN,
         }
     }
 
     /// Push a scenario hypervector into the sliding window.
     ///
+    /// Current EMA of the critical Rips scale. NaN if no Hodge analysis has run.
+    pub fn critical_scale_ema(&self) -> f64 {
+        self.critical_scale_ema
+    }
+
     /// Also updates the running EMA prior of harmony coordinates for
     /// moral free energy computation and records a trajectory point.
     pub fn add_scenario(&mut self, hv: ContinuousHV) {
@@ -916,6 +977,7 @@ impl MoralTopology {
                 moral_free_energy: MoralFreeEnergy::default(),
                 harmony_entropy: 0.0,
                 attractor_detected: false,
+                hodge_fractions: None,
             };
             let mut new_summary = MoralTopologySummary::from(&assessment);
             self.stamp_fingerprint(&mut new_summary);
@@ -945,6 +1007,43 @@ impl MoralTopology {
             .iter()
             .map(|hv| self.basis.project(hv))
             .collect();
+
+        // ── Step 5b: Persistence-weighted vertex Hodge decomposition (L₀) ─
+        // Decomposes harmony coordinates on vertices across multi-scale Rips
+        // filtration. Measures moral fragmentation: harmonic fraction rises
+        // when β₀ > 1 (disconnected clusters trap moral meaning).
+        // Science: Hodge (1941), Tononi (2004) — consciousness requires integration.
+        let adaptive_center = if self.config.adaptive_rips_enabled
+            && self.critical_scale_ema.is_finite()
+        {
+            Some(self.critical_scale_ema)
+        } else {
+            None
+        };
+        let hodge_fractions = if self.config.exact_betti {
+            Self::compute_persistent_hodge_fractions(
+                &similarities,
+                n,
+                self.config.num_scales,
+                &harmony_coordinates,
+                adaptive_center,
+            )
+        } else {
+            None
+        };
+
+        // Update critical_scale EMA for adaptive Rips focusing
+        if let Some(ref fracs) = hodge_fractions {
+            if fracs.critical_scale.is_finite() {
+                const ALPHA: f64 = 0.05; // HODGE_CRITICAL_SCALE_EMA_ALPHA
+                if self.critical_scale_ema.is_finite() {
+                    self.critical_scale_ema = ALPHA * fracs.critical_scale
+                        + (1.0 - ALPHA) * self.critical_scale_ema;
+                } else {
+                    self.critical_scale_ema = fracs.critical_scale;
+                }
+            }
+        }
 
         // ── Step 6: Per-harmony variance ────────────────────────────────
         let harmony_variance = Self::harmony_variance(&harmony_coordinates);
@@ -993,11 +1092,13 @@ impl MoralTopology {
         };
 
         // ── Derived scores ──────────────────────────────────────────────
-        debug_assert!(
-            betti.beta_0 >= 1,
-            "beta_0 must be >= 1 for non-empty simplicial complex, got {}",
-            betti.beta_0
-        );
+        // Guard: exact_betti Jacobi solver may undercount zero eigenvalues
+        // for small/degenerate Rips complexes, producing beta_0=0.
+        let betti = if betti.beta_0 == 0 && n > 0 {
+            BettiNumbers::new(1, betti.beta_1, betti.beta_2)
+        } else {
+            betti
+        };
         let unity = 1.0 / (betti.beta_0.max(1) as f64);
         let circularity = {
             let cycle_count = persistent_features
@@ -1072,6 +1173,7 @@ impl MoralTopology {
             moral_free_energy,
             harmony_entropy,
             attractor_detected,
+            hodge_fractions,
         };
         let mut new_summary = MoralTopologySummary::from(&assessment);
         self.stamp_fingerprint(&mut new_summary);

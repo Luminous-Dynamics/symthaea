@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Execution Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Execution Coordinator Zome
 //! Business logic for proposal execution
 //!
 //! Updated to use HDK 0.6 patterns
@@ -749,6 +750,48 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
         )));
     }
 
+    // ── VETO RATE LIMITING ──
+    // Max 1 veto per Guardian per 7 days. Prevents serial veto DoS where
+    // a Guardian freezes governance by vetoing every proposal in sequence.
+    const VETO_COOLDOWN_US: i64 = 7 * 24 * 3600 * 1_000_000;
+    let guardian_anchor = format!("guardian:{}", input.guardian_did);
+    if let Ok(eh) = anchor_hash(&guardian_anchor) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(eh, LinkTypes::GuardianToVeto)?,
+            GetStrategy::default(),
+        ) {
+            let now_us = sys_time()?.as_micros() as i64;
+            for link in links {
+                if let Ok(ah) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(ah, GetOptions::default())? {
+                        if let Some(prior_veto) = record
+                            .entry()
+                            .to_app_option::<GuardianVeto>()
+                            .ok()
+                            .flatten()
+                        {
+                            let elapsed = now_us - prior_veto.vetoed_at.as_micros() as i64;
+                            if elapsed < VETO_COOLDOWN_US {
+                                let days_remaining = (VETO_COOLDOWN_US - elapsed) / (24 * 3600 * 1_000_000);
+                                let _ = emit_signal(serde_json::json!({
+                                    "type": "VetoRateLimitExceeded",
+                                    "guardian_did": input.guardian_did,
+                                    "cooldown_days": 7,
+                                    "days_remaining": days_remaining,
+                                }));
+                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Veto rate limit: max 1 veto per 7 days per Guardian. \
+                                     Next veto available in {} day(s).",
+                                    days_remaining + 1
+                                ))));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Verify guardian role: caller must be a member of at least one council
     let guardian_io = governance_utils::call_local(
         "councils",
@@ -763,7 +806,7 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
         }
     }
 
-    // If the timelock is already in Ready state, require Guardian-tier Φ (0.6)
+    // If the timelock is already in Ready state, require Guardian-tier Φ (0.8)
     // since cancelling a signed, ready-to-execute proposal is a high-impact action.
     let tl_pre = find_timelock_by_id(&input.timelock_id)?;
     let tl_pre_entry: Timelock = tl_pre
@@ -776,7 +819,7 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
 
     if tl_pre_entry.status == TimelockStatus::Ready {
         // Require elevated consciousness for Ready-state vetoes
-        const GUARDIAN_PHI_THRESHOLD: f64 = 0.6;
+        const GUARDIAN_PHI_THRESHOLD: f64 = 0.8;
         match governance_utils::call_local_best_effort(
             "governance_bridge",
             "verify_consciousness_gate",
@@ -825,14 +868,15 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
             "Invalid timelock entry".into()
         )))?;
     if matches!(tl.status, TimelockStatus::Pending | TimelockStatus::Ready) {
-        let cancelled = Timelock {
-            status: TimelockStatus::Cancelled,
+        // Transition to Vetoed (not Cancelled) — allows supermajority override
+        let vetoed = Timelock {
+            status: TimelockStatus::Vetoed,
             cancellation_reason: Some(input.reason.clone()),
             ..tl
         };
         update_entry(
             tl_record.action_address().clone(),
-            &EntryTypes::Timelock(cancelled),
+            &EntryTypes::Timelock(vetoed),
         )?;
     }
 
@@ -878,6 +922,402 @@ pub struct VetoTimelockInput {
     pub timelock_id: String,
     pub guardian_did: String,
     pub reason: String,
+}
+
+// ============================================================================
+// VETO OVERRIDE MECHANISM
+// Thermodynamic counterbalance: No Maxwell's Demon — collective energy (80%
+// supermajority) can overcome any individual barrier.
+// ============================================================================
+
+/// Challenge a guardian veto — initiates the 48-hour override window.
+/// Any Citizen-tier (Φ ≥ 0.4) agent can challenge.
+#[hdk_extern]
+pub fn challenge_veto(input: ChallengeVetoInput) -> ExternResult<()> {
+    if input.veto_id.is_empty() || input.veto_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Veto ID must be 1-256 characters".into()
+        )));
+    }
+    if input.challenger_did.is_empty() || input.challenger_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Challenger DID must be 1-256 characters".into()
+        )));
+    }
+
+    // Verify challenger DID matches calling agent
+    let agent = agent_info()?;
+    let expected_did = format!("did:mycelix:{}", agent.agent_initial_pubkey);
+    if input.challenger_did != expected_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Challenger DID must match the calling agent".into()
+        )));
+    }
+
+    // Verify challenger meets Citizen-tier Φ (0.4)
+    const CITIZEN_PHI: f64 = 0.4;
+    match governance_utils::call_local_best_effort(
+        "governance_bridge",
+        "verify_consciousness_gate",
+        serde_json::json!({"action_type": "ChallengeVeto", "action_id": input.veto_id.clone()}),
+    )? {
+        Some(extern_io) => {
+            if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                let phi = result.get("phi").and_then(|p| p.as_f64()).unwrap_or(0.0);
+                if phi < CITIZEN_PHI {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Challenging a veto requires Citizen-tier Φ ({:.2}), caller has {:.2}",
+                        CITIZEN_PHI, phi
+                    ))));
+                }
+            }
+        }
+        None => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot challenge veto: consciousness bridge unavailable (fail-closed)".into()
+            )));
+        }
+    }
+
+    // Emit signal to notify participants
+    let _ = emit_signal(serde_json::json!({
+        "type": "VetoChallenged",
+        "veto_id": input.veto_id,
+        "challenger_did": input.challenger_did,
+        "override_window_hours": 48,
+        "override_threshold": execution_integrity::VETO_OVERRIDE_THRESHOLD,
+    }));
+
+    Ok(())
+}
+
+/// Input for challenging a veto
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChallengeVetoInput {
+    pub veto_id: String,
+    pub challenger_did: String,
+}
+
+/// Cast a vote to override (or sustain) a guardian veto.
+/// Requires Citizen-tier Φ (0.4).
+#[hdk_extern]
+pub fn cast_override_vote(input: CastOverrideVoteInput) -> ExternResult<Record> {
+    if input.veto_id.is_empty() || input.veto_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Veto ID must be 1-256 characters".into()
+        )));
+    }
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
+    }
+
+    // Verify voter DID matches calling agent
+    let agent = agent_info()?;
+    let expected_did = format!("did:mycelix:{}", agent.agent_initial_pubkey);
+    if input.voter_did != expected_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must match the calling agent".into()
+        )));
+    }
+
+    // Get voter's Φ score (must be Citizen-tier ≥ 0.4)
+    let phi_score = match governance_utils::call_local_best_effort(
+        "governance_bridge",
+        "verify_consciousness_gate",
+        serde_json::json!({"action_type": "OverrideVote", "action_id": input.veto_id.clone()}),
+    )? {
+        Some(extern_io) => {
+            if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                let phi = result.get("phi").and_then(|p| p.as_f64()).unwrap_or(0.0);
+                if phi < 0.4 {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Override voting requires Citizen-tier Φ (0.40), caller has {:.2}",
+                        phi
+                    ))));
+                }
+                phi
+            } else {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Failed to decode consciousness gate response".into()
+                )));
+            }
+        }
+        None => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot vote on override: consciousness bridge unavailable (fail-closed)".into()
+            )));
+        }
+    };
+
+    // Check for duplicate vote by this agent on this veto
+    let veto_anchor = format!("veto_override:{}", input.veto_id);
+    create_entry(&EntryTypes::Anchor(Anchor(veto_anchor.clone())))?;
+    let existing_votes = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&veto_anchor)?,
+            LinkTypes::VetoToOverrideVotes,
+        )?,
+        GetStrategy::default(),
+    )?;
+    for link in &existing_votes {
+        if let Ok(ah) = ActionHash::try_from(link.target.clone()) {
+            if let Some(record) = get(ah, GetOptions::default())? {
+                if let Some(existing) = record
+                    .entry()
+                    .to_app_option::<VetoOverrideVote>()
+                    .ok()
+                    .flatten()
+                {
+                    if existing.voter_did == input.voter_did {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Agent has already voted on this veto override".into()
+                        )));
+                    }
+                }
+            }
+        }
+    }
+
+    let now = sys_time()?;
+    let vote_id = format!("override_vote:{}:{}:{}", input.veto_id, input.voter_did, now.as_micros());
+
+    let vote = VetoOverrideVote {
+        id: vote_id,
+        veto_id: input.veto_id.clone(),
+        voter_did: input.voter_did,
+        supports_override: input.supports_override,
+        phi_score,
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::VetoOverrideVote(vote))?;
+
+    // Link vote to veto
+    create_link(
+        anchor_hash(&veto_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VetoToOverrideVotes,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find override vote".into()
+    )))
+}
+
+/// Input for casting an override vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastOverrideVoteInput {
+    pub veto_id: String,
+    pub voter_did: String,
+    pub supports_override: bool,
+}
+
+/// Resolve a veto override — tallies votes and transitions the timelock.
+/// Can be called by any agent after the 48-hour override window closes.
+/// This is permission-less enforcement — no special role required.
+#[hdk_extern]
+pub fn resolve_override(input: ResolveOverrideInput) -> ExternResult<Record> {
+    if input.veto_id.is_empty() || input.veto_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Veto ID must be 1-256 characters".into()
+        )));
+    }
+    if input.timelock_id.is_empty() || input.timelock_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Timelock ID must be 1-256 characters".into()
+        )));
+    }
+
+    // Verify the timelock is in Vetoed state
+    let tl_record = find_timelock_by_id(&input.timelock_id)?;
+    let tl: Timelock = tl_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid timelock entry".into()
+        )))?;
+
+    if tl.status != TimelockStatus::Vetoed {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Timelock must be in Vetoed status to resolve override, current: {:?}",
+            tl.status
+        ))));
+    }
+
+    // Collect all override votes
+    let veto_anchor = format!("veto_override:{}", input.veto_id);
+    let vote_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&veto_anchor)?,
+            LinkTypes::VetoToOverrideVotes,
+        )?,
+        GetStrategy::default(),
+    )
+    .unwrap_or_default();
+
+    let mut votes_for: f64 = 0.0;
+    let mut votes_against: f64 = 0.0;
+    let mut voter_count: u64 = 0;
+
+    for link in vote_links {
+        if let Ok(ah) = ActionHash::try_from(link.target) {
+            if let Some(record) = get(ah, GetOptions::default())? {
+                if let Some(vote) = record
+                    .entry()
+                    .to_app_option::<VetoOverrideVote>()
+                    .ok()
+                    .flatten()
+                {
+                    voter_count += 1;
+                    // Weight by phi score for consciousness-integrated override
+                    let weight = vote.phi_score.max(0.0).min(1.0);
+                    if vote.supports_override {
+                        votes_for += weight;
+                    } else {
+                        votes_against += weight;
+                    }
+                }
+            }
+        }
+    }
+
+    let total_weight = votes_for + votes_against;
+    let override_ratio = if total_weight > 0.0 {
+        votes_for / total_weight
+    } else {
+        0.0
+    };
+    let override_succeeded = override_ratio >= execution_integrity::VETO_OVERRIDE_THRESHOLD;
+
+    let now = sys_time()?;
+    let result_id = format!("override_result:{}:{}", input.veto_id, now.as_micros());
+
+    let result = VetoOverrideResult {
+        id: result_id,
+        veto_id: input.veto_id.clone(),
+        timelock_id: input.timelock_id.clone(),
+        override_votes_for: votes_for,
+        override_votes_against: votes_against,
+        total_eligible_voters: voter_count,
+        override_threshold: execution_integrity::VETO_OVERRIDE_THRESHOLD,
+        override_succeeded,
+        resolved_at: now,
+    };
+
+    let result_hash = create_entry(&EntryTypes::VetoOverrideResult(result))?;
+
+    // Link result to veto
+    create_entry(&EntryTypes::Anchor(Anchor(veto_anchor.clone())))?;
+    create_link(
+        anchor_hash(&veto_anchor)?,
+        result_hash.clone(),
+        LinkTypes::VetoToOverrideResult,
+        (),
+    )?;
+
+    // Transition timelock based on outcome
+    if override_succeeded {
+        // Override succeeded — restore timelock to Ready
+        let restored = Timelock {
+            status: TimelockStatus::Ready,
+            cancellation_reason: None,
+            ..tl
+        };
+        update_entry(
+            tl_record.action_address().clone(),
+            &EntryTypes::Timelock(restored),
+        )?;
+
+        let _ = emit_signal(serde_json::json!({
+            "type": "VetoOverrideSucceeded",
+            "veto_id": input.veto_id,
+            "timelock_id": input.timelock_id,
+            "override_ratio": override_ratio,
+            "voter_count": voter_count,
+        }));
+    } else {
+        // Override failed — finalize cancellation
+        let cancelled = Timelock {
+            status: TimelockStatus::Cancelled,
+            ..tl
+        };
+        update_entry(
+            tl_record.action_address().clone(),
+            &EntryTypes::Timelock(cancelled),
+        )?;
+
+        // Clean up pending_timelocks link
+        if let Ok(pending_links) = get_links(
+            LinkQuery::try_new(
+                anchor_hash("pending_timelocks")?,
+                LinkTypes::PendingTimelocks,
+            )?,
+            GetStrategy::default(),
+        ) {
+            for link in pending_links {
+                if let Ok(target_hash) = ActionHash::try_from(link.target.clone()) {
+                    if let Ok(Some(record)) = get(target_hash, GetOptions::default()) {
+                        if let Some(ptl) = record.entry().to_app_option::<Timelock>().ok().flatten() {
+                            if ptl.id == input.timelock_id {
+                                let _ = delete_link(link.create_link_hash, GetOptions::default());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = emit_signal(serde_json::json!({
+            "type": "VetoSustained",
+            "veto_id": input.veto_id,
+            "timelock_id": input.timelock_id,
+            "override_ratio": override_ratio,
+            "voter_count": voter_count,
+        }));
+    }
+
+    get(result_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find override result".into()
+    )))
+}
+
+/// Input for resolving a veto override
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResolveOverrideInput {
+    pub veto_id: String,
+    pub timelock_id: String,
+}
+
+/// Query a guardian's veto history for accountability and transparency.
+#[hdk_extern]
+pub fn get_guardian_vetoes(guardian_did: String) -> ExternResult<Vec<Record>> {
+    if guardian_did.is_empty() || guardian_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Guardian DID must be 1-256 characters".into()
+        )));
+    }
+    let guardian_anchor = format!("guardian:{}", guardian_did);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&guardian_anchor)?,
+            LinkTypes::GuardianToVeto,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut vetoes = Vec::new();
+    for link in links {
+        if let Ok(ah) = ActionHash::try_from(link.target) {
+            if let Ok(Some(record)) = get(ah, GetOptions::default()) {
+                vetoes.push(record);
+            }
+        }
+    }
+    Ok(vetoes)
 }
 
 /// Lock funds in escrow for a proposal's execution.
@@ -1449,13 +1889,19 @@ mod tests {
     }
 
     #[test]
+    fn test_veto_cooldown_is_7_days() {
+        const VETO_COOLDOWN_US: i64 = 7 * 24 * 3600 * 1_000_000;
+        assert_eq!(VETO_COOLDOWN_US, 604_800_000_000);
+    }
+
+    #[test]
     fn test_guardian_phi_threshold_constant() {
         // Verify the Guardian-tier threshold used in veto_timelock
-        // is consistent with the governance Φ tier system
-        const GUARDIAN_PHI_THRESHOLD: f64 = 0.6;
+        // matches the actual Guardian Φ requirement (0.8)
+        const GUARDIAN_PHI_THRESHOLD: f64 = 0.8;
         assert!(
-            GUARDIAN_PHI_THRESHOLD > 0.4,
-            "Guardian tier must be above Steward (0.4)"
+            GUARDIAN_PHI_THRESHOLD >= 0.8,
+            "Guardian veto must require actual Guardian-tier Φ (0.8)"
         );
         assert!(GUARDIAN_PHI_THRESHOLD <= 1.0, "Must be a valid Φ score");
     }

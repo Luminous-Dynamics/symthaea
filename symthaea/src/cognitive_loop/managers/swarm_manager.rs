@@ -107,6 +107,13 @@ pub enum SwarmEvent {
         description: String,
     },
 
+    /// A peer's Markov blanket state update (Kirchhoff et al. 2018).
+    BlanketStateUpdate {
+        peer_id: String,
+        effective_permeability: f64,
+        coalescence_ready: bool,
+    },
+
     /// A time beacon received from a mesh peer (Sovereign Clock).
     TimeBeaconReceived {
         /// Source peer ID (8-byte prefix).
@@ -154,6 +161,19 @@ pub enum SwarmEvent {
         circularity_potential: f32,
         /// Classification confidence [0.0, 1.0].
         confidence: f32,
+    },
+
+    /// Embodiment distress signal from a peer.
+    ///
+    /// Triggered when: high prediction_error + energy depletion + safety degradation.
+    /// Basis: de Waal (2008) social alarm signals; Eisenberg (2000) empathic distress.
+    DistressSignal {
+        peer_id: String,
+        prediction_error: f32,
+        energy_depletion: f32,
+        safety_level: u8,
+        allostatic_load: f32,
+        consciousness_level: f32,
     },
 
     /// Space situational awareness alert from mycelix-space or ground network.
@@ -228,6 +248,10 @@ pub struct SwarmTelemetry {
     pub anomaly_count: u32,
     /// Number of peers that completed trust handshake verification.
     pub verified_peers: usize,
+    /// Number of active coalitions (Markov blanket merges, Friston 2013).
+    pub coalition_count: usize,
+    /// Number of conscious collectives (coalitions passing consciousness test).
+    pub conscious_collective_count: usize,
     /// Total space alerts received (monotonic counter).
     #[cfg(feature = "space-alerts")]
     pub space_alert_count: u32,
@@ -345,6 +369,15 @@ pub struct SwarmManager {
     #[cfg(feature = "circular")]
     waste_confidence_ema: f64,
 
+    // ── Markov blanket coalescence (Friston 2013) ─────────────────────
+    active_coalitions: Vec<crate::consciousness::fep_active_inference::SwarmCoalition>,
+    coalition_cycle_counter: u32,
+    peer_blanket_permeability: Vec<(String, f64)>,
+
+    // ── Distress tracking ──────────────────────────────────────────────
+    /// Number of distress signals received (monotonic).
+    distress_signals_received: u32,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
@@ -413,6 +446,10 @@ impl Default for SwarmManager {
             waste_events_processed: 0,
             #[cfg(feature = "circular")]
             waste_confidence_ema: 0.0,
+            distress_signals_received: 0,
+            active_coalitions: Vec::new(),
+            coalition_cycle_counter: 0,
+            peer_blanket_permeability: Vec::new(),
             last_telemetry: SwarmTelemetry::default(),
             #[cfg(feature = "fhe-wisdom")]
             wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool::new(),
@@ -613,6 +650,68 @@ impl SwarmManager {
         self.fhe_cycles_since_aggregation
     }
 
+    // ── Markov blanket coalescence API ──────────────────────────────────
+
+    const COALITION_INTERVAL: u32 = 10;
+    const COALITION_PERMEABILITY_THRESHOLD: f64 = 0.7;
+
+    pub fn identify_coalitions(&mut self) -> usize {
+        self.coalition_cycle_counter += 1;
+        if self.coalition_cycle_counter < Self::COALITION_INTERVAL {
+            return self.active_coalitions.len();
+        }
+        self.coalition_cycle_counter = 0;
+        if self.peer_phi.len() < 2 {
+            self.active_coalitions.clear();
+            return 0;
+        }
+        let n = self.peer_phi.len();
+        let mut edges = Vec::with_capacity(n * (n - 1) / 2);
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let peer_i_blanket = self
+                    .peer_blanket_permeability
+                    .iter()
+                    .find(|(id, _)| id == &self.peer_phi[i].0)
+                    .map(|(_, p)| *p);
+                let peer_j_blanket = self
+                    .peer_blanket_permeability
+                    .iter()
+                    .find(|(id, _)| id == &self.peer_phi[j].0)
+                    .map(|(_, p)| *p);
+                let permeability = match (peer_i_blanket, peer_j_blanket) {
+                    (Some(pi), Some(pj)) => pi.min(pj),
+                    (Some(pi), None) | (None, Some(pi)) => {
+                        let phi_proxy =
+                            (1.0 - (self.peer_phi[i].1 - self.peer_phi[j].1).abs()).max(0.0);
+                        (pi + phi_proxy) * 0.5
+                    }
+                    (None, None) => {
+                        (1.0 - (self.peer_phi[i].1 - self.peer_phi[j].1).abs()).max(0.0)
+                    }
+                };
+                edges.push((i, j, permeability));
+            }
+        }
+        self.active_coalitions = crate::consciousness::fep_active_inference::identify_coalitions(
+            &self.peer_phi,
+            &edges,
+            Self::COALITION_PERMEABILITY_THRESHOLD,
+        );
+        self.active_coalitions.len()
+    }
+
+    pub fn coalitions(&self) -> &[crate::consciousness::fep_active_inference::SwarmCoalition] {
+        &self.active_coalitions
+    }
+
+    pub fn conscious_collective_count(&self) -> usize {
+        self.active_coalitions
+            .iter()
+            .filter(|c| c.is_conscious_collective())
+            .count()
+    }
+
     // ── Internal helpers ────────────────────────────────────────────────
 
     fn drain_events(&mut self) {
@@ -761,6 +860,27 @@ impl SwarmManager {
                 // Sovereign Inoculation events — handled by dedicated managers.
                 SwarmEvent::TimeBeaconReceived { .. } | SwarmEvent::ContentAnnounced { .. } => {}
 
+                SwarmEvent::BlanketStateUpdate {
+                    peer_id,
+                    effective_permeability,
+                    ..
+                } => {
+                    let perm = if effective_permeability.is_finite() {
+                        effective_permeability.clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    if let Some(entry) = self
+                        .peer_blanket_permeability
+                        .iter_mut()
+                        .find(|(id, _)| id == &peer_id)
+                    {
+                        entry.1 = perm;
+                    } else if self.peer_blanket_permeability.len() < Self::MAX_TRACKED_PEERS {
+                        self.peer_blanket_permeability.push((peer_id, perm));
+                    }
+                }
+
                 // Space situational awareness alerts — modulate arousal/valence/confidence.
                 #[cfg(feature = "space-alerts")]
                 SwarmEvent::SpaceAlert {
@@ -809,23 +929,19 @@ impl SwarmManager {
                             // Debris → threat response (fight-or-flight analogue)
                             self.space_arousal_acc +=
                                 thresholds::SPACE_DEBRIS_AROUSAL * sev * urgency;
-                            self.space_valence_acc +=
-                                thresholds::SPACE_DEBRIS_VALENCE * sev;
-                            self.space_confidence_acc +=
-                                thresholds::SPACE_DEBRIS_CONFIDENCE * sev;
+                            self.space_valence_acc += thresholds::SPACE_DEBRIS_VALENCE * sev;
+                            self.space_confidence_acc += thresholds::SPACE_DEBRIS_CONFIDENCE * sev;
                         }
                         SpaceAlertType::CommWindow => {
                             // Communication window → opportunity, boost learning
-                            self.space_confidence_acc +=
-                                thresholds::SPACE_COMM_CONFIDENCE * conf;
+                            self.space_confidence_acc += thresholds::SPACE_COMM_CONFIDENCE * conf;
                             self.space_lr_acc +=
                                 thresholds::SPACE_COMM_LR_BOOST as f64 * conf as f64;
                         }
                         SpaceAlertType::OrbitalAnomaly => {
                             // Anomaly → suspicious, elevate vigilance
                             self.anomaly_streak = self.anomaly_streak.saturating_add(1);
-                            self.space_arousal_acc +=
-                                thresholds::SPACE_ANOMALY_AROUSAL * sev;
+                            self.space_arousal_acc += thresholds::SPACE_ANOMALY_AROUSAL * sev;
                         }
                         SpaceAlertType::ManeuverAnnounced => {
                             // Maneuver announced → neutral information update
@@ -843,7 +959,11 @@ impl SwarmManager {
                     confidence,
                     ..
                 } => {
-                    let qty = if quantity_kg.is_finite() { quantity_kg.max(0.0) } else { 0.0 };
+                    let qty = if quantity_kg.is_finite() {
+                        quantity_kg.max(0.0)
+                    } else {
+                        0.0
+                    };
                     let circ = if circularity_potential.is_finite() {
                         circularity_potential.clamp(0.0, 1.0)
                     } else {
@@ -860,8 +980,26 @@ impl SwarmManager {
                     let n = self.waste_events_processed as f32;
                     self.waste_mean_circularity += (circ - self.waste_mean_circularity) / n;
                     // Confidence EMA (alpha = 0.1)
-                    self.waste_confidence_ema =
-                        self.waste_confidence_ema * 0.9 + conf as f64 * 0.1;
+                    self.waste_confidence_ema = self.waste_confidence_ema * 0.9 + conf as f64 * 0.1;
+                }
+
+                SwarmEvent::DistressSignal {
+                    prediction_error, energy_depletion, safety_level,
+                    allostatic_load, consciousness_level, ..
+                } => {
+                    let pe = if prediction_error.is_finite() { prediction_error.clamp(0.0, 1.0) } else { 0.0 };
+                    let energy = if energy_depletion.is_finite() { energy_depletion.clamp(0.0, 1.0) } else { 0.0 };
+                    let load = if allostatic_load.is_finite() { allostatic_load.clamp(0.0, 1.0) } else { 0.0 };
+                    let severity = energy * 0.4 + load * 0.3 + pe * 0.2
+                        + (1.0 - consciousness_level.clamp(0.0, 1.0)) * 0.1;
+                    if safety_level >= 3 && energy > 0.9 {
+                        self.affective_arousal_acc += 0.15 * severity as f64;
+                        self.affective_valence_acc -= 0.1 * severity as f64;
+                    } else if safety_level >= 2 || energy > 0.7 {
+                        self.affective_arousal_acc += 0.05 * severity as f64;
+                        self.affective_valence_acc -= 0.05 * severity as f64;
+                    }
+                    self.distress_signals_received += 1;
                 }
             }
         }
@@ -914,6 +1052,8 @@ impl SwarmManager {
             federated_confidence: self.federated_confidence,
             anomaly_count: self.anomaly_streak,
             verified_peers: self.verified_peers,
+            coalition_count: self.active_coalitions.len(),
+            conscious_collective_count: self.conscious_collective_count(),
             #[cfg(feature = "space-alerts")]
             space_alert_count: self.space_alert_count,
             #[cfg(feature = "space-alerts")]
@@ -1020,7 +1160,15 @@ impl CognitiveSubsystem for SwarmManager {
             self.space_lr_acc = 0.0;
         }
 
-        // ── 9. Update telemetry ─────────────────────────────────────────
+        // ── 9. Coalition identification (Friston 2013) ──────────────────
+        self.identify_coalitions();
+        let conscious_count = self.conscious_collective_count();
+        if conscious_count > 0 {
+            output.confidence_delta +=
+                (conscious_count as f64 * 0.02).min(thresholds::SWARM_SOCIAL_BUFFERING_CAP);
+        }
+
+        // ── 10. Update telemetry ────────────────────────────────────────
         self.update_telemetry(affective_mag);
 
         output
@@ -1754,7 +1902,7 @@ mod tests {
         // Inject with out-of-range values
         sm.inject_event(SwarmEvent::SpaceAlert {
             alert_type: SpaceAlertType::DebrisProximity,
-            severity: 5.0, // Over max
+            severity: 5.0,        // Over max
             confidence: f32::NAN, // NaN
             time_to_event_seconds: f64::INFINITY,
             description: "Bad data".into(),

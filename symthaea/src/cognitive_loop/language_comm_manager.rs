@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Language & Communication Manager — groups voice coherence, Broca language,
 //! and user state inference into a single CLS field.
 
@@ -22,6 +25,9 @@ pub struct LanguageAndCommunicationManager {
 
     /// User state inference for adaptive response generation.
     pub user_state: Option<crate::user_state_inference::UserStateInference>,
+    /// Code channels injected by CodingAgent for Broca's CodeGate.
+    /// `[syntax_complexity, type_confidence, algorithm_pattern, error_likelihood]`
+    pub broca_code_channels: Option<[f32; 4]>,
 }
 
 impl std::fmt::Debug for LanguageAndCommunicationManager {

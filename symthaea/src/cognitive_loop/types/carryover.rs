@@ -271,6 +271,12 @@ pub struct QualityMetrics {
     /// Whether a subsystem VETO_ACTION flag was set this cycle.
     /// Reset at cycle start. When true, motor output should be suppressed.
     pub(crate) subsystem_veto: bool,
+    /// Safety enforcement: motor halt (Red level). Set in Phase 3.5.
+    /// When true, ALL motor output must be blocked — both embodiment and file I/O.
+    pub(crate) safety_motor_halt: bool,
+    /// Safety enforcement: motor read-only (Orange level). Set in Phase 3.5.
+    /// When true, only read-only motor output is permitted.
+    pub(crate) safety_motor_readonly: bool,
     /// LR momentum: EMA of recent effective LR.
     pub(crate) lr_momentum_ema: f32,
     /// Previous metacognitive prediction (expected consciousness level).
@@ -366,6 +372,8 @@ impl Default for QualityMetrics {
             confidence_calibration_bias: 0.0,
             confidence_calibration_count: 0,
             subsystem_veto: false,
+            safety_motor_halt: false,
+            safety_motor_readonly: false,
             lr_momentum_ema: 1.0,
             prev_metacognitive_prediction: 0.0,
             sleep_pressure: 0.0,
@@ -482,4 +490,8 @@ pub struct CycleCarryover {
     pub gwt_broadcast_occurred: bool,
     /// GWT winning coalition size from previous cycle (0 if no broadcast)
     pub gwt_coalition_size: u32,
+    /// Injected code reasoning context from CodingAgent (one-shot: consumed by cycle).
+    #[cfg(feature = "reasoning_engine")]
+    pub injected_code_context:
+        Option<crate::consciousness::reasoning_engine::CodeReasoningContext>,
 }

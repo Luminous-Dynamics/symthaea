@@ -1,0 +1,178 @@
+/* Mycelix Music — Leptos UI Styles */
+
+:root {
+    --bg: #0a0a0f;
+    --bg-card: #14141f;
+    --bg-hover: #1a1a2e;
+    --text: #e0e0e8;
+    --text-dim: #8888a0;
+    --accent: #8b5cf6;
+    --accent-hover: #a78bfa;
+    --success: #22c55e;
+    --warning: #eab308;
+    --error: #ef4444;
+    --border: #2a2a3e;
+    --radius: 8px;
+    --gap: 1rem;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* --- Navbar --- */
+.navbar {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.logo {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+    margin-right: 2rem;
+}
+.nav-links { display: flex; gap: 1.5rem; }
+.nav-links a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+.nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+/* --- Main content --- */
+.main-content { padding: 2rem 1.5rem; max-width: 1200px; margin: 0 auto; padding-bottom: 100px; }
+.page { min-height: 60vh; }
+
+/* --- Hero --- */
+.hero { text-align: center; padding: 4rem 0 2rem; }
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero-subtitle { color: var(--text-dim); font-size: 1.1rem; max-width: 600px; margin: 0 auto 2rem; }
+.hero-cta { display: flex; gap: 1rem; justify-content: center; }
+
+/* --- Buttons --- */
+.btn {
+    padding: 0.6rem 1.5rem;
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn-secondary:hover { background: var(--accent); color: white; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- Steps / How It Works --- */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--gap); margin-top: 1.5rem; }
+.step { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); }
+.step-number { display: inline-block; width: 2rem; height: 2rem; line-height: 2rem; text-align: center; background: var(--accent); border-radius: 50%; font-weight: 700; margin-bottom: 0.5rem; }
+
+/* --- Model grid --- */
+.model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--gap); margin-top: 1.5rem; }
+.model-card { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); }
+.model-card h3 { color: var(--accent); margin-bottom: 0.5rem; }
+
+/* --- Song grid --- */
+.song-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--gap); margin-top: 1.5rem; }
+
+/* --- Song card --- */
+.song-card { background: var(--bg-card); padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border); transition: border-color 0.2s; }
+.song-card:hover { border-color: var(--accent); }
+.song-card-header { display: flex; align-items: center; gap: 0.75rem; }
+.btn-play { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; font-size: 1rem; }
+.song-title { font-weight: 600; }
+.song-duration { color: var(--text-dim); font-size: 0.85rem; }
+.song-genres { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.genre-tag { background: var(--bg-hover); padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; color: var(--text-dim); }
+.strategy-badge { font-size: 0.8rem; color: var(--accent); margin-top: 0.5rem; display: inline-block; }
+
+/* --- Genre filters --- */
+.genre-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.genre-chip { padding: 0.4rem 1rem; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer; font-size: 0.85rem; }
+.genre-chip:hover { border-color: var(--accent); color: var(--text); }
+.genre-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* --- Player bar --- */
+.player-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-card); border-top: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 1rem; z-index: 200; }
+.player-info { flex: 1; }
+.player-title { font-weight: 600; }
+.player-duration { color: var(--text-dim); font-size: 0.85rem; margin-left: 0.5rem; }
+.btn-player { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; font-size: 1.2rem; }
+.player-empty { color: var(--text-dim); }
+.player-empty a { color: var(--accent); }
+
+/* --- Stats grid --- */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--gap); margin: 1.5rem 0; }
+
+/* --- Earnings calculator --- */
+.earnings-calculator { background: var(--bg-card); padding: 2rem; border-radius: var(--radius); border: 1px solid var(--border); margin: 2rem 0; }
+.earnings-input { margin: 1rem 0; }
+.earnings-input input[type="range"] { width: 100%; margin-top: 0.5rem; }
+.earnings-comparison { display: flex; gap: 2rem; margin: 1.5rem 0; }
+.earnings-column { flex: 1; text-align: center; padding: 1rem; border-radius: var(--radius); }
+.spotify { background: #1db95433; }
+.mycelix { background: #8b5cf633; }
+.earnings-value { font-size: 1.5rem; font-weight: 700; display: block; margin-top: 0.5rem; }
+.earnings-multiplier { text-align: center; color: var(--success); font-weight: 600; font-size: 1.1rem; }
+
+/* --- Comparison table --- */
+.comparison-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.comparison-table th, .comparison-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+.comparison-table th { color: var(--text-dim); font-weight: 600; }
+
+/* --- Forms --- */
+.upload-form { max-width: 600px; }
+.form-group { margin-bottom: 1.5rem; }
+.form-group label { display: block; margin-bottom: 0.4rem; font-weight: 500; }
+.form-group input, .form-group select { width: 100%; padding: 0.6rem 0.8rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.95rem; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+.help-text { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 0.3rem; }
+.status-message { margin-top: 1rem; padding: 1rem; background: var(--bg-hover); border-radius: var(--radius); border-left: 3px solid var(--accent); }
+
+/* --- Gallery --- */
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--gap); margin: 1.5rem 0; }
+.gallery-card { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); }
+.gallery-placeholder { padding: 3rem; text-align: center; color: var(--text-dim); background: var(--bg-hover); border-radius: var(--radius); margin-bottom: 1rem; }
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--gap); margin-top: 1rem; }
+.info-card { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); }
+
+/* --- Footer --- */
+.footer { position: fixed; bottom: 60px; left: 0; right: 0; padding: 0.4rem 1.5rem; display: flex; align-items: center; gap: 1rem; background: var(--bg); border-top: 1px solid var(--border); font-size: 0.75rem; }
+.footer-text { color: var(--text-dim); }
+
+/* --- Utility --- */
+h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin: 2rem 0 0.5rem; }
+.page-subtitle { color: var(--text-dim); margin-bottom: 1.5rem; }
+
+/* --- Trust tiers --- */
+.tier-unverified { color: var(--text-dim); }
+.tier-community { color: var(--warning); }
+.tier-trusted { color: var(--success); }
+.tier-platform { color: var(--accent); }
+.tier-founding { color: gold; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .hero h1 { font-size: 1.8rem; }
+    .hero-cta { flex-direction: column; align-items: center; }
+    .nav-links { gap: 0.75rem; }
+    .earnings-comparison { flex-direction: column; }
+}

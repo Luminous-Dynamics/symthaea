@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Voting Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Voting Coordinator Zome
 //! Business logic for governance voting
 //!
 //! Enhanced with Φ-weighted voting, quadratic voting, and delegation decay
@@ -149,6 +150,14 @@ pub enum GovernanceSignal {
         severity: u8,
         reason: String,
     },
+
+    /// An ethics disclosure was added to a proposal
+    EthicsDisclosureAdded {
+        proposal_id: String,
+        verdict: String,
+        concerns_count: usize,
+        disclosure_source: String,
+    },
 }
 
 /// Emit a governance signal to connected clients
@@ -161,6 +170,75 @@ fn emit_governance_signal(signal: GovernanceSignal) -> ExternResult<()> {
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+// ============================================================================
+// ETHICS-GOVERNANCE BINDING — Disclosure creation
+// ============================================================================
+
+/// Create an ethics disclosure for a proposal.
+/// Called when Symthaea's ethics engine flags a proposal as Caution or Blocked.
+#[hdk_extern]
+pub fn create_ethics_disclosure(input: CreateEthicsDisclosureInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
+    }
+    if input.disclosure_source.is_empty() || input.disclosure_source.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Disclosure source must be 1-256 characters".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let disclosure_id = format!(
+        "ethics:{}:{}",
+        input.proposal_id,
+        now.as_micros()
+    );
+
+    let disclosure = EthicsDisclosure {
+        id: disclosure_id,
+        proposal_id: input.proposal_id.clone(),
+        verdict: input.verdict,
+        concerns: input.concerns.clone(),
+        disclosed_at: now,
+        disclosure_source: input.disclosure_source.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::EthicsDisclosure(disclosure))?;
+
+    // Link from proposal anchor for tally lookup
+    let ethics_anchor = format!("ethics_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(ethics_anchor.clone())))?;
+    create_link(
+        anchor_hash(&ethics_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToEthicsDisclosure,
+        (),
+    )?;
+
+    // Emit signal for real-time UI notification
+    let _ = emit_governance_signal(GovernanceSignal::EthicsDisclosureAdded {
+        proposal_id: input.proposal_id,
+        verdict: format!("{:?}", input.verdict),
+        concerns_count: input.concerns.len(),
+        disclosure_source: input.disclosure_source,
+    });
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find ethics disclosure".into()
+    )))
+}
+
+/// Input for creating an ethics disclosure
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateEthicsDisclosureInput {
+    pub proposal_id: String,
+    pub verdict: GovernanceEthicsVerdict,
+    pub concerns: Vec<String>,
+    pub disclosure_source: String,
 }
 
 /// Enforce one-agent-one-vote: prevents a single Holochain agent from voting
@@ -1865,9 +1943,62 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         0.0
     };
 
-    // Get thresholds from tier
-    let quorum_requirement = input.tier.quorum_requirement();
-    let approval_threshold = input.tier.approval_threshold();
+    // === ETHICS-GOVERNANCE BINDING ===
+    // Query EthicsDisclosure entries linked to this proposal.
+    // Blocked → escalate tier (higher quorum + approval threshold).
+    // Caution → transparent flag only, no threshold change.
+    // Safe/absent → proceed normally.
+    let mut ethics_caution_flagged = false;
+    let mut ethics_blocked_flagged = false;
+    let mut ethics_escalated_from: Option<String> = None;
+
+    let ethics_anchor = format!("ethics_proposal:{}", input.proposal_id);
+    if let Ok(eh) = anchor_hash(&ethics_anchor) {
+        if let Ok(ethics_links) = get_links(
+            LinkQuery::try_new(eh, LinkTypes::ProposalToEthicsDisclosure)?,
+            GetStrategy::default(),
+        ) {
+            for link in &ethics_links {
+                if let Ok(target) = ActionHash::try_from(link.target.clone()) {
+                    if let Ok(Some(record)) = get(target, GetOptions::default()) {
+                        if let Some(disclosure) = record
+                            .entry()
+                            .to_app_option::<EthicsDisclosure>()
+                            .ok()
+                            .flatten()
+                        {
+                            match disclosure.verdict {
+                                GovernanceEthicsVerdict::Caution => {
+                                    ethics_caution_flagged = true;
+                                }
+                                GovernanceEthicsVerdict::Blocked => {
+                                    ethics_blocked_flagged = true;
+                                    ethics_caution_flagged = true;
+                                }
+                                GovernanceEthicsVerdict::Safe => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Determine effective tier (escalate if ethics Blocked)
+    let effective_tier = if ethics_blocked_flagged {
+        if let Some(escalated) = CircuitBreakerOutcome::escalated_tier(&input.tier) {
+            ethics_escalated_from = Some(format!("{:?}", input.tier));
+            escalated
+        } else {
+            input.tier.clone()
+        }
+    } else {
+        input.tier.clone()
+    };
+
+    // Get thresholds from effective tier (may be escalated by ethics binding)
+    let quorum_requirement = effective_tier.quorum_requirement();
+    let approval_threshold = effective_tier.approval_threshold();
 
     // Calculate quorum (would need total eligible voters in production)
     let eligible_voters = input.eligible_voters.unwrap_or(100);
@@ -1960,6 +2091,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         concentration_warning,
         vote_margin,
         narrow_margin_warning,
+        ethics_caution_flagged,
+        ethics_blocked_flagged,
+        ethics_escalated_from,
     };
 
     let action_hash = create_entry(&EntryTypes::PhiWeightedTally(tally))?;

@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "title": "CS2013: Software Engineering",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Software Engineering",
+    "domain": "CS2013: Software Engineering",
+    "version": "2024",
+    "total_standards": 3,
+    "domains": [
+      "waterfall",
+      "design patterns",
+      "unit testing"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Software Engineering. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 1
+  },
+  "nodes": [
+    {
+      "id": "SE/Process",
+      "title": "Software Processes",
+      "description": "Software Processes (Tier1, 3 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "waterfall",
+      "tags": [
+        "waterfall",
+        "agile",
+        "scrum",
+        "kanban",
+        "DevOps"
+      ],
+      "estimated_hours": 9,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:SE"
+    },
+    {
+      "id": "SE/Design",
+      "title": "Software Design",
+      "description": "Software Design (Tier1, 3 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "design patterns",
+      "tags": [
+        "design patterns",
+        "architectural patterns",
+        "UML",
+        "coupling",
+        "cohesion"
+      ],
+      "estimated_hours": 9,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:SE"
+    },
+    {
+      "id": "SE/Testing",
+      "title": "Software Verification and Validation",
+      "description": "Software Verification and Validation (Tier2, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "unit testing",
+      "tags": [
+        "unit testing",
+        "integration testing",
+        "test-driven development",
+        "code review",
+        "static analysis"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:SE"
+    }
+  ],
+  "edges": []
+}

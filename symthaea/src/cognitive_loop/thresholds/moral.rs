@@ -370,3 +370,54 @@ pub const NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE: f32 = 0.15;
 
 /// Social trust boost from strong narrative identity (Baumeister & Leary 1995).
 pub const NARRATIVE_SELF_SOCIAL_TRUST_BOOST: f32 = 1.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HODGE ADAPTIVE RIPS THRESHOLD
+// Science: Beggs & Plenz (2003) — neural systems self-organize near criticality;
+// Shew & Plenz (2013) — critical dynamics maximize information capacity.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA alpha for critical_scale tracking. α=0.05 → ~20 analysis half-life.
+/// Science: Haykin (2002) — adaptive filtering; low α = stable tracking.
+pub const HODGE_CRITICAL_SCALE_EMA_ALPHA: f64 = 0.05;
+
+/// Half-width of the focused Rips sweep around the EMA critical scale.
+/// Sweep covers [center − 0.15, center + 0.15] with num_scales steps.
+pub const HODGE_ADAPTIVE_RIPS_RADIUS: f64 = 0.15;
+
+/// Default center when no critical_scale history exists.
+pub const HODGE_ADAPTIVE_RIPS_DEFAULT_CENTER: f64 = 0.5;
+
+/// Critical scale below this = fragile (over-connected, trivial topology).
+/// Science: Beggs & Plenz (2003) — subcritical regime has low dynamic range.
+pub const HODGE_CRITICAL_SCALE_FRAGILE_THRESHOLD: f64 = 0.1;
+
+/// Critical scale above this = robust (well-separated, stable clusters).
+/// Science: Shew & Plenz (2013) — supercritical regime is stable but rigid.
+pub const HODGE_CRITICAL_SCALE_ROBUST_THRESHOLD: f64 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HODGE → FEP EXPLORATION COUPLING
+// Science: Beggs & Plenz (2003) — criticality maximizes dynamic range;
+// Friston (2010) — precision (inverse temperature) controls explore/exploit.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Harmonic fraction below which the system is over-connected (echo chamber).
+pub const HODGE_HARMONIC_LOW_THRESHOLD: f64 = 0.2;
+
+/// Harmonic fraction above which the system is fragmented.
+pub const HODGE_HARMONIC_HIGH_THRESHOLD: f64 = 0.8;
+
+/// Temperature boost when over-connected (harmonic < 0.2): explore to break symmetry.
+/// Science: De Martino (2006) — echo chambers require perturbation to escape.
+pub const HODGE_TEMP_EXPLORATION_BOOST: f64 = 0.3;
+
+/// Temperature dampening when fragmented (harmonic > 0.8): focus on integration.
+/// Science: Tononi (2004) — fragmentation requires integration, not divergence.
+pub const HODGE_TEMP_INTEGRATION_DAMPEN: f64 = 0.7;
+
+/// Temperature boost when critical_scale EMA < fragile threshold.
+pub const HODGE_FRAGILE_TEMP_BOOST: f64 = 0.2;
+
+/// Temperature dampening when critical_scale EMA > robust threshold.
+pub const HODGE_ROBUST_TEMP_DAMPEN: f64 = 0.9;

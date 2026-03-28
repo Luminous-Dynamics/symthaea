@@ -1,0 +1,894 @@
+{
+  "metadata": {
+    "title": "High School — Algebra",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade9",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 27,
+    "domains": [
+      "Reasoning with Equations and Inequalities",
+      "Creating Equations",
+      "Arithmetic with Polynomials and Rational Expressions",
+      "Seeing Structure in Expressions",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_high-school-algebra). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.HSA-REI.D.12",
+      "title": "Graph the solutions to a linear inequality in two variables as a half-plane (...",
+      "description": "Graph the solutions to a linear inequality in two variables as a half-plane (excluding the boundary in the case of a strict inequality), and graph the solution set to a system of linear inequalities in two variables as the intersection of the corresponding half-planes.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.D.12",
+          "description": "Graph the solutions to a linear inequality in two variables as a half-plane (excluding the boundary in the case of a strict inequality), and graph the solution set to a system of linear inequalities in two variables as the intersection of the corresponding half-planes.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.D.11",
+      "title": "Explain why the x-coordinates of the points where the graphs of the equations...",
+      "description": "Explain why the x-coordinates of the points where the graphs of the equations y = f(x) and y = g(x) intersect are the solutions of the equation f(x) = g(x); find the solutions approximately, e.g., using technology to graph the functions, make tables of values, or find successive approximations. Include cases where f(x) and/or g(x) are linear, polynomial, rational, absolute value, exponential, and logarithmic functions.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations",
+        "graphs",
+        "functions",
+        "coordinates"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.D.11",
+          "description": "Explain why the x-coordinates of the points where the graphs of the equations y = f(x) and y = g(x) intersect are the solutions of the equation f(x) = g(x); find the solutions approximately, e.g., using technology to graph the functions, make tables of values, or find successive approximations. Include cases where f(x) and/or g(x) are linear, polynomial, rational, absolute value, exponential, and logarithmic functions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.D.10",
+      "title": "Understand that the graph of an equation in two variables is the set of all i...",
+      "description": "Understand that the graph of an equation in two variables is the set of all its solutions plotted in the coordinate plane, often forming a curve (which could be a line).",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.D.10",
+          "description": "Understand that the graph of an equation in two variables is the set of all its solutions plotted in the coordinate plane, often forming a curve (which could be a line).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.C.9",
+      "title": "(+) Find the inverse of a matrix if it exists and use it to solve systems of ...",
+      "description": "(+) Find the inverse of a matrix if it exists and use it to solve systems of linear equations (using technology for matrices of dimension 3 × 3 or greater).",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.C.9",
+          "description": "(+) Find the inverse of a matrix if it exists and use it to solve systems of linear equations (using technology for matrices of dimension 3 × 3 or greater).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.C.8",
+      "title": "(+) Represent a system of linear equations as a single matrix equation in a v...",
+      "description": "(+) Represent a system of linear equations as a single matrix equation in a vector variable.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.C.8",
+          "description": "(+) Represent a system of linear equations as a single matrix equation in a vector variable.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.C.7",
+      "title": "Solve a simple system consisting of a linear equation and a quadratic equatio...",
+      "description": "Solve a simple system consisting of a linear equation and a quadratic equation in two variables algebraically and graphically.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "algebra"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.C.7",
+          "description": "Solve a simple system consisting of a linear equation and a quadratic equation in two variables algebraically and graphically.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.C.6",
+      "title": "Solve systems of linear equations exactly and approximately (e",
+      "description": "Solve systems of linear equations exactly and approximately (e.g., with graphs), focusing on pairs of linear equations in two variables.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations",
+        "graphs"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.C.6",
+          "description": "Solve systems of linear equations exactly and approximately (e.g., with graphs), focusing on pairs of linear equations in two variables.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.C.5",
+      "title": "Prove that, given a system of two equations in two variables, replacing one e...",
+      "description": "Prove that, given a system of two equations in two variables, replacing one equation by the sum of that equation and a multiple of the other produces a system with the same solutions.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.C.5",
+          "description": "Prove that, given a system of two equations in two variables, replacing one equation by the sum of that equation and a multiple of the other produces a system with the same solutions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.B.4",
+      "title": "Solve quadratic equations in one variable",
+      "description": "Solve quadratic equations in one variable.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.B.4",
+          "description": "Solve quadratic equations in one variable.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.B.3",
+      "title": "Solve linear equations and inequalities in one variable, including equations ...",
+      "description": "Solve linear equations and inequalities in one variable, including equations with coefficients represented by letters.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.B.3",
+          "description": "Solve linear equations and inequalities in one variable, including equations with coefficients represented by letters.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.A.2",
+      "title": "Solve simple rational and radical equations in one variable, and give example...",
+      "description": "Solve simple rational and radical equations in one variable, and give examples showing how extraneous solutions may arise.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.A.2",
+          "description": "Solve simple rational and radical equations in one variable, and give examples showing how extraneous solutions may arise.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-REI.A.1",
+      "title": "Explain each step in solving a simple equation as following from the equality...",
+      "description": "Explain each step in solving a simple equation as following from the equality of numbers asserted at the previous step, starting from the assumption that the original equation has a solution. Construct a viable argument to justify a solution method.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Reasoning with Equations and Inequalities",
+      "tags": [
+        "argument"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-REI.A.1",
+          "description": "Explain each step in solving a simple equation as following from the equality of numbers asserted at the previous step, starting from the assumption that the original equation has a solution. Construct a viable argument to justify a solution method.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-CED.A.4",
+      "title": "Rearrange formulas to highlight a quantity of interest, using the same reason...",
+      "description": "Rearrange formulas to highlight a quantity of interest, using the same reasoning as in solving equations.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Creating Equations",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-CED.A.4",
+          "description": "Rearrange formulas to highlight a quantity of interest, using the same reasoning as in solving equations.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-CED.A.3",
+      "title": "Represent constraints by equations or inequalities, and by systems of equatio...",
+      "description": "Represent constraints by equations or inequalities, and by systems of equations and/or inequalities, and interpret solutions as viable or nonviable options in a modeling context.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Creating Equations",
+      "tags": [
+        "equations",
+        "modeling"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-CED.A.3",
+          "description": "Represent constraints by equations or inequalities, and by systems of equations and/or inequalities, and interpret solutions as viable or nonviable options in a modeling context.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-CED.A.2",
+      "title": "Create equations in two or more variables to represent relationships between ...",
+      "description": "Create equations in two or more variables to represent relationships between quantities; graph equations on coordinate axes with labels and scales.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Creating Equations",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-CED.A.2",
+          "description": "Create equations in two or more variables to represent relationships between quantities; graph equations on coordinate axes with labels and scales.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-CED.A.1",
+      "title": "Create equations and inequalities in one variable and use them to solve problems",
+      "description": "Create equations and inequalities in one variable and use them to solve problems. Include equations arising from linear and quadratic functions, and simple rational and exponential functions.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Creating Equations",
+      "tags": [
+        "equations",
+        "functions"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-CED.A.1",
+          "description": "Create equations and inequalities in one variable and use them to solve problems. Include equations arising from linear and quadratic functions, and simple rational and exponential functions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.D.7",
+      "title": "(+) Understand that rational expressions form a system analogous to the ratio...",
+      "description": "(+) Understand that rational expressions form a system analogous to the rational numbers, closed under addition, subtraction, multiplication, and division by a nonzero rational expression; add, subtract, multiply, and divide rational expressions.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [
+        "addition",
+        "subtraction",
+        "multiplication",
+        "division",
+        "expressions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.D.7",
+          "description": "(+) Understand that rational expressions form a system analogous to the rational numbers, closed under addition, subtraction, multiplication, and division by a nonzero rational expression; add, subtract, multiply, and divide rational expressions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.D.6",
+      "title": "Rewrite simple rational expressions in different forms",
+      "description": "Rewrite simple rational expressions in different forms; write <sup>a(x </sup>/<sub>b(x)</sub> in the form q(x) + <sup>r(x)</sup>/<sub>b(x)</sub>, where a(x), b(x), q(x), and r(x) are polynomials with the degree of r(x) less than the degree of b(x), using inspection, long division, or, for the more complicated examples, a computer algebra system.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [
+        "division",
+        "algebra",
+        "expressions",
+        "polynomials"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.D.6",
+          "description": "Rewrite simple rational expressions in different forms; write <sup>a(x </sup>/<sub>b(x)</sub> in the form q(x) + <sup>r(x)</sup>/<sub>b(x)</sub>, where a(x), b(x), q(x), and r(x) are polynomials with the degree of r(x) less than the degree of b(x), using inspection, long division, or, for the more complicated examples, a computer algebra system.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.C.5",
+      "title": "(+) Know and apply the Binomial Theorem for the expansion of (x + y)<sup>n</s...",
+      "description": "(+) Know and apply the Binomial Theorem for the expansion of (x + y)<sup>n</sup> in powers of x and y for a positive integer n, where x and y are any numbers, with coefficients determined for example by Pascal's Triangle.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [
+        "theorem"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.C.5",
+          "description": "(+) Know and apply the Binomial Theorem for the expansion of (x + y)<sup>n</sup> in powers of x and y for a positive integer n, where x and y are any numbers, with coefficients determined for example by Pascal's Triangle.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.C.4",
+      "title": "Prove polynomial identities and use them to describe numerical relationships",
+      "description": "Prove polynomial identities and use them to describe numerical relationships.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.C.4",
+          "description": "Prove polynomial identities and use them to describe numerical relationships.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.B.3",
+      "title": "Identify zeros of polynomials when suitable factorizations are available, and...",
+      "description": "Identify zeros of polynomials when suitable factorizations are available, and use the zeros to construct a rough graph of the function defined by the polynomial.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [
+        "polynomials"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.B.3",
+          "description": "Identify zeros of polynomials when suitable factorizations are available, and use the zeros to construct a rough graph of the function defined by the polynomial.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.B.2",
+      "title": "Know and apply the Remainder Theorem: For a polynomial p(x) and a number a, t...",
+      "description": "Know and apply the Remainder Theorem: For a polynomial p(x) and a number a, the remainder on division by x - a is p(a), so p(a) = 0 if and only if (x - a) is a factor of p(x).",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [
+        "division",
+        "theorem"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.B.2",
+          "description": "Know and apply the Remainder Theorem: For a polynomial p(x) and a number a, the remainder on division by x - a is p(a), so p(a) = 0 if and only if (x - a) is a factor of p(x).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-APR.A.1",
+      "title": "Understand that polynomials form a system analogous to the integers, namely, ...",
+      "description": "Understand that polynomials form a system analogous to the integers, namely, they are closed under the operations of addition, subtraction, and multiplication; add, subtract, and multiply polynomials.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Arithmetic with Polynomials and Rational Expressions",
+      "tags": [
+        "addition",
+        "subtraction",
+        "multiplication",
+        "integers",
+        "polynomials"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-APR.A.1",
+          "description": "Understand that polynomials form a system analogous to the integers, namely, they are closed under the operations of addition, subtraction, and multiplication; add, subtract, and multiply polynomials.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-SSE.B.4",
+      "title": "Derive the formula for the sum of a finite geometric series (when the common ...",
+      "description": "Derive the formula for the sum of a finite geometric series (when the common ratio is not 1), and use the formula to solve problems.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Seeing Structure in Expressions",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-SSE.B.4",
+          "description": "Derive the formula for the sum of a finite geometric series (when the common ratio is not 1), and use the formula to solve problems.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-SSE.B.3",
+      "title": "Choose and produce an equivalent form of an expression to reveal and explain ...",
+      "description": "Choose and produce an equivalent form of an expression to reveal and explain properties of the quantity represented by the expression.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Seeing Structure in Expressions",
+      "tags": [],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-SSE.B.3",
+          "description": "Choose and produce an equivalent form of an expression to reveal and explain properties of the quantity represented by the expression.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-SSE.A.2",
+      "title": "Use the structure of an expression to identify ways to rewrite it",
+      "description": "Use the structure of an expression to identify ways to rewrite it.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Seeing Structure in Expressions",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-SSE.A.2",
+          "description": "Use the structure of an expression to identify ways to rewrite it.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSA-SSE.A.1",
+      "title": "Interpret expressions that represent a quantity in terms of its context",
+      "description": "Interpret expressions that represent a quantity in terms of its context",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Seeing Structure in Expressions",
+      "tags": [
+        "expressions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSA-SSE.A.1",
+          "description": "Interpret expressions that represent a quantity in terms of its context",
+          "grade_level": "Grade9"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.HSA-SSE.A.1",
+      "to": "CCSS.Math.Content.HSA-SSE.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-SSE.A.1 is a prerequisite for CCSS.Math.Content.HSA-SSE.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-SSE.A.2",
+      "to": "CCSS.Math.Content.HSA-SSE.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-SSE.A.2 is a prerequisite for CCSS.Math.Content.HSA-SSE.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-SSE.B.3",
+      "to": "CCSS.Math.Content.HSA-SSE.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-SSE.B.3 is a prerequisite for CCSS.Math.Content.HSA-SSE.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-CED.A.1",
+      "to": "CCSS.Math.Content.HSA-CED.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-CED.A.1 is a prerequisite for CCSS.Math.Content.HSA-CED.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-CED.A.2",
+      "to": "CCSS.Math.Content.HSA-CED.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-CED.A.2 is a prerequisite for CCSS.Math.Content.HSA-CED.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-CED.A.3",
+      "to": "CCSS.Math.Content.HSA-CED.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-CED.A.3 is a prerequisite for CCSS.Math.Content.HSA-CED.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.A.1",
+      "to": "CCSS.Math.Content.HSA-REI.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.A.1 is a prerequisite for CCSS.Math.Content.HSA-REI.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.A.2",
+      "to": "CCSS.Math.Content.HSA-REI.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.A.2 is a prerequisite for CCSS.Math.Content.HSA-REI.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.B.3",
+      "to": "CCSS.Math.Content.HSA-REI.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.B.3 is a prerequisite for CCSS.Math.Content.HSA-REI.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.B.4",
+      "to": "CCSS.Math.Content.HSA-REI.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.B.4 is a prerequisite for CCSS.Math.Content.HSA-REI.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.C.5",
+      "to": "CCSS.Math.Content.HSA-REI.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.C.5 is a prerequisite for CCSS.Math.Content.HSA-REI.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.C.6",
+      "to": "CCSS.Math.Content.HSA-REI.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.C.6 is a prerequisite for CCSS.Math.Content.HSA-REI.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.C.7",
+      "to": "CCSS.Math.Content.HSA-REI.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.C.7 is a prerequisite for CCSS.Math.Content.HSA-REI.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.C.8",
+      "to": "CCSS.Math.Content.HSA-REI.C.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.C.8 is a prerequisite for CCSS.Math.Content.HSA-REI.C.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.C.9",
+      "to": "CCSS.Math.Content.HSA-REI.D.10",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.C.9 is a prerequisite for CCSS.Math.Content.HSA-REI.D.10 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.D.10",
+      "to": "CCSS.Math.Content.HSA-REI.D.11",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.D.10 is a prerequisite for CCSS.Math.Content.HSA-REI.D.11 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-REI.D.11",
+      "to": "CCSS.Math.Content.HSA-REI.D.12",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-REI.D.11 is a prerequisite for CCSS.Math.Content.HSA-REI.D.12 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-APR.A.1",
+      "to": "CCSS.Math.Content.HSA-APR.B.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-APR.A.1 is a prerequisite for CCSS.Math.Content.HSA-APR.B.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-APR.B.2",
+      "to": "CCSS.Math.Content.HSA-APR.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-APR.B.2 is a prerequisite for CCSS.Math.Content.HSA-APR.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-APR.B.3",
+      "to": "CCSS.Math.Content.HSA-APR.C.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-APR.B.3 is a prerequisite for CCSS.Math.Content.HSA-APR.C.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-APR.C.4",
+      "to": "CCSS.Math.Content.HSA-APR.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-APR.C.4 is a prerequisite for CCSS.Math.Content.HSA-APR.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-APR.C.5",
+      "to": "CCSS.Math.Content.HSA-APR.D.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-APR.C.5 is a prerequisite for CCSS.Math.Content.HSA-APR.D.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSA-APR.D.6",
+      "to": "CCSS.Math.Content.HSA-APR.D.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSA-APR.D.6 is a prerequisite for CCSS.Math.Content.HSA-APR.D.7 within the same domain."
+    }
+  ]
+}

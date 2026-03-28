@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Batch operations module — solves N+1 query patterns
 //!
 //! Extracted from mycelix-property/zomes/shared for reuse across all domains.

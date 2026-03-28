@@ -206,6 +206,75 @@ impl CognitiveLoopService {
         let neuromod_consciousness_mod = self.neuromod.bath.consciousness_modulation();
         let unified_psi = (unified_psi * neuromod_consciousness_mod as f64).clamp(0.0, 1.0);
 
+        // ── Hodge vertex harmonic → consciousness fragmentation modulation ──
+        // Vertex L₀ harmonic fraction measures moral FRAGMENTATION: high harmonic
+        // means moral meaning is trapped in disconnected clusters (β₀ > 1).
+        // This is the opposite of integration — it DAMPENS consciousness.
+        //
+        // At criticality (harmonic ∈ [0.2, 0.8]): the system is at the edge of
+        // chaos — maximally flexible and creative. We give a small BOOST here.
+        //
+        // Modulation:
+        //   harmonic < 0.2 (unified)     → +1% (good integration)
+        //   harmonic ∈ [0.2, 0.8] (critical) → +2% (edge-of-chaos creativity boost)
+        //   harmonic > 0.8 (fragmented)  → -5% (moral disintegration dampens consciousness)
+        //
+        // Science: Tononi (2004) — Phi collapses when components disconnect;
+        // Beggs & Plenz (2003) — criticality maximizes dynamic range;
+        // Shew & Plenz (2013) — neural systems optimize at criticality.
+        const HODGE_UNIFIED_BOOST: f64 = 0.01;
+        const HODGE_CRITICAL_BOOST: f64 = 0.02;
+        const HODGE_FRAGMENTED_DAMPING: f64 = 0.05;
+        let hodge_mod = {
+            let summary = self.ethics_engine.moral_topology().last_summary();
+            if let Some(ref fracs) = summary.hodge_fractions {
+                if fracs.at_criticality {
+                    1.0 + HODGE_CRITICAL_BOOST // Edge-of-chaos: creativity boost
+                } else if fracs.harmonic < 0.2 {
+                    1.0 + HODGE_UNIFIED_BOOST // Unified reasoning: mild boost
+                } else {
+                    1.0 - HODGE_FRAGMENTED_DAMPING // Fragmented: consciousness drops
+                }
+            } else {
+                1.0 // No fractions available — neutral
+            }
+        };
+        let unified_psi = (unified_psi * hodge_mod).clamp(0.0, 1.0);
+
+        // ── Hodge criticality → FEP exploration temperature modulation ──
+        // Over-connected (harmonic < 0.2): raise temperature → explore to break echo chamber
+        // Fragmented (harmonic > 0.8): lower temperature → focus on integration
+        // At criticality (0.2–0.8): no modulation (optimal zone)
+        // Additionally: fragile critical_scale → boost exploration
+        //               robust critical_scale → allow exploitation
+        // Science: Beggs & Plenz (2003) — criticality; Friston (2010) — precision.
+        if self.config.enable_hodge_decomposition {
+            const TEMP_MIN: f64 = 0.5;
+            const TEMP_MAX: f64 = 2.0;
+            let summary = self.ethics_engine.moral_topology().last_summary();
+            if let Some(ref fracs) = summary.hodge_fractions {
+                if fracs.harmonic < 0.2 {
+                    self.fep.agent.config.action_temperature += 0.3; // Explore
+                } else if fracs.harmonic > 0.8 {
+                    self.fep.agent.config.action_temperature *= 0.7; // Integrate
+                }
+            }
+            let cs_ema = self.ethics_engine.moral_topology().critical_scale_ema();
+            if cs_ema.is_finite() {
+                if cs_ema < 0.1 {
+                    self.fep.agent.config.action_temperature += 0.2; // Fragile → explore
+                } else if cs_ema > 0.5 {
+                    self.fep.agent.config.action_temperature *= 0.9; // Robust → exploit
+                }
+            }
+            self.fep.agent.config.action_temperature = self
+                .fep
+                .agent
+                .config
+                .action_temperature
+                .clamp(TEMP_MIN, TEMP_MAX);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.exp EXPERIENCE BUS: Update principled signals from cognitive state
         // Maps cycle values to 5 principled signals (Active Inference).
@@ -278,7 +347,7 @@ impl CognitiveLoopService {
         // NE → surprise threshold (attention aperture), DA → compute budget.
         // Science: Corbetta & Shulman (2002) — NE modulates attentional scope.
         #[cfg(feature = "foveation")]
-        if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
+        if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
             let ne = self.neuromod.bath.noradrenaline.effective();
             let da = self.neuromod.bath.dopamine.effective();
             if let Ok(mut fov) = fov_mutex.lock() {

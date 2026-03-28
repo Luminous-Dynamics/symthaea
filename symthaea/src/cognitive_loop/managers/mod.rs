@@ -42,6 +42,7 @@ pub mod network_service_bridge;
 pub mod perception_manager;
 pub mod soul_manager;
 pub mod swarm_manager;
+pub mod thermodynamic_manager;
 
 #[cfg(feature = "mycelix")]
 pub mod governance_manager;
@@ -160,3 +161,8 @@ pub use survival_manager::SurvivalManager;
 pub mod vision_manager;
 #[cfg(feature = "vision-manifold")]
 pub use vision_manager::VisionManager;
+
+#[cfg(feature = "muse")]
+pub mod muse_manager;
+#[cfg(feature = "muse")]
+pub use muse_manager::{MuseManager, MuseTelemetry};

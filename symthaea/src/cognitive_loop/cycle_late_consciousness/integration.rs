@@ -489,6 +489,13 @@ impl CognitiveLoopService {
                     self.prediction_confidence,
                 ];
                 let state = thermo.analyze(dims);
+                // Feed analyzer data to ThermodynamicManager
+                self.thermodynamic_mgr.set_analyzer(
+                    state.entropy,
+                    state.free_energy,
+                    state.temperature,
+                    state.phase,
+                );
                 // FEEDBACK: Phase-dependent exploration modulation (Kelso 1995)
                 use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
                 match state.phase {
@@ -559,7 +566,7 @@ impl CognitiveLoopService {
         let (embodied_psi_modulation, embodied_agency) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
                 if let Some(ref mut embodied) = self.consciousness.consciousness_monitors.embodied {
-                    if let Some(ref body) = self.vision_sensory.virtual_body {
+                    if let Some(ref body) = self.sensorimotor.vision_sensory.virtual_body {
                         embodied.update_interoception(body.interoceptive_state().clone());
                     }
                     let response = embodied.process();

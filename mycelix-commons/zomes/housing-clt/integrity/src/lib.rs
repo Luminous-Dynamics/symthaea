@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Community Land Trust Integrity Zome
 //! Entry types and validation for land trusts, ground leases, resale formulas,
 //! and affordability reporting.
@@ -106,6 +109,8 @@ pub enum LinkTypes {
     TrustToReport,
     /// Unit to lease
     UnitToLease,
+    /// Geohash spatial index
+    GeoIndex,
 }
 
 #[hdk_extern]
@@ -194,6 +199,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
+            LinkTypes::GeoIndex => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { action, .. } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
@@ -1900,7 +1906,8 @@ mod tests {
             | LinkTypes::LeaseholderToLease
             | LinkTypes::LeaseToResaleCalc
             | LinkTypes::TrustToReport
-            | LinkTypes::UnitToLease => {
+            | LinkTypes::UnitToLease
+            | LinkTypes::GeoIndex => {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(format!(
                         "{:?} link tag too long (max 256 bytes)",

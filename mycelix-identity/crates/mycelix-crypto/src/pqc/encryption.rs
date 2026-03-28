@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Symmetric encryption using XChaCha20-Poly1305 AEAD.
 //!
 //! Combined with ML-KEM key encapsulation, this provides a complete

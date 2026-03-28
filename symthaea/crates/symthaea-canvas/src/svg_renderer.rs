@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SceneNode → self-contained animated SVG string.
 
 use std::fmt::Write;
@@ -167,6 +170,12 @@ fn write_node(buf: &mut String, node: &SceneNode, depth: usize) {
         NodeKind::UseFilter { filter_id } => {
             // Applied via style.filter on other nodes — this is a no-op placeholder
             let _ = writeln!(buf, r#"{indent}<!-- filter ref: {filter_id} -->"#);
+        }
+        NodeKind::Path { d } => {
+            let _ = write!(buf, r#"{indent}<path d="{d}""#);
+            write_transform(buf, node);
+            write_style_attrs(buf, &node.style);
+            buf.push_str("/>\n");
         }
     }
 }

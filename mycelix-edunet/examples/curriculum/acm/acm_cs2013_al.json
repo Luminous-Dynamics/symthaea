@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "title": "CS2013: Algorithms and Complexity",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Algorithms and Complexity",
+    "domain": "CS2013: Algorithms and Complexity",
+    "version": "2024",
+    "total_standards": 4,
+    "domains": [
+      "finite automata",
+      "arrays",
+      "asymptotic analysis",
+      "brute-force"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Algorithms and Complexity. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 1
+  },
+  "nodes": [
+    {
+      "id": "AL/BasicAnalysis",
+      "title": "Basic Analysis",
+      "description": "Basic Analysis (Tier1, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "asymptotic analysis",
+      "tags": [
+        "asymptotic analysis",
+        "big-O notation",
+        "time complexity",
+        "space complexity"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AL"
+    },
+    {
+      "id": "AL/AlgorithmicStrategies",
+      "title": "Algorithmic Strategies",
+      "description": "Algorithmic Strategies (Tier1, 5 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "brute-force",
+      "tags": [
+        "brute-force",
+        "greedy",
+        "divide-and-conquer",
+        "dynamic programming",
+        "backtracking"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AL"
+    },
+    {
+      "id": "AL/FundamentalDataStructures",
+      "title": "Fundamental Data Structures and Algorithms",
+      "description": "Fundamental Data Structures and Algorithms (Tier1, 9 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "arrays",
+      "tags": [
+        "arrays",
+        "linked lists",
+        "stacks",
+        "queues",
+        "trees",
+        "hash tables",
+        "sorting",
+        "searching",
+        "graphs"
+      ],
+      "estimated_hours": 27,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AL"
+    },
+    {
+      "id": "AL/Automata",
+      "title": "Automata Theory",
+      "description": "Automata Theory (Elective, 6 hours)",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "finite automata",
+      "tags": [
+        "finite automata",
+        "regular expressions",
+        "pushdown automata",
+        "Turing machines",
+        "decidability"
+      ],
+      "estimated_hours": 18,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "300-400",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AL"
+    }
+  ],
+  "edges": []
+}

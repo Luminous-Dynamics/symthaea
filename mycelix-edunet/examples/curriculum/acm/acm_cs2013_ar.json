@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "title": "CS2013: Architecture and Organization",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Architecture and Organization",
+    "domain": "CS2013: Architecture and Organization",
+    "version": "2024",
+    "total_standards": 3,
+    "domains": [
+      "binary representation",
+      "logic gates",
+      "instruction set architecture"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Architecture and Organization. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 1
+  },
+  "nodes": [
+    {
+      "id": "AR/DigitalLogic",
+      "title": "Digital Logic and Digital Systems",
+      "description": "Digital Logic and Digital Systems (Tier2, 6 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "logic gates",
+      "tags": [
+        "logic gates",
+        "boolean algebra",
+        "multiplexers",
+        "decoders",
+        "flip-flops"
+      ],
+      "estimated_hours": 18,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AR"
+    },
+    {
+      "id": "AR/MachineOrg",
+      "title": "Machine Level Representation of Data",
+      "description": "Machine Level Representation of Data (Tier2, 3 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "binary representation",
+      "tags": [
+        "binary representation",
+        "floating point",
+        "two's complement",
+        "character encoding"
+      ],
+      "estimated_hours": 9,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AR"
+    },
+    {
+      "id": "AR/ISA",
+      "title": "Assembly Level Machine Organization",
+      "description": "Assembly Level Machine Organization (Tier2, 7 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "instruction set architecture",
+      "tags": [
+        "instruction set architecture",
+        "assembly language",
+        "addressing modes",
+        "subroutine calls"
+      ],
+      "estimated_hours": 21,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:AR"
+    }
+  ],
+  "edges": []
+}

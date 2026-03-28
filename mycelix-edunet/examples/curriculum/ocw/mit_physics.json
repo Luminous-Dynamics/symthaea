@@ -1,0 +1,1074 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Physics",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=8&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Physics",
+    "domain": "Physics",
+    "version": "2024",
+    "total_standards": 30,
+    "domains": [
+      "Algorithms and Data Structures",
+      "Chemistry",
+      "Computer Science",
+      "Biological Engineering",
+      "Science & Math",
+      "Mathematics",
+      "Data Science, Analytics & Computer Technology",
+      "Mechanical Engineering",
+      "Physics",
+      "Biology"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 8). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "40.08"
+  },
+  "nodes": [
+    {
+      "id": "22.52J",
+      "title": "Statistical Thermodynamics of Complex Liquids",
+      "description": "This course explores the theory of self-assembly in surfactant-water (micellar) and surfactant-water-oil (micro-emulsion) systems. It also introduces the theory of polymer solutions, as well as scattering techniques, light, x-ray, and neutron scattering applied to studies of the structure and dynamics of complex liquids, and modern theory of the liquid state relevant to structured (supramolecular) liquids.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mathematics",
+        "mechanical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "22.52J",
+          "description": "Statistical Thermodynamics of Complex Liquids",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.012",
+      "title": "Physics I: Classical Mechanics",
+      "description": "This class is an introduction to classical mechanics for students who are comfortable with calculus. The main topics are: Vectors, Kinematics, Forces, Motion, Momentum, Energy, Angular Motion, Angular Momentum, Gravity, Planetary Motion, Moving Frames, and the Motion of Rigid Bodies.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.012",
+          "description": "Physics I: Classical Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.01L",
+      "title": "Physics I: Classical Mechanics",
+      "description": "8.01L is an introductory mechanics course, which covers all the topics covered in 8.01T. The class meets throughout the fall, and continues throughout the Independent Activities Period (IAP).",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.01L",
+          "description": "Physics I: Classical Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.01SC",
+      "title": "Classical Mechanics",
+      "description": "<p>This first course in the physics curriculum introduces classical mechanics. Historically, a set of core concepts—space, time, mass, force, momentum, torque, and angular momentum—were introduced in classical mechanics in order to solve the most famous physics problem, the motion of the planets.</p>\n<p>The principles of mechanics successfully described many other phenomena encountered in the world. Conservation laws involving energy, momentum and angular momentum provided a second parall...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.01SC",
+          "description": "Classical Mechanics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.02T",
+      "title": "Electricity and Magnetism",
+      "description": "<p>This freshman-level course is the second semester of introductory physics. The focus is on electricity and magnetism. The subject is taught using the TEAL (Technology Enabled Active Learning) format which utilizes small group interaction and current technology. The TEAL/Studio Project at MIT is a new approach to physics education designed to help students develop much better intuition about, and conceptual models of, physical phenomena.</p>\nAcknowledgements\n<p>The TEAL project is supported...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.02T",
+          "description": "Electricity and Magnetism",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.02X",
+      "title": "Physics II: Electricity & Magnetism with an Experimental Focus",
+      "description": "<p>This course is an introduction to electromagnetism and electrostatics. Topics include: electric charge, Coulomb’s law, electric structure of matter, conductors and dielectrics, concepts of electrostatic field and potential, electrostatic energy, electric currents, magnetic fields, Ampere’s law, magnetic materials, time-varying fields, Faraday’s law of induction, basic electric circuits, electromagnetic waves, and Maxwell’s equations. The course has an experimental focus, and includ...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.02X",
+          "description": "Physics II: Electricity & Magnetism with an Experimental Focus",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.04",
+      "title": "Quantum Physics I",
+      "description": "<p>This course covers the experimental basis of quantum physics. It introduces wave mechanics, Schrödinger’s equation in a single dimension, and Schrödinger’s equation in three dimensions.</p>\n<p>It is the first course in the undergraduate Quantum Physics sequence, followed by <em>8.05 Quantum Physics II</em> and <em>8.06 Quantum Physics III</em>.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.04",
+          "description": "Quantum Physics I",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.06",
+      "title": "Quantum Physics III",
+      "description": "This course is a continuation of <em>8.05 Quantum Physics II</em>. It introduces some of the important model systems studied in contemporary physics, including two-dimensional electron systems, the fine structure of hydrogen, lasers, and particle scattering. The lectures and lecture notes for this course form the basis of Zwiebach’s textbook <em>Mastering Quantum Mechanics</em> published by&nbsp;MIT Press&nbsp;in April 2022.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.06",
+          "description": "Quantum Physics III",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.07",
+      "title": "Electromagnetism II",
+      "description": "This course is the second in a series on Electromagnetism beginning with Electromagnetism I (8.02 or 8.022). It is a survey of basic electromagnetic phenomena: electrostatics; magnetostatics; electromagnetic properties of matter; time-dependent electromagnetic fields; Maxwell’s equations; electromagnetic waves; emission, absorption, and scattering of radiation; and relativistic electrodynamics and mechanics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.07",
+          "description": "Electromagnetism II",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.224",
+      "title": "Exploring Black Holes: General Relativity & Astrophysics",
+      "description": "Study of physical effects in the vicinity of a black hole as a basis for understanding general relativity, astrophysics, and elements of cosmology. Extension to current developments in theory and observation. Energy and momentum in flat spacetime; the metric; curvature of spacetime near rotating and nonrotating centers of attraction; trajectories and orbits of particles and light; elementary models of the Cosmos. Weekly meetings include an evening seminar and recitation. The last third of the...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.224",
+          "description": "Exploring Black Holes: General Relativity & Astrophysics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.324",
+      "title": "Relativistic Quantum Field Theory II",
+      "description": "This course is the second course of the quantum field theory trimester sequence beginning with Relativistic Quantum Field Theory I (8.323) and ending with Relativistic Quantum Field Theory III (8.325). It develops in depth some of the topics discussed in 8.323 and introduces some advanced material.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.324",
+          "description": "Relativistic Quantum Field Theory II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.325",
+      "title": "Relativistic Quantum Field Theory III",
+      "description": "This is the third and last term of the quantum field theory sequence. The course is devoted to the standard model of particle physics, including both its conceptual foundations and its specific structure, and to some current research frontiers that grow immediately out of it.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.325",
+          "description": "Relativistic Quantum Field Theory III",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.371x",
+      "title": "Quantum Information Science II",
+      "description": "<p>This three-module sequence of courses covers advanced topics in quantum computation and quantum information, including quantum error correction code techniques; efficient quantum computation principles, including fault-tolerance; and quantum complexity theory and quantum information theory. Prior knowledge of quantum circuits and elementary quantum algorithms is assumed. These courses are the second part in a sequence of two quantum information science subjects at MIT.</p>\n<p>The three mod...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "algorithms and data structures",
+        "networks and security",
+        "physics",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.371x",
+          "description": "Quantum Information Science II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.422",
+      "title": "Atomic and Optical Physics II",
+      "description": "This is the second of a two-semester subject sequence beginning with Atomic and Optical Physics I (8.421) that provides the foundations for contemporary research in selected areas of atomic and optical physics. Topics covered include non-classical states of light–squeezed states; multi-photon processes, Raman scattering; coherence–level crossings, quantum beats, double resonance, superradiance; trapping and cooling-light forces, laser cooling, atom optics, spectroscopy of trapped atoms an...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.422",
+          "description": "Atomic and Optical Physics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.511",
+      "title": "Theory of Solids I",
+      "description": "This is the first term of a theoretical treatment of the physics of solids. Topics covered include crystal structure and band theory, density functional theory, a survey of properties of metals and semiconductors, quantum Hall effect, phonons, electron phonon interaction and superconductivity.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mechanical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.511",
+          "description": "Theory of Solids I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.513",
+      "title": "Modern Quantum Many-body Physics for Condensed Matter Systems",
+      "description": "This graduate-level course covers the quantum effect in solids. It focuses on the concepts and physical pictures behind various phenomena that appear in interacting many-body systems.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.513",
+          "description": "Modern Quantum Many-body Physics for Condensed Matter Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.513",
+      "title": "Many-Body Theory for Condensed Matter Systems",
+      "description": "This course covers the concepts and physical pictures behind various phenomena that appear in interacting many-body systems. Visualization occurs through concentration on path integral, mean-field theories and semi-classical picture of fluctuations around mean-field state.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.513",
+          "description": "Many-Body Theory for Condensed Matter Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.514",
+      "title": "Strongly Correlated Systems in Condensed Matter Physics",
+      "description": "In this course we shall develop theoretical methods suitable for the description of the many-body phenomena, such as Hamiltonian second-quantized operator formalism, Greens functions, path integral, functional integral, and the quantum kinetic equation. The concepts to be introduced include, but are not limited to, the random phase approximation, the mean field theory (aka saddle-point, or semiclassical approximation), the tunneling dynamics in imaginary time, instantons, Berry phase, coheren...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.514",
+          "description": "Strongly Correlated Systems in Condensed Matter Physics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.591J",
+      "title": "Systems Biology",
+      "description": "This course introduces the mathematical modeling techniques needed to address key questions in modern biology. An overview of modeling techniques in molecular biology and genetics, cell biology and developmental biology is covered. Key experiments that validate mathematical models are also discussed, as well as molecular, cellular, and developmental systems biology, bacterial chemotaxis, genetic oscillators, control theory and genetic networks, and gradient sensing systems. Additional specifi...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.591J",
+          "description": "Systems Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.592J",
+      "title": "Statistical Physics in Biology",
+      "description": "Statistical Physics in Biology is a survey of problems at the interface of statistical physics and modern biology. Topics include: bioinformatic methods for extracting information content of DNA; gene finding, sequence comparison, and phylogenetic trees; physical interactions responsible for structure of biopolymers; DNA double helix, secondary structure of RNA, and elements of protein folding; considerations of force, motion, and packaging; protein motors, membranes. We also look at collecti...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.592J",
+          "description": "Statistical Physics in Biology",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.811",
+      "title": "Particle Physics II",
+      "description": "8.811, Particle Physics II, describes essential research in High Energy Physics. We derive the Standard Model (SM) first using a bottom up method based on Unitarity, in addition to the usual top down method using SU3xSU2xU1. We describe and analyze several classical experiments, which established the SM, as examples on how to design experiments. Further topics include heavy flavor physics, high-precision tests of the Standard Model, neutrino oscillations, searches for new phenomena (composite...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.811",
+          "description": "Particle Physics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.821",
+      "title": "String Theory and Holographic Duality",
+      "description": "This string theory course focuses on holographic duality (also known as gauge / gravity duality or AdS / CFT) as a novel method of approaching and connecting a range of diverse subjects, including quantum gravity / black holes, QCD at extreme conditions, exotic condensed matter systems, and quantum information.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.821",
+          "description": "String Theory and Holographic Duality",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.821",
+      "title": "String Theory",
+      "description": "This is a one-semester class about gauge/gravity duality (often called AdS/CFT) and its applications.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.821",
+          "description": "String Theory",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.902",
+      "title": "Astrophysics II",
+      "description": "This is the second course in a two-semester sequence on astrophysics. Topics include galactic dynamics, groups and clusters on galaxies, phenomenological cosmology, Newtonian cosmology, Roberston-Walker models, and galaxy formation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.902",
+          "description": "Astrophysics II",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.952",
+      "title": "Particle Physics of the Early Universe",
+      "description": "This course covers the basics of general relativity, standard big bang cosmology, thermodynamics of the early universe, cosmic background radiation, primordial nucleosynthesis, basics of the standard model of particle physics, electroweak and QCD phase transition, basics of group theory, grand unified theories, baryon asymmetry, monopoles, cosmic strings, domain walls, axions, inflationary universe, and structure formation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.952",
+          "description": "Particle Physics of the Early Universe",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "8.962",
+      "title": "General Relativity",
+      "description": "8.962 is MIT’s graduate course in general relativity, which covers the basic principles of Einstein’s general theory of relativity, differential geometry, experimental tests of general relativity, black holes, and cosmology.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "8.962",
+          "description": "General Relativity",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "9.29J",
+      "title": "Introduction to Computational Neuroscience",
+      "description": "<p>This course gives a mathematical introduction to neural coding and dynamics. Topics include convolution, correlation, linear systems, game theory, signal detection theory, probability theory, information theory, and reinforcement learning. Applications to neural coding, focusing on the visual system are covered, as well as Hodgkin-Huxley and other related models of neural excitability, stochastic models of ion channels, cable theory, and models of synaptic transmission.</p>\n<p>Visit the Se...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "biology",
+        "biological engineering",
+        "cognitive science",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "9.29J",
+          "description": "Introduction to Computational Neuroscience",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "MAS.865J",
+      "title": "Quantum Information Science",
+      "description": "This is an advanced graduate course on quantum computation and quantum information, for which prior knowledge of quantum mechanics is required. Topics include quantum computation, advanced quantum error correction codes, fault tolerance, quantum algorithms beyond factoring, properties of quantum entanglement, and quantum protocols and communication complexity.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "mathematics",
+        "computer science",
+        "engineering",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "MAS.865J",
+          "description": "Quantum Information Science",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "RES.8-001",
+      "title": "Applied Geometric Algebra",
+      "description": "<p>László Tisza was Professor of Physics Emeritus at MIT, where he began teaching in 1941. This online publication is a reproduction the original lecture notes for the course “Applied Geometric Algebra” taught by Professor Tisza in the Spring of 1976.</p>\n<p>Over the last 100 years, the mathematical tools employed by physicists have expanded considerably, from differential calculus, vector algebra and geometry, to advanced linear algebra, tensors, Hilbert space, spinors, Group theory an...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.8-001",
+          "description": "Applied Geometric Algebra",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    },
+    {
+      "id": "RES.8-007",
+      "title": "Cosmic Origin of the Chemical Elements ",
+      "description": "Everything around us is made from different chemical elements: carbon, silicon, iron, and all the other elements from the Periodic Table. The lighter elements were mostly produced in the Big Bang, but the rest were (and are) formed within stars and in the explosions of supernovae. In this series of short lecture videos, created to accompany her book <em>Searching for the Oldest Stars: Ancient Relics from the Early Universe</em> (Princeton University Press, 2019), Professor Anna Frebel reveals...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Physics",
+      "subdomain": "Physics",
+      "tags": [
+        "physics",
+        "chemistry",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.8-007",
+          "description": "Cosmic Origin of the Chemical Elements ",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "40.08"
+    }
+  ],
+  "edges": [
+    {
+      "from": "8.01L",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.01L typically precedes 8.224."
+    },
+    {
+      "from": "8.01SC",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.01SC typically precedes 8.224."
+    },
+    {
+      "from": "8.02T",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.02T typically precedes 8.224."
+    },
+    {
+      "from": "8.02X",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.02X typically precedes 8.224."
+    },
+    {
+      "from": "8.04",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.04 typically precedes 8.224."
+    },
+    {
+      "from": "8.06",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.06 typically precedes 8.224."
+    },
+    {
+      "from": "8.07",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.07 typically precedes 8.224."
+    },
+    {
+      "from": "RES.8-001",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.8-001 typically precedes 8.224."
+    },
+    {
+      "from": "RES.8-007",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.8-007 typically precedes 8.224."
+    },
+    {
+      "from": "8.012",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 8.012 typically precedes 8.224."
+    },
+    {
+      "from": "9.29J",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 9.29J typically precedes 8.224."
+    },
+    {
+      "from": "22.52J",
+      "to": "8.224",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 22.52J typically precedes 8.224."
+    },
+    {
+      "from": "8.224",
+      "to": "8.324",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 8.224 typically precedes 8.324."
+    },
+    {
+      "from": "8.224",
+      "to": "8.325",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 8.224 typically precedes 8.325."
+    },
+    {
+      "from": "8.224",
+      "to": "8.371x",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 8.224 typically precedes 8.371x."
+    },
+    {
+      "from": "8.422",
+      "to": "8.511",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 8.422 typically precedes graduate course 8.511."
+    },
+    {
+      "from": "8.422",
+      "to": "8.513",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 8.422 typically precedes graduate course 8.513."
+    }
+  ]
+}

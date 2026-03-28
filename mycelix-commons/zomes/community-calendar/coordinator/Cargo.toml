@@ -1,0 +1,19 @@
+[package]
+name = "community_calendar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "community_calendar"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+community_calendar_integrity = { path = "../integrity" }
+commons-types = { workspace = true }
+mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }

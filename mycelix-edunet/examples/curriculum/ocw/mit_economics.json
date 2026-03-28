@@ -1,0 +1,877 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Economics",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=14&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Economics",
+    "domain": "Economics",
+    "version": "2024",
+    "total_standards": 20,
+    "domains": [
+      "Social Sciences",
+      "Science & Math",
+      "Business & Management",
+      "Computer Science",
+      "Data Science, Analytics & Computer Technology",
+      "Economics",
+      "Political Science",
+      "Finance & Accounting",
+      "Policy and Administration",
+      "Organizations & Leadership"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 14). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "45.06"
+  },
+  "nodes": [
+    {
+      "id": "11.486J",
+      "title": "Economic Institutions and Growth Policy Analysis",
+      "description": "This course is designed for students particularly concerned with the practical problems of operating in large formal organizations, either from an operational or a research perspective. It will focus, as the title suggests, upon different forms of economic organizations and institutions in advanced and developing industrial societies and the theories (and theoretical perspectives) which might help us to understand them.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "economics",
+        "organizations & leadership",
+        "social sciences",
+        "business & management"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "11.486J",
+          "description": "Economic Institutions and Growth Policy Analysis",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.01SC",
+      "title": "Principles of Microeconomics",
+      "description": "<p><em>14.01 Principles of Microeconomics</em> is an introductory undergraduate course that teaches the fundamentals of microeconomics. This course introduces microeconomic concepts and analysis, supply and demand analysis, theories of the firm and individual behavior, competition and monopoly, and welfare economics. Students will also be introduced to the use of microeconomic applications to address problems in current economic policy throughout the semester.</p>\n<p>This course is a core sub...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.01SC",
+          "description": "Principles of Microeconomics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.05",
+      "title": "Intermediate Macroeconomics",
+      "description": "This course uses the tools of macroeconomics to study various macroeconomic policy problems in-depth. The problems range from economic growth in the long run, to government finances in the intermediate run, and economic stability in the short run. Many economic models used today are surveyed.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.05",
+          "description": "Intermediate Macroeconomics",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.06",
+      "title": "Intermediate Macroeconomic Theory",
+      "description": "This course is a survey of modern macroeconomics at a quite advanced level. Topics include the neoclassical growth model, overlapping generations, endogenous growth models, business cycles, incomplete nominal adjustment, incomplete financial markets, fiscal and monetary policy, consumption and savings, and unemployment. The course is also an introduction to the mathematical tools used in modern macroeconomics, including dynamic systems, optimal control, and dynamic programming.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "systems engineering",
+        "engineering",
+        "systems thinking",
+        "business & management",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.06",
+          "description": "Intermediate Macroeconomic Theory",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.06",
+      "title": "Intermediate Macroeconomic Theory",
+      "description": "This course is a survey of modern macroeconomics at a fairly advanced level. Topics include neoclassical and new&amp; growth theory, consumption and saving behavior, investment, and unemployment. It also includes use of the dynamic programming techniques. Assignments include problem sets and written discussions of macroeconomic events. This course is recommended for students planning to apply to graduate school in economics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "systems engineering",
+        "systems thinking",
+        "engineering",
+        "business & management",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.06",
+          "description": "Intermediate Macroeconomic Theory",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.09",
+      "title": "Financial Crises",
+      "description": "<p>This course is an introduction to the economic theories of financial crises. It focuses on amplification mechanisms that exacerbate crises, such as leverage, fire sales, bank runs, interconnections, and complexity. It also analyzes the different perspectives on the origins of crises, such as mistaken beliefs and moral hazard, and discusses the optimal regulation of the financial system. The course draws upon examples from financial crises around the world, especially the recent subprime fi...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Finance & Accounting",
+      "tags": [
+        "finance & accounting",
+        "economics",
+        "business & management",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.09",
+          "description": "Financial Crises",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.121",
+      "title": "Microeconomic Theory I",
+      "description": "This half-semester course provides an introduction to microeconomic theory designed to meet the needs of students in an economics Ph.D. program. Some parts of the course are designed to teach material that all graduate students should know. Others are used to introduce methodologies. Students should be comfortable with multivariable calculus, linear algebra, and basic real analysis.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.121",
+          "description": "Microeconomic Theory I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.128",
+      "title": "Dynamic Optimization & Economic Applications (Recursive Methods)",
+      "description": "The unifying theme of this course is best captured by the title of our main reference book: “Recursive Methods in Economic Dynamics”. We start by covering deterministic and stochastic dynamic optimization using dynamic programming analysis. We then study the properties of the resulting dynamic systems. Finally, we will go over a recursive method for repeated games that has proven useful in contract theory and macroeconomics. We shall stress applications and examples of all these technique...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "economics",
+        "systems engineering",
+        "systems thinking",
+        "business & management",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.128",
+          "description": "Dynamic Optimization & Economic Applications (Recursive Methods)",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.15J",
+      "title": "Networks",
+      "description": "This course will highlight common principles that permeate the functioning of networks and how the same issues related to robustness, fragility and interlinkages arise in several different types of networks. It will both introduce conceptual tools from dynamical systems, random graph models, optimization and game theory, and cover a wide variety of applications.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "computer science",
+        "engineering",
+        "networks and security",
+        "data science, analytics & computer technology",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.15J",
+          "description": "Networks",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.282",
+      "title": "Organizational Economics",
+      "description": "<p>This course in organizational economics prepares doctoral students for further study in the field. The course introduces the classic papers and some recent research. The material is organized into the following modules: boundaries of the firm, employment in organizations, decision-making in organizations, and structures and processes in organizations. Each class session covers a few leading papers.</p>\n<p>This course was joint-taught between faculty of the Massachusetts Institute of Techno...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "organizations & leadership",
+        "social sciences",
+        "business & management"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.282",
+          "description": "Organizational Economics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.387",
+      "title": "Applied Econometrics: Mostly Harmless Big Data",
+      "description": "This course covers empirical strategies for applied micro research questions. Our agenda includes regression and matching, instrumental variables, differences-in-differences, regression discontinuity designs, standard errors, and a module consisting of 8–9 lectures on the analysis of high-dimensional data sets a.k.a. “Big Data”.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "economics",
+        "computer science",
+        "data science",
+        "engineering",
+        "data science, analytics & computer technology",
+        "social sciences",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.387",
+          "description": "Applied Econometrics: Mostly Harmless Big Data",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.451",
+      "title": "Dynamic Optimization Methods with Applications",
+      "description": "This course focuses on dynamic optimization methods, both in discrete and in continuous time. We approach these problems from a dynamic programming and optimal control perspective. We also study the dynamic systems that come from the solutions to these problems. The course will illustrate how these techniques are useful in various applications, drawing on many economic examples. However, the focus will remain on gaining a general command of the tools so that they can be applied later in other...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "mathematics",
+        "economics",
+        "systems engineering",
+        "systems thinking",
+        "business & management",
+        "social sciences",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.451",
+          "description": "Dynamic Optimization Methods with Applications",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.451",
+      "title": "Macroeconomic Theory I",
+      "description": "Introduction to the theories of economic growth. Topics will include basic facts of economic growth and long-run economic development; brief overview of optimal control theory and dynamic programming; basic neoclassical growth model under a variety of market structures; human capital and economic growth; endogenous growth models; models with endogenous technology; models of directed technical change; competition, market structure and growth; financial and economic development; international t...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.451",
+          "description": "Macroeconomic Theory I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.454",
+      "title": "Economic Crises",
+      "description": "14.454 is an introduction to current macroeconomic concerns with particular emphasis on medium-run economic fluctuations, economic crises, and the role of asset markets. Topics include the explanation of high chronic unemployment in some nations, the source of modern liquidity crises, the origin and end of speculative bubbles, and the factors that lead to substantial periods of economic stagnation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.454",
+          "description": "Economic Crises",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.581",
+      "title": "International Economics I",
+      "description": "This course covers, with a focus on both theory and empirics, advanced topics in international trade (as well as inter-regional trade and economic geography.) It includes the study of positive issues, such as: Why do countries trade? What goods do countries trade? What are the implications of openness for the location of production, industries, occupations, and innovative activity? And, what impedes trade and why do some countries deliberately erect policy impediments to trade? The course als...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.581",
+          "description": "International Economics I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.64",
+      "title": "Labor Economics and Public Policy",
+      "description": "This course is an introduction to labor economics with an emphasis on applied microeconomic theory and empirical analysis. We are especially interested in the link between research and public policy. Topics to be covered include: labor supply and demand, taxes and transfers, minimum wages, immigration, human capital, education production, inequality, discrimination, unions and strikes, and unemployment.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Policy and Administration",
+      "tags": [
+        "policy and administration",
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.64",
+          "description": "Labor Economics and Public Policy",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.661",
+      "title": "Labor Economics I",
+      "description": "This course aims to acquaint students with traditional and contemporary topics in labor economics and to encourage the development of independent research interests. The class provides a systematic development of the theory of labor supply, labor demand, and human capital. Topics covered include wage and employment determination, immigration, unemployment, equalizing differences, among many others. There is a particular emphasis on the interaction between theoretical and empirical modeling.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.661",
+          "description": "Labor Economics I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.71",
+      "title": "Economic History of Financial Crises",
+      "description": "This course gives a historical perspective on financial panics. Topics include the growth of the industrial world, the Great Depression and surrounding events, and more recent topics such as the first oil crisis, Japanese stagnation, and conditions following the financial crisis of 2008.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "history",
+        "economics",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.71",
+          "description": "Economic History of Financial Crises",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "14.731",
+      "title": "Economic History",
+      "description": "This course is a survey of world economic history, and it introduces economics students to the subject matter and methodology of economic history. It is designed to expand the range of empirical settings in students’ research by drawing upon historical material and long-run data. Topics are chosen to show a wide variety of historical experience and illuminate the process of industrialization. The emphasis will be on questions related to labor markets and economic growth.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "History",
+      "tags": [
+        "history",
+        "economics",
+        "humanities",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.731",
+          "description": "Economic History",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "45.06"
+    },
+    {
+      "id": "17.100J",
+      "title": "Political Economy I",
+      "description": "Political Economy I explores the major social science paradigms for analyzing relations among state, economy, and society. Through readings, lectures and discussion of original texts in political liberalism and individualism, neo-classical economics, Marxism, sociological and cultural theories, and neo-institutionalism, the seminar examines the fundamental assumptions on which our understanding of the social world and our research are based.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Economics",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "political science",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "17.100J",
+          "description": "Political Economy I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "45.06"
+    }
+  ],
+  "edges": [
+    {
+      "from": "14.01SC",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.01SC typically precedes 17.100J."
+    },
+    {
+      "from": "14.01SC",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.01SC typically precedes 14.121."
+    },
+    {
+      "from": "14.01SC",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.01SC typically precedes 14.128."
+    },
+    {
+      "from": "14.05",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.05 typically precedes 17.100J."
+    },
+    {
+      "from": "14.05",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.05 typically precedes 14.121."
+    },
+    {
+      "from": "14.05",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.05 typically precedes 14.128."
+    },
+    {
+      "from": "14.06",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.06 typically precedes 17.100J."
+    },
+    {
+      "from": "14.06",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.06 typically precedes 14.121."
+    },
+    {
+      "from": "14.06",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.06 typically precedes 14.128."
+    },
+    {
+      "from": "14.06",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.06 typically precedes 17.100J."
+    },
+    {
+      "from": "14.06",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.06 typically precedes 14.121."
+    },
+    {
+      "from": "14.06",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.06 typically precedes 14.128."
+    },
+    {
+      "from": "14.09",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.09 typically precedes 17.100J."
+    },
+    {
+      "from": "14.09",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.09 typically precedes 14.121."
+    },
+    {
+      "from": "14.09",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.09 typically precedes 14.128."
+    },
+    {
+      "from": "14.15J",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 17.100J."
+    },
+    {
+      "from": "14.15J",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 14.121."
+    },
+    {
+      "from": "14.15J",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 14.128."
+    },
+    {
+      "from": "14.64",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.64 typically precedes 17.100J."
+    },
+    {
+      "from": "14.64",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.64 typically precedes 14.121."
+    },
+    {
+      "from": "14.64",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.64 typically precedes 14.128."
+    },
+    {
+      "from": "14.71",
+      "to": "17.100J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.71 typically precedes 17.100J."
+    },
+    {
+      "from": "14.71",
+      "to": "14.121",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.71 typically precedes 14.121."
+    },
+    {
+      "from": "14.71",
+      "to": "14.128",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.71 typically precedes 14.128."
+    },
+    {
+      "from": "14.282",
+      "to": "14.387",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 14.282 typically precedes 14.387."
+    },
+    {
+      "from": "14.282",
+      "to": "14.451",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 14.282 typically precedes 14.451."
+    },
+    {
+      "from": "14.282",
+      "to": "14.451",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 14.282 typically precedes 14.451."
+    },
+    {
+      "from": "11.486J",
+      "to": "14.581",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 11.486J typically precedes graduate course 14.581."
+    },
+    {
+      "from": "11.486J",
+      "to": "14.661",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 11.486J typically precedes graduate course 14.661."
+    }
+  ]
+}

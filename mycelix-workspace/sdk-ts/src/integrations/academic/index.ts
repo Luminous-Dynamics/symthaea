@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk Academic Credentials Integration (Legacy Bridge)
  *
@@ -637,4 +640,144 @@ export function getAcademicService(): AcademicCredentialService {
  */
 export function resetAcademicService(): void {
   _instance = null;
+}
+
+// ============================================================================
+// Academic Holochain Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Academic/Knowledge cluster */
+export class AcademicBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    },
+  ) {}
+
+  // -- Claims zome (credential management) --
+
+  async registerCredential(credential: AcademicCredential): Promise<void> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'register_credential',
+      payload: credential,
+    });
+  }
+
+  async getCredential(credentialId: string): Promise<AcademicCredential | null> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'get_credential',
+      payload: credentialId,
+    });
+  }
+
+  async listCredentialsBySubject(subjectDid: string): Promise<AcademicCredential[]> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'list_credentials_by_subject',
+      payload: subjectDid,
+    });
+  }
+
+  async listCredentialsByInstitution(institutionDid: string): Promise<AcademicCredential[]> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'list_credentials_by_institution',
+      payload: institutionDid,
+    });
+  }
+
+  async verifyCredential(credentialId: string): Promise<CredentialVerification> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'verify_credential',
+      payload: credentialId,
+    });
+  }
+
+  // -- Revocations --
+
+  async registerRevocation(revocation: CredentialRevocation): Promise<void> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'register_revocation',
+      payload: revocation,
+    });
+  }
+
+  async isRevoked(credentialId: string): Promise<boolean> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'claims',
+      fn_name: 'is_revoked',
+      payload: credentialId,
+    });
+  }
+
+  // -- Graph zome (knowledge graph queries) --
+
+  async publishEpistemicClaim(credentialId: string): Promise<EpistemicClaim> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'graph',
+      fn_name: 'publish_epistemic_claim',
+      payload: credentialId,
+    });
+  }
+
+  async getInstitutionReputation(institutionDid: string): Promise<number> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'graph',
+      fn_name: 'get_institution_reputation',
+      payload: institutionDid,
+    });
+  }
+
+  // -- Query zome (search and stats) --
+
+  async getStats(): Promise<{
+    totalCredentials: number;
+    totalRevocations: number;
+    institutionCount: number;
+    degreeBreakdown: Record<DegreeType, number>;
+  }> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'query',
+      fn_name: 'get_stats',
+      payload: null,
+    });
+  }
+
+  async searchCredentials(params: {
+    degreeType?: DegreeType;
+    fieldOfStudy?: string;
+    institution?: string;
+    limit?: number;
+  }): Promise<AcademicCredential[]> {
+    return this.client.callZome({
+      role_name: 'knowledge',
+      zome_name: 'query',
+      fn_name: 'search_credentials',
+      payload: {
+        degree_type: params.degreeType,
+        field_of_study: params.fieldOfStudy,
+        institution: params.institution,
+        limit: params.limit,
+      },
+    });
+  }
 }

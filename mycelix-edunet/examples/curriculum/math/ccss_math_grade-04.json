@@ -1,0 +1,920 @@
+{
+  "metadata": {
+    "title": "Grade 4",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade4",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 28,
+    "domains": [
+      "Number and Operations—Fractions",
+      "Geometry",
+      "Measurement and Data",
+      "Number and Operations in Base Ten",
+      "Operations and Algebraic Thinking",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_grade-04). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.4.NF.C.7",
+      "title": "Compare two decimals to hundredths by reasoning about their size",
+      "description": "Compare two decimals to hundredths by reasoning about their size. Recognize that comparisons are valid only when the two decimals refer to the same whole. Record the results of comparisons with the symbols >, =, or <, and justify the conclusions, e.g., by using a visual model.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "decimals"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.C.7",
+          "description": "Compare two decimals to hundredths by reasoning about their size. Recognize that comparisons are valid only when the two decimals refer to the same whole. Record the results of comparisons with the symbols >, =, or <, and justify the conclusions, e.g., by using a visual model.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NF.C.6",
+      "title": "Use decimal notation for fractions with denominators 10 or 100",
+      "description": "Use decimal notation for fractions with denominators 10 or 100.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.C.6",
+          "description": "Use decimal notation for fractions with denominators 10 or 100.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NF.C.5",
+      "title": "Express a fraction with denominator 10 as an equivalent fraction with denomin...",
+      "description": "Express a fraction with denominator 10 as an equivalent fraction with denominator 100, and use this technique to add two fractions with respective denominators 10 and 100.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.C.5",
+          "description": "Express a fraction with denominator 10 as an equivalent fraction with denominator 100, and use this technique to add two fractions with respective denominators 10 and 100.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NF.B.4",
+      "title": "Apply and extend previous understandings of multiplication to multiply a frac...",
+      "description": "Apply and extend previous understandings of multiplication to multiply a fraction by a whole number.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "multiplication"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.B.4",
+          "description": "Apply and extend previous understandings of multiplication to multiply a fraction by a whole number.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NF.B.3",
+      "title": "Understand a fraction a/b with a > 1 as a sum of fractions 1/b",
+      "description": "Understand a fraction a/b with a > 1 as a sum of fractions 1/b.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.B.3",
+          "description": "Understand a fraction a/b with a > 1 as a sum of fractions 1/b.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NF.A.2",
+      "title": "Compare two fractions with different numerators and different denominators, e",
+      "description": "Compare two fractions with different numerators and different denominators, e.g., by creating common denominators or numerators, or by comparing to a benchmark fraction such as 1/2. Recognize that comparisons are valid only when the two fractions refer to the same whole. Record the results of comparisons with symbols >, =, or <, and justify the conclusions, e.g., by using a visual fraction model.",
+      "node_type": "Project",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.A.2",
+          "description": "Compare two fractions with different numerators and different denominators, e.g., by creating common denominators or numerators, or by comparing to a benchmark fraction such as 1/2. Recognize that comparisons are valid only when the two fractions refer to the same whole. Record the results of comparisons with symbols >, =, or <, and justify the conclusions, e.g., by using a visual fraction model.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NF.A.1",
+      "title": "Explain why a fraction a/b is equivalent to a fraction (n × a)/(n × b) by u...",
+      "description": "Explain why a fraction a/b is equivalent to a fraction (n × a)/(n × b) by using visual fraction models, with attention to how the number and size of the parts differ even though the two fractions themselves are the same size. Use this principle to recognize and generate equivalent fractions.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations—Fractions",
+      "tags": [
+        "fractions"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NF.A.1",
+          "description": "Explain why a fraction a/b is equivalent to a fraction (n × a)/(n × b) by using visual fraction models, with attention to how the number and size of the parts differ even though the two fractions themselves are the same size. Use this principle to recognize and generate equivalent fractions.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.G.A.3",
+      "title": "Recognize a line of symmetry for a two-dimensional figure as a line across th...",
+      "description": "Recognize a line of symmetry for a two-dimensional figure as a line across the figure such that the figure can be folded along the line into matching parts. Identify line-symmetric figures and draw lines of symmetry.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "symmetry"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.G.A.3",
+          "description": "Recognize a line of symmetry for a two-dimensional figure as a line across the figure such that the figure can be folded along the line into matching parts. Identify line-symmetric figures and draw lines of symmetry.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.G.A.2",
+      "title": "Classify two-dimensional figures based on the presence or absence of parallel...",
+      "description": "Classify two-dimensional figures based on the presence or absence of parallel or perpendicular lines, or the presence or absence of angles of a specified size. Recognize right triangles as a category, and identify right triangles.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.G.A.2",
+          "description": "Classify two-dimensional figures based on the presence or absence of parallel or perpendicular lines, or the presence or absence of angles of a specified size. Recognize right triangles as a category, and identify right triangles.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.G.A.1",
+      "title": "Draw points, lines, line segments, rays, angles (right, acute, obtuse), and p...",
+      "description": "Draw points, lines, line segments, rays, angles (right, acute, obtuse), and perpendicular and parallel lines. Identify these in two-dimensional figures.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.G.A.1",
+          "description": "Draw points, lines, line segments, rays, angles (right, acute, obtuse), and perpendicular and parallel lines. Identify these in two-dimensional figures.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.C.7",
+      "title": "Recognize angle measure as additive",
+      "description": "Recognize angle measure as additive. When an angle is decomposed into non-overlapping parts, the angle measure of the whole is the sum of the angle measures of the parts. Solve addition and subtraction problems to find unknown angles on a diagram in real world and mathematical problems, e.g., by using an equation with a symbol for the unknown angle measure.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "addition",
+        "subtraction",
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.C.7",
+          "description": "Recognize angle measure as additive. When an angle is decomposed into non-overlapping parts, the angle measure of the whole is the sum of the angle measures of the parts. Solve addition and subtraction problems to find unknown angles on a diagram in real world and mathematical problems, e.g., by using an equation with a symbol for the unknown angle measure.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.C.6",
+      "title": "Measure angles in whole-number degrees using a protractor",
+      "description": "Measure angles in whole-number degrees using a protractor. Sketch angles of specified measure.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.C.6",
+          "description": "Measure angles in whole-number degrees using a protractor. Sketch angles of specified measure.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.C.5",
+      "title": "Recognize angles as geometric shapes that are formed wherever two rays share ...",
+      "description": "Recognize angles as geometric shapes that are formed wherever two rays share a common endpoint, and understand concepts of angle measurement:",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement",
+        "angles"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.C.5",
+          "description": "Recognize angles as geometric shapes that are formed wherever two rays share a common endpoint, and understand concepts of angle measurement:",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.B.4",
+      "title": "Make a line plot to display a data set of measurements in fractions of a unit...",
+      "description": "Make a line plot to display a data set of measurements in fractions of a unit (1/2, 1/4, 1/8). Solve problems involving addition and subtraction of fractions by using information presented in line plots.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "addition",
+        "subtraction",
+        "fractions",
+        "measurement",
+        "data"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.B.4",
+          "description": "Make a line plot to display a data set of measurements in fractions of a unit (1/2, 1/4, 1/8). Solve problems involving addition and subtraction of fractions by using information presented in line plots.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.A.3",
+      "title": "Apply the area and perimeter formulas for rectangles in real world and mathem...",
+      "description": "Apply the area and perimeter formulas for rectangles in real world and mathematical problems.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "area",
+        "perimeter",
+        "angles"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.A.3",
+          "description": "Apply the area and perimeter formulas for rectangles in real world and mathematical problems.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.A.2",
+      "title": "Use the four operations to solve word problems involving distances, intervals...",
+      "description": "Use the four operations to solve word problems involving distances, intervals of time, liquid volumes, masses of objects, and money, including problems involving simple fractions or decimals, and problems that require expressing measurements given in a larger unit in terms of a smaller unit. Represent measurement quantities using diagrams such as number line diagrams that feature a measurement scale.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "fractions",
+        "decimals",
+        "measurement",
+        "volume"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.A.2",
+          "description": "Use the four operations to solve word problems involving distances, intervals of time, liquid volumes, masses of objects, and money, including problems involving simple fractions or decimals, and problems that require expressing measurements given in a larger unit in terms of a smaller unit. Represent measurement quantities using diagrams such as number line diagrams that feature a measurement scale.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.MD.A.1",
+      "title": "Know relative sizes of measurement units within one system of units including...",
+      "description": "Know relative sizes of measurement units within one system of units including km, m, cm; kg, g; lb, oz.; l, ml; hr, min, sec. Within a single system of measurement, express measurements in a larger unit in terms of a smaller unit. Record measurement equivalents in a two column table.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement and Data",
+      "tags": [
+        "measurement"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.MD.A.1",
+          "description": "Know relative sizes of measurement units within one system of units including km, m, cm; kg, g; lb, oz.; l, ml; hr, min, sec. Within a single system of measurement, express measurements in a larger unit in terms of a smaller unit. Record measurement equivalents in a two column table.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NBT.B.6",
+      "title": "Find whole-number quotients and remainders with up to four-digit dividends an...",
+      "description": "Find whole-number quotients and remainders with up to four-digit dividends and one-digit divisors, using strategies based on place value, the properties of operations, and/or the relationship between multiplication and division. Illustrate and explain the calculation by using equations, rectangular arrays, and/or area models.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "multiplication",
+        "division",
+        "equations",
+        "area"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NBT.B.6",
+          "description": "Find whole-number quotients and remainders with up to four-digit dividends and one-digit divisors, using strategies based on place value, the properties of operations, and/or the relationship between multiplication and division. Illustrate and explain the calculation by using equations, rectangular arrays, and/or area models.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NBT.B.5",
+      "title": "Multiply a whole number of up to four digits by a one-digit whole number, and...",
+      "description": "Multiply a whole number of up to four digits by a one-digit whole number, and multiply two two-digit numbers, using strategies based on place value and the properties of operations. Illustrate and explain the calculation by using equations, rectangular arrays, and/or area models.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [
+        "equations",
+        "area"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NBT.B.5",
+          "description": "Multiply a whole number of up to four digits by a one-digit whole number, and multiply two two-digit numbers, using strategies based on place value and the properties of operations. Illustrate and explain the calculation by using equations, rectangular arrays, and/or area models.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NBT.B.4",
+      "title": "Fluently add and subtract multi-digit whole numbers using the standard algorithm",
+      "description": "Fluently add and subtract multi-digit whole numbers using the standard algorithm.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NBT.B.4",
+          "description": "Fluently add and subtract multi-digit whole numbers using the standard algorithm.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NBT.A.3",
+      "title": "Use place value understanding to round multi-digit whole numbers to any place",
+      "description": "Use place value understanding to round multi-digit whole numbers to any place.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NBT.A.3",
+          "description": "Use place value understanding to round multi-digit whole numbers to any place.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NBT.A.2",
+      "title": "Read and write multi-digit whole numbers using base-ten numerals, number name...",
+      "description": "Read and write multi-digit whole numbers using base-ten numerals, number names, and expanded form. Compare two multi-digit numbers based on meanings of the digits in each place, using >, =, and < symbols to record the results of comparisons.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NBT.A.2",
+          "description": "Read and write multi-digit whole numbers using base-ten numerals, number names, and expanded form. Compare two multi-digit numbers based on meanings of the digits in each place, using >, =, and < symbols to record the results of comparisons.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.NBT.A.1",
+      "title": "Recognize that in a multi-digit whole number, a digit in one place represents...",
+      "description": "Recognize that in a multi-digit whole number, a digit in one place represents ten times what it represents in the place to its right.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Number and Operations in Base Ten",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.NBT.A.1",
+          "description": "Recognize that in a multi-digit whole number, a digit in one place represents ten times what it represents in the place to its right.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.OA.C.5",
+      "title": "Generate a number or shape pattern that follows a given rule",
+      "description": "Generate a number or shape pattern that follows a given rule. Identify apparent features of the pattern that were not explicit in the rule itself.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.OA.C.5",
+          "description": "Generate a number or shape pattern that follows a given rule. Identify apparent features of the pattern that were not explicit in the rule itself.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.OA.B.4",
+      "title": "Find all factor pairs for a whole number in the range 1—100",
+      "description": "Find all factor pairs for a whole number in the range 1—100. Recognize that a whole number is a multiple of each of its factors. Determine whether a given whole number in the range 1—100 is a multiple of a given one-digit number. Determine whether a given whole number in the range 1—100 is prime or composite.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.OA.B.4",
+          "description": "Find all factor pairs for a whole number in the range 1—100. Recognize that a whole number is a multiple of each of its factors. Determine whether a given whole number in the range 1—100 is a multiple of a given one-digit number. Determine whether a given whole number in the range 1—100 is prime or composite.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.OA.A.3",
+      "title": "Solve multistep word problems posed with whole numbers and having whole-numbe...",
+      "description": "Solve multistep word problems posed with whole numbers and having whole-number answers using the four operations, including problems in which remainders must be interpreted. Represent these problems using equations with a letter standing for the unknown quantity. Assess the reasonableness of answers using mental computation and estimation strategies including rounding.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.OA.A.3",
+          "description": "Solve multistep word problems posed with whole numbers and having whole-number answers using the four operations, including problems in which remainders must be interpreted. Represent these problems using equations with a letter standing for the unknown quantity. Assess the reasonableness of answers using mental computation and estimation strategies including rounding.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.OA.A.2",
+      "title": "Multiply or divide to solve word problems involving multiplicative comparison, e",
+      "description": "Multiply or divide to solve word problems involving multiplicative comparison, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem, distinguishing multiplicative comparison from additive comparison.",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "equations"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.OA.A.2",
+          "description": "Multiply or divide to solve word problems involving multiplicative comparison, e.g., by using drawings and equations with a symbol for the unknown number to represent the problem, distinguishing multiplicative comparison from additive comparison.",
+          "grade_level": "Grade4"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.4.OA.A.1",
+      "title": "Interpret a multiplication equation as a comparison, e",
+      "description": "Interpret a multiplication equation as a comparison, e.g., interpret 35 = 5 × 7 as a statement that 35 is 5 times as many as 7 and 7 times as many as 5. Represent verbal statements of multiplicative comparisons as multiplication equations.",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Operations and Algebraic Thinking",
+      "tags": [
+        "multiplication",
+        "equations"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade4"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.4.OA.A.1",
+          "description": "Interpret a multiplication equation as a comparison, e.g., interpret 35 = 5 × 7 as a statement that 35 is 5 times as many as 7 and 7 times as many as 5. Represent verbal statements of multiplicative comparisons as multiplication equations.",
+          "grade_level": "Grade4"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.4.G.A.1",
+      "to": "CCSS.Math.Content.4.G.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.G.A.1 is a prerequisite for CCSS.Math.Content.4.G.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.G.A.2",
+      "to": "CCSS.Math.Content.4.G.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.G.A.2 is a prerequisite for CCSS.Math.Content.4.G.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.OA.A.1",
+      "to": "CCSS.Math.Content.4.OA.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.OA.A.1 is a prerequisite for CCSS.Math.Content.4.OA.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.OA.A.2",
+      "to": "CCSS.Math.Content.4.OA.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.OA.A.2 is a prerequisite for CCSS.Math.Content.4.OA.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.OA.A.3",
+      "to": "CCSS.Math.Content.4.OA.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.OA.A.3 is a prerequisite for CCSS.Math.Content.4.OA.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.OA.B.4",
+      "to": "CCSS.Math.Content.4.OA.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.OA.B.4 is a prerequisite for CCSS.Math.Content.4.OA.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NF.A.1",
+      "to": "CCSS.Math.Content.4.NF.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NF.A.1 is a prerequisite for CCSS.Math.Content.4.NF.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NF.A.2",
+      "to": "CCSS.Math.Content.4.NF.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NF.A.2 is a prerequisite for CCSS.Math.Content.4.NF.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NF.B.3",
+      "to": "CCSS.Math.Content.4.NF.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NF.B.3 is a prerequisite for CCSS.Math.Content.4.NF.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NF.B.4",
+      "to": "CCSS.Math.Content.4.NF.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NF.B.4 is a prerequisite for CCSS.Math.Content.4.NF.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NF.C.5",
+      "to": "CCSS.Math.Content.4.NF.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NF.C.5 is a prerequisite for CCSS.Math.Content.4.NF.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NF.C.6",
+      "to": "CCSS.Math.Content.4.NF.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NF.C.6 is a prerequisite for CCSS.Math.Content.4.NF.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.MD.A.1",
+      "to": "CCSS.Math.Content.4.MD.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.MD.A.1 is a prerequisite for CCSS.Math.Content.4.MD.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.MD.A.2",
+      "to": "CCSS.Math.Content.4.MD.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.MD.A.2 is a prerequisite for CCSS.Math.Content.4.MD.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.MD.A.3",
+      "to": "CCSS.Math.Content.4.MD.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.MD.A.3 is a prerequisite for CCSS.Math.Content.4.MD.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.MD.B.4",
+      "to": "CCSS.Math.Content.4.MD.C.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.MD.B.4 is a prerequisite for CCSS.Math.Content.4.MD.C.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.MD.C.5",
+      "to": "CCSS.Math.Content.4.MD.C.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.MD.C.5 is a prerequisite for CCSS.Math.Content.4.MD.C.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.MD.C.6",
+      "to": "CCSS.Math.Content.4.MD.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.MD.C.6 is a prerequisite for CCSS.Math.Content.4.MD.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NBT.A.1",
+      "to": "CCSS.Math.Content.4.NBT.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NBT.A.1 is a prerequisite for CCSS.Math.Content.4.NBT.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NBT.A.2",
+      "to": "CCSS.Math.Content.4.NBT.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NBT.A.2 is a prerequisite for CCSS.Math.Content.4.NBT.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NBT.A.3",
+      "to": "CCSS.Math.Content.4.NBT.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NBT.A.3 is a prerequisite for CCSS.Math.Content.4.NBT.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NBT.B.4",
+      "to": "CCSS.Math.Content.4.NBT.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NBT.B.4 is a prerequisite for CCSS.Math.Content.4.NBT.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.4.NBT.B.5",
+      "to": "CCSS.Math.Content.4.NBT.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.4.NBT.B.5 is a prerequisite for CCSS.Math.Content.4.NBT.B.6 within the same domain."
+    }
+  ]
+}

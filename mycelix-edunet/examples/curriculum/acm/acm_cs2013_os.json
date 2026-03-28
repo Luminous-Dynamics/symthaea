@@ -1,0 +1,132 @@
+{
+  "metadata": {
+    "title": "CS2013: Operating Systems",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Operating Systems",
+    "domain": "CS2013: Operating Systems",
+    "version": "2024",
+    "total_standards": 4,
+    "domains": [
+      "OS role",
+      "threads",
+      "file systems",
+      "virtual memory"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Operating Systems. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 1
+  },
+  "nodes": [
+    {
+      "id": "OS/Overview",
+      "title": "Overview of Operating Systems",
+      "description": "Overview of Operating Systems (Tier1, 2 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "OS role",
+      "tags": [
+        "OS role",
+        "kernel",
+        "system calls",
+        "protection"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:OS"
+    },
+    {
+      "id": "OS/Concurrency",
+      "title": "Concurrency",
+      "description": "Concurrency (Tier2, 3 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "threads",
+      "tags": [
+        "threads",
+        "synchronization",
+        "semaphores",
+        "monitors",
+        "deadlock"
+      ],
+      "estimated_hours": 9,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:OS"
+    },
+    {
+      "id": "OS/MemMgmt",
+      "title": "Memory Management",
+      "description": "Memory Management (Tier2, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "virtual memory",
+      "tags": [
+        "virtual memory",
+        "paging",
+        "segmentation",
+        "memory allocation",
+        "cache"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:OS"
+    },
+    {
+      "id": "OS/FileSystems",
+      "title": "File Systems",
+      "description": "File Systems (Tier2, 2 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "file systems",
+      "tags": [
+        "file systems",
+        "directories",
+        "access control",
+        "journaling"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:OS"
+    }
+  ],
+  "edges": []
+}

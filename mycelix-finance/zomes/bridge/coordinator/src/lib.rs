@@ -1,4 +1,8 @@
 #![deny(unsafe_code)]
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Finance Bridge Coordinator Zome
 //!
 //! Cross-hApp communication for payment processing, collateral management,
@@ -2088,4 +2092,63 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
             e
         )))
     })
+}
+
+// ============================================================================
+// Notification Service
+// ============================================================================
+
+/// Receive a cross-cluster notification and store it locally.
+#[hdk_extern]
+pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = anchor_hash(&format!("notifications:{:?}", agent))?;
+    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+    let all_anchor = anchor_hash("all_notifications")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+    let signal = mycelix_bridge_common::notifications::NotificationSignal {
+        signal_type: "cross_cluster_notification".into(),
+        source_cluster: notification.source_cluster,
+        event_type: notification.event_type,
+        payload: notification.payload,
+        priority: notification.priority,
+    };
+    emit_signal(&signal)?;
+    Ok(action_hash)
+}
+
+/// Get notifications for the calling agent.
+#[hdk_extern]
+pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = anchor_hash(&format!("notifications:{:?}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
+        GetStrategy::default(),
+    )?;
+    let limit = input.limit
+        .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
+        .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
+    let mut records = Vec::new();
+    for link in links.iter().rev().take(limit) {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get unread notification count for the calling agent.
+#[hdk_extern]
+pub fn get_unread_count(_: ()) -> ExternResult<u32> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let inbox_anchor = anchor_hash(&format!("notifications:{:?}", agent))?;
+    let links = get_links(
+        LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
+        GetStrategy::default(),
+    )?;
+    Ok(links.len() as u32)
 }

@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "title": "CS2013: Information Assurance and Security",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Information Assurance and Security",
+    "domain": "CS2013: Information Assurance and Security",
+    "version": "2024",
+    "total_standards": 2,
+    "domains": [
+      "symmetric encryption",
+      "confidentiality"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Information Assurance and Security. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 0
+  },
+  "nodes": [
+    {
+      "id": "IAS/Foundations",
+      "title": "Foundational Concepts in Security",
+      "description": "Foundational Concepts in Security (Tier1, 1 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "confidentiality",
+      "tags": [
+        "confidentiality",
+        "integrity",
+        "availability",
+        "threat models",
+        "least privilege"
+      ],
+      "estimated_hours": 3,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:IAS"
+    },
+    {
+      "id": "IAS/Cryptography",
+      "title": "Cryptography",
+      "description": "Cryptography (Tier2, 3 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "symmetric encryption",
+      "tags": [
+        "symmetric encryption",
+        "public key cryptography",
+        "hash functions",
+        "digital signatures",
+        "certificates"
+      ],
+      "estimated_hours": 9,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "200-300",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:IAS"
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,413 @@
+\documentclass[11pt,twocolumn]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=green!40!black,urlcolor=blue!60!black}
+
+\lstset{
+  language=Rust,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{red!60!black},
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+
+\title{Decentralized Knowledge Verification: Claims, Inference, and Factchecking with Epistemic Mesh}
+\author{Tristan Stoltz \\ Luminous Dynamics \\ \texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
+\date{March 2026}
+
+\begin{document}
+
+\twocolumn[
+\begin{@twocolumnfalse}
+\maketitle
+
+\begin{abstract}
+We present a decentralized knowledge verification system implemented as 8
+Holochain zomes: claims registration, knowledge graph construction, semantic
+query, logical inference, multi-source factchecking, prediction market
+integration, distributed key generation for knowledge attestation, and
+cross-cluster bridge. The system forms an ``epistemic mesh'' where knowledge
+claims are verified through multiple independent pathways---peer review,
+logical inference, prediction market pricing, and cross-domain
+corroboration---each contributing to a composite confidence score. Verification
+quality is weighted by the verifier's consciousness tier and domain engagement,
+creating an incentive structure where epistemic authority derives from
+demonstrated knowledge rather than institutional position. The knowledge graph
+is distributed across Holochain's DHT with typed relationships (supports,
+contradicts, extends, specializes) and supports transitive confidence
+propagation across claim chains. Integration with 15 other Mycelix clusters
+enables cross-domain knowledge verification: a climate claim can be corroborated
+by supply chain provenance data, space-based observations, and energy grid
+measurements.
+\end{abstract}
+\end{@twocolumnfalse}
+]
+
+\section{Introduction}
+
+Centralized knowledge systems---Wikipedia, Snopes, institutional peer
+review---face a fundamental trust problem: who verifies the verifiers?
+Centralized platforms concentrate epistemic authority in editors,
+administrators, and reviewers whose incentives may not align with truth.
+
+Decentralized alternatives have emerged---prediction markets for forecasting,
+blockchain-based fact-checking protocols, and peer-to-peer review
+systems---but these typically address only one aspect of knowledge
+verification. A claim about climate change requires scientific evidence,
+statistical analysis, observational data, and economic context. No single
+verification mechanism suffices.
+
+We present the Mycelix Knowledge cluster: an \emph{epistemic mesh} where
+multiple verification pathways converge on composite confidence scores for
+knowledge claims.
+
+\section{Architecture}
+
+\subsection{Seven Zomes plus Bridge}
+
+\begin{enumerate}[nosep]
+  \item \textbf{claims}: Structured claim registration with provenance
+    metadata, evidence links, domain tags, and confidence scoring.
+  \item \textbf{graph}: Knowledge graph construction with typed
+    relationships between claims.
+  \item \textbf{query}: Semantic query processing across the distributed
+    knowledge graph.
+  \item \textbf{inference}: Logical inference engine for deriving new
+    claims from existing premises.
+  \item \textbf{factcheck}: Multi-source fact verification with
+    consciousness-weighted confidence aggregation.
+  \item \textbf{markets\_integration}: Prediction market integration for
+    epistemic value discovery.
+  \item \textbf{bridge}: Cross-cluster knowledge dispatch.
+\end{enumerate}
+
+\subsection{Data Model}
+
+Claims are the atomic unit of knowledge:
+
+\begin{lstlisting}
+pub struct Claim {
+    pub statement: String,
+    pub domain: Vec<String>,
+    pub evidence: Vec<EvidenceLink>,
+    pub confidence: f64,  // [0, 1]
+    pub author: AgentPubKey,
+    pub created_at: Timestamp,
+    pub schema_version: u8,
+}
+
+pub struct EvidenceLink {
+    pub source: EvidenceSource,
+    pub uri: String,
+    pub strength: f64,  // [0, 1]
+}
+
+pub enum EvidenceSource {
+    DirectObservation,
+    PeerReview,
+    StatisticalAnalysis,
+    ExpertTestimony,
+    InstrumentMeasurement,
+    CrossDomainCorroboration,
+}
+\end{lstlisting}
+
+\section{Knowledge Graph}
+
+\subsection{Typed Relationships}
+
+The graph zome maintains a typed knowledge graph where nodes are claims
+and edges are relationships:
+
+\begin{definition}[Knowledge Edge Types]
+\begin{enumerate}[nosep]
+  \item \textbf{Supports}: Claim A provides evidence for Claim B.
+    Strength: how strongly A supports B.
+  \item \textbf{Contradicts}: Claim A provides counter-evidence to Claim B.
+    Strength: how strongly A undermines B.
+  \item \textbf{Extends}: Claim A generalizes or broadens Claim B.
+  \item \textbf{Specializes}: Claim A is a specific instance of Claim B.
+  \item \textbf{Requires}: Claim A is a necessary premise for Claim B.
+  \item \textbf{Supersedes}: Claim A replaces an outdated Claim B.
+\end{enumerate}
+\end{definition}
+
+\subsection{DHT Distribution}
+
+The knowledge graph is distributed across Holochain's DHT:
+
+\begin{itemize}[nosep]
+  \item Claim entries are hashed and stored in their DHT neighborhood
+  \item Link entries (relationships) are attached to source claim hashes
+  \item Query processing traverses links across DHT neighborhoods
+  \item Validation rules ensure relationship consistency (e.g., a
+    Supersedes edge requires both claims to share at least one domain tag)
+\end{itemize}
+
+\subsection{Transitive Confidence Propagation}
+
+Confidence propagates through the knowledge graph along Support edges:
+
+\begin{equation}
+  c_{\text{derived}}(B) = \max\left(c_{\text{direct}}(B), \;
+    \max_{A \to_s B} c(A) \cdot s(A, B) \cdot d^{h(A,B)}\right)
+\end{equation}
+
+where $s(A, B)$ is the support strength, $d \in (0, 1)$ is the per-hop
+decay, and $h(A, B)$ is the hop distance. Contradiction edges reduce
+confidence:
+
+\begin{equation}
+  c_{\text{adjusted}}(B) = c_{\text{derived}}(B) \cdot
+    \prod_{A \to_c B} (1 - c(A) \cdot s_c(A, B))
+\end{equation}
+
+This formulation ensures that a single strong contradiction can significantly
+reduce confidence, while weak contradictions have proportionally small effects.
+
+\section{Claim Lifecycle}
+
+\subsection{Registration}
+
+Any Participant+ tier agent can register a claim. The claim entry is
+validated by the integrity zome:
+
+\begin{enumerate}[nosep]
+  \item Statement is non-empty and within length limits
+  \item At least one domain tag is provided
+  \item Author's consciousness credential is valid
+  \item Schema version is current
+\end{enumerate}
+
+\subsection{Verification}
+
+Independent agents verify claims by submitting verification entries:
+
+\begin{lstlisting}
+pub struct Verification {
+    pub claim_hash: ActionHash,
+    pub verdict: Verdict,
+    pub evidence: Vec<EvidenceLink>,
+    pub confidence: f64,
+    pub verifier: AgentPubKey,
+}
+
+pub enum Verdict {
+    Confirmed,
+    Disputed,
+    Inconclusive,
+    NeedsMoreEvidence,
+}
+\end{lstlisting}
+
+Verification quality is weighted by the verifier's consciousness profile:
+
+\begin{equation}
+  w_j = E_j \cdot \text{tier\_weight}(\text{tier}_j)
+\end{equation}
+
+where $E_j$ is the verifier's engagement in the claim's domain and
+$\text{tier\_weight}$ maps consciousness tiers to weights. This ensures
+that domain experts with strong governance standing contribute more to
+the consensus.
+
+\subsection{Inference}
+
+The inference zome derives new claims from existing premises using
+logical rules:
+
+\begin{lstlisting}
+pub struct InferenceRule {
+    pub premises: Vec<ClaimPattern>,
+    pub conclusion: ClaimTemplate,
+    pub confidence_function: ConfidenceFn,
+}
+\end{lstlisting}
+
+Inference runs periodically (not in real-time), scanning the knowledge
+graph for premise patterns and generating derived claims with
+appropriate provenance metadata. Derived claims are marked as
+inference-generated and link back to their premises via Requires edges.
+
+\subsection{Factchecking}
+
+The factcheck zome aggregates verification results:
+
+\begin{equation}
+  c_{\text{fact}}(B) = \frac{\sum_{j: v_j = \text{Confirmed}} w_j \cdot c_j
+    - \sum_{j: v_j = \text{Disputed}} w_j \cdot c_j}
+    {\sum_{j} w_j}
+\end{equation}
+
+Claims with $c_{\text{fact}} > 0.8$ are classified as ``well-supported.''
+Claims with $c_{\text{fact}} < -0.5$ are classified as ``disputed.''
+Intermediate values indicate ongoing verification.
+
+\section{Prediction Market Integration}
+
+The markets\_integration zome connects knowledge claims to prediction
+markets:
+
+\begin{enumerate}[nosep]
+  \item A prediction market is created for a specific claim (e.g.,
+    ``Global average temperature will exceed 1.5C above pre-industrial
+    by 2030'')
+  \item Participants stake MYCEL on outcomes
+  \item Market prices reflect collective confidence in the claim
+  \item Resolved markets adjust participant reputation (correct predictions
+    increase reputation, incorrect predictions decrease it)
+\end{enumerate}
+
+Market prices provide an independent signal for claim confidence,
+complementing the expert verification pathway. The two signals are
+combined with configurable weights:
+
+\begin{equation}
+  c_{\text{composite}} = \alpha \cdot c_{\text{fact}} +
+    (1 - \alpha) \cdot c_{\text{market}}
+\end{equation}
+
+where $\alpha$ is the domain-specific weight for expert vs. market
+confidence (default 0.7, prioritizing expert verification).
+
+\section{Cross-Domain Corroboration}
+
+\subsection{The Epistemic Mesh}
+
+The Knowledge cluster's bridge zome enables cross-domain corroboration:
+
+\begin{itemize}[nosep]
+  \item A climate claim about deforestation can be corroborated by the
+    Space cluster's satellite observations
+  \item A supply chain provenance claim can be verified against the
+    Energy cluster's grid measurements
+  \item A health claim about nutrition can be checked against the
+    Commons cluster's food production data
+\end{itemize}
+
+Cross-domain corroboration uses the \texttt{CrossDomainCorroboration}
+evidence source type and adds Support/Contradict edges to the knowledge
+graph.
+
+\subsection{Cross-Cluster Query}
+
+The query zome supports cross-cluster queries via the bridge:
+
+\begin{lstlisting}
+pub struct CrossClusterQuery {
+    pub source_domain: String,
+    pub target_cluster: CrossClusterRole,
+    pub query: SemanticQuery,
+    pub max_depth: u32,
+    pub min_confidence: f64,
+}
+\end{lstlisting}
+
+Queries are consciousness-gated: cross-cluster queries require Citizen+
+tier to prevent abuse of the bridge dispatch mechanism.
+
+\section{Consciousness-Weighted Epistemic Authority}
+
+The key innovation of the epistemic mesh is that epistemic authority
+derives from the consciousness profile rather than institutional position:
+
+\begin{proposition}[Epistemic weight decomposition]
+An agent's epistemic weight for a claim in domain $d$ is:
+\begin{equation}
+  w = \underbrace{E_d}_{\text{engagement}} \cdot
+      \underbrace{f(\text{tier})}_{\text{governance}} \cdot
+      \underbrace{R}_{\text{reputation}} \cdot
+      \underbrace{(1 + \beta \cdot h_d)}_{\text{history}}
+\end{equation}
+where $E_d$ is domain engagement, $f(\text{tier})$ is the tier weight
+function, $R$ is reputation, $h_d$ is the agent's verification accuracy
+history in domain $d$, and $\beta$ is the history bonus factor.
+\end{proposition}
+
+This decomposition means that an agent's epistemic authority in a domain
+is proportional to their actual engagement and track record, not their
+credentials or institutional affiliation.
+
+\section{Integration with Symthaea}
+
+For agents connected to the Symthaea consciousness engine, the Knowledge
+cluster provides a bidirectional integration:
+
+\begin{itemize}[nosep]
+  \item \textbf{Knowledge $\to$ Consciousness}: Verified knowledge claims
+    feed the Knowledge Manager in Symthaea's cognitive loop, providing
+    grounding for the reasoning engine.
+  \item \textbf{Consciousness $\to$ Knowledge}: Symthaea's inference outputs
+    (from the reasoning engine) can be registered as claims with appropriate
+    provenance metadata, contributing to the collective knowledge graph.
+\end{itemize}
+
+\section{Evaluation}
+
+The Knowledge cluster includes:
+\begin{itemize}[nosep]
+  \item Unit tests for claim validation, graph operations, and inference rules
+  \item Integration tests for cross-zome query processing
+  \item Property tests for confidence propagation bounds
+  \item Cross-cluster integration tests for corroboration pathways
+\end{itemize}
+
+\section{Related Work}
+
+\textbf{Google Knowledge Graph}~\cite{singhal2012}: Centralized, proprietary,
+no verification mechanism.
+
+\textbf{Wikidata}~\cite{vrandecic2014}: Open but centrally administered.
+No confidence scoring or prediction market integration.
+
+\textbf{The Graph}~\cite{thegraph2020}: Decentralized indexing for blockchain
+data. Focuses on data availability, not knowledge verification.
+
+\textbf{Augur}~\cite{peterson2015}: Decentralized prediction markets on
+Ethereum. Addresses price discovery but not structured knowledge verification.
+
+Our contribution is the integration of structured claims, logical inference,
+expert verification, and prediction markets into a single epistemic mesh
+with consciousness-weighted authority.
+
+\section{Conclusion}
+
+The epistemic mesh demonstrates that knowledge verification can be
+decentralized without sacrificing rigor. Multiple independent verification
+pathways---peer review, logical inference, market pricing, and cross-domain
+corroboration---converge on confidence scores that reflect genuine epistemic
+status rather than institutional authority. Consciousness-weighted verification
+ensures that domain experts with demonstrated engagement contribute more to
+the collective knowledge base, while the open participation model (Participant+
+for claim registration) ensures that no gatekeeper can suppress inconvenient
+truths.
+
+\begin{thebibliography}{99}
+  \bibitem{singhal2012} Singhal, A. (2012). Introducing the Knowledge Graph.
+    Google Blog.
+  \bibitem{vrandecic2014} Vrandecic, D. and Krotzsch, M. (2014). Wikidata:
+    A Free Collaborative Knowledgebase. \textit{Communications of the ACM}.
+  \bibitem{thegraph2020} The Graph (2020). The Graph: An Indexing Protocol
+    for Querying Networks.
+  \bibitem{peterson2015} Peterson, J. et al. (2015). Augur: A Decentralized
+    Oracle and Prediction Market Platform. Whitepaper.
+  \bibitem{brock2018} Brock, A. and Harris-Braun, E. (2018). Holochain:
+    Scalable Agent-Centric Distributed Computing.
+\end{thebibliography}
+
+\end{document}

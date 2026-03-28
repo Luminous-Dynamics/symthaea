@@ -22,3 +22,8 @@ rmp-serde = "1"
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
+
+# Validation tests — zero dependencies, compiles instantly
+[[test]]
+name = "validation_tests"
+path = "validation_tests.rs"

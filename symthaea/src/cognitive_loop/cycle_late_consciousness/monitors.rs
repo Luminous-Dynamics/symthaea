@@ -219,7 +219,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (body_psi_modulation, body_valence, body_arousal) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut body) = self.vision_sensory.virtual_body {
+                if let Some(ref mut body) = self.sensorimotor.vision_sensory.virtual_body {
                     let signals = crate::cognitive_loop::virtual_body::CognitiveSignals {
                         prediction_error: ctx.prediction_error,
                         coherence: ctx.coherence,
@@ -485,7 +485,14 @@ impl CognitiveLoopService {
                         .map(|&x| x as f64)
                         .collect();
                     hfe.update_beliefs(&obs);
-                    hfe.total_free_energy()
+                    let decomp = hfe.compute_free_energy();
+                    // Feed HFE data to ThermodynamicManager
+                    self.thermodynamic_mgr.set_hfe(
+                        decomp.total,
+                        decomp.complexity,
+                        decomp.accuracy,
+                    );
+                    decomp.total
                 } else {
                     0.0
                 }
@@ -515,6 +522,9 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
+
+        // NOTE: Jarzynski→HFE and Onsager→coherence feedback now consolidated in
+        // ThermodynamicIntegration::run_cycle() (thermodynamic_integration.rs).
 
         module_timings.hierarchical_free_energy = _t.elapsed().as_micros() as u64;
 

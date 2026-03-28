@@ -29,3 +29,6 @@ chrono.workspace = true
 
 # Crypto
 blake3.workspace = true
+
+# Cross-cluster bridge (consciousness gating)
+mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }

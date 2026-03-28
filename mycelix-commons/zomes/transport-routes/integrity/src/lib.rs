@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Transport Routes Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Transport Routes Integrity Zome
 //! Entry types and validation for vehicles, routes, and stops.
 
 use hdi::prelude::*;
@@ -186,6 +187,8 @@ pub enum LinkTypes {
     VehicleToRoute,
     VehicleToMaintenance,
     VehicleToFeatures,
+    /// Geohash anchor to entry for spatial indexing
+    GeoIndex,
 }
 
 // ============================================================================
@@ -264,6 +267,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "VehicleToFeatures link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::GeoIndex => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "GeoIndex link tag too long (max 256 bytes)".into(),
                     ));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -1186,7 +1197,8 @@ mod tests {
             | LinkTypes::RouteToStop
             | LinkTypes::VehicleToRoute
             | LinkTypes::VehicleToMaintenance
-            | LinkTypes::VehicleToFeatures => 256,
+            | LinkTypes::VehicleToFeatures
+            | LinkTypes::GeoIndex => 256,
         };
         let name = match link_type {
             LinkTypes::AllVehicles => "AllVehicles",
@@ -1196,6 +1208,7 @@ mod tests {
             LinkTypes::VehicleToRoute => "VehicleToRoute",
             LinkTypes::VehicleToMaintenance => "VehicleToMaintenance",
             LinkTypes::VehicleToFeatures => "VehicleToFeatures",
+            LinkTypes::GeoIndex => "GeoIndex",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(format!(

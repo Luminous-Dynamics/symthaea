@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Mycelix Bridge Common — Shared dispatch types and utilities
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Mycelix Bridge Common — Shared dispatch types and utilities
 //!
 //! Provides the cross-domain dispatch primitives used by both the
 //! Commons and Civic cluster bridge zomes. Each cluster's bridge
@@ -33,6 +34,14 @@ pub use consciousness_profile::{
 pub mod offline_credential;
 pub mod sub_passport;
 
+pub mod earth_colony_protocol;
+pub mod terrain_fl;
+
+pub mod interplanetary_bridge;
+pub mod mars_isru;
+pub mod planetary_governance;
+pub mod cross_planetary_fl;
+
 pub mod validation;
 pub use validation::{check_author_match, check_link_author_match};
 
@@ -50,6 +59,14 @@ pub use routing::{
 pub mod routing_registry;
 
 pub mod metrics;
+
+pub mod saga;
+pub mod migration;
+pub mod notifications;
+
+pub mod license_enforcement;
+pub mod merkle_timestamp;
+pub mod timestamp_anchor;
 
 #[cfg(kani)]
 mod kani_proofs;
@@ -754,6 +771,160 @@ pub struct HearthEmergencyResult {
     pub members_checked_in: u32,
     pub members_missing: u32,
     pub error: Option<String>,
+}
+
+// ============================================================================
+// Cross-cluster typed queries (Phase 1C — governance/finance/identity/health)
+// ============================================================================
+
+/// Query: Check budget proposal status (Finance ↔ Governance)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BudgetProposalQuery {
+    pub proposal_id: String,
+}
+
+/// Result: Budget proposal status
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BudgetProposalResult {
+    pub approved: bool,
+    pub amount: u64,
+    pub treasury_balance: u64,
+    pub error: Option<String>,
+}
+
+/// Query: Verify property as collateral (Finance → Commons)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CollateralPropertyQuery {
+    pub property_hash: String,
+}
+
+/// Result: Collateral property status
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CollateralPropertyResult {
+    pub valid: bool,
+    pub appraised_value: u64,
+    pub encumbered: bool,
+    pub error: Option<String>,
+}
+
+/// Query: Check restitution ability (Civic → Finance)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RestitutionQuery {
+    pub case_id: String,
+    pub defendant_did: String,
+}
+
+/// Result: Restitution check
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RestitutionResult {
+    pub balance_sufficient: bool,
+    pub amount_due: u64,
+    pub error: Option<String>,
+}
+
+/// Notice: Credential revocation push (Identity → *)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RevocationNotice {
+    pub credential_hash: String,
+    pub did: String,
+    pub reason: String,
+    pub effective_at: u64,
+}
+
+/// Acknowledgment: Revocation received
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RevocationAck {
+    pub received: bool,
+    pub affected_entries: u32,
+    pub error: Option<String>,
+}
+
+/// Query: Consented health record access (Health → Personal)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsentedRecordQuery {
+    pub patient_did: String,
+    pub record_type: String,
+}
+
+/// Result: Consented record access
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsentedRecordResult {
+    pub authorized: bool,
+    pub record_hash: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Query: Energy project governance approval (Energy → Governance)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProjectProposalQuery {
+    pub project_id: String,
+}
+
+/// Result: Project governance approval
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProjectProposalResult {
+    pub governance_approved: bool,
+    pub conditions: Vec<String>,
+    pub error: Option<String>,
+}
+
+/// Query: Verify knowledge claim (Knowledge → Media)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimVerificationQuery {
+    pub claim_hash: String,
+}
+
+/// Result: Claim verification
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimVerificationResult {
+    pub verified: bool,
+    pub confidence: f64,
+    pub sources: Vec<String>,
+    pub error: Option<String>,
+}
+
+/// Query: Carbon offset from transport (Climate → Transport/Commons)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarbonOffsetQuery {
+    pub route_id: String,
+    pub distance_km: f64,
+}
+
+/// Result: Carbon offset calculation
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarbonOffsetResult {
+    pub credits_earned: f64,
+    pub offset_hash: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Priority levels for cross-cluster notifications.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NotificationPriority {
+    /// Batched into daily digest
+    Low = 0,
+    /// Delivered on next poll
+    Normal = 1,
+    /// Immediate signal
+    High = 2,
+    /// Bypass quiet hours, multi-channel delivery
+    Emergency = 3,
+}
+
+impl NotificationPriority {
+    pub const fn from_u8(v: u8) -> Self {
+        match v {
+            0 => Self::Low,
+            1 => Self::Normal,
+            2 => Self::High,
+            3 => Self::Emergency,
+            _ => Self::Normal,
+        }
+    }
+
+    pub const fn as_u8(&self) -> u8 {
+        *self as u8
+    }
 }
 
 // ============================================================================

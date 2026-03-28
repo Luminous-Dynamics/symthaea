@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Plays Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Plays Integrity Zome
 //!
 //! Defines validation rules for play records.
 //! CRITICAL: Plays are recorded on the listener's source chain - ZERO COST.

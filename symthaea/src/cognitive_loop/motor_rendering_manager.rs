@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Motor Rendering Manager — motor output bridge + canvas pipeline.
 //!
 //! Groups motor output bridge, pending requests, results, phi gating,
@@ -32,6 +35,10 @@ pub struct MotorRenderingManager {
     /// Most recent canvas SVG, drained into `CycleResult.canvas_svg` each cycle.
     #[cfg(feature = "canvas")]
     pub(crate) last_canvas_svg: Option<String>,
+
+    /// Creative pipeline manager: generative art + music + synesthesia + gallery.
+    #[cfg(feature = "creative")]
+    pub(crate) creative_manager: Option<super::creative_bridge::CreativeManager>,
 }
 
 impl MotorRenderingManager {
@@ -46,6 +53,8 @@ impl MotorRenderingManager {
             canvas_manager: Some(super::canvas_bridge::CanvasManager::new()),
             #[cfg(feature = "canvas")]
             last_canvas_svg: None,
+            #[cfg(feature = "creative")]
+            creative_manager: Some(super::creative_bridge::CreativeManager::new()),
         }
     }
 }

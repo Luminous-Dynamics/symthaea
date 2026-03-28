@@ -564,6 +564,20 @@ pub enum GovernanceDispatchCommand {
         care_activation: f64,
         meta_awareness: f64,
     },
+    /// Declare a civic crisis to the Mycelix emergency-incidents zome.
+    DeclareCrisis {
+        correlation_id: u64,
+        /// FEMA-aligned severity (1-5).
+        severity: u8,
+        /// Maps to Mycelix DisasterType.
+        crisis_type: String,
+        /// Human-readable description of the detected anomaly.
+        description: String,
+        /// Detection confidence (0.0-1.0).
+        confidence: f64,
+        /// Cycle at which the crisis was detected.
+        detected_at_cycle: u64,
+    },
 }
 
 /// Outcome received from the conductor confirming or rejecting a dispatched command.
@@ -1206,6 +1220,59 @@ impl MycelixBridge {
         }
 
         Ok(score)
+    }
+
+    // ========================================================================
+    // CRISIS DISPATCH
+    // ========================================================================
+
+    /// Forward a civic crisis event to the Mycelix emergency-incidents zome.
+    ///
+    /// Uses the same `governance_dispatch_tx` channel as proposals and votes.
+    /// The conductor bridge maps `DeclareCrisis` to a `civic::create_incident`
+    /// zome call on the civic cluster role.
+    #[cfg(feature = "mycelix")]
+    pub fn dispatch_crisis(
+        &mut self,
+        event: &super::super::cognitive_loop::civic_crisis_detector::CivicCrisisEvent,
+    ) {
+        let mut disconnected = false;
+        if let Some(ref tx) = self.governance_dispatch_tx {
+            let cid = self.next_correlation_id;
+            self.next_correlation_id += 1;
+            match tx.try_send(GovernanceDispatchCommand::DeclareCrisis {
+                correlation_id: cid,
+                severity: event.severity,
+                crisis_type: event.crisis_type.to_string(),
+                description: event.description.clone(),
+                confidence: event.confidence,
+                detected_at_cycle: event.detected_at_cycle,
+            }) {
+                Ok(()) => {
+                    self.pending_confirmations.insert(cid, Instant::now());
+                    tracing::info!(
+                        severity = event.severity,
+                        crisis_type = %event.crisis_type,
+                        confidence = event.confidence,
+                        "Crisis event dispatched to Mycelix civic bridge"
+                    );
+                }
+                Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                    tracing::warn!(
+                        "Governance dispatch channel full — crisis event not dispatched"
+                    );
+                }
+                Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {
+                    tracing::warn!(
+                        "Governance dispatch channel disconnected — crisis event not dispatched"
+                    );
+                    disconnected = true;
+                }
+            }
+        }
+        if disconnected {
+            self.governance_dispatch_tx = None;
+        }
     }
 
     // ========================================================================

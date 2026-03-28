@@ -29,12 +29,14 @@
 
 pub mod ast_bridge;
 pub mod codebase_bridge;
+pub mod composer;
 pub mod emitter_bridge;
 pub mod execution_oracle;
 pub mod manifold;
 pub mod manifold_bootstrap;
 pub mod noise;
 pub mod pdg;
+pub mod periodic_table;
 pub mod program_emitter;
 pub mod program_memory;
 pub mod resonant_explorer;
@@ -43,6 +45,8 @@ pub mod skeleton_synthesis;
 pub mod synthesis;
 pub mod token_codebook;
 pub mod topology;
+pub mod understanding;
+pub mod tri_oracle;
 pub mod verification;
 
 // Re-export key types for convenience.
@@ -64,6 +68,7 @@ pub use emitter_bridge::{
 };
 pub use codebase_bridge::{index_directory, index_file, IndexResult};
 pub use verification::{verify_generated_code, VerificationResult};
+pub use tri_oracle::{TriOracle, TriOracleConfig, TriOracleScore};
 pub use program_memory::{ProgramMemory, ProgramMemoryEntry};
 pub use program_emitter::{emit_expression, emit_rust};
 pub use resonant_explorer::{ExplorationConfig, ExplorationResult, ResonantExplorer};

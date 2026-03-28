@@ -2,9 +2,6 @@
 resolver = "2"
 # Tests excluded from WASM workspace (use different deps)
 exclude = ["tests", "cli"]
-
-[workspace.package]
-license = "AGPL-3.0-or-later"
 members = [
     # Shared crypto-agile types (PQE abstraction layer)
     "crates/mycelix-crypto",
@@ -35,7 +32,13 @@ members = [
     # Web of Trust
     "zomes/web-of-trust/coordinator",
     "zomes/web-of-trust/integrity",
+    # Cross-Cluster Reputation Aggregator
+    "zomes/reputation-aggregator/coordinator",
+    "zomes/reputation-aggregator/integrity",
 ]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible (per official compatibility table)

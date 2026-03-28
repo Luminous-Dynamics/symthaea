@@ -24,9 +24,15 @@ members = [
   # Adaptive Learning Intelligence (ML-inspired personalization)
   "zomes/adaptive_zome/integrity",
   "zomes/adaptive_zome/coordinator",
+  # Classroom Management (teacher/student/parent roles)
+  "zomes/classroom_zome/integrity",
+  "zomes/classroom_zome/coordinator",
   # Integration Layer (cross-zome orchestration)
   "zomes/integration_zome/integrity",
   "zomes/integration_zome/coordinator",
+  # Mentorship Matching (mentor/mentee pairing + session tracking)
+  "zomes/mentorship_zome/integrity",
+  "zomes/mentorship_zome/coordinator",
   # Trust Tier Bridge (cross-domain dispatch + consciousness gating)
   "zomes/edunet-bridge/integrity",
   "zomes/edunet-bridge/coordinator",
@@ -35,7 +41,7 @@ members = [
 # - tests: full holochain conductor (tokio/mio)
 # - edunet-agg, mycelix-governance: statrs/nalgebra (rand -> getrandom 0.2)
 # Run tests with: cargo test --manifest-path tests/Cargo.toml
-exclude = ["tests", "crates/edunet-agg", "crates/mycelix-governance"]
+exclude = ["tests", "crates/edunet-agg", "crates/edunet-content-gen", "crates/edunet-standards-ingest", "crates/mycelix-governance", "apps/leptos"]
 
 [workspace.package]
 version = "0.1.0"

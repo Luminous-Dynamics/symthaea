@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * Water ↔ Energy Integration Module
  *
@@ -915,4 +918,274 @@ export function shouldParticipateInDemandResponse(
     reason: 'Eligible for participation',
     maxReduction,
   };
+}
+
+// ============================================================================
+// Holochain Conductor Bridge Client
+// ============================================================================
+
+/** Holochain conductor bridge client for Water-Energy cross-domain operations */
+export class WaterEnergyBridgeClient {
+  constructor(
+    private client: {
+      callZome(input: {
+        role_name: string;
+        zome_name: string;
+        fn_name: string;
+        payload: any;
+      }): Promise<any>;
+    }
+  ) {}
+
+  // ---- Water Capture (commons_land role) ----
+
+  async createWaterSource(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-capture',
+      fn_name: 'create_water_source',
+      payload,
+    });
+  }
+
+  async getWaterSource(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-capture',
+      fn_name: 'get_water_source',
+      payload,
+    });
+  }
+
+  async listWaterSources(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-capture',
+      fn_name: 'list_water_sources',
+      payload: payload ?? null,
+    });
+  }
+
+  async recordCaptureEvent(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-capture',
+      fn_name: 'record_capture_event',
+      payload,
+    });
+  }
+
+  // ---- Water Purity (commons_land role) ----
+
+  async submitWaterQualityReport(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-purity',
+      fn_name: 'submit_quality_report',
+      payload,
+    });
+  }
+
+  async getWaterQualityReport(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-purity',
+      fn_name: 'get_quality_report',
+      payload,
+    });
+  }
+
+  async listWaterQualityReports(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-purity',
+      fn_name: 'list_quality_reports',
+      payload,
+    });
+  }
+
+  // ---- Water Flow (commons_land role) ----
+
+  async recordWaterFlow(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-flow',
+      fn_name: 'record_water_flow',
+      payload,
+    });
+  }
+
+  async getWaterFlowHistory(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-flow',
+      fn_name: 'get_flow_history',
+      payload,
+    });
+  }
+
+  // ---- Water Steward (commons_land role) ----
+
+  async registerSteward(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-steward',
+      fn_name: 'register_steward',
+      payload,
+    });
+  }
+
+  async getSteward(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-steward',
+      fn_name: 'get_steward',
+      payload,
+    });
+  }
+
+  async listStewards(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-steward',
+      fn_name: 'list_stewards',
+      payload: payload ?? null,
+    });
+  }
+
+  // ---- Water Wisdom (commons_land role) ----
+
+  async submitWaterWisdom(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-wisdom',
+      fn_name: 'submit_wisdom',
+      payload,
+    });
+  }
+
+  async getWaterWisdom(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'commons_land',
+      zome_name: 'water-wisdom',
+      fn_name: 'get_wisdom',
+      payload,
+    });
+  }
+
+  // ---- Energy Projects (energy role) ----
+
+  async createEnergyProject(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'projects',
+      fn_name: 'create_project',
+      payload,
+    });
+  }
+
+  async getEnergyProject(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'projects',
+      fn_name: 'get_project',
+      payload,
+    });
+  }
+
+  async listEnergyProjects(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'projects',
+      fn_name: 'list_projects',
+      payload: payload ?? null,
+    });
+  }
+
+  async updateEnergyProject(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'projects',
+      fn_name: 'update_project',
+      payload,
+    });
+  }
+
+  // ---- Energy Investments (energy role) ----
+
+  async createInvestment(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'investments',
+      fn_name: 'create_investment',
+      payload,
+    });
+  }
+
+  async getInvestment(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'investments',
+      fn_name: 'get_investment',
+      payload,
+    });
+  }
+
+  async listInvestments(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'investments',
+      fn_name: 'list_investments',
+      payload: payload ?? null,
+    });
+  }
+
+  // ---- Energy Grid (energy role) ----
+
+  async getGridStatus(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'grid',
+      fn_name: 'get_grid_status',
+      payload: payload ?? null,
+    });
+  }
+
+  async reportGridEvent(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'grid',
+      fn_name: 'report_grid_event',
+      payload,
+    });
+  }
+
+  // ---- Energy Regenerative (energy role) ----
+
+  async registerRegenerativeSource(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'regenerative',
+      fn_name: 'register_source',
+      payload,
+    });
+  }
+
+  async getRegenerativeSource(payload: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'regenerative',
+      fn_name: 'get_source',
+      payload,
+    });
+  }
+
+  async listRegenerativeSources(payload?: any): Promise<any> {
+    return this.client.callZome({
+      role_name: 'energy',
+      zome_name: 'regenerative',
+      fn_name: 'list_sources',
+      payload: payload ?? null,
+    });
+  }
 }

@@ -1,0 +1,89 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Docker Compose for Mycelix Federated Learning.
+# The coordinator is the only required service. In production, FL nodes
+# are external clients (hospitals, research institutions) connecting over
+# gRPC. The node services below are for local demo/testing only.
+
+version: '3.8'
+
+services:
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mycelix-fl-coordinator
+    ports:
+      - "50051:50051"
+    environment:
+      - MYCELIX_FL_MIN_NODES=3
+      - MYCELIX_FL_MAX_NODES=100
+      - MYCELIX_FL_ROUND_TIMEOUT=300
+      - MYCELIX_FL_DEFENSE=pogq_v41
+      - MYCELIX_FL_LOG_LEVEL=info
+      - RUST_LOG=mycelix_fl=info
+    volumes:
+      - fl-data:/data
+    restart: unless-stopped
+    networks:
+      - fl-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  # Example FL node (for demo/testing)
+  # In production, nodes are external clients connecting to the coordinator
+  node-1:
+    image: mycelix-fl-node:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: fl-node-1
+    environment:
+      - COORDINATOR_URL=http://coordinator:50051
+      - NODE_ID=hospital-alpha
+      - NODE_DID=did:mycelix:hospital-alpha
+    depends_on:
+      - coordinator
+    networks:
+      - fl-network
+
+  node-2:
+    image: mycelix-fl-node:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: fl-node-2
+    environment:
+      - COORDINATOR_URL=http://coordinator:50051
+      - NODE_ID=hospital-beta
+      - NODE_DID=did:mycelix:hospital-beta
+    depends_on:
+      - coordinator
+    networks:
+      - fl-network
+
+  node-3:
+    image: mycelix-fl-node:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: fl-node-3
+    environment:
+      - COORDINATOR_URL=http://coordinator:50051
+      - NODE_ID=hospital-gamma
+      - NODE_DID=did:mycelix:hospital-gamma
+    depends_on:
+      - coordinator
+    networks:
+      - fl-network
+
+volumes:
+  fl-data:
+
+networks:
+  fl-network:
+    driver: bridge

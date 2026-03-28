@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Transport Routes Coordinator Zome
 //! Business logic for vehicle registration, route creation, and stop management.
 
@@ -147,6 +150,17 @@ pub fn add_stop(stop: Stop) -> ExternResult<Record> {
         (),
     )?;
 
+    // Geo-spatial index for stop location
+    let geo_hash = commons_types::geo::geohash_encode(stop.location_lat, stop.location_lon, 6);
+    let geo_anchor_str = format!("geo:{}", geo_hash);
+    create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+    create_link(
+        anchor_hash(&geo_anchor_str)?,
+        action_hash.clone(),
+        LinkTypes::GeoIndex,
+        geo_hash.as_bytes().to_vec(),
+    )?;
+
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created stop".into()
     )))
@@ -282,6 +296,40 @@ pub fn get_vehicles_needing_maintenance(current_time: u64) -> ExternResult<Vec<R
         }
     }
     Ok(needing_maintenance)
+}
+
+// ============================================================================
+// GEO QUERIES
+// ============================================================================
+
+/// Get transport routes near a geographic location using geohash-based indexing.
+#[hdk_extern]
+pub fn get_nearby_routes(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+    let center_hash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
+    let mut all_cells = vec![center_hash.clone()];
+    all_cells.extend(commons_types::geo::geohash_neighbors(&center_hash));
+
+    let mut records = Vec::new();
+    for cell in &all_cells {
+        let anchor_str = format!("geo:{}", cell);
+        let anchor_entry = Anchor(anchor_str);
+        let anchor_hash = hash_entry(&anchor_entry)?;
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(anchor_hash, LinkTypes::GeoIndex)?,
+            GetStrategy::Local,
+        ) {
+            for link in links {
+                if let Ok(action_hash) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(action_hash, GetOptions::default())? {
+                        records.push(record);
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = input.radius_km;
+    Ok(records)
 }
 
 #[cfg(test)]

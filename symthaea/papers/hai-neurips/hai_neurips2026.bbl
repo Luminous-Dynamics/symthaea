@@ -1,0 +1,46 @@
+\begin{thebibliography}{6}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Friston(2010)]{friston2010free}
+Karl Friston.
+\newblock The free-energy principle: a unified brain theory?
+\newblock \emph{Nature Reviews Neuroscience}, 11\penalty0 (2):\penalty0
+  127--138, 2010.
+
+\bibitem[Friston et~al.(2017)Friston, FitzGerald, Rigoli, Schwartenbeck, and
+  Pezzulo]{friston2017active}
+Karl Friston, Thomas FitzGerald, Francesco Rigoli, Philipp Schwartenbeck, and
+  Giovanni Pezzulo.
+\newblock Active inference: a process theory.
+\newblock \emph{Neural Computation}, 29\penalty0 (1):\penalty0 1--49, 2017.
+
+\bibitem[Garcez and Lamb(2020)]{garcez2020neurosymbolic}
+Artur Garcez and Luis~C Lamb.
+\newblock Neurosymbolic {AI}: The 3rd wave.
+\newblock \emph{arXiv preprint arXiv:2012.05876}, 2020.
+
+\bibitem[Heins et~al.(2022)Heins, Millidge, Da~Costa, et~al.]{heins2022pymdp}
+Conor Heins, Beren Millidge, Lancelot Da~Costa, et~al.
+\newblock pymdp: A {Python} library for active inference in discrete state
+  spaces.
+\newblock \emph{Journal of Open Source Software}, 7\penalty0 (73):\penalty0
+  4098, 2022.
+
+\bibitem[Kanerva(2009)]{kanerva2009hyperdimensional}
+Pentti Kanerva.
+\newblock Hyperdimensional computing: An introduction to computing in
+  distributed representation with high-dimensional random vectors.
+\newblock \emph{Cognitive Computation}, 1\penalty0 (2):\penalty0 139--159,
+  2009.
+
+\bibitem[Rahimi et~al.(2016)Rahimi, Kanerva, and Recht]{rahimi2016robust}
+Abbas Rahimi, Pentti Kanerva, and Benjamin Recht.
+\newblock A robust and energy-efficient classifier using brain-inspired
+  hyperdimensional computing.
+\newblock In \emph{ISLPED}, pages 64--69, 2016.
+
+\end{thebibliography}

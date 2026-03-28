@@ -1,0 +1,30 @@
+# Mycelix Test Conductor Configuration
+# Holochain 0.6.x — for local Docker mesh testing
+#
+# Differences from prod:
+#   - Uses local bootstrap server (http://bootstrap:8787) instead of bootstrap.holo.host
+#   - Uses lair_server_in_proc for reliable signing
+#   - Fast db_sync for lower latency
+---
+
+keystore:
+  type: lair_server_in_proc
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 4444
+      bind_to: "0.0.0.0"
+      allowed_origins: "*"
+
+# Local bootstrap server running in the Docker network.
+# All conductors register here with their Docker-internal hostnames,
+# so peer discovery works within the Docker bridge network.
+network:
+  bootstrap_url: http://bootstrap:8787
+  signal_url: ws://bootstrap:8787
+  relay_url: ws://bootstrap:8787
+  target_arc_factor: 1
+
+data_root_path: /data/holochain/databases
+db_sync_strategy: Fast

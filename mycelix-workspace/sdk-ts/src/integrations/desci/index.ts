@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /**
  * @mycelix/sdk DeSci (Decentralized Science) Integration
  *
@@ -590,6 +593,137 @@ export {
   NormativeLevel,
   MaterialityLevel,
 };
+
+// ============================================================================
+// DeSci HTTP Bridge Client (REST API, not Holochain)
+// ============================================================================
+
+/**
+ * HTTP bridge client for DeSci cluster.
+ *
+ * @remarks
+ * Unlike other Mycelix clusters, DeSci uses a REST API (Actix-web)
+ * rather than Holochain zomes. This client wraps fetch() calls
+ * to the DeSci backend.
+ */
+export class DeSciHttpBridgeClient {
+  constructor(private baseUrl: string) {}
+
+  // -- Researchers --
+
+  async registerResearcher(input: Omit<Researcher, 'verifiedIdentity' | 'joinedAt'>): Promise<Researcher> {
+    return this.post('/api/researchers', input);
+  }
+
+  async getResearcher(researcherId: string): Promise<Researcher> {
+    return this.get(`/api/researchers/${encodeURIComponent(researcherId)}`);
+  }
+
+  async listResearchers(params?: { field?: string; institution?: string; limit?: number; offset?: number }): Promise<Researcher[]> {
+    const qs = new URLSearchParams();
+    if (params?.field) qs.set('field', params.field);
+    if (params?.institution) qs.set('institution', params.institution);
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.get(`/api/researchers${suffix}`);
+  }
+
+  async getResearcherProfile(researcherId: string): Promise<ResearcherProfile> {
+    return this.get(`/api/researchers/${encodeURIComponent(researcherId)}/profile`);
+  }
+
+  // -- Publications --
+
+  async publishResearch(input: Omit<Publication, 'reviewCount' | 'citationCount' | 'epistemicClassification'>): Promise<Publication> {
+    return this.post('/api/publications', input);
+  }
+
+  async getPublication(publicationId: string): Promise<Publication> {
+    return this.get(`/api/publications/${encodeURIComponent(publicationId)}`);
+  }
+
+  async listPublications(params?: { authorId?: string; limit?: number; offset?: number }): Promise<Publication[]> {
+    const qs = new URLSearchParams();
+    if (params?.authorId) qs.set('author_id', params.authorId);
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.get(`/api/publications${suffix}`);
+  }
+
+  async getPublicationWithReviews(publicationId: string): Promise<{ publication: Publication; reviews: PeerReview[]; averageQuality: number }> {
+    return this.get(`/api/publications/${encodeURIComponent(publicationId)}/reviews`);
+  }
+
+  // -- Peer Reviews --
+
+  async submitPeerReview(input: Omit<PeerReview, 'id' | 'submittedAt' | 'verified'>): Promise<PeerReview> {
+    return this.post('/api/reviews', input);
+  }
+
+  // -- Grants --
+
+  async createGrant(input: Omit<ResearchGrant, 'status'>): Promise<ResearchGrant> {
+    return this.post('/api/grants', input);
+  }
+
+  async getGrant(grantId: string): Promise<ResearchGrant> {
+    return this.get(`/api/grants/${encodeURIComponent(grantId)}`);
+  }
+
+  async listGrants(params?: { piId?: string; status?: string; limit?: number; offset?: number }): Promise<ResearchGrant[]> {
+    const qs = new URLSearchParams();
+    if (params?.piId) qs.set('pi_id', params.piId);
+    if (params?.status) qs.set('status', params.status);
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.get(`/api/grants${suffix}`);
+  }
+
+  async verifyMilestone(grantId: string, milestoneId: string, verifierId: string): Promise<{ verified: boolean }> {
+    return this.post(`/api/grants/${encodeURIComponent(grantId)}/milestones/${encodeURIComponent(milestoneId)}/verify`, { verifier_id: verifierId });
+  }
+
+  // -- Citations --
+
+  async recordCitation(citingPubId: string, citedPubId: string): Promise<void> {
+    await this.post('/api/citations', { citing_pub_id: citingPubId, cited_pub_id: citedPubId });
+  }
+
+  // -- Collaborations --
+
+  async createCollaboration(input: Omit<Collaboration, 'publications' | 'grants' | 'status'>): Promise<Collaboration> {
+    return this.post('/api/collaborations', input);
+  }
+
+  async getCollaboration(collaborationId: string): Promise<Collaboration> {
+    return this.get(`/api/collaborations/${encodeURIComponent(collaborationId)}`);
+  }
+
+  // -- Internal helpers --
+
+  private async get<T>(path: string): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`);
+    if (!res.ok) {
+      throw new Error(`DeSci API error ${res.status}: ${await res.text()}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
+  private async post<T>(path: string, body: unknown): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`DeSci API error ${res.status}: ${await res.text()}`);
+    }
+    return res.json() as Promise<T>;
+  }
+}
 
 // Default service instance
 let defaultService: DeSciService | null = null;

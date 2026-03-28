@@ -1,0 +1,1223 @@
+{
+  "metadata": {
+    "title": "MIT OCW: Electrical Engineering and Computer Science",
+    "framework": "MIT OpenCourseWare",
+    "source": "https://ocw.mit.edu/search/?d=6&s=department_course_numbers.sort_coursenum",
+    "grade_level": "Undergraduate",
+    "subject_area": "Computer Science",
+    "domain": "Computer Science",
+    "version": "2024",
+    "total_standards": 30,
+    "domains": [
+      "Humanities",
+      "Economics",
+      "Physics",
+      "Policy and Administration",
+      "Linguistics",
+      "Computer Science",
+      "Biology",
+      "Digital Business & IT",
+      "User Experience",
+      "Data Science, Analytics & Computer Technology"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from MIT Learn API (department 6). Prerequisites inferred from course numbering.",
+    "academic_level": "Undergraduate",
+    "institution": "Massachusetts Institute of Technology",
+    "cip_code": "11.0701"
+  },
+  "nodes": [
+    {
+      "id": "10.01",
+      "title": "Ethics for Engineers: Artificial Intelligence",
+      "description": "Artificial Intelligence (AI), and the algorithmic judgment at its core, is developing at breakneck speed. This version of the popular Ethics for Engineers course focuses on the ethics issues involved in the latest developments of computer science.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "engineering",
+        "philosophy",
+        "computer science",
+        "machine learning",
+        "ai",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "10.01",
+          "description": "Ethics for Engineers: Artificial Intelligence",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "14.15J",
+      "title": "Networks",
+      "description": "This course will highlight common principles that permeate the functioning of networks and how the same issues related to robustness, fragility and interlinkages arise in several different types of networks. It will both introduce conceptual tools from dynamical systems, random graph models, optimization and game theory, and cover a wide variety of applications.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Economics",
+      "tags": [
+        "economics",
+        "computer science",
+        "engineering",
+        "networks and security",
+        "data science, analytics & computer technology",
+        "social sciences"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "14.15J",
+          "description": "Networks",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "20.330J",
+      "title": "Fields, Forces and Flows in Biological Systems",
+      "description": "This course introduces the basic driving forces for electric current, fluid flow, and mass transport, plus their application to a variety of biological systems. Basic mathematical and engineering tools will be introduced, in the context of biology and physiology. Various electrokinetic phenomena are also considered as an example of coupled nature of chemical-electro-mechanical driving forces. Applications include transport in biological tissues and across membranes, manipulation of cells and ...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "mechanical engineering",
+        "chemical engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "20.330J",
+          "description": "Fields, Forces and Flows in Biological Systems",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "20.410J",
+      "title": "Molecular, Cellular and Tissue Biomechanics (BE.410J)",
+      "description": "<p>This course develops and applies scaling laws and the methods of continuum mechanics to biomechanical phenomena over a range of length scales. Topics include: structure of tissues and the molecular basis for macroscopic properties; chemical and electrical effects on mechanical behavior; cell mechanics, motility and adhesion; biomembranes; biomolecular mechanics and molecular motors. Experimental methods for probing structures at the tissue, cellular, and molecular levels will also be inves...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biological engineering",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "20.410J",
+          "description": "Molecular, Cellular and Tissue Biomechanics (BE.410J)",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.011",
+      "title": "Signals, Systems and Inference",
+      "description": "This course covers signals, systems and inference in communication, control and signal processing. Topics include input-output and state-space models of linear systems driven by deterministic and random signals; time- and transform-domain representations in discrete and continuous time; and group delay. State feedback and observers. Probabilistic models; stochastic processes, correlation functions, power spectra, spectral factorization. Least-mean square error estimation; Wiener filtering. Hy...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.011",
+          "description": "Signals, Systems and Inference",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.013",
+      "title": "Electromagnetics and Applications",
+      "description": "<p>This course explores electromagnetic phenomena in modern applications, including wireless communications, circuits, computer interconnects and peripherals, optical fiber links and components, microwave communications and radar, antennas, sensors, micro-electromechanical systems, motors, and power generation and transmission. Fundamentals covered include: quasistatic and dynamic solutions to Maxwell’s equations; waves, radiation, and diffraction; coupling to media and structures; guided a...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "physics",
+        "science & math",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.013",
+          "description": "Electromagnetics and Applications",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.041",
+      "title": "Probabilistic Systems Analysis and Applied  Probability",
+      "description": "This course is offered both to undergraduates (6.041) and graduates (6.431), but the assignments differ. 6.041/6.431 introduces students to the modeling, quantification, and analysis of uncertainty. Topics covered include: formulation and solution in sample space, random variables, transform techniques, simple random processes and their probability distributions, Markov processes, limit theorems, and elements of statistical inference.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.041",
+          "description": "Probabilistic Systems Analysis and Applied  Probability",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.042J",
+      "title": "Mathematics for Computer Science",
+      "description": "This course covers elementary discrete mathematics for computer science and engineering. It emphasizes mathematical definitions and proofs as well as applicable methods. Topics include formal logic notation, proof methods; induction, well-ordering; sets, relations; elementary graph theory; integer congruences; asymptotic notation and growth of functions; permutations and combinations, counting principles; discrete probability. Further selected topics may also be covered, such as recursive def...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.042J",
+          "description": "Mathematics for Computer Science",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.057",
+      "title": "Introduction to MATLAB",
+      "description": "This is an accelerated introduction to MATLAB® and its popular toolboxes. Lectures are interactive, with students conducting sample MATLAB problems in real time. The course includes problem-based MATLAB assignments. Students must provide their own laptop and software. This is great preparation for classes that use MATLAB.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "programming & coding",
+        "visualization",
+        "computer science",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.057",
+          "description": "Introduction to MATLAB",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.091",
+      "title": "Hands-On Introduction to Electrical Engineering Lab Skills",
+      "description": "<p>This course introduces students to both passive and active electronic components (op-amps, 555 timers, TTL digital circuits). Basic analog and digital circuits and theory of operation are covered. The labs allow the students to master the use of electronic instruments and construct and/or solder several circuits. The labs also reinforce the concepts discussed in class with a hands-on approach and allow the students to gain significant experience with electrical instruments such as function...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.091",
+          "description": "Hands-On Introduction to Electrical Engineering Lab Skills",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.092",
+      "title": "Java Preparation for 6.170",
+      "description": "This course focuses on introducing the language, libraries, tools and concepts of Javaᵀᴹ. The course is specifically targeted at students who intend to take 6.170 in the following term and feel they would struggle because they lack the necessary background. Topics include: Object-oriented programming, primitives, arrays, objects, inheritance, interfaces, polymorphism, hashing, data structures, collections, nested classes, floating point precision, defensive programming, and depth-first se...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Computer Science",
+      "tags": [
+        "computer science",
+        "engineering",
+        "programming & coding",
+        "software design and engineering",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.092",
+          "description": "Java Preparation for 6.170",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.245",
+      "title": "Multivariable Control Systems",
+      "description": "This course uses computer-aided design methodologies for synthesis of multivariable feedback control systems. Topics covered include: performance and robustness trade-offs; model-based compensators; Q-parameterization; ill-posed optimization problems; dynamic augmentation; linear-quadratic optimization of controllers; H-infinity controller design; Mu-synthesis; model and compensator simplification; and nonlinear effects. The assignments for the course comprise of computer-aided (MATLAB®) des...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "systems engineering",
+        "computer science",
+        "engineering",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.245",
+          "description": "Multivariable Control Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.253",
+      "title": "Convex Analysis and Optimization",
+      "description": "This course will focus on fundamental subjects in convexity, duality, and convex optimization algorithms. The aim is to develop the core analytical and algorithmic issues of continuous optimization, duality, and saddle point theory using a handful of unifying principles that can be easily visualized and readily understood.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Mathematics",
+      "tags": [
+        "mathematics",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.253",
+          "description": "Convex Analysis and Optimization",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.301",
+      "title": "Solid-State Circuits",
+      "description": "6.301 is a course in analog circuit analysis and design. We cover the tools and methods necessary for the creative design of useful circuits using active devices. The class stresses insight and intuition, applied to the design of transistor circuits and the estimation of their performance. We concentrate on circuits using the bipolar junction transistor, but the techniques that we study can be equally applied to circuits using JFETs, MOSFETs, MESFETs, future exotic devices, or even vacuum tubes.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.301",
+          "description": "Solid-State Circuits",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.302",
+      "title": "Feedback Systems",
+      "description": "This course provides an introduction to the design of feedback systems. Topics covered include: properties and advantages of feedback systems, time-domain and frequency-domain performance measures, stability and degree of stability, root locus method, Nyquist criterion, frequency-domain design, compensation techniques, application to a wide variety of physical systems, internal and external compensation of operational amplifiers, modeling and compensation of power converter systems, and phase...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.302",
+          "description": "Feedback Systems",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.336J",
+      "title": "Introduction to Numerical Simulation (SMA 5211)",
+      "description": "<p>6.336J is an introduction to computational techniques for the simulation of a large variety of engineering and physical systems. Applications are drawn from aerospace, mechanical, electrical, chemical and biological engineering, and materials science. Topics include: mathematical formulations; network problems; sparse direct and iterative matrix solution techniques; Newton methods for nonlinear problems; discretization methods for ordinary, time-periodic and partial differential equations,...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Systems Engineering",
+      "tags": [
+        "systems engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.336J",
+          "description": "Introduction to Numerical Simulation (SMA 5211)",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.341",
+      "title": "Discrete-Time Signal Processing",
+      "description": "<p>This class addresses the representation, analysis, and design of discrete time signals and systems. The major concepts covered include: Discrete-time processing of continuous-time signals; decimation, interpolation, and sampling rate conversion; flowgraph structures for DT systems; time-and frequency-domain design techniques for recursive (IIR) and non-recursive (FIR) filters; linear prediction; discrete Fourier transform, FFT algorithm; short-time Fourier analysis and filter banks; multir...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "mathematics",
+        "engineering",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.341",
+          "description": "Discrete-Time Signal Processing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.450",
+      "title": "Principles of Digital Communication I",
+      "description": "<p>The course serves as an introduction to the theory and practice behind many of today’s communications systems. 6.450 forms the first of a two-course sequence on digital communication. The second class, <em>6.451 Principles of Digital Communication II</em>, is offered in the spring.</p>\n<p>Topics covered include: digital communications at the block diagram level, data compression, Lempel-Ziv algorithm, scalar and vector quantization, sampling and aliasing, the Nyquist criterion, PAM and Q...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "engineering"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.450",
+          "description": "Principles of Digital Communication I",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "300-400",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.776",
+      "title": "High Speed Communication Circuits",
+      "description": "6.776 covers circuit level design issues of high speed communication systems, with primary focus being placed on wireless and broadband data link applications. Specific circuit topics include transmission lines, high speed and low noise amplifiers, VCO’s, mixers, power amps, high speed digital circuits, and frequency synthesizers. In addition to learning analysis skills for the above items, students will gain a significant amount of experience in simulating RF circuits in SPICE and also bui...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "networks and security",
+        "electrical engineering",
+        "computer science",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.776",
+          "description": "High Speed Communication Circuits",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.811",
+      "title": "Principles and Practice of Assistive Technology",
+      "description": "6.811: Principles and Practice of Assistive Technology (PPAT) is an interdisciplinary, project-based course, centered around a design project in which small teams of students work closely with a person with a disability in the Cambridge area to design a device, piece of equipment, app, or other solution that helps them live more independently.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "public health",
+        "computer science",
+        "mechanical engineering",
+        "user experience",
+        "engineering",
+        "data science, analytics & computer technology",
+        "health & medicine"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.811",
+          "description": "Principles and Practice of Assistive Technology",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.849",
+      "title": "Geometric Folding Algorithms: Linkages, Origami, Polyhedra",
+      "description": "<p>This course focuses on the algorithms for analyzing and designing geometric foldings. Topics include reconfiguration of foldable structures, linkages made from one-dimensional rods connected by hinges, folding two-dimensional paper (origami), and unfolding and folding three-dimensional polyhedra. Applications to architecture, robotics, manufacturing, and biology are also covered in this course.</p>\nAcknowledgments\n<p>Thanks to videographers Martin Demaine and Jayson Lynch.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Visual Arts",
+      "tags": [
+        "visual arts",
+        "mathematics",
+        "computer science",
+        "engineering",
+        "algorithms and data structures",
+        "art, design & architecture",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.849",
+          "description": "Geometric Folding Algorithms: Linkages, Origami, Polyhedra",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.856J",
+      "title": "Randomized Algorithms",
+      "description": "This course examines how randomization can be used to make algorithms simpler and more efficient via random sampling, random selection of witnesses, symmetry breaking, and Markov chains. Topics covered include: randomized computation; data structures (hash tables, skip lists); graph algorithms (minimum spanning trees, shortest paths, minimum cuts); geometric algorithms (convex hulls, linear programming in fixed or arbitrary dimension); approximate counting; parallel algorithms; online algorit...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "algorithms and data structures",
+        "mathematics",
+        "computer science",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.856J",
+          "description": "Randomized Algorithms",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.858",
+      "title": "Computer Systems Security",
+      "description": "6.858 Computer Systems Security is a class about the design and implementation of secure computer systems. Lectures cover threat models, attacks that compromise security, and techniques for achieving security, based on recent research papers. Topics include operating system (OS) security, capabilities, information flow control, language security, network protocols, hardware security, and security in web applications.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Engineering",
+      "tags": [
+        "engineering",
+        "software design and engineering",
+        "computer science",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.858",
+          "description": "Computer Systems Security",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.864",
+      "title": "Advanced Natural Language Processing",
+      "description": "This course is a graduate introduction to natural language processing - the study of human language from a computational perspective. It covers syntactic, semantic and discourse processing models, emphasizing machine learning or corpus-based methods and algorithms. It also covers applications of these methods and models in syntactic parsing, information extraction, statistical machine translation, dialogue systems, and summarization. The subject qualifies as an Artificial Intelligence and App...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Humanities",
+      "tags": [
+        "humanities",
+        "linguistics",
+        "computer science",
+        "cognitive science",
+        "engineering",
+        "machine learning",
+        "ai",
+        "data science, analytics & computer technology",
+        "science & math"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.864",
+          "description": "Advanced Natural Language Processing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "6.S897",
+      "title": "Machine Learning for Healthcare",
+      "description": "This course introduces students to machine learning in healthcare, including the nature of clinical data and the use of machine learning for risk stratification, disease progression modeling, precision medicine, diagnosis, subtype discovery, and improving clinical workflows.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Imaging",
+      "tags": [
+        "imaging",
+        "computer science",
+        "public health",
+        "user experience",
+        "machine learning",
+        "engineering",
+        "ai",
+        "data science, analytics & computer technology",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "6.S897",
+          "description": "Machine Learning for Healthcare",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "200-300",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "7.90J",
+      "title": "Computational Functional Genomics",
+      "description": "The course focuses on casting contemporary problems in systems biology and functional genomics in computational terms and providing appropriate tools and methods to solve them. Topics include genome structure and function, transcriptional regulation, and stem cell biology in particular; measurement technologies such as microarrays (expression, protein-DNA interactions, chromatin structure); statistical data analysis, predictive and causal inference, and experiment design. The emphasis is on c...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Biology",
+      "tags": [
+        "biology",
+        "biomedical technologies",
+        "science & math",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "7.90J",
+          "description": "Computational Functional Genomics",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "CMS.611J",
+      "title": "Creating Video Games",
+      "description": "CMS.611J / 6.073 Creating Video Games is a class that introduces students to the complexities of working in small, multidisciplinary teams to develop video games. Students will learn creative design and production methods, working together in small teams to design, develop, and thoroughly test their own original digital games. Design iteration across all aspects of video game development (game design, audio design, visual aesthetics, fiction and programming) will be stressed. Students will al...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Media Studies",
+      "tags": [
+        "media studies",
+        "game design",
+        "computer science",
+        "engineering",
+        "software design and engineering",
+        "art, design & architecture",
+        "data science, analytics & computer technology"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "CMS.611J",
+          "description": "Creating Video Games",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "500-600",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "ESD.68J",
+      "title": "Communications and Information Policy",
+      "description": "This course provides an introduction to the technology and policy context of public communications networks, through critical discussion of current issues in communications policy and their historical roots. The course focuses on underlying rationales and models for government involvement and the complex dynamics introduced by co-evolving technologies, industry structure, and public policy objectives. Cases drawn from cellular, fixed-line, and Internet applications include evolution of spectr...",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "communication",
+        "policy and administration",
+        "engineering",
+        "social sciences"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "ESD.68J",
+          "description": "Communications and Information Policy",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "HST.950J",
+      "title": "Medical Computing",
+      "description": "<p>The focus of the course is on medical science and practice in the age of automation and the genome, both present and future.</p>\n<p>It ncludes an analysis of the computational needs of clinical medicine, a review systems and approaches that have been used to support those needs, and an examination of new technologies.</p>\n",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Computer Science",
+      "subdomain": "Digital Business & IT",
+      "tags": [
+        "digital business & it",
+        "biological engineering",
+        "computer science",
+        "biomedical technologies",
+        "engineering",
+        "data science",
+        "business & management",
+        "data science, analytics & computer technology",
+        "health & medicine"
+      ],
+      "estimated_hours": 180,
+      "grade_levels": [
+        "Graduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "HST.950J",
+          "description": "Medical Computing",
+          "grade_level": "Graduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "700+",
+      "cip_code": "11.0701"
+    },
+    {
+      "id": "RES.6-007",
+      "title": "Signals and Systems",
+      "description": "<p>This course was developed in 1987 by the MIT Center for Advanced Engineering Studies. It was designed as a distance-education course for engineers and scientists in the workplace.</p>\n<p>Signals and Systems is an introduction to analog and digital signal processing, a topic that forms an integral part of engineering systems in many diverse areas, including seismic data processing, communications, speech processing, image processing, defense electronics, consumer electronics, and consumer p...",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Computer Science",
+      "subdomain": "Electrical Engineering",
+      "tags": [
+        "electrical engineering",
+        "systems engineering",
+        "engineering"
+      ],
+      "estimated_hours": 135,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "MIT OCW",
+          "code": "RES.6-007",
+          "description": "Signals and Systems",
+          "grade_level": "Undergraduate"
+        }
+      ],
+      "credit_hours": 12,
+      "course_level": "100",
+      "cip_code": "11.0701"
+    }
+  ],
+  "edges": [
+    {
+      "from": "10.01",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 10.01 typically precedes 6.245."
+    },
+    {
+      "from": "10.01",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 10.01 typically precedes 6.253."
+    },
+    {
+      "from": "RES.6-007",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.6-007 typically precedes 6.245."
+    },
+    {
+      "from": "RES.6-007",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course RES.6-007 typically precedes 6.253."
+    },
+    {
+      "from": "6.011",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.011 typically precedes 6.245."
+    },
+    {
+      "from": "6.011",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.011 typically precedes 6.253."
+    },
+    {
+      "from": "6.013",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.013 typically precedes 6.245."
+    },
+    {
+      "from": "6.013",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.013 typically precedes 6.253."
+    },
+    {
+      "from": "14.15J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 6.245."
+    },
+    {
+      "from": "14.15J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 14.15J typically precedes 6.253."
+    },
+    {
+      "from": "6.041",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.041 typically precedes 6.245."
+    },
+    {
+      "from": "6.041",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.041 typically precedes 6.253."
+    },
+    {
+      "from": "6.042J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 6.245."
+    },
+    {
+      "from": "6.042J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.042J typically precedes 6.253."
+    },
+    {
+      "from": "6.057",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.057 typically precedes 6.245."
+    },
+    {
+      "from": "6.057",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.057 typically precedes 6.253."
+    },
+    {
+      "from": "ESD.68J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course ESD.68J typically precedes 6.245."
+    },
+    {
+      "from": "ESD.68J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course ESD.68J typically precedes 6.253."
+    },
+    {
+      "from": "7.90J",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.90J typically precedes 6.245."
+    },
+    {
+      "from": "7.90J",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 7.90J typically precedes 6.253."
+    },
+    {
+      "from": "6.091",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.091 typically precedes 6.245."
+    },
+    {
+      "from": "6.091",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.091 typically precedes 6.253."
+    },
+    {
+      "from": "6.092",
+      "to": "6.245",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.092 typically precedes 6.245."
+    },
+    {
+      "from": "6.092",
+      "to": "6.253",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Introductory course 6.092 typically precedes 6.253."
+    },
+    {
+      "from": "6.253",
+      "to": "6.301",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 6.253 typically precedes 6.301."
+    },
+    {
+      "from": "6.253",
+      "to": "6.302",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 6.253 typically precedes 6.302."
+    },
+    {
+      "from": "6.253",
+      "to": "20.330J",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Intermediate course 6.253 typically precedes 20.330J."
+    },
+    {
+      "from": "6.450",
+      "to": "CMS.611J",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 6.450 typically precedes graduate course CMS.611J."
+    },
+    {
+      "from": "6.450",
+      "to": "6.776",
+      "edge_type": "Requires",
+      "strength_permille": 600,
+      "rationale": "Advanced course 6.450 typically precedes graduate course 6.776."
+    }
+  ]
+}

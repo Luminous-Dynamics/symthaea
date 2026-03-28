@@ -1,0 +1,2433 @@
+{
+  "metadata": {
+    "title": "Grade 1",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_ELA%20Standards.pdf",
+    "grade_level": "Grade1",
+    "subject_area": "EnglishLanguageArts",
+    "domain": "EnglishLanguageArts",
+    "version": "2010",
+    "total_standards": 77,
+    "domains": [
+      "Language Standards",
+      "College and Career Readiness Anchor Standards for Language",
+      "Speaking and Listening Standards",
+      "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "Writing Standards",
+      "College and Career Readiness Anchor Standards for Writing",
+      "Reading Standards: Foundational Skills",
+      "Reading Standards for Informational Text",
+      "Reading Standards for Literature",
+      "College and Career Readiness Anchor Standards for Reading"
+    ],
+    "created_at": "2026-03-27",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FC_grade-01). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.ELA-Literacy.L.1.6",
+      "title": "Use words and phrases acquired through conversations, reading and being read ...",
+      "description": "Use words and phrases acquired through conversations, reading and being read to, and responding to texts, including using frequently occurring conjunctions to signal simple relationships (e.g., because).",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Language Standards",
+      "tags": [
+        "reading"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.L.1.6",
+          "description": "Use words and phrases acquired through conversations, reading and being read to, and responding to texts, including using frequently occurring conjunctions to signal simple relationships (e.g., because).",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.L.1.5",
+      "title": "With guidance and support from adults, demonstrate understanding of word rela...",
+      "description": "With guidance and support from adults, demonstrate understanding of word relationships and nuances in word meanings.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Language Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.L.1.5",
+          "description": "With guidance and support from adults, demonstrate understanding of word relationships and nuances in word meanings.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.L.1.4",
+      "title": "Determine or clarify the meaning of unknown and multiple-meaning words and ph...",
+      "description": "Determine or clarify the meaning of unknown and multiple-meaning words and phrases based on grade 1 reading and content, choosing flexibly from an array of strategies.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Language Standards",
+      "tags": [
+        "reading"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.L.1.4",
+          "description": "Determine or clarify the meaning of unknown and multiple-meaning words and phrases based on grade 1 reading and content, choosing flexibly from an array of strategies.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "(Begins in grade 2)",
+      "title": "(Begins in grade 2)",
+      "description": "(Begins in grade 2)",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Language Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "(Begins in grade 2)",
+          "description": "(Begins in grade 2)",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.L.1.2",
+      "title": "Demonstrate command of the conventions of standard English capitalization, pu...",
+      "description": "Demonstrate command of the conventions of standard English capitalization, punctuation, and spelling when writing.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Language Standards",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.L.1.2",
+          "description": "Demonstrate command of the conventions of standard English capitalization, punctuation, and spelling when writing.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.L.1.1",
+      "title": "Demonstrate command of the conventions of standard English grammar and usage ...",
+      "description": "Demonstrate command of the conventions of standard English grammar and usage when writing or speaking.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Language Standards",
+      "tags": [
+        "writing",
+        "grammar",
+        "speaking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.L.1.1",
+          "description": "Demonstrate command of the conventions of standard English grammar and usage when writing or speaking.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.L.6",
+      "title": "Acquire and use accurately a range of general academic and domain-specific wo...",
+      "description": "Acquire and use accurately a range of general academic and domain-specific words and phrases sufficient for reading, writing, speaking, and listening at the college and career readiness level; demonstrate independence in gathering vocabulary knowledge when encountering an unknown term important to comprehension or expression.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Language",
+      "tags": [
+        "reading",
+        "writing",
+        "vocabulary",
+        "comprehension",
+        "speaking",
+        "listening"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.L.6",
+          "description": "Acquire and use accurately a range of general academic and domain-specific words and phrases sufficient for reading, writing, speaking, and listening at the college and career readiness level; demonstrate independence in gathering vocabulary knowledge when encountering an unknown term important to comprehension or expression.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.L.5",
+      "title": "Demonstrate understanding of figurative language, word relationships, and nua...",
+      "description": "Demonstrate understanding of figurative language, word relationships, and nuances in word meanings.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Language",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.L.5",
+          "description": "Demonstrate understanding of figurative language, word relationships, and nuances in word meanings.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.L.4",
+      "title": "Determine or clarify the meaning of unknown and multiple-meaning words and ph...",
+      "description": "Determine or clarify the meaning of unknown and multiple-meaning words and phrases by using context clues, analyzing meaningful word parts, and consulting general and specialized reference materials, as appropriate.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Language",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.L.4",
+          "description": "Determine or clarify the meaning of unknown and multiple-meaning words and phrases by using context clues, analyzing meaningful word parts, and consulting general and specialized reference materials, as appropriate.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.L.3",
+      "title": "Apply knowledge of language to understand how language functions in different...",
+      "description": "Apply knowledge of language to understand how language functions in different contexts, to make effective choices for meaning or style, and to comprehend more fully when reading or listening.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Language",
+      "tags": [
+        "functions",
+        "reading",
+        "listening"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.L.3",
+          "description": "Apply knowledge of language to understand how language functions in different contexts, to make effective choices for meaning or style, and to comprehend more fully when reading or listening.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.L.2",
+      "title": "Demonstrate command of the conventions of standard English capitalization, pu...",
+      "description": "Demonstrate command of the conventions of standard English capitalization, punctuation, and spelling when writing.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Language",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.L.2",
+          "description": "Demonstrate command of the conventions of standard English capitalization, punctuation, and spelling when writing.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.L.1",
+      "title": "Demonstrate command of the conventions of standard English grammar and usage ...",
+      "description": "Demonstrate command of the conventions of standard English grammar and usage when writing or speaking.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Language",
+      "tags": [
+        "writing",
+        "grammar",
+        "speaking"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.L.1",
+          "description": "Demonstrate command of the conventions of standard English grammar and usage when writing or speaking.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.SL.1.6",
+      "title": "Produce complete sentences when appropriate to task and situation",
+      "description": "Produce complete sentences when appropriate to task and situation.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Speaking and Listening Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.SL.1.6",
+          "description": "Produce complete sentences when appropriate to task and situation.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.SL.1.5",
+      "title": "Add drawings or other visual displays to descriptions when appropriate to cla...",
+      "description": "Add drawings or other visual displays to descriptions when appropriate to clarify ideas, thoughts, and feelings.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Speaking and Listening Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.SL.1.5",
+          "description": "Add drawings or other visual displays to descriptions when appropriate to clarify ideas, thoughts, and feelings.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.SL.1.4",
+      "title": "Describe people, places, things, and events with relevant details, expressing...",
+      "description": "Describe people, places, things, and events with relevant details, expressing ideas and feelings clearly.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Speaking and Listening Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.SL.1.4",
+          "description": "Describe people, places, things, and events with relevant details, expressing ideas and feelings clearly.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.SL.1.3",
+      "title": "Ask and answer questions about what a speaker says in order to gather additio...",
+      "description": "Ask and answer questions about what a speaker says in order to gather additional information or clarify something that is not understood.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Speaking and Listening Standards",
+      "tags": [
+        "addition"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.SL.1.3",
+          "description": "Ask and answer questions about what a speaker says in order to gather additional information or clarify something that is not understood.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.SL.1.2",
+      "title": "Ask and answer questions about key details in a text read aloud or informatio...",
+      "description": "Ask and answer questions about key details in a text read aloud or information presented orally or through other media.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Speaking and Listening Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.SL.1.2",
+          "description": "Ask and answer questions about key details in a text read aloud or information presented orally or through other media.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.SL.1.1",
+      "title": "Participate in collaborative conversations with diverse partners about grade ...",
+      "description": "Participate in collaborative conversations with diverse partners about grade 1 topics and texts with peers and adults in small and larger groups",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Speaking and Listening Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.SL.1.1",
+          "description": "Participate in collaborative conversations with diverse partners about grade 1 topics and texts with peers and adults in small and larger groups",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.SL.6",
+      "title": "Adapt speech to a variety of contexts and communicative tasks, demonstrating ...",
+      "description": "Adapt speech to a variety of contexts and communicative tasks, demonstrating command of formal English when indicated or appropriate.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.SL.6",
+          "description": "Adapt speech to a variety of contexts and communicative tasks, demonstrating command of formal English when indicated or appropriate.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.SL.5",
+      "title": "Make strategic use of digital media and visual displays of data to express in...",
+      "description": "Make strategic use of digital media and visual displays of data to express information and enhance understanding of presentations.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.SL.5",
+          "description": "Make strategic use of digital media and visual displays of data to express information and enhance understanding of presentations.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.SL.4",
+      "title": "Present information, findings, and supporting evidence such that listeners ca...",
+      "description": "Present information, findings, and supporting evidence such that listeners can follow the line of reasoning and the organization, development, and style are appropriate to task, purpose, and audience.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.SL.4",
+          "description": "Present information, findings, and supporting evidence such that listeners can follow the line of reasoning and the organization, development, and style are appropriate to task, purpose, and audience.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.SL.3",
+      "title": "Evaluate a speaker's point of view, reasoning, and use of evidence and rhetoric",
+      "description": "Evaluate a speaker's point of view, reasoning, and use of evidence and rhetoric.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "tags": [
+        "evidence"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.SL.3",
+          "description": "Evaluate a speaker's point of view, reasoning, and use of evidence and rhetoric.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.SL.2",
+      "title": "Integrate and evaluate information presented in diverse media and formats, in...",
+      "description": "Integrate and evaluate information presented in diverse media and formats, including visually, quantitatively, and orally.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.SL.2",
+          "description": "Integrate and evaluate information presented in diverse media and formats, including visually, quantitatively, and orally.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.SL.1",
+      "title": "Prepare for and participate effectively in a range of conversations and colla...",
+      "description": "Prepare for and participate effectively in a range of conversations and collaborations with diverse partners, building on others' ideas and expressing their own clearly and persuasively.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Speaking and Listening",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.SL.1",
+          "description": "Prepare for and participate effectively in a range of conversations and collaborations with diverse partners, building on others' ideas and expressing their own clearly and persuasively.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "(Begins in grade 3)",
+      "title": "(Begins in grade 3)",
+      "description": "(Begins in grade 3)",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "(Begins in grade 3)",
+          "description": "(Begins in grade 3)",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "(Begins in grade 4)",
+      "title": "(Begins in grade 4)",
+      "description": "(Begins in grade 4)",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "(Begins in grade 4)",
+          "description": "(Begins in grade 4)",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.8",
+      "title": "With guidance and support from adults, recall information from experiences or...",
+      "description": "With guidance and support from adults, recall information from experiences or gather information from provided sources to answer a question.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.8",
+          "description": "With guidance and support from adults, recall information from experiences or gather information from provided sources to answer a question.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.7",
+      "title": "Participate in shared research and writing projects (e",
+      "description": "Participate in shared research and writing projects (e.g., explore a number of \"how-to\" books on a given topic and use them to write a sequence of instructions).",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [
+        "writing",
+        "research"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.7",
+          "description": "Participate in shared research and writing projects (e.g., explore a number of \"how-to\" books on a given topic and use them to write a sequence of instructions).",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.6",
+      "title": "With guidance and support from adults, use a variety of digital tools to prod...",
+      "description": "With guidance and support from adults, use a variety of digital tools to produce and publish writing, including in collaboration with peers.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.6",
+          "description": "With guidance and support from adults, use a variety of digital tools to produce and publish writing, including in collaboration with peers.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.5",
+      "title": "With guidance and support from adults, focus on a topic, respond to questions...",
+      "description": "With guidance and support from adults, focus on a topic, respond to questions and suggestions from peers, and add details to strengthen writing as needed.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.5",
+          "description": "With guidance and support from adults, focus on a topic, respond to questions and suggestions from peers, and add details to strengthen writing as needed.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "(Begins in grade 3)",
+      "title": "(Begins in grade 3)",
+      "description": "(Begins in grade 3)",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "(Begins in grade 3)",
+          "description": "(Begins in grade 3)",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.3",
+      "title": "Write narratives in which they recount two or more appropriately sequenced ev...",
+      "description": "Write narratives in which they recount two or more appropriately sequenced events, include some details regarding what happened, use temporal words to signal event order, and provide some sense of closure.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [
+        "narrative"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.3",
+          "description": "Write narratives in which they recount two or more appropriately sequenced events, include some details regarding what happened, use temporal words to signal event order, and provide some sense of closure.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.2",
+      "title": "Write informative/explanatory texts in which they name a topic, supply some f...",
+      "description": "Write informative/explanatory texts in which they name a topic, supply some facts about the topic, and provide some sense of closure.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.2",
+          "description": "Write informative/explanatory texts in which they name a topic, supply some facts about the topic, and provide some sense of closure.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.W.1.1",
+      "title": "Write opinion pieces in which they introduce the topic or name the book they ...",
+      "description": "Write opinion pieces in which they introduce the topic or name the book they are writing about, state an opinion, supply a reason for the opinion, and provide some sense of closure.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Writing Standards",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.W.1.1",
+          "description": "Write opinion pieces in which they introduce the topic or name the book they are writing about, state an opinion, supply a reason for the opinion, and provide some sense of closure.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.10",
+      "title": "Write routinely over extended time frames (time for research, reflection, and...",
+      "description": "Write routinely over extended time frames (time for research, reflection, and revision) and shorter time frames (a single sitting or a day or two) for a range of tasks, purposes, and audiences.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "research"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.10",
+          "description": "Write routinely over extended time frames (time for research, reflection, and revision) and shorter time frames (a single sitting or a day or two) for a range of tasks, purposes, and audiences.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.9",
+      "title": "Draw evidence from literary or informational texts to support analysis, refle...",
+      "description": "Draw evidence from literary or informational texts to support analysis, reflection, and research.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "evidence",
+        "informational",
+        "research"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.9",
+          "description": "Draw evidence from literary or informational texts to support analysis, reflection, and research.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.8",
+      "title": "Gather relevant information from multiple print and digital sources, assess t...",
+      "description": "Gather relevant information from multiple print and digital sources, assess the credibility and accuracy of each source, and integrate the information while avoiding plagiarism.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.8",
+          "description": "Gather relevant information from multiple print and digital sources, assess the credibility and accuracy of each source, and integrate the information while avoiding plagiarism.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.7",
+      "title": "Conduct short as well as more sustained research projects based on focused qu...",
+      "description": "Conduct short as well as more sustained research projects based on focused questions, demonstrating understanding of the subject under investigation.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "research"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.7",
+          "description": "Conduct short as well as more sustained research projects based on focused questions, demonstrating understanding of the subject under investigation.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.6",
+      "title": "Use technology, including the Internet, to produce and publish writing and to...",
+      "description": "Use technology, including the Internet, to produce and publish writing and to interact and collaborate with others.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.6",
+          "description": "Use technology, including the Internet, to produce and publish writing and to interact and collaborate with others.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.5",
+      "title": "Develop and strengthen writing as needed by planning, revising, editing, rewr...",
+      "description": "Develop and strengthen writing as needed by planning, revising, editing, rewriting, or trying a new approach.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.5",
+          "description": "Develop and strengthen writing as needed by planning, revising, editing, rewriting, or trying a new approach.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.4",
+      "title": "Produce clear and coherent writing in which the development, organization, an...",
+      "description": "Produce clear and coherent writing in which the development, organization, and style are appropriate to task, purpose, and audience.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "writing"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.4",
+          "description": "Produce clear and coherent writing in which the development, organization, and style are appropriate to task, purpose, and audience.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.3",
+      "title": "Write narratives to develop real or imagined experiences or events using effe...",
+      "description": "Write narratives to develop real or imagined experiences or events using effective technique, well-chosen details, and well-structured event sequences.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "narrative"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.3",
+          "description": "Write narratives to develop real or imagined experiences or events using effective technique, well-chosen details, and well-structured event sequences.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.2",
+      "title": "Write informative/explanatory texts to examine and convey complex ideas and i...",
+      "description": "Write informative/explanatory texts to examine and convey complex ideas and information clearly and accurately through the effective selection, organization, and analysis of content.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.2",
+          "description": "Write informative/explanatory texts to examine and convey complex ideas and information clearly and accurately through the effective selection, organization, and analysis of content.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.W.1",
+      "title": "Write arguments to support claims in an analysis of substantive topics or tex...",
+      "description": "Write arguments to support claims in an analysis of substantive topics or texts, using valid reasoning and relevant and sufficient evidence.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Writing",
+      "tags": [
+        "argument",
+        "evidence"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.W.1",
+          "description": "Write arguments to support claims in an analysis of substantive topics or texts, using valid reasoning and relevant and sufficient evidence.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RF.1.4",
+      "title": "Read with sufficient accuracy and fluency to support comprehension",
+      "description": "Read with sufficient accuracy and fluency to support comprehension.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards: Foundational Skills",
+      "tags": [
+        "comprehension",
+        "fluency"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RF.1.4",
+          "description": "Read with sufficient accuracy and fluency to support comprehension.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RF.1.3",
+      "title": "Know and apply grade-level phonics and word analysis skills in decoding words",
+      "description": "Know and apply grade-level phonics and word analysis skills in decoding words.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards: Foundational Skills",
+      "tags": [
+        "phonics"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RF.1.3",
+          "description": "Know and apply grade-level phonics and word analysis skills in decoding words.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RF.1.2",
+      "title": "Demonstrate understanding of spoken words, syllables, and sounds (phonemes)",
+      "description": "Demonstrate understanding of spoken words, syllables, and sounds (phonemes).",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards: Foundational Skills",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RF.1.2",
+          "description": "Demonstrate understanding of spoken words, syllables, and sounds (phonemes).",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RF.1.1",
+      "title": "Demonstrate understanding of the organization and basic features of print",
+      "description": "Demonstrate understanding of the organization and basic features of print.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards: Foundational Skills",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RF.1.1",
+          "description": "Demonstrate understanding of the organization and basic features of print.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.10",
+      "title": "With prompting and support, read informational texts appropriately complex fo...",
+      "description": "With prompting and support, read informational texts appropriately complex for grade 1.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [
+        "informational"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.10",
+          "description": "With prompting and support, read informational texts appropriately complex for grade 1.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.9",
+      "title": "Identify basic similarities in and differences between two texts on the same ...",
+      "description": "Identify basic similarities in and differences between two texts on the same topic (e.g., in illustrations, descriptions, or procedures).",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.9",
+          "description": "Identify basic similarities in and differences between two texts on the same topic (e.g., in illustrations, descriptions, or procedures).",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.8",
+      "title": "Identify the reasons an author gives to support points in a text",
+      "description": "Identify the reasons an author gives to support points in a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.8",
+          "description": "Identify the reasons an author gives to support points in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.7",
+      "title": "Use the illustrations and details in a text to describe its key ideas",
+      "description": "Use the illustrations and details in a text to describe its key ideas.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.7",
+          "description": "Use the illustrations and details in a text to describe its key ideas.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.6",
+      "title": "Distinguish between information provided by pictures or other illustrations a...",
+      "description": "Distinguish between information provided by pictures or other illustrations and information provided by the words in a text.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.6",
+          "description": "Distinguish between information provided by pictures or other illustrations and information provided by the words in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.5",
+      "title": "Know and use various text features (e",
+      "description": "Know and use various text features (e.g., headings, tables of contents, glossaries, electronic menus, icons) to locate key facts or information in a text.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.5",
+          "description": "Know and use various text features (e.g., headings, tables of contents, glossaries, electronic menus, icons) to locate key facts or information in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.4",
+      "title": "Ask and answer questions to help determine or clarify the meaning of words an...",
+      "description": "Ask and answer questions to help determine or clarify the meaning of words and phrases in a text.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.4",
+          "description": "Ask and answer questions to help determine or clarify the meaning of words and phrases in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.3",
+      "title": "Describe the connection between two individuals, events, ideas, or pieces of ...",
+      "description": "Describe the connection between two individuals, events, ideas, or pieces of information in a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.3",
+          "description": "Describe the connection between two individuals, events, ideas, or pieces of information in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.2",
+      "title": "Identify the main topic and retell key details of a text",
+      "description": "Identify the main topic and retell key details of a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.2",
+          "description": "Identify the main topic and retell key details of a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RI.1.1",
+      "title": "Ask and answer questions about key details in a text",
+      "description": "Ask and answer questions about key details in a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Informational Text",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RI.1.1",
+          "description": "Ask and answer questions about key details in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.10",
+      "title": "With prompting and support, read prose and poetry of appropriate complexity f...",
+      "description": "With prompting and support, read prose and poetry of appropriate complexity for grade 1.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.10",
+          "description": "With prompting and support, read prose and poetry of appropriate complexity for grade 1.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.9",
+      "title": "Compare and contrast the adventures and experiences of characters in stories",
+      "description": "Compare and contrast the adventures and experiences of characters in stories.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.9",
+          "description": "Compare and contrast the adventures and experiences of characters in stories.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.7",
+      "title": "Use illustrations and details in a story to describe its characters, setting,...",
+      "description": "Use illustrations and details in a story to describe its characters, setting, or events.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.7",
+          "description": "Use illustrations and details in a story to describe its characters, setting, or events.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.6",
+      "title": "Identify who is telling the story at various points in a text",
+      "description": "Identify who is telling the story at various points in a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.6",
+          "description": "Identify who is telling the story at various points in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.5",
+      "title": "Explain major differences between books that tell stories and books that give...",
+      "description": "Explain major differences between books that tell stories and books that give information, drawing on a wide reading of a range of text types.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [
+        "reading"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.5",
+          "description": "Explain major differences between books that tell stories and books that give information, drawing on a wide reading of a range of text types.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.4",
+      "title": "Identify words and phrases in stories or poems that suggest feelings or appea...",
+      "description": "Identify words and phrases in stories or poems that suggest feelings or appeal to the senses.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.4",
+          "description": "Identify words and phrases in stories or poems that suggest feelings or appeal to the senses.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.3",
+      "title": "Describe characters, settings, and major events in a story, using key details",
+      "description": "Describe characters, settings, and major events in a story, using key details.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.3",
+          "description": "Describe characters, settings, and major events in a story, using key details.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.2",
+      "title": "Retell stories, including key details, and demonstrate understanding of their...",
+      "description": "Retell stories, including key details, and demonstrate understanding of their central message or lesson.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.2",
+          "description": "Retell stories, including key details, and demonstrate understanding of their central message or lesson.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.RL.1.1",
+      "title": "Ask and answer questions about key details in a text",
+      "description": "Ask and answer questions about key details in a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "Reading Standards for Literature",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.RL.1.1",
+          "description": "Ask and answer questions about key details in a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.10",
+      "title": "Read and comprehend complex literary and informational texts independently an...",
+      "description": "Read and comprehend complex literary and informational texts independently and proficiently.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [
+        "informational"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.10",
+          "description": "Read and comprehend complex literary and informational texts independently and proficiently.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.9",
+      "title": "Analyze how two or more texts address similar themes or topics in order to bu...",
+      "description": "Analyze how two or more texts address similar themes or topics in order to build knowledge or to compare the approaches the authors take.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.9",
+          "description": "Analyze how two or more texts address similar themes or topics in order to build knowledge or to compare the approaches the authors take.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.8",
+      "title": "Delineate and evaluate the argument and specific claims in a text, including ...",
+      "description": "Delineate and evaluate the argument and specific claims in a text, including the validity of the reasoning as well as the relevance and sufficiency of the evidence.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [
+        "argument",
+        "evidence"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.8",
+          "description": "Delineate and evaluate the argument and specific claims in a text, including the validity of the reasoning as well as the relevance and sufficiency of the evidence.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.7",
+      "title": "Integrate and evaluate content presented in diverse media and formats, includ...",
+      "description": "Integrate and evaluate content presented in diverse media and formats, including visually and quantitatively, as well as in words.",
+      "node_type": "Project",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.7",
+          "description": "Integrate and evaluate content presented in diverse media and formats, including visually and quantitatively, as well as in words.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.6",
+      "title": "Assess how point of view or purpose shapes the content and style of a text",
+      "description": "Assess how point of view or purpose shapes the content and style of a text.",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.6",
+          "description": "Assess how point of view or purpose shapes the content and style of a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.5",
+      "title": "Analyze the structure of texts, including how specific sentences, paragraphs,...",
+      "description": "Analyze the structure of texts, including how specific sentences, paragraphs, and larger portions of the text (e.g., a section, chapter, scene, or stanza) relate to each other and the whole.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [
+        "graphs"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.5",
+          "description": "Analyze the structure of texts, including how specific sentences, paragraphs, and larger portions of the text (e.g., a section, chapter, scene, or stanza) relate to each other and the whole.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.4",
+      "title": "Interpret words and phrases as they are used in a text, including determining...",
+      "description": "Interpret words and phrases as they are used in a text, including determining technical, connotative, and figurative meanings, and analyze how specific word choices shape meaning or tone.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.4",
+          "description": "Interpret words and phrases as they are used in a text, including determining technical, connotative, and figurative meanings, and analyze how specific word choices shape meaning or tone.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.3",
+      "title": "Analyze how and why individuals, events, and ideas develop and interact over ...",
+      "description": "Analyze how and why individuals, events, and ideas develop and interact over the course of a text.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.3",
+          "description": "Analyze how and why individuals, events, and ideas develop and interact over the course of a text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.2",
+      "title": "Determine central ideas or themes of a text and analyze their development",
+      "description": "Determine central ideas or themes of a text and analyze their development; summarize the key supporting details and ideas.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.2",
+          "description": "Determine central ideas or themes of a text and analyze their development; summarize the key supporting details and ideas.",
+          "grade_level": "Grade1"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.ELA-Literacy.CCRA.R.1",
+      "title": "Read closely to determine what the text says explicitly and to make logical i...",
+      "description": "Read closely to determine what the text says explicitly and to make logical inferences from it; cite specific textual evidence when writing or speaking to support conclusions drawn from the text.",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "EnglishLanguageArts",
+      "subdomain": "College and Career Readiness Anchor Standards for Reading",
+      "tags": [
+        "writing",
+        "inference",
+        "evidence",
+        "speaking"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade1"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "EnglishLanguageArts",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.ELA-Literacy.CCRA.R.1",
+          "description": "Read closely to determine what the text says explicitly and to make logical inferences from it; cite specific textual evidence when writing or speaking to support conclusions drawn from the text.",
+          "grade_level": "Grade1"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.SL.1",
+      "to": "CCSS.ELA-Literacy.CCRA.SL.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.SL.1 is a prerequisite for CCSS.ELA-Literacy.CCRA.SL.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.SL.2",
+      "to": "CCSS.ELA-Literacy.CCRA.SL.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.SL.2 is a prerequisite for CCSS.ELA-Literacy.CCRA.SL.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.SL.3",
+      "to": "CCSS.ELA-Literacy.CCRA.SL.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.SL.3 is a prerequisite for CCSS.ELA-Literacy.CCRA.SL.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.SL.4",
+      "to": "CCSS.ELA-Literacy.CCRA.SL.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.SL.4 is a prerequisite for CCSS.ELA-Literacy.CCRA.SL.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.SL.5",
+      "to": "CCSS.ELA-Literacy.CCRA.SL.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.SL.5 is a prerequisite for CCSS.ELA-Literacy.CCRA.SL.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.L.1.1",
+      "to": "CCSS.ELA-Literacy.L.1.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.L.1.1 is a prerequisite for CCSS.ELA-Literacy.L.1.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.L.1.2",
+      "to": "(Begins in grade 2)",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.L.1.2 is a prerequisite for (Begins in grade 2) within the same domain."
+    },
+    {
+      "from": "(Begins in grade 2)",
+      "to": "CCSS.ELA-Literacy.L.1.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "(Begins in grade 2) is a prerequisite for CCSS.ELA-Literacy.L.1.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.L.1.4",
+      "to": "CCSS.ELA-Literacy.L.1.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.L.1.4 is a prerequisite for CCSS.ELA-Literacy.L.1.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.L.1.5",
+      "to": "CCSS.ELA-Literacy.L.1.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.L.1.5 is a prerequisite for CCSS.ELA-Literacy.L.1.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.1",
+      "to": "CCSS.ELA-Literacy.RL.1.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.1 is a prerequisite for CCSS.ELA-Literacy.RL.1.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.2",
+      "to": "CCSS.ELA-Literacy.RL.1.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.2 is a prerequisite for CCSS.ELA-Literacy.RL.1.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.3",
+      "to": "CCSS.ELA-Literacy.RL.1.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.3 is a prerequisite for CCSS.ELA-Literacy.RL.1.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.4",
+      "to": "CCSS.ELA-Literacy.RL.1.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.4 is a prerequisite for CCSS.ELA-Literacy.RL.1.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.5",
+      "to": "CCSS.ELA-Literacy.RL.1.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.5 is a prerequisite for CCSS.ELA-Literacy.RL.1.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.6",
+      "to": "CCSS.ELA-Literacy.RL.1.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.6 is a prerequisite for CCSS.ELA-Literacy.RL.1.7 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.7",
+      "to": "CCSS.ELA-Literacy.RL.1.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.7 is a prerequisite for CCSS.ELA-Literacy.RL.1.9 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RL.1.9",
+      "to": "CCSS.ELA-Literacy.RL.1.10",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RL.1.9 is a prerequisite for CCSS.ELA-Literacy.RL.1.10 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RF.1.1",
+      "to": "CCSS.ELA-Literacy.RF.1.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RF.1.1 is a prerequisite for CCSS.ELA-Literacy.RF.1.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RF.1.2",
+      "to": "CCSS.ELA-Literacy.RF.1.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RF.1.2 is a prerequisite for CCSS.ELA-Literacy.RF.1.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RF.1.3",
+      "to": "CCSS.ELA-Literacy.RF.1.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RF.1.3 is a prerequisite for CCSS.ELA-Literacy.RF.1.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.1",
+      "to": "CCSS.ELA-Literacy.RI.1.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.1 is a prerequisite for CCSS.ELA-Literacy.RI.1.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.2",
+      "to": "CCSS.ELA-Literacy.RI.1.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.2 is a prerequisite for CCSS.ELA-Literacy.RI.1.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.3",
+      "to": "CCSS.ELA-Literacy.RI.1.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.3 is a prerequisite for CCSS.ELA-Literacy.RI.1.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.4",
+      "to": "CCSS.ELA-Literacy.RI.1.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.4 is a prerequisite for CCSS.ELA-Literacy.RI.1.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.5",
+      "to": "CCSS.ELA-Literacy.RI.1.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.5 is a prerequisite for CCSS.ELA-Literacy.RI.1.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.6",
+      "to": "CCSS.ELA-Literacy.RI.1.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.6 is a prerequisite for CCSS.ELA-Literacy.RI.1.7 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.7",
+      "to": "CCSS.ELA-Literacy.RI.1.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.7 is a prerequisite for CCSS.ELA-Literacy.RI.1.8 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.8",
+      "to": "CCSS.ELA-Literacy.RI.1.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.8 is a prerequisite for CCSS.ELA-Literacy.RI.1.9 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.RI.1.9",
+      "to": "CCSS.ELA-Literacy.RI.1.10",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.RI.1.9 is a prerequisite for CCSS.ELA-Literacy.RI.1.10 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.1",
+      "to": "CCSS.ELA-Literacy.CCRA.R.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.1 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.2",
+      "to": "CCSS.ELA-Literacy.CCRA.R.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.2 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.3",
+      "to": "CCSS.ELA-Literacy.CCRA.R.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.3 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.4",
+      "to": "CCSS.ELA-Literacy.CCRA.R.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.4 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.5",
+      "to": "CCSS.ELA-Literacy.CCRA.R.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.5 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.6",
+      "to": "CCSS.ELA-Literacy.CCRA.R.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.6 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.7 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.7",
+      "to": "CCSS.ELA-Literacy.CCRA.R.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.7 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.8 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.8",
+      "to": "CCSS.ELA-Literacy.CCRA.R.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.8 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.9 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.R.9",
+      "to": "CCSS.ELA-Literacy.CCRA.R.10",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.R.9 is a prerequisite for CCSS.ELA-Literacy.CCRA.R.10 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.1",
+      "to": "CCSS.ELA-Literacy.CCRA.W.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.1 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.2",
+      "to": "CCSS.ELA-Literacy.CCRA.W.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.2 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.3",
+      "to": "CCSS.ELA-Literacy.CCRA.W.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.3 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.4",
+      "to": "CCSS.ELA-Literacy.CCRA.W.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.4 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.5",
+      "to": "CCSS.ELA-Literacy.CCRA.W.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.5 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.6",
+      "to": "CCSS.ELA-Literacy.CCRA.W.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.6 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.7 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.7",
+      "to": "CCSS.ELA-Literacy.CCRA.W.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.7 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.8 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.8",
+      "to": "CCSS.ELA-Literacy.CCRA.W.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.8 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.9 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.W.9",
+      "to": "CCSS.ELA-Literacy.CCRA.W.10",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.W.9 is a prerequisite for CCSS.ELA-Literacy.CCRA.W.10 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.SL.1.1",
+      "to": "CCSS.ELA-Literacy.SL.1.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.SL.1.1 is a prerequisite for CCSS.ELA-Literacy.SL.1.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.SL.1.2",
+      "to": "CCSS.ELA-Literacy.SL.1.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.SL.1.2 is a prerequisite for CCSS.ELA-Literacy.SL.1.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.SL.1.3",
+      "to": "CCSS.ELA-Literacy.SL.1.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.SL.1.3 is a prerequisite for CCSS.ELA-Literacy.SL.1.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.SL.1.4",
+      "to": "CCSS.ELA-Literacy.SL.1.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.SL.1.4 is a prerequisite for CCSS.ELA-Literacy.SL.1.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.SL.1.5",
+      "to": "CCSS.ELA-Literacy.SL.1.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.SL.1.5 is a prerequisite for CCSS.ELA-Literacy.SL.1.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.L.1",
+      "to": "CCSS.ELA-Literacy.CCRA.L.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.L.1 is a prerequisite for CCSS.ELA-Literacy.CCRA.L.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.L.2",
+      "to": "CCSS.ELA-Literacy.CCRA.L.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.L.2 is a prerequisite for CCSS.ELA-Literacy.CCRA.L.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.L.3",
+      "to": "CCSS.ELA-Literacy.CCRA.L.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.L.3 is a prerequisite for CCSS.ELA-Literacy.CCRA.L.4 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.L.4",
+      "to": "CCSS.ELA-Literacy.CCRA.L.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.L.4 is a prerequisite for CCSS.ELA-Literacy.CCRA.L.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.CCRA.L.5",
+      "to": "CCSS.ELA-Literacy.CCRA.L.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.CCRA.L.5 is a prerequisite for CCSS.ELA-Literacy.CCRA.L.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.1",
+      "to": "CCSS.ELA-Literacy.W.1.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.1 is a prerequisite for CCSS.ELA-Literacy.W.1.2 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.2",
+      "to": "CCSS.ELA-Literacy.W.1.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.2 is a prerequisite for CCSS.ELA-Literacy.W.1.3 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.3",
+      "to": "(Begins in grade 3)",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.3 is a prerequisite for (Begins in grade 3) within the same domain."
+    },
+    {
+      "from": "(Begins in grade 3)",
+      "to": "CCSS.ELA-Literacy.W.1.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "(Begins in grade 3) is a prerequisite for CCSS.ELA-Literacy.W.1.5 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.5",
+      "to": "CCSS.ELA-Literacy.W.1.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.5 is a prerequisite for CCSS.ELA-Literacy.W.1.6 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.6",
+      "to": "CCSS.ELA-Literacy.W.1.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.6 is a prerequisite for CCSS.ELA-Literacy.W.1.7 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.7",
+      "to": "CCSS.ELA-Literacy.W.1.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.7 is a prerequisite for CCSS.ELA-Literacy.W.1.8 within the same domain."
+    },
+    {
+      "from": "CCSS.ELA-Literacy.W.1.8",
+      "to": "(Begins in grade 4)",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.ELA-Literacy.W.1.8 is a prerequisite for (Begins in grade 4) within the same domain."
+    },
+    {
+      "from": "(Begins in grade 4)",
+      "to": "(Begins in grade 3)",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "(Begins in grade 4) is a prerequisite for (Begins in grade 3) within the same domain."
+    }
+  ]
+}

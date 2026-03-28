@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Credential Coordinator Zome
 //!
 //! Implements business logic for W3C Verifiable Credentials.
@@ -63,6 +66,13 @@ pub enum MaterialityLevel {
 /// The credential is stored on the DHT and linked to the learner, course, and issuer.
 #[hdk_extern]
 pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<ActionHash> {
+    // Trust tier gate: requires Steward tier to issue credentials
+    mycelix_bridge_common::gate_consciousness(
+        "edunet_bridge",
+        &mycelix_bridge_common::requirement_for_constitutional(),
+        "issue_credential",
+    )?;
+
     // Get issuer agent info
     let agent_info = agent_info()?;
     let issuer_pubkey = agent_info.agent_initial_pubkey;

@@ -1,0 +1,11 @@
+# Gitleaks configuration — allowlist false positives in test/example code
+# https://github.com/gitleaks/gitleaks#configuration
+
+[allowlist]
+  description = "False positives in test fixtures and documentation"
+  regexTarget = "match"
+  regexes = [
+    '''myc3l1x-s0ver31gn''',
+    '''z6MkTestDrain''',
+    '''ghp_1234567890abcdefghijklmnopqrstuvwxyz''',
+  ]

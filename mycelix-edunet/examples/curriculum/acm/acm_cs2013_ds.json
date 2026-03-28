@@ -1,0 +1,189 @@
+{
+  "metadata": {
+    "title": "CS2013: Discrete Structures",
+    "framework": "CIP:11.0701",
+    "source": "",
+    "grade_level": "Undergraduate",
+    "subject_area": "CS2013: Discrete Structures",
+    "domain": "CS2013: Discrete Structures",
+    "version": "2024",
+    "total_standards": 6,
+    "domains": [
+      "directed graphs",
+      "sets",
+      "propositional logic",
+      "probability",
+      "counting",
+      "direct proof"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Higher-education program: CS2013: Discrete Structures. Level: Undergraduate.",
+    "academic_level": "Undergraduate",
+    "cip_code": "11.0701",
+    "total_credits": 2
+  },
+  "nodes": [
+    {
+      "id": "DS/SetsRelations",
+      "title": "Sets, Relations, and Functions",
+      "description": "Sets, Relations, and Functions (Tier1, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "sets",
+      "tags": [
+        "sets",
+        "relations",
+        "functions",
+        "equivalence relations",
+        "partial orders"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:DS"
+    },
+    {
+      "id": "DS/Logic",
+      "title": "Basic Logic",
+      "description": "Basic Logic (Tier1, 9 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "propositional logic",
+      "tags": [
+        "propositional logic",
+        "predicate logic",
+        "logical connectives",
+        "truth tables",
+        "proofs"
+      ],
+      "estimated_hours": 27,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:DS"
+    },
+    {
+      "id": "DS/ProofTechniques",
+      "title": "Proof Techniques",
+      "description": "Proof Techniques (Tier1, 10 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "direct proof",
+      "tags": [
+        "direct proof",
+        "proof by contradiction",
+        "mathematical induction",
+        "strong induction"
+      ],
+      "estimated_hours": 30,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:DS"
+    },
+    {
+      "id": "DS/Combinatorics",
+      "title": "Basics of Counting",
+      "description": "Basics of Counting (Tier1, 5 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "counting",
+      "tags": [
+        "counting",
+        "permutations",
+        "combinations",
+        "pigeonhole principle",
+        "inclusion-exclusion"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:DS"
+    },
+    {
+      "id": "DS/Graphs",
+      "title": "Graphs and Trees",
+      "description": "Graphs and Trees (Tier1, 4 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "directed graphs",
+      "tags": [
+        "directed graphs",
+        "undirected graphs",
+        "trees",
+        "spanning trees",
+        "graph traversals"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:DS"
+    },
+    {
+      "id": "DS/Probability",
+      "title": "Discrete Probability",
+      "description": "Discrete Probability (Tier1, 5 hours)",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Computer Science",
+      "subdomain": "probability",
+      "tags": [
+        "probability",
+        "conditional probability",
+        "Bayes' theorem",
+        "random variables",
+        "expected value"
+      ],
+      "estimated_hours": 15,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [],
+      "credit_hours": 1,
+      "course_level": "100",
+      "cip_code": "11.0701",
+      "program_id": "ACM:CS2013:DS"
+    }
+  ],
+  "edges": []
+}

@@ -1,0 +1,32 @@
+[package]
+name = "symthaea-muse"
+version = "0.1.0"
+edition = "2021"
+description = "Consciousness-driven music synthesis for Symthaea — CfC temporal dynamics to tonal art"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-aesthetic = { path = "../symthaea-aesthetic" }
+serde = { workspace = true }
+rand = { workspace = true }
+hound = { workspace = true }
+flacenc = { workspace = true }
+
+# Real-time audio output (optional)
+cpal = { version = "0.17", optional = true }
+ringbuf = { version = "0.4", optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+muse-live = ["cpal", "ringbuf"]
+
+[[example]]
+name = "live_demo"
+required-features = ["muse-live"]
+
+[lints]
+workspace = true

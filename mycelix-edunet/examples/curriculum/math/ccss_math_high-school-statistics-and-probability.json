@@ -1,0 +1,1020 @@
+{
+  "metadata": {
+    "title": "High School — Statistics and Probability",
+    "framework": "Common Core State Standards",
+    "source": "http://www.corestandards.org/assets/CCSSI_Math%20Standards.pdf",
+    "grade_level": "Grade9",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2010",
+    "total_standards": 31,
+    "domains": [
+      "Using Probability to Make Decisions",
+      "Conditional Probability and the Rules of Probability",
+      "Making Inferences and Justifying Conclusions",
+      "Interpreting Categorical and Quantitative Data",
+      "Standards for Mathematical Practice"
+    ],
+    "created_at": "2026-03-28",
+    "notes": "Auto-ingested from Common Standards Project (set 67810E9EF6944F9383DCC602A3484C23_D10003FB_high-school-statistics-and-probability). Node structure matches KnowledgeNode in knowledge_zome/integrity/src/lib.rs."
+  },
+  "nodes": [
+    {
+      "id": "CCSS.Math.Content.HSS-MD.B.7",
+      "title": "(+) Analyze decisions and strategies using probability concepts (e",
+      "description": "(+) Analyze decisions and strategies using probability concepts (e.g., product testing, medical testing, pulling a hockey goalie at the end of a game).",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.B.7",
+          "description": "(+) Analyze decisions and strategies using probability concepts (e.g., product testing, medical testing, pulling a hockey goalie at the end of a game).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-MD.B.6",
+      "title": "(+) Use probabilities to make fair decisions (e",
+      "description": "(+) Use probabilities to make fair decisions (e.g., drawing by lots, using a random number generator).",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.B.6",
+          "description": "(+) Use probabilities to make fair decisions (e.g., drawing by lots, using a random number generator).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-MD.B.5",
+      "title": "(+) Weigh the possible outcomes of a decision by assigning probabilities to p...",
+      "description": "(+) Weigh the possible outcomes of a decision by assigning probabilities to payoff values and finding expected values.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.B.5",
+          "description": "(+) Weigh the possible outcomes of a decision by assigning probabilities to payoff values and finding expected values.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-MD.A.4",
+      "title": "(+) Develop a probability distribution for a random variable defined for a sa...",
+      "description": "(+) Develop a probability distribution for a random variable defined for a sample space in which probabilities are assigned empirically; find the expected value.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [
+        "probability",
+        "empirical"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.A.4",
+          "description": "(+) Develop a probability distribution for a random variable defined for a sample space in which probabilities are assigned empirically; find the expected value.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-MD.A.3",
+      "title": "(+) Develop a probability distribution for a random variable defined for a sa...",
+      "description": "(+) Develop a probability distribution for a random variable defined for a sample space in which theoretical probabilities can be calculated; find the expected value.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.A.3",
+          "description": "(+) Develop a probability distribution for a random variable defined for a sample space in which theoretical probabilities can be calculated; find the expected value.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-MD.A.2",
+      "title": "(+) Calculate the expected value of a random variable",
+      "description": "(+) Calculate the expected value of a random variable; interpret it as the mean of the probability distribution.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.A.2",
+          "description": "(+) Calculate the expected value of a random variable; interpret it as the mean of the probability distribution.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-MD.A.1",
+      "title": "(+) Define a random variable for a quantity of interest by assigning a numeri...",
+      "description": "(+) Define a random variable for a quantity of interest by assigning a numerical value to each event in a sample space; graph the corresponding probability distribution using the same graphical displays as for data distributions.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Using Probability to Make Decisions",
+      "tags": [
+        "data",
+        "probability"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Remember",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-MD.A.1",
+          "description": "(+) Define a random variable for a quantity of interest by assigning a numerical value to each event in a sample space; graph the corresponding probability distribution using the same graphical displays as for data distributions.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.B.9",
+      "title": "(+) Use permutations and combinations to compute probabilities of compound ev...",
+      "description": "(+) Use permutations and combinations to compute probabilities of compound events and solve problems.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.B.9",
+          "description": "(+) Use permutations and combinations to compute probabilities of compound events and solve problems.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.B.8",
+      "title": "(+) Apply the general Multiplication Rule in a uniform probability model, P(A...",
+      "description": "(+) Apply the general Multiplication Rule in a uniform probability model, P(A and B) = P(A)P(B|A) = P(B)P(A|B), and interpret the answer in terms of the model.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "multiplication",
+        "probability"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.B.8",
+          "description": "(+) Apply the general Multiplication Rule in a uniform probability model, P(A and B) = P(A)P(B|A) = P(B)P(A|B), and interpret the answer in terms of the model.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.B.7",
+      "title": "Apply the Addition Rule, P(A or B) = P(A) + P(B) - P(A and B), and interpret ...",
+      "description": "Apply the Addition Rule, P(A or B) = P(A) + P(B) - P(A and B), and interpret the answer in terms of the model.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "addition"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.B.7",
+          "description": "Apply the Addition Rule, P(A or B) = P(A) + P(B) - P(A and B), and interpret the answer in terms of the model.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.B.6",
+      "title": "Find the conditional probability of A given B as the fraction of B's outcomes...",
+      "description": "Find the conditional probability of A given B as the fraction of B's outcomes that also belong to A, and interpret the answer in terms of the model.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.B.6",
+          "description": "Find the conditional probability of A given B as the fraction of B's outcomes that also belong to A, and interpret the answer in terms of the model.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.A.5",
+      "title": "Recognize and explain the concepts of conditional probability and independenc...",
+      "description": "Recognize and explain the concepts of conditional probability and independence in everyday language and everyday situations.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.A.5",
+          "description": "Recognize and explain the concepts of conditional probability and independence in everyday language and everyday situations.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.A.4",
+      "title": "Construct and interpret two-way frequency tables of data when two categories ...",
+      "description": "Construct and interpret two-way frequency tables of data when two categories are associated with each object being classified. Use the two-way table as a sample space to decide if events are independent and to approximate conditional probabilities.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.A.4",
+          "description": "Construct and interpret two-way frequency tables of data when two categories are associated with each object being classified. Use the two-way table as a sample space to decide if events are independent and to approximate conditional probabilities.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.A.3",
+      "title": "Understand the conditional probability of A given B as P(A and B)/P(B), and i...",
+      "description": "Understand the conditional probability of A given B as P(A and B)/P(B), and interpret independence of A and B as saying that the conditional probability of A given B is the same as the probability of A, and the conditional probability of B given A is the same as the probability of B.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.A.3",
+          "description": "Understand the conditional probability of A given B as P(A and B)/P(B), and interpret independence of A and B as saying that the conditional probability of A given B is the same as the probability of A, and the conditional probability of B given A is the same as the probability of B.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.A.2",
+      "title": "Understand that two events A and B are independent if the probability of A an...",
+      "description": "Understand that two events A and B are independent if the probability of A and B occurring together is the product of their probabilities, and use this characterization to determine if they are independent.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [
+        "probability"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.A.2",
+          "description": "Understand that two events A and B are independent if the probability of A and B occurring together is the product of their probabilities, and use this characterization to determine if they are independent.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-CP.A.1",
+      "title": "Describe events as subsets of a sample space (the set of outcomes) using char...",
+      "description": "Describe events as subsets of a sample space (the set of outcomes) using characteristics (or categories) of the outcomes, or as unions, intersections, or complements of other events (\"or,\" \"and,\" \"not\").",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Conditional Probability and the Rules of Probability",
+      "tags": [],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-CP.A.1",
+          "description": "Describe events as subsets of a sample space (the set of outcomes) using characteristics (or categories) of the outcomes, or as unions, intersections, or complements of other events (\"or,\" \"and,\" \"not\").",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-IC.B.6",
+      "title": "Evaluate reports based on data",
+      "description": "Evaluate reports based on data.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Making Inferences and Justifying Conclusions",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-IC.B.6",
+          "description": "Evaluate reports based on data.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-IC.B.5",
+      "title": "Use data from a randomized experiment to compare two treatments",
+      "description": "Use data from a randomized experiment to compare two treatments; use simulations to decide if differences between parameters are significant.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Making Inferences and Justifying Conclusions",
+      "tags": [
+        "data",
+        "experiment",
+        "simulation"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-IC.B.5",
+          "description": "Use data from a randomized experiment to compare two treatments; use simulations to decide if differences between parameters are significant.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-IC.B.4",
+      "title": "Use data from a sample survey to estimate a population mean or proportion",
+      "description": "Use data from a sample survey to estimate a population mean or proportion; develop a margin of error through the use of simulation models for random sampling.",
+      "node_type": "Project",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Making Inferences and Justifying Conclusions",
+      "tags": [
+        "data",
+        "simulation"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-IC.B.4",
+          "description": "Use data from a sample survey to estimate a population mean or proportion; develop a margin of error through the use of simulation models for random sampling.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-IC.B.3",
+      "title": "Recognize the purposes of and differences among sample surveys, experiments, ...",
+      "description": "Recognize the purposes of and differences among sample surveys, experiments, and observational studies; explain how randomization relates to each.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Making Inferences and Justifying Conclusions",
+      "tags": [
+        "experiment",
+        "observation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-IC.B.3",
+          "description": "Recognize the purposes of and differences among sample surveys, experiments, and observational studies; explain how randomization relates to each.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-IC.A.2",
+      "title": "Decide if a specified model is consistent with results from a given data-gene...",
+      "description": "Decide if a specified model is consistent with results from a given data-generating process, e.g., using simulation.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Making Inferences and Justifying Conclusions",
+      "tags": [
+        "data",
+        "simulation"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-IC.A.2",
+          "description": "Decide if a specified model is consistent with results from a given data-generating process, e.g., using simulation.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-IC.A.1",
+      "title": "Understand statistics as a process for making inferences about population par...",
+      "description": "Understand statistics as a process for making inferences about population parameters based on a random sample from that population.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Making Inferences and Justifying Conclusions",
+      "tags": [
+        "inference",
+        "statistics"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-IC.A.1",
+          "description": "Understand statistics as a process for making inferences about population parameters based on a random sample from that population.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.C.9",
+      "title": "Distinguish between correlation and causation",
+      "description": "Distinguish between correlation and causation.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.C.9",
+          "description": "Distinguish between correlation and causation.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.C.8",
+      "title": "Compute (using technology) and interpret the correlation coefficient of a lin...",
+      "description": "Compute (using technology) and interpret the correlation coefficient of a linear fit.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.C.8",
+          "description": "Compute (using technology) and interpret the correlation coefficient of a linear fit.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.C.7",
+      "title": "Interpret the slope (rate of change) and the intercept (constant term) of a l...",
+      "description": "Interpret the slope (rate of change) and the intercept (constant term) of a linear model in the context of the data.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.C.7",
+          "description": "Interpret the slope (rate of change) and the intercept (constant term) of a linear model in the context of the data.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.B.6",
+      "title": "Represent data on two quantitative variables on a scatter plot, and describe ...",
+      "description": "Represent data on two quantitative variables on a scatter plot, and describe how the variables are related.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data",
+        "quantitative"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.B.6",
+          "description": "Represent data on two quantitative variables on a scatter plot, and describe how the variables are related.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.B.5",
+      "title": "Summarize categorical data for two categories in two-way frequency tables",
+      "description": "Summarize categorical data for two categories in two-way frequency tables. Interpret relative frequencies in the context of the data (including joint, marginal, and conditional relative frequencies). Recognize possible associations and trends in the data.",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.B.5",
+          "description": "Summarize categorical data for two categories in two-way frequency tables. Interpret relative frequencies in the context of the data (including joint, marginal, and conditional relative frequencies). Recognize possible associations and trends in the data.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.A.4",
+      "title": "Use the mean and standard deviation of a data set to fit it to a normal distr...",
+      "description": "Use the mean and standard deviation of a data set to fit it to a normal distribution and to estimate population percentages. Recognize that there are data sets for which such a procedure is not appropriate. Use calculators, spreadsheets, and tables to estimate areas under the normal curve.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data",
+        "area"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.A.4",
+          "description": "Use the mean and standard deviation of a data set to fit it to a normal distribution and to estimate population percentages. Recognize that there are data sets for which such a procedure is not appropriate. Use calculators, spreadsheets, and tables to estimate areas under the normal curve.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.A.3",
+      "title": "Interpret differences in shape, center, and spread in the context of the data...",
+      "description": "Interpret differences in shape, center, and spread in the context of the data sets, accounting for possible effects of extreme data points (outliers).",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.A.3",
+          "description": "Interpret differences in shape, center, and spread in the context of the data sets, accounting for possible effects of extreme data points (outliers).",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.A.2",
+      "title": "Use statistics appropriate to the shape of the data distribution to compare c...",
+      "description": "Use statistics appropriate to the shape of the data distribution to compare center (median, mean) and spread (interquartile range, standard deviation) of two or more different data sets.",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data",
+        "statistics"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.A.2",
+          "description": "Use statistics appropriate to the shape of the data distribution to compare center (median, mean) and spread (interquartile range, standard deviation) of two or more different data sets.",
+          "grade_level": "Grade9"
+        }
+      ]
+    },
+    {
+      "id": "CCSS.Math.Content.HSS-ID.A.1",
+      "title": "Represent data with plots on the real number line (dot plots, histograms, and...",
+      "description": "Represent data with plots on the real number line (dot plots, histograms, and box plots).",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Interpreting Categorical and Quantitative Data",
+      "tags": [
+        "data"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "Common Core State Standards",
+          "code": "CCSS.Math.Content.HSS-ID.A.1",
+          "description": "Represent data with plots on the real number line (dot plots, histograms, and box plots).",
+          "grade_level": "Grade9"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CCSS.Math.Content.HSS-CP.A.1",
+      "to": "CCSS.Math.Content.HSS-CP.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.A.1 is a prerequisite for CCSS.Math.Content.HSS-CP.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.A.2",
+      "to": "CCSS.Math.Content.HSS-CP.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.A.2 is a prerequisite for CCSS.Math.Content.HSS-CP.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.A.3",
+      "to": "CCSS.Math.Content.HSS-CP.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.A.3 is a prerequisite for CCSS.Math.Content.HSS-CP.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.A.4",
+      "to": "CCSS.Math.Content.HSS-CP.A.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.A.4 is a prerequisite for CCSS.Math.Content.HSS-CP.A.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.A.5",
+      "to": "CCSS.Math.Content.HSS-CP.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.A.5 is a prerequisite for CCSS.Math.Content.HSS-CP.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.B.6",
+      "to": "CCSS.Math.Content.HSS-CP.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.B.6 is a prerequisite for CCSS.Math.Content.HSS-CP.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.B.7",
+      "to": "CCSS.Math.Content.HSS-CP.B.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.B.7 is a prerequisite for CCSS.Math.Content.HSS-CP.B.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-CP.B.8",
+      "to": "CCSS.Math.Content.HSS-CP.B.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-CP.B.8 is a prerequisite for CCSS.Math.Content.HSS-CP.B.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.A.1",
+      "to": "CCSS.Math.Content.HSS-ID.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.A.1 is a prerequisite for CCSS.Math.Content.HSS-ID.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.A.2",
+      "to": "CCSS.Math.Content.HSS-ID.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.A.2 is a prerequisite for CCSS.Math.Content.HSS-ID.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.A.3",
+      "to": "CCSS.Math.Content.HSS-ID.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.A.3 is a prerequisite for CCSS.Math.Content.HSS-ID.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.A.4",
+      "to": "CCSS.Math.Content.HSS-ID.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.A.4 is a prerequisite for CCSS.Math.Content.HSS-ID.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.B.5",
+      "to": "CCSS.Math.Content.HSS-ID.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.B.5 is a prerequisite for CCSS.Math.Content.HSS-ID.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.B.6",
+      "to": "CCSS.Math.Content.HSS-ID.C.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.B.6 is a prerequisite for CCSS.Math.Content.HSS-ID.C.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.C.7",
+      "to": "CCSS.Math.Content.HSS-ID.C.8",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.C.7 is a prerequisite for CCSS.Math.Content.HSS-ID.C.8 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-ID.C.8",
+      "to": "CCSS.Math.Content.HSS-ID.C.9",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-ID.C.8 is a prerequisite for CCSS.Math.Content.HSS-ID.C.9 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-MD.A.1",
+      "to": "CCSS.Math.Content.HSS-MD.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-MD.A.1 is a prerequisite for CCSS.Math.Content.HSS-MD.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-MD.A.2",
+      "to": "CCSS.Math.Content.HSS-MD.A.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-MD.A.2 is a prerequisite for CCSS.Math.Content.HSS-MD.A.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-MD.A.3",
+      "to": "CCSS.Math.Content.HSS-MD.A.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-MD.A.3 is a prerequisite for CCSS.Math.Content.HSS-MD.A.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-MD.A.4",
+      "to": "CCSS.Math.Content.HSS-MD.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-MD.A.4 is a prerequisite for CCSS.Math.Content.HSS-MD.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-MD.B.5",
+      "to": "CCSS.Math.Content.HSS-MD.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-MD.B.5 is a prerequisite for CCSS.Math.Content.HSS-MD.B.6 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-MD.B.6",
+      "to": "CCSS.Math.Content.HSS-MD.B.7",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-MD.B.6 is a prerequisite for CCSS.Math.Content.HSS-MD.B.7 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-IC.A.1",
+      "to": "CCSS.Math.Content.HSS-IC.A.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-IC.A.1 is a prerequisite for CCSS.Math.Content.HSS-IC.A.2 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-IC.A.2",
+      "to": "CCSS.Math.Content.HSS-IC.B.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-IC.A.2 is a prerequisite for CCSS.Math.Content.HSS-IC.B.3 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-IC.B.3",
+      "to": "CCSS.Math.Content.HSS-IC.B.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-IC.B.3 is a prerequisite for CCSS.Math.Content.HSS-IC.B.4 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-IC.B.4",
+      "to": "CCSS.Math.Content.HSS-IC.B.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-IC.B.4 is a prerequisite for CCSS.Math.Content.HSS-IC.B.5 within the same domain."
+    },
+    {
+      "from": "CCSS.Math.Content.HSS-IC.B.5",
+      "to": "CCSS.Math.Content.HSS-IC.B.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "CCSS.Math.Content.HSS-IC.B.5 is a prerequisite for CCSS.Math.Content.HSS-IC.B.6 within the same domain."
+    }
+  ]
+}

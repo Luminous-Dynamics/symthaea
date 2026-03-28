@@ -44,11 +44,11 @@ impl CognitiveLoopService {
         // EMOTION CONTAGION
         // ═══════════════════════════════════════════════════════════════════
 
-        /// Get current emotional valence from content analysis
-        pub fn emotional_valence(&self) -> f32 { self.behavior.emotion_contagion.smoothed_valence() }
+        /// Get current emotional valence (from unified emotional state)
+        pub fn emotional_valence(&self) -> f32 { self.unification_engine.emotional.state().valence as f32 }
 
-        /// Get current emotional arousal
-        pub fn emotional_arousal(&self) -> f32 { self.behavior.emotion_contagion.smoothed_arousal() }
+        /// Get current emotional arousal (from unified emotional state)
+        pub fn emotional_arousal(&self) -> f32 { self.unification_engine.emotional.state().arousal as f32 }
 
         /// Get emotion-based pattern nudge suggestion
         pub fn emotion_pattern_nudge(&self) -> (Option<ConsciousnessPattern>, f32) { self.behavior.emotion_contagion.pattern_nudge() }
@@ -200,7 +200,7 @@ impl CognitiveLoopService {
 
     /// Check if emotional content is significant
     pub fn has_emotional_content(&self) -> bool {
-        self.behavior.emotion_contagion.smoothed_valence().abs() > 0.2
+        (self.unification_engine.emotional.state().valence as f32).abs() > 0.2
     }
 
     /// Force an immediate reflection cycle
@@ -474,6 +474,30 @@ impl CognitiveLoopService {
         for outcome in outcomes {
             self.governance_mgr.inject_outcome(outcome);
         }
+    }
+
+    /// Drain pending crisis events and forward them to the Mycelix civic bridge.
+    ///
+    /// Call from the host application between cycles to dispatch crisis events
+    /// to the Holochain emergency-incidents zome. Each event is forwarded via
+    /// `MycelixBridge::dispatch_crisis()`.
+    #[cfg(all(feature = "mycelix", feature = "safety-agents"))]
+    pub fn poll_bridge_crisis(
+        &mut self,
+        bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
+    ) {
+        let events: Vec<_> = self.pending_crisis_events.drain(..).collect();
+        for event in &events {
+            bridge.dispatch_crisis(event);
+        }
+    }
+
+    /// Drain pending crisis events without a bridge (for testing or logging).
+    #[cfg(feature = "safety-agents")]
+    pub fn drain_pending_crisis_events(
+        &mut self,
+    ) -> Vec<super::super::civic_crisis_detector::CivicCrisisEvent> {
+        self.pending_crisis_events.drain(..).collect()
     }
 
     /// Override the epistemic mesh with collective network data.
@@ -868,6 +892,66 @@ impl CognitiveLoopService {
         self.swarm_event_tx.clone()
     }
 
+    /// Take ownership of the safety alert receiver.
+    ///
+    /// The host application calls this once at startup and spawns a thread/task
+    /// to drain alerts and forward them to desktop notifications, Slack, email,
+    /// or any monitoring system. Returns `None` if already taken.
+    pub fn take_safety_alert_receiver(
+        &self,
+    ) -> Option<std::sync::mpsc::Receiver<super::super::safety_alert::SafetyAlert>> {
+        self.safety_alert_rx.lock().ok()?.take()
+    }
+
+    /// Enable network attestation for the cognitive loop.
+    ///
+    /// Creates a `NetworkService`, initializes Ed25519 attestation, and spawns
+    /// an attestation-aware bridge that feeds verified swarm events into the
+    /// cognitive loop's Phase B drain.
+    ///
+    /// This is the **production wiring point** for P2P consciousness sharing
+    /// with cryptographic verification. Call once after CLS construction.
+    ///
+    /// # Requirements
+    /// - `identity` feature must be enabled
+    /// - `swarm` feature must be enabled for real networking (stub without)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let mut cls = CognitiveLoopService::new(config)?;
+    /// let rt = tokio::runtime::Handle::current();
+    /// rt.block_on(cls.enable_network_attestation())?;
+    /// ```
+    #[cfg(feature = "identity")]
+    pub async fn enable_network_attestation(
+        &self,
+    ) -> anyhow::Result<()> {
+        use crate::swarm::{NetworkService, SwarmConfig};
+        use super::super::managers::network_service_bridge::NetworkServiceBridge;
+
+        let swarm_config = SwarmConfig::production();
+        let mut service = NetworkService::new(swarm_config).await
+            .map_err(|e| anyhow::anyhow!("NetworkService init failed: {e}"))?;
+
+        let attestation_mgr = service.initialize_attestation()
+            .map_err(|e| anyhow::anyhow!("Attestation init failed: {e}"))?;
+
+        let tx = self.swarm_event_sender();
+        let _bridge = NetworkServiceBridge::spawn_with_attestation(
+            &service,
+            tx,
+            Some(attestation_mgr.clone()),
+        );
+
+        let pubkey = attestation_mgr.read().public_key_hex().to_string();
+        tracing::info!(
+            pubkey = %&pubkey[..16],
+            "Network attestation enabled — verified CV exchange active"
+        );
+
+        Ok(())
+    }
+
     /// Take the mesh outbound receiver (one-shot — returns None after first call).
     ///
     /// ContinuousMind calls this once during wiring to drain CLS-generated
@@ -954,6 +1038,18 @@ impl CognitiveLoopService {
     /// Total messages processed by the HolonReceiver.
     pub fn holon_total_processed(&self) -> u64 {
         self.holon_receiver.total_processed()
+    }
+
+    /// Clone the Holon inbound sender for use by HTTP handlers.
+    ///
+    /// The channel is created eagerly at CLS construction. Clone the returned
+    /// sender and pass it to `HolonHttpState::new(tx)` so HTTP handlers can
+    /// inject SomaMessages into the cognitive loop. The receiver is drained
+    /// non-blocking in Phase B before `holon_receiver.process_inbound()`.
+    pub fn holon_inbound_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<(String, crate::consciousness::holon_receiver::SomaMessage)> {
+        self.holon_inbound_tx.clone()
     }
 
     // ========================================================================
@@ -1261,7 +1357,7 @@ impl CognitiveLoopService {
 
     /// Access the vision and sensory manager.
     pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
-        &self.vision_sensory
+        &self.sensorimotor.vision_sensory
     }
 
     /// Get the current unified ethical verdict.

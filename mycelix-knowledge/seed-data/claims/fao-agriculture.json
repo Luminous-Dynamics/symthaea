@@ -1,0 +1,573 @@
+[
+  {
+    "id": "fao:23921474d198e989",
+    "content": "Global cereal production was approximately 2.8 billion metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "cereals",
+      "production",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:35218f3a75411213",
+    "content": "China is the world's largest rice producer, producing approximately 212 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "rice",
+      "china",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:a1132bf71c803e77",
+    "content": "The United States is the world's largest corn (maize) producer at approximately 349 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "corn",
+      "maize",
+      "united-states",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.93,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:20f706d28b51ac6d",
+    "content": "Global wheat production was approximately 808 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "wheat",
+      "production",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:23c53ae83312dc91",
+    "content": "Brazil is the world's largest soybean producer, followed by the United States and Argentina.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "soybean",
+      "brazil",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:050bdad1ee8656f7",
+    "content": "Global sugar cane production was approximately 1.9 billion metric tons in 2022, with Brazil as the leading producer.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "sugar-cane",
+      "brazil",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:7b7e5871adb2a441",
+    "content": "Global cattle population was approximately 1 billion head in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QA"
+    ],
+    "tags": [
+      "agriculture",
+      "livestock",
+      "cattle",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:10ec3025fce5302a",
+    "content": "China has the world's largest pig population at approximately 453 million head in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QA"
+    ],
+    "tags": [
+      "agriculture",
+      "livestock",
+      "pigs",
+      "china"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:f47ad02fa0b4c76d",
+    "content": "Global milk production was approximately 930 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "dairy",
+      "milk",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:45bc00d389290bc4",
+    "content": "Global egg production was approximately 93 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "eggs",
+      "poultry",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:28339dfff2f0db4f",
+    "content": "Approximately 735 million people were affected by hunger in 2022, up from 613 million in 2019.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/state-of-food-security-nutrition"
+    ],
+    "tags": [
+      "food-security",
+      "hunger",
+      "malnutrition",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.92,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:d5f5f35d0acc5c0a",
+    "content": "Africa has the highest prevalence of undernourishment at approximately 20% of the population.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/state-of-food-security-nutrition"
+    ],
+    "tags": [
+      "food-security",
+      "hunger",
+      "africa",
+      "undernourishment"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:a0a74376da11c965",
+    "content": "Approximately one-third of food produced globally is lost or wasted, amounting to about 1.3 billion metric tons per year.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/food-loss-and-food-waste/en/"
+    ],
+    "tags": [
+      "food-security",
+      "food-waste",
+      "food-loss",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.88,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:98203d278b753332",
+    "content": "Food loss and waste contribute approximately 8-10% of global greenhouse gas emissions.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/food-loss-and-food-waste/en/"
+    ],
+    "tags": [
+      "food-security",
+      "food-waste",
+      "climate",
+      "emissions"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.85,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:08c89c4765aa8874",
+    "content": "Approximately 37% of the global land surface is used for agriculture (cropland and pasture).",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/RL"
+    ],
+    "tags": [
+      "agriculture",
+      "land-use",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:f1b5b1ccee55b086",
+    "content": "Global agricultural land area has remained relatively stable at approximately 4.8 billion hectares since 2000.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/RL"
+    ],
+    "tags": [
+      "agriculture",
+      "land-use",
+      "trends"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.89,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:86362b36744e2d5d",
+    "content": "Cropland covers approximately 1.6 billion hectares globally, or about 12% of the land surface.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/RL"
+    ],
+    "tags": [
+      "agriculture",
+      "cropland",
+      "land-use"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:095600ad5c8f68d5",
+    "content": "Deforestation for agriculture causes approximately 10% of global greenhouse gas emissions.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/state-of-forests/en/"
+    ],
+    "tags": [
+      "agriculture",
+      "deforestation",
+      "climate",
+      "land-use"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.85,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:b55e62c23b3bf465",
+    "content": "Global agricultural trade was valued at approximately $1.9 trillion in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/TP"
+    ],
+    "tags": [
+      "agriculture",
+      "trade",
+      "global",
+      "economics"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.88,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:085fe16d772018dc",
+    "content": "The European Union is the world's largest agricultural importer and exporter combined.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/TP"
+    ],
+    "tags": [
+      "agriculture",
+      "trade",
+      "eu"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.87,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:f4876043edf81253",
+    "content": "Coffee is one of the most traded agricultural commodities, with global production of approximately 10.8 million metric tons in 2022.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/faostat/en/#data/QCL"
+    ],
+    "tags": [
+      "agriculture",
+      "coffee",
+      "trade",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.89,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:eafb95e76b6ef938",
+    "content": "Global fisheries and aquaculture production reached a record 214 million metric tons in 2020.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/state-of-fisheries-aquaculture"
+    ],
+    "tags": [
+      "fisheries",
+      "aquaculture",
+      "production",
+      "global"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.91,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:cdeb1b91fd2311f3",
+    "content": "Aquaculture now provides approximately 49% of global fish production for human consumption.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/state-of-fisheries-aquaculture"
+    ],
+    "tags": [
+      "fisheries",
+      "aquaculture",
+      "food"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  },
+  {
+    "id": "fao:4b804039b0ddc60b",
+    "content": "China produces approximately 35% of global fisheries and aquaculture output.",
+    "classification": {
+      "empirical": 1,
+      "normative": 0,
+      "mythic": 1
+    },
+    "author": "did:mycelix:knowledge-importer",
+    "sources": [
+      "https://www.fao.org/state-of-fisheries-aquaculture"
+    ],
+    "tags": [
+      "fisheries",
+      "china",
+      "production"
+    ],
+    "claim_type": "Fact",
+    "confidence": 0.9,
+    "created": 1742900000000000,
+    "updated": 1742900000000000,
+    "version": 1
+  }
+]

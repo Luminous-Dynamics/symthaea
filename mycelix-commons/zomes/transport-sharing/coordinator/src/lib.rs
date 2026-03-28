@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Transport Sharing Coordinator Zome
 //! Business logic for ride offers, requests, matching, and cargo coordination.
 
@@ -76,6 +79,17 @@ pub fn request_ride(request: RideRequest) -> ExternResult<Record> {
         action_hash.clone(),
         LinkTypes::RequesterToRequest,
         (),
+    )?;
+
+    // Geo-spatial index for ride request origin
+    let geo_hash = commons_types::geo::geohash_encode(request.origin_lat, request.origin_lon, 6);
+    let geo_anchor_str = format!("geo:{}", geo_hash);
+    create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+    create_link(
+        anchor_hash(&geo_anchor_str)?,
+        action_hash.clone(),
+        LinkTypes::GeoIndex,
+        geo_hash.as_bytes().to_vec(),
     )?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -203,6 +217,8 @@ pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
         WasmErrorInner::Guest("Vehicle not found".into())
     ))?;
 
+    let cargo_origin_lat = cargo.origin_lat;
+    let cargo_origin_lon = cargo.origin_lon;
     let action_hash = create_entry(&EntryTypes::CargoOffer(cargo))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_offers".to_string())))?;
@@ -211,6 +227,17 @@ pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
         action_hash.clone(),
         LinkTypes::AllOffers,
         (),
+    )?;
+
+    // Geo-spatial index for cargo offer origin
+    let geo_hash = commons_types::geo::geohash_encode(cargo_origin_lat, cargo_origin_lon, 6);
+    let geo_anchor_str = format!("geo:{}", geo_hash);
+    create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
+    create_link(
+        anchor_hash(&geo_anchor_str)?,
+        action_hash.clone(),
+        LinkTypes::GeoIndex,
+        geo_hash.as_bytes().to_vec(),
     )?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -365,6 +392,40 @@ pub fn get_my_rides(_: ()) -> ExternResult<Vec<Record>> {
     all.extend(records_from_links(requester_links)?);
 
     Ok(all)
+}
+
+// ============================================================================
+// GEO QUERIES
+// ============================================================================
+
+/// Get ride shares near a geographic location using geohash-based indexing.
+#[hdk_extern]
+pub fn get_nearby_rides(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+    let center_hash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
+    let mut all_cells = vec![center_hash.clone()];
+    all_cells.extend(commons_types::geo::geohash_neighbors(&center_hash));
+
+    let mut records = Vec::new();
+    for cell in &all_cells {
+        let anchor_str = format!("geo:{}", cell);
+        let anchor_entry = Anchor(anchor_str);
+        let anchor_hash = hash_entry(&anchor_entry)?;
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(anchor_hash, LinkTypes::GeoIndex)?,
+            GetStrategy::Local,
+        ) {
+            for link in links {
+                if let Ok(action_hash) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(action_hash, GetOptions::default())? {
+                        records.push(record);
+                    }
+                }
+            }
+        }
+    }
+
+    let _ = input.radius_km;
+    Ok(records)
 }
 
 #[cfg(test)]

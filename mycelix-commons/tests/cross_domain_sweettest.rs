@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Cross-cluster civic types are only used when civic_cluster feature is enabled
 #![allow(dead_code)]
 //! Cross-Domain Integration Sweettest

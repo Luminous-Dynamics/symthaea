@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Type-safe bridge dispatch routing.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Type-safe bridge dispatch routing.
 //!
 //! Replaces the fragile `query_type.contains("transfer")` substring matching
 //! in each bridge's `resolve_domain_zome()` with strongly-typed enums and
@@ -448,6 +449,14 @@ pub enum CrossClusterRole {
     Finance,
     Governance,
     Music,
+    Health,
+    Energy,
+    Knowledge,
+    Climate,
+    Manufacturing,
+    Supplychain,
+    Edunet,
+    Legacy,
 }
 
 impl CrossClusterRole {
@@ -462,6 +471,14 @@ impl CrossClusterRole {
             Self::Finance => "finance",
             Self::Governance => "governance",
             Self::Music => "music",
+            Self::Health => "health",
+            Self::Energy => "energy",
+            Self::Knowledge => "knowledge",
+            Self::Climate => "climate",
+            Self::Manufacturing => "manufacturing",
+            Self::Supplychain => "supplychain",
+            Self::Edunet => "edunet",
+            Self::Legacy => "legacy",
         }
     }
 
@@ -475,6 +492,14 @@ impl CrossClusterRole {
         Self::Finance,
         Self::Governance,
         Self::Music,
+        Self::Health,
+        Self::Energy,
+        Self::Knowledge,
+        Self::Climate,
+        Self::Manufacturing,
+        Self::Supplychain,
+        Self::Edunet,
+        Self::Legacy,
     ];
 }
 

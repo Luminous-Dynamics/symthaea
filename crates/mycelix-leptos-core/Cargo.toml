@@ -1,0 +1,11 @@
+[package]
+name = "mycelix-leptos-core"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Shared Leptos components for the Mycelix ecosystem"
+
+[dependencies]
+leptos = { version = "0.7" }
+serde = { version = "1", features = ["derive"] }
+mycelix-leptos-client = { path = "../mycelix-leptos-client", default-features = false }

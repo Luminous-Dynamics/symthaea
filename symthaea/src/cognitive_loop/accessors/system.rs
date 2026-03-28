@@ -25,13 +25,13 @@ impl CognitiveLoopService {
         ///
         /// Used by integration tests to inject `InfrastructureError`s and verify
         /// that the somatic bridge converts them into interoceptive signals.
-        pub fn pain_sender(&self) -> Option<crate::infrastructure::PainSender> { self.pain_tx.clone() }
+        pub fn pain_sender(&self) -> Option<crate::infrastructure::PainSender> { self.sensorimotor.pain_tx.clone() }
 
         /// Get a clone of the thermal sender channel, if active.
         ///
         /// Used by platform integration code (Android PowerManager, iOS ProcessInfo)
         /// to report hardware thermal state. Also used by integration tests.
-        pub fn thermal_sender(&self) -> Option<crate::infrastructure::ThermalSender> { self.thermal_tx.clone() }
+        pub fn thermal_sender(&self) -> Option<crate::infrastructure::ThermalSender> { self.sensorimotor.thermal_tx.clone() }
 
         /// Get the configuration used to create this service.
         pub fn config(&self) -> &super::super::CognitiveLoopConfig { &self.config }
@@ -215,7 +215,7 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.vision_sensory
+        self.sensorimotor.vision_sensory
             .vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
@@ -440,7 +440,7 @@ impl CognitiveLoopService {
     /// The frame is consumed during the next `cycle()` call.
     #[cfg(feature = "vision-manifold")]
     pub fn inject_vision_frame(&mut self, frame: Vec<u8>) {
-        self.vision_sensory.vision_frame_buffer = Some(frame);
+        self.sensorimotor.vision_sensory.vision_frame_buffer = Some(frame);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -454,7 +454,7 @@ impl CognitiveLoopService {
         &mut self,
         bridge: super::super::motor_output_bridge::MotorOutputBridge,
     ) {
-        self.motor_rendering.output_bridge = Some(bridge);
+        self.sensorimotor.motor_rendering.output_bridge = Some(bridge);
     }
 
     /// Set the pending motor action request (path, content, args).
@@ -463,7 +463,7 @@ impl CognitiveLoopService {
         &mut self,
         request: super::super::motor_output_bridge::MotorActionRequest,
     ) {
-        self.motor_rendering.pending_request = Some(request);
+        self.sensorimotor.motor_rendering.pending_request = Some(request);
     }
 
     /// Take the last motor output result (if any).
@@ -471,12 +471,39 @@ impl CognitiveLoopService {
     pub fn take_motor_result(
         &mut self,
     ) -> Option<super::super::motor_output_bridge::MotorOutputResult> {
-        self.motor_rendering.last_result.take()
+        self.sensorimotor.motor_rendering.last_result.take()
     }
 
     /// Whether a motor output bridge is installed.
     pub fn has_motor_bridge(&self) -> bool {
-        self.motor_rendering.output_bridge.is_some()
+        self.sensorimotor.motor_rendering.output_bridge.is_some()
+    }
+
+    /// Whether a physical embodiment bridge is active.
+    #[cfg(feature = "humanoid")]
+    pub fn has_embodiment(&self) -> bool {
+        self.sensorimotor.embodiment_bridge.is_some()
+    }
+
+    /// Get the current embodiment platform.
+    #[cfg(feature = "humanoid")]
+    pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
+        self.sensorimotor.embodiment_bridge
+            .as_ref()
+            .map(|b| b.platform())
+            .unwrap_or(super::super::motor_bridge::EmbodimentPlatform::None)
+    }
+
+    /// Get the latest embodiment telemetry.
+    #[cfg(feature = "humanoid")]
+    pub fn embodiment_telemetry(&self) -> &super::super::motor_bridge::EmbodimentTelemetry {
+        &self.sensorimotor.embodiment_telemetry
+    }
+
+    /// Get the last proprioceptive HV.
+    #[cfg(feature = "humanoid")]
+    pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
+        self.sensorimotor.last_proprioceptive_hv.as_ref()
     }
 
     /// Get the math service for dispatching mathematical queries.
@@ -648,13 +675,13 @@ impl CognitiveLoopService {
     /// Whether the canvas living topology pipeline is active.
     #[cfg(feature = "canvas")]
     pub fn has_canvas(&self) -> bool {
-        self.motor_rendering.canvas_manager.is_some()
+        self.sensorimotor.motor_rendering.canvas_manager.is_some()
     }
 
     /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
     #[cfg(feature = "canvas")]
     pub fn canvas_aesthetic_score(&self) -> f32 {
-        self.motor_rendering
+        self.sensorimotor.motor_rendering
             .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().aesthetic_score)
@@ -664,7 +691,7 @@ impl CognitiveLoopService {
     /// Take the last generated canvas SVG (drains it).
     #[cfg(feature = "canvas")]
     pub fn take_canvas_svg(&mut self) -> Option<String> {
-        self.motor_rendering
+        self.sensorimotor.motor_rendering
             .canvas_manager
             .as_mut()
             .and_then(|m| m.take_svg())
@@ -673,7 +700,7 @@ impl CognitiveLoopService {
     /// Last canvas generation time in microseconds.
     #[cfg(feature = "canvas")]
     pub fn canvas_generation_time_us(&self) -> u64 {
-        self.motor_rendering
+        self.sensorimotor.motor_rendering
             .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().generation_time_us)
@@ -683,7 +710,7 @@ impl CognitiveLoopService {
     /// Set the canvas generation interval (SVG produced every N cycles).
     #[cfg(feature = "canvas")]
     pub fn set_canvas_generation_interval(&mut self, interval: u32) {
-        if let Some(ref mut mgr) = self.motor_rendering.canvas_manager {
+        if let Some(ref mut mgr) = self.sensorimotor.motor_rendering.canvas_manager {
             mgr.set_generation_interval(interval);
         }
     }
@@ -1015,5 +1042,26 @@ impl CognitiveLoopService {
         if let Some(ref mut a) = self.epistemic_auditor {
             a.flush_sync();
         }
+    }
+
+    // ── Thermodynamic Unification Accessors ──────────────────────────────
+
+    /// Access the unified thermodynamic state (read-only).
+    pub fn thermodynamic_state(
+        &self,
+    ) -> &super::thermodynamic_state::UnifiedThermodynamicState {
+        self.thermodynamic_mgr.state()
+    }
+
+    /// Access the thermodynamic physics bridge (read-only).
+    pub fn thermodynamic_bridge(
+        &self,
+    ) -> &super::thermodynamic_physics_bridge::ThermodynamicPhysicsBridge {
+        self.thermodynamic_mgr.bridge()
+    }
+
+    /// Whether Landauer memory pressure is suppressing consolidation.
+    pub fn thermodynamic_memory_suppressed(&self) -> bool {
+        self.thermodynamic_mgr.memory_consolidation_suppressed()
     }
 }

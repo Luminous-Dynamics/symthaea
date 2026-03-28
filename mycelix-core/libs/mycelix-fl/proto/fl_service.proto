@@ -1,0 +1,92 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+// Mycelix FL gRPC service definition.
+//
+// This proto file is the canonical reference for the network protocol.
+// The Rust types are defined manually in src/grpc/types.rs using prost
+// derive macros (no protoc compilation step required).
+
+syntax = "proto3";
+package mycelix.fl;
+
+service FederatedLearning {
+    // Node registration
+    rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse);
+
+    // Submit a gradient for the current round
+    rpc SubmitGradient(SubmitGradientRequest) returns (SubmitGradientResponse);
+
+    // Query current round status
+    rpc GetRoundStatus(GetRoundStatusRequest) returns (GetRoundStatusResponse);
+
+    // Get aggregation result for a completed round
+    rpc GetRoundResult(GetRoundResultRequest) returns (GetRoundResultResponse);
+
+    // Stream gradient submissions (server returns result when round completes)
+    rpc StreamGradients(stream SubmitGradientRequest) returns (GetRoundResultResponse);
+
+    // Health check
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message RegisterNodeRequest {
+    string node_id = 1;
+    bytes public_key = 2;  // Optional Ed25519 public key
+    string did = 3;         // Optional DID
+}
+
+message RegisterNodeResponse {
+    bool success = 1;
+    string message = 2;
+    uint64 current_round = 3;
+}
+
+message SubmitGradientRequest {
+    string node_id = 1;
+    repeated float values = 2;
+    uint64 round = 3;
+}
+
+message SubmitGradientResponse {
+    bool accepted = 1;
+    string message = 2;
+}
+
+message GetRoundStatusRequest {
+    uint64 round = 1;  // 0 = current round
+}
+
+message GetRoundStatusResponse {
+    uint64 round = 1;
+    string status = 2;  // "pending", "collecting", "aggregating", "complete", "failed"
+    uint32 submitted_nodes = 3;
+    uint32 required_nodes = 4;
+}
+
+message GetRoundResultRequest {
+    uint64 round = 1;
+}
+
+message GetRoundResultResponse {
+    uint64 round = 1;
+    bool success = 2;
+    repeated float aggregated_gradient = 3;
+    repeated string included_nodes = 4;
+    repeated string excluded_nodes = 5;
+    repeated NodeScore scores = 6;
+}
+
+message NodeScore {
+    string node_id = 1;
+    double score = 2;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+    bool healthy = 1;
+    uint64 uptime_secs = 2;
+    uint32 registered_nodes = 3;
+    uint64 current_round = 4;
+}
