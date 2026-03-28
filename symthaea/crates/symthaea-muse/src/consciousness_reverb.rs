@@ -22,26 +22,43 @@ pub struct ConsciousnessReverb {
     sample_rate: f32,
 }
 
-/// Simple mono delay line.
+/// Smooth mono delay line with interpolated delay changes (no clicks).
 struct DelayLine {
     buffer: Vec<f32>,
     write_pos: usize,
-    delay_samples: usize,
+    delay_samples: f32,   // current (smoothed) delay
+    target_delay: f32,    // target delay
+    smooth_rate: f32,     // interpolation rate (lower = smoother)
 }
 
 impl DelayLine {
     fn new(max_samples: usize) -> Self {
-        Self { buffer: vec![0.0; max_samples.max(1)], write_pos: 0, delay_samples: 0 }
+        Self {
+            buffer: vec![0.0; max_samples.max(1)],
+            write_pos: 0,
+            delay_samples: 0.0,
+            target_delay: 0.0,
+            smooth_rate: 0.001, // very smooth transitions
+        }
     }
 
     fn set_delay(&mut self, samples: usize) {
-        self.delay_samples = samples.min(self.buffer.len() - 1);
+        self.target_delay = (samples as f32).min((self.buffer.len() - 1) as f32);
     }
 
     fn process(&mut self, input: f32) -> f32 {
+        // Smooth toward target (eliminates clicks)
+        self.delay_samples += (self.target_delay - self.delay_samples) * self.smooth_rate;
+
         self.buffer[self.write_pos] = input;
-        let read_pos = (self.write_pos + self.buffer.len() - self.delay_samples) % self.buffer.len();
-        let output = self.buffer[read_pos];
+
+        // Fractional delay via linear interpolation
+        let delay_int = self.delay_samples as usize;
+        let delay_frac = self.delay_samples - delay_int as f32;
+        let read_pos0 = (self.write_pos + self.buffer.len() - delay_int) % self.buffer.len();
+        let read_pos1 = (self.write_pos + self.buffer.len() - delay_int - 1) % self.buffer.len();
+        let output = self.buffer[read_pos0] * (1.0 - delay_frac) + self.buffer[read_pos1] * delay_frac;
+
         self.write_pos = (self.write_pos + 1) % self.buffer.len();
         output
     }
@@ -80,12 +97,10 @@ impl EarlyReflections {
         Self { taps }
     }
 
-    /// Update tap gains from harmony activations.
+    /// Update tap gains from harmony activations (capped total gain).
     fn update_harmonies(&mut self, harmonies: &[f32; 8]) {
         for (tap, &activation) in self.taps.iter_mut().zip(harmonies.iter()) {
-            // Each harmony's activation controls its reflection's volume
-            // Higher activation = more prominent reflection from that direction
-            tap.gain = activation * 0.15; // max 0.15 per tap
+            tap.gain = activation * 0.06; // max 0.06 per tap (0.48 total max)
         }
     }
 
@@ -164,16 +179,12 @@ impl ConsciousnessReverb {
         let predelay_ms = psi * 80.0; // 0-80ms
         self.pre_delay.set_delay((predelay_ms * 0.001 * self.sample_rate) as usize);
 
-        // Room size: consciousness maps to Freeverb feedback
-        let room = 0.1 + psi * 0.8; // [0.1, 0.9]
-        let feedback = 0.28 + room * 0.7;
-        // Update Freeverb room (we'll reconstruct — Freeverb is cheap)
-        self.late_reverb = Freeverb::new(
-            self.sample_rate as u32,
-            room,
-            0.3 + state.serotonin * 0.4, // serotonin → more damping (warmer tail)
-            0.1 + psi * 0.3,             // consciousness → wet level
-        );
+        // Room size: consciousness maps to Freeverb feedback.
+        // CRITICAL: update params in-place to preserve reverb tail.
+        let room = 0.1 + psi * 0.8;
+        let damping = 0.3 + state.serotonin * 0.4;
+        let wet = 0.1 + psi * 0.3;
+        self.late_reverb.set_params(room, damping, wet);
 
         // Early reflections from harmony activations
         self.early_reflections.update_harmonies(&state.harmony_activations);

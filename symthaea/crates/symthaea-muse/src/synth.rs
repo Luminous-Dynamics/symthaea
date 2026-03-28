@@ -27,6 +27,18 @@ impl Freeverb {
         let ma = |d: usize, o: usize| AllpassFilter { buffer: vec![0.0; ((d+o) as f32 * scale) as usize + 1], index: 0 };
         Self { comb_l: COMB_DELAYS.iter().map(|&d| mc(d,0)).collect(), comb_r: COMB_DELAYS.iter().map(|&d| mc(d,STEREO_SPREAD)).collect(), allpass_l: ALLPASS_DELAYS.iter().map(|&d| ma(d,0)).collect(), allpass_r: ALLPASS_DELAYS.iter().map(|&d| ma(d,STEREO_SPREAD)).collect(), wet }
     }
+    /// Update reverb parameters WITHOUT destroying the tail.
+    pub(crate) fn set_params(&mut self, room_size: f32, damping: f32, wet: f32) {
+        let fb = 0.28 + room_size.clamp(0.0, 1.0) * 0.7;
+        let d1 = damping.clamp(0.0, 1.0);
+        let d2 = 1.0 - d1;
+        for c in self.comb_l.iter_mut().chain(self.comb_r.iter_mut()) {
+            c.feedback = fb;
+            c.damp1 = d1;
+            c.damp2 = d2;
+        }
+        self.wet = wet.clamp(0.0, 1.0);
+    }
     pub(crate) fn process_stereo(&mut self, il: f32, ir: f32) -> (f32, f32) {
         let (mut ol, mut or) = (0.0f32, 0.0f32);
         for c in &mut self.comb_l { ol += cp(c, il); }

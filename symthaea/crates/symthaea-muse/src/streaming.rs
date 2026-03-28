@@ -92,6 +92,8 @@ pub struct StreamingSynth {
     fep_engine: MusicalInferenceEngine,
     /// Free energy history for learning verification.
     fe_history: Vec<f64>,
+    /// Dither PRNG state.
+    dither_state: u32,
     /// Mixing chain: EQ → compressor → limiter.
     mixing: MixingChain,
     /// Pending drum hits for the current bar.
@@ -137,6 +139,7 @@ impl StreamingSynth {
             aesthetic: AestheticListener::new(),
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
+            dither_state: 42,
             mixing: MixingChain::new(sample_rate),
             drum_hits: Vec::new(),
             bar_sample_pos: 0,
@@ -265,9 +268,11 @@ impl StreamingSynth {
                     // Pre-rendered FM (e-piano, bell): read from buffer
                     if active.sample_pos < fm_buf.len() { fm_buf[active.sample_pos] } else { 0.0 }
                 } else {
-                    // Additive synthesis with instrument-specific partials
+                    // Additive synthesis with instrument-specific partials (normalized)
                     let partials = active.instrument.partials();
                     let num_p = partials.len().min(16);
+                    let partial_sum: f32 = partials.iter().take(num_p).sum();
+                    let norm = if partial_sum > 0.01 { 1.0 / partial_sum } else { 1.0 };
                     let mut s = 0.0f32;
                     for h in 0..num_p {
                         let cf = freq * (h + 1) as f32;
@@ -279,7 +284,7 @@ impl StreamingSynth {
                         }
                         s += partials[h] * active.partial_phases[h].sin();
                     }
-                    s * env
+                    s * norm * env
                 };
 
                 // Arousal-modulated gain with wide dynamic range for V-A measurability.
@@ -338,8 +343,10 @@ impl StreamingSynth {
                 for (j, &s) in drum_buf.iter().enumerate() {
                     let idx = local_offset + j;
                     if idx < buffer.len() {
-                        buffer[idx][0] += s * 0.15; // subtle percussion
-                        buffer[idx][1] += s * 0.15;
+                        // Consciousness-scaled drums: barely present at high Psi
+                        let drum_gain = 0.06 * (1.0 - self.state.consciousness_level * 0.7);
+                        buffer[idx][0] += s * drum_gain;
+                        buffer[idx][1] += s * drum_gain;
                     }
                 }
             }
@@ -358,6 +365,22 @@ impl StreamingSynth {
             let (l, r) = self.mixing.process(pair[0], pair[1]);
             pair[0] = l;
             pair[1] = r;
+        }
+
+        // ── Phase 4.6: TPDF dithering (triangular probability density function) ──
+        // Eliminates quantization artifacts in quiet passages for 16-bit output.
+        {
+            let dither_amp = 1.5 / 65536.0; // TPDF for 16-bit
+            for pair in &mut buffer {
+                // Simple TPDF: sum of two uniform randoms
+                self.dither_state = self.dither_state.wrapping_mul(1103515245).wrapping_add(12345);
+                let r1 = (self.dither_state >> 16) as f32 / 32768.0 - 1.0;
+                self.dither_state = self.dither_state.wrapping_mul(1103515245).wrapping_add(12345);
+                let r2 = (self.dither_state >> 16) as f32 / 32768.0 - 1.0;
+                let dither = (r1 + r2) * 0.5 * dither_amp;
+                pair[0] += dither;
+                pair[1] += dither;
+            }
         }
 
         // ── Phase 5: Audio feedback (strange loop) ──

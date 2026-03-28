@@ -77,9 +77,9 @@ impl Compressor {
         }
     }
 
-    /// Gentle default: -12dB threshold, 3:1 ratio, 5ms attack, 100ms release, +3dB makeup.
+    /// Gentle default: -14dB threshold, 2:1 ratio, 15ms attack, 150ms release, +2dB makeup.
     pub fn gentle(sample_rate: u32) -> Self {
-        Self::new(sample_rate, -12.0, 3.0, 5.0, 100.0, 3.0)
+        Self::new(sample_rate, -14.0, 2.0, 15.0, 150.0, 2.0)
     }
 
     /// Process stereo pair, returning compressed pair.
@@ -113,14 +113,14 @@ impl Limiter {
         let sr = sample_rate as f32;
         Self {
             ceiling: 10.0f32.powf(ceiling_db / 20.0),
-            release_coeff: (-1.0 / (5.0 * 0.001 * sr)).exp(), // 5ms release
+            release_coeff: (-1.0 / (15.0 * 0.001 * sr)).exp(), // 15ms release (smoother)
             attenuation: 1.0,
         }
     }
 
-    /// Default: -0.3 dB ceiling.
+    /// Default: -1.5 dB ceiling (safe headroom).
     pub fn default_limiter(sample_rate: u32) -> Self {
-        Self::new(sample_rate, -0.3)
+        Self::new(sample_rate, -1.5)
     }
 
     /// Process stereo pair.

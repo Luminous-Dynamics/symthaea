@@ -81,12 +81,12 @@ impl DuckingMatrix {
                 DuckingEntry {
                     source: VoiceRole::Lead,
                     target: VoiceRole::Bass,
-                    ducker: SidechainDucker::new(sample_rate, 1.0, 80.0, 0.15, 4.0),
+                    ducker: SidechainDucker::new(sample_rate, 3.0, 150.0, 0.15, 2.0), // gentler: 2:1, slower release
                 },
                 DuckingEntry {
                     source: VoiceRole::Lead,
                     target: VoiceRole::Harmony,
-                    ducker: SidechainDucker::new(sample_rate, 2.0, 100.0, 0.2, 2.0),
+                    ducker: SidechainDucker::new(sample_rate, 5.0, 200.0, 0.2, 1.5), // very gentle: 1.5:1
                 },
             ],
         }

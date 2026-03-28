@@ -104,18 +104,18 @@ impl Instrument {
     /// Karplus-Strong parameters: (damping, brightness, stiffness).
     pub fn ks_params(&self) -> (f32, f32, f32) {
         match self {
-            Self::AcousticGuitar => (0.996, 0.50, 0.005),
-            Self::Harp => (0.997, 0.48, 0.000),
-            _ => (0.996, 0.50, 0.000),
+            Self::AcousticGuitar => (0.996, 0.42, 0.005), // warmer: brightness 0.42
+            Self::Harp => (0.997, 0.40, 0.000),           // warmer: brightness 0.40
+            _ => (0.996, 0.42, 0.000),
         }
     }
 
     /// FM parameters: (carrier_ratio, mod_ratio, index, index_decay_rate).
     pub fn fm_params(&self) -> (f32, f32, f32, f32) {
         match self {
-            Self::ElectricPiano => (1.0, 1.0, 2.0, 15.0),  // Rhodes: mod decays fast
-            Self::Bell => (1.0, 3.5, 4.0, 3.0),             // Bell: inharmonic mod, slow decay
-            _ => (1.0, 1.0, 0.5, 10.0),
+            Self::ElectricPiano => (1.0, 1.0, 1.5, 15.0),  // Rhodes: gentler index
+            Self::Bell => (1.0, 3.5, 2.5, 3.0),             // Bell: reduced index for warmth
+            _ => (1.0, 1.0, 0.3, 10.0),
         }
     }
 }
