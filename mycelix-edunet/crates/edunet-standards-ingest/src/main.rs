@@ -194,6 +194,27 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Find an optimal learning path through the curriculum graph
+    Plan {
+        /// Curriculum JSON file (unified graph)
+        file: PathBuf,
+        /// Starting node ID
+        #[arg(long)]
+        from: String,
+        /// Goal: node ID, "career:Software", or "level:6:Mathematics"
+        #[arg(long)]
+        to: String,
+        /// Maximum total hours budget
+        #[arg(long)]
+        max_hours: Option<u32>,
+        /// Enforce strict Bloom level progression
+        #[arg(long)]
+        bloom_strict: bool,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Analyze a curriculum JSON file and print statistics
     Stats {
         /// Curriculum JSON file to analyze
@@ -601,6 +622,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let doc = source.fetch_career_pathway(&field, limit).await?;
             eprintln!("Got {} nodes ({} occupations + skills)", doc.nodes.len(), limit);
             write_document(&doc, output.as_deref(), true)?;
+        }
+
+        // ============================================================
+        // Learning Path Planner
+        // ============================================================
+        Commands::Plan {
+            file,
+            from,
+            to,
+            max_hours,
+            bloom_strict,
+            json,
+        } => {
+            let content = std::fs::read_to_string(&file)?;
+            let doc: converter::CurriculumDocument = serde_json::from_str(&content)?;
+
+            let goal = if to.starts_with("career:") {
+                edunet_standards_ingest::pathfind::PathGoal::Career(to[7..].to_string())
+            } else if to.starts_with("level:") {
+                let parts: Vec<&str> = to[6..].splitn(2, ':').collect();
+                let level: u8 = parts[0].parse().unwrap_or(6);
+                let subject = parts.get(1).unwrap_or(&"").to_string();
+                edunet_standards_ingest::pathfind::PathGoal::Level {
+                    isced_level: level,
+                    subject,
+                }
+            } else {
+                edunet_standards_ingest::pathfind::PathGoal::Node(to.clone())
+            };
+
+            let constraints = edunet_standards_ingest::pathfind::PathConstraints {
+                max_hours,
+                bloom_strict,
+                ..Default::default()
+            };
+
+            eprintln!("Planning path from '{}' to '{}'...", from, to);
+            match edunet_standards_ingest::pathfind::find_learning_path(
+                &doc,
+                &from,
+                &goal,
+                &std::collections::HashSet::new(),
+                &constraints,
+            ) {
+                Some(plan) => {
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&plan)?);
+                    } else {
+                        edunet_standards_ingest::pathfind::print_plan(&plan);
+                    }
+                }
+                None => {
+                    eprintln!("No path found from '{}' to '{}'.", from, to);
+                }
+            }
         }
 
         // ============================================================

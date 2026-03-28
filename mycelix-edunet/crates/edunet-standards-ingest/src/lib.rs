@@ -27,6 +27,7 @@ pub mod client;
 pub mod converter;
 pub mod higher_ed_types;
 pub mod merge;
+pub mod pathfind;
 pub mod sources;
 pub mod stats;
 pub mod taxonomy;
