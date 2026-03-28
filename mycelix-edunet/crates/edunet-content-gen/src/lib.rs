@@ -38,6 +38,7 @@
 //! ```
 
 pub mod batch;
+pub mod broca_adapter;
 pub mod channels;
 pub mod ingest;
 pub mod mock;
