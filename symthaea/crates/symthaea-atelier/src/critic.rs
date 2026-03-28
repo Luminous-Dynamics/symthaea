@@ -56,6 +56,28 @@ pub struct CriticVerdict {
     pub reached_stillness: bool,
 }
 
+impl CriticVerdict {
+    /// Encode this verdict as a 4D vector suitable for FEP observation.
+    ///
+    /// When wired into the cognitive loop, the caller creates:
+    /// ```ignore
+    /// let obs = symthaea_fep::Observation::new(
+    ///     verdict.as_fep_values(),
+    ///     2.0,        // high precision
+    ///     "creative",
+    /// );
+    /// fep_agent.perceive(&obs);
+    /// ```
+    pub fn as_fep_values(&self) -> Vec<f64> {
+        vec![
+            self.composite as f64,           // phi proxy: aesthetic quality
+            self.novelty as f64,             // integration: creative novelty
+            self.intention_coherence as f64, // coherence: faithful expression
+            self.taste_alignment as f64,     // attention: matches preferences
+        ]
+    }
+}
+
 /// Ensemble self-critic with moral-aesthetic binding.
 pub struct SelfCritic {
     novelty_tracker: novelty::NoveltyTracker,
@@ -327,61 +349,118 @@ fn extract_scene_features(artwork: &crate::Artwork) -> PerceptualInput {
 
 /// Apply critic verdict as wisdom to evolve the cognitive state.
 ///
-/// Nudges the snapshot's harmony activations and neuromodulators
-/// toward the dimensions that scored highest in the verdict.
+/// Uses FEP-inspired exploration/exploitation balance instead of gradient following.
+/// The `exploration_urge` parameter (0-1) controls the explore/exploit tradeoff:
+/// - High exploration: perturb harmonies, boost arousal, seek novelty
+/// - High exploitation: reinforce dominant harmony, consolidate, boost serotonin
+///
+/// Call with `exploration_urge = 1.0 - verdict.novelty` as a simple heuristic,
+/// or feed in the FEP agent's epistemic value for principled active inference.
 pub fn apply_verdict_wisdom(snapshot: &mut CognitiveSnapshot, verdict: &CriticVerdict) {
-    let lr = 0.03; // Learning rate (reduced from 0.05 to prevent premature convergence)
+    // Default exploration heuristic: low novelty → explore, high novelty → exploit
+    let exploration_urge = (1.0 - verdict.novelty).clamp(0.0, 1.0);
+    apply_fep_wisdom(snapshot, verdict, exploration_urge);
+}
 
-    // ── Homeostatic decay: all neuromodulators drift toward baseline ──
-    // Without this, serotonin saturates at 1.0 and arousal collapses to 0.0.
-    // This implements the biological reality that neurotransmitter levels
-    // have a resting state they return to without stimulation.
+/// FEP-driven wisdom application with explicit exploration/exploitation parameter.
+///
+/// The exploration_urge comes from either:
+/// - `CuriosityDrive.exploration_urge` (cognitive loop)
+/// - `1.0 - verdict.novelty` (simple heuristic)
+/// - FEP epistemic value (principled active inference)
+pub fn apply_fep_wisdom(
+    snapshot: &mut CognitiveSnapshot,
+    verdict: &CriticVerdict,
+    exploration_urge: f32,
+) {
+    let lr = 0.03;
+    let exploit = (1.0 - exploration_urge).clamp(0.0, 1.0);
+    let explore = exploration_urge.clamp(0.0, 1.0);
+
+    // ── Homeostatic decay: neuromodulators drift toward resting baseline ──
     let decay = 0.02;
     snapshot.serotonin += (0.5 - snapshot.serotonin) * decay;
     snapshot.arousal += (0.4 - snapshot.arousal) * decay;
     snapshot.dopamine += (0.5 - snapshot.dopamine) * decay;
+    snapshot.noradrenaline += (0.3 - snapshot.noradrenaline) * decay;
 
-    // ── Boredom/curiosity: if novelty is very low, inject exploration ──
-    // The system must not be content with repetition. Low novelty for
-    // sustained periods should trigger the curiosity drive.
-    if verdict.novelty < 0.2 {
-        // Boredom → boost arousal + noradrenaline (seek something new)
-        snapshot.arousal = (snapshot.arousal + lr * 2.0).clamp(0.0, 1.0);
-        snapshot.noradrenaline = (snapshot.noradrenaline + lr).clamp(0.0, 1.0);
-        // Perturb a random harmony to create variation
-        let idx = (verdict.composite * 7.99) as usize % 8;
-        snapshot.harmony_activations[idx] =
-            (snapshot.harmony_activations[idx] + lr * 3.0).clamp(0.0, 1.0);
+    // ── Harmony homeostatic decay: prevent all-1.0 saturation ──
+    // Each harmony drifts toward its own baseline (diversity-preserving)
+    let harmony_baselines = [0.4, 0.5, 0.6, 0.5, 0.4, 0.5, 0.6, 0.3];
+    for i in 0..8 {
+        snapshot.harmony_activations[i] +=
+            (harmony_baselines[i] - snapshot.harmony_activations[i]) * decay * 1.5;
     }
 
-    // ── Reward: good harmony → gentle boost ──
-    if verdict.aesthetic.harmony > 0.5 {
-        for h in snapshot.harmony_activations.iter_mut() {
-            *h = (*h + lr * 0.3 * verdict.aesthetic.harmony).clamp(0.0, 1.0);
+    // ── EXPLOIT: reinforce what works (dominant harmony only) ──
+    if exploit > 0.5 && verdict.composite > 0.5 {
+        // Find the dominant harmony (competitive reinforcement)
+        let max_idx = snapshot.harmony_activations
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        snapshot.harmony_activations[max_idx] =
+            (snapshot.harmony_activations[max_idx] + lr * exploit * verdict.aesthetic.harmony)
+                .clamp(0.0, 1.0);
+
+        // Taste satisfaction → serotonin
+        if verdict.taste_alignment > 0.5 {
+            snapshot.serotonin = (snapshot.serotonin + lr * 0.2 * exploit).clamp(0.0, 1.0);
+        }
+
+        // Good coherence → consolidate (reduce arousal gently)
+        if verdict.intention_coherence > 0.6 {
+            snapshot.arousal = (snapshot.arousal - lr * 0.2 * exploit).clamp(0.0, 1.0);
         }
     }
 
-    // ── Exploration vs consolidation (from novelty/coherence balance) ──
-    if verdict.novelty > 0.6 && verdict.intention_coherence < 0.4 {
-        snapshot.arousal = (snapshot.arousal + lr).clamp(0.0, 1.0);
-    }
-    if verdict.intention_coherence > 0.6 && verdict.novelty < 0.3 {
-        snapshot.arousal = (snapshot.arousal - lr * 0.3).clamp(0.0, 1.0);
+    // ── EXPLORE: seek novelty when bored ──
+    if explore > 0.4 {
+        // Boost arousal + noradrenaline (seek something new)
+        snapshot.arousal = (snapshot.arousal + lr * explore).clamp(0.0, 1.0);
+        snapshot.noradrenaline = (snapshot.noradrenaline + lr * 0.5 * explore).clamp(0.0, 1.0);
+
+        // Perturb a non-dominant harmony (create variation)
+        let min_idx = snapshot.harmony_activations
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        snapshot.harmony_activations[min_idx] =
+            (snapshot.harmony_activations[min_idx] + lr * 2.0 * explore).clamp(0.0, 1.0);
     }
 
-    // ── Taste satisfaction (bounded by homeostatic decay) ──
-    if verdict.taste_alignment > 0.6 {
-        snapshot.serotonin = (snapshot.serotonin + lr * 0.3).clamp(0.0, 1.0);
+    // ── Entropy pressure: prevent harmony homogenization ──
+    let harmony_diversity = information::element_diversity(
+        &snapshot.harmony_activations, 0.1,
+    );
+    if harmony_diversity < 0.5 {
+        // Too homogeneous — dampen the highest, boost the lowest
+        let (max_i, _) = snapshot.harmony_activations.iter().enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or((0, &0.5));
+        let (min_i, _) = snapshot.harmony_activations.iter().enumerate()
+            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or((0, &0.5));
+        if max_i != min_i {
+            snapshot.harmony_activations[max_i] =
+                (snapshot.harmony_activations[max_i] - lr * 0.5).clamp(0.0, 1.0);
+            snapshot.harmony_activations[min_i] =
+                (snapshot.harmony_activations[min_i] + lr * 0.5).clamp(0.0, 1.0);
+        }
+    }
+
+    // ── Surprise reward: unexpected good output → dopamine ──
+    if verdict.self_surprise > 0.5 && verdict.composite > 0.4 {
+        snapshot.dopamine = (snapshot.dopamine + lr * 0.5 * verdict.self_surprise).clamp(0.0, 1.0);
     }
 
     // ── Golden ratio correction ──
     if verdict.golden_ratio < 0.3 {
         snapshot.valence = snapshot.valence * 0.97;
-    }
-
-    // ── Surprise reward: unexpected good output → dopamine ──
-    if verdict.self_surprise > 0.5 && verdict.composite > 0.5 {
-        snapshot.dopamine = (snapshot.dopamine + lr * 0.5).clamp(0.0, 1.0);
     }
 }
 
