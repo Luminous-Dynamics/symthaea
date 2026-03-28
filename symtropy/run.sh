@@ -30,20 +30,35 @@ else
     echo "[symtropy] Using default backend"
 fi
 
+# Feature flags
+FEATURES=""
+for arg in "$@"; do
+    case "$arg" in
+        --mycelix) FEATURES="--features mycelix" ;;
+    esac
+done
+
 # Choose debug or release binary
 if [[ "${1:-}" == "--release" ]] || [[ "${2:-}" == "--release" ]]; then
     BIN="target/release/symtropy"
+    if [[ ! -f "$BIN" ]]; then
+        echo "Building release binary..."
+        PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/nix/store/47crwj8zckj6l1d4rgz3dk1mwqpym9is-alsa-lib-1.2.15.1-dev/lib/pkgconfig" \
+            cargo build --release $FEATURES
+    fi
 else
     BIN="target/debug/symtropy"
-fi
-
-if [[ ! -f "$BIN" ]]; then
-    echo "Binary not found: $BIN"
-    echo "Build with: cargo build [--release]"
-    exit 1
+    if [[ ! -f "$BIN" ]]; then
+        echo "Building debug binary..."
+        PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/nix/store/47crwj8zckj6l1d4rgz3dk1mwqpym9is-alsa-lib-1.2.15.1-dev/lib/pkgconfig" \
+            cargo build $FEATURES
+    fi
 fi
 
 echo "[symtropy] Launching $BIN..."
+if [[ -n "$FEATURES" ]]; then
+    echo "[symtropy] Mycelix physicalized cryptography ACTIVE"
+fi
 export RUST_LOG="${RUST_LOG:-warn,symtropy=info}"
 export RUST_BACKTRACE=1
 exec "$BIN" "$@"
