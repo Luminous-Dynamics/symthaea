@@ -103,10 +103,10 @@ pub fn faction_recruitment_system(
         .iter()
         .map(|(e, cp, fa)| {
             let ideology = [
-                cp.dimensions[0], // level → economic axis
-                cp.dimensions[1], // meta_awareness → authority axis
-                cp.dimensions[3], // care → tradition/progress axis
-                cp.dimensions[4], // harmony → individual/collective axis
+                cp.sim_dimensions[0], // level → economic axis
+                cp.sim_dimensions[1], // meta_awareness → authority axis
+                cp.sim_dimensions[3], // care → tradition/progress axis
+                cp.sim_dimensions[4], // harmony → individual/collective axis
             ];
             (e, ideology, fa.faction_id)
         })
@@ -168,10 +168,10 @@ pub fn faction_conflict_system(
     for (fa, cp, _) in &npcs {
         if let Some(fid) = fa.faction_id {
             factions.entry(fid).or_default().push([
-                cp.dimensions[0],
-                cp.dimensions[1],
-                cp.dimensions[3],
-                cp.dimensions[4],
+                cp.sim_dimensions[0],
+                cp.sim_dimensions[1],
+                cp.sim_dimensions[3],
+                cp.sim_dimensions[4],
             ]);
         }
     }

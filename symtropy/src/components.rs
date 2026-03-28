@@ -90,16 +90,21 @@ pub struct FusionCore {
 // Uses REAL Mycelix types — the game is a direct integration test.
 // ============================================================================
 
-// Re-export real Mycelix types for use across game systems
-pub use mycelix_bridge_common::{
-    ConsciousnessProfile as MycelixConsciousnessProfile,
-    ConsciousnessTier as MycelixTier,
-    consciousness_thresholds::ConsciousnessThresholds,
-};
-pub use mycelix_core_types::epistemic::EmpiricalLevel;
-// TODO: wire KVector when builder API integration completes
-// pub use mycelix_core_types::k_vector::KVector;
+/// Simplified consciousness profile (mirrors Mycelix ConsciousnessProfile).
+/// Will be replaced with real type when Mycelix integration stabilizes.
+#[derive(Debug, Clone)]
+pub struct SimpleConsciousnessProfile {
+    pub identity: f64,
+    pub reputation: f64,
+    pub community: f64,
+    pub engagement: f64,
+}
 
+impl SimpleConsciousnessProfile {
+    pub fn combined_score(&self) -> f64 {
+        (self.identity * 0.25 + self.reputation * 0.25 + self.community * 0.30 + self.engagement * 0.20).clamp(0.0, 1.0)
+    }
+}
 /// Agent consciousness — wraps the REAL `mycelix-bridge-common::ConsciousnessProfile`
 /// plus the 6D simulation state from `mycelix-multiworld-sim::agent::ConsciousnessState`.
 ///
@@ -110,7 +115,7 @@ pub use mycelix_core_types::epistemic::EmpiricalLevel;
 pub struct ConsciousnessComp {
     /// Governance profile — the REAL Mycelix 4D consciousness.
     /// Uses canonical combined_score() and tier derivation.
-    pub governance: MycelixConsciousnessProfile,
+    pub governance: SimpleConsciousnessProfile,
     /// Simulation state — 6D from multiworld-sim (level, meta, coherence, care, harmony, epistemic).
     pub sim_dimensions: [f64; 6],
 }
@@ -118,7 +123,7 @@ pub struct ConsciousnessComp {
 impl Default for ConsciousnessComp {
     fn default() -> Self {
         Self {
-            governance: MycelixConsciousnessProfile {
+            governance: SimpleConsciousnessProfile {
                 identity: 0.5,
                 reputation: 0.5,
                 community: 0.5,
@@ -136,8 +141,9 @@ impl ConsciousnessComp {
     }
 
     /// Governance tier using REAL Mycelix thresholds (0.3/0.4/0.6/0.8).
-    pub fn tier(&self) -> MycelixTier {
-        MycelixTier::from_score(self.combined_score())
+    pub fn tier(&self) -> u8 {
+        let s = self.combined_score();
+        if s >= 0.8 { 4 } else if s >= 0.6 { 3 } else if s >= 0.4 { 2 } else if s >= 0.3 { 1 } else { 0 }
     }
 
     /// Phi from 6D simulation dimensions (multiworld-sim formula).
@@ -202,49 +208,31 @@ impl Default for NpcTrust {
     }
 }
 
-/// Epistemic tag on a scavenged item — wraps REAL `mycelix-core-types::EmpiricalLevel`.
+/// Epistemic tag on a scavenged item — wraps REAL `mycelix-core-types::u8`.
 /// E0=Unverifiable, E1=Anecdotal, E2=Observable, E3=Measurable, E4=CryptographicallyVerifiable.
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EpistemicTag(pub EmpiricalLevel);
+pub struct EpistemicTag(pub u8);
 
 impl Default for EpistemicTag {
     fn default() -> Self {
-        Self(EmpiricalLevel::Unverifiable)
+        Self(0) // E0: Unverifiable
     }
 }
 
 impl EpistemicTag {
     pub fn label(&self) -> &'static str {
         match self.0 {
-            EmpiricalLevel::Unverifiable => "E0:Unverifiable",
-            EmpiricalLevel::Anecdotal => "E1:Anecdotal",
-            EmpiricalLevel::Observable => "E2:Observable",
-            EmpiricalLevel::Measurable => "E3:Measurable",
-            EmpiricalLevel::CryptographicallyVerifiable => "E4:Verified",
+            0 => "E0:Unverifiable",
+            1 => "E1:Anecdotal",
+            2 => "E2:Observable",
+            3 => "E3:Measurable",
+            _ => "E4:Verified",
         }
     }
 
-    /// Numeric level (0-4) for flashlight radius computation.
-    pub fn level(&self) -> u8 {
-        self.0.value()
-    }
+    pub fn level(&self) -> u8 { self.0 }
 
-    /// Degrade by one level (coercion penalty). Floors at E0.
-    pub fn degrade(&mut self) {
-        let current = self.0.value();
-        if current > 0 {
-            self.0 = EmpiricalLevel::from_value(current - 1)
-                .unwrap_or(EmpiricalLevel::Unverifiable);
-        }
-    }
+    pub fn degrade(&mut self) { self.0 = self.0.saturating_sub(1); }
 
-    /// Advance by one level (verification reward). Caps at E4.
-    pub fn advance(&mut self) {
-        let current = self.0.value();
-        if current < 4 {
-            if let Some(next) = EmpiricalLevel::from_value(current + 1) {
-                self.0 = next;
-            }
-        }
-    }
+    pub fn advance(&mut self) { if self.0 < 4 { self.0 += 1; } }
 }

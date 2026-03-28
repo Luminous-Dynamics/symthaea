@@ -166,7 +166,7 @@ pub fn dkg_ceremony_system(
         ceremony.participants_in_range += 1;
 
         // Evaluate NPC willingness to contribute
-        let trust_score = trust.trust_toward_player;
+        let trust_score = trust.trust;
         let combined_score = consciousness.combined_score();
         let npc_stress = npc.caution + leviathan_pressure;
 

@@ -48,7 +48,7 @@ pub fn tend_exchange_system(
     let npc_data: Vec<(Entity, String, f64, f64, i64)> = npcs
         .iter()
         .map(|(e, npc, cp, tend, trust)| {
-            (e, npc.name.clone(), cp.phi, trust.trust, tend.balance)
+            (e, npc.name.clone(), cp.combined_score(), trust.trust, tend.balance)
         })
         .collect();
 
@@ -66,7 +66,7 @@ pub fn tend_exchange_system(
         }
 
         // Only high-care NPCs initiate exchanges
-        let care_i = npcs.get(entity_i).map(|(_, _, cp, _, _)| cp.dimensions[3]).unwrap_or(0.0);
+        let care_i = npcs.get(entity_i).map(|(_, _, cp, _, _)| cp.sim_dimensions[3]).unwrap_or(0.0);
         if care_i < 0.5 {
             continue;
         }

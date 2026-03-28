@@ -288,21 +288,20 @@ pub fn hud_system(
 
     let hud_text = format!(
         "WASD: move | Shift: sprint | E: extract | Esc: quit\n\
-         Stress: {:.0}%  Load: {:.0}%  Leviathan: {}{}\n\
-         {}  Harmony: {}  Fragments: {}/48\n\
-         Noise: {:.1}/{:.1}  Extract: {:.0}%  Explored: {:.0}%",
+         Stress: {:.0}%  Load: {:.0}%  Leviathan: {phase}{sanctuary}\n\
+         {consciousness}  Harmony: {harm}  Fragments: {frags}/48\n\
+         Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%",
         stress.arousal * 100.0,
         biometrics.model.allostatic_load * 100.0,
-        phase_str,
-        sanctuary_str,
-        consciousness_str,
-        harmony_str,
-        collected.total(),
-        leviathan.noise_accumulator,
-        leviathan.threshold,
-        extraction * 100.0,
-        player_pos.x,
-        player_pos.y,
+        phase = phase_str,
+        sanctuary = sanctuary_str,
+        consciousness = consciousness_str,
+        harm = harmony_str,
+        frags = collected.total(),
+        noise = leviathan.noise_accumulator,
+        thresh = leviathan.threshold,
+        ext = extraction * 100.0,
+        exp = explored.explore_percent(),
     );
 
     for (mut text, mut color) in &mut hud {

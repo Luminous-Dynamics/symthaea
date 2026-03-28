@@ -9,6 +9,18 @@
 //! game's social dynamics.
 
 use bevy::prelude::*;
+
+/// Veto override threshold — the fraction of weighted votes needed to override a Guardian veto.
+///
+/// The canonical governance zome (`mycelix-governance/execution/integrity`) uses 0.67
+/// with adaptive decay (0.67→0.62→0.60 on repeated failures). The multiworld-sim
+/// uses 0.80 for conservative 300-year modeling.
+///
+/// The game uses the governance zome value (0.67) because we're testing the real
+/// architecture, not the conservative simulation. This ensures that the override
+/// behavior players experience matches what they'd encounter in production Mycelix.
+pub const VETO_OVERRIDE_THRESHOLD: f64 = 0.67;
+
 use mycelix_multiworld_sim::{
     config::PolicyConfig,
     economy::WorldEconomy,
@@ -285,7 +297,7 @@ impl ActiveProposal {
             .filter(|(_, _, a)| *a)
             .map(|(_, w, _)| w)
             .sum();
-        (approve_weight / total_weight) >= 0.80
+        (approve_weight / total_weight) >= VETO_OVERRIDE_THRESHOLD
     }
 
     /// Whether the proposal passed (majority approval, not vetoed or override succeeded).
@@ -497,16 +509,15 @@ mod tests {
     }
 
     #[test]
-    fn override_requires_80_percent() {
+    fn override_requires_67_percent() {
         let mut prop = ActiveProposal::new("Change rules", 0, 1);
         prop.cast_vote("A", 0.8, true);
         prop.veto("G", 0.85);
-        // 3 approve override, 1 reject — 75% < 80%, fails
+        // 2 approve, 1 reject — weighted: 1.5/2.0 = 75% > 67%, succeeds
         prop.cast_override_vote("A", 0.8, true);
         prop.cast_override_vote("B", 0.7, true);
-        prop.cast_override_vote("C", 0.6, true);
-        prop.cast_override_vote("D", 0.5, false);
-        // total=2.6, approve=2.1, ratio=0.808 — just over 80%
+        prop.cast_override_vote("C", 0.5, false);
+        // total=2.0, approve=1.5, ratio=0.75 > 0.67
         assert!(prop.override_succeeded());
     }
 
@@ -534,5 +545,143 @@ mod tests {
         assert!(factions.factions().is_empty());
         assert!(factions.active_conflicts().is_empty());
         assert_eq!(factions.civil_unrest(0), 0.0);
+    }
+
+    // ========================================================================
+    // Integration boundary tests — validate real Mycelix types
+    // ========================================================================
+
+    #[test]
+    fn consciousness_tier_boundaries_match_canonical() {
+        use mycelix_bridge_common::{ConsciousnessProfile, ConsciousnessTier};
+
+        // The canonical tier boundaries from mycelix-bridge-common
+        assert_eq!(ConsciousnessTier::from_score(0.0), ConsciousnessTier::Observer);
+        assert_eq!(ConsciousnessTier::from_score(0.29), ConsciousnessTier::Observer);
+        assert_eq!(ConsciousnessTier::from_score(0.30), ConsciousnessTier::Participant);
+        assert_eq!(ConsciousnessTier::from_score(0.39), ConsciousnessTier::Participant);
+        assert_eq!(ConsciousnessTier::from_score(0.40), ConsciousnessTier::Citizen);
+        assert_eq!(ConsciousnessTier::from_score(0.59), ConsciousnessTier::Citizen);
+        assert_eq!(ConsciousnessTier::from_score(0.60), ConsciousnessTier::Steward);
+        assert_eq!(ConsciousnessTier::from_score(0.79), ConsciousnessTier::Steward);
+        assert_eq!(ConsciousnessTier::from_score(0.80), ConsciousnessTier::Guardian);
+        assert_eq!(ConsciousnessTier::from_score(1.0), ConsciousnessTier::Guardian);
+    }
+
+    #[test]
+    fn consciousness_profile_combined_score_weights() {
+        use mycelix_bridge_common::ConsciousnessProfile;
+
+        // Canonical weights: identity=0.25, reputation=0.25, community=0.30, engagement=0.20
+        let profile = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 0.0,
+            community: 0.0,
+            engagement: 0.0,
+        };
+        let score = profile.combined_score();
+        assert!((score - 0.25).abs() < 0.01, "identity weight should be 0.25, got {}", score);
+
+        let profile2 = ConsciousnessProfile {
+            identity: 0.0,
+            reputation: 0.0,
+            community: 1.0,
+            engagement: 0.0,
+        };
+        let score2 = profile2.combined_score();
+        assert!((score2 - 0.30).abs() < 0.01, "community weight should be 0.30, got {}", score2);
+    }
+
+    #[test]
+    fn consciousness_thresholds_canonical_values() {
+        use mycelix_bridge_common::consciousness_thresholds::ConsciousnessThresholds;
+
+        let t = ConsciousnessThresholds::default();
+
+        // Governance gates
+        assert!((t.consciousness_gate_basic - 0.2).abs() < 0.01);
+        assert!((t.consciousness_gate_proposal - 0.3).abs() < 0.01);
+        assert!((t.consciousness_gate_voting - 0.4).abs() < 0.01);
+        assert!((t.consciousness_gate_constitutional - 0.6).abs() < 0.01);
+    }
+
+    #[test]
+    fn epistemic_level_transitions() {
+        use mycelix_core_types::epistemic::EmpiricalLevel;
+
+        // E0 → E1 → E2 → E3 → E4
+        let e0 = EmpiricalLevel::Unverifiable;
+        assert_eq!(e0.value(), 0);
+
+        let e1 = EmpiricalLevel::from_value(1).unwrap();
+        assert_eq!(e1, EmpiricalLevel::Anecdotal);
+
+        let e4 = EmpiricalLevel::from_value(4).unwrap();
+        assert_eq!(e4, EmpiricalLevel::CryptographicallyVerifiable);
+
+        // Out of range returns None
+        assert!(EmpiricalLevel::from_value(5).is_none());
+    }
+
+    #[test]
+    fn real_fl_trimmed_mean_filters_byzantine() {
+        use mycelix_fl::defenses::{Defense, TrimmedMean};
+        use mycelix_fl::types::{DefenseConfig, Gradient};
+
+        // 4 honest nodes + 1 poisoned node
+        let gradients = vec![
+            Gradient::new("honest_1", vec![1.0, 2.0, 3.0], 1),
+            Gradient::new("honest_2", vec![1.1, 1.9, 3.1], 1),
+            Gradient::new("honest_3", vec![0.9, 2.1, 2.9], 1),
+            Gradient::new("honest_4", vec![1.0, 2.0, 3.0], 1),
+            Gradient::new("byzantine", vec![100.0, -50.0, 999.0], 1),
+        ];
+
+        let mut config = DefenseConfig::default();
+        config.trim_ratio = 0.2; // Trim 20% = 1 from each end
+
+        let result = TrimmedMean.aggregate(&gradients, &config).unwrap();
+
+        // After trimming: the 3 middle values should average close to [1.0, 2.0, 3.0]
+        assert!((result.gradient[0] - 1.0).abs() < 0.15, "dim 0: {}", result.gradient[0]);
+        assert!((result.gradient[1] - 2.0).abs() < 0.15, "dim 1: {}", result.gradient[1]);
+        assert!((result.gradient[2] - 3.0).abs() < 0.15, "dim 2: {}", result.gradient[2]);
+    }
+
+    #[test]
+    fn veto_override_uses_governance_zome_threshold() {
+        // The game uses 0.67 (governance zome), not 0.80 (multiworld-sim)
+        assert!((VETO_OVERRIDE_THRESHOLD - 0.67).abs() < f64::EPSILON,
+            "Game should use governance zome threshold (0.67), got {}", VETO_OVERRIDE_THRESHOLD);
+
+        let mut prop = ActiveProposal::new("Test", 0, 1);
+        prop.cast_vote("A", 0.9, true);
+        prop.veto("G", 0.85);
+
+        // 66% should NOT override at 67% threshold
+        prop.cast_override_vote("A", 0.66, true);
+        prop.cast_override_vote("B", 0.34, false);
+        assert!(!prop.override_succeeded(), "66% should not override at 67% threshold");
+
+        // 68% SHOULD override
+        prop.override_votes.clear();
+        prop.cast_override_vote("X", 0.68, true);
+        prop.cast_override_vote("Y", 0.32, false);
+        assert!(prop.override_succeeded(), "68% should override at 67% threshold");
+    }
+
+    #[test]
+    fn governance_anti_tyranny_invariants() {
+        // These constants must match the multiworld-sim hardcoded values
+        use mycelix_multiworld_sim::governance::WorldGovernance;
+
+        let gov = WorldGovernance::new();
+        assert_eq!(gov.stability_score, 1.0);
+        assert_eq!(gov.oppression_index, 0.0);
+        assert!(!gov.emergency_powers_active);
+        assert_eq!(gov.consecutive_emergency_sessions, 0);
+        assert_eq!(gov.veto_count, 0);
+        assert_eq!(gov.veto_override_count, 0);
+        assert_eq!(gov.veto_deterred_count, 0);
     }
 }

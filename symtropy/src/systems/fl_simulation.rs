@@ -3,51 +3,60 @@
 //! Federated Learning simulation with Byzantine Leviathan.
 //!
 //! The Leviathan is a literal network attacker. When it enters a room, it injects
-//! poisoned gradients into the local FL pool. The real `mycelix-fl` PoGQ v4.1
-//! defense runs in real-time to filter the attack. If BFT tolerance (45%) is
-//! exceeded, room systems fail (lights out, doors jam). If PoGQ succeeds, the
-//! immune system holds.
+//! poisoned gradients into the local FL pool. The REAL `mycelix_fl::defenses::TrimmedMean`
+//! runs in real-time to filter the attack.
 //!
-//! This is not a metaphor — it's the actual `mycelix_fl::defenses::TrimmedMean`
-//! and `mycelix_fl::types::Gradient` running live in the game engine.
+//! Every game session exercises the actual `mycelix-fl` crate code path — the same
+//! `TrimmedMean::aggregate()` that runs in production Mycelix FL rounds.
 
 use bevy::prelude::*;
 
-use crate::components::{CrewNpc, ConsciousnessComp, NoiseEmitter};
+use mycelix_fl::defenses::{Defense, TrimmedMean};
+use mycelix_fl::types::{DefenseConfig, Gradient};
+
+use crate::components::{ConsciousnessComp, CrewNpc, NoiseEmitter};
 use crate::resources::{GovernanceLog, LeviathanState, SleepPhase};
 
 /// FL pool state — tracks the local federated learning round.
 #[derive(Resource)]
 pub struct FlPool {
-    /// Honest gradients from crew NPCs.
-    pub honest_gradients: Vec<Vec<f32>>,
-    /// Poisoned gradients injected by the Leviathan.
-    pub poisoned_gradients: Vec<Vec<f32>>,
+    /// Defense configuration (real `mycelix_fl::types::DefenseConfig`).
+    pub config: DefenseConfig,
     /// Last aggregation result quality [0, 1]. 1.0 = clean, 0.0 = fully poisoned.
     pub aggregation_quality: f32,
-    /// Number of nodes excluded by PoGQ this round.
+    /// Number of nodes excluded by defense this round.
     pub excluded_count: usize,
+    /// Number of nodes included this round.
+    pub included_count: usize,
     /// Whether the BFT threshold was exceeded (>45% poisoned).
     pub bft_exceeded: bool,
     /// FL round number.
     pub round: u32,
-    /// Gradient dimension (matches NPC count × feature dim).
+    /// Gradient dimension (matches 8-sector economy).
     pub gradient_dim: usize,
     /// Healing rate bonus from successful FL (0.0-0.3).
     pub healing_bonus: f32,
+    /// Total gradients submitted this round (honest + poisoned).
+    pub total_submitted: usize,
+    /// Total poisoned gradients this round.
+    pub total_poisoned: usize,
 }
 
 impl Default for FlPool {
     fn default() -> Self {
+        let mut config = DefenseConfig::default();
+        config.trim_ratio = 0.2; // Trim 20% from each end (robust to ~40% Byzantine)
         Self {
-            honest_gradients: Vec::new(),
-            poisoned_gradients: Vec::new(),
+            config,
             aggregation_quality: 1.0,
             excluded_count: 0,
+            included_count: 0,
             bft_exceeded: false,
             round: 0,
-            gradient_dim: 8, // 8D gradient matches 8-sector economy
-            healing_bonus: 0.15, // Baseline 15% healing bonus from FL
+            gradient_dim: 8,
+            healing_bonus: 0.15,
+            total_submitted: 0,
+            total_poisoned: 0,
         }
     }
 }
@@ -64,9 +73,11 @@ const HONEST_NOISE: f32 = 0.1;
 /// Gradient noise magnitude for poisoned contributions (much larger).
 const POISON_MAGNITUDE: f32 = 5.0;
 
-/// Run FL aggregation rounds. NPCs contribute honest gradients.
-/// When the Leviathan is Awake/Hunting, it injects poisoned gradients.
-/// PoGQ defense (trimmed mean) filters outliers.
+/// Run FL aggregation rounds using REAL `mycelix-fl` TrimmedMean defense.
+///
+/// NPCs contribute honest gradients. When the Leviathan is Awake/Hunting,
+/// it injects poisoned gradients. The actual `TrimmedMean::aggregate()` from
+/// `mycelix-fl` runs to filter the attack.
 pub fn fl_aggregation_system(
     npcs: Query<(&CrewNpc, &ConsciousnessComp)>,
     leviathan: Res<LeviathanState>,
@@ -83,150 +94,157 @@ pub fn fl_aggregation_system(
     pool.round += 1;
 
     let dim = pool.gradient_dim;
+    let round = pool.round as u64;
 
-    // Collect honest gradients from NPCs
-    pool.honest_gradients.clear();
-    pool.poisoned_gradients.clear();
+    // Build REAL Gradient structs from NPC consciousness state
+    let mut all_gradients: Vec<Gradient> = Vec::new();
+    let mut honest_count = 0usize;
 
     for (npc, consciousness) in &npcs {
-        // Each NPC contributes a gradient based on their consciousness state
         let phi = consciousness.sim_phi() as f32;
-        let gradient: Vec<f32> = (0..dim)
+        let values: Vec<f32> = (0..dim)
             .map(|i| {
-                // Honest gradient: small values modulated by consciousness
                 let base = phi * 0.1 * ((i as f32 + 1.0) / dim as f32);
                 let noise = ((npc.caution * 100.0 + i as f32) * 7.919).sin() * HONEST_NOISE;
                 base + noise
             })
             .collect();
-        pool.honest_gradients.push(gradient);
+        all_gradients.push(Gradient::new(&npc.name, values, round));
+        honest_count += 1;
     }
 
     // Leviathan injects poisoned gradients when Awake or Hunting
-    let leviathan_injecting = matches!(
-        leviathan.phase,
-        SleepPhase::Awake | SleepPhase::Hunting
-    );
+    let num_poison = match leviathan.phase {
+        SleepPhase::Awake => 1,
+        SleepPhase::Hunting => 3,
+        _ => 0,
+    };
 
-    if leviathan_injecting {
-        // Inject poisoned gradients — large random values that would corrupt aggregation
-        let num_poison = match leviathan.phase {
-            SleepPhase::Awake => 1,   // 1 poisoned node when Awake
-            SleepPhase::Hunting => 3, // 3 poisoned nodes when Hunting (may exceed 45%)
-            _ => 0,
-        };
-        for p in 0..num_poison {
-            let gradient: Vec<f32> = (0..dim)
-                .map(|i| {
-                    // Poisoned: large adversarial values
-                    let poison = POISON_MAGNITUDE * ((p as f32 * 13.0 + i as f32) * 3.14).sin();
-                    poison
-                })
-                .collect();
-            pool.poisoned_gradients.push(gradient);
-        }
+    for p in 0..num_poison {
+        let values: Vec<f32> = (0..dim)
+            .map(|i| POISON_MAGNITUDE * ((p as f32 * 13.0 + i as f32) * 3.14).sin())
+            .collect();
+        all_gradients.push(Gradient::new(format!("leviathan_{}", p), values, round));
     }
 
-    // Combine all gradients for aggregation
-    let total_honest = pool.honest_gradients.len();
-    let total_poisoned = pool.poisoned_gradients.len();
-    let total_nodes = total_honest + total_poisoned;
+    pool.total_submitted = all_gradients.len();
+    pool.total_poisoned = num_poison;
 
-    if total_nodes == 0 {
+    if all_gradients.is_empty() {
         return;
     }
 
-    let poison_fraction = total_poisoned as f32 / total_nodes as f32;
+    let poison_fraction = num_poison as f32 / all_gradients.len() as f32;
     pool.bft_exceeded = poison_fraction > BFT_THRESHOLD;
 
-    // Run trimmed mean defense (real mycelix-fl algorithm logic)
-    // TrimmedMean removes the highest and lowest k% of values per coordinate
-    let trim_fraction = 0.2; // Trim 20% from each end
-    let all_gradients: Vec<&Vec<f32>> = pool
-        .honest_gradients
-        .iter()
-        .chain(pool.poisoned_gradients.iter())
-        .collect();
+    // =========================================================================
+    // REAL MYCELIX-FL CALL — this is the actual production defense algorithm
+    // =========================================================================
+    let defense = TrimmedMean;
+    let result = defense.aggregate(&all_gradients, &pool.config);
 
-    let mut aggregated = vec![0.0f32; dim];
-    let mut excluded = 0usize;
+    match result {
+        Ok(agg) => {
+            pool.excluded_count = agg.excluded_nodes.len();
+            pool.included_count = agg.included_nodes.len();
 
-    for d in 0..dim {
-        let mut values: Vec<(usize, f32)> = all_gradients
-            .iter()
-            .enumerate()
-            .map(|(i, g)| (i, g[d]))
-            .collect();
-        values.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            if pool.bft_exceeded {
+                pool.aggregation_quality = (1.0 - poison_fraction).max(0.1);
+                pool.healing_bonus = 0.0;
 
-        let n = values.len();
-        let trim_count = ((n as f32) * trim_fraction) as usize;
-        let trimmed = &values[trim_count..n.saturating_sub(trim_count)];
+                let msg = format!(
+                    "FL DEFENSE OVERWHELMED — {:.0}% Byzantine (>{:.0}% threshold). {} nodes, {} excluded.",
+                    poison_fraction * 100.0, BFT_THRESHOLD * 100.0,
+                    pool.total_submitted, pool.excluded_count,
+                );
+                eprintln!("[fl] {}", msg);
+                log.push(time.elapsed_secs(), msg, 2);
+            } else if num_poison > 0 {
+                pool.aggregation_quality = 1.0 - (poison_fraction * 0.3);
+                pool.healing_bonus = 0.15 * pool.aggregation_quality;
 
-        if !trimmed.is_empty() {
-            aggregated[d] = trimmed.iter().map(|(_, v)| v).sum::<f32>() / trimmed.len() as f32;
-        }
-
-        // Count how many poisoned nodes were trimmed (on first dimension only)
-        if d == 0 {
-            let trimmed_low = &values[..trim_count];
-            let trimmed_high = &values[n.saturating_sub(trim_count)..];
-            for (idx, _) in trimmed_low.iter().chain(trimmed_high.iter()) {
-                if *idx >= total_honest {
-                    excluded += 1;
-                }
+                let msg = format!(
+                    "FL defense held (TrimmedMean): {}/{} nodes included, {} poisoned filtered (quality={:.0}%)",
+                    agg.included_nodes.len(), pool.total_submitted,
+                    num_poison, pool.aggregation_quality * 100.0,
+                );
+                eprintln!("[fl] {}", msg);
+                log.push(time.elapsed_secs(), msg, 0);
+            } else {
+                pool.aggregation_quality = 1.0;
+                pool.healing_bonus = 0.15;
             }
         }
-    }
+        Err(e) => {
+            pool.aggregation_quality = 0.0;
+            pool.healing_bonus = 0.0;
+            pool.bft_exceeded = true;
 
-    pool.excluded_count = excluded.min(total_poisoned);
-
-    // Compute aggregation quality
-    if pool.bft_exceeded {
-        // Defense overwhelmed — quality degrades
-        pool.aggregation_quality = (1.0 - poison_fraction).max(0.1);
-        pool.healing_bonus = 0.0; // No healing when FL is compromised
-
-        let msg = format!(
-            "FL DEFENSE OVERWHELMED — {:.0}% Byzantine (>{:.0}% threshold). Healing disabled!",
-            poison_fraction * 100.0,
-            BFT_THRESHOLD * 100.0,
-        );
-        eprintln!("[fl] {}", msg);
-        log.push(time.elapsed_secs(), msg, 2);
-    } else if total_poisoned > 0 {
-        // Defense held — some poisoned nodes filtered
-        pool.aggregation_quality = 1.0 - (poison_fraction * 0.3); // Slight quality loss
-        pool.healing_bonus = 0.15 * pool.aggregation_quality;
-
-        let msg = format!(
-            "FL defense held: {}/{} poisoned nodes filtered by PoGQ (quality={:.0}%)",
-            pool.excluded_count, total_poisoned, pool.aggregation_quality * 100.0,
-        );
-        eprintln!("[fl] {}", msg);
-        log.push(time.elapsed_secs(), msg, 0);
-    } else {
-        // Clean round
-        pool.aggregation_quality = 1.0;
-        pool.healing_bonus = 0.15;
+            let msg = format!("FL aggregation FAILED: {:?}", e);
+            eprintln!("[fl] {}", msg);
+            log.push(time.elapsed_secs(), msg, 2);
+        }
     }
 }
 
 /// Byzantine Leviathan effect: when FL defense fails, room systems degrade.
-/// Lights dim (noise emitters increase), representing infrastructure failure.
 pub fn byzantine_effect_system(
     pool: Res<FlPool>,
     mut noise_sources: Query<&mut NoiseEmitter>,
-    leviathan: Res<LeviathanState>,
 ) {
     if !pool.bft_exceeded {
         return;
     }
 
-    // BFT exceeded — room infrastructure failing
-    // Add noise to all emitters (systems malfunctioning = more noise = Leviathan escalates)
     let malfunction_noise = (1.0 - pool.aggregation_quality) * 0.1;
     for mut noise in &mut noise_sources {
         noise.level += malfunction_noise;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fl_pool_default_config() {
+        let pool = FlPool::default();
+        assert!((pool.config.trim_ratio - 0.2).abs() < f32::EPSILON);
+        assert_eq!(pool.gradient_dim, 8);
+        assert!(!pool.bft_exceeded);
+    }
+
+    #[test]
+    fn real_trimmed_mean_filters_outlier() {
+        // Directly test that mycelix-fl TrimmedMean works as expected
+        let gradients = vec![
+            Gradient::new("npc_a", vec![1.0; 8], 1),
+            Gradient::new("npc_b", vec![1.0; 8], 1),
+            Gradient::new("npc_c", vec![1.0; 8], 1),
+            Gradient::new("npc_d", vec![1.0; 8], 1),
+            Gradient::new("leviathan_0", vec![100.0; 8], 1), // Poisoned
+        ];
+        let mut config = DefenseConfig::default();
+        config.trim_ratio = 0.2; // Trim 1 from each end
+
+        let result = TrimmedMean.aggregate(&gradients, &config).unwrap();
+
+        // After trimming top and bottom: remaining should average ~1.0
+        for &v in &result.gradient {
+            assert!((v - 1.0).abs() < 0.01, "Expected ~1.0, got {}", v);
+        }
+    }
+
+    #[test]
+    fn bft_threshold_correct() {
+        // 3 honest, 3 poisoned = 50% > 45% threshold
+        let total = 6;
+        let poisoned = 3;
+        let fraction = poisoned as f32 / total as f32;
+        assert!(fraction > BFT_THRESHOLD);
+
+        // 4 honest, 1 poisoned = 20% < 45% threshold
+        let fraction2 = 1.0 / 5.0;
+        assert!(fraction2 < BFT_THRESHOLD);
     }
 }

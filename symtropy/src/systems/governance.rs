@@ -60,10 +60,10 @@ pub fn governance_proposal_system(
         let surprise = npc.fep.current_free_energy();
         if let Some((_, best_surprise, _)) = best_proposer {
             if surprise > best_surprise {
-                best_proposer = Some((&npc.name, surprise, consciousness.phi));
+                best_proposer = Some((&npc.name, surprise, consciousness.combined_score()));
             }
         } else {
-            best_proposer = Some((&npc.name, surprise, consciousness.phi));
+            best_proposer = Some((&npc.name, surprise, consciousness.combined_score()));
         }
     }
 
@@ -131,21 +131,21 @@ pub fn governance_voting_system(
         }
 
         // Vote decision: NPCs with high care_activation approve pro-social proposals
-        let care = consciousness.dimensions[3]; // care_activation
-        let coherence = consciousness.dimensions[2]; // coherence
+        let care = consciousness.sim_dimensions[3]; // care_activation
+        let coherence = consciousness.sim_dimensions[2]; // coherence
         // High-care NPCs approve; low-coherence NPCs abstain (don't vote)
         if coherence < 0.3 {
             continue; // Too confused to vote
         }
 
         let approve = care > 0.4; // Care-driven voting
-        proposal.cast_vote(&npc.name, consciousness.phi, approve);
+        proposal.cast_vote(&npc.name, consciousness.combined_score(), approve);
 
         eprintln!(
             "[governance] {} votes {} (phi={:.2}, care={:.2})",
             npc.name,
             if approve { "YES" } else { "NO" },
-            consciousness.phi,
+            consciousness.combined_score(),
             care,
         );
     }
@@ -183,8 +183,8 @@ pub fn veto_override_system(
                     continue;
                 }
                 // Most NPCs support override (democracy)
-                let approve = consciousness.dimensions[3] > 0.3; // care threshold
-                proposal.cast_override_vote(&npc.name, consciousness.phi, approve);
+                let approve = consciousness.sim_dimensions[3] > 0.3; // care threshold
+                proposal.cast_override_vote(&npc.name, consciousness.combined_score(), approve);
             }
 
             if proposal.override_succeeded() {
@@ -199,16 +199,16 @@ pub fn veto_override_system(
 
     // Check if any Guardian NPC wants to veto
     for (npc, consciousness) in &npcs {
-        if consciousness.tier < 4 {
+        if consciousness.tier() != crate::components::MycelixTier::Guardian {
             continue; // Only Guardians can veto
         }
 
         // Guardian vetoes if they strongly disagree (low care + high caution)
-        let care = consciousness.dimensions[3];
-        let harmony = consciousness.dimensions[4];
+        let care = consciousness.sim_dimensions[3];
+        let harmony = consciousness.sim_dimensions[4];
         if care < 0.3 && harmony < 0.4 {
-            if proposal.veto(&npc.name, consciousness.phi) {
-                let msg = format!("{} VETOES proposal (Guardian, phi={:.2})", npc.name, consciousness.phi);
+            if proposal.veto(&npc.name, consciousness.combined_score()) {
+                let msg = format!("{} VETOES proposal (Guardian, phi={:.2})", npc.name, consciousness.combined_score());
                 eprintln!("[governance] {}", msg);
                 log.push(time.elapsed_secs(), msg, 2);
                 gov.governance.veto_count += 1;
@@ -233,11 +233,25 @@ pub fn oppression_detection_system(
     let mut total = 0u32;
 
     for cp in &npcs {
-        tier_counts[cp.tier as usize] += 1;
+        let tier_idx = match cp.tier() {
+            crate::components::MycelixTier::Observer => 0,
+            crate::components::MycelixTier::Participant => 1,
+            crate::components::MycelixTier::Citizen => 2,
+            crate::components::MycelixTier::Steward => 3,
+            crate::components::MycelixTier::Guardian => 4,
+        };
+        tier_counts[tier_idx] += 1;
         total += 1;
     }
     if let Ok(player_cp) = player_consciousness.single() {
-        tier_counts[player_cp.tier as usize] += 1;
+        let ptier = match player_cp.tier() {
+            crate::components::MycelixTier::Observer => 0,
+            crate::components::MycelixTier::Participant => 1,
+            crate::components::MycelixTier::Citizen => 2,
+            crate::components::MycelixTier::Steward => 3,
+            crate::components::MycelixTier::Guardian => 4,
+        };
+        tier_counts[ptier] += 1;
         total += 1;
     }
 
@@ -308,41 +322,41 @@ pub fn consciousness_evolution_system(
 
         // Meta-awareness grows when participating in governance
         if proposal.active {
-            cp.dimensions[1] += 0.01 * dt; // meta_awareness
+            cp.sim_dimensions[1] += 0.01 * dt; // meta_awareness
         }
 
         // Care activation grows when not under extreme threat
         if surprise < 0.5 {
-            cp.dimensions[3] += 0.005 * dt; // care_activation
+            cp.sim_dimensions[3] += 0.005 * dt; // care_activation
         } else {
-            cp.dimensions[3] -= 0.01 * dt; // threat suppresses care
+            cp.sim_dimensions[3] -= 0.01 * dt; // threat suppresses care
         }
 
         // Harmonic alignment tracks governance stability
-        cp.dimensions[4] = cp.dimensions[4] * 0.99 + gov.stability() * 0.01;
+        cp.sim_dimensions[4] = cp.sim_dimensions[4] * 0.99 + gov.stability() * 0.01;
 
         // Epistemic confidence grows slowly through survival
-        cp.dimensions[5] += 0.002 * dt;
+        cp.sim_dimensions[5] += 0.002 * dt;
 
         // Clamp all dimensions
-        for d in &mut cp.dimensions {
+        for d in &mut cp.sim_dimensions {
             *d = d.clamp(0.0, 1.0);
         }
-        cp.compute_phi();
+        cp.sync_engagement_from_sim();
     }
 
     // Player consciousness evolves too
     if let Ok(mut cp) = player_consciousness.single_mut() {
         // Player governance participation boosts meta-awareness
         if proposal.active {
-            cp.dimensions[1] += 0.01 * dt;
+            cp.sim_dimensions[1] += 0.01 * dt;
         }
         // Stability affects harmonic alignment
-        cp.dimensions[4] = cp.dimensions[4] * 0.99 + gov.stability() * 0.01;
+        cp.sim_dimensions[4] = cp.sim_dimensions[4] * 0.99 + gov.stability() * 0.01;
 
-        for d in &mut cp.dimensions {
+        for d in &mut cp.sim_dimensions {
             *d = d.clamp(0.0, 1.0);
         }
-        cp.compute_phi();
+        cp.sync_engagement_from_sim();
     }
 }

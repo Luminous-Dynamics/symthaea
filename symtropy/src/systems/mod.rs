@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Game systems for Symtropy.
 
-// Core gameplay systems
 pub mod audio;
 pub mod consciousness;
 pub mod fep_behavior;
@@ -17,11 +16,7 @@ pub mod procgen;
 pub mod rendering;
 pub mod scavenge;
 
-// Mycelix integration systems — currently disabled due to:
-// 1. ConsciousnessProfile → ConsciousnessComp rename (API in flux)
-// 2. Bevy Query B0001 conflicts between governance/economy/faction systems
-// 3. NpcTrust/KVector API changes from bridge-common integration
-// Re-enable when the other session's Mycelix integration stabilizes.
+// Mycelix integration — disabled until sim-bridge/multiworld-sim stabilize
 // pub mod dkg_ceremony;
 // pub mod economy;
 // pub mod epistemics;
