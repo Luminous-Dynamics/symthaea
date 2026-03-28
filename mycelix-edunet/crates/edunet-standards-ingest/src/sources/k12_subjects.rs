@@ -96,7 +96,7 @@ impl CurriculumSource for C3Source {
                         description: desc.to_string(),
                         grade_level: grade_level.to_string(),
                     }],
-                    credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![],
+                    credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
                 });
 
                 if i > 0 {
@@ -177,7 +177,7 @@ impl CurriculumSource for IsteSource {
                     framework: "ISTE".into(), code: format!("ISTE.S.{}", i + 1),
                     description: desc.to_string(), grade_level: "K-12".into(),
                 }],
-                credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![],
+                credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
             }
         }).collect();
 
@@ -256,7 +256,7 @@ impl CurriculumSource for ArtsSource {
                         framework: "National Core Arts Standards".into(), code: node_id.clone(),
                         description: desc.to_string(), grade_level: grade_level.to_string(),
                     }],
-                    credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![],
+                    credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
                 });
 
                 if i > 0 {
@@ -340,7 +340,7 @@ impl CurriculumSource for PeSource {
                     framework: "SHAPE America".into(), code: format!("SHAPE.PE.{}", i + 1),
                     description: desc.to_string(), grade_level: grade_level.to_string(),
                 }],
-                credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![],
+                credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
             }
         }).collect();
 
@@ -424,7 +424,7 @@ impl CurriculumSource for CefrSource {
                         framework: "CEFR".into(), code: format!("CEFR.{}", code),
                         description: desc.to_string(), grade_level: grade.to_string(),
                     }],
-                    credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![],
+                    credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
                 });
 
                 // Prerequisite: same skill at previous level

@@ -450,7 +450,7 @@ mod tests {
             course_level: None,
             cip_code: None,
             program_id: None,
-            corequisites: vec![],
+            corequisites: vec![], supplementary_resources: vec![],
         }
     }
 

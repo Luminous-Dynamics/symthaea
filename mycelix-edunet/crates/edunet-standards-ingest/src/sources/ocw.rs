@@ -285,7 +285,7 @@ fn course_to_node(course: &OcwCourse, subject_area: &str, cip_code: Option<&str>
         course_level: Some(infer_course_level_from_number(course)),
         cip_code: cip_code.map(|c| c.to_string()),
         program_id: None,
-        corequisites: vec![],
+        corequisites: vec![], supplementary_resources: vec![],
     }
 }
 

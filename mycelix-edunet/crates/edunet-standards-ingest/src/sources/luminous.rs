@@ -308,7 +308,7 @@ fn build_course_document(
             }.into()),
             cip_code: None,
             program_id: None,
-            corequisites: vec![],
+            corequisites: vec![], supplementary_resources: vec![],
         });
 
         for prereq in prereqs {

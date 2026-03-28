@@ -176,7 +176,7 @@ impl EscoSource {
                         course_level: None,
                         cip_code: None,
                         program_id: None,
-                        corequisites: vec![],
+                        corequisites: vec![], supplementary_resources: vec![],
                     });
 
                     // Create skill nodes from essential skills
@@ -207,7 +207,7 @@ impl EscoSource {
                                 course_level: None,
                                 cip_code: None,
                                 program_id: None,
-                                corequisites: vec![],
+                                corequisites: vec![], supplementary_resources: vec![],
                             });
                         }
 

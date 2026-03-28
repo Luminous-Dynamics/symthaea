@@ -81,6 +81,52 @@ pub struct CurriculumNode {
     /// Corequisite node IDs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub corequisites: Vec<String>,
+    /// Supplementary external resources (for when generated content is insufficient).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supplementary_resources: Vec<SupplementaryResource>,
+}
+
+/// An external resource that supplements the generated content for a node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupplementaryResource {
+    /// Human-readable title.
+    pub title: String,
+    /// URL to the resource.
+    pub url: String,
+    /// Source platform.
+    pub source: ResourceSource,
+    /// Content type.
+    pub content_type: ResourceType,
+    /// How relevant this resource is to the node (0-100).
+    pub relevance_score: u8,
+    /// Standard code alignment (if the resource explicitly covers this standard).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aligned_standard: Option<String>,
+}
+
+/// Platform/source of a supplementary resource.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceSource {
+    KhanAcademy,
+    OpenStax,
+    MitOcw,
+    Wikipedia,
+    YouTube,
+    Brilliant,
+    Coursera,
+    EdX,
+    Custom(String),
+}
+
+/// Content type of a supplementary resource.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResourceType {
+    Video,
+    Textbook,
+    Interactive,
+    Article,
+    Exercise,
+    Course,
 }
 
 /// Academic standard reference within a node.
@@ -219,7 +265,7 @@ fn standard_to_node(
         course_level: None,
         cip_code: None,
         program_id: None,
-        corequisites: vec![],
+        corequisites: vec![], supplementary_resources: vec![],
     }
 }
 
@@ -288,7 +334,7 @@ pub fn convert_program(program: &ProgramDescriptor) -> CurriculumDocument {
             course_level: Some(course.level.number_range().to_string()),
             cip_code: program.cip_code.clone(),
             program_id: Some(program.id.clone()),
-            corequisites: course.corequisites.clone(),
+            corequisites: course.corequisites.clone(), supplementary_resources: vec![],
         };
         nodes.push(node);
 
@@ -380,7 +426,7 @@ pub fn convert_phd_template(
             course_level: Some("900".to_string()),
             cip_code: cip_code.map(|s| s.to_string()),
             program_id: None,
-            corequisites: vec![],
+            corequisites: vec![], supplementary_resources: vec![],
         })
         .collect();
 

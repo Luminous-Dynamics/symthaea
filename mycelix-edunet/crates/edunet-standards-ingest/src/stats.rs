@@ -276,7 +276,7 @@ mod tests {
             estimated_hours: 10, grade_levels: vec![grade.into()],
             bloom_level: bloom.into(), subject_area: subject.into(),
             academic_standards: vec![], credit_hours: None, course_level: None,
-            cip_code: None, program_id: None, corequisites: vec![],
+            cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
         }
     }
 
