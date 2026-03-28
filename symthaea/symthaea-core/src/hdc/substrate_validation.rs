@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Substrate Validation Research Framework
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Substrate Validation Research Framework
 //!
 //! This module provides a RIGOROUS scientific framework for validating
 //! substrate independence claims. It explicitly acknowledges what we
@@ -565,7 +566,7 @@ impl SubstrateValidationFramework {
         }
 
         self.check_evidence_upgrade(substrate)
-            .map_or(false, |new| new > old_level)
+            .is_some_and(|new| new > old_level)
     }
 
     /// Check if evidence level should upgrade based on tested predictions.

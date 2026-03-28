@@ -2,7 +2,8 @@
 
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root#![allow(clippy::needless_range_loop, clippy::new_without_default)]
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+#![allow(clippy::needless_range_loop, clippy::new_without_default)]
 
 //! Hodge Laplacian for Simplicial Complexes
 //!

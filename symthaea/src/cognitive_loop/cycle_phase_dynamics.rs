@@ -551,6 +551,45 @@ impl CognitiveLoopService {
                         .record("swarm_manager", swarm_output);
                 }
 
+                // ── Muse Manager (interval 1, every cycle) ──────────
+                // Streaming consciousness-driven music synthesis with
+                // allostatic sonification and peer distress resonance.
+                #[cfg(feature = "muse")]
+                {
+                    use super::subsystem_trait::CognitiveSubsystem;
+                    self.muse_manager.inject_neuromod(
+                        self.neuromod.bath.dopamine.effective(),
+                        self.neuromod.bath.serotonin.effective(),
+                        self.neuromod.bath.noradrenaline.effective(),
+                        self.neuromod.bath.allostatic_load,
+                    );
+                    let energy_ratio = if self.substrate_manager.consciousness_viable {
+                        0.0
+                    } else {
+                        1.0
+                    };
+                    self.muse_manager.inject_substrate(
+                        self.substrate_manager.feasibility,
+                        energy_ratio,
+                    );
+                    let safety_u8 = if snapshot.unified_psi > 0.6 {
+                        0
+                    } else if snapshot.unified_psi > 0.3 {
+                        1
+                    } else if snapshot.unified_psi > 0.1 {
+                        2
+                    } else {
+                        3
+                    };
+                    self.muse_manager.inject_safety(safety_u8);
+
+                    if self.muse_manager.should_run(cycle_num, urgency_u8) {
+                        let muse_output = self.muse_manager.process(snapshot);
+                        self.subsystem_collector
+                            .record("muse_manager", muse_output);
+                    }
+                }
+
                 // ── Thermodynamic Manager (interval 43, co-prime) ─────
                 // Unified thermodynamics: cross-couples dissipative,
                 // analyzer, HFE, physics bridge. Inputs set by cycle_consciousness,
@@ -2309,6 +2348,85 @@ impl CognitiveLoopService {
                             ),
                         };
                         self.sensorimotor.motor_rendering.last_result = Some(result);
+                    } else if self.carryover.quality.safety_motor_halt {
+                        // Safety enforcement Red: consciousness < 0.1 — hard motor halt.
+                        // This is the physical boundary of the consciousness safety cascade.
+                        // No motor output of any kind may execute at Red level.
+                        tracing::warn!(
+                            cycle = self.stats.total_cycles,
+                            "Motor output HALTED by safety enforcement (Red level) \
+                             — consciousness below critical threshold"
+                        );
+                        let result = super::motor_output_bridge::MotorOutputResult {
+                            success: false,
+                            action_type: None,
+                            prediction_error: 1.0,
+                            outcome: None,
+                            error: Some(
+                                "Motor output halted — safety level Red \
+                                 (consciousness below 0.1)"
+                                    .to_string(),
+                            ),
+                        };
+                        self.sensorimotor.motor_rendering.last_result = Some(result);
+                    } else if self.carryover.quality.safety_motor_readonly {
+                        // Safety enforcement Orange: only read-only actions permitted.
+                        // Write, execute, and destructive actions are blocked.
+                        let is_readonly = enhanced_result
+                            .motor_command
+                            .parameters
+                            .first()
+                            .and_then(|&v| super::motor_output_bridge::ActionType::from_param(v))
+                            .map_or(false, |at| matches!(
+                                at,
+                                super::motor_output_bridge::ActionType::Read
+                                | super::motor_output_bridge::ActionType::List
+                                | super::motor_output_bridge::ActionType::Parse
+                            ));
+                        if is_readonly {
+                            // Read-only action: permitted at Orange level
+                            if let Some(ref mut bridge) =
+                                self.sensorimotor.motor_rendering.output_bridge
+                            {
+                                let request = self
+                                    .sensorimotor
+                                    .motor_rendering
+                                    .pending_request
+                                    .take()
+                                    .unwrap_or_default();
+                                let motor_phi =
+                                    if self.carryover.history.consciousness_level > 0.0 {
+                                        self.carryover.history.consciousness_level
+                                    } else {
+                                        coherence as f64
+                                    };
+                                let result = bridge.execute(
+                                    &enhanced_result.motor_command.parameters,
+                                    enhanced_result.motor_command.confidence,
+                                    motor_phi,
+                                    &request,
+                                );
+                                self.sensorimotor.motor_rendering.last_phi = motor_phi;
+                                self.sensorimotor.motor_rendering.last_result = Some(result);
+                            }
+                        } else {
+                            tracing::warn!(
+                                cycle = self.stats.total_cycles,
+                                "Non-read motor output blocked by safety enforcement \
+                                 (Orange level — read-only mode)"
+                            );
+                            let result = super::motor_output_bridge::MotorOutputResult {
+                                success: false,
+                                action_type: None,
+                                prediction_error: 1.0,
+                                outcome: None,
+                                error: Some(
+                                    "Motor output restricted to read-only — safety level Orange"
+                                        .to_string(),
+                                ),
+                            };
+                            self.sensorimotor.motor_rendering.last_result = Some(result);
+                        }
                     } else if self.carryover.quality.subsystem_veto {
                         // Subsystem veto: sentinel/safety manager flagged this cycle unsafe
                         tracing::warn!(
@@ -2723,7 +2841,6 @@ impl CognitiveLoopService {
                     neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
                     epistemic_quality: 0.5, // default neutral; wired when epistemic tiers active
                     code_context: self.carryover.injected_code_context.take(),
-                    causal_dag: None,
                 };
 
                 let reasoning_result = reasoning_engine.reason(&reasoning_ctx);

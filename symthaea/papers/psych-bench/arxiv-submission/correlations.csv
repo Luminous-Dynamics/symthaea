@@ -1,0 +1,11 @@
+benchmark_a,metric_a,benchmark_b,metric_b,r,n,p_value,shared_mechanism
+Executive::Stroop,incongruent_accuracy,Executive::WCST,categories_completed,-0.361231,10,0.273210,Moderate
+WorM::N-back,nback_2::accuracy,WorM::DigitSpan,forward_span,0.000000,10,1.000000,Independent
+Executive::WCST,categories_completed,CogBench::ReversalLearning,win_stay_rate,-0.278049,10,0.412942,Weak
+Inhibition::GoNoGo,nogo_accuracy,Inhibition::StopSignal,ssrt_ticks,0.537617,10,0.071325,Strong
+Social::RME,rme_accuracy,ToMBench::FalseBelief,false_belief_accuracy,0.000000,10,1.000000,Independent
+Attention::VisualSearch,conjunction_search_accuracy,SustainedAttention::CPT,d_prime,0.000000,10,1.000000,Independent
+Language::LexicalDecision,word_accuracy,Language::SemanticPriming,priming_effect,0.000000,10,1.000000,Independent
+Motor::FittsLaw,fitts_r_squared,Motor::Bimanual,coordination_cost,0.000000,10,1.000000,Independent
+Metacognition::Calibration,calibration_error_ece,Metacognition::FeelingOfKnowing,fok_gamma,-0.447945,10,0.156452,Moderate
+Reasoning::ArcFluid,transfer_accuracy,Executive::Ravens,overall_accuracy,0.424406,10,0.184933,Moderate

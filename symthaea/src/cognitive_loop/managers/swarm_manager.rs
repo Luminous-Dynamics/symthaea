@@ -163,6 +163,19 @@ pub enum SwarmEvent {
         confidence: f32,
     },
 
+    /// Embodiment distress signal from a peer.
+    ///
+    /// Triggered when: high prediction_error + energy depletion + safety degradation.
+    /// Basis: de Waal (2008) social alarm signals; Eisenberg (2000) empathic distress.
+    DistressSignal {
+        peer_id: String,
+        prediction_error: f32,
+        energy_depletion: f32,
+        safety_level: u8,
+        allostatic_load: f32,
+        consciousness_level: f32,
+    },
+
     /// Space situational awareness alert from mycelix-space or ground network.
     ///
     /// Basis: Kahneman (2011) — threat salience drives attentional capture.
@@ -361,6 +374,10 @@ pub struct SwarmManager {
     coalition_cycle_counter: u32,
     peer_blanket_permeability: Vec<(String, f64)>,
 
+    // ── Distress tracking ──────────────────────────────────────────────
+    /// Number of distress signals received (monotonic).
+    distress_signals_received: u32,
+
     // ── Telemetry snapshot ──────────────────────────────────────────────
     /// Last computed telemetry (readable between process calls).
     last_telemetry: SwarmTelemetry,
@@ -429,6 +446,7 @@ impl Default for SwarmManager {
             waste_events_processed: 0,
             #[cfg(feature = "circular")]
             waste_confidence_ema: 0.0,
+            distress_signals_received: 0,
             active_coalitions: Vec::new(),
             coalition_cycle_counter: 0,
             peer_blanket_permeability: Vec::new(),
@@ -963,6 +981,25 @@ impl SwarmManager {
                     self.waste_mean_circularity += (circ - self.waste_mean_circularity) / n;
                     // Confidence EMA (alpha = 0.1)
                     self.waste_confidence_ema = self.waste_confidence_ema * 0.9 + conf as f64 * 0.1;
+                }
+
+                SwarmEvent::DistressSignal {
+                    prediction_error, energy_depletion, safety_level,
+                    allostatic_load, consciousness_level, ..
+                } => {
+                    let pe = if prediction_error.is_finite() { prediction_error.clamp(0.0, 1.0) } else { 0.0 };
+                    let energy = if energy_depletion.is_finite() { energy_depletion.clamp(0.0, 1.0) } else { 0.0 };
+                    let load = if allostatic_load.is_finite() { allostatic_load.clamp(0.0, 1.0) } else { 0.0 };
+                    let severity = energy * 0.4 + load * 0.3 + pe * 0.2
+                        + (1.0 - consciousness_level.clamp(0.0, 1.0)) * 0.1;
+                    if safety_level >= 3 && energy > 0.9 {
+                        self.affective_arousal_acc += 0.15 * severity as f64;
+                        self.affective_valence_acc -= 0.1 * severity as f64;
+                    } else if safety_level >= 2 || energy > 0.7 {
+                        self.affective_arousal_acc += 0.05 * severity as f64;
+                        self.affective_valence_acc -= 0.05 * severity as f64;
+                    }
+                    self.distress_signals_received += 1;
                 }
             }
         }

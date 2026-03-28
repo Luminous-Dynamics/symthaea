@@ -476,6 +476,30 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Drain pending crisis events and forward them to the Mycelix civic bridge.
+    ///
+    /// Call from the host application between cycles to dispatch crisis events
+    /// to the Holochain emergency-incidents zome. Each event is forwarded via
+    /// `MycelixBridge::dispatch_crisis()`.
+    #[cfg(all(feature = "mycelix", feature = "safety-agents"))]
+    pub fn poll_bridge_crisis(
+        &mut self,
+        bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
+    ) {
+        let events: Vec<_> = self.pending_crisis_events.drain(..).collect();
+        for event in &events {
+            bridge.dispatch_crisis(event);
+        }
+    }
+
+    /// Drain pending crisis events without a bridge (for testing or logging).
+    #[cfg(feature = "safety-agents")]
+    pub fn drain_pending_crisis_events(
+        &mut self,
+    ) -> Vec<super::super::civic_crisis_detector::CivicCrisisEvent> {
+        self.pending_crisis_events.drain(..).collect()
+    }
+
     /// Override the epistemic mesh with collective network data.
     ///
     /// Call from the host application after aggregating EpistemicSummary vectors
@@ -866,6 +890,17 @@ impl CognitiveLoopService {
         &self,
     ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
         self.swarm_event_tx.clone()
+    }
+
+    /// Take ownership of the safety alert receiver.
+    ///
+    /// The host application calls this once at startup and spawns a thread/task
+    /// to drain alerts and forward them to desktop notifications, Slack, email,
+    /// or any monitoring system. Returns `None` if already taken.
+    pub fn take_safety_alert_receiver(
+        &self,
+    ) -> Option<std::sync::mpsc::Receiver<super::super::safety_alert::SafetyAlert>> {
+        self.safety_alert_rx.lock().ok()?.take()
     }
 
     /// Enable network attestation for the cognitive loop.

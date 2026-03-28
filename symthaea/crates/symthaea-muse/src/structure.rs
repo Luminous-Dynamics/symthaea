@@ -11,7 +11,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::MusicalState;
-use serde::{Deserialize, Serialize};
 
 /// Musical section type, derived from creative mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

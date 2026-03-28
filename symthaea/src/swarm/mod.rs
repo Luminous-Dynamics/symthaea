@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Swarm Intelligence Module - Hybrid Iroh + Holochain Architecture
 //!
 //! This module implements the "Nervous System Pattern" for distributed
@@ -100,6 +103,46 @@ pub mod web_of_trust;
 
 /// PQC-secured remote display protocol.
 pub mod rdp_protocol;
+/// RDP Protocol v3 extensions (Audio, Chat, RemoteExec, Clipboard).
+pub mod rdp_protocol_ext;
+/// HDC patch quantization codec for RDP.
+pub mod rdp_codec;
+/// PQC-authenticated session lifecycle for RDP.
+pub mod rdp_session;
+/// Screen capture abstraction (X11 SHM, Wayland PipeWire, test stubs).
+pub mod rdp_capture;
+/// Sovereign RDP server (tick-based frame producer).
+pub mod rdp_server;
+/// Sovereign RDP client (frame consumer + input forwarder).
+pub mod rdp_client;
+/// Input injection (X11 XTest, Wayland virtual input, logging/noop).
+pub mod rdp_input;
+/// Adaptive quality engine (AIMD + consciousness tiers).
+pub mod rdp_adaptive;
+/// Behavioral biometric continuous authentication via HDC.
+pub mod rdp_behavioral_auth;
+/// Egui renderer for RDP client.
+pub mod rdp_render_egui;
+/// Encrypted file transfer with BLAKE3 integrity.
+pub mod rdp_file_transfer;
+/// PQC-encrypted session recording and playback.
+pub mod rdp_recording;
+/// Support ticket ↔ RDP session bridge with invite tokens and governance.
+pub mod rdp_support_bridge;
+/// Governance-gated session approval for sensitive support sessions.
+pub mod rdp_governance;
+/// Remote command execution with consciousness + MFDI gating.
+pub mod rdp_remote_exec;
+/// Audio capture and playback with consciousness-gated quality.
+pub mod rdp_audio;
+/// Clipboard synchronization (bidirectional, consciousness-gated, scrubbed).
+pub mod rdp_clipboard;
+/// Unattended access daemon (MFDI-gated, time-bounded, audit-logged).
+pub mod rdp_unattended;
+/// Iroh QUIC transport layer (Handle/Actor pattern, stream multiplexing).
+pub mod rdp_transport;
+/// Soma↔Holon RDP bridge for phone remote support.
+pub mod rdp_holon_bridge;
 
 // Re-exports
 pub use config::{

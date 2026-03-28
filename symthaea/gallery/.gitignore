@@ -1,0 +1,5 @@
+# Generated art files — regenerate with:
+#   cargo run -p symthaea-atelier --example creative_demo
+#   cargo run -p symthaea-atelier --example creative_evolution
+*.svg
+*.wav

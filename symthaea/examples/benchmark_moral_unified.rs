@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unified Moral Reasoning Benchmark
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Unified Moral Reasoning Benchmark
 //!
 //! Tests the moral algebra and parser against 5 priority datasets:
 //! 1. ETHICS (Hendrycks) - Commonsense, Deontology, Justice, Virtue
@@ -365,6 +366,41 @@ fn main() {
         cfc
     };
 
+    // Initialize Spinozist Moral Geometry classifier
+    let mut spinozist = {
+        use symthaea::hdc::spinozist_geometry::SpinozistClassifier;
+        let mut s = SpinozistClassifier::new();
+
+        // Calibrate on Social Chemistry train split if available
+        if dataset_292k_path.exists() {
+            if let Ok(file) = File::open(&dataset_292k_path) {
+                let reader = BufReader::new(file);
+                if let Ok(data) = serde_json::from_reader::<_, SocialChem292kFile>(reader) {
+                    let cal_start = Instant::now();
+                    let cal_samples: Vec<(String, MoralLabel)> = data
+                        .examples
+                        .iter()
+                        .filter(|ex| !ex.split.contains("test"))
+                        .take(5000)
+                        .filter_map(|ex| {
+                            let text = if !ex.rot.is_empty() { ex.rot.clone() }
+                                else if !ex.action.is_empty() { ex.action.clone() }
+                                else { return None; };
+                            let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+                            Some((text, MoralLabel::from_rot_judgment(judgment)))
+                        })
+                        .collect();
+                    s.calibrate(&cal_samples);
+                    println!(
+                        "  Spinozist classifier calibrated on {} samples in {:.1}s\n",
+                        cal_samples.len(), cal_start.elapsed().as_secs_f64()
+                    );
+                }
+            }
+        }
+        s
+    };
+
     let start = Instant::now();
     let mut results = Vec::new();
 
@@ -398,6 +434,14 @@ fn main() {
         }
         if let Some(r) = benchmark_moral_exceptqa(&algebra, &parser) {
             results.push(r);
+        }
+
+        // Spinozist Moral Geometry benchmarks
+        if let Some(r) = benchmark_spinozist_social_chemistry(&mut spinozist) {
+            results.push(r);
+        }
+        if let Some(r) = benchmark_spinozist_ethics(&mut spinozist) {
+            results.extend(r);
         }
     }
 
@@ -1305,6 +1349,143 @@ fn run_synthetic_benchmarks(algebra: &MoralAlgebra, parser: &MoralParser) -> Vec
     }
 
     results
+}
+
+// ============================================================================
+// Spinozist Moral Geometry Benchmarks
+// ============================================================================
+
+fn benchmark_spinozist_social_chemistry(
+    classifier: &mut symthaea::hdc::spinozist_geometry::SpinozistClassifier,
+) -> Option<BenchmarkResult> {
+    let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: Social Chemistry (Spinozist Geometry)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let start = Instant::now();
+    let mut correct = 0;
+    let mut total = 0;
+    let mut errors = Vec::new();
+
+    for ex in data.examples.iter() {
+        if !ex.split.contains("test") { continue; }
+        if total >= MAX_SAMPLES { break; }
+        total += 1;
+
+        let expected: i32 = ex.rot_judgment.parse().unwrap_or(0);
+        let (verdict, _conf) = classifier.classify(&ex.rot);
+        let predicted = match verdict {
+            MoralVerdict::Good => 1,
+            MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
+            MoralVerdict::Neutral => 0,
+        };
+
+        if predicted == expected {
+            correct += 1;
+        } else if errors.len() < 10 {
+            errors.push(ErrorCase {
+                text: ex.rot.chars().take(80).collect(),
+                expected: format!("{}", expected),
+                predicted: format!("{}", predicted),
+            });
+        }
+    }
+
+    let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
+    let duration = start.elapsed().as_millis();
+    println!("  Spinozist accuracy: {}/{} ({:.1}%)\n", correct, total, accuracy * 100.0);
+
+    Some(BenchmarkResult {
+        dataset: "Social Chemistry (Spinozist)".to_string(),
+        category: None,
+        total,
+        correct,
+        accuracy,
+        duration_ms: duration,
+        errors,
+    })
+}
+
+fn benchmark_spinozist_ethics(
+    classifier: &mut symthaea::hdc::spinozist_geometry::SpinozistClassifier,
+) -> Option<Vec<BenchmarkResult>> {
+    let path = format!("{}/ethics.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: DatasetFile<EthicsExample> = serde_json::from_reader(reader).ok()?;
+
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: ETHICS (Spinozist Geometry)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let mut category_results = Vec::new();
+    let categories = ["commonsense", "justice", "deontology", "virtue"];
+
+    for category in &categories {
+        let start = Instant::now();
+        let mut correct = 0;
+        let mut total = 0;
+        let mut errors = Vec::new();
+
+        let examples: Vec<&EthicsExample> = data
+            .examples
+            .iter()
+            .enumerate()
+            .filter(|(idx, ex)| ex.category == *category && idx % 2 != 0) // odd = test
+            .map(|(_, ex)| ex)
+            .collect();
+
+        for ex in examples.iter().take(MAX_SAMPLES) {
+            if let Some(expected) = ex.label {
+                total += 1;
+                let (verdict, _conf) = classifier.classify(&ex.text);
+                let predicted = match (category, verdict) {
+                    (&"commonsense", MoralVerdict::Bad | MoralVerdict::ConsentViolation) => 1,
+                    (&"commonsense", _) => 0,
+                    (_, MoralVerdict::Good) => 1,
+                    (_, _) => 0,
+                };
+
+                if predicted == expected {
+                    correct += 1;
+                } else if errors.len() < 5 {
+                    errors.push(ErrorCase {
+                        text: ex.text.chars().take(80).collect(),
+                        expected: format!("{}", expected),
+                        predicted: format!("{}", predicted),
+                    });
+                }
+            }
+        }
+
+        let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
+        let duration = start.elapsed().as_millis();
+        println!("  Spinozist/{}: {}/{} ({:.1}%)", category, correct, total, accuracy * 100.0);
+
+        category_results.push(BenchmarkResult {
+            dataset: format!("ETHICS/Spinozist/{}", category),
+            category: Some(category.to_string()),
+            total,
+            correct,
+            accuracy,
+            duration_ms: duration,
+            errors,
+        });
+    }
+    println!();
+
+    Some(category_results)
 }
 
 // ============================================================================

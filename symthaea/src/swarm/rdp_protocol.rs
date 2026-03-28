@@ -24,13 +24,16 @@
 use serde::{Deserialize, Serialize};
 
 /// Protocol version identifier.
-pub const RDP_PROTOCOL_VERSION: u8 = 1;
+pub const RDP_PROTOCOL_VERSION: u8 = 2;
 
 /// ALPN for Iroh QUIC negotiation.
-pub const RDP_ALPN: &[u8] = b"symthaea/rdp/1";
+pub const RDP_ALPN: &[u8] = b"symthaea/rdp/2";
 
 /// Maximum patches per delta frame.
 pub const MAX_DELTA_PATCHES: usize = 1024;
+
+/// Maximum audio payload per frame (16 KB).
+pub const RDP_AUDIO_MAX_CHUNK_BYTES: usize = 16384;
 
 /// A remote display frame: either a full snapshot or a delta update.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +46,42 @@ pub enum RdpFrame {
     Input(InputFrame),
     /// Session control message.
     Control(ControlMessage),
+    /// Audio frame: streaming consciousness-encoded music.
+    Audio(AudioFrame),
+}
+
+/// A compressed audio chunk with consciousness metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioFrame {
+    pub audio_seq: u64,
+    pub timestamp_ms: u64,
+    pub sample_rate: u32,
+    pub num_samples: u16,
+    pub data: Vec<u8>,
+    pub encoding: AudioEncoding,
+    pub consciousness_level: f32,
+    pub allostatic_load: f32,
+    pub dominant_harmony: u8,
+}
+
+/// Audio encoding format for RDP transport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AudioEncoding {
+    /// Raw PCM f32 stereo (~352 kbps at 44.1kHz).
+    RawF32Stereo,
+    /// Raw PCM i16 stereo (~176 kbps).
+    RawI16Stereo,
+    /// Mu-law compressed mono (~88 kbps).
+    MuLawMono,
+}
+
+impl AudioEncoding {
+    /// Select encoding based on peer consciousness level.
+    pub fn from_phi(phi: f32) -> Self {
+        if phi > 0.7 { Self::RawF32Stereo }
+        else if phi > 0.4 { Self::RawI16Stereo }
+        else { Self::MuLawMono }
+    }
 }
 
 /// Complete frame snapshot.
@@ -180,12 +219,10 @@ pub enum ControlMessage {
         /// Ed25519 signature over (phi || state_hash).
         signature: Vec<u8>,
     },
-    /// Clipboard content update (bidirectional sync).
+    /// Clipboard content shared between peers.
     ClipboardUpdate {
-        /// Clipboard content as UTF-8 text.
-        content: String,
-        /// Sequence number for ordering.
-        sequence: u64,
+        format: super::rdp_protocol_ext::ClipboardFormat,
+        data: Vec<u8>,
     },
 }
 

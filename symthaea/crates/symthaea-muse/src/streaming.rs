@@ -122,6 +122,14 @@ impl StreamingSynth {
         if self.enable_phi_optimizer {
             self.phi_optimizer.update_phi(state.consciousness_level);
         }
+
+        // Arousal-driven note generation cadence:
+        // High arousal (0.9) → generate every 1 chunk (dense onsets)
+        // Low arousal (0.1) → generate every 8 chunks (sparse, calm)
+        // Formula: cadence = 8 - 7 * arousal, clamped to [1, 8]
+        self.note_gen_cadence = (8.0 - 7.0 * state.arousal.clamp(0.0, 1.0))
+            .round()
+            .clamp(1.0, 8.0) as u32;
     }
 
     /// Set substrate type for timbre coloring.
@@ -225,7 +233,9 @@ impl StreamingSynth {
                     s
                 };
 
-                voice_buffers[voice][i] += sample * env * active.note.velocity * active.volume * 0.15;
+                // Arousal-modulated master gain: 0.08 (calm) → 0.25 (excited)
+                let master_gain = 0.08 + self.state.arousal.clamp(0.0, 1.0) * 0.17;
+                voice_buffers[voice][i] += sample * env * active.note.velocity * active.volume * master_gain;
                 active.sample_pos += 1;
             }
         }

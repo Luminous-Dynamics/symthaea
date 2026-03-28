@@ -835,6 +835,11 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub substrate: super::SubstrateTelemetry,
 
+    /// Muse telemetry: streaming consciousness-driven music synthesis.
+    #[cfg(feature = "muse")]
+    #[serde(default)]
+    pub muse: crate::cognitive_loop::managers::muse_manager::MuseTelemetry,
+
     /// Thermal telemetry snapshot (from ThermalBridge).
     /// Reports platform thermal state and CfC tau modulation.
     /// Science: Angilletta (2009) thermal performance curves.

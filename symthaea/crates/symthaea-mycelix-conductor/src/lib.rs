@@ -64,6 +64,15 @@ pub enum DispatchCommand {
         care_activation: f64,
         meta_awareness: f64,
     },
+    /// Declare a civic crisis to the emergency-incidents zome.
+    DeclareCrisis {
+        correlation_id: u64,
+        severity: u8,
+        crisis_type: String,
+        description: String,
+        confidence: f64,
+        detected_at_cycle: u64,
+    },
 }
 
 /// Outcome received back from the conductor.
@@ -365,6 +374,53 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     }
                 }
             }
+
+            DispatchCommand::DeclareCrisis {
+                correlation_id,
+                severity,
+                crisis_type,
+                description,
+                confidence,
+                detected_at_cycle,
+            } => {
+                let payload = serde_json::json!({
+                    "severity": severity,
+                    "crisis_type": crisis_type,
+                    "description": description,
+                    "confidence": confidence,
+                    "detected_at_cycle": detected_at_cycle,
+                });
+                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+
+                match self
+                    .transport
+                    .call_zome(
+                        "mycelix-civic",
+                        "emergency",
+                        "create_incident",
+                        payload_bytes,
+                    )
+                    .await
+                {
+                    Ok(result) => {
+                        let action_hash = String::from_utf8(result).ok();
+                        info!(correlation_id, severity, %crisis_type,
+                            "Crisis incident declared on Mycelix civic DHT");
+                        DispatchOutcome::ProposalAccepted {
+                            correlation_id,
+                            action_hash,
+                        }
+                    }
+                    Err(reason) => {
+                        warn!(correlation_id, severity, %crisis_type, %reason,
+                            "Crisis declaration rejected by conductor");
+                        DispatchOutcome::ProposalRejected {
+                            correlation_id,
+                            reason,
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -384,10 +440,11 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
         loop {
             while let Ok(cmd) = rx.try_recv() {
                 let corr_id = match &cmd {
-                    DispatchCommand::SubmitProposal { correlation_id, .. } => *correlation_id,
-                    DispatchCommand::CastVote { correlation_id, .. } => *correlation_id,
+                    DispatchCommand::SubmitProposal { correlation_id, .. }
+                    | DispatchCommand::CastVote { correlation_id, .. }
+                    | DispatchCommand::EvaluateAsset { correlation_id, .. }
+                    | DispatchCommand::DeclareCrisis { correlation_id, .. } => *correlation_id,
                     DispatchCommand::QueryActiveProposals => 0,
-                    DispatchCommand::EvaluateAsset { correlation_id, .. } => *correlation_id,
                 };
                 if corr_id > 0 {
                     pending.push((corr_id, std::time::Instant::now()));

@@ -477,7 +477,7 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 # ── Sovereign RDP ──────────────────────────────────────────────────
 rdp = []                                   # Core RDP protocol + codec + session
 rdp-server = ["rdp"]                       # RDP server with screen capture
-rdp-x11 = ["rdp-server", "dep:x11rb"]     # X11 SHM capture + XTest injection
+rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (x11rb TODO)
 rdp-client = ["rdp"]                       # RDP client with frame reconstruction
 rdp-support = ["rdp"]                      # Mycelix support integration
 rdp-full = ["rdp-server", "rdp-client", "rdp-support"]  # Everything

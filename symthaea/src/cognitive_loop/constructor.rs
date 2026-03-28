@@ -560,6 +560,12 @@ impl CognitiveLoopService {
         // Create swarm event channel eagerly so the sender is always available.
         let (swarm_event_tx, swarm_event_rx) = std::sync::mpsc::channel();
 
+        // Create safety alert channel — bounded (32) so the cognitive loop never blocks.
+        // Host application drains via take_safety_alert_receiver().
+        let (safety_alert_tx, safety_alert_rx) = std::sync::mpsc::sync_channel(
+            super::safety_alert::SAFETY_ALERT_CHANNEL_CAPACITY,
+        );
+
         // Create Holon inbound channel eagerly so the sender is always available.
         // HTTP handlers (HolonHttpState) clone the tx to inject SomaMessages.
         let (holon_inbound_tx, holon_inbound_rx) = std::sync::mpsc::channel();
@@ -1147,6 +1153,8 @@ impl CognitiveLoopService {
             holon_inbound_tx,
             swarm_event_rx: std::sync::Mutex::new(Some(swarm_event_rx)),
             swarm_event_tx,
+            safety_alert_tx,
+            safety_alert_rx: std::sync::Mutex::new(Some(safety_alert_rx)),
             federation_handle,
             #[cfg(feature = "mesh")]
             spectrum_manager: super::managers::SpectrumManager::default(),

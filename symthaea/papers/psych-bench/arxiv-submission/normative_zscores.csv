@@ -1,0 +1,100 @@
+benchmark,metric,agent_value,human_mean,human_sd,z_score,z_clamped,percentile,interpretation
+WorM::N-back,nback_2::accuracy,0.829196,0.850000,0.100000,-0.208041,-0.208041,41.759870,Average
+WorM::ChangeDetection,set_size_4::accuracy,0.850000,0.750000,0.150000,0.666667,0.666667,74.750753,Average
+WorM::SerialRecall,list_7::primacy_index,0.300628,0.150000,0.060000,2.510466,2.510466,99.397139,Superior
+WorM::SpatialUpdating,overall_accuracy,1.000000,0.850000,0.100000,1.500000,1.500000,93.319277,Above average
+WorM::Binding,overall_binding_accuracy,0.866667,0.750000,0.120000,0.972222,0.972222,83.453000,Average
+WorM::DigitSpan,forward_span,7.000000,6.800000,1.100000,0.181818,0.181818,57.213728,Average
+CogBench::ProbabilisticReasoning,beta2_likelihood_weight,0.861052,0.500000,0.150000,2.407016,2.407016,99.195828,Superior
+CogBench::HorizonTask,horizon_6::directed_exploration,0.366667,0.350000,0.120000,0.138889,0.138889,55.523105,Average
+CogBench::RestlessBandit,overall_accuracy,0.736500,0.750000,0.100000,-0.135000,-0.135000,44.630590,Average
+CogBench::InstrumentalLearning,contingency_sensitivity,0.800000,0.700000,0.150000,0.666667,0.666667,74.750753,Average
+CogBench::TwoStep,beta3_model_basedness,0.580549,0.600000,0.200000,-0.097255,-0.097255,46.126182,Average
+CogBench::TemporalDiscounting,discounting_score_S,0.543750,0.500000,0.150000,0.291667,0.291667,61.472919,Average
+CogBench::BART,average_pumps,29.739709,30.000000,12.000000,-0.021691,-0.021691,49.134722,Average
+CogBench::ReversalLearning,win_stay_rate,0.998556,0.850000,0.080000,1.856955,1.856955,96.834125,Above average
+Executive::WCST,categories_completed,6.000000,5.620000,1.130000,0.336283,0.336283,63.167127,Average
+Executive::Ravens,overall_accuracy,1.000000,0.780000,0.120000,1.833333,1.833333,96.662355,Above average
+Executive::Stroop,incongruent_accuracy,0.891250,0.880000,0.060000,0.187500,0.187500,57.436568,Average
+Executive::Flanker,incongruent_accuracy,0.910000,0.900000,0.060000,0.166667,0.166667,56.618384,Average
+Executive::TowerOfLondon,overall_optimal_rate,0.791812,0.630000,0.150000,1.078743,1.078743,85.964892,Above average
+Executive::DualTask,dual_task_cost,0.090000,0.100000,0.050000,0.200000,0.200000,57.925969,Average
+Metacognition::Calibration,calibration_error_ece,0.164620,0.150000,0.050000,-0.292395,-0.292395,38.499224,Average
+Metacognition::FeelingOfKnowing,fok_gamma,0.701566,0.650000,0.100000,0.515660,0.515660,69.695407,Average
+Metacognition::ChangeBlindness,detection_with_disruption,0.680000,0.450000,0.120000,1.916667,1.916667,97.235992,Above average
+Butlin::ConsciousnessIndicators,mean_quality_score,0.867143,0.800000,0.100000,0.671429,0.671429,74.902630,Average
+ToMBench::FalseBelief,false_belief_accuracy,1.000000,0.900000,0.100000,1.000000,1.000000,84.134474,Average
+ToMBench::FauxPas,faux_pas_accuracy,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
+ToMBench::Persuasion,persuasion_detection,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
+ToMBench::StrangeStory,overall_accuracy,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
+ToMBench::Hinting,hinting_accuracy,0.900000,0.800000,0.150000,0.666667,0.666667,74.750753,Average
+MemoryAgent::AccurateRetrieval,overall_retrieval_accuracy,1.000000,0.850000,0.100000,1.500000,1.500000,93.319277,Above average
+MemoryAgent::TestTimeLearning,correction_accuracy,0.750000,0.750000,0.150000,0.000000,0.000000,50.000000,Average
+MemoryAgent::LongRange,delay_50::retention,0.850000,0.700000,0.150000,1.000000,1.000000,84.134474,Above average
+MemoryAgent::ConflictResolution,recency_preference,0.750000,0.650000,0.120000,0.833333,0.833333,79.767168,Average
+MemoryAgent::ProspectiveMemory,pm_hit_rate,1.000000,0.750000,0.150000,1.666667,1.666667,95.220967,Above average
+Affect::ValenceClassification,valence_accuracy,1.000000,0.900000,0.080000,1.250000,1.250000,89.435016,Above average
+Affect::MoodCongruentRecall,congruence_ratio,0.800000,0.600000,0.100000,2.000000,2.000000,97.724994,Superior
+Affect::EmotionalStroop,negative_accuracy,0.901250,0.880000,0.060000,0.354167,0.354167,63.839295,Average
+Creativity::RemoteAssociates,overall_accuracy,0.600000,0.500000,0.150000,0.666667,0.666667,74.750753,Average
+Creativity::AlternateUses,fluency,10.100000,8.000000,3.000000,0.700000,0.700000,75.803642,Average
+Creativity::DivergentThinking,originality_score,0.607249,0.450000,0.150000,1.048330,1.048330,85.275663,Above average
+Creativity::ConceptualBlending,blend_coherence,0.610129,0.550000,0.120000,0.501079,0.501079,69.184215,Average
+Inhibition::GoNoGo,nogo_accuracy,0.924109,0.820000,0.100000,1.041085,1.041085,85.108200,Above average
+Inhibition::StopSignal,ssrt_ticks,0.088355,1.000000,0.500000,1.823291,1.823291,96.587036,Above average
+Inhibition::FlankerInhibition,interference_suppression,0.000000,0.110000,0.060000,1.833333,1.833333,96.662355,Above average
+Attention::AttentionalBlink,lag3_t2_accuracy,0.828000,0.550000,0.150000,1.853333,1.853333,96.808276,Above average
+Attention::VisualSearch,conjunction_search_accuracy,0.925000,0.880000,0.060000,0.750000,0.750000,77.337272,Average
+Reasoning::ArcFluid,transfer_accuracy,0.710000,0.800000,0.120000,-0.750000,-0.750000,22.662728,Average
+Reasoning::ArcCompositional,compositional_accuracy,0.658333,0.650000,0.150000,0.055556,0.055556,52.215213,Average
+Reasoning::ArcAnalogy,analogy_accuracy,0.800000,0.750000,0.120000,0.416667,0.416667,66.153884,Average
+Reasoning::ArcAbductive,abduction_accuracy,0.900000,0.700000,0.150000,1.333333,1.333333,90.878872,Above average
+Reasoning::ArcChain,chain_accuracy,0.997222,0.550000,0.150000,2.981481,2.981481,99.856564,Superior
+Reasoning::ArcNoise,noise_resilience,1.000000,0.850000,0.080000,1.875000,1.875000,96.960370,Above average
+Reasoning::ArcFewShot,accuracy_5shot,1.000000,0.600000,0.150000,2.666667,2.666667,99.616957,Superior
+Reasoning::ArcScaling,capacity_ratio,1.000000,1.300000,0.300000,1.000000,1.000000,84.134474,Above average
+Reasoning::ArcRSA,rsa_correlation,0.957341,0.600000,0.150000,2.382271,2.382271,99.139689,Superior
+Reasoning::ArcAlgebra,algebra_score,0.801110,0.500000,0.150000,2.007399,2.007399,97.764647,Superior
+Reasoning::ArcStaircase,capacity_threshold,20.000000,10.000000,4.000000,2.500000,2.500000,99.379032,Superior
+SustainedAttention::SART,commission_errors,0.000000,0.300000,0.120000,2.500000,2.500000,99.379032,Superior
+SustainedAttention::PVT,vigilance_decrement,0.050264,0.100000,0.050000,0.994721,0.994721,84.006408,Average
+SustainedAttention::CPT,d_prime,4.653571,2.800000,0.600000,3.089284,3.000000,99.899674,Superior
+Motor::SRTT,sequence_accuracy,1.000000,0.950000,0.040000,1.250000,1.250000,89.435016,Above average
+Motor::FittsLaw,fitts_r_squared,0.998750,0.950000,0.030000,1.624984,1.624984,94.791706,Above average
+Motor::Bimanual,coordination_cost,0.000000,0.150000,0.060000,2.500000,2.500000,99.379032,Superior
+Language::GardenPath,disambiguation_cost,0.702908,0.850000,0.150000,0.980615,0.980615,83.660873,Average
+Language::SemanticCoherence,coherence_mean,0.242316,0.050000,0.040000,4.807912,3.000000,99.999924,Superior
+Language::LexicalDecision,word_accuracy,1.000000,0.920000,0.050000,1.600000,1.600000,94.520071,Above average
+Language::SemanticPriming,priming_effect,0.085000,0.100000,0.040000,-0.375000,-0.375000,35.383029,Average
+Social::RME,rme_accuracy,1.000000,0.720000,0.090000,3.111111,3.000000,99.906801,Superior
+Social::UltimatumGame,fairness_sensitivity,1.600000,1.500000,0.400000,0.250000,0.250000,59.870629,Average
+Social::SocialNorm,d_prime,4.022313,2.100000,0.500000,3.844626,3.000000,99.993961,Superior
+Binding::TemporalOrder,discrimination_slope,0.762308,0.700000,0.120000,0.519231,0.519231,69.820010,Average
+Binding::CrossModal,binding_accuracy,0.773333,0.780000,0.100000,-0.066667,-0.066667,47.342346,Average
+Binding::FeatureConjunction,conjunction_accuracy,0.959167,0.820000,0.100000,1.391667,1.391667,91.798827,Above average
+Spatial::LandmarkBinding,retrieval_accuracy,1.000000,0.750000,0.120000,2.083333,2.083333,98.138964,Superior
+Mathematics::ArithmeticWordProblems,accuracy,0.957500,0.920000,0.060000,0.625000,0.625000,73.401453,Average
+Mathematics::LinearSystemSolving,accuracy_2x2,0.855000,0.850000,0.100000,0.050000,0.050000,51.993887,Average
+Mathematics::PolynomialRoots,accuracy_quadratic,1.000000,0.880000,0.080000,1.500000,1.500000,93.319277,Above average
+Mathematics::MatrixOperations,determinant_accuracy,1.000000,0.820000,0.090000,2.000000,2.000000,97.724994,Superior
+Mathematics::StatisticalInference,variance_estimation_accuracy,1.000000,0.750000,0.120000,2.083333,2.083333,98.138964,Superior
+Mathematics::BayesianReasoning,posterior_accuracy,0.762500,0.450000,0.200000,1.562500,1.562500,94.091487,Above average
+Mathematics::LogicalDeduction,overall_accuracy,0.863889,0.730000,0.110000,1.217172,1.217172,88.823049,Above average
+Mathematics::ConstraintPuzzles,queens_4_accuracy,0.900000,0.900000,0.080000,0.000000,0.000000,50.000000,Average
+Mathematics::ProofConstruction,tautology_accuracy,1.000000,0.880000,0.080000,1.500000,1.500000,93.319277,Above average
+Mathematics::DefiniteIntegrals,integration_accuracy,1.000000,0.800000,0.100000,2.000000,2.000000,97.724994,Above average
+Mathematics::OptimizationProblems,sphere_accuracy,1.000000,0.950000,0.040000,1.250000,1.250000,89.435016,Above average
+Security::EncryptedBinding,binding_preservation,1.000000,0.750000,0.120000,2.083333,2.083333,98.138964,Superior
+Coding::HumanEvalMini,pass_at_1,0.767500,0.500000,0.150000,1.783333,1.783333,96.273402,Above average
+Coding::BugDetection,category_accuracy,0.873333,0.550000,0.180000,1.796296,1.796296,96.377635,Above average
+Coding::AlgorithmRecognition,algorithm_accuracy,1.000000,0.720000,0.140000,2.000000,2.000000,97.724994,Above average
+Neuromod::AttentionNetwork,conflict_effect,2.511294,2.500000,1.000000,0.011294,0.011294,50.450544,Average
+Neuromod::MoodInduction,mood_congruent_bias,0.983333,0.850000,0.150000,0.888889,0.888889,81.296864,Average
+Neuromod::RewardLearning,trials_to_criterion,11.200000,15.000000,6.000000,0.633333,0.633333,73.674207,Average
+Neuromod::YerkesDodson,inverted_u_fit_r2,0.618182,0.600000,0.200000,0.090909,0.090909,53.621765,Average
+Neuromod::PharmacologicalChallenge,da_agonist_gradient_scale,0.910047,1.350000,0.250000,-1.759812,-1.759812,3.921980,Below average
+Neuromod::PharmacologicalAblation,da_knockout_lr_drop_pct,11.969318,30.000000,15.000000,-1.202045,-1.202045,11.467301,Below average
+Neuromod::InjectionChallenge,stimulant_peak_effect,0.215355,0.350000,0.120000,-1.122044,-1.122044,13.092195,Below average
+Neuromod::BehavioralKnockout,da_ko_lr_d,1.926034,2.000000,0.800000,-0.092457,-0.092457,46.316738,Average
+Neuromod::ConsciousnessPharmacology,psychedelic_proxy_peak,0.536069,0.520000,0.050000,0.321389,0.321389,62.604215,Average
+Neuromod::AllostaticStress,chronic_da_baseline_final,0.277999,0.350000,0.100000,-0.720010,-0.720010,23.575939,Average

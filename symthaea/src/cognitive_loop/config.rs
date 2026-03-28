@@ -839,7 +839,6 @@ impl Default for CognitiveLoopConfig {
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
             enable_trajectory_planning: false,
-            enable_hodge_decomposition: false,
             trajectory_horizon_seconds: default_trajectory_horizon(),
             trajectory_planning_interval: default_trajectory_interval(),
             enable_hierarchical_bundling: false,
@@ -892,6 +891,7 @@ impl Default for CognitiveLoopConfig {
             enable_broca_nsm_semantic: false,
             #[cfg(feature = "ssm_language")]
             enable_broca_nsm_gate: false,
+            enable_hodge_decomposition: false,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT

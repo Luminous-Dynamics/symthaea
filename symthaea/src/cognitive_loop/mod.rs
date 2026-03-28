@@ -252,6 +252,7 @@ pub mod collective_immunity;
 pub mod defense;
 #[cfg(feature = "safety-agents")]
 pub mod guardian;
+pub mod safety_alert;
 #[cfg(feature = "safety-agents")]
 pub mod safety_enforcement;
 #[cfg(feature = "sentinel")]
@@ -695,6 +696,10 @@ pub struct CognitiveLoopService {
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
 
+    /// Muse Manager: Streaming consciousness-driven music synthesis.
+    #[cfg(feature = "muse")]
+    pub(crate) muse_manager: managers::MuseManager,
+
     /// Holon Receiver: Desktop-side bridge accepting Soma WebSocket connections.
     /// Processes inbound SomaMessages (heartbeats, CVs, tasks, knowledge) and
     /// routes them to SwarmManager (peers), ReasoningManager (tasks), KnowledgeManager (offers).
@@ -718,6 +723,15 @@ pub struct CognitiveLoopService {
     /// Sender half of the swarm event channel. Clone via `swarm_event_sender()` to
     /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
     swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
+
+    /// Sender for safety-critical alerts requiring human attention.
+    /// Bounded channel (capacity 32). The host application drains via
+    /// `drain_safety_alerts()` and forwards to desktop notifications, monitoring, etc.
+    safety_alert_tx: std::sync::mpsc::SyncSender<safety_alert::SafetyAlert>,
+    /// Receiver for safety alerts. Wrapped in Mutex<Option<>> so the host can
+    /// take ownership via `take_safety_alert_receiver()`.
+    safety_alert_rx:
+        std::sync::Mutex<Option<std::sync::mpsc::Receiver<safety_alert::SafetyAlert>>>,
 
     /// Handle for the federated coordinator task (if enabled).
     federation_handle:
@@ -870,6 +884,11 @@ pub struct CognitiveLoopService {
     /// community-level emergencies. Produces CivicCrisisEvent for Mycelix.
     #[cfg(feature = "safety-agents")]
     pub(crate) civic_crisis_detector: civic_crisis_detector::CivicCrisisDetector,
+
+    /// Crisis events waiting to be forwarded to Mycelix civic bridge.
+    /// Drained by `drain_pending_crisis_events()` from the external host.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) pending_crisis_events: Vec<civic_crisis_detector::CivicCrisisEvent>,
 
     /// Aggregate security telemetry for the crypto/swarm stack.
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,

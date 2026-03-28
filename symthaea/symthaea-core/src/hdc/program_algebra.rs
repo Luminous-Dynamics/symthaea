@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! HDC Program Algebra — Hyperdimensional Intermediate Representation for code.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! HDC Program Algebra — Hyperdimensional Intermediate Representation for code.
 //!
 //! Encodes program structure as 16,384-bit hypervectors using HDC combinators.
 //! This is the "Native tier" replacement: instead of hardcoded templates, Symthaea
@@ -1003,7 +1004,7 @@ impl ProgramPatternLibrary {
                 if combined < threshold { continue; }
                 let inter_sim = top[i].0.encoding.similarity(&top[j].0.encoding);
                 if inter_sim > 0.7 { continue; }
-                if best.map_or(true, |(_, _, s)| combined > s) {
+                if best.is_none_or(|(_, _, s)| combined > s) {
                     best = Some((i, j, combined));
                 }
             }
