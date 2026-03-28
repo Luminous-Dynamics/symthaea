@@ -98,6 +98,86 @@ pub struct WorldKnowledge {
     pub stagnation_detected: bool,
     /// Tick at which stagnation was first detected.
     pub stagnation_start_tick: Option<u32>,
+
+    /// Critical system dependency tracking.
+    /// Each critical system requires specific sector skill coverage.
+    /// When coverage drops to 0, that system fails at 5%/tick.
+    /// This is the "bus factor" made specific to colony operations.
+    #[serde(default)]
+    pub critical_system_coverage: CriticalSystemCoverage,
+}
+
+/// Tracks which critical colony systems have adequate skilled operators.
+///
+/// Each system maps to a primary sector and requires at least 1 skilled
+/// operator (skill > 0.3). Bus factor = 1 means one death away from failure.
+/// Bus factor = 0 means the system is already failing.
+///
+/// Ref: Henrich (2004) — Tasmania lost technology with pop ~4,000.
+/// The threshold isn't absolute population but SKILLED population per system.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CriticalSystemCoverage {
+    /// ECLSS: O2/CO2/H2O recycling. Needs engineering (0) + medicine (2).
+    pub eclss_operators: u32,
+    /// Power: reactor/solar management. Needs engineering (0) + science (4).
+    pub power_operators: u32,
+    /// Agriculture: food production. Needs agriculture (1).
+    pub agriculture_operators: u32,
+    /// Medical: surgery, pharmacy, emergency. Needs medicine (2).
+    pub medical_operators: u32,
+    /// Communications: Earth/inter-colony comms. Needs engineering (0).
+    pub comms_operators: u32,
+    /// Fabrication: repair, manufacturing. Needs engineering (0) + logistics (7).
+    pub fabrication_operators: u32,
+    /// Education: training the next generation. Needs education (5).
+    pub education_operators: u32,
+    /// Governance: legal, administrative. Needs governance (3).
+    pub governance_operators: u32,
+    /// Number of systems at bus_factor <= 1 (critical vulnerability).
+    pub systems_at_risk: u32,
+    /// Number of systems at bus_factor = 0 (actively failing).
+    pub systems_failing: u32,
+}
+
+impl CriticalSystemCoverage {
+    /// Compute coverage from agent skills.
+    pub fn compute(agents: &[crate::agent::CivAgent], current_tick: u32) -> Self {
+        let living: Vec<_> = agents.iter()
+            .filter(|a| a.is_alive() && a.life_stage(current_tick).can_work())
+            .collect();
+
+        let count_skilled = |sector: usize, min_skill: f64| -> u32 {
+            living.iter()
+                .filter(|a| a.skills.as_slice()[sector] > min_skill)
+                .count() as u32
+        };
+
+        let eclss = count_skilled(0, 0.3); // engineering
+        let power = count_skilled(0, 0.4).min(count_skilled(4, 0.3)); // eng + sci
+        let agriculture = count_skilled(1, 0.3);
+        let medical = count_skilled(2, 0.3);
+        let comms = count_skilled(0, 0.3);
+        let fabrication = count_skilled(0, 0.4).min(count_skilled(7, 0.2)); // eng + logistics
+        let education = count_skilled(5, 0.3);
+        let governance = count_skilled(3, 0.3);
+
+        let systems = [eclss, power, agriculture, medical, comms, fabrication, education, governance];
+        let at_risk = systems.iter().filter(|&&s| s <= 1).count() as u32;
+        let failing = systems.iter().filter(|&&s| s == 0).count() as u32;
+
+        Self {
+            eclss_operators: eclss,
+            power_operators: power,
+            agriculture_operators: agriculture,
+            medical_operators: medical,
+            comms_operators: comms,
+            fabrication_operators: fabrication,
+            education_operators: education,
+            governance_operators: governance,
+            systems_at_risk: at_risk,
+            systems_failing: failing,
+        }
+    }
 }
 
 impl WorldKnowledge {
@@ -116,6 +196,7 @@ impl WorldKnowledge {
             tech_history: Vec::new(),
             stagnation_detected: false,
             stagnation_start_tick: None,
+            critical_system_coverage: CriticalSystemCoverage::default(),
         }
     }
 
@@ -380,7 +461,7 @@ impl WorldKnowledge {
         self.technology_levels
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, &v)| (i, v))
             .unwrap_or((0, 1.0))
     }

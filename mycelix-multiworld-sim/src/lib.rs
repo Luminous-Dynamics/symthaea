@@ -1201,18 +1201,34 @@ impl MultiWorldSimulator {
                 world.infrastructure_level = (world.infrastructure_level - extra_decay).max(0.0);
             }
 
-            // === #4: BUS FACTOR ===
-            // Count critical skills with only 1 holder. 8 sectors, need ≥2 each.
-            let mut bus_factor_count = 0u32;
-            for sector in 0..8 {
-                let skilled = world.agents.iter()
-                    .filter(|a| a.is_alive() && a.skills.as_slice()[sector] > 0.3)
-                    .count();
-                if skilled <= 1 && pop > 20.0 {
-                    bus_factor_count += 1;
+            // === #4: BUS FACTOR + CRITICAL SYSTEMS DEPENDENCY ===
+            // Compute detailed per-system coverage from agent skills.
+            // Systems with 0 operators actively fail (5%/tick infrastructure decay).
+            // Systems with 1 operator are at critical risk (bus factor = 1).
+            let coverage = knowledge::CriticalSystemCoverage::compute(
+                &world.agents, tick);
+            world.bus_factor_critical = coverage.systems_at_risk;
+            world.knowledge.critical_system_coverage = coverage;
+
+            // Systems with zero operators cause specific failures
+            if world.knowledge.critical_system_coverage.systems_failing > 0 && pop > 20.0 {
+                let failing = world.knowledge.critical_system_coverage.systems_failing;
+                // Each failing system accelerates infrastructure decay
+                world.infrastructure_level =
+                    (world.infrastructure_level - 0.005 * failing as f64).max(0.0);
+                // Failing medical = health crisis
+                if world.knowledge.critical_system_coverage.medical_operators == 0 {
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.health = (agent.health - 0.01).max(0.1);
+                    }
+                }
+                // Failing education = knowledge decay
+                if world.knowledge.critical_system_coverage.education_operators == 0 {
+                    for level in world.knowledge.technology_levels.iter_mut() {
+                        *level = (*level - 0.005).max(1.0);
+                    }
                 }
             }
-            world.bus_factor_critical = bus_factor_count;
 
             // === #5: PATHOGEN PRESSURE ===
             // Accumulates in sealed environments. Lenski: novel virulence per ~30K generations.
