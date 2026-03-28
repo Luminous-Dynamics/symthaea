@@ -391,8 +391,9 @@ fn main() {
                         })
                         .collect();
                     s.calibrate(&cal_samples);
+                    s.train_prototypes(&cal_samples);
                     println!(
-                        "  Spinozist classifier calibrated on {} samples in {:.1}s\n",
+                        "  Spinozist classifier calibrated + trained on {} samples in {:.1}s\n",
                         cal_samples.len(), cal_start.elapsed().as_secs_f64()
                     );
                 }
@@ -1381,7 +1382,8 @@ fn benchmark_spinozist_social_chemistry(
         total += 1;
 
         let expected: i32 = ex.rot_judgment.parse().unwrap_or(0);
-        let (verdict, _conf) = classifier.classify(&ex.rot);
+        // Use learned prototypes if trained, otherwise geometric verdict
+        let (verdict, _conf) = classifier.classify_learned(&ex.rot);
         let predicted = match verdict {
             MoralVerdict::Good => 1,
             MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
@@ -1449,6 +1451,7 @@ fn benchmark_spinozist_ethics(
         for ex in examples.iter().take(MAX_SAMPLES) {
             if let Some(expected) = ex.label {
                 total += 1;
+                // Use geometric verdict for ETHICS (prototypes trained on Social Chemistry don't transfer)
                 let (verdict, _conf) = classifier.classify(&ex.text);
                 let predicted = match (category, verdict) {
                     (&"commonsense", MoralVerdict::Bad | MoralVerdict::ConsentViolation) => 1,
