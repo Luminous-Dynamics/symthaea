@@ -16,6 +16,27 @@ use crate::world::{CulturalProfile, World, WorldResources};
 
 use serde::{Deserialize, Serialize};
 
+// ---------------------------------------------------------------------------
+// Orbital mechanics constants (Bate, Mueller & White 1971; JPL Horizons)
+// ---------------------------------------------------------------------------
+
+/// Synodic periods in ticks (1 tick = 1 month). Time between launch windows.
+const SYNODIC_EARTH_MARS: u32 = 26;     // 25.6 months
+const SYNODIC_EARTH_JUPITER: u32 = 13;  // 13.1 months (Europa)
+const SYNODIC_EARTH_SATURN: u32 = 12;   // 12.4 months (Titan)
+const SYNODIC_MARS_JUPITER: u32 = 27;   // 26.8 months
+const SYNODIC_MARS_SATURN: u32 = 24;    // 24.1 months
+
+/// Hohmann transfer times in ticks.
+const TRANSFER_EARTH_MARS: u32 = 9;     // 258 days (Vallado 2013)
+const TRANSFER_EARTH_JUPITER: u32 = 33; // 2.73 years
+const TRANSFER_EARTH_SATURN: u32 = 73;  // 6.05 years
+const TRANSFER_MARS_JUPITER: u32 = 26;  // 2.16 years
+const TRANSFER_MARS_SATURN: u32 = 59;   // 4.9 years
+
+/// Emergency (off-window) transfer delta-v cost multiplier.
+const EMERGENCY_DV_MULTIPLIER: f64 = 2.5;
+
 /// Migration probability per agent per tick when GDP disparity is >= 2x.
 const MIGRATION_PROB_PER_AGENT: f64 = 0.001;
 
@@ -30,6 +51,16 @@ const MAX_TRADE_ROUTES: f64 = 5.0;
 
 /// Near-zero mass cost for information/knowledge transfer (kg-equivalent).
 const KNOWLEDGE_MASS_COST: f64 = 0.001;
+
+/// Cargo in transit between worlds (launched at window, arrives after transfer time).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InTransitCargo {
+    pub resource: String,
+    pub amount: f64,
+    pub departure_tick: u32,
+    pub arrival_tick: u32,
+    pub destination_world: u32,
+}
 
 /// A trade route between two worlds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +80,10 @@ pub struct TradeRoute {
     pub light_delay_secs: f64,
     /// Probability of disruption per tick (based on distance + conflict).
     pub route_vulnerability: f64,
+    /// Synodic period (ticks between launch windows). 0 = continuous access.
+    pub synodic_period: u32,
+    /// Hohmann transfer time (ticks for cargo to arrive). 0 = instant.
+    pub transfer_time: u32,
 }
 
 /// Record of a migration event.
@@ -82,6 +117,12 @@ pub struct InterWorldEngine {
     pub total_trade_volume: f64,
     pub total_migrants: u64,
     pub knowledge_transfers: u64,
+    /// Cargo currently in transit between worlds.
+    pub in_transit: Vec<InTransitCargo>,
+    /// LEO access multiplier from Kessler debris (1.0 = normal, 0.0 = denied).
+    pub leo_access_multiplier: f64,
+    /// Whether fusion grid-scale is achieved (removes window constraint).
+    pub fusion_override: bool,
 }
 
 impl InterWorldEngine {
@@ -92,7 +133,46 @@ impl InterWorldEngine {
             total_trade_volume: 0.0,
             total_migrants: 0,
             knowledge_transfers: 0,
+            in_transit: Vec::new(),
+            leo_access_multiplier: 1.0,
+            fusion_override: false,
         }
+    }
+
+    /// Look up orbital parameters for a route between two locations.
+    /// Returns (synodic_period, transfer_time) in ticks. (0, 0) = continuous access.
+    pub fn orbital_params(from_loc: &str, to_loc: &str) -> (u32, u32) {
+        // Moon-Earth: co-orbital, continuous access (3-day transfer ≈ 0 ticks)
+        let pair = Self::normalize_pair(from_loc, to_loc);
+        match pair.as_str() {
+            "Earth-Moon" | "Moon-Earth" => (0, 0),
+            "Earth-Mars" | "Mars-Earth" => (SYNODIC_EARTH_MARS, TRANSFER_EARTH_MARS),
+            "Earth-Europa" | "Europa-Earth" => (SYNODIC_EARTH_JUPITER, TRANSFER_EARTH_JUPITER),
+            "Earth-Titan" | "Titan-Earth" => (SYNODIC_EARTH_SATURN, TRANSFER_EARTH_SATURN),
+            "Mars-Europa" | "Europa-Mars" => (SYNODIC_MARS_JUPITER, TRANSFER_MARS_JUPITER),
+            "Mars-Titan" | "Titan-Mars" => (SYNODIC_MARS_SATURN, TRANSFER_MARS_SATURN),
+            "Moon-Mars" | "Mars-Moon" => (SYNODIC_EARTH_MARS, TRANSFER_EARTH_MARS), // ~same orbit
+            "Moon-Europa" | "Europa-Moon" => (SYNODIC_EARTH_JUPITER, TRANSFER_EARTH_JUPITER),
+            "Moon-Titan" | "Titan-Moon" => (SYNODIC_EARTH_SATURN, TRANSFER_EARTH_SATURN),
+            _ => (0, 0), // Unknown pairs: continuous
+        }
+    }
+
+    fn normalize_pair(a: &str, b: &str) -> String {
+        if a <= b {
+            format!("{}-{}", a, b)
+        } else {
+            format!("{}-{}", b, a)
+        }
+    }
+
+    /// Check if a transfer window is currently open for this route.
+    pub fn is_window_open(synodic_period: u32, established_tick: u32, current_tick: u32) -> bool {
+        if synodic_period == 0 {
+            return true; // Continuous access
+        }
+        let elapsed = current_tick.saturating_sub(established_tick);
+        elapsed % synodic_period == 0
     }
 
     /// Establish a trade route between two worlds.
@@ -106,6 +186,8 @@ impl InterWorldEngine {
         to: u32,
         tick: u32,
         light_delay: f64,
+        from_location: &str,
+        to_location: &str,
     ) -> &TradeRoute {
         // Estimate delta-v from light delay heuristic:
         // Moon-Earth: ~1.3s delay, ~2.5 km/s delta-v
@@ -126,6 +208,9 @@ impl InterWorldEngine {
         // Route vulnerability: higher for longer distances
         let route_vulnerability = (light_delay / 10000.0).clamp(0.001, 0.05);
 
+        // Orbital mechanics: synodic period and transfer time
+        let (synodic_period, transfer_time) = Self::orbital_params(from_location, to_location);
+
         let route = TradeRoute {
             from_world: from,
             to_world: to,
@@ -136,6 +221,8 @@ impl InterWorldEngine {
             transport_cost_per_kg,
             light_delay_secs: light_delay,
             route_vulnerability,
+            synodic_period,
+            transfer_time,
         };
 
         self.trade_routes.push(route);
@@ -152,7 +239,37 @@ impl InterWorldEngine {
     ) -> Vec<CivEvent> {
         let mut events = Vec::new();
 
-        // --- Trade: transfer resources along routes ---
+        // --- Deliver in-transit cargo that has arrived ---
+        let mut arrived = Vec::new();
+        let mut still_in_transit = Vec::new();
+        for cargo in self.in_transit.drain(..) {
+            if current_tick >= cargo.arrival_tick {
+                arrived.push(cargo);
+            } else {
+                still_in_transit.push(cargo);
+            }
+        }
+        self.in_transit = still_in_transit;
+
+        for cargo in &arrived {
+            let dest = cargo.destination_world as usize;
+            if dest < worlds.len() {
+                if let Some(stock) = worlds[dest].resources.get_mut(&cargo.resource) {
+                    stock.current = (stock.current + cargo.amount).min(stock.capacity);
+                }
+                events.push(CivEvent::new(
+                    current_tick,
+                    Some(cargo.destination_world),
+                    CivEventType::EmergencyDeclared,
+                    format!(
+                        "{}: cargo arrived — {:.0} units of {} (departed tick {})",
+                        worlds[dest].name, cargo.amount, cargo.resource, cargo.departure_tick
+                    ),
+                ));
+            }
+        }
+
+        // --- Trade: transfer resources along routes (window-gated) ---
         for route_idx in 0..self.trade_routes.len() {
             let route = &self.trade_routes[route_idx];
             let from = route.from_world as usize;
@@ -161,7 +278,31 @@ impl InterWorldEngine {
                 continue;
             }
 
-            let volume = self.trade_routes[route_idx].volume_per_tick;
+            // Transfer window check: only allow trade when window is open
+            // Moon-Earth (synodic_period == 0) is always open.
+            // Fusion grid-scale removes the constraint entirely.
+            let window_open = self.fusion_override
+                || Self::is_window_open(route.synodic_period, route.established_tick, current_tick);
+
+            if !window_open {
+                continue; // Window closed — no trade this tick
+            }
+
+            // Kessler syndrome: degrade volume for routes from/to Earth
+            let mut volume = self.trade_routes[route_idx].volume_per_tick;
+            if self.leo_access_multiplier < 1.0 {
+                let involves_earth = worlds[from].location == "Earth" || worlds[to].location == "Earth";
+                let is_moon_earth = (worlds[from].location == "Moon" && worlds[to].location == "Earth")
+                    || (worlds[from].location == "Earth" && worlds[to].location == "Moon");
+                if involves_earth {
+                    if is_moon_earth {
+                        volume *= self.leo_access_multiplier.max(0.5); // Moon-Earth less affected
+                    } else {
+                        volume *= self.leo_access_multiplier;
+                    }
+                }
+            }
+
             self.total_trade_volume += volume;
 
             // Transfer a fraction of surplus resources from exporter to importer
@@ -171,6 +312,12 @@ impl InterWorldEngine {
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
+
+            let transfer_time = if self.fusion_override {
+                route.transfer_time / 2 // Fusion halves transit time
+            } else {
+                route.transfer_time
+            };
 
             for name in &resource_names {
                 let transfer = {
@@ -184,11 +331,25 @@ impl InterWorldEngine {
                 };
 
                 if transfer > 0.0 {
+                    // Deduct from source immediately
                     if let Some(from_stock) = worlds[from].resources.get_mut(name) {
                         from_stock.current -= transfer;
                     }
-                    if let Some(to_stock) = worlds[to].resources.get_mut(name) {
-                        to_stock.current = (to_stock.current + transfer).min(to_stock.capacity);
+
+                    if transfer_time == 0 {
+                        // Instant delivery (Moon-Earth)
+                        if let Some(to_stock) = worlds[to].resources.get_mut(name) {
+                            to_stock.current = (to_stock.current + transfer).min(to_stock.capacity);
+                        }
+                    } else {
+                        // Cargo goes in transit — arrives after transfer_time ticks
+                        self.in_transit.push(InTransitCargo {
+                            resource: name.clone(),
+                            amount: transfer,
+                            departure_tick: current_tick,
+                            arrival_tick: current_tick + transfer_time,
+                            destination_world: route.to_world,
+                        });
                     }
                 }
             }
@@ -466,8 +627,11 @@ impl InterWorldEngine {
             governance: crate::governance::WorldGovernance::new(),
         };
 
-        // Establish trade route with parent (assume Moon-Earth-class delay)
-        self.establish_route(parent_world.id, new_world_id, tick, 1.3);
+        // Establish trade route with parent (assume Moon-Earth-class delay).
+        // "Colony" location has synodic_period=0 (continuous), matching co-orbital.
+        let parent_loc = parent_world.location.clone();
+        self.establish_route(parent_world.id, new_world_id, tick, 1.3,
+            &parent_loc, "Colony");
 
         new_world
     }
@@ -631,7 +795,7 @@ mod tests {
     #[test]
     fn test_route_establishment() {
         let mut engine = InterWorldEngine::new();
-        let route = engine.establish_route(0, 1, 10, 1.3);
+        let route = engine.establish_route(0, 1, 10, 1.3, "Earth", "Moon");
         assert_eq!(route.from_world, 0);
         assert_eq!(route.to_world, 1);
         assert_eq!(route.established_tick, 10);
@@ -644,7 +808,7 @@ mod tests {
         let mut engine = InterWorldEngine::new();
 
         // Moon-Earth class (light_delay < 2s → delta_v = 2.5)
-        let route_near = engine.establish_route(0, 1, 0, 1.3);
+        let route_near = engine.establish_route(0, 1, 0, 1.3, "Earth", "Moon");
         let cost_near = route_near.transport_cost_per_kg;
         let expected_near = 2.5 * 2.5 * 0.001;
         assert!(
@@ -653,7 +817,7 @@ mod tests {
         );
 
         // Earth-Mars class (180-600s → delta_v = 4.0)
-        let route_far = engine.establish_route(0, 2, 0, 300.0);
+        let route_far = engine.establish_route(0, 2, 0, 300.0, "Earth", "Mars");
         let cost_far = route_far.transport_cost_per_kg;
         let expected_far = 4.0 * 4.0 * 0.001;
         assert!(
@@ -667,7 +831,7 @@ mod tests {
     #[test]
     fn test_trade_transfers_resources() {
         let mut engine = InterWorldEngine::new();
-        engine.establish_route(0, 1, 0, 1.3);
+        engine.establish_route(0, 1, 0, 1.3, "Earth", "Moon");
 
         let mut w0 = make_world_with_agents(0, "Earth", 50, 0.5);
         // Give Earth abundant food (above 50% capacity threshold)
@@ -692,7 +856,7 @@ mod tests {
     #[test]
     fn test_migration_moves_agents() {
         let mut engine = InterWorldEngine::new();
-        engine.establish_route(0, 1, 0, 1.3);
+        engine.establish_route(0, 1, 0, 1.3, "Earth", "Moon");
 
         // World 0: low skills (low GDP proxy)
         let w0 = make_world_with_agents(0, "Poor", 30, 0.1);
@@ -731,7 +895,7 @@ mod tests {
     #[test]
     fn test_knowledge_diffusion_reduces_gap() {
         let mut engine = InterWorldEngine::new();
-        engine.establish_route(0, 1, 0, 1.3);
+        engine.establish_route(0, 1, 0, 1.3, "Earth", "Moon");
 
         let w0 = make_world_with_agents(0, "Advanced", 20, 0.8);
         let w1 = make_world_with_agents(1, "Developing", 20, 0.2);
@@ -813,9 +977,9 @@ mod tests {
         let mut engine = InterWorldEngine::new();
         assert!((engine.connectivity_score(0) - 0.0).abs() < 1e-10);
 
-        engine.establish_route(0, 1, 0, 1.3);
-        engine.establish_route(0, 2, 0, 300.0);
-        engine.establish_route(0, 3, 0, 600.0);
+        engine.establish_route(0, 1, 0, 1.3, "Earth", "Moon");
+        engine.establish_route(0, 2, 0, 300.0, "Earth", "Mars");
+        engine.establish_route(0, 3, 0, 600.0, "Earth", "Europa");
 
         let score = engine.connectivity_score(0);
         assert!(

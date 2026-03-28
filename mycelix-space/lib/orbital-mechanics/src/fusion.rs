@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Multi-Sensor Observation Fusion Pipeline
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Multi-Sensor Observation Fusion Pipeline
 //!
 //! Fuses observations from multiple sensors into a single best-estimate state
 //! with uncertainty. This is the core value proposition of a decentralized SSA

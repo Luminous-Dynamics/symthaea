@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Traffic Control Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Traffic Control Integrity Zome
 //!
 //! Implements automated space traffic coordination through
 //! AI-mediated negotiation between operators. When a conjunction

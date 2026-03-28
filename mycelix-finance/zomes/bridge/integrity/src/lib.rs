@@ -2,7 +2,8 @@
 
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Finance Bridge Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Finance Bridge Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 //!
 //! Entry types for cross-hApp payment processing, collateral management,

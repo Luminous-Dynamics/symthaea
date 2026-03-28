@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Personal Bridge Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Personal Bridge Coordinator Zome
 //!
 //! Selective disclosure gateway for the Sovereign (Personal) cluster.
 //! Provides three integration patterns (matching civic/commons bridges):

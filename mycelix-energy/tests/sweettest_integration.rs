@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Mycelix Energy - Sweettest Integration Tests
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Mycelix Energy - Sweettest Integration Tests
 //!
 //! Comprehensive integration tests using Holochain's sweettest framework.
 //! Tests cover energy projects, grid trading, investments, regenerative transitions,

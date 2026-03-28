@@ -101,6 +101,115 @@ const DEEP_SPACE_EPOCH_END: u8 = 3;
 // Types
 // =============================================================================
 
+/// Spinozist affect state: 6 dimensions derived from agent needs and consciousness.
+///
+/// Grounded in Spinoza's *Ethics* III: affects as transitions in the power of acting.
+/// Joy = increase in power (conatus enhanced), Sadness = decrease (conatus diminished).
+/// The 6 CfC (Conatus-for-Collective) dimensions map to:
+///
+/// 1. **Joy** (Laetitia): Met needs + social bonds + engagement → power increase
+/// 2. **Sadness** (Tristitia): Isolation + burnout + trauma → power decrease
+/// 3. **Desire** (Cupiditas): Conatus — striving toward flourishing (gap between current and potential)
+/// 4. **Care** (Cura): Capacity for mutual aid — consciousness.care_activation + social bonds
+/// 5. **Harm** (Nocere): Accumulated moral injury — dealt + received harm, faction violence
+/// 6. **Consent** (Consensus): Trust/reciprocity in collective decisions — governance alignment
+///
+/// References:
+/// - Spinoza, *Ethics* III, Propositions 11-13 (joy, sadness, desire as primary affects)
+/// - Damasio (2003), "Looking for Spinoza" — somatic marker hypothesis
+/// - Nussbaum (2001), "Upheavals of Thought" — emotions as evaluative judgments
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AffectState {
+    /// Laetitia: increase in power of acting [0, 1].
+    /// High when needs met, socially connected, engaged.
+    pub joy: f64,
+    /// Tristitia: decrease in power of acting [0, 1].
+    /// High when isolated, burned out, traumatized.
+    pub sadness: f64,
+    /// Cupiditas: striving intensity [0, 1].
+    /// The gap between current state and flourishing potential.
+    pub desire: f64,
+    /// Cura: capacity for mutual aid and caregiving [0, 1].
+    /// Maps to consciousness.care_activation + social bonds.
+    pub care: f64,
+    /// Nocere: accumulated moral injury [0, 1].
+    /// Tracks both harm dealt (faction violence) and harm received (disaster casualties).
+    pub harm: f64,
+    /// Consensus: trust and reciprocity in collective governance [0, 1].
+    /// High when governance is stable and agent participates; low during crises.
+    pub consent: f64,
+}
+
+impl AffectState {
+    /// Compute affect state from agent's needs, consciousness, and context.
+    ///
+    /// This is the core Spinozist mapping: affects emerge from the body's
+    /// relationship to its environment, not as independent mental states.
+    pub fn compute(
+        needs: &PsychologicalNeeds,
+        care_activation: f64,
+        trauma_level: f64,
+        governance_stability: f64,
+        is_faction_member: bool,
+        resource_fraction: f64,
+    ) -> Self {
+        // Joy: composite of needs satisfaction — the body's power is enhanced
+        // when social bonds are strong, engagement is high, and stress is low.
+        let joy = (needs.social_satiation * 0.4
+            + needs.engagement * 0.3
+            + (1.0 - needs.allostatic_load) * 0.3)
+            .clamp(0.0, 1.0);
+
+        // Sadness: inverse — the body's power is diminished by isolation,
+        // burnout, and accumulated trauma.
+        let sadness = (needs.allostatic_load * 0.4
+            + (1.0 - needs.social_satiation) * 0.3
+            + trauma_level * 0.3)
+            .clamp(0.0, 1.0);
+
+        // Desire: conatus intensity — the striving gap between current and potential.
+        // High when resources are scarce or needs unmet (the body strives harder).
+        // Low when fully satisfied (desire quiets in fulfillment).
+        let deprivation = (1.0 - resource_fraction).max(0.0);
+        let desire = (deprivation * 0.4
+            + needs.allostatic_load * 0.3
+            + (1.0 - needs.engagement) * 0.3)
+            .clamp(0.0, 1.0);
+
+        // Care: mutual aid capacity — consciousness.care_activation + social richness.
+        // Spinoza's "amor" as rational recognition of interdependence.
+        let care = (care_activation * 0.5
+            + needs.social_satiation * 0.3
+            + (1.0 - needs.allostatic_load) * 0.2)
+            .clamp(0.0, 1.0);
+
+        // Harm: moral injury accumulation — trauma received + faction membership
+        // (which implies potential for violence, Spinoza's "indignatio").
+        let faction_harm = if is_faction_member { 0.2 } else { 0.0 };
+        let harm = (trauma_level * 0.6 + faction_harm + needs.allostatic_load * 0.2)
+            .clamp(0.0, 1.0);
+
+        // Consent: trust in collective governance — stable governance + low stress
+        // enables rational participation; crises erode trust.
+        let consent = (governance_stability * 0.5
+            + (1.0 - needs.allostatic_load) * 0.3
+            + care_activation * 0.2)
+            .clamp(0.0, 1.0);
+
+        Self { joy, sadness, desire, care, harm, consent }
+    }
+
+    /// Net conatus: joy - sadness. Positive = flourishing, negative = suffering.
+    pub fn net_conatus(&self) -> f64 {
+        self.joy - self.sadness
+    }
+
+    /// Moral balance: care - harm. Positive = moral health, negative = moral injury.
+    pub fn moral_balance(&self) -> f64 {
+        self.care - self.harm
+    }
+}
+
 /// Per-agent psychological needs state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PsychologicalNeeds {
@@ -111,6 +220,8 @@ pub struct PsychologicalNeeds {
     /// Physical-world participation / engagement [0, 1].
     /// Decays under high load + low social (digital escapism proxy).
     pub engagement: f64,
+    /// Spinozist affect state (derived from needs + consciousness each tick).
+    pub affect: AffectState,
 }
 
 impl PsychologicalNeeds {
@@ -120,6 +231,7 @@ impl PsychologicalNeeds {
             allostatic_load: 0.1,
             social_satiation: 0.7,
             engagement: 0.8,
+            affect: AffectState::default(),
         }
     }
 
@@ -129,6 +241,7 @@ impl PsychologicalNeeds {
             allostatic_load: 0.0,
             social_satiation: 0.9,
             engagement: 0.9,
+            affect: AffectState::default(),
         }
     }
 
@@ -160,6 +273,23 @@ pub struct NeedsWorldSummary {
     pub escapism_count: usize,
     /// Agents in burnout (allostatic_load > 0.8).
     pub burnout_count: usize,
+    // --- Spinozist collective affect aggregates ---
+    /// Mean collective joy (Laetitia): power of acting.
+    pub mean_joy: f64,
+    /// Mean collective sadness (Tristitia): power diminished.
+    pub mean_sadness: f64,
+    /// Mean collective desire (Cupiditas): conatus intensity.
+    pub mean_desire: f64,
+    /// Mean collective care (Cura): mutual aid capacity.
+    pub mean_care: f64,
+    /// Mean collective harm (Nocere): moral injury.
+    pub mean_harm: f64,
+    /// Mean collective consent (Consensus): governance trust.
+    pub mean_consent: f64,
+    /// Net collective conatus (joy - sadness): >0 = flourishing, <0 = suffering.
+    pub net_conatus: f64,
+    /// Moral balance (care - harm): >0 = moral health, <0 = moral crisis.
+    pub moral_balance: f64,
 }
 
 /// Psychological needs engine — stateless, operates on world + agents each tick.
@@ -314,6 +444,21 @@ impl PsychNeedsEngine {
             }
         }
 
+        // Compute aggregate Spinozist affects across all living agents.
+        // Affects are computed from each agent's state and averaged.
+        let (mut total_joy, mut total_sadness, mut total_desire) = (0.0, 0.0, 0.0);
+        let (mut total_care, mut total_harm, mut total_consent) = (0.0, 0.0, 0.0);
+        for agent in world.agents.iter().filter(|a| a.is_alive()) {
+            total_joy += agent.needs.affect.joy;
+            total_sadness += agent.needs.affect.sadness;
+            total_desire += agent.needs.affect.desire;
+            total_care += agent.needs.affect.care;
+            total_harm += agent.needs.affect.harm;
+            total_consent += agent.needs.affect.consent;
+        }
+        let (mean_joy, mean_sadness, mean_desire) = (total_joy / count, total_sadness / count, total_desire / count);
+        let (mean_care_aff, mean_harm_aff, mean_consent_aff) = (total_care / count, total_harm / count, total_consent / count);
+
         let summary = NeedsWorldSummary {
             mean_allostatic_load: mean_load,
             mean_social_satiation: total_social / count,
@@ -321,6 +466,14 @@ impl PsychNeedsEngine {
             thrill_incidents,
             escapism_count,
             burnout_count,
+            mean_joy,
+            mean_sadness,
+            mean_desire,
+            mean_care: mean_care_aff,
+            mean_harm: mean_harm_aff,
+            mean_consent: mean_consent_aff,
+            net_conatus: mean_joy - mean_sadness,
+            moral_balance: mean_care_aff - mean_harm_aff,
         };
 
         (events, summary)

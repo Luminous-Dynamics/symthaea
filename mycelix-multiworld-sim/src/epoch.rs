@@ -50,6 +50,21 @@ pub fn epoch_name(id: EpochId) -> &'static str {
     }
 }
 
+/// Per-world summary in an epoch snapshot.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorldSnapshot {
+    pub name: String,
+    pub location: String,
+    pub population: usize,
+    pub phi: f64,
+    pub allostatic_load: f64,
+    /// Spinozist net conatus (joy - sadness). >0 = flourishing.
+    pub net_conatus: f64,
+    /// Moral balance (care - harm). >0 = moral health.
+    pub moral_balance: f64,
+    pub self_sufficiency: f64,
+}
+
 /// Snapshot of civilization state at a point in time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpochSnapshot {
@@ -90,6 +105,8 @@ pub struct EpochSnapshot {
     pub trauma_level: f64,
     /// Genetic speciation index between worlds.
     pub speciation_index: f64,
+    /// Per-world breakdowns (populated for outer system visibility).
+    pub worlds: Vec<WorldSnapshot>,
 }
 
 impl EpochSnapshot {
@@ -177,6 +194,26 @@ impl EpochSnapshot {
             mean_phi,
         );
 
+        // Per-world snapshots for outer system visibility.
+        let world_snapshots: Vec<WorldSnapshot> = worlds.iter().map(|w| {
+            let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+            let n = living.len().max(1) as f64;
+            let phi = living.iter().map(|a| a.consciousness.phi()).sum::<f64>() / n;
+            let load = living.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / n;
+            let net_conatus = living.iter().map(|a| a.needs.affect.net_conatus()).sum::<f64>() / n;
+            let moral_balance = living.iter().map(|a| a.needs.affect.moral_balance()).sum::<f64>() / n;
+            WorldSnapshot {
+                name: w.name.clone(),
+                location: w.location.clone(),
+                population: w.population(),
+                phi,
+                allostatic_load: load,
+                net_conatus,
+                moral_balance,
+                self_sufficiency: w.resources.self_sufficiency(),
+            }
+        }).collect();
+
         Self {
             epoch_id,
             tick,
@@ -203,6 +240,7 @@ impl EpochSnapshot {
             recovery_count: 0,
             trauma_level: 0.0,
             speciation_index: 0.0,
+            worlds: world_snapshots,
         }
     }
 }

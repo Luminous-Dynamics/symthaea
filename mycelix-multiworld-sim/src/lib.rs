@@ -421,9 +421,19 @@ impl MultiWorldSimulator {
                 .filter(|a| a.needs.is_burnout())
                 .count() as f64
                 / world.population().max(1) as f64;
-            let governance_stability = (world.infrastructure_level * 0.5
-                + world.mean_phi() * 0.3
-                + (1.0 - burnout_frac) * 0.2)
+            // Governance stability incorporates Spinozist consent (trust/reciprocity).
+            // Low collective consent erodes governance; high consent strengthens it.
+            let mean_consent = {
+                let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+                if living.is_empty() { 0.5 } else {
+                    living.iter().map(|a| a.needs.affect.consent).sum::<f64>()
+                        / living.len() as f64
+                }
+            };
+            let governance_stability = (world.infrastructure_level * 0.4
+                + world.mean_phi() * 0.2
+                + (1.0 - burnout_frac) * 0.2
+                + mean_consent * 0.2)
                 .clamp(0.0, 1.0);
 
             // Compute worker ratio for overwork stress
@@ -1788,10 +1798,34 @@ impl MultiWorldSimulator {
                 // Mechanism 2 — Stress-driven faction emergence: compute max stress
                 // boost across all worlds. When mean allostatic load > 0.8, faction
                 // emergence probability is multiplied by up to 4x.
+                // Stress boost: classic allostatic load + Spinozist suffering.
+                // Negative net conatus (sadness > joy) amplifies faction recruitment.
+                // High desire + low care = Turchin elite overproduction dynamics.
                 let stress_boost: f64 = self.worlds.iter()
                     .map(|w| {
                         let load = w.mean_allostatic_load();
-                        if load > 0.8 { load - 0.8 } else { 0.0 }
+                        let load_boost = if load > 0.8 { load - 0.8 } else { 0.0 };
+                        // Spinozist amplifier: collective suffering drives faction emergence
+                        let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                        let n = living.len().max(1) as f64;
+                        let mean_conatus = living.iter()
+                            .map(|a| a.needs.affect.net_conatus())
+                            .sum::<f64>() / n;
+                        let mean_desire = living.iter()
+                            .map(|a| a.needs.affect.desire)
+                            .sum::<f64>() / n;
+                        let mean_care = living.iter()
+                            .map(|a| a.needs.affect.care)
+                            .sum::<f64>() / n;
+                        // Suffering (negative conatus) adds to faction pressure
+                        let suffering_boost = if mean_conatus < 0.0 { -mean_conatus * 0.5 } else { 0.0 };
+                        // High desire + low care = frustration → faction emergence
+                        let frustration_boost = if mean_desire > 0.5 && mean_care < 0.3 {
+                            (mean_desire - mean_care) * 0.3
+                        } else {
+                            0.0
+                        };
+                        load_boost + suffering_boost + frustration_boost
                     })
                     .fold(0.0f64, f64::max);
                 let faction_events = self.faction_engine.tick_factions_with_stress(

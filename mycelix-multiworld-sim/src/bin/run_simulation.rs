@@ -37,6 +37,15 @@ fn main() {
             snap.tick as f64 / 12.0, snap.total_population,
             snap.mean_phi, snap.civilization_viability_score,
             snap.faction_count, snap.trauma_level);
+        // Per-world breakdown (show only at 50-year intervals to avoid flooding)
+        if snap.tick % 600 == 0 && !snap.worlds.is_empty() {
+            for ws in &snap.worlds {
+                println!("    {:>12} ({:>6}) | Pop {:>5} | Phi {:.3} | Load {:.3} | Conatus {:+.3} | Moral {:+.3} | SS {:.2}",
+                    ws.name, ws.location, ws.population, ws.phi,
+                    ws.allostatic_load, ws.net_conatus, ws.moral_balance,
+                    ws.self_sufficiency);
+            }
+        }
     }
 
     let years = report.total_ticks / 12;

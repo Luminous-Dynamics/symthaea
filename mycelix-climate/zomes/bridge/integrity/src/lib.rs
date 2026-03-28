@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Bridge Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Bridge Integrity Zome
 //!
 //! Defines entry types and validation for cross-hApp climate verification.
 //! Uses HDI 0.7.0-dev.1 with FlatOp validation pattern.
