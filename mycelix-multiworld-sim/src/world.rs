@@ -95,6 +95,31 @@ impl WorldResources {
         self.stocks.keys().map(|s| s.as_str()).collect()
     }
 
+    /// Deduct up to `amount` from a resource stock, returning the actual amount deducted.
+    pub fn deduct(&mut self, name: &str, amount: f64) -> f64 {
+        if let Some(stock) = self.stocks.get_mut(name) {
+            let actual = amount.min(stock.current);
+            stock.current -= actual;
+            actual
+        } else {
+            0.0
+        }
+    }
+
+    /// Get the fraction of capacity for a resource (current / capacity), or 0.0 if absent.
+    pub fn fraction_of_capacity(&self, name: &str) -> f64 {
+        self.stocks
+            .get(name)
+            .map(|s| {
+                if s.capacity > 0.0 {
+                    s.current / s.capacity
+                } else {
+                    0.0
+                }
+            })
+            .unwrap_or(0.0)
+    }
+
     /// Default resource set for a lunar colony.
     pub fn lunar_default() -> Self {
         let mut r = Self::new();
@@ -148,6 +173,107 @@ impl WorldResources {
                 critical_threshold: 0.2,
             },
         );
+        r
+    }
+
+    /// Default resource set for Europa (Jupiter system).
+    ///
+    /// Unlimited water/ice, zero solar power (nuclear-gated), limited materials.
+    /// Energy production requires fission/fusion tech — without it, the colony dies.
+    /// Paranicas et al. (2009); Anderson et al. (1998) for ocean/ice data.
+    pub fn europa_default() -> Self {
+        let mut r = Self::new();
+        r.set("food", ResourceStock {
+            current: 500.0,
+            capacity: 1500.0,
+            production_rate: 30.0,    // Hydroponics under ice (energy-limited)
+            consumption_rate: 40.0,
+            critical_threshold: 0.15,
+        });
+        r.set("water", ResourceStock {
+            current: 5000.0,
+            capacity: 20000.0,
+            production_rate: 500.0,   // 10× lunar — unlimited ice
+            consumption_rate: 45.0,
+            critical_threshold: 0.05,
+        });
+        r.set("energy", ResourceStock {
+            current: 500.0,           // Bootstrapped from lander reactors
+            capacity: 3000.0,
+            production_rate: 0.0,     // ZERO until fission/fusion achieved
+            consumption_rate: 100.0,  // Higher than lunar — radiation shielding + ice processing
+            critical_threshold: 0.15,
+        });
+        r.set("materials", ResourceStock {
+            current: 200.0,
+            capacity: 800.0,
+            production_rate: 3.0,     // 0.3× lunar — limited metals, must import
+            consumption_rate: 15.0,
+            critical_threshold: 0.25,
+        });
+        r.set("oxygen", ResourceStock {
+            current: 900.0,
+            capacity: 2000.0,
+            production_rate: 60.0,    // Electrolysis from ice (if energy available)
+            consumption_rate: 50.0,
+            critical_threshold: 0.2,
+        });
+        r
+    }
+
+    /// Default resource set for Titan (Saturn system).
+    ///
+    /// Limitless hydrocarbons + nitrogen, ice bedrock for water, zero solar.
+    /// Energy is nuclear-only. Materials production boosted by hydrocarbon ISRU.
+    /// Fulchignoni et al. (2005); Niemann et al. (2010); Mastrogiuseppe et al. (2019).
+    pub fn titan_default() -> Self {
+        let mut r = Self::new();
+        r.set("food", ResourceStock {
+            current: 300.0,
+            capacity: 1000.0,
+            production_rate: 22.0,    // 0.5× lunar — all lighting artificial, energy-expensive
+            consumption_rate: 40.0,
+            critical_threshold: 0.15,
+        });
+        r.set("water", ResourceStock {
+            current: 3000.0,
+            capacity: 15000.0,
+            production_rate: 250.0,   // 5× lunar — ice bedrock, but must melt (energy cost)
+            consumption_rate: 45.0,
+            critical_threshold: 0.1,
+        });
+        r.set("energy", ResourceStock {
+            current: 300.0,           // Bootstrapped from lander reactors
+            capacity: 2000.0,
+            production_rate: 0.0,     // ZERO until fission/fusion achieved
+            consumption_rate: 120.0,  // Higher than Europa — heating load is relentless (199K ΔT)
+            critical_threshold: 0.2,
+        });
+        r.set("materials", ResourceStock {
+            current: 400.0,
+            capacity: 1500.0,
+            production_rate: 20.0,    // 2× lunar — hydrocarbon polymers, ice pykrete construction
+            consumption_rate: 15.0,
+            critical_threshold: 0.15,
+        });
+        r.set("oxygen", ResourceStock {
+            current: 600.0,
+            capacity: 1500.0,
+            production_rate: 40.0,    // Electrolysis from ice (if energy available)
+            consumption_rate: 50.0,
+            critical_threshold: 0.2,
+        });
+        // Titan-exclusive: hydrocarbon resource (methane/ethane from lakes).
+        // Kraken Mare alone holds ~20,000 km³. Effectively unlimited for colony scale.
+        // Used for materials ISRU (polymers, pykrete), rocket fuel (CH4/LOX), and
+        // chemical energy storage. Mastrogiuseppe et al. (2019), Nature Astronomy.
+        r.set("hydrocarbons", ResourceStock {
+            current: 50000.0,
+            capacity: 100000.0,
+            production_rate: 500.0,   // Surface collection from methane lakes
+            consumption_rate: 50.0,   // Materials + fuel synthesis
+            critical_threshold: 0.05, // Very hard to run out
+        });
         r
     }
 
@@ -384,6 +510,20 @@ impl World {
             dist[i] = counts[i] as f64 / total as f64;
         }
         dist
+    }
+
+    /// Mean allostatic load of living agents.
+    pub fn mean_allostatic_load(&self) -> f64 {
+        let living: Vec<f64> = self
+            .agents
+            .iter()
+            .filter(|a| a.is_alive())
+            .map(|a| a.needs.allostatic_load)
+            .collect();
+        if living.is_empty() {
+            return 0.0;
+        }
+        living.iter().sum::<f64>() / living.len() as f64
     }
 
     /// Add an agent to this world.

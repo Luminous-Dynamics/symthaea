@@ -57,6 +57,13 @@ pub struct WorldEconomy {
     pub trade_balance: f64,
     /// Fraction of output reinvested in infrastructure (0.0-0.5).
     pub investment_rate: f64,
+    /// Sectors currently in skill gap crisis (zero workers AND pop > 10).
+    /// Requires 36 ticks of education to recover.
+    #[serde(default)]
+    pub skill_gap_sectors: Vec<usize>,
+    /// Per-sector: ticks remaining until skill gap recovery (0 = no gap or recovered).
+    #[serde(default)]
+    pub skill_gap_recovery_ticks: [u32; NUM_SECTORS],
 }
 
 impl WorldEconomy {
@@ -75,6 +82,8 @@ impl WorldEconomy {
             self_sufficiency: 0.0,
             trade_balance: 0.0,
             investment_rate: 0.15,
+            skill_gap_sectors: Vec::new(),
+            skill_gap_recovery_ticks: [0; NUM_SECTORS],
         }
     }
 

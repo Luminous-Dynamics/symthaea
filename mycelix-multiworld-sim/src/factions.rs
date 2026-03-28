@@ -101,14 +101,31 @@ impl FactionEngine {
         rng: &mut StochasticEngine,
         policy: &PolicyConfig,
     ) -> Vec<CivEvent> {
+        self.tick_factions_with_stress(worlds, current_tick, rng, policy, 0.0)
+    }
+
+    /// Run one tick of faction dynamics with a stress-driven emergence boost.
+    ///
+    /// Mechanism 2 — Agent Decision Quality Under Stress: when stress_boost > 0,
+    /// faction emergence probability is multiplied by (1 + 3 * stress_boost).
+    /// This models how collective psychological distress drives political
+    /// fragmentation (Turchin 2003, Putnam 2000).
+    pub fn tick_factions_with_stress(
+        &mut self,
+        worlds: &mut [World],
+        current_tick: u32,
+        rng: &mut StochasticEngine,
+        policy: &PolicyConfig,
+        stress_boost: f64,
+    ) -> Vec<CivEvent> {
         if !policy.faction_enabled {
             return Vec::new();
         }
 
         let mut events = Vec::new();
 
-        // Phase 1: Faction emergence
-        events.extend(self.tick_emergence(worlds, current_tick, rng));
+        // Phase 1: Faction emergence (with stress boost)
+        events.extend(self.tick_emergence_with_stress(worlds, current_tick, rng, stress_boost));
 
         // Phase 2: Recruitment (update member counts)
         self.tick_recruitment(worlds);
@@ -128,12 +145,23 @@ impl FactionEngine {
         events
     }
 
-    /// Check for faction emergence in each world.
+    /// Check for faction emergence in each world (no stress boost).
     fn tick_emergence(
         &mut self,
         worlds: &[World],
         current_tick: u32,
         rng: &mut StochasticEngine,
+    ) -> Vec<CivEvent> {
+        self.tick_emergence_with_stress(worlds, current_tick, rng, 0.0)
+    }
+
+    /// Check for faction emergence with optional stress-driven boost.
+    fn tick_emergence_with_stress(
+        &mut self,
+        worlds: &[World],
+        current_tick: u32,
+        rng: &mut StochasticEngine,
+        stress_boost: f64,
     ) -> Vec<CivEvent> {
         let mut events = Vec::new();
 
@@ -147,8 +175,9 @@ impl FactionEngine {
                 continue;
             }
 
-            // 0.5% chance per tick when conditions are met
-            if !rng.bernoulli(0.005) {
+            // 0.5% chance per tick when conditions are met, amplified by stress
+            let emergence_prob = 0.005 * (1.0 + 3.0 * stress_boost);
+            if !rng.bernoulli(emergence_prob.min(0.5)) {
                 continue;
             }
 

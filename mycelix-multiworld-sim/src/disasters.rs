@@ -26,7 +26,7 @@ use crate::stochastic::StochasticEngine;
 use crate::world::World;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 // ---------------------------------------------------------------------------
 // Constants: monthly probabilities derived from published annualized rates
@@ -76,6 +76,82 @@ const P_POWER_FAILURE: f64 = 0.0119;
 const SEAL_DEGRADATION_PER_TICK: f64 = 0.001 / 12.0;
 /// Hydroponic system: MTBF 48 months.
 const P_HYDROPONIC_FAILURE: f64 = 0.0208;
+
+// ---------------------------------------------------------------------------
+// Outer System: Europa (Jupiter radiation belt at 9.38 Rj)
+// ---------------------------------------------------------------------------
+// Paranicas et al. (2009), "Europa's Radiation Environment", in Europa
+// (Univ. Arizona Press); JPL Europa Clipper environmental design docs.
+
+/// Radiation surge from Jupiter magnetosphere compression. ~2%/month.
+const P_EUROPA_RADIATION_SURGE: f64 = 0.02;
+/// Tidal quake from 30m peak-to-peak flexing (3.55-day orbital period).
+/// Moore & Schubert (2000), Icarus. ~8.5 events/month, ~3% damaging.
+const P_EUROPA_TIDAL_QUAKE: f64 = 0.03;
+/// Ice shell instability (cryovolcanic diapir). Very rare.
+/// Pappalardo et al. (1998), Nature.
+const P_EUROPA_ICE_INSTABILITY: f64 = 0.001;
+/// Europa solar flux: 3.7% of Earth's (50.3 / 1361 W/m²). Panels useless.
+const EUROPA_SOLAR_FLUX_FRACTION: f64 = 0.037;
+
+// ---------------------------------------------------------------------------
+// Outer System: Titan (cryogenic at 93.7 K, 1.467 bar N₂)
+// ---------------------------------------------------------------------------
+// Fulchignoni et al. (2005), Nature 438:785; Niemann et al. (2010),
+// JGR 115:E12006; Turtle et al. (2011), Science 331:1414.
+
+/// Heating failure in cryogenic environment: 2× thermal MTBF penalty.
+/// At -179°C, heating loss = colony freeze in hours (uninsulated) to days.
+const P_TITAN_HEATING_FAILURE: f64 = P_THERMAL_FAILURE * 2.0;
+/// Cryogenic embrittlement: cumulative material fatigue at 94 K.
+/// Standard steel DBTT well above 94 K; seals and polymers shatter.
+const TITAN_EMBRITTLEMENT_PER_TICK: f64 = 0.001;
+/// Major methane rainstorm: ~1 per 15 years equatorial. Turtle et al. 2011.
+const P_TITAN_METHANE_STORM: f64 = 0.005;
+/// Low-gravity chronic health degradation: 0.14g (1.352 m/s²).
+/// Estimated 0.5%/month bone loss interpolated from microgravity data.
+const TITAN_LOW_G_LOAD_PER_TICK: f64 = 0.002;
+/// Titan solar flux: 1.1% of Earth's at orbit, ~1 W/m² at surface after haze.
+const TITAN_SOLAR_FLUX_FRACTION: f64 = 0.011;
+
+// ---------------------------------------------------------------------------
+// Earth geophysics
+// ---------------------------------------------------------------------------
+// USGS historical seismicity catalog; Mason et al. (2004) VEI analysis.
+
+/// Mega-quake M9.0+: ~1 per 80 years (historical record: 5 since 1900).
+const P_MEGA_QUAKE: f64 = 0.001;
+/// Supervolcanic eruption VEI 7+: ~1 per 80,000 years.
+const P_SUPERVOLCANO: f64 = 0.000_001;
+
+// ---------------------------------------------------------------------------
+// Magnetosphere decay
+// ---------------------------------------------------------------------------
+// IGRF-13 model; Pavon-Carrasco & De Santis (2016).
+
+/// Magnetic field decay: ~5% per century (measured ~9% over last 200 years).
+const MAGNETIC_DECAY_PER_TICK: f64 = 0.05 / 1200.0;
+/// Laschamp-type excursion probability: ~1 per 8,000 years.
+const P_EXCURSION: f64 = 0.000_01;
+/// Field strength during excursion: 5% of normal. Laschamp event 41 kya.
+const EXCURSION_FIELD_STRENGTH: f64 = 0.05;
+/// Excursion duration: ~50 years (short excursion, not full reversal).
+const EXCURSION_DURATION_TICKS: u32 = 600;
+
+// ---------------------------------------------------------------------------
+// Kessler syndrome (orbital debris cascade)
+// ---------------------------------------------------------------------------
+// Kessler & Cour-Palais (1978), JGR; Liou & Johnson (2006), Adv. Space Res.;
+// Liou (2011), NASA ADR parametric study.
+
+/// Debris density doubling time: ~30 years (360 ticks). Liou 2011.
+const KESSLER_DOUBLING_TICKS: f64 = 360.0;
+/// Governance collapse threshold for cascade trigger.
+const KESSLER_GOVERNANCE_THRESHOLD: f64 = 0.3;
+/// Sustained collapse duration required (5 years).
+const KESSLER_COLLAPSE_DURATION: u32 = 60;
+/// Probability of cascade initiation once conditions met.
+const P_KESSLER_INITIATION: f64 = 0.05;
 
 // Psychological Events — per-tick probabilities for confined crews
 /// Winter-over syndrome: ~40% prevalence/year in confined crews (Palinkas 2008).
@@ -170,6 +246,29 @@ pub enum PlanetaryEventKind {
     ThermalMoonquake,
     /// Charged dust during terminator crossing. Equipment fouling.
     LunarDustEvent,
+    // --- Europa (Jupiter system) ---
+    /// Jupiter magnetosphere compression → radiation surge. Paranicas 2009.
+    EuropaRadiationSurge,
+    /// Tidal flexing stress (30m peak-to-peak, 3.55-day cycle). Moore 2000.
+    EuropaTidalQuake,
+    /// Cryovolcanic/diapir event in ice shell. Pappalardo 1998.
+    EuropaIceShellInstability,
+    // --- Titan (Saturn system) ---
+    /// Thermal control failure in cryogenic environment (-179°C). 2× MTBF.
+    TitanHeatingFailure,
+    /// Cumulative material fatigue from 94 K thermal cycling.
+    TitanCryogenicEmbrittlement,
+    /// Major methane rainstorm + flash flooding. Turtle 2011.
+    TitanMethaneStorm,
+    /// Chronic health degradation at 0.14g. Deterministic per-tick.
+    TitanLowGravityHealth,
+    // --- Earth geophysics ---
+    /// M9.0+ mega-earthquake. ~1 per 80 years. USGS catalog.
+    EarthMegaQuake,
+    /// Tsunami triggered by mega-quake (50% co-occurrence).
+    EarthMegaTsunami,
+    /// VEI 7+ supervolcanic eruption. ~1 per 80,000 years. Global effects.
+    EarthSupervolcanicEruption,
 }
 
 /// ECLSS and infrastructure failure classification.
@@ -244,6 +343,8 @@ pub enum CivilizationEventKind {
     SystemicCascadeFailure,
     /// When mean allostatic_load > 0.6 for 24+ ticks.
     SocialCohesionCrisis,
+    /// LEO debris cascade triggered by governance collapse. Kessler 1978.
+    KesslerCascade,
 }
 
 /// Unified disaster kind covering all 7 categories.
@@ -502,10 +603,163 @@ impl TechTree {
     }
 
     /// Check whether a named milestone has been achieved.
-    fn is_achieved(&self, name: &str) -> bool {
+    pub fn is_achieved(&self, name: &str) -> bool {
         self.milestones
             .iter()
             .any(|m| m.name == name && m.achieved)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Magnetosphere state (Earth's geomagnetic field)
+// ---------------------------------------------------------------------------
+
+/// Earth's magnetic field state — decays over centuries, occasional excursions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MagnetosphereState {
+    /// Normalized field strength (1.0 = current 2025, decays toward 0).
+    pub field_strength: f64,
+    /// Whether a Laschamp-type excursion is active.
+    pub excursion_active: bool,
+    /// Ticks remaining in the current excursion.
+    pub excursion_remaining_ticks: u32,
+}
+
+impl Default for MagnetosphereState {
+    fn default() -> Self {
+        Self {
+            field_strength: 1.0,
+            excursion_active: false,
+            excursion_remaining_ticks: 0,
+        }
+    }
+}
+
+impl MagnetosphereState {
+    /// Advance magnetosphere state by one tick.
+    pub fn tick(&mut self, rng: &mut StochasticEngine) {
+        // Secular decay: ~5% per century
+        self.field_strength = (self.field_strength - MAGNETIC_DECAY_PER_TICK).max(0.01);
+
+        if self.excursion_active {
+            if self.excursion_remaining_ticks > 0 {
+                self.excursion_remaining_ticks -= 1;
+            } else {
+                // Excursion ends — field recovers to pre-excursion level
+                self.excursion_active = false;
+                // Recovery is partial — field returns to decayed baseline, not 1.0
+            }
+        } else if rng.bernoulli(P_EXCURSION) {
+            self.excursion_active = true;
+            self.excursion_remaining_ticks = EXCURSION_DURATION_TICKS;
+        }
+    }
+
+    /// Effective field strength (drops to 5% during excursion).
+    pub fn effective_strength(&self) -> f64 {
+        if self.excursion_active {
+            self.field_strength * EXCURSION_FIELD_STRENGTH
+        } else {
+            self.field_strength
+        }
+    }
+
+    /// Solar event severity multiplier for Earth.
+    /// Weaker field → more severe solar events reaching the surface.
+    /// At full strength: 1.0. At 5% (excursion): ~4.0.
+    pub fn solar_severity_multiplier(&self) -> f64 {
+        let eff = self.effective_strength();
+        1.0 + 3.0 * (1.0 - eff).powi(2)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Orbital debris state (Kessler syndrome)
+// ---------------------------------------------------------------------------
+
+/// LEO orbital debris density and cascade dynamics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrbitalDebrisState {
+    /// Debris density relative to 2025 baseline (1.0 = current).
+    pub density_fraction: f64,
+    /// Whether a self-sustaining collision cascade is active.
+    pub cascade_active: bool,
+    /// Tick at which the cascade began.
+    pub cascade_start_tick: Option<u32>,
+    /// Active debris removal capacity (normalized, 0 = none).
+    pub adr_capacity: f64,
+    /// LEO access multiplier (1.0 = normal, → 0.0 as density grows).
+    pub leo_access_multiplier: f64,
+    /// Consecutive ticks of Earth governance below threshold.
+    pub governance_collapse_ticks: u32,
+}
+
+impl Default for OrbitalDebrisState {
+    fn default() -> Self {
+        Self {
+            density_fraction: 1.0,
+            cascade_active: false,
+            cascade_start_tick: None,
+            adr_capacity: 0.0,
+            leo_access_multiplier: 1.0,
+            governance_collapse_ticks: 0,
+        }
+    }
+}
+
+impl OrbitalDebrisState {
+    /// Advance debris state by one tick.
+    pub fn tick(
+        &mut self,
+        earth_governance_stability: f64,
+        has_manufacturing: bool,
+        current_tick: u32,
+        rng: &mut StochasticEngine,
+    ) {
+        // Track governance collapse duration
+        if earth_governance_stability < KESSLER_GOVERNANCE_THRESHOLD {
+            self.governance_collapse_ticks += 1;
+        } else {
+            self.governance_collapse_ticks = self.governance_collapse_ticks.saturating_sub(2);
+        }
+
+        // Cascade trigger
+        if !self.cascade_active
+            && self.governance_collapse_ticks >= KESSLER_COLLAPSE_DURATION
+            && rng.bernoulli(P_KESSLER_INITIATION)
+        {
+            self.cascade_active = true;
+            self.cascade_start_tick = Some(current_tick);
+        }
+
+        // Cascade dynamics
+        if self.cascade_active {
+            // Exponential growth: doubles every 30 years (360 ticks)
+            self.density_fraction *= 1.0 + (0.693 / KESSLER_DOUBLING_TICKS);
+        } else {
+            // Slow natural decay from atmospheric drag (sub-600km)
+            self.density_fraction = (self.density_fraction * 0.999).max(1.0);
+        }
+
+        // Active debris removal
+        if has_manufacturing && earth_governance_stability > 0.5 {
+            self.adr_capacity = 1.0; // Full ADR capability
+        } else if earth_governance_stability > 0.3 {
+            self.adr_capacity = 0.3; // Partial
+        } else {
+            self.adr_capacity = 0.0;
+        }
+        self.density_fraction = (self.density_fraction - self.adr_capacity * 0.002).max(1.0);
+
+        // LEO access multiplier: drops as density grows
+        // At 1x: 1.0, at 10x: ~0.9, at 100x: ~0.5, at 1000x: ~0.09
+        self.leo_access_multiplier =
+            (1.0 / (1.0 + (self.density_fraction - 1.0) * 0.01)).clamp(0.0, 1.0);
+
+        // Cascade can be arrested if density drops back to baseline
+        if self.cascade_active && self.density_fraction <= 1.5 {
+            self.cascade_active = false;
+        }
     }
 }
 
@@ -540,6 +794,16 @@ pub struct DisasterEngine {
     /// has survived (remaining_ticks reached 0). Subsequent occurrences of the same
     /// kind have severity reduced by 30% (institutional learning).
     pub survived_disaster_types: HashSet<String>,
+    /// Mechanism 1 — Non-Linear Cascade Failures: count of active disasters per world.
+    /// When a world has 3+ active disasters, all new effects are amplified.
+    pub active_per_world: HashMap<u32, u32>,
+    // --- Geophysics & orbital environment ---
+    /// Earth's magnetic field state.
+    pub magnetosphere: MagnetosphereState,
+    /// LEO orbital debris (Kessler syndrome).
+    pub orbital_debris: OrbitalDebrisState,
+    /// Cumulative Titan embrittlement damage (0.0-1.0).
+    pub titan_embrittlement: f64,
     // --- Statistics ---
     pub total_disasters: u64,
     pub carrington_events: u32,
@@ -561,6 +825,10 @@ impl DisasterEngine {
             high_load_ticks: Vec::new(),
             tech_tree: TechTree::default_tree(),
             survived_disaster_types: HashSet::new(),
+            active_per_world: HashMap::new(),
+            magnetosphere: MagnetosphereState::default(),
+            orbital_debris: OrbitalDebrisState::default(),
+            titan_embrittlement: 0.0,
             total_disasters: 0,
             carrington_events: 0,
             faction_crises: 0,
@@ -586,6 +854,37 @@ impl DisasterEngine {
         // 1. Advance solar cycle
         self.advance_solar_cycle();
 
+        // 1.5. Advance geophysics subsystems
+        self.magnetosphere.tick(rng);
+        let earth_gov_stability = worlds
+            .iter()
+            .find(|w| w.location == "Earth")
+            .map(|w| w.governance.stability_score)
+            .unwrap_or(1.0);
+        let has_manufacturing = self.tech_tree.is_achieved("Manufacturing Breakthrough");
+        self.orbital_debris.tick(earth_gov_stability, has_manufacturing, current_tick, rng);
+
+        // Kessler cascade event generation
+        if self.orbital_debris.cascade_active
+            && self.orbital_debris.cascade_start_tick == Some(current_tick)
+        {
+            let effects = DisasterEffects {
+                resource_production_penalty: 0.15,
+                consciousness_shock: 0.05,
+                allostatic_load_increase: 0.1,
+                morale_impact: -0.2,
+                ..Default::default()
+            };
+            results.push((
+                effects,
+                None,
+                CivEvent::new(current_tick, None, CivEventType::EmergencyDeclared,
+                    format!("KESSLER CASCADE INITIATED — LEO debris density {:.1}x baseline, space access degrading",
+                        self.orbital_debris.density_fraction)),
+            ));
+            self.total_disasters += 1;
+        }
+
         // 2. Roll for each disaster category
         self.roll_solar_events(current_tick, rng, &mut results);
         self.roll_impact_events(worlds, current_tick, rng, &mut results);
@@ -599,6 +898,22 @@ impl DisasterEngine {
 
         // 4. Advance active disasters
         self.advance_active_disasters();
+
+        // 4.5. Mechanism 1 — Non-Linear Cascade Failures: recompute active disaster
+        // counts per world. When a world has 3+ active disasters, all effects from
+        // this tick are amplified by 1.0 + 0.5 * (active_count - 2).
+        self.active_per_world.clear();
+        for d in &self.active_disasters {
+            if let Some(wid) = d.world_id {
+                *self.active_per_world.entry(wid).or_insert(0) += 1;
+            }
+        }
+        // Also count global disasters (world_id == None) toward all worlds
+        let global_count = self.active_disasters.iter().filter(|d| d.world_id.is_none()).count() as u32;
+        for world in worlds {
+            let entry = self.active_per_world.entry(world.id).or_insert(0);
+            *entry += global_count;
+        }
 
         // 5. Prune old failure timestamps
         self.last_failure_ticks
@@ -708,6 +1023,9 @@ impl DisasterEngine {
             // provides hardened electronics + nuclear backup (60% reduction), and
             // manufacturing capability enables local rebuild (additional 30% reduction).
             let mut carrington_severity = 1.0_f64;
+            // Magnetosphere decay amplifies Carrington severity for Earth.
+            // At full field: 1.0×. At excursion (5%): ~4.0×.
+            carrington_severity *= self.magnetosphere.solar_severity_multiplier();
             if self.tech_tree.is_achieved("Fission Surface Power") {
                 carrington_severity *= 0.4; // 60% reduction
             }
@@ -947,7 +1265,270 @@ impl DisasterEngine {
                         ));
                     }
                 }
-                _ => {} // Other locations have their own hazards
+                "Europa" => {
+                    // Jupiter radiation surge — magnetosphere compression event
+                    if rng.bernoulli(P_EUROPA_RADIATION_SURGE) {
+                        // Subterranean colonies (infrastructure > 0.3 implies buried) get 90% reduction
+                        let shielding = if world.infrastructure_level > 0.3 { 0.1 } else { 1.0 };
+                        let effects = DisasterEffects {
+                            electronics_damage: 0.05 * shielding,
+                            population_loss_fraction: 0.005 * shielding,
+                            consciousness_shock: 0.1 * shielding,
+                            allostatic_load_increase: 0.1,
+                            morale_impact: -0.15,
+                            ..Default::default()
+                        };
+                        results.push((
+                            effects,
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                format!("{}: Jupiter magnetosphere compression — radiation surge (shielding {:.0}%)",
+                                    world.name, (1.0 - shielding) * 100.0)),
+                        ));
+                        self.total_disasters += 1;
+                    }
+
+                    // Tidal quake (30m peak-to-peak flexing, 3.55-day cycle)
+                    if rng.bernoulli(P_EUROPA_TIDAL_QUAKE) {
+                        let damage = 0.01 + rng.next_f64() * 0.02; // 0.01-0.03
+                        // Better infrastructure flexes with the ice
+                        let flex_factor = 1.0 - world.infrastructure_level * 0.5;
+                        let effects = DisasterEffects {
+                            infrastructure_damage: damage * flex_factor,
+                            allostatic_load_increase: 0.03,
+                            ..Default::default()
+                        };
+                        results.push((
+                            effects,
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                format!("{}: tidal flexing quake — structural stress ({:.1}% damage)",
+                                    world.name, damage * flex_factor * 100.0)),
+                        ));
+                        self.total_disasters += 1;
+                    }
+
+                    // Ice shell instability (rare, catastrophic)
+                    if rng.bernoulli(P_EUROPA_ICE_INSTABILITY) {
+                        let severity = 0.1 + rng.next_f64() * 0.2; // 0.1-0.3
+                        let effects = DisasterEffects {
+                            infrastructure_damage: severity,
+                            population_loss_fraction: severity * 0.15,
+                            consciousness_shock: 0.2,
+                            allostatic_load_increase: 0.3,
+                            morale_impact: -0.4,
+                            ..Default::default()
+                        };
+                        self.active_disasters.push(ActiveDisaster {
+                            kind: DisasterKind::Planetary(PlanetaryEventKind::EuropaIceShellInstability),
+                            severity,
+                            remaining_ticks: 2,
+                            world_id: Some(world.id),
+                            effects: effects.clone(),
+                        });
+                        results.push((
+                            effects,
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                format!("{}: ICE SHELL INSTABILITY — cryovolcanic event, severity {:.0}%",
+                                    world.name, severity * 100.0)),
+                        ));
+                        self.total_disasters += 1;
+                    }
+                }
+                "Titan" => {
+                    // Heating failure — Titan's signature killer (2× thermal MTBF)
+                    if rng.bernoulli(P_TITAN_HEATING_FAILURE) {
+                        let (pop_loss, infra_damage) = if world.infrastructure_level < 0.5 {
+                            // No redundant heating → freeze cascade
+                            let severity = 0.1 + rng.next_f64() * 0.4; // 0.1-0.5
+                            (severity, 0.1)
+                        } else {
+                            // Redundant heating absorbs the failure
+                            (0.0, 0.05)
+                        };
+                        let effects = DisasterEffects {
+                            population_loss_fraction: pop_loss,
+                            infrastructure_damage: infra_damage,
+                            allostatic_load_increase: 0.2,
+                            morale_impact: -0.3,
+                            consciousness_shock: pop_loss * 0.5,
+                            ..Default::default()
+                        };
+                        results.push((
+                            effects,
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                if pop_loss > 0.0 {
+                                    format!("{}: HEATING SYSTEM FAILURE — freeze cascade, {:.0}% casualties",
+                                        world.name, pop_loss * 100.0)
+                                } else {
+                                    format!("{}: heating system failure — redundant systems activated",
+                                        world.name)
+                                }),
+                        ));
+                        self.total_disasters += 1;
+                    }
+
+                    // Cryogenic embrittlement (cumulative)
+                    self.titan_embrittlement =
+                        (self.titan_embrittlement + TITAN_EMBRITTLEMENT_PER_TICK).min(1.0);
+                    // Tech level reduces embrittlement (better materials)
+                    let embrittlement_factor = 1.0 - world.knowledge.mean_tech_level() * 0.3;
+                    let seal_accel = 3.0 * embrittlement_factor.max(0.1);
+                    if self.titan_embrittlement > 0.1 {
+                        let effects = DisasterEffects {
+                            infrastructure_damage: 0.005 * embrittlement_factor.max(0.1),
+                            ..Default::default()
+                        };
+                        // Accelerate seal degradation for Titan
+                        self.seal_degradation =
+                            (self.seal_degradation + SEAL_DEGRADATION_PER_TICK * seal_accel).min(1.0);
+                        if rng.bernoulli(0.1) { // Log occasionally, not every tick
+                            results.push((
+                                effects,
+                                Some(world.id),
+                                CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                    format!("{}: cryogenic embrittlement — seal degradation at {:.1}%",
+                                        world.name, self.seal_degradation * 100.0)),
+                            ));
+                        }
+                    }
+
+                    // Major methane rainstorm
+                    if rng.bernoulli(P_TITAN_METHANE_STORM) {
+                        let duration = 1 + (rng.next_f64() * 2.0) as u32; // 1-2 ticks
+                        let effects = DisasterEffects {
+                            resource_production_penalty: 0.2,
+                            infrastructure_damage: 0.02,
+                            allostatic_load_increase: 0.1,
+                            morale_impact: -0.1,
+                            ..Default::default()
+                        };
+                        self.active_disasters.push(ActiveDisaster {
+                            kind: DisasterKind::Planetary(PlanetaryEventKind::TitanMethaneStorm),
+                            severity: 0.4,
+                            remaining_ticks: duration,
+                            world_id: Some(world.id),
+                            effects: effects.clone(),
+                        });
+                        results.push((
+                            effects,
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                format!("{}: major methane rainstorm — flooding, {} months duration",
+                                    world.name, duration)),
+                        ));
+                        self.total_disasters += 1;
+                    }
+
+                    // Low-gravity chronic health degradation (deterministic, every tick)
+                    let low_g_load = TITAN_LOW_G_LOAD_PER_TICK;
+                    // Tech milestones reduce the health impact (centrifuge quarters, pharma)
+                    let low_g_mitigation = if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
+                        0.5
+                    } else {
+                        1.0
+                    };
+                    results.push((
+                        DisasterEffects {
+                            allostatic_load_increase: low_g_load * low_g_mitigation,
+                            ..Default::default()
+                        },
+                        Some(world.id),
+                        CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                            format!("{}: chronic 0.14g health effects — bone loss, cardiovascular stress",
+                                world.name)),
+                    ));
+
+                    // Titan is IMMUNE to radiation disasters (double shielded)
+                    // — no radiation events generated here; solar events in
+                    //   roll_solar_events apply globally but Titan's atmosphere
+                    //   (1085 g/cm²) and Saturn's magnetosphere absorb them.
+                    //   This is handled in the disaster application phase.
+                }
+                "Earth" => {
+                    // Mega-earthquake M9.0+ (~1 per 80 years)
+                    if rng.bernoulli(P_MEGA_QUAKE) {
+                        let severity = 0.05 + rng.next_f64() * 0.1; // 0.05-0.15
+                        let mut effects = DisasterEffects {
+                            infrastructure_damage: severity,
+                            population_loss_fraction: 0.001 + rng.next_f64() * 0.009,
+                            allostatic_load_increase: 0.15,
+                            morale_impact: -0.2,
+                            ..Default::default()
+                        };
+                        results.push((
+                            effects.clone(),
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                format!("{}: MEGA-QUAKE M9.0+ — infrastructure damage {:.1}%",
+                                    world.name, severity * 100.0)),
+                        ));
+                        self.total_disasters += 1;
+
+                        // 50% chance of mega-tsunami co-occurrence
+                        if rng.bernoulli(0.5) {
+                            effects = DisasterEffects {
+                                infrastructure_damage: 0.05,
+                                resource_production_penalty: 0.1,
+                                population_loss_fraction: 0.002,
+                                allostatic_load_increase: 0.1,
+                                morale_impact: -0.15,
+                                ..Default::default()
+                            };
+                            results.push((
+                                effects,
+                                Some(world.id),
+                                CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                    format!("{}: MEGA-TSUNAMI triggered by quake", world.name)),
+                            ));
+                            self.total_disasters += 1;
+                        }
+                    }
+
+                    // Supervolcanic eruption VEI 7+ (~1 per 80,000 years)
+                    if rng.bernoulli(P_SUPERVOLCANO) {
+                        let effects = DisasterEffects {
+                            resource_production_penalty: 0.3,
+                            allostatic_load_increase: 0.2,
+                            consciousness_shock: 0.1,
+                            morale_impact: -0.3,
+                            ..Default::default()
+                        };
+                        // Volcanic winter: 24 ticks (2 years) of reduced food production
+                        self.active_disasters.push(ActiveDisaster {
+                            kind: DisasterKind::Planetary(PlanetaryEventKind::EarthSupervolcanicEruption),
+                            severity: 0.9,
+                            remaining_ticks: 24,
+                            world_id: None, // Global: affects all worlds' solar/food
+                            effects: effects.clone(),
+                        });
+                        results.push((
+                            effects,
+                            None,
+                            CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
+                                "SUPERVOLCANIC ERUPTION VEI 7+ — volcanic winter begins (24 months)"),
+                        ));
+                        self.total_disasters += 1;
+                    }
+
+                    // Magnetosphere excursion effects (chronic, if active)
+                    if self.magnetosphere.excursion_active {
+                        results.push((
+                            DisasterEffects {
+                                allostatic_load_increase: 0.01,
+                                resource_production_penalty: 0.05, // UV/ozone damage to agriculture
+                                ..Default::default()
+                            },
+                            Some(world.id),
+                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
+                                format!("{}: magnetic field excursion — elevated surface radiation, ozone depletion",
+                                    world.name)),
+                        ));
+                    }
+                }
+                _ => {} // Generic locations use only shared disaster categories
             }
         }
     }

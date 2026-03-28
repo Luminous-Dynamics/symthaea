@@ -67,6 +67,18 @@ pub enum CivEventType {
     TraumaAccumulation,
     /// Governance model transition (e.g., authoritarian -> democratic).
     GovernanceTransition,
+    /// Non-linear cascade failure: 3+ simultaneous disasters amplify each other.
+    SystemicCascadeFailure,
+    /// A critical economic sector has zero skilled workers (knowledge bottleneck).
+    SkillGapCrisis,
+    /// Inter-generational knowledge loss: too few skilled workers to maintain tech level.
+    KnowledgeLoss,
+    /// A critical resource has been below 20% capacity for 12+ consecutive ticks.
+    ResourceDepletionCrisis,
+    /// Low or high morale is spreading through the population (social epidemic).
+    MoraleContagion,
+    /// Population has exceeded the dynamic carrying capacity of the world.
+    CarryingCapacityExceeded,
 }
 
 impl CivEvent {
