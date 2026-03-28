@@ -160,6 +160,101 @@ fn evaluate_contour(notes: &[Note]) -> f32 {
     arc_quality.clamp(0.0, 1.0)
 }
 
+// ── Music Auto-Improve ──────────────────────────────────────────────────────
+
+/// Score improvement below this triggers Sacred Stillness for music.
+pub const MUSIC_STILLNESS_THRESHOLD: f32 = 0.01;
+
+/// Result of a music practice session.
+#[derive(Debug, Clone)]
+pub struct MusicPracticeResult {
+    /// Rounds completed.
+    pub rounds: usize,
+    /// Composite score per round.
+    pub trajectory: Vec<f32>,
+    /// Whether stillness was reached.
+    pub reached_stillness: bool,
+    /// Best score achieved.
+    pub best_score: f32,
+}
+
+/// Autonomous music practice: compose, critique, evolve state, repeat.
+///
+/// Each round: compose → evaluate → apply musical wisdom → repeat.
+/// Stops at stillness (delta < threshold) or max_rounds.
+pub fn music_auto_improve(
+    config: &crate::MuseConfig,
+    state: &mut MusicalState,
+    max_rounds: usize,
+    seed_base: u64,
+) -> MusicPracticeResult {
+    let mut trajectory = Vec::with_capacity(max_rounds);
+    let mut best_score = 0.0f32;
+    let mut prev_score = 0.0f32;
+
+    for round in 0..max_rounds {
+        let comp = crate::compose(config, state, seed_base + round as u64);
+        let verdict = evaluate_composition(&comp, state);
+        trajectory.push(verdict.composite);
+
+        if verdict.composite > best_score {
+            best_score = verdict.composite;
+        }
+
+        // Stillness check
+        if round > 2 && (verdict.composite - prev_score).abs() < MUSIC_STILLNESS_THRESHOLD {
+            return MusicPracticeResult {
+                rounds: round + 1,
+                trajectory,
+                reached_stillness: true,
+                best_score,
+            };
+        }
+        prev_score = verdict.composite;
+
+        // Apply musical wisdom
+        apply_music_wisdom(state, &verdict);
+    }
+
+    MusicPracticeResult {
+        rounds: max_rounds,
+        trajectory,
+        reached_stillness: false,
+        best_score,
+    }
+}
+
+/// Apply music verdict as wisdom to evolve the musical state.
+fn apply_music_wisdom(state: &mut MusicalState, verdict: &MusicVerdict) {
+    let lr = 0.05;
+
+    // High melodic interest + good contour → boost consciousness (reward creative phrasing)
+    if verdict.melodic_contour > 0.5 && verdict.melodic_interest > 0.5 {
+        state.consciousness_level = (state.consciousness_level + lr * 0.5).clamp(0.0, 1.0);
+    }
+
+    // Low rhythmic regularity → reduce arousal (calm down, find the groove)
+    if verdict.rhythmic_regularity < 0.4 {
+        state.arousal = (state.arousal - lr).clamp(0.0, 1.0);
+    }
+
+    // High harmonic alignment → boost serotonin (satisfaction)
+    if verdict.harmonic_alignment > 0.5 {
+        state.serotonin = (state.serotonin + lr * 0.3).clamp(0.0, 1.0);
+    }
+
+    // Low voice balance → reduce consciousness slightly (simplify)
+    if verdict.voice_balance < 0.3 {
+        state.consciousness_level = (state.consciousness_level - lr * 0.3).clamp(0.0, 1.0);
+    }
+
+    // Good form coherence → boost progression harmony
+    if verdict.form_coherence > 0.5 {
+        state.harmony_activations[6] =
+            (state.harmony_activations[6] + lr * 0.3).clamp(0.0, 1.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,6 +370,57 @@ mod tests {
             v_diverse.melodic_interest > v_repetitive.melodic_interest,
             "diverse {} should beat repetitive {}",
             v_diverse.melodic_interest, v_repetitive.melodic_interest
+        );
+    }
+
+    #[test]
+    fn music_auto_improve_produces_trajectory() {
+        let config = crate::MuseConfig {
+            duration_secs: 2.0,
+            max_notes: 8,
+            ..Default::default()
+        };
+        let mut state = crate::MusicalState::default();
+        let result = music_auto_improve(&config, &mut state, 10, 42);
+        assert!(result.rounds > 0);
+        assert!(!result.trajectory.is_empty());
+        assert!(result.best_score >= 0.0 && result.best_score <= 1.0);
+    }
+
+    #[test]
+    fn music_auto_improve_reaches_stillness() {
+        let config = crate::MuseConfig {
+            duration_secs: 2.0,
+            max_notes: 8,
+            ..Default::default()
+        };
+        let mut state = crate::MusicalState::default();
+        let result = music_auto_improve(&config, &mut state, 15, 42);
+        assert!(
+            result.reached_stillness || result.rounds == 15,
+            "should terminate"
+        );
+    }
+
+    #[test]
+    fn music_wisdom_modifies_state() {
+        let mut state = crate::MusicalState::default();
+        let original_serotonin = state.serotonin;
+        let verdict = MusicVerdict {
+            melodic_interest: 0.7,
+            rhythmic_regularity: 0.8,
+            harmonic_alignment: 0.8,
+            voice_balance: 0.6,
+            form_coherence: 0.7,
+            melodic_contour: 0.8,
+            composite: 0.7,
+        };
+        apply_music_wisdom(&mut state, &verdict);
+        // High harmonic alignment should boost serotonin
+        assert!(
+            state.serotonin > original_serotonin,
+            "serotonin should increase: {} → {}",
+            original_serotonin, state.serotonin
         );
     }
 }
