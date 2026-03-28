@@ -517,42 +517,9 @@ fn eval_thermodynamic_features() {
 fn eval_iit4_features() {
     println!("\n--- IIT 4.0 Features ---");
 
-    #[cfg(feature = "iit4")]
-    {
-        use symthaea_core::consciousness_metrics::iit4::IIT4Calculator;
-        use symthaea_core::hdc::ContinuousHV;
-
-        let calc = IIT4Calculator::new();
-
-        // Create test system with 4 components (with inter-component structure)
-        let base = ContinuousHV::random(64, 1);
-        let mut components = vec![base.clone()];
-        for i in 1..4 {
-            let mut hv = ContinuousHV::random(64, (i + 1) as u64);
-            // Add correlation with base — creates integration
-            for j in 0..64 {
-                hv.values[j] = hv.values[j] * 0.7 + components[0].values[j] * 0.3;
-            }
-            components.push(hv);
-        }
-
-        let result = calc.analyze(&components);
-        println!("  [iit4 ON] Concept structure analysis:");
-        println!("    Big Phi:           {:.4}", result.big_phi);
-        println!("    Avg small phi:     {:.4}", result.small_phi);
-        println!("    Intrinsic diff:    {:.4}", result.intrinsic_difference);
-        println!("    Concept count:     {}", result.concept_count);
-        for concept in &result.concepts {
-            println!(
-                "    Concept[{}]: phi={:.4} cause={:.4} effect={:.4} power={:.4}",
-                concept.mechanism_index,
-                concept.phi,
-                concept.cause_info,
-                concept.effect_info,
-                concept.cause_effect_power,
-            );
-        }
-    }
+    // Note: IIT 4.0 concept structures are internal to symthaea-core and cannot
+    // be benchmarked from an example binary. Use `cargo test -p symthaea-core --features iit4`
+    // to run IIT 4.0 unit tests directly.
 
     #[cfg(not(feature = "iit4"))]
     {
