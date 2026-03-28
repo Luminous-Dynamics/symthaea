@@ -54,6 +54,10 @@ fn main() {
         ("emergency-limits", scenario_emergency_limits),
         ("governance-invariants", scenario_governance_invariants),
         ("epistemic-transitions", scenario_epistemic_transitions),
+        ("dkg-threshold-validation", scenario_dkg_threshold),
+        ("tyranny-300-ticks", scenario_tyranny_resistance),
+        ("multi-seed-governance", scenario_multi_seed),
+        ("fl-overwhelm-recovery", scenario_fl_overwhelm),
     ];
 
     for (name, func) in &scenarios {

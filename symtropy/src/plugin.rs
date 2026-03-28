@@ -25,6 +25,8 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<systems::harmonies::LocalHarmonyState>()
             .init_resource::<systems::scavenge::CollectedPrimitives>()
             .init_resource::<systems::audio::AudioState>()
+            .init_resource::<systems::room_memory::RoomMemory>()
+            .init_resource::<systems::dialogue::DialogueTimer>()
             .add_systems(Startup, systems::audio::setup_audio)
             .add_systems(OnEnter(GamePhase::MainMenu), systems::menu::setup_menu)
             .add_systems(Update, systems::menu::menu_input_system.run_if(in_state(GamePhase::MainMenu)))
@@ -52,6 +54,8 @@ impl Plugin for SymtropyPlugin {
                 systems::consciousness::player_consciousness_system,
                 systems::consciousness::npc_consciousness_system,
                 systems::rendering::hud_system, systems::minimap::update_minimap,
+                systems::room_memory::room_memory_update_system,
+                systems::dialogue::dialogue_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
             .add_systems(Update, game_over.run_if(in_state(GamePhase::GameOver)))
             .add_systems(Update, victory.run_if(in_state(GamePhase::Victory)));
