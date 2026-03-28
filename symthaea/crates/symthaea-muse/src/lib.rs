@@ -604,7 +604,9 @@ mod tests {
 
 pub mod ablation;
 pub mod aesthetic_listener;
+pub mod ambient_drone;
 pub mod audio_feedback;
+pub mod state_smoother;
 pub mod binaural;
 pub mod collaborative;
 pub mod consciousness_reverb;

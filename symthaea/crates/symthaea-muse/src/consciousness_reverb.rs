@@ -249,12 +249,12 @@ mod tests {
         // Low consciousness = short pre-delay
         let low_state = MusicalState { consciousness_level: 0.1, ..Default::default() };
         reverb.update_state(&low_state);
-        assert!(reverb.pre_delay.delay_samples < 500);
+        assert!(reverb.pre_delay.target_delay < 500.0);
 
         // High consciousness = long pre-delay
         let high_state = MusicalState { consciousness_level: 0.9, ..Default::default() };
         reverb.update_state(&high_state);
-        assert!(reverb.pre_delay.delay_samples > 2000);
+        assert!(reverb.pre_delay.target_delay > 2000.0);
     }
 
     #[test]

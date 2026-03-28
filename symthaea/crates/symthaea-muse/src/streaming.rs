@@ -12,7 +12,9 @@
 //! - Substrate timbre (substrate type → synthesis character)
 
 use crate::aesthetic_listener::AestheticListener;
+use crate::ambient_drone::AmbientDrone;
 use crate::audio_feedback::AudioFeedbackEncoder;
+use crate::state_smoother::StateSmoother;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
 use crate::instruments::{self, Instrument, KarplusStrong};
@@ -88,6 +90,10 @@ pub struct StreamingSynth {
     substrate: Option<SubstrateTimbreModifier>,
     /// Aesthetic self-listener: judges beauty, corrects harshness.
     aesthetic: AestheticListener,
+    /// Ambient drone: continuous low pad filling silence.
+    drone: AmbientDrone,
+    /// State smoother: prevents abrupt parameter changes.
+    smoother: StateSmoother,
     /// FEP active inference engine for music (the system predicts its own sound).
     fep_engine: MusicalInferenceEngine,
     /// Free energy history for learning verification.
@@ -137,6 +143,8 @@ impl StreamingSynth {
             wavetable_bank: WavetableBank::default_bank(),
             substrate: None,
             aesthetic: AestheticListener::new(),
+            drone: AmbientDrone::new(sample_rate),
+            smoother: StateSmoother::default_smooth(),
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
             dither_state: 42,
@@ -153,12 +161,20 @@ impl StreamingSynth {
     }
 
     pub fn update_state(&mut self, state: &MusicalState) {
-        self.state = state.clone();
-        self.muse_stream.update_state(state);
-        self.reverb.update_state(state);
-        self.binaural.update_state(state);
+        // Smooth all state transitions (~1 second time constant)
+        let smoothed = self.smoother.smooth(state);
+        self.state = smoothed.clone();
+        self.muse_stream.update_state(&smoothed);
+        self.reverb.update_state(&smoothed);
+        self.binaural.update_state(&smoothed);
+        self.drone.update_state(&smoothed, self.active_notes.len());
         if self.enable_phi_optimizer {
             self.phi_optimizer.update_phi(state.consciousness_level);
+        }
+
+        // Emotion anchor: tell the FEP self-model what emotional quadrant to preserve
+        if self.enable_fep {
+            self.fep_engine.set_emotion_anchor(state);
         }
 
         // Arousal-driven note generation cadence:
@@ -353,6 +369,15 @@ impl StreamingSynth {
         }
         self.bar_sample_pos += self.chunk_samples;
 
+        // ── Phase 3.7: Ambient drone (fills silence, continuous low pad) ──
+        let drone_chunk = self.drone.render(self.chunk_samples);
+        for (i, pair) in buffer.iter_mut().enumerate() {
+            if i < drone_chunk.len() {
+                pair[0] += drone_chunk[i][0];
+                pair[1] += drone_chunk[i][1];
+            }
+        }
+
         // ── Phase 4: Consciousness reverb ──
         for pair in &mut buffer {
             let (l, r) = self.reverb.process_stereo(pair[0], pair[1]);
@@ -511,6 +536,8 @@ impl StreamingSynth {
     pub fn reset(&mut self, seed: u64) {
         self.fep_engine = MusicalInferenceEngine::new();
         self.fe_history.clear();
+        self.drone.reset();
+        self.smoother.reset();
         self.mixing = MixingChain::new(self.sample_rate);
         self.drum_hits.clear();
         self.bar_sample_pos = 0;
