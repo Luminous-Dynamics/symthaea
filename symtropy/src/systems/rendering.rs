@@ -115,6 +115,9 @@ pub fn setup_world(mut commands: Commands) {
         Player,
         Flashlight::default(),
         NoiseEmitter::default(),
+        ConsciousnessProfile::default(),
+        TendBalance::new(40), // ±40 TEND credit limit
+        FactionAffiliation::default(),
     ));
 
     // Crew NPCs — each a different green shade, spread near player
@@ -123,7 +126,20 @@ pub fn setup_world(mut commands: Commands) {
         ("Mira", player_pos.x + 32.0, player_pos.y, Color::srgb(0.4, 0.85, 0.5)),
         ("Soren", player_pos.x, player_pos.y + 32.0, Color::srgb(0.25, 0.8, 0.4)),
     ];
+    // NPC consciousness varies — creates natural tier distribution for governance
+    let npc_consciousness = [
+        [0.6, 0.5, 0.5, 0.7, 0.6, 0.5], // Kael: high care, Steward-tier
+        [0.4, 0.3, 0.6, 0.5, 0.4, 0.4], // Mira: moderate, Contributor-tier
+        [0.8, 0.7, 0.7, 0.4, 0.8, 0.6], // Soren: high level, near-Guardian
+    ];
     for (i, (name, x, y, color)) in npc_configs.iter().enumerate() {
+        let mut cp = ConsciousnessProfile {
+            phi: 0.0,
+            tier: 0,
+            dimensions: npc_consciousness[i],
+        };
+        cp.compute_phi();
+
         commands.spawn((
             Sprite::from_color(*color, Vec2::splat(16.0)),
             Transform::from_xyz(*x, *y, 2.0),
@@ -133,6 +149,18 @@ pub fn setup_world(mut commands: Commands) {
                 speed: 60.0,
             },
             NoiseEmitter::default(),
+            cp,
+            TendBalance::new(40),
+            FactionAffiliation {
+                faction_id: None,
+                ideology: [
+                    npc_consciousness[i][0], // economic
+                    npc_consciousness[i][1], // authority
+                    npc_consciousness[i][3], // tradition
+                    npc_consciousness[i][4], // individual
+                ],
+            },
+            NpcTrust::default(),
         ));
     }
 

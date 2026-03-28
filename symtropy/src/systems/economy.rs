@@ -152,7 +152,7 @@ pub fn demurrage_system(
 /// Player TEND interaction: press T near an NPC to exchange services.
 pub fn player_tend_interaction_system(
     keyboard: Res<ButtonInput<KeyCode>>,
-    player_query: Query<(&Transform, &mut TendBalance), With<Player>>,
+    mut player_query: Query<(&Transform, &mut TendBalance), With<Player>>,
     mut npcs: Query<
         (&Transform, &CrewNpc, &mut TendBalance, &mut NpcTrust, &mut NoiseEmitter),
         Without<Player>,
@@ -164,25 +164,12 @@ pub fn player_tend_interaction_system(
         return;
     }
 
-    let Ok((player_tf, mut player_tend)) = player_query.single() else {
+    let Ok((player_tf, mut player_tend)) = player_query.single_mut() else {
         return;
     };
     let player_pos = player_tf.translation.truncate();
 
-    // Find nearest NPC within interaction range
-    let mut closest: Option<(Entity, f32)> = None;
-    for (npc_tf, _, _, _, _) in &npcs {
-        let dist = player_pos.distance(npc_tf.translation.truncate());
-        if dist < 60.0 {
-            if let Some((_, best_dist)) = closest {
-                if dist < best_dist {
-                    // Can't easily get entity from this query pattern; use a different approach
-                }
-            }
-        }
-    }
-
-    // Simpler: just interact with the first NPC in range
+    // Interact with the first NPC in range
     for (npc_tf, npc, mut npc_tend, mut npc_trust, _) in &mut npcs {
         let dist = player_pos.distance(npc_tf.translation.truncate());
         if dist >= 60.0 {

@@ -152,7 +152,7 @@ pub fn faction_recruitment_system(
 
 /// Faction conflict: opposing factions generate noise (social instability → Leviathan threat).
 pub fn faction_conflict_system(
-    npcs: Query<(&FactionAffiliation, &ConsciousnessProfile, &mut NoiseEmitter)>,
+    mut npcs: Query<(&FactionAffiliation, &ConsciousnessProfile, &mut NoiseEmitter)>,
     mut log: ResMut<GovernanceLog>,
     time: Res<Time>,
     mut timer: Local<f32>,
@@ -205,7 +205,7 @@ pub fn faction_conflict_system(
     // Apply conflict noise — social instability wakes the Leviathan
     if conflict_intensity > 0.1 {
         let noise_boost = conflict_intensity as f32 * CONFLICT_NOISE_PER_SEC;
-        for (_, _, mut noise) in &npcs {
+        for (_, _, mut noise) in &mut npcs {
             noise.level += noise_boost;
         }
 

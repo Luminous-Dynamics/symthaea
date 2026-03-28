@@ -57,7 +57,7 @@ pub fn governance_proposal_system(
     // Find the NPC with highest free-energy (most surprised / most need for change)
     let mut best_proposer: Option<(&str, f64, f64)> = None; // (name, surprise, phi)
     for (npc, consciousness) in &npcs {
-        let surprise = npc.fep.free_energy();
+        let surprise = npc.fep.current_free_energy();
         if let Some((_, best_surprise, _)) = best_proposer {
             if surprise > best_surprise {
                 best_proposer = Some((&npc.name, surprise, consciousness.phi));
@@ -304,7 +304,7 @@ pub fn consciousness_evolution_system(
 
     // NPCs evolve consciousness based on gameplay context
     for (npc, mut cp) in &mut npcs {
-        let surprise = npc.fep.free_energy();
+        let surprise = npc.fep.current_free_energy();
 
         // Meta-awareness grows when participating in governance
         if proposal.active {

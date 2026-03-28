@@ -32,27 +32,46 @@ impl Plugin for SymtropyPlugin {
                 systems::rendering::setup_world,
                 systems::audio::setup_audio,
             ))
-            // Gameplay systems (run during Playing state)
+            // Core gameplay systems (input → player → NPC AI)
             .add_systems(
                 Update,
                 (
-                    // Input capture (must run first)
                     systems::input::input_system,
-                    // Player systems
                     systems::player::player_movement_system,
                     systems::player::flashlight_system,
                     systems::player::extraction_system,
-                    // NPC AI
+                    systems::economy::player_tend_interaction_system,
                     systems::fep_behavior::fep_behavior_system,
                     systems::fep_behavior::npc_movement_system,
-                    // TODO: governance sim tick (re-enable with sim-bridge)
-                    // symtropy_sim_bridge::governance_tick_system,
-                    // Leviathan
+                )
+                    .chain()
+                    .run_if(in_state(GamePhase::Playing)),
+            )
+            // Governance + economy + faction systems (run in parallel, timer-gated internally)
+            .add_systems(
+                Update,
+                (
+                    symtropy_sim_bridge::governance_tick_system,
+                    systems::governance::governance_proposal_system,
+                    systems::governance::governance_voting_system,
+                    systems::governance::veto_override_system,
+                    systems::governance::oppression_detection_system,
+                    systems::governance::consciousness_evolution_system,
+                    systems::economy::tend_exchange_system,
+                    systems::economy::demurrage_system,
+                    systems::faction::faction_emergence_system,
+                    systems::faction::faction_recruitment_system,
+                    systems::faction::faction_conflict_system,
+                )
+                    .run_if(in_state(GamePhase::Playing)),
+            )
+            // Leviathan + audio + rendering (must run after all state updates)
+            .add_systems(
+                Update,
+                (
                     systems::leviathan::leviathan_system,
                     systems::leviathan::victory_check_system,
-                    // Audio (reads stress + leviathan)
                     systems::audio::audio_system,
-                    // Rendering + visuals
                     systems::rendering::camera_follow_system,
                     systems::rendering::visual_stress_system,
                     systems::rendering::leviathan_visual_system,
