@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Primitive-Belief Bridge: Connecting Ontological Primitives to Active Inference
 //!
 //! Maps between the 9-tier primitive system and active inference belief states,

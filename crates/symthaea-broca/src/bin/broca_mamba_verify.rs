@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! broca-mamba-verify: Verification suite for the mamba-130m integration.
 //!
 //! Runs 10 sequential checks proving the Mamba SSM model loads, generates,

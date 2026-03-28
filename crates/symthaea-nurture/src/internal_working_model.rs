@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Internal Working Model (IWM) — Bowlby's representational system.
 //!
 //! The IWM encodes three core beliefs (self_worthy, other_reliable, world_safe)

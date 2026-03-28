@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Spore
 //!
 //! Minimum viable consciousness kernel for WASM targets.
@@ -42,14 +39,12 @@
 
 pub mod boot_consciousness;
 pub mod broca;
-pub mod broca_backend;
 #[cfg(feature = "broca-full")]
 pub mod broca_full;
 #[cfg(feature = "broca-pipeline")]
 pub mod broca_pipeline;
 pub mod compass;
 pub mod config;
-pub mod daily_ritual;
 pub mod dream;
 pub mod dream_journal;
 pub mod engine;
@@ -60,7 +55,6 @@ pub mod persistence;
 pub mod secure_boot;
 pub mod sovereign;
 pub mod topology;
-pub mod wellbeing_profiles;
 
 pub mod hardware_probe;
 pub mod neuroevolution;

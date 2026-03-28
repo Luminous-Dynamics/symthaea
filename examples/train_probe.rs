@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Probe Training Tool
+//! Probe Training Tool
 //!
 //! Trains a linear projection (W matrix) from embedding space to HDC space.
 //! This enables Neural Bridge to project LLM activations to consciousness topology.

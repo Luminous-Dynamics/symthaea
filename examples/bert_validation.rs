@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! BERT Cross-Architecture Validation
+//! BERT Cross-Architecture Validation
 //!
 //! Tests whether the phenomenal effect exists in BERT-base (12 layers, 768D)
 //! as a smaller encoder comparison to BGE-M3 (24 layers, 1024D).

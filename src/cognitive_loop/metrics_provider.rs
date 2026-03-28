@@ -24,10 +24,10 @@ impl MetricsProvider for CognitiveLoopService {
             is_conscious: phi > 0.3,
             cognitive_depth: format!("{:?}", self.cognitive_depth),
             strategy: format!("{:?}", self.fep.closed_learning_loop.current_strategy),
-            in_flow: self.flow_state.in_flow,
+            in_flow: self.behavior.flow_state.in_flow,
             prediction_error: self.stats.avg_prediction_error,
-            emotional_valence: self.emotion_contagion.prosody_valence(),
-            emotional_arousal: self.emotion_contagion.prosody_arousal(),
+            emotional_valence: self.unification_engine.emotional.state().valence as f32,
+            emotional_arousal: self.unification_engine.emotional.state().arousal as f32,
             timestamp_ms: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -63,7 +63,7 @@ impl MetricsProvider for CognitiveLoopService {
     }
 
     fn in_flow(&self) -> bool {
-        self.flow_state.in_flow
+        self.behavior.flow_state.in_flow
     }
 
     fn uptime_secs(&self) -> u64 {

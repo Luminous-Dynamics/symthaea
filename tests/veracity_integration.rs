@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Veracity Integration Tests: The Humble Machine
+//! # Veracity Integration Tests: The Humble Machine
 //!
 //! These tests verify the core safety mechanism of the Reason-then-Generate pipeline:
 //! **When the Rust brain doesn't know something, the LLM must admit it.**

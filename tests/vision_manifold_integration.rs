@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration test: Vision Manifold → Cognitive Loop via cycle_with_hv().
+//! Integration test: Vision Manifold → Cognitive Loop via cycle_with_hv().
 //!
 //! Verifies that the vision manifold's output HV flows correctly through
 //! the cognitive loop's fast path (500Hz non-text pipeline).

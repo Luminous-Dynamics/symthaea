@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Autonomous Forge Demo: WASM Code Mutation
+//! Autonomous Forge Demo: WASM Code Mutation
 //!
 //! Demonstrates the 'Asymmetric Swarm' and 'Autonomous Forge':
 //! 1. Simulate receiving a pre-compiled .wasm optimization from the Swarm.

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Temporal Prediction O(1) Proof Benchmark
 //!
 //! Proves that the CfC closed-form solution gives O(1) temporal prediction:

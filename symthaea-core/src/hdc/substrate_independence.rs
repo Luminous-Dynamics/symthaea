@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Revolutionary Improvement #28: Substrate Independence & Multiple Realizability
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+// Revolutionary Improvement #28: Substrate Independence & Multiple Realizability
 //
 // THE PARADIGM SHIFT: Consciousness is substrate-independent!
 // It's about ORGANIZATION and DYNAMICS, not the physical medium.

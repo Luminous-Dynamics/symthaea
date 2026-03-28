@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Persistent Coding Experience Store: HDC-encoded coding experiences that survive across sessions.
 //!
 //! Replaces the in-memory `error_pattern_memory` and `code_generation_cache` on the

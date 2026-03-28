@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Validate EmotionSentinel on DENS Dataset (ds003751)
+//! Validate EmotionSentinel on DENS Dataset (ds003751)
 //!
 //! This example loads real EEG data from the DENS emotion dataset
 //! and validates the EmotionSentinel's ability to detect emotional states.

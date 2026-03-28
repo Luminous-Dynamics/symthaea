@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Change detection working memory task.
 //!
 //! Present an array of K visual objects, brief delay, then probe with
@@ -61,12 +58,7 @@ impl ChangeDetectionBenchmark {
             // Time pressure: +0.10/unit adds encoding degradation, reflecting reduced dwell time
             // in visual WM consolidation under speed emphasis (Vogel et al., 2006).
             let diff_model = difficulty_model_for("WorM::ChangeDetection");
-            // Lapse_rate scales encoding noise: attention-dependent encoding quality
-            // varies across individuals (Vogel & Machizawa, 2004 — WM capacity and
-            // attentional control predict encoding fidelity).
-            let noise_frac = (0.03 * set_size as f32
-                + config.time_pressure as f32 * 0.10
-                + config.lapse_rate as f32 * 0.02)
+            let noise_frac = (0.03 * set_size as f32 + config.time_pressure as f32 * 0.10)
                 * diff_model.interference_multiplier(config.difficulty) as f32;
             let encoding_noise_seed = rng_state.wrapping_add(700 + pos as u64);
             let noisy_hv = if noise_frac > 0.01 {
@@ -144,10 +136,7 @@ impl ChangeDetectionBenchmark {
         // sometimes undetectable (Wilken & Ma, 2004 — signal detection model).
         // Time pressure: base margin 0.06 models signal detection noise (Wilken & Ma, 2004);
         // +0.04/unit widens the "same" bias zone, reflecting hasty criterion under SAT (Wickelgren, 1977).
-        // Individual differences in detection criterion: lapse_rate widens the
-        // "same" bias zone, modeling person-specific response caution
-        // (Wilken & Ma, 2004 — signal detection individual differences).
-        let margin = 0.06 + config.time_pressure * 0.04 + config.lapse_rate * 0.03;
+        let margin = 0.06 + config.time_pressure * 0.04;
         let responded_same = sim_to_probe >= sim_to_original - margin as f32;
 
         let correct = if is_changed {
@@ -162,28 +151,7 @@ impl ChangeDetectionBenchmark {
         let decision_margin = ((sim_to_original - sim_to_probe).abs() as f64).min(1.0);
         let rt_ticks = 4.0 + (1.0 - decision_margin) * 7.0;
 
-        // Lapse rate: on a fraction of trials, randomly guess same/different
-        // (models attention lapses; Rouder et al. 2008 WM capacity individual differences)
-        let acc = if config.lapse_rate > 0.0 {
-            let lapse_seed = config.trial_seed("worm", "cd_lapse", trial_idx);
-            if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
-                // Random 50/50 guess
-                let guess_correct = (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 2) == 0;
-                if guess_correct {
-                    1.0
-                } else {
-                    0.0
-                }
-            } else if correct {
-                1.0
-            } else {
-                0.0
-            }
-        } else if correct {
-            1.0
-        } else {
-            0.0
-        };
+        let acc = if correct { 1.0 } else { 0.0 };
         (acc, rt_ticks)
     }
 }

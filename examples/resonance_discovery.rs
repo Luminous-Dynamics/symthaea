@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Resonance Discovery Engine
+//! # Resonance Discovery Engine
 //!
 //! Use Symthaea's HDC framework to discover novel energy solutions through
 //! inverse vector search - dreaming backwards from ideal properties.

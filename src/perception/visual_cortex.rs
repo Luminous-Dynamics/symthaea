@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Visual Cortex: Hierarchical Visual Processing
 //!
 //! Simulates visual cortex processing with hierarchical feature extraction

@@ -128,9 +128,13 @@ mod identity_integration;
 
 // ── Impl-block submodules (split from this file) ────────────────────────────
 mod accessors;
+pub(crate) mod behavioral_synthesis;
 pub(crate) mod biorhythm_manager;
+#[cfg(feature = "mycelix")]
+pub(crate) mod broca_factcheck;
 pub(crate) mod cantor_dream_manager;
 pub(crate) mod consciousness_engine;
+pub(crate) mod consciousness_execution;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
 mod constructor;
@@ -156,6 +160,7 @@ mod helpers;
 pub(crate) mod language_comm_manager;
 pub(crate) mod managers;
 pub(crate) mod memory_consolidation_manager;
+pub(crate) mod memory_execution;
 mod moral;
 pub mod motor_output_bridge;
 pub(crate) mod motor_rendering_manager;
@@ -164,7 +169,9 @@ pub(crate) mod neuromodulators;
 mod phase_results;
 mod prediction;
 pub(crate) mod primitive_tier;
+pub mod radiation_environment;
 pub(crate) mod self_model_tier;
+pub(crate) mod sensorimotor_execution;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
 #[cfg(feature = "support")]
@@ -185,11 +192,23 @@ pub mod broca_bridge;
 #[cfg(feature = "canvas")]
 pub(crate) mod canvas_bridge;
 
+#[cfg(feature = "creative")]
+pub(crate) mod creative_bridge;
+
 #[cfg(feature = "physics-bridge")]
 pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
 pub use physics_integration::ParetoContext;
 
+pub(crate) mod thermodynamic_integration;
+pub(crate) mod thermodynamic_physics_bridge;
+pub(crate) mod thermodynamic_state;
+
+#[cfg(feature = "mycelix")]
+pub use broca_factcheck::{
+    BrocaFactcheckBridge, BrocaModulation, FactCheckResult, FactCheckVerdict, FactcheckChannels,
+    FactcheckTelemetry,
+};
 #[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
 
@@ -236,10 +255,14 @@ pub mod collective_immunity;
 pub mod defense;
 #[cfg(feature = "safety-agents")]
 pub mod guardian;
+pub mod safety_alert;
 #[cfg(feature = "safety-agents")]
 pub mod safety_enforcement;
 #[cfg(feature = "sentinel")]
 pub mod threat_memory;
+
+pub mod life_support;
+pub mod power_budget;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
@@ -258,7 +281,7 @@ use crate::consciousness::dream::DreamEngine;
 use crate::consciousness::enactive_cognition::EnactiveCognition;
 // ActiveInferenceAgent, EnhancedFEPBridge moved to fep_module.rs
 // UnifiedGlobalWorkspace now owned by GwtManager
-use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+// MasterConsciousnessEquation now owned by ConsciousnessExecution
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 // PredictiveMind now owned by ConsciousnessStateManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -357,34 +380,16 @@ pub struct CognitiveLoopService {
     /// Language & communication: voice coherence, Broca, user state.
     pub(crate) language_comm: language_comm_manager::LanguageAndCommunicationManager,
 
-    /// Current adaptive behavior based on consciousness state
-    adaptive_behavior: AdaptiveBehavior,
+    /// Behavioral synthesis group: flow, emotion, curiosity, adaptive behavior,
+    /// thalamic routing, and social cognition.
+    /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 5).
+    pub(crate) behavior: behavioral_synthesis::BehavioralSynthesis,
 
     /// Prediction confidence (0.0 to 1.0)
     /// Decays during uncertain states, grows with accurate predictions
     prediction_confidence: f64,
 
-    /// Flow state tracker
-    /// Detects and maintains flow state for optimal cognitive engagement
-    flow_state: FlowState,
-
-    /// Emotion contagion tracker
-    /// Emotional content influences consciousness patterns
-    emotion_contagion: EmotionContagion,
-
-    /// Curiosity drive for novelty seeking
-    /// Triggers exploration when predictions are too accurate
-    curiosity_drive: CuriosityDrive,
-
     // NOTE: self_reflection moved to self_model_tier.self_reflection (Phase 3, Step 5)
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // MEGA-UNIFIED ARCHITECTURE: Consciousness Unification Engine
-    // ═══════════════════════════════════════════════════════════════════════
-    /// Thalamic router for cognitive depth selection
-    /// Routes inputs to Reflex/Cortical/DeepThought paths based on novelty and urgency
-    thalamic_router: ThalamicRouter,
-
     /// Consciousness Unification Engine - integrates all consciousness subsystems
     /// Provides: EmotionalBridge (VAD emotions), CausalReasoning, DialoguePipeline
     /// This replaces simple EmotionContagion with full VAD emotional tracking
@@ -405,7 +410,7 @@ pub struct CognitiveLoopService {
     coherence_tracker: ConversationCoherenceTracker,
 
     /// Memory & consolidation: semantic memory, coordinator, resonator, stability, discovery.
-    pub(crate) memory_consol: memory_consolidation_manager::MemoryAndConsolidationManager,
+    pub(crate) memory: memory_execution::MemoryExecution,
 
     /// Feature integrations: neural bridge, semantic encoder, school, causal, physics.
     pub(crate) feature_integ: feature_integration_manager::FeatureIntegrationManager,
@@ -417,13 +422,10 @@ pub struct CognitiveLoopService {
     /// Causal loop enhancer for discovering causal structure in (input, output) pairs.
     /// When enabled via `config.causal_enhancement`, this:
     /// - Tracks recent (input, output) pairs
-    /// - Periodically runs causal discovery
-    /// - Weights attention based on discovered causal parents
-    /// - Suggests interventions for exploration
-    causal_enhancer: Option<CausalLoopEnhancer>,
+    // causal_enhancer moved to memory_execution::MemoryExecution
 
     /// Episodic persistence: replay, database, flush guard, reasoning context.
-    pub(crate) episodic_persistence: episodic_persistence_manager::EpisodicPersistenceManager,
+    // episodic_persistence moved to memory_execution::MemoryExecution
 
     /// Conscious Reasoning Engine: unified 7-step reasoning cycle
     /// Composes epistemic conflict, temporal planning, counterfactual reasoning,
@@ -472,15 +474,9 @@ pub struct CognitiveLoopService {
     /// gates learning/exploration when memory utilization is high.
     prefrontal: Option<PrefrontalCortex>,
 
-    /// Self-model subsystems: narrative, predictive, attention schema, meta-cognition.
-    self_model_tier: self_model_tier::SelfModelTierManager,
-
-    /// GWT manager: workspace + memory flag + perception counter.
-    gwt_mgr: gwt_manager::GwtManager,
-
-    /// Consciousness monitoring tier: resonance, quantum, temporal, embodied,
-    /// thermodynamics, phenomenal binding, hierarchical free energy.
-    consciousness_monitors: consciousness_monitor_tier::ConsciousnessMonitorTier,
+    /// Consciousness execution group: consciousness engine, monitors, GWT, self-model, MCE.
+    /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 1).
+    pub(crate) consciousness: consciousness_execution::ConsciousnessExecution,
 
     /// Narrative-GWT integration (consciousness governance capstone).
     /// When enabled, provides coherence veto, value checking, goal alignment
@@ -508,6 +504,10 @@ pub struct CognitiveLoopService {
     /// See `primitive_tier::PrimitiveTierManager` for field list.
     primitive_tier: primitive_tier::PrimitiveTierManager,
 
+    /// Unified thermodynamic manager (interval 43): cross-couples Dissipative,
+    /// Analyzer, HFE, and physics bridge. See `managers/thermodynamic_manager.rs`.
+    pub(crate) thermodynamic_mgr: managers::thermodynamic_manager::ThermodynamicManager,
+
     // ═══════════════════════════════════════════════════════════════════════
     // SUPPORT INTELLIGENCE: Predictive diagnostics + knowledge federation
     // ═══════════════════════════════════════════════════════════════════════
@@ -526,8 +526,7 @@ pub struct CognitiveLoopService {
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
     attention_visualizer: Option<crate::visualization::AttentionVisualizer>,
 
-    /// Social manager: social signals + phi-dyad + partner model + ring buffers.
-    pub(crate) social_mgr: SocialManager,
+    // social_mgr moved to behavioral_synthesis::BehavioralSynthesis
 
     // user_state moved to language_comm_manager
     /// Resonant speech generator: adapts response complexity to user cognitive load.
@@ -540,8 +539,10 @@ pub struct CognitiveLoopService {
     /// Config: batch_accumulation=1, max_latency=32ms (cycle-aligned).
     streaming_inference: Option<crate::inference::StreamingInference>,
 
-    /// Vision & sensory: coherence field, virtual body, vision, foveation.
-    pub(crate) vision_sensory: vision_sensory_manager::VisionAndSensoryManager,
+    /// Sensorimotor execution group: vision/sensory, motor rendering, somatic bridge,
+    /// pain/thermal channels, embodiment bridge.
+    /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 4).
+    pub(crate) sensorimotor: sensorimotor_execution::SensoriMotorExecution,
 
     /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
     /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,
@@ -549,7 +550,7 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "nurture")]
     pub(crate) nurture_attachment: Option<nurture_bridge::NurtureAttachmentBridge>,
 
-    // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to vision_sensory_manager
+    // vision_bridge, vision_frame_buffer, cross_manifold_predictor, foveation_manager moved to sensorimotor_execution
 
     // broca_manager, last_broca_text moved to language_comm_manager
 
@@ -564,11 +565,7 @@ pub struct CognitiveLoopService {
     /// Capacity bound: POLICY_WINDOW_SIZE (20) — evict before push.
     policy_agreement_window: VecDeque<bool>,
 
-    /// Master Consciousness Equation (MCE) — comprehensive consciousness metric.
-    /// C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × weighted_sum × S × ρ(t) × M × N × Soc
-    /// Runs every 10th cycle to provide richer consciousness measurement than Phi alone.
-    master_equation: MasterConsciousnessEquation,
-
+    // master_equation moved to consciousness_execution::ConsciousnessExecution
     /// Unified Living Mind: life-mind continuity integration (full_consciousness feature).
     /// Integrates autopoietic self-maintenance, enactive sense-making, affect, and prediction
     /// into a unified vitality/coherence state that measures "aliveness" of the system.
@@ -598,7 +595,7 @@ pub struct CognitiveLoopService {
     /// Extracts structured facts from input, encodes as HDC vectors, stores in a
     /// temporal knowledge graph, builds causal DAG edges, and grows adaptive ontology.
     /// Science: Kanerva (2009) HDC, Pearl (2009) Causality, Carey (2009) conceptual change.
-    knowledge_manager: Option<crate::knowledge::KnowledgeManager>,
+    // knowledge_manager moved to memory_execution::MemoryExecution
 
     // last_reasoning_context moved to episodic_persistence manager
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
@@ -616,23 +613,7 @@ pub struct CognitiveLoopService {
     /// Groups 8 neuromod-related fields into a single manager.
     pub(crate) neuromod: neuromod_manager::NeuromodManager,
 
-    /// Somatic error bridge: converts infrastructure failures into felt stress.
-    /// Lock poisoning, task panics, DB errors → arousal, thermodynamic load, tau slowdown.
-    pub(crate) somatic_bridge: crate::infrastructure::somatic_error_bridge::SomaticErrorBridge,
-
-    /// Pain channel sender for distributing to subsystems.
-    /// Subsystems clone this to report infrastructure errors.
-    pub(crate) pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
-
-    /// Thermal bridge: converts platform thermal state into CfC tau modulation.
-    /// Hardware heat → tau slowdown → slower integration → less heat generated.
-    /// Science: Angilletta (2009) thermal performance curves.
-    pub(crate) thermal_bridge: crate::infrastructure::thermal_bridge::ThermalBridge,
-
-    /// Thermal channel sender for platform integration code.
-    /// Android PowerManager / iOS ProcessInfo / Linux sysfs thermal zones.
-    pub(crate) thermal_tx: Option<crate::infrastructure::thermal_bridge::ThermalSender>,
-
+    // somatic_bridge, pain_tx, thermal_bridge, thermal_tx moved to sensorimotor_execution
     /// Subsystem output collector (Phase 2.3 staged computation model).
     /// Collects SubsystemOutput proposals during Phase B (COMPUTE),
     /// integrates them in Phase C for consensus-averaged state updates.
@@ -643,11 +624,7 @@ pub struct CognitiveLoopService {
     /// Built at the start of each cycle (Phase A: OBSERVE).
     last_snapshot: Option<subsystem_trait::CycleSnapshot>,
 
-    /// Unified Consciousness Engine: wraps SpectralMIP + MultiModal + EquationV2 + Pipeline
-    /// into a single `measure()` call per cycle with co-prime interval scheduling.
-    /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
-    consciousness_engine: consciousness_engine::ConsciousnessEngine,
-
+    // consciousness_engine moved to consciousness_execution::ConsciousnessExecution
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
@@ -708,14 +685,37 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "mycelix")]
     governance_mgr: managers::GovernanceManager,
 
+    /// Broca Factcheck Bridge: Verifies Broca language output against the Mycelix
+    /// knowledge graph. Extracts claims, submits for verification, modulates
+    /// confidence/cadence based on verdicts. Feature-gated behind `mycelix`.
+    #[cfg(feature = "mycelix")]
+    factcheck_bridge: broca_factcheck::BrocaFactcheckBridge,
+
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.
     swarm_manager: managers::SwarmManager,
+
+    /// Muse Manager: Streaming consciousness-driven music synthesis.
+    #[cfg(feature = "muse")]
+    pub(crate) muse_manager: managers::MuseManager,
 
     /// Holon Receiver: Desktop-side bridge accepting Soma WebSocket connections.
     /// Processes inbound SomaMessages (heartbeats, CVs, tasks, knowledge) and
     /// routes them to SwarmManager (peers), ReasoningManager (tasks), KnowledgeManager (offers).
     holon_receiver: crate::consciousness::holon_receiver::HolonReceiver,
+
+    /// Receiver for Holon inbound messages from the HTTP layer.
+    /// Created eagerly at construction; clone `holon_inbound_tx` to feed from HTTP handlers.
+    holon_inbound_rx: std::sync::Mutex<
+        Option<
+            std::sync::mpsc::Receiver<(String, crate::consciousness::holon_receiver::SomaMessage)>,
+        >,
+    >,
+
+    /// Sender half of the Holon inbound channel. Clone via `holon_inbound_sender()` to
+    /// feed messages from HTTP handlers (HolonHttpState).
+    holon_inbound_tx:
+        std::sync::mpsc::Sender<(String, crate::consciousness::holon_receiver::SomaMessage)>,
 
     /// Receiver for swarm events from external async P2P layer.
     /// Drained non-blocking in Phase B before `swarm_manager.process()`.
@@ -726,6 +726,14 @@ pub struct CognitiveLoopService {
     /// Sender half of the swarm event channel. Clone via `swarm_event_sender()` to
     /// inject events from async components (NetworkService, Hyperfeel, mesh layer).
     swarm_event_tx: std::sync::mpsc::Sender<managers::swarm_manager::SwarmEvent>,
+
+    /// Sender for safety-critical alerts requiring human attention.
+    /// Bounded channel (capacity 32). The host application drains via
+    /// `drain_safety_alerts()` and forwards to desktop notifications, monitoring, etc.
+    safety_alert_tx: std::sync::mpsc::SyncSender<safety_alert::SafetyAlert>,
+    /// Receiver for safety alerts. Wrapped in Mutex<Option<>> so the host can
+    /// take ownership via `take_safety_alert_receiver()`.
+    safety_alert_rx: std::sync::Mutex<Option<std::sync::mpsc::Receiver<safety_alert::SafetyAlert>>>,
 
     /// Handle for the federated coordinator task (if enabled).
     federation_handle:
@@ -830,9 +838,7 @@ pub struct CognitiveLoopService {
     /// Cantor dream: broadcast buffer, cleanup engine, activation, surprise, resonance.
     pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 
-    /// Motor rendering: output bridge, pending request, last result, phi, canvas.
-    pub(crate) motor_rendering: motor_rendering_manager::MotorRenderingManager,
-
+    // motor_rendering moved to sensorimotor_execution
     /// Hierarchical bundler for per-region BinaryHV aggregation.
     /// Accumulates HDC encodings per cortical region, enabling structured
     /// role-bound aggregation and per-region recovery via XOR unbinding.
@@ -880,8 +886,14 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "safety-agents")]
     pub(crate) civic_crisis_detector: civic_crisis_detector::CivicCrisisDetector,
 
+    /// Crisis events waiting to be forwarded to Mycelix civic bridge.
+    /// Drained by `drain_pending_crisis_events()` from the external host.
+    #[cfg(feature = "safety-agents")]
+    pub(crate) pending_crisis_events: Vec<civic_crisis_detector::CivicCrisisEvent>,
+
     /// Aggregate security telemetry for the crypto/swarm stack.
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
+    // embodiment_bridge, last_proprioceptive_hv, embodiment_telemetry moved to sensorimotor_execution
 }
 
 // MetricsProvider impl is in metrics_provider.rs

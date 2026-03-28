@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! The Moral Drone — Cinematic split-screen: FEP Active Inference vs PD baseline.
+//! The Moral Drone — Cinematic split-screen: FEP Active Inference vs PD baseline.
 //!
 //! Left panel: Active Inference agent (FEP) — evaluates Expected Free Energy
 //! over 8 candidate setpoints. Safety precision 1000× mission precision.

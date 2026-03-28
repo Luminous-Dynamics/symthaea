@@ -274,6 +274,7 @@ impl CognitiveLoopService {
         let dissipative_health = consciousness_metrics.dissipative_health
             * (1.0
                 - self
+                    .sensorimotor
                     .somatic_bridge
                     .to_interoceptive_signals()
                     .dissipative_health_penalty);
@@ -348,8 +349,9 @@ impl CognitiveLoopService {
         // ── Phase 18: Empathic tone → speech rate modulation ─────────────────
         let empathic_speech_rate_mod = if empathic_tone_adj.abs() > EMPATHIC_TONE_THRESHOLD as f64 {
             let rate_mod = 1.0 - empathic_tone_adj as f32 * EMPATHIC_TONE_RATE_SCALE;
-            self.adaptive_behavior.speech_rate_multiplier *= rate_mod;
-            self.adaptive_behavior.speech_rate_multiplier = self
+            self.behavior.adaptive_behavior.speech_rate_multiplier *= rate_mod;
+            self.behavior.adaptive_behavior.speech_rate_multiplier = self
+                .behavior
                 .adaptive_behavior
                 .speech_rate_multiplier
                 .clamp(SPEECH_RATE_CLAMP_MIN, SPEECH_RATE_CLAMP_MAX);
@@ -364,8 +366,9 @@ impl CognitiveLoopService {
         {
             match consciousness_limiting_component.as_str() {
                 "Attention" => {
-                    self.adaptive_behavior.attention_sensitivity =
-                        (self.adaptive_behavior.attention_sensitivity * EFFICACY_ATTENTION_BOOST)
+                    self.behavior.adaptive_behavior.attention_sensitivity =
+                        (self.behavior.adaptive_behavior.attention_sensitivity
+                            * EFFICACY_ATTENTION_BOOST)
                             .min(NEUROMOD_ATTENTION_SENSITIVITY_MAX);
                     self.stats.limiting_component_boost_count += 1;
                     "Attention"
@@ -495,7 +498,7 @@ impl CognitiveLoopService {
 
         // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
         let social_learning_rate_factor =
-            SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.social_mgr.social.social_trust; // [0.8, 1.2]
+            SOCIAL_LR_BASE + SOCIAL_LR_RANGE * self.behavior.social_mgr.social.social_trust; // [0.8, 1.2]
         if (social_learning_rate_factor - 1.0).abs() > SOCIAL_LR_CHANGE_THRESHOLD {
             self.scale_lr("social_trust", social_learning_rate_factor);
         }
@@ -505,8 +508,8 @@ impl CognitiveLoopService {
         // Low accuracy → dampen confidence (our model is unreliable).
         // Guard: only active when social models exist (avoid constant dampening
         // when no social context has been injected — default accuracy is 0.0).
-        if self.social_mgr.social.social_models_count > 0 {
-            let tom_accuracy = self.social_mgr.social.social_prediction_accuracy;
+        if self.behavior.social_mgr.social.social_models_count > 0 {
+            let tom_accuracy = self.behavior.social_mgr.social.social_prediction_accuracy;
             if tom_accuracy > TOM_ACCURACY_HIGH {
                 let boost = (tom_accuracy - TOM_ACCURACY_HIGH) * TOM_ACCURACY_SCALE; // [0, 0.015]
                 self.adjust_confidence("tom_accurate", boost);
@@ -625,7 +628,11 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
         // ═══════════════════════════════════════════════════════════════════════
-        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        let reflection_thresholds = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .get_thresholds();
         let ResonatorCodebookResult {
             resonator_promotions,
             codebook_evictions,
@@ -678,7 +685,7 @@ impl CognitiveLoopService {
             if let Some(ref engine) = self.support.triage_engine {
                 let result = engine.triage(input, "");
                 triage_count = 1;
-                if let Some(ref manager) = self.support.knowledge_manager {
+                if let Some(ref manager) = self.support.memory.knowledge_manager {
                     let category_str = result.suggested_category.as_str();
                     let articles = manager.search(category_str, 3);
                     if !articles.is_empty() {
@@ -719,7 +726,7 @@ impl CognitiveLoopService {
                     .unwrap_or(true);
 
                 if can_share {
-                    if let Some(ref manager) = self.support.knowledge_manager {
+                    if let Some(ref manager) = self.support.memory.knowledge_manager {
                         let pending = Vec::new();
                         let result =
                             symthaea_support::federation::check_graduations(manager, &pending);
@@ -871,7 +878,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let encoding_hdv = &perception.encoding.encoding_result.hdv;
         let phi_spectral_weight = self.carryover.quality.phi_spectral_weight;
-        let consciousness_output = self.consciousness_engine.measure(
+        let consciousness_output = self.consciousness.consciousness_engine.measure(
             &super::consciousness_engine::ConsciousnessEngineInput {
                 hdv: encoding_hdv,
                 hv16: &perception.encoding.hv16_cached,
@@ -900,6 +907,7 @@ impl CognitiveLoopService {
                 // Basis: Kruger & Dunning (1999) — miscalibrated self-assessment.
                 hot_depth: {
                     let raw_hot = self
+                        .consciousness
                         .self_model_tier
                         .meta_cognition
                         .as_ref()
@@ -944,7 +952,7 @@ impl CognitiveLoopService {
                 },
                 // Knowledge grounding: dynamic from KnowledgeManager signals
                 // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
-                knowledge_grounding: if let Some(ref km) = self.knowledge_manager {
+                knowledge_grounding: if let Some(ref km) = self.memory.knowledge_manager {
                     let s = km.signals();
                     let grounding = (s.relevance
                         * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
@@ -962,7 +970,7 @@ impl CognitiveLoopService {
                 // Knowledge coherence: composite quality from graph size, calibration, contradictions.
                 // Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
                 // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
-                knowledge_coherence: if let Some(ref km) = self.knowledge_manager {
+                knowledge_coherence: if let Some(ref km) = self.memory.knowledge_manager {
                     let t = km.telemetry();
                     let log_scale = super::thresholds::KNOWLEDGE_COHERENCE_LOG_SCALE;
                     let size_factor =
@@ -1000,7 +1008,8 @@ impl CognitiveLoopService {
                     .phi_contribution(),
             },
         );
-        self.consciousness_engine
+        self.consciousness
+            .consciousness_engine
             .update_cache(&mut self.carryover.consciousness);
         if consciousness_output.confidence_delta != 0.0 {
             self.adjust_confidence(
@@ -1023,13 +1032,13 @@ impl CognitiveLoopService {
                 self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.2);
         }
         if let Some(consolidation_boost) = consciousness_output.episodic_consolidation_boost {
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 replay.boost_recent_consolidation(consolidation_boost);
             }
         }
         // ── Knowledge Engine: PE → ontology learning rate ────────────────
         // High prediction error → faster ontology adaptation (Rescorla-Wagner 1972).
-        if let Some(ref mut km) = self.knowledge_manager {
+        if let Some(ref mut km) = self.memory.knowledge_manager {
             km.set_ontology_lr_from_pe(prediction_error as f32);
             km.modulate_lr_from_consciousness(self.stats.unified_psi as f64);
         }
@@ -1292,7 +1301,7 @@ impl CognitiveLoopService {
                 .last_moral_judgment()
                 .map(|j| j.moral_score)
                 .unwrap_or(0.0);
-            let valence = self.emotion_contagion.valence;
+            let valence = self.behavior.emotion_contagion.valence;
             let cycles = self.stats.total_cycles as u64;
             if let Some(ref mut soul) = self.ethics_values.soul {
                 let experience = crate::soul::Experience {
@@ -1309,10 +1318,11 @@ impl CognitiveLoopService {
 
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
-        if self.social_mgr.recent_ai_hvs.len() >= 2 {
-            if let (Some(ref dyad), Some(ref model)) =
-                (&self.social_mgr.phi_dyad, &self.social_mgr.partner_model)
-            {
+        if self.behavior.social_mgr.recent_ai_hvs.len() >= 2 {
+            if let (Some(ref dyad), Some(ref model)) = (
+                &self.behavior.social_mgr.phi_dyad,
+                &self.behavior.social_mgr.partner_model,
+            ) {
                 use symthaea_core::hdc::relational_consciousness::{
                     RelationMode, RelationalAssessment,
                 };
@@ -1334,14 +1344,14 @@ impl CognitiveLoopService {
                     explanation: String::new(),
                 };
                 let input = crate::partnership::DyadInput {
-                    ai_states: &self.social_mgr.recent_ai_hvs,
-                    human_states: &self.social_mgr.recent_input_hvs,
+                    ai_states: &self.behavior.social_mgr.recent_ai_hvs,
+                    human_states: &self.behavior.social_mgr.recent_input_hvs,
                     relational: &relational,
                     human_model: model,
                     weights: crate::partnership::DyadWeights::default(),
                 };
                 let result = dyad.compute(&input);
-                self.social_mgr.social.relational_psi = result.phi_dyad;
+                self.behavior.social_mgr.social.relational_psi = result.phi_dyad;
 
                 // Phi divergence → exploration (novel relational territory)
                 // Science: Friston (2010) — high divergence = high epistemic value
@@ -1390,7 +1400,7 @@ impl CognitiveLoopService {
 
         // Trust evolution from cycle coherence (Bowlby 1969)
         // Coherence > 0.5 builds trust, < 0.5 erodes it; slow decay prevents runaway
-        if let Some(ref mut model) = self.social_mgr.partner_model {
+        if let Some(ref mut model) = self.behavior.social_mgr.partner_model {
             let signal =
                 (dynamics.core.coherence as f64 - TRUST_SIGNAL_MIDPOINT) * TRUST_SIGNAL_RATE;
             model.trust =
@@ -1553,7 +1563,7 @@ impl CognitiveLoopService {
         // Session 13 Item 5: Flow state → subsystem LR modulation.
         // Flow = optimal learning zone → gently boost subsystem learning.
         // Science: Csikszentmihalyi (1990) — flow maximizes skill acquisition.
-        if self.flow_state.in_flow && self.flow_state.intensity > 0.5 {
+        if self.behavior.flow_state.in_flow && self.behavior.flow_state.intensity > 0.5 {
             self.carryover.learning.subsystem_lr_factor *= 1.05;
             self.carryover.learning.subsystem_lr_factor = self
                 .carryover
@@ -1970,11 +1980,11 @@ mod tests {
     #[test]
     fn feedback_social_trust_modulates_lr() {
         let mut svc_hi = make_service();
-        svc_hi.social_mgr.social.social_trust = 0.9;
+        svc_hi.behavior.social_mgr.social.social_trust = 0.9;
         let hi = svc_hi.cycle("trust high");
 
         let mut svc_lo = make_service();
-        svc_lo.social_mgr.social.social_trust = 0.1;
+        svc_lo.behavior.social_mgr.social.social_trust = 0.1;
         let lo = svc_lo.cycle("trust low");
 
         // Social LR factor = 0.8 + 0.4 * trust → [0.84, 1.16]
@@ -1990,8 +2000,8 @@ mod tests {
     #[test]
     fn feedback_tom_accuracy_requires_social_models() {
         let mut svc = make_service();
-        svc.social_mgr.social.social_prediction_accuracy = 0.0;
-        svc.social_mgr.social.social_models_count = 0;
+        svc.behavior.social_mgr.social.social_prediction_accuracy = 0.0;
+        svc.behavior.social_mgr.social.social_models_count = 0;
         for _ in 0..15 {
             svc.cycle("warmup");
         }

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deterministic hash-based projection to bit-packed hypervectors (BinaryHV)
 //!
 //! This follows the v1.2 design: any byte sequence is projected via BLAKE3

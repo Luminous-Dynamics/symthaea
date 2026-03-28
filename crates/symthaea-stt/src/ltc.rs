@@ -314,6 +314,252 @@ impl LtcCell {
     pub fn hidden_size(&self) -> usize {
         self.config.hidden_size
     }
+
+    /// Get input size
+    pub fn input_size(&self) -> usize {
+        self.w_in.first().map(|r| r.len()).unwrap_or(0)
+    }
+
+    /// Mutable access to weights for gradient updates.
+    pub fn w_in_mut(&mut self) -> &mut Vec<Vec<f32>> {
+        &mut self.w_in
+    }
+
+    /// Mutable access to recurrent weights.
+    pub fn w_rec_mut(&mut self) -> &mut Vec<Vec<f32>> {
+        &mut self.w_rec
+    }
+
+    /// Mutable access to bias.
+    pub fn bias_mut(&mut self) -> &mut Vec<f32> {
+        &mut self.bias
+    }
+
+    /// Mutable access to tau.
+    pub fn tau_mut(&mut self) -> &mut Vec<f32> {
+        &mut self.tau
+    }
+
+    // ====================================================================
+    // Supervised training: forward with cache + backward step
+    // ====================================================================
+
+    /// Forward pass that caches activations for BPTT.
+    ///
+    /// Returns (output_state, cache) where cache is used by `backward_step`.
+    pub fn forward_cached(&mut self, input: &[f32], dt: f32) -> (Vec<f32>, LtcStepCache) {
+        let h = self.config.hidden_size;
+        let prev_state = self.state.clone();
+
+        // Compute input contribution: W_in @ input
+        let mut pre = vec![0.0f32; h];
+        for j in 0..h {
+            for (i, &x) in input.iter().enumerate() {
+                if i < self.w_in[j].len() {
+                    pre[j] += self.w_in[j][i] * x;
+                }
+            }
+            // Recurrent: W_rec @ prev_state
+            for k in 0..h {
+                pre[j] += self.w_rec[j][k] * prev_state[k];
+            }
+            pre[j] += self.bias[j];
+        }
+
+        // Compute activation and update state
+        let mut decay = vec![0.0f32; h];
+        let mut activation = vec![0.0f32; h];
+        let smoothed_tau = self.tau_smoother.smooth(&self.tau);
+
+        for j in 0..h {
+            let tau_j = smoothed_tau[j].clamp(self.config.tau_min, self.config.tau_max);
+            decay[j] = (-dt / tau_j).exp();
+            activation[j] = pre[j].tanh();
+            self.state[j] = prev_state[j] * decay[j] + (1.0 - decay[j]) * activation[j];
+        }
+
+        let cache = LtcStepCache {
+            prev_state,
+            input: input.to_vec(),
+            pre,
+            activation,
+            decay,
+            dt,
+        };
+
+        (self.state.clone(), cache)
+    }
+
+    /// Backward pass through one LTC step.
+    ///
+    /// Given ∂L/∂x(t+dt) (gradient of loss w.r.t. current state),
+    /// computes gradients for all parameters and propagates ∂L/∂x(t).
+    ///
+    /// Returns (gradients, ∂L/∂x(t) for previous step).
+    pub fn backward_step(
+        &self,
+        dl_dstate: &[f32],
+        cache: &LtcStepCache,
+    ) -> (LtcGradients, Vec<f32>) {
+        let h = self.config.hidden_size;
+        let input_size = self.input_size();
+        let mut grads = LtcGradients::zeros(h, input_size);
+        let mut dl_dprev_state = vec![0.0f32; h];
+
+        for j in 0..h {
+            // sech²(pre) = 1 - tanh²(pre)
+            let sech2 = 1.0 - cache.activation[j] * cache.activation[j];
+
+            // ∂L/∂pre[j] = ∂L/∂x(t+dt) · (1 - decay) · sech²(pre)
+            let dl_dpre = dl_dstate[j] * (1.0 - cache.decay[j]) * sech2;
+
+            // ∂L/∂w_in[j][i] = ∂L/∂pre[j] · input[i]
+            for i in 0..input_size.min(cache.input.len()) {
+                grads.w_in[j][i] += dl_dpre * cache.input[i];
+            }
+
+            // ∂L/∂w_rec[j][k] = ∂L/∂pre[j] · prev_state[k]
+            for k in 0..h {
+                grads.w_rec[j][k] += dl_dpre * cache.prev_state[k];
+            }
+
+            // ∂L/∂bias[j] = ∂L/∂pre[j]
+            grads.bias[j] += dl_dpre;
+
+            // ∂L/∂tau[j] = ∂L/∂x(t+dt) · (dt/τ²) · exp(-dt/τ) · (activation - prev_state)
+            let tau_j = self.tau[j].clamp(self.config.tau_min, self.config.tau_max);
+            let ddecay_dtau = (cache.dt / (tau_j * tau_j)) * cache.decay[j];
+            grads.tau[j] +=
+                dl_dstate[j] * ddecay_dtau * (cache.activation[j] - cache.prev_state[j]);
+
+            // ∂L/∂x(t) = ∂L/∂x(t+dt) · decay + sum_k(∂L/∂pre[k] · w_rec[k][j])
+            dl_dprev_state[j] += dl_dstate[j] * cache.decay[j];
+            // Recurrent contribution: state j influences pre[k] via w_rec[k][j]
+            for k in 0..h {
+                let sech2_k = 1.0 - cache.activation[k] * cache.activation[k];
+                let dl_dpre_k = dl_dstate[k] * (1.0 - cache.decay[k]) * sech2_k;
+                dl_dprev_state[j] += dl_dpre_k * self.w_rec[k][j];
+            }
+        }
+
+        (grads, dl_dprev_state)
+    }
+}
+
+/// Cached forward pass data for BPTT.
+#[derive(Debug, Clone)]
+pub struct LtcStepCache {
+    pub prev_state: Vec<f32>,
+    pub input: Vec<f32>,
+    pub pre: Vec<f32>,
+    pub activation: Vec<f32>,
+    pub decay: Vec<f32>,
+    pub dt: f32,
+}
+
+/// Gradients for LTC parameters.
+#[derive(Debug, Clone)]
+pub struct LtcGradients {
+    pub w_in: Vec<Vec<f32>>,
+    pub w_rec: Vec<Vec<f32>>,
+    pub bias: Vec<f32>,
+    pub tau: Vec<f32>,
+}
+
+impl LtcGradients {
+    /// Create zero gradients.
+    pub fn zeros(hidden_size: usize, input_size: usize) -> Self {
+        Self {
+            w_in: vec![vec![0.0; input_size]; hidden_size],
+            w_rec: vec![vec![0.0; hidden_size]; hidden_size],
+            bias: vec![0.0; hidden_size],
+            tau: vec![0.0; hidden_size],
+        }
+    }
+
+    /// Accumulate gradients from another set.
+    pub fn accumulate(&mut self, other: &LtcGradients) {
+        for (row, orow) in self.w_in.iter_mut().zip(&other.w_in) {
+            for (w, o) in row.iter_mut().zip(orow) {
+                *w += o;
+            }
+        }
+        for (row, orow) in self.w_rec.iter_mut().zip(&other.w_rec) {
+            for (w, o) in row.iter_mut().zip(orow) {
+                *w += o;
+            }
+        }
+        for (b, o) in self.bias.iter_mut().zip(&other.bias) {
+            *b += o;
+        }
+        for (t, o) in self.tau.iter_mut().zip(&other.tau) {
+            *t += o;
+        }
+    }
+
+    /// Scale all gradients by a factor (for averaging over batch).
+    pub fn scale(&mut self, factor: f32) {
+        for row in &mut self.w_in {
+            for w in row {
+                *w *= factor;
+            }
+        }
+        for row in &mut self.w_rec {
+            for w in row {
+                *w *= factor;
+            }
+        }
+        for b in &mut self.bias {
+            *b *= factor;
+        }
+        for t in &mut self.tau {
+            *t *= factor;
+        }
+    }
+
+    /// Clip gradient norms to prevent exploding gradients.
+    pub fn clip_norm(&mut self, max_norm: f32) {
+        let norm_sq: f32 = self
+            .w_in
+            .iter()
+            .flat_map(|r| r.iter())
+            .map(|x| x * x)
+            .sum::<f32>()
+            + self
+                .w_rec
+                .iter()
+                .flat_map(|r| r.iter())
+                .map(|x| x * x)
+                .sum::<f32>()
+            + self.bias.iter().map(|x| x * x).sum::<f32>()
+            + self.tau.iter().map(|x| x * x).sum::<f32>();
+        let norm = norm_sq.sqrt();
+        if norm > max_norm {
+            self.scale(max_norm / norm);
+        }
+    }
+
+    /// Apply gradients to LTC weights via SGD with learning rate.
+    pub fn apply_sgd(&self, ltc: &mut LtcCell, lr: f32) {
+        for (row, grow) in ltc.w_in_mut().iter_mut().zip(&self.w_in) {
+            for (w, g) in row.iter_mut().zip(grow) {
+                *w -= lr * g;
+            }
+        }
+        for (row, grow) in ltc.w_rec_mut().iter_mut().zip(&self.w_rec) {
+            for (w, g) in row.iter_mut().zip(grow) {
+                *w -= lr * g;
+            }
+        }
+        for (b, g) in ltc.bias_mut().iter_mut().zip(&self.bias) {
+            *b -= lr * g;
+        }
+        for (t, g) in ltc.tau_mut().iter_mut().zip(&self.tau) {
+            *t -= lr * g;
+            // Keep tau positive
+            *t = t.max(0.001);
+        }
+    }
 }
 
 /// Multi-layer LTC network

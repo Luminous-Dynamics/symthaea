@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Manufacturing-Aware Design: From Physics to Fabrication
 //!
 //! Bridges the gap between "physics works" and "can actually build this".

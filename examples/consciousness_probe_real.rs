@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Consciousness Probe with Real BGE-M3 Embeddings
+//! Consciousness Probe with Real BGE-M3 Embeddings
 //!
 //! This example demonstrates Research Direction 1 using actual neural embeddings
 //! from the BGE-M3 model, not simulated vectors.

@@ -192,10 +192,21 @@ impl ProgramDependenceGraph {
 
     /// Number of loops (counted as LoopBack edges).
     pub fn loop_count(&self) -> usize {
-        self.edges
+        // Count both explicit LoopBack edges AND LoopHead nodes
+        // (LoopHead is more reliable — always created for while/for/loop)
+        let loop_heads = self
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::LoopHead)
+            .count();
+        let loop_backs = self
+            .edges
             .iter()
             .filter(|e| e.kind == EdgeKind::LoopBack)
-            .count()
+            .count();
+        // Use the higher count — LoopHead is always created but LoopBack
+        // may be missed if the closing brace heuristic fails
+        loop_heads.max(loop_backs)
     }
 
     /// Number of branch nodes.
@@ -223,9 +234,16 @@ impl ProgramDependenceGraph {
 
     /// Convert to [`SimplicialComplex`] for Hodge-theoretic analysis.
     ///
+    /// **Uses control-flow edges ONLY** — data dependency edges (DefUse, UseDef,
+    /// OutputDep) are excluded to prevent spurious cycles in the topology.
+    /// This gives meaningful Betti numbers:
+    /// - β₀ = connected components in control flow
+    /// - β₁ = loops (while/for/loop back-edges create actual cycles)
+    /// - β₂ = unreachable enclosed regions
+    ///
     /// - 0-simplices: all node IDs (vertices)
-    /// - 1-simplices: all edges as sorted pairs `[min, max]`
-    /// - 2-simplices: triangles (3-cliques where all three pairs are edges)
+    /// - 1-simplices: control-flow edges as sorted pairs `[min, max]`
+    /// - 2-simplices: triangles from control-flow edges only
     pub fn to_simplicial_complex(&self) -> SimplicialComplex {
         let n = self.nodes.len();
 
@@ -234,10 +252,14 @@ impl ProgramDependenceGraph {
         let zero_simplices: Vec<Vec<usize>> = vertices.iter().map(|&v| vec![v]).collect();
 
         // Build undirected adjacency set for clique detection
+        // ONLY from control-flow edges — data dependencies create spurious topology
         let mut adj: HashMap<usize, HashSet<usize>> = HashMap::new();
         let mut edge_set: HashSet<(usize, usize)> = HashSet::new();
 
         for e in &self.edges {
+            if !e.kind.is_control_flow() {
+                continue; // Skip DefUse, UseDef, OutputDep
+            }
             let lo = e.from.min(e.to);
             let hi = e.from.max(e.to);
             edge_set.insert((lo, hi));
@@ -303,6 +325,7 @@ impl ProgramDependenceGraph {
             let trimmed = raw_line.trim();
 
             // Skip empty lines, braces-only, fn signature, comments
+            // NOTE: "} else" lines are NOT skipped — they flow through to else-arm detection below
             if trimmed.is_empty()
                 || trimmed == "{"
                 || trimmed == "}"
@@ -310,27 +333,37 @@ impl ProgramDependenceGraph {
                 || trimmed.starts_with("fn ")
                 || trimmed.starts_with("pub fn ")
             {
-                // Closing brace may end a branch or loop
+                // Closing brace may end a branch or loop.
+                // Use brace-depth tracking for reliable loop close detection.
                 if trimmed == "}" {
                     if pending_branch_false.take().is_some() {
                         // End of if-body; the next statement becomes the join point.
                     }
-                    if let Some((head_id, kind)) = branch_stack.last() {
-                        if *kind == NodeKind::LoopHead && trimmed == "}" {
-                            // Potential loop close — handled heuristically:
-                            // if the next non-empty line is not "}" or "else",
-                            // this closes the loop
-                            let next_meaningful = lines
-                                .get(line_idx + 1..)
-                                .and_then(|rest| rest.iter().find(|l| !l.trim().is_empty()))
-                                .map(|l| l.trim());
-                            let closes_loop =
-                                next_meaningful.map(|l| !l.starts_with('}')).unwrap_or(true);
-                            if closes_loop {
+
+                    // Check if this closes a loop by tracking indentation depth.
+                    // A loop closes when its closing brace is at the same indent
+                    // as the loop header. We approximate: count leading spaces.
+                    if let Some((head_id, kind)) = branch_stack.last().copied() {
+                        if kind == NodeKind::LoopHead {
+                            // Find the loop header's indentation
+                            let head_line = pdg
+                                .nodes
+                                .iter()
+                                .find(|n| n.id == head_id)
+                                .and_then(|n| n.line)
+                                .and_then(|l| lines.get(l - 1))
+                                .map(|l| l.len() - l.trim_start().len())
+                                .unwrap_or(0);
+                            let this_indent = raw_line.len() - raw_line.trim_start().len();
+
+                            // Close the loop if this brace is at or shallower than
+                            // the loop header's indent, and it's a plain "}"
+                            // (not "} else" which would be part of an inner branch)
+                            if trimmed == "}" && this_indent <= head_line {
                                 // LoopBack from last body node to loop head
                                 if let Some(body) = loop_body_nodes.last() {
                                     if let Some(&last) = body.last() {
-                                        pdg.add_edge(last, *head_id, EdgeKind::LoopBack);
+                                        pdg.add_edge(last, head_id, EdgeKind::LoopBack);
                                     }
                                 }
                                 // LoopExit
@@ -339,11 +372,14 @@ impl ProgramDependenceGraph {
                                     "loop-exit-join",
                                     Some(line_num),
                                 );
-                                pdg.add_edge(*head_id, exit_node, EdgeKind::LoopExit);
+                                pdg.add_edge(head_id, exit_node, EdgeKind::LoopExit);
                                 prev_node = exit_node;
                                 branch_stack.pop();
                                 loop_body_nodes.pop();
                             }
+                        } else if kind == NodeKind::Branch && trimmed == "}" {
+                            // Might close a branch — pop if indent matches
+                            branch_stack.pop();
                         }
                     }
                 }
@@ -377,6 +413,26 @@ impl ProgramDependenceGraph {
                 || trimmed == "loop {"
                 || trimmed == "loop"
             {
+                (NodeKind::LoopHead, trimmed.to_string())
+            } else if trimmed.contains(".iter()")
+                || trimmed.contains(".into_iter()")
+                || trimmed.contains(".iter_mut()")
+                || trimmed.contains(".map(")
+                || trimmed.contains(".filter(")
+                || trimmed.contains(".fold(")
+                || trimmed.contains(".for_each(")
+                || trimmed.contains(".flat_map(")
+                || trimmed.contains(".filter_map(")
+                || trimmed.contains(".find(")
+                || trimmed.contains(".any(")
+                || trimmed.contains(".all(")
+                || trimmed.contains(".position(")
+                || trimmed.contains(".enumerate(")
+                || trimmed.contains(".zip(")
+                || trimmed.contains(".scan(")
+            {
+                // Iterator chains are implicit loops — each consumes the
+                // collection element-by-element, equivalent to β₁=1.
                 (NodeKind::LoopHead, trimmed.to_string())
             } else if trimmed.starts_with("return") {
                 (NodeKind::Return, trimmed.to_string())
@@ -655,23 +711,37 @@ fn compute() -> i32 {
         let b = pdg.add_node(NodeKind::Statement, "b", None);
         let c = pdg.add_node(NodeKind::Exit, "c", None);
 
-        // Create a triangle: a→b, b→c, a→c
+        // Create a triangle using CONTROL-FLOW edges only
+        // (data dependency edges are excluded from simplicial complex)
         pdg.add_edge(a, b, EdgeKind::Sequential);
         pdg.add_edge(b, c, EdgeKind::Sequential);
-        pdg.add_edge(a, c, EdgeKind::DefUse);
+        pdg.add_edge(a, c, EdgeKind::BranchTrue); // control-flow, not DefUse
 
         let sc = pdg.to_simplicial_complex();
 
         // 3 vertices
         assert_eq!(sc.vertices.len(), 3);
-        // 3 unique edges (undirected)
-        assert_eq!(sc.simplices[1].len(), 3, "expected 3 one-simplices (edges)");
-        // 1 triangle
+        // 3 unique edges (undirected, control-flow only)
+        assert_eq!(
+            sc.simplices[1].len(),
+            3,
+            "expected 3 one-simplices (CF edges)"
+        );
+        // 1 triangle (all 3 pairs connected)
         assert_eq!(
             sc.simplices[2].len(),
             1,
             "expected 1 two-simplex (triangle)"
         );
+
+        // Verify DefUse edges are excluded from the complex
+        let mut pdg2 = ProgramDependenceGraph::new("test2");
+        let x = pdg2.add_node(NodeKind::Entry, "x", None);
+        let y = pdg2.add_node(NodeKind::Statement, "y", None);
+        pdg2.add_edge(x, y, EdgeKind::Sequential);
+        pdg2.add_edge(x, y, EdgeKind::DefUse); // should be ignored
+        let sc2 = pdg2.to_simplicial_complex();
+        assert_eq!(sc2.simplices[1].len(), 1, "DefUse edge should be excluded");
     }
 
     #[test]

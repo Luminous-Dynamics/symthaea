@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::relational_consciousness::RelationshipStage;
 
@@ -47,7 +44,9 @@ impl RelationshipTrajectory {
         }
 
         let first = &self.points[0];
-        let last = self.points.last()?;
+        let Some(last) = self.points.last() else {
+            return None;
+        };
 
         let phi_delta = last.phi_dyad - first.phi_dyad;
         let stages_visited = self.points.iter().map(|p| p.stage).collect();

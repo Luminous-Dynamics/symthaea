@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Full Stack Consciousness: Unified Understanding + Active Inference + Memory + Imagination
 //!
 //! This module integrates all consciousness capabilities into a coherent system:

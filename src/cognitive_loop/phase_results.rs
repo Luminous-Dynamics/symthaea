@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Phase result structs — carry local variables between cognitive cycle phases.
 //!
 //! All fields are `pub(super)` so that the phase modules can construct/read them,

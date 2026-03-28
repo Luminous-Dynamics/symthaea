@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Topology Reconfigure Closed Loop Test
+//! Topology Reconfigure Closed Loop Test
 //!
 //! Validates that the Φ-gradient driven topology reconfiguration loop
 //! actually improves integrated information. This is the feedback loop:

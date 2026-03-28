@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Property-Based Testing for Crucible Invariants (Option B)
 //!
 //! Uses proptest to throw arbitrary text at the moral algebra math

@@ -6,45 +6,45 @@ Database file #1: psych_bench_references.bib
 Warning--I didn't find a database entry for "rensink1997see"
 Warning--I didn't find a database entry for "treisman1980feature"
 Warning--I didn't find a database entry for "shepard1971mental"
-You've used 35 entries,
+You've used 36 entries,
             1935 wiz_defined-function locations,
-            711 strings with 10021 characters,
-and the built_in function-call counts, 14115 in all, are:
-= -- 1393
-> -- 566
-< -- 20
-+ -- 218
-- -- 190
-* -- 1274
-:= -- 2464
-add.period$ -- 105
-call.type$ -- 35
-change.case$ -- 266
-chr.to.int$ -- 35
-cite$ -- 35
-duplicate$ -- 488
-empty$ -- 989
-format.name$ -- 237
-if$ -- 2689
+            716 strings with 10212 characters,
+and the built_in function-call counts, 14478 in all, are:
+= -- 1431
+> -- 573
+< -- 21
++ -- 220
+- -- 192
+* -- 1305
+:= -- 2526
+add.period$ -- 108
+call.type$ -- 36
+change.case$ -- 272
+chr.to.int$ -- 36
+cite$ -- 36
+duplicate$ -- 502
+empty$ -- 1019
+format.name$ -- 240
+if$ -- 2760
 int.to.chr$ -- 1
 int.to.str$ -- 0
-missing$ -- 39
-newline$ -- 178
-num.names$ -- 105
-pop$ -- 198
+missing$ -- 40
+newline$ -- 183
+num.names$ -- 108
+pop$ -- 201
 preamble$ -- 1
-purify$ -- 269
+purify$ -- 275
 quote$ -- 0
-skip$ -- 368
+skip$ -- 379
 stack$ -- 0
-substring$ -- 1131
-swap$ -- 35
+substring$ -- 1168
+swap$ -- 36
 text.length$ -- 0
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 202
+type$ -- 208
 warning$ -- 0
-while$ -- 128
+while$ -- 132
 width$ -- 0
-write$ -- 456
+write$ -- 469
 (There were 3 warnings)

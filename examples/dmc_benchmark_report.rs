@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! DMC Humanoid Benchmark Report — External validation against RL baselines.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! DMC Humanoid Benchmark Report — External validation against RL baselines.
 //!
 //! Trains Stand/Walk/Run tasks using the HDC-LTC-FEP humanoid controller,
 //! evaluates performance, runs perturbation recovery tests, and outputs

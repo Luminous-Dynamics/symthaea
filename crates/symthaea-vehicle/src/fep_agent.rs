@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Active Inference vehicle agent: precision/tau modulation at cognitive rate (50Hz).
 //!
 //! Wraps `symthaea_fep::ActiveInferenceAgent` with driving-specific safety priors.
@@ -145,9 +142,6 @@ pub struct ActiveInferenceVehicleAgent {
     prev_observation: Vec<f64>,
     /// EMA of observation L2 delta (sensor stability signal).
     obs_delta_ema: f64,
-    /// Optional consciousness context from Spore/Holon.
-    /// SafetyLevel gates speed limits; consciousness modulates attention allocation.
-    consciousness_ctx: symthaea_core::ConsciousnessContext,
 }
 
 impl ActiveInferenceVehicleAgent {
@@ -187,21 +181,7 @@ impl ActiveInferenceVehicleAgent {
             target_speed: task.target_speed(),
             prev_observation: Vec::new(),
             obs_delta_ema: 0.5,
-            consciousness_ctx: symthaea_core::ConsciousnessContext::DEFAULT,
         }
-    }
-
-    /// Update the consciousness context from Spore/Holon.
-    ///
-    /// SafetyLevel::Red → emergency braking override.
-    /// Consciousness level modulates exploration gain.
-    pub fn set_consciousness_context(&mut self, ctx: symthaea_core::ConsciousnessContext) {
-        self.consciousness_ctx = ctx;
-    }
-
-    /// Current consciousness context.
-    pub fn consciousness_context(&self) -> &symthaea_core::ConsciousnessContext {
-        &self.consciousness_ctx
     }
 
     /// Build the 11D observation vector from vehicle state.
@@ -415,28 +395,6 @@ impl ActiveInferenceVehicleAgent {
             }
         } else {
             self.high_fe_ticks = 0;
-        }
-
-        // ── Consciousness modulation ──────────────────────────────────────
-        // Scale exploration by consciousness context.
-        if let Some(ref mut noise) = result.exploration_noise {
-            let gain = self.consciousness_ctx.exploration_gain();
-            for n in noise.iter_mut() {
-                *n *= gain;
-            }
-            if gain == 0.0 {
-                result.exploration_noise = None;
-            }
-        }
-        // Emergency: force deceleration
-        if self.consciousness_ctx.is_emergency() {
-            result.exploration_noise = None;
-            result.tau_factor = 0.5; // Fast brake response
-            result.learning_rate_factor = 0.1; // Freeze learning
-        }
-        // Elevated safety: reduce effective target speed
-        if self.consciousness_ctx.safety_level >= 2 {
-            result.prior_precision *= 2.0; // Stronger deceleration prior
         }
 
         // Update tracking state

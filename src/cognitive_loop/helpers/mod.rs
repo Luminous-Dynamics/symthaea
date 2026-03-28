@@ -579,36 +579,40 @@ impl CognitiveLoopService {
         self.stats.tau_trend = temporal_summary.features.trend;
 
         // Adaptive behavior stats
-        self.stats.adaptive_confidence = self.adaptive_behavior.confidence;
-        let hint_str = self.adaptive_behavior.action_hint.as_str();
+        self.stats.adaptive_confidence = self.behavior.adaptive_behavior.confidence;
+        let hint_str = self.behavior.adaptive_behavior.action_hint.as_str();
         if self.stats.action_hint != hint_str {
             self.stats.action_hint = hint_str.to_string();
         }
-        self.stats.learning_paused = self.adaptive_behavior.pause_learning;
+        self.stats.learning_paused = self.behavior.adaptive_behavior.pause_learning;
         self.stats.adaptive_learning_rate = self
+            .behavior
             .adaptive_behavior
             .effective_learning_rate(self.combined_learning_rate());
-        self.stats.adaptive_speech_rate = self.adaptive_behavior.speech_rate_multiplier;
+        self.stats.adaptive_speech_rate = self.behavior.adaptive_behavior.speech_rate_multiplier;
 
         // Prediction confidence stats
         self.stats.prediction_confidence = self.prediction_confidence as f32;
         // Decay rate: higher when in uncertain states
-        self.stats.confidence_decay_rate = match self.adaptive_behavior.action_hint {
+        self.stats.confidence_decay_rate = match self.behavior.adaptive_behavior.action_hint {
             ActionHint::Stabilize | ActionHint::SeekInput => 0.05,
             ActionHint::SlowDown => 0.03,
             _ => 0.0,
         };
 
         // Flow state stats
-        self.stats.in_flow = self.flow_state.in_flow;
-        self.stats.flow_intensity = self.flow_state.intensity;
-        self.stats.flow_streak = self.flow_state.streak;
-        self.stats.flow_learning_boost = self.flow_state.learning_boost;
+        self.stats.in_flow = self.behavior.flow_state.in_flow;
+        self.stats.flow_intensity = self.behavior.flow_state.intensity;
+        self.stats.flow_streak = self.behavior.flow_state.streak;
+        self.stats.flow_learning_boost = self.behavior.flow_state.learning_boost;
 
-        // Emotion contagion stats
-        self.stats.emotional_valence = self.emotion_contagion.smoothed_valence();
-        self.stats.emotional_arousal = self.emotion_contagion.smoothed_arousal();
-        let (nudge_pattern, nudge_strength) = self.emotion_contagion.pattern_nudge();
+        // Emotion contagion stats — read from unified emotional state (canonical source)
+        // EmotionContagion is now a stateless preprocessor; UnifiedEmotionalState
+        // is the single source of truth for affect (Phase 2 consolidation).
+        let unified_emo = self.unification_engine.emotional.state();
+        self.stats.emotional_valence = unified_emo.valence as f32;
+        self.stats.emotional_arousal = unified_emo.arousal as f32;
+        let (nudge_pattern, nudge_strength) = self.behavior.emotion_contagion.pattern_nudge();
         let nudge_str = nudge_pattern.map(|p| p.as_str()).unwrap_or("None");
         if self.stats.emotion_nudge_pattern != nudge_str {
             self.stats.emotion_nudge_pattern = nudge_str.to_string();
@@ -616,14 +620,15 @@ impl CognitiveLoopService {
         self.stats.emotion_nudge_strength = nudge_strength;
 
         // Curiosity drive stats
-        self.stats.boredom = self.curiosity_drive.boredom;
-        self.stats.curiosity = self.curiosity_drive.curiosity;
-        self.stats.exploration_urge = self.curiosity_drive.exploration_urge as f32;
-        self.stats.curiosity_exploring = self.curiosity_drive.should_explore();
-        self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
+        self.stats.boredom = self.behavior.curiosity_drive.boredom;
+        self.stats.curiosity = self.behavior.curiosity_drive.curiosity;
+        self.stats.exploration_urge = self.behavior.curiosity_drive.exploration_urge as f32;
+        self.stats.curiosity_exploring = self.behavior.curiosity_drive.should_explore();
+        self.stats.novelty_bonus = self.behavior.curiosity_drive.novelty_bonus;
 
         // Self-reflection stats
         let assess_str = self
+            .consciousness
             .self_model_tier
             .self_reflection
             .self_assessment
@@ -631,18 +636,33 @@ impl CognitiveLoopService {
         if self.stats.self_assessment != assess_str {
             self.stats.self_assessment = assess_str.to_string();
         }
-        self.stats.reflection_count = self.self_model_tier.self_reflection.reflection_count;
-        self.stats.adjustments_made = self.self_model_tier.self_reflection.adjustments_made;
+        self.stats.reflection_count = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .reflection_count;
+        self.stats.adjustments_made = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .adjustments_made;
         self.stats.learning_effectiveness = self
+            .consciousness
             .self_model_tier
             .self_reflection
             .learning_effectiveness();
-        let summary = self.self_model_tier.self_reflection.summary();
+        let summary = self.consciousness.self_model_tier.self_reflection.summary();
         self.stats.next_reflection_in = summary.next_reflection_in;
-        self.stats.adapted_flow_threshold =
-            self.self_model_tier.self_reflection.flow_error_threshold;
-        self.stats.adapted_boredom_threshold =
-            self.self_model_tier.self_reflection.boredom_threshold;
+        self.stats.adapted_flow_threshold = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .flow_error_threshold;
+        self.stats.adapted_boredom_threshold = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .boredom_threshold;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE STATS
@@ -677,7 +697,7 @@ impl CognitiveLoopService {
         }
 
         // Thalamic routing statistics
-        let (reflex_rate, cortical_rate, deep_rate) = self.thalamic_router.routing_stats();
+        let (reflex_rate, cortical_rate, deep_rate) = self.behavior.thalamic_router.routing_stats();
         self.stats.thalamic_reflex_rate = reflex_rate;
         self.stats.thalamic_cortical_rate = cortical_rate;
         self.stats.thalamic_deep_rate = deep_rate;
@@ -813,43 +833,48 @@ impl CognitiveLoopService {
         self.stats = LoopStats::default();
         self.start_time = Instant::now();
         self.language_comm.reset();
-        self.adaptive_behavior = AdaptiveBehavior::default();
+        self.behavior.adaptive_behavior = AdaptiveBehavior::default();
         self.prediction_confidence = 0.5;
         self.feedback_state = super::feedback_state::FeedbackState::new();
         self.feedback_state.begin_cycle();
         self.feedback_state.snapshot_cycle_start(0.5, 1.0, 0.0, 1.0);
-        self.flow_state.reset();
-        self.emotion_contagion.reset();
-        self.curiosity_drive.reset();
-        self.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
+        self.behavior.flow_state.reset();
+        self.behavior.emotion_contagion.reset();
+        self.behavior.curiosity_drive.reset();
+        self.consciousness.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
-        self.social_mgr = super::SocialManager::default();
+        self.behavior.social_mgr = super::SocialManager::default();
         // user_state reset handled by self.language_comm.reset() above
         self.policy_agreement_window.clear();
         self.carryover = CycleCarryover::default();
         self.consciousness_state.reset();
-        if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
+        if let Some(ref mut thermo) = self.consciousness.consciousness_monitors.thermodynamics {
             *thermo = crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer::new(
                 crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
             );
         }
-        if let Some(ref mut binding) = self.consciousness_monitors.phenomenal_binding {
+        if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding
+        {
             *binding =
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
                     crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 );
         }
-        if let Some(ref mut hfe) = self.consciousness_monitors.hierarchical_free_energy {
+        if let Some(ref mut hfe) = self
+            .consciousness
+            .consciousness_monitors
+            .hierarchical_free_energy
+        {
             *hfe = crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );
         }
         self.ethics_values.reset();
         self.primitive_tier.reset();
-        self.memory_consol.reset();
+        self.memory.memory_consol.reset();
         self.feature_integ.reset();
-        self.vision_sensory.reset();
+        self.sensorimotor.vision_sensory.reset();
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
         self.subsystem_collector.clear();

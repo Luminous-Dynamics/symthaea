@@ -1,7 +1,5 @@
 #![cfg(feature = "genesis")]
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cross-crate CfC consistency validation for genesis pipeline predictors.
+//! Cross-crate CfC consistency validation for genesis pipeline predictors.
 //!
 //! All 5 genesis crates use `HdcLtcUnifiedNeuron::evolve_closed_form()` for O(1)
 //! temporal jumps. This test suite validates three invariants:

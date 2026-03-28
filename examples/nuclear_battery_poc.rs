@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Nuclear Battery Proof of Concept
+//! # Nuclear Battery Proof of Concept
 //!
 //! Demonstrates the energy storage potential of nuclear isomers compared to
 //! chemical batteries, using Symthaea's compositional physics framework.

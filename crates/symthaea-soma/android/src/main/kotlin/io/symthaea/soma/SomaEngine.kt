@@ -369,30 +369,6 @@ class SomaEngine private constructor(private var handle: Long) : Closeable {
         check(!closed); NativeBindings.bleCollectivePhi(handle)
     }
 
-    // Daily rituals
-
-    /** Generate Morning Alignment ritual as JSON. */
-    fun morningRitualJson(): String? = lock.withLock {
-        check(!closed); NativeBindings.morningRitual(handle)
-    }
-
-    /** Generate Evening Reflection ritual as JSON. */
-    fun eveningRitualJson(): String? = lock.withLock {
-        check(!closed); NativeBindings.eveningRitual(handle)
-    }
-
-    // Wellbeing profiles
-
-    /** Set the active wellbeing profile by name. Returns true if recognized. */
-    fun setWellbeingProfile(name: String): Boolean = lock.withLock {
-        check(!closed); NativeBindings.setWellbeingProfile(handle, name) == 1
-    }
-
-    /** Get the current wellbeing profile name. */
-    fun wellbeingProfileName(): String? = lock.withLock {
-        check(!closed); NativeBindings.wellbeingProfileName(handle)
-    }
-
     // Lifecycle
 
     override fun close() = lock.withLock {

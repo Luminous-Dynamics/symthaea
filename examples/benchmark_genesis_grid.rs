@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 1: Grid Scaling
+//! Genesis Mission Challenge 1: Grid Scaling
 //!
 //! Demonstrates HDC + CfC + FEP grid stability monitoring with
 //! O(1) prediction cost across timescales from 1 minute to 1 year.

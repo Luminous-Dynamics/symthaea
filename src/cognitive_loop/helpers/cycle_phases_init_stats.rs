@@ -17,9 +17,9 @@ impl CognitiveLoopService {
     /// Startup transient suppression, biorhythm refresh, nociception, and
     /// neuromodulator bath update. Run at the very start of each cycle.
     ///
-    /// Mutates: `self.stats`, `self.curiosity_drive`, `self.carryover`,
+    /// Mutates: `self.stats`, `self.behavior.curiosity_drive`, `self.carryover`,
     /// `self.feedback_state`, `self.subsystem_collector`, `self.biorhythm_mgr.rhythm`,
-    /// `self.neuromod.bath`, `self.somatic_bridge`, `self.emotion_contagion`,
+    /// `self.neuromod.bath`, `self.sensorimotor.somatic_bridge`, `self.behavior.emotion_contagion`,
     /// `self.thermodynamic_load`, `self.neuromod.phase_tracker`,
     /// `self.neuromod.drift_tracker`.
     pub(in crate::cognitive_loop) fn run_cycle_init(
@@ -75,7 +75,7 @@ impl CognitiveLoopService {
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
-        let exploration_urge_start = self.curiosity_drive.exploration_urge as f32;
+        let exploration_urge_start = self.behavior.curiosity_drive.exploration_urge as f32;
 
         // Snapshot confidence for end-of-cycle drift clamping (Task G)
         self.carryover.learning.prediction_confidence = self.prediction_confidence;
@@ -106,12 +106,14 @@ impl CognitiveLoopService {
         self.feedback_state.snapshot_cycle_start(
             self.prediction_confidence,
             self.fep.lr_boost,
-            self.curiosity_drive.exploration_urge,
+            self.behavior.curiosity_drive.exploration_urge,
             self.carryover.learning.adaptive_threshold_scale,
         );
         // ── Phase 2.3: Clear subsystem output collector ────
         self.subsystem_collector.clear();
         self.carryover.quality.subsystem_veto = false;
+        self.carryover.quality.safety_motor_halt = false;
+        self.carryover.quality.safety_motor_readonly = false;
 
         // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
         self.biorhythm_mgr.refresh_counter += 1;
@@ -267,25 +269,25 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // NOCICEPTION: Drain infrastructure errors and convert to felt signals
         // ═══════════════════════════════════════════════════════════════════════
-        self.somatic_bridge.update();
-        let somatic_signals = self.somatic_bridge.to_interoceptive_signals();
+        self.sensorimotor.somatic_bridge.update();
+        let somatic_signals = self.sensorimotor.somatic_bridge.to_interoceptive_signals();
         // Apply somatic stress to thermodynamic load (additive)
         self.thermodynamic_load =
             (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
         // Apply arousal spike from severe infrastructure damage
         if somatic_signals.arousal_spike > 0.0 {
-            self.emotion_contagion.arousal =
-                (self.emotion_contagion.arousal + somatic_signals.arousal_spike).min(1.0);
+            self.behavior.emotion_contagion.arousal =
+                (self.behavior.emotion_contagion.arousal + somatic_signals.arousal_spike).min(1.0);
         }
         // #5: Forward somatic stress to neuromodulator bath (McEwen 2007)
-        let somatic_stress_level = self.somatic_bridge.systemic_stress() as f32;
+        let somatic_stress_level = self.sensorimotor.somatic_bridge.systemic_stress() as f32;
         self.neuromod.bath.apply_stress(somatic_stress_level);
 
         // ═══════════════════════════════════════════════════════════════════════
         // THERMOCEPTION: Drain platform thermal reports and update tau modulation
         // Science: Angilletta (2009) thermal performance curves
         // ═══════════════════════════════════════════════════════════════════════
-        self.thermal_bridge.update();
+        self.sensorimotor.thermal_bridge.update();
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH: Produce from previous cycle's signals (Phase A)
@@ -304,10 +306,10 @@ impl CognitiveLoopService {
                     .history
                     .cached_coherence
                     .unwrap_or(super::super::thresholds::COHERENCE_DEFAULT),
-                arousal: self.emotion_contagion.arousal,
+                arousal: self.behavior.emotion_contagion.arousal,
                 binding_strength: self.carryover.quality.last_phenomenal_binding as f32,
                 epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
-                flow_active: self.flow_state.in_flow,
+                flow_active: self.behavior.flow_state.in_flow,
                 // Consciousness → neuromod baseline modulation (Dehaene et al. 2006)
                 consciousness_level: self.carryover.consciousness.last_sigma.map(|s| s as f32),
                 // Moral judgment → oxytocin/DA (Zak 2012)
@@ -612,7 +614,7 @@ impl CognitiveLoopService {
 
         // Populate v0.8.0 Resonance Metadata
         metadata.temporal.thermodynamic_load = self.thermodynamic_load;
-        metadata.embodied.somatic_stress = self.somatic_bridge.systemic_stress();
+        metadata.embodied.somatic_stress = self.sensorimotor.somatic_bridge.systemic_stress();
         metadata.embodied.mood_temperature = self.mood_temperature;
         // Phase 2.2: feedback proposal attribution telemetry
         metadata.feedback.feedback_confidence_proposals =

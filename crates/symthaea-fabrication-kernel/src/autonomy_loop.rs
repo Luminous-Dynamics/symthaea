@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Autonomy Loop — Fabrication state machine with consciousness bridge.
 //!
 //! Tracks fabrication lifecycle (Idle → Printing → QC → Complete/Failed)

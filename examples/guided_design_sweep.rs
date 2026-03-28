@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Guided Design Sweep: Physics-bridge-enhanced fusion reactor design exploration.
+//! Guided Design Sweep: Physics-bridge-enhanced fusion reactor design exploration.
 //!
 //! Demonstrates `GuidedDesignExplorer` which runs parametric sweeps over
 //! fusion reactor design parameters and annotates plateau regions with

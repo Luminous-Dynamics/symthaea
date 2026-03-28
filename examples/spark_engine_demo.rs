@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Spark Engine Demo: Complete LCF Power System Specification
+//! # Spark Engine Demo: Complete LCF Power System Specification
 //!
 //! This example demonstrates the full integration of:
 //! - Resonance Discovery (fuel/reaction selection)

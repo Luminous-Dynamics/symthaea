@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Getting Started with Symthaea
+//! # Getting Started with Symthaea
 //!
 //! This example demonstrates the core concepts of the Symthaea Holographic Liquid Brain:
 //!

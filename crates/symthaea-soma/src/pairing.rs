@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! BLE Pairing Manager — Ed25519 trust establishment for Spore-to-Spore pairing.
 //!
 //! Follows the BleMesh pattern: mode-gated, tick-driven, queue-based, WASM-safe.

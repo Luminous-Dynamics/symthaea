@@ -76,6 +76,30 @@ pub enum SentinelEvent {
         severity: f32,
         evidence_hash: u64,
     },
+    /// A coordinated cartel detected by the CartelDetector.
+    ///
+    /// When confidence exceeds `CARTEL_SLASH_MIN_CONFIDENCE` (0.7),
+    /// the sentinel records this pattern in ThreatMemory and may
+    /// escalate safety level for the affected governance domain.
+    CartelDetected {
+        members: Vec<String>,
+        confidence: f64,
+        avg_similarity: f64,
+    },
+    /// Oppression pattern detected by governance reflection.
+    ///
+    /// Emitted when `reflect_on_proposal()` identifies high echo chamber
+    /// risk combined with power concentration, absent harmonies, or
+    /// fragmentation warnings. Feeds into ThreatMemory for HDV pattern
+    /// recognition of systematic oppression across proposals.
+    OppressionDetected {
+        proposal_id: String,
+        echo_chamber_risk: String,
+        concentration_warning: bool,
+        fragmentation_warning: bool,
+        absent_harmonies: Vec<String>,
+        timestamp_us: u64,
+    },
 }
 
 /// Types of threat signals the sentinel can detect.
@@ -95,6 +119,10 @@ pub enum ThreatSignalKind {
     DispatchLoop,
     /// Rapid consciousness tier changes.
     ConsciousnessManipulation,
+    /// Coordinated cartel attack (from CartelDetector).
+    CartelAttack,
+    /// Systematic oppression pattern in governance.
+    GovernanceOppression,
 }
 
 impl ThreatSignalKind {
@@ -108,6 +136,8 @@ impl ThreatSignalKind {
             Self::TimingAnomaly => 0.3,
             Self::DispatchLoop => 0.5,
             Self::ConsciousnessManipulation => 0.6,
+            Self::CartelAttack => 0.7,
+            Self::GovernanceOppression => 0.6,
         }
     }
 }
@@ -470,6 +500,67 @@ impl SentinelManager {
                 } => {
                     self.external_reports.push((threat_type, severity));
                     external_count += 1;
+                }
+
+                SentinelEvent::CartelDetected {
+                    ref members,
+                    confidence,
+                    ..
+                } => {
+                    if confidence > 0.7 && members.len() >= 3 {
+                        self.emit_threat(ThreatSignal {
+                            kind: ThreatSignalKind::CartelAttack,
+                            confidence: confidence as f32,
+                            severity: (confidence * 0.8) as f32,
+                            subject: Some(members.join(",")),
+                            detected_at: cycle,
+                            evidence: format!(
+                                "Cartel of {} members detected with confidence {:.2}",
+                                members.len(),
+                                confidence
+                            ),
+                        });
+                    }
+                }
+
+                SentinelEvent::OppressionDetected {
+                    ref proposal_id,
+                    ref echo_chamber_risk,
+                    concentration_warning,
+                    fragmentation_warning,
+                    ref absent_harmonies,
+                    ..
+                } => {
+                    // Score oppression severity from combined signals
+                    let severity = {
+                        let mut s = 0.0f32;
+                        if echo_chamber_risk == "High" {
+                            s += 0.4;
+                        }
+                        if concentration_warning {
+                            s += 0.3;
+                        }
+                        if fragmentation_warning {
+                            s += 0.2;
+                        }
+                        if absent_harmonies.len() > 2 {
+                            s += 0.1;
+                        }
+                        s.min(1.0)
+                    };
+                    if severity > 0.3 {
+                        self.emit_threat(ThreatSignal {
+                            kind: ThreatSignalKind::GovernanceOppression,
+                            confidence: severity,
+                            severity,
+                            subject: Some(proposal_id.clone()),
+                            detected_at: cycle,
+                            evidence: format!(
+                                "Oppression pattern: echo={}, concentration={}, fragmentation={}, absent_harmonies={}",
+                                echo_chamber_risk, concentration_warning, fragmentation_warning, absent_harmonies.len()
+                            ),
+                        });
+                    }
                 }
             }
         }

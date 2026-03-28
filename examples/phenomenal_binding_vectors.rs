@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! H2 Revised: Phenomenal Binding via Vector Metrics
+//! H2 Revised: Phenomenal Binding via Vector Metrics
 //!
 //! Tests whether HDC binding (XOR) creates different vector structure than
 //! bundling (majority vote) using direct metrics instead of topology.

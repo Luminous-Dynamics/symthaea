@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Normative comparison of agent performance against human baselines.
+//! Normative comparison of agent performance against human baselines.
 //!
 //! Computes z-scores, percentiles, and clinical-style interpretations for each
 //! benchmark metric by comparing agent values to published human population
@@ -96,15 +94,12 @@ fn baseline_for_benchmark<'a>(
     match benchmark {
         // Executive domain
         name if name.contains("Stroop") && !name.contains("Emotional") => {
-            Some(("stroop_incongruent_accuracy", &bl.executive))
+            Some(("stroop_effect", &bl.executive))
         }
         name if name.contains("WCST") || name.contains("Wisconsin") => {
             Some(("wcst_categories_completed", &bl.executive))
         }
-        name if name.contains("FlankerInhibition") => {
-            Some(("interference_suppression", &bl.inhibition))
-        }
-        name if name.contains("Flanker") => Some(("flanker_incongruent_accuracy", &bl.executive)),
+        name if name.contains("Flanker") => Some(("flanker_effect", &bl.executive)),
         name if name.contains("TowerOfLondon") => Some(("tol_overall_optimal_rate", &bl.executive)),
         name if name.contains("DualTask") => Some(("dual_task_cost", &bl.executive)),
         name if name.contains("Ravens") => Some(("ravens_overall_accuracy", &bl.executive)),
@@ -145,7 +140,7 @@ fn baseline_for_benchmark<'a>(
 
         // Affect
         name if name.contains("Emotional") && name.contains("Stroop") => {
-            Some(("emotional_negative_accuracy", &bl.affect))
+            Some(("emotional_interference", &bl.affect))
         }
         name if name.contains("MoodCongruent") => Some(("congruence_ratio", &bl.affect)),
         name if name.contains("ValenceClassification") => Some(("valence_accuracy", &bl.affect)),
@@ -155,18 +150,16 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("StopSignal") => Some(("ssrt_ticks", &bl.inhibition)),
 
         // Attention
-        name if name.contains("VisualSearch") => {
-            Some(("conjunction_search_accuracy", &bl.attention))
-        }
-        name if name.contains("AttentionalBlink") => Some(("lag3_t2_accuracy", &bl.attention)),
+        name if name.contains("VisualSearch") => Some(("search_asymmetry", &bl.attention)),
+        name if name.contains("AttentionalBlink") => Some(("blink_magnitude", &bl.attention)),
 
         // Motor
         name if name.contains("FittsLaw") => Some(("fitts_r_squared", &bl.motor)),
-        name if name.contains("SRTT") => Some(("sequence_accuracy", &bl.motor)),
+        name if name.contains("SRTT") => Some(("learning_effect", &bl.motor)),
         name if name.contains("Bimanual") => Some(("coordination_cost", &bl.motor)),
 
         // Language
-        name if name.contains("LexicalDecision") => Some(("word_accuracy", &bl.language)),
+        name if name.contains("LexicalDecision") => Some(("lexicality_effect", &bl.language)),
         name if name.contains("SemanticPriming") => Some(("priming_effect", &bl.language)),
         name if name.contains("SemanticCoherence") => Some(("coherence_mean", &bl.language)),
         name if name.contains("GardenPath") => Some(("disambiguation_cost", &bl.language)),
@@ -185,7 +178,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("ArcChain") => Some(("arc_chain_accuracy", &bl.reasoning)),
         name if name.contains("ArcNoise") => Some(("arc_noise_resilience", &bl.reasoning)),
         name if name.contains("ArcFewShot") => Some(("arc_accuracy_1shot", &bl.reasoning)),
-        name if name.contains("ArcScaling") => Some(("arc_capacity_ratio", &bl.reasoning)),
+        name if name.contains("ArcScaling") => Some(("arc_grid_3x3_accuracy", &bl.reasoning)),
         name if name.contains("ArcRSA") => Some(("arc_rsa_correlation", &bl.reasoning)),
         name if name.contains("ArcAlgebra") => Some(("arc_algebra_score", &bl.reasoning)),
         name if name.contains("ArcStaircase") => Some(("arc_capacity_threshold", &bl.reasoning)),
@@ -217,17 +210,17 @@ fn baseline_for_benchmark<'a>(
         }
 
         // Creativity
-        name if name.contains("AlternateUses") => Some(("aut_fluency", &bl.creativity)),
-        name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
-        name if name.contains("ConceptualBlending") => Some(("blend_coherence", &bl.creativity)),
-        name if name.contains("DivergentThinking") => Some(("originality_score", &bl.creativity)),
+        name if name.contains("AlternateUses") => Some(("aut_originality", &bl.creativity)),
+        name if name.contains("RemoteAssociates") => {
+            Some(("rat_mean_solution_rank", &bl.creativity))
+        }
 
         // Butlin
         name if name.contains("Butlin") => Some(("mean_quality_score", &bl.butlin)),
 
         // Neuromod
         name if name.contains("RewardLearning") => Some(("trials_to_criterion", &bl.neuromod)),
-        name if name.contains("YerkesDodson") => Some(("inverted_u_fit_r2", &bl.neuromod)),
+        name if name.contains("YerkesDodson") => Some(("peak_ne_level", &bl.neuromod)),
         name if name.contains("AttentionNetwork") => Some(("conflict_effect", &bl.neuromod)),
         name if name.contains("MoodInduction") => Some(("mood_congruent_bias", &bl.neuromod)),
         name if name.contains("PharmacologicalAblation") => {
@@ -248,46 +241,6 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("BehavioralKnockout") => Some(("da_ko_lr_d", &bl.neuromod)),
         name if name.contains("ConsciousnessPharmacology") => {
             Some(("psychedelic_proxy_peak", &bl.neuromod))
-        }
-
-        // Mathematics domain
-        name if name.contains("ArithmeticWordProblem") => {
-            Some(("arithmetic_accuracy", &bl.mathematics))
-        }
-        name if name.contains("LinearSystemSolving") => {
-            Some(("linear_system_accuracy_2x2", &bl.mathematics))
-        }
-        name if name.contains("PolynomialRoots") => {
-            Some(("polynomial_quadratic_accuracy", &bl.mathematics))
-        }
-        name if name.contains("DefiniteIntegral") => {
-            Some(("integration_accuracy", &bl.mathematics))
-        }
-        name if name.contains("MatrixOperations") => {
-            Some(("determinant_accuracy", &bl.mathematics))
-        }
-        name if name.contains("StatisticalInference") => {
-            Some(("variance_estimation_accuracy", &bl.mathematics))
-        }
-        name if name.contains("BayesianReasoning") => {
-            Some(("bayesian_posterior_accuracy", &bl.mathematics))
-        }
-        name if name.contains("LogicalDeduction") => {
-            Some(("logical_overall_accuracy", &bl.mathematics))
-        }
-        name if name.contains("ConstraintPuzzle") => {
-            Some(("constraint_queens_4_accuracy", &bl.mathematics))
-        }
-        name if name.contains("ProofConstruction") => Some(("tautology_accuracy", &bl.mathematics)),
-        name if name.contains("OptimizationProblem") => {
-            Some(("optimization_sphere_accuracy", &bl.mathematics))
-        }
-
-        // Coding
-        name if name.contains("HumanEvalMini") => Some(("humaneval_pass_at_1", &bl.coding)),
-        name if name.contains("BugDetection") => Some(("bug_category_accuracy", &bl.coding)),
-        name if name.contains("AlgorithmRecognition") => {
-            Some(("algorithm_recognition_accuracy", &bl.coding))
         }
 
         _ => {

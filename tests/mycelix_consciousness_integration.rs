@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for the bidirectional Mycelix consciousness bridge.
+//! Integration tests for the bidirectional Mycelix consciousness bridge.
 //!
 //! Tests `CognitiveLoopService::inject_mycelix_profile()` which maps Mycelix's
 //! 4D consciousness profile (identity, reputation, community, engagement) back

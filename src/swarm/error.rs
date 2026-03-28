@@ -68,6 +68,13 @@ pub enum SwarmError {
     /// Decryption failed (authentication tag mismatch or malformed ciphertext).
     DecryptionFailed { reason: String },
 
+    /// Attestation required but no attestation manager configured.
+    ///
+    /// In release builds, `recv_verified_consciousness()` rejects unsigned
+    /// ConsciousnessVectors when no `AttestationManager` is set on the node.
+    /// Use `recv_consciousness()` explicitly if you intend to accept unverified CVs.
+    AttestationRequired,
+
     /// Internal error
     Internal(String),
 }
@@ -135,6 +142,14 @@ impl fmt::Display for SwarmError {
             }
             Self::DecryptionFailed { reason } => {
                 write!(f, "Decryption failed: {reason}")
+            }
+            Self::AttestationRequired => {
+                write!(
+                    f,
+                    "Attestation required: no AttestationManager configured. \
+                     Use recv_consciousness() for unverified reception, or \
+                     configure an AttestationManager via set_attestation()."
+                )
             }
             Self::Internal(msg) => {
                 write!(f, "Internal error: {msg}")

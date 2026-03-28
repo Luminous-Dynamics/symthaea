@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! End-to-end integration tests for FabricationManager consciousness coupling.
+//! End-to-end integration tests for FabricationManager consciousness coupling.
 //!
 //! Proves the full pipeline: FabricationEvent → FabricationManager.process() →
 //! SubsystemOutput (flags, confidence, LR) + neuromod injections → CycleMetadata telemetry.

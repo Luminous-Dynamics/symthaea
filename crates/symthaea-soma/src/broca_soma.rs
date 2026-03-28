@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Soma-aware Broca language center -- full 20-channel ThoughtEncoder.
 //!
 //! Replaces BrocaLite with the full Broca pipeline: 20-channel ThoughtEncoder,

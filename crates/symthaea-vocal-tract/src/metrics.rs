@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Vocal tract quality metrics and WAV output.
 //!
 //! Provides spectral accuracy metrics for benchmarking the LTC-driven vocal tract

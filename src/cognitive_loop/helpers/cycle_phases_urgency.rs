@@ -25,7 +25,7 @@ impl CognitiveLoopService {
             return result;
         }
 
-        if let Some(ref replay) = self.episodic_persistence.replay {
+        if let Some(ref replay) = self.memory.episodic_persistence.replay {
             let episodes = replay.get_top_episodes(16);
             if episodes.is_empty() {
                 return result;

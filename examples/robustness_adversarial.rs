@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Robustness and Adversarial Testing
+//! Robustness and Adversarial Testing
 //!
 //! Tests edge cases and adversarial examples to verify the phenomenal detector
 //! is robust and not relying on superficial features.

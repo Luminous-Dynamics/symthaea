@@ -216,7 +216,7 @@ mod tests {
         let mut timings = super::super::ModuleTimings::default();
         let result = s.run_late_consciousness_monitors(&ctx, &mut timings);
         assert!(result.prefrontal_veto);
-        assert!((s.curiosity_drive.exploration_urge - 0.3).abs() < 0.01);
+        assert!((s.behavior.curiosity_drive.exploration_urge - 0.3).abs() < 0.01);
     }
 
     // ── run_consciousness_integration ─────────────────────────────────

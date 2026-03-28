@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! 16,384D genome encoding using HDC bind/bundle operations.
 //!
 //! Pattern: bind(locus_hv, allele_hv) per locus, bundle all -> individual genome HV.

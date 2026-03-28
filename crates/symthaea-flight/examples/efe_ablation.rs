@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! EFE Ablation Study: Precision sweep to find the decision boundary.
 //!
 //! Sweeps safety_prior_precision from 0.001 to 10000, computing EFE for both

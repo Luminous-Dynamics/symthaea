@@ -3405,6 +3405,7 @@ fn test_moral_topology_packet_roundtrip() {
         attractor_detected: false,
         trajectory_fingerprint: [0.0; 8],
         trajectory_entropy: 0.0,
+        hodge_fractions: None,
     };
 
     let packet = WisdomPacket::from_moral_topology([1, 2, 3, 4, 5, 6, 7, 8], 42, 0.65, &summary);

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! HAL Integration Demo (v5)
+//! HAL Integration Demo (v5)
 //!
 //! Demonstrates the full mock HAL pipeline with v5 features:
 //! - Sensor recording/replay for offline debugging

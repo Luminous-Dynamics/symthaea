@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "RISC Zero host-side prover for Symthaea ZK proofs"
 
+[workspace]
+
 [dependencies]
 anyhow = "1.0"
 risc0-zkvm = "3.0"

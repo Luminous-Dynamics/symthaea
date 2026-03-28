@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Dynamics Module Integration Tests
+//! # Dynamics Module Integration Tests
 //!
 //! Integration tests for `symthaea::dynamics` covering the core CfC (Closed-form
 //! Continuous-time) neural network types, hierarchical multi-scale processing,

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! HDC (Hyperdimensional Computing) Integration Tests
+//! HDC (Hyperdimensional Computing) Integration Tests
 //!
 //! Tests for the BinaryHV binary hypervector type and related operations.
 //! These tests verify the mathematical properties and practical usage

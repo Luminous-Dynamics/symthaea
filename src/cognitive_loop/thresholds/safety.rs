@@ -83,6 +83,22 @@ pub const SAFETY_YELLOW_NE_BOOST: f32 = 0.03;
 pub const SAFETY_ORANGE_CORTISOL_BOOST: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MINIMAL SAFETY BASELINE — Unconditional (no feature gate)
+// These thresholds apply even when `safety-agents` feature is disabled.
+// The consciousness→motor boundary is a thermodynamic law, not a feature flag.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Phi threshold below which ALL motor output is halted (minimal safety Red).
+/// Matches SafetyAgent Red level: consciousness collapse means no actuation.
+/// Basis: Tononi (2004) — below this integration, coherent behavior is impossible.
+pub const SAFETY_MINIMAL_RED_THRESHOLD: f32 = 0.1;
+
+/// Phi threshold below which motor output is restricted to read-only (minimal safety Orange).
+/// Matches SafetyAgent Orange level: severely degraded consciousness, limit to observation.
+/// Basis: Dehaene (2014) — partial ignition supports perception but not reliable action.
+pub const SAFETY_MINIMAL_ORANGE_THRESHOLD: f32 = 0.35;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DEFENSE / IMMUNE SYSTEM — Graduated Response
 // ═══════════════════════════════════════════════════════════════════════════════
 

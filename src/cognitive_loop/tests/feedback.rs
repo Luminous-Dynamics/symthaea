@@ -29,9 +29,9 @@ fn test_prefrontal_veto_suppresses_exploration() {
         // Not exactly 0.0 because end-of-cycle homeostatic drift nudges it slightly toward 0.3,
         // and knowledge engine contradiction→exploration coupling adds a small boost (~0.02).
         assert!(
-            service.curiosity_drive().exploration_urge < 0.10,
+            service.behavior.curiosity_drive.exploration_urge < 0.10,
             "Prefrontal veto should suppress exploration_urge to near-zero, got: {}",
-            service.curiosity_drive().exploration_urge,
+            service.behavior.curiosity_drive.exploration_urge,
         );
     }
     // Even if veto didn't trigger this exact cycle, verify the mechanism exists
@@ -41,9 +41,9 @@ fn test_prefrontal_veto_suppresses_exploration() {
         "Prediction error should be finite with prefrontal veto enabled"
     );
     assert!(
-        (0.0..=1.0).contains(&service.curiosity_drive().exploration_urge),
+        (0.0..=1.0).contains(&service.behavior.curiosity_drive.exploration_urge),
         "Exploration urge should be in [0, 1]: {}",
-        service.curiosity_drive().exploration_urge
+        service.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -98,7 +98,7 @@ fn test_attention_schema_bidirectional() {
 
     // With the new bidirectional gain (up to +30%), the attention_sensitivity
     // can be much higher than the old 10% cap allowed
-    let sensitivity = service.adaptive_behavior().attention_sensitivity;
+    let sensitivity = service.behavior.adaptive_behavior.attention_sensitivity;
     assert!(
         sensitivity > 0.0,
         "Attention sensitivity should be positive: {sensitivity}"
@@ -324,7 +324,7 @@ fn test_quantum_coherence_boosts_exploration() {
     }
 
     // Exploration urge should be within valid range
-    let urge = service.curiosity_drive().exploration_urge;
+    let urge = service.behavior.curiosity_drive.exploration_urge;
     assert!(
         (0.0..=1.0).contains(&urge),
         "Exploration urge should be in [0, 1]: got {urge}"
@@ -568,7 +568,7 @@ fn test_v063_affective_curiosity_feedback() {
 
     // Run enough cycles for affective bridge to produce positive valence
     // (low prediction error → positive valence → boredom *= 1.05)
-    let initial_boredom = service.curiosity_drive().boredom;
+    let initial_boredom = service.behavior.curiosity_drive.boredom;
     assert!(
         initial_boredom.is_finite(),
         "Initial boredom should be finite"
@@ -579,7 +579,7 @@ fn test_v063_affective_curiosity_feedback() {
     }
 
     // Boredom should have been modulated by affective feedback
-    let final_boredom = service.curiosity_drive().boredom;
+    let final_boredom = service.behavior.curiosity_drive.boredom;
     assert!(
         final_boredom.is_finite(),
         "Boredom should be finite: {final_boredom}"
@@ -1014,7 +1014,11 @@ fn test_coherence_field_wired_when_enabled() {
     .unwrap();
 
     assert!(
-        service.vision_sensory.coherence_field.is_some(),
+        service
+            .sensorimotor
+            .vision_sensory
+            .coherence_field
+            .is_some(),
         "CoherenceField should be Some"
     );
 
@@ -1023,7 +1027,12 @@ fn test_coherence_field_wired_when_enabled() {
     assert!(r.prediction_error.is_finite());
 
     // Coherence should remain bounded
-    let cf = service.vision_sensory.coherence_field.as_ref().unwrap();
+    let cf = service
+        .sensorimotor
+        .vision_sensory
+        .coherence_field
+        .as_ref()
+        .unwrap();
     assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
 }
 
@@ -1035,7 +1044,11 @@ fn test_coherence_field_none_when_disabled() {
     })
     .unwrap();
 
-    assert!(service.vision_sensory.coherence_field.is_none());
+    assert!(service
+        .sensorimotor
+        .vision_sensory
+        .coherence_field
+        .is_none());
 }
 
 #[test]
@@ -1088,7 +1101,12 @@ fn test_coherence_field_modulates_consciousness() {
         );
     }
     // Verify the coherence field has a valid value
-    let cf = service.vision_sensory.coherence_field.as_ref().unwrap();
+    let cf = service
+        .sensorimotor
+        .vision_sensory
+        .coherence_field
+        .as_ref()
+        .unwrap();
     assert!(cf.coherence >= 0.0 && cf.coherence <= 1.0);
 }
 
@@ -1569,7 +1587,7 @@ fn helper_lr_clamps_to_bounds() {
 #[test]
 fn helper_adjust_exploration_applies_delta_and_records_proposal() {
     let mut svc = make_helper_service();
-    svc.curiosity_drive.exploration_urge = 0.5;
+    svc.behavior.curiosity_drive.exploration_urge = 0.5;
     svc.feedback_state.begin_cycle();
     svc.feedback_state.snapshot_cycle_start(
         svc.prediction_confidence,
@@ -1580,9 +1598,9 @@ fn helper_adjust_exploration_applies_delta_and_records_proposal() {
     let delta: f32 = 0.2;
     svc.adjust_exploration("test_source", delta);
     assert!(
-        (svc.curiosity_drive.exploration_urge - (0.5 + delta as f64)).abs() < 1e-10,
+        (svc.behavior.curiosity_drive.exploration_urge - (0.5 + delta as f64)).abs() < 1e-10,
         "adjust_exploration should add delta: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
     assert_eq!(svc.feedback_state.exploration.len(), 1);
 }
@@ -1590,7 +1608,7 @@ fn helper_adjust_exploration_applies_delta_and_records_proposal() {
 #[test]
 fn helper_scale_exploration_applies_factor() {
     let mut svc = make_helper_service();
-    svc.curiosity_drive.exploration_urge = 0.8;
+    svc.behavior.curiosity_drive.exploration_urge = 0.8;
     svc.feedback_state.begin_cycle();
     svc.feedback_state.snapshot_cycle_start(
         svc.prediction_confidence,
@@ -1601,9 +1619,9 @@ fn helper_scale_exploration_applies_factor() {
     let factor: f32 = 0.5;
     svc.scale_exploration("test_source", factor);
     assert!(
-        (svc.curiosity_drive.exploration_urge - (0.8 * factor as f64)).abs() < 1e-10,
+        (svc.behavior.curiosity_drive.exploration_urge - (0.8 * factor as f64)).abs() < 1e-10,
         "scale_exploration should multiply: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -1613,15 +1631,15 @@ fn helper_exploration_clamps_to_bounds() {
     svc.feedback_state.begin_cycle();
     svc.set_exploration("test", 2.0);
     assert!(
-        (svc.curiosity_drive.exploration_urge - 1.0).abs() < 1e-7,
+        (svc.behavior.curiosity_drive.exploration_urge - 1.0).abs() < 1e-7,
         "exploration should clamp to 1.0: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
     svc.set_exploration("test", -1.0);
     assert!(
-        (svc.curiosity_drive.exploration_urge - 0.0).abs() < 1e-7,
+        (svc.behavior.curiosity_drive.exploration_urge - 0.0).abs() < 1e-7,
         "exploration should clamp to 0.0: got {}",
-        svc.curiosity_drive.exploration_urge
+        svc.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -1685,7 +1703,7 @@ fn helper_multiple_proposals_accumulate_within_cycle() {
     svc.feedback_state.snapshot_cycle_start(
         svc.prediction_confidence,
         svc.fep.lr_boost,
-        svc.curiosity_drive.exploration_urge,
+        svc.behavior.curiosity_drive.exploration_urge,
         svc.carryover.learning.adaptive_threshold_scale,
     );
     let d1: f32 = 0.05;

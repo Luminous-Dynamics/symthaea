@@ -2,6 +2,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
 //! # Symthaea Neuromodulators
 //!
 //! Neuromodulator Bath: DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine signaling.
@@ -71,6 +72,9 @@ pub struct NeuromodulatorBath {
     /// Science: Porkka-Heiskanen et al. (1997) — adenosine accumulation drives sleep pressure.
     /// Borbely (1982) — two-process model (Process S = adenosine).
     pub adenosine: Transmitter,
+    /// Cortisol: HPA axis stress hormone (Sapolsky 2004; McEwen 1998).
+    /// Diurnal rhythm + allostatic driver. Suppresses GABA, boosts glutamate.
+    pub cortisol: Transmitter,
     /// Allostatic load: cumulative stress (0.0–1.0).
     /// Science: McEwen (1998) — allostatic overload; Sterling (2012) — allostasis.
     pub allostatic_load: f32,
@@ -148,6 +152,7 @@ impl Default for NeuromodulatorBath {
                 withdrawal_duration: 25,
                 withdrawal_recovery_rate: 1.020,
                 tolerance_threshold: 0.15,
+                ..Transmitter::default()
             },
             oxytocin: Transmitter {
                 level: 0.3,
@@ -163,6 +168,7 @@ impl Default for NeuromodulatorBath {
                 withdrawal_duration: 15,
                 withdrawal_recovery_rate: 1.003,
                 tolerance_threshold: 0.2,
+                ..Transmitter::default()
             },
             glutamate: Transmitter {
                 level: 0.3,
@@ -178,6 +184,7 @@ impl Default for NeuromodulatorBath {
                 withdrawal_duration: 20,
                 withdrawal_recovery_rate: 1.015,
                 tolerance_threshold: 0.15,
+                ..Transmitter::default()
             },
             glutamate_high_cycles: 0,
             adenosine: Transmitter {
@@ -194,6 +201,7 @@ impl Default for NeuromodulatorBath {
                 withdrawal_duration: 10,
                 withdrawal_recovery_rate: 1.002,
                 tolerance_threshold: 0.1,
+                ..Transmitter::default()
             },
             endocannabinoid: Transmitter {
                 level: 0.3,
@@ -209,6 +217,19 @@ impl Default for NeuromodulatorBath {
                 withdrawal_duration: 60,
                 withdrawal_recovery_rate: 1.001,
                 tolerance_threshold: 0.2,
+                ..Transmitter::default()
+            },
+            cortisol: Transmitter {
+                level: 0.5,
+                reuptake_rate: 0.03,
+                baseline: 0.5,
+                phasic_decay: 0.05,
+                tolerance_onset_cycles: 60,
+                tolerance_decay_rate: 0.997,
+                withdrawal_duration: 80,
+                withdrawal_recovery_rate: 1.003,
+                tolerance_threshold: 0.15,
+                ..Transmitter::default()
             },
             allostatic_load: 0.0,
             allostatic_recovery_cycles: 0,

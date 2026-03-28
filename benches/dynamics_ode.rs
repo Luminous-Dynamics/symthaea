@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! ODE Solver Benchmark Suite
+//! ODE Solver Benchmark Suite
 //!
 //! Measures ODE solver latency for Euler, RK4, Dormand-Prince, Implicit Midpoint,
 //! Backward Euler, and Exponential integrators across varying dimensions.

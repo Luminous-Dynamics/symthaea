@@ -27,7 +27,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut gwt) = self.gwt_mgr.gwt {
+                if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
                     let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
@@ -207,12 +207,12 @@ impl CognitiveLoopService {
         // Pre-compute to avoid borrow conflict with mutable subsystem references below
         let wm_utilization = self.prefrontal_utilization();
         let resonance_frequency = if ctx.urgency.run_consciousness_monitors() {
-            if let Some(ref mut resonance) = self.consciousness_monitors.resonance {
+            if let Some(ref mut resonance) = self.consciousness.consciousness_monitors.resonance {
                 let dims = [
                     ctx.unified_psi,
                     ctx.coherence as f64,
                     wm_utilization,
-                    self.adaptive_behavior.attention_sensitivity as f64,
+                    self.behavior.adaptive_behavior.attention_sensitivity as f64,
                     (self.stats.total_cycles.min(100) as f64 / 100.0),
                     late.body_psi_modulation,
                     self.prediction_confidence,
@@ -233,11 +233,11 @@ impl CognitiveLoopService {
             let attention_mod = 1.0
                 + (resonance_quality as f32 - 0.5)
                     * crate::cognitive_loop::thresholds::RESONANCE_ATTENTION_SCALE; // ±5%
-            self.adaptive_behavior.attention_sensitivity *= attention_mod;
+            self.behavior.adaptive_behavior.attention_sensitivity *= attention_mod;
         }
 
         let quantum_coherence_level = if ctx.urgency.run_consciousness_monitors() {
-            if let Some(ref mut qc) = self.consciousness_monitors.quantum_coherence {
+            if let Some(ref mut qc) = self.consciousness.consciousness_monitors.quantum_coherence {
                 qc.observe(&ctx.hv16_cached, ctx.unified_psi);
                 qc.coherence()
             } else {
@@ -279,12 +279,14 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (phenomenal_binding_strength, phenomenal_fragmented) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut binding) = self.consciousness_monitors.phenomenal_binding {
+                if let Some(ref mut binding) =
+                    self.consciousness.consciousness_monitors.phenomenal_binding
+                {
                     let dims = [
                         ctx.unified_psi,
                         ctx.coherence as f64,
                         wm_utilization,
-                        self.adaptive_behavior.attention_sensitivity as f64,
+                        self.behavior.adaptive_behavior.attention_sensitivity as f64,
                         (self.stats.total_cycles.min(100) as f64 / 100.0),
                         late.body_psi_modulation,
                         self.prediction_confidence,
@@ -316,9 +318,9 @@ impl CognitiveLoopService {
         // FEEDBACK: Fragmentation suppresses exploration (Singer 1989)
         // When consciousness is fragmented, focus on integration not exploration
         if phenomenal_fragmented {
-            self.curiosity_drive.boredom *=
+            self.behavior.curiosity_drive.boredom *=
                 crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_BOREDOM_SCALE;
-            self.adaptive_behavior.exploration_factor *=
+            self.behavior.adaptive_behavior.exploration_factor *=
                 crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
         }
 
@@ -343,7 +345,7 @@ impl CognitiveLoopService {
                 - crate::cognitive_loop::thresholds::WM_BINDING_HIGH_THRESHOLD)
                 * crate::cognitive_loop::thresholds::WM_BINDING_BOOST_SCALE)
                 as f32;
-            self.adaptive_behavior.attention_sensitivity *= 1.0 + wm_boost;
+            self.behavior.adaptive_behavior.attention_sensitivity *= 1.0 + wm_boost;
         } else if phenomenal_binding_strength > 0.0
             && phenomenal_binding_strength
                 < crate::cognitive_loop::thresholds::WM_BINDING_LOW_THRESHOLD
@@ -352,7 +354,7 @@ impl CognitiveLoopService {
                 - phenomenal_binding_strength)
                 * crate::cognitive_loop::thresholds::WM_BINDING_RESTRICT_SCALE)
                 as f32;
-            self.adaptive_behavior.attention_sensitivity *= (1.0 - wm_restrict)
+            self.behavior.adaptive_behavior.attention_sensitivity *= (1.0 - wm_restrict)
                 .max(crate::cognitive_loop::thresholds::WM_BINDING_MIN_SENSITIVITY);
         }
 
@@ -364,12 +366,12 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (temporal_coherence_score, temporal_discontinuity) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut temporal) = self.consciousness_monitors.temporal {
+                if let Some(ref mut temporal) = self.consciousness.consciousness_monitors.temporal {
                     temporal.observe(
                         &ctx.hv16_cached,
                         ctx.unified_psi,
-                        self.self_model_tier.narrative_self.as_ref(),
-                        self.self_model_tier.predictive_self.as_ref(),
+                        self.consciousness.self_model_tier.narrative_self.as_ref(),
+                        self.consciousness.self_model_tier.predictive_self.as_ref(),
                     );
                     let coherence = temporal.overall_temporal_coherence();
                     let healthy = temporal.is_temporally_healthy();
@@ -441,7 +443,7 @@ impl CognitiveLoopService {
         if temporal_coherence_score
             > crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_THRESHOLD
         {
-            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+            if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
                 let continuity_boost = (temporal_coherence_score
                     - crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_THRESHOLD)
                     * crate::cognitive_loop::thresholds::TEMPORAL_NARRATIVE_BOOST_SCALE;
@@ -462,7 +464,7 @@ impl CognitiveLoopService {
                     - temporal_coherence_score)
                     * crate::cognitive_loop::thresholds::TEMPORAL_ATTENTION_PENALTY_SCALE)
                     as f32;
-            self.adaptive_behavior.attention_sensitivity *= (1.0 - coherence_penalty)
+            self.behavior.adaptive_behavior.attention_sensitivity *= (1.0 - coherence_penalty)
                 .max(crate::cognitive_loop::thresholds::TEMPORAL_ATTENTION_MIN);
         }
 
@@ -478,25 +480,32 @@ impl CognitiveLoopService {
             .urgency
             .run_consciousness_monitors()
         {
-            if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
+            if let Some(ref mut thermo) = self.consciousness.consciousness_monitors.thermodynamics {
                 let dims = [
                     ctx.unified_psi,
                     ctx.coherence as f64,
                     wm_utilization,
-                    self.adaptive_behavior.attention_sensitivity as f64,
+                    self.behavior.adaptive_behavior.attention_sensitivity as f64,
                     (self.stats.total_cycles.min(100) as f64 / 100.0),
                     late.body_psi_modulation,
                     self.prediction_confidence,
                 ];
                 let state = thermo.analyze(dims);
+                // Feed analyzer data to ThermodynamicManager
+                self.thermodynamic_mgr.set_analyzer(
+                    state.entropy,
+                    state.free_energy,
+                    state.temperature,
+                    state.phase,
+                );
                 // FEEDBACK: Phase-dependent exploration modulation (Kelso 1995)
                 use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
                 match state.phase {
                     ConsciousnessPhase::Critical => {
                         // Edge of chaos — maximum creativity, boost exploration
-                        self.curiosity_drive.boredom *=
+                        self.behavior.curiosity_drive.boredom *=
                             crate::cognitive_loop::thresholds::THERMO_CRITICAL_CURIOSITY_BOOST;
-                        self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_STRESS_EXPLORATION_BOOST;
+                        self.behavior.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_STRESS_EXPLORATION_BOOST;
                     }
                     ConsciousnessPhase::Flow => {
                         // Superfluid state — boost learning rate
@@ -505,12 +514,12 @@ impl CognitiveLoopService {
                     }
                     ConsciousnessPhase::Chaotic => {
                         // Fragmented — suppress exploration, seek stability
-                        self.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
-                        self.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_RECOVERY_EXPLORATION_SCALE;
+                        self.behavior.curiosity_drive.boredom *= crate::cognitive_loop::thresholds::PHENOMENAL_FRAGMENTATION_EXPLORATION_SCALE;
+                        self.behavior.adaptive_behavior.exploration_factor *= crate::cognitive_loop::thresholds::THERMODYNAMIC_RECOVERY_EXPLORATION_SCALE;
                     }
                     ConsciousnessPhase::Frozen => {
                         // Rigid — nudge toward exploration to unfreeze
-                        self.curiosity_drive.boredom *=
+                        self.behavior.curiosity_drive.boredom *=
                             crate::cognitive_loop::thresholds::THERMO_FROZEN_CURIOSITY_BOOST;
                     }
                     _ => {} // Normal, Unified — no modulation needed
@@ -558,8 +567,8 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (embodied_psi_modulation, embodied_agency) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut embodied) = self.consciousness_monitors.embodied {
-                    if let Some(ref body) = self.vision_sensory.virtual_body {
+                if let Some(ref mut embodied) = self.consciousness.consciousness_monitors.embodied {
+                    if let Some(ref body) = self.sensorimotor.vision_sensory.virtual_body {
                         embodied.update_interoception(body.interoceptive_state().clone());
                     }
                     let response = embodied.process();
@@ -620,7 +629,7 @@ impl CognitiveLoopService {
             if embodied_agency > EMBODIED_AGENCY_HIGH_THRESHOLD {
                 let agency_boost = ((embodied_agency - EMBODIED_AGENCY_HIGH_THRESHOLD)
                     * EMBODIED_AGENCY_BOOST_SCALE) as f32;
-                self.adaptive_behavior.exploration_factor *= 1.0 + agency_boost;
+                self.behavior.adaptive_behavior.exploration_factor *= 1.0 + agency_boost;
             } else if embodied_agency > 0.0 && embodied_agency < EMBODIED_AGENCY_LOW_THRESHOLD {
                 let caution = ((EMBODIED_AGENCY_LOW_THRESHOLD - embodied_agency)
                     * EMBODIED_AGENCY_CAUTION_SCALE) as f32;
@@ -677,7 +686,7 @@ impl CognitiveLoopService {
             );
 
             // Map cognitive loop action to enactive ActionType based on adaptive behavior
-            let enactive_action = match self.adaptive_behavior.action_hint {
+            let enactive_action = match self.behavior.adaptive_behavior.action_hint {
                 crate::cognitive_loop::ActionHint::Explore => {
                     crate::consciousness::enactive_cognition::ActionType::Explore
                 }
@@ -714,7 +723,7 @@ impl CognitiveLoopService {
             // Science: Thompson (2007) — enacted meaning modulates attention
             if enacted_meaning.meaning.relevance > 0.6 {
                 let relevance_gain = (enacted_meaning.meaning.relevance * 0.1).min(0.15) as f32;
-                self.adaptive_behavior.attention_sensitivity *= 1.0 + relevance_gain;
+                self.behavior.adaptive_behavior.attention_sensitivity *= 1.0 + relevance_gain;
             }
             // 2. Negative valence strengthens narrative veto tendency (caution)
             // Science: Colombetti (2014) — affect and enaction are inseparable
@@ -754,10 +763,13 @@ impl CognitiveLoopService {
         // memory even without full conscious access (pre-attentive encoding).
         if ctx.surprise_triggered {
             let valence = -(ctx.prediction_error as f64 * 0.3); // surprise is mildly negative
-            self.master_equation.narrative_coherence.add_episode(
-                format!("surprise_pre_pe{:.2}", ctx.prediction_error),
-                valence,
-            );
+            self.consciousness
+                .master_equation
+                .narrative_coherence
+                .add_episode(
+                    format!("surprise_pre_pe{:.2}", ctx.prediction_error),
+                    valence,
+                );
         }
 
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
@@ -768,16 +780,20 @@ impl CognitiveLoopService {
             // Wire embodiment factor from cognitive loop signals.
             // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
             // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
-            self.master_equation.embodiment_factor.record_prediction(
-                1.0 - ctx.prediction_error as f64,
-                1.0 - ctx.prediction_error as f64,
-            );
+            self.consciousness
+                .master_equation
+                .embodiment_factor
+                .record_prediction(
+                    1.0 - ctx.prediction_error as f64,
+                    1.0 - ctx.prediction_error as f64,
+                );
             // Use allostatic load as direct interoceptive coherence signal.
             // Low allostatic load = high body coherence (expected ≈ actual).
             {
                 let allostatic = self.neuromod.bath.allostatic_load;
                 let coherence = 1.0 - allostatic as f64;
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .embodiment_factor
                     .update_interoceptive(coherence, coherence);
             }
@@ -788,7 +804,8 @@ impl CognitiveLoopService {
             // Conway (2005) — narrative identity forms from dense episodic sampling.
             if self.stats.total_cycles % 5 == 0 {
                 let valence = (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0);
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_episode(format!("cycle_{}", self.stats.total_cycles), valence);
             }
@@ -798,7 +815,8 @@ impl CognitiveLoopService {
             // Science: Schacter et al. (2012) — prospection uses same networks as episodic memory
             if self.stats.total_cycles % 25 == 0 {
                 let horizon = ((1.0 - ctx.prediction_error as f64) * 10.0).max(1.0) as usize;
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_horizon_{}", self.stats.total_cycles),
@@ -827,30 +845,32 @@ impl CognitiveLoopService {
                     format!("coherence_{:.1}", ctx.coherence),
                     format!("safety_{:.1}", late.predictive_self_safety),
                 ];
-                self.master_equation.social_embedding.update_self_model(
-                    self_goals,
-                    self_beliefs,
-                    late.affective_valence as f64,
-                );
+                self.consciousness
+                    .master_equation
+                    .social_embedding
+                    .update_self_model(self_goals, self_beliefs, late.affective_valence as f64);
 
                 // User agent model: the system IS modeling the user (their input
                 // drives prediction, their patterns are tracked by social_coherence).
                 // Prediction accuracy serves as ToM accuracy proxy.
                 let user_goals = vec!["communicate".to_string(), "seek_understanding".to_string()];
                 let user_beliefs = vec![
-                    format!("trust_{:.1}", self.social_mgr.social.social_trust),
+                    format!("trust_{:.1}", self.behavior.social_mgr.social.social_trust),
                     format!(
                         "cooperation_{:.1}",
-                        self.social_mgr.social.social_cooperation_rate
+                        self.behavior.social_mgr.social.social_cooperation_rate
                     ),
                 ];
-                self.master_equation.social_embedding.update_agent_model(
-                    "user",
-                    user_beliefs,
-                    user_goals,
-                    0.0, // neutral valence (we don't know user's emotions)
-                    self.social_mgr.social.social_prediction_accuracy as f64,
-                );
+                self.consciousness
+                    .master_equation
+                    .social_embedding
+                    .update_agent_model(
+                        "user",
+                        user_beliefs,
+                        user_goals,
+                        0.0, // neutral valence (we don't know user's emotions)
+                        self.behavior.social_mgr.social.social_prediction_accuracy as f64,
+                    );
 
                 // Feed prediction accuracy as ToM feedback — when the system
                 // correctly predicts user input patterns, its "other_modeling_accuracy"
@@ -863,10 +883,12 @@ impl CognitiveLoopService {
                 let c_level = self.carryover.history.consciousness_level;
                 let c_tom_mod = 0.85 + 0.25 * c_level; // [0.85, 1.10]
                 let accuracy = (raw_accuracy * c_tom_mod).clamp(0.0, 1.0);
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .social_embedding
                     .record_tom_prediction("user", accuracy);
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .social_embedding
                     .provide_tom_feedback("user", accuracy);
             }
@@ -978,10 +1000,10 @@ impl CognitiveLoopService {
                 synchrony: (0.35
                     + ctx.coherence as f64 * 0.25
                     + ctx.peak_attention as f64 * 0.15
-                    + self.flow_state.intensity as f64 * 0.25)
+                    + self.behavior.flow_state.intensity as f64 * 0.25)
                     .clamp(0.1, 1.0),
             };
-            let mce_result = self.master_equation.compute(&inputs);
+            let mce_result = self.consciousness.master_equation.compute(&inputs);
             let level = mce_result.consciousness_level;
 
             // Cache MCE factor telemetry for output phase
@@ -1068,7 +1090,8 @@ impl CognitiveLoopService {
                 } else {
                     format!("consolidation_c{:.2}", level)
                 };
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_episode(episode_label, episode_valence);
             }
@@ -1090,7 +1113,8 @@ impl CognitiveLoopService {
                 let probability = (1.0 - pe).clamp(0.1, 0.9);
                 // Desirability: valence of the predicted state
                 let desirability = late.body_valence as f64;
-                self.master_equation
+                self.consciousness
+                    .master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_h{}_pe{:.2}", horizon_steps, pe),
@@ -1116,7 +1140,7 @@ impl CognitiveLoopService {
         // Science: Frith & Frith (2006) — social cognition recruits higher-order
         // mentalizing networks that correlate with conscious processing capacity.
         // Scale: 0.95 at accuracy=0.0, 1.05 at accuracy=1.0 (mild +/-5% modulation).
-        let social_accuracy = self.social_mgr.social.social_prediction_accuracy;
+        let social_accuracy = self.behavior.social_mgr.social.social_prediction_accuracy;
         let social_mod = 0.95 + 0.1 * social_accuracy as f64;
         let consciousness_level = (consciousness_level * social_mod).clamp(0.0, 1.0);
 

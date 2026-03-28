@@ -15,7 +15,7 @@
 
 ### I. From Measurement to Credential
 
-The first six essays of this series have constructed an argument in two parts. Section I (Essays 1–3) diagnosed the failure of the 1602 architecture — the severance of governance from consequence — and proposed consciousness coupling as the minimum viable alignment mechanism. Section II (Essays 4–6) described the measurement system: integration, continuity, and moral coherence — the three properties that a consciousness engine must have to serve as the foundation for governance.
+The first six essays of this series have constructed an argument in two parts. Section I (Essays 1–3) diagnosed the failure of the 1602 architecture — the severance of governance from consequence — and proposed consciousness coupling as a necessary alignment primitive. Section II (Essays 4–6) described the measurement system: integration, continuity, and moral coherence — the three properties that a consciousness engine must have to serve as the foundation for governance.
 
 We now face the question that separates theoretical frameworks from working systems: *how do you translate a consciousness measurement into a governance credential?*
 

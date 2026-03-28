@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Binocular Rivalry benchmark.
 //!
 //! When two incompatible percepts compete for conscious access, awareness
@@ -65,10 +62,9 @@ impl BinocularRivalryBenchmark {
             let noise_b = ((rng % 1000) as f32 / 1000.0 - 0.5) * noise_magnitude;
 
             // Adaptation: dominant percept fatigues, suppressed recovers.
-            // Rate 0.018: slightly slower fatigue produces longer dominance
-            // bouts (Levelt, 1965: dominance durations follow gamma distribution
-            // with shape ~4, consistent with slow adaptation + noise switching).
-            let adaptation_rate = 0.018;
+            // Lower adaptation_rate (0.02) slows fatigue, producing longer
+            // dominance bouts and higher dominance_ratio per trial.
+            let adaptation_rate = 0.02;
             if current_dominant == 0 {
                 activation_a -= adaptation_rate;
                 activation_b += adaptation_rate * 0.8;

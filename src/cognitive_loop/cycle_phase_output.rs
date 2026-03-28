@@ -219,6 +219,7 @@ impl CognitiveLoopService {
                 dream_wisdom_count: feedback.memory.dream_wisdom_count,
                 continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
+                    .memory
                     .memory_consol
                     .resonator_memory
                     .as_ref()
@@ -226,12 +227,14 @@ impl CognitiveLoopService {
                     .map(|cb| cb.len())
                     .unwrap_or(0),
                 resonator_episodes: self
+                    .memory
                     .memory_consol
                     .resonator_memory
                     .as_ref()
                     .map(|m| m.len())
                     .unwrap_or(0),
                 resonator_factorization_iters: self
+                    .memory
                     .memory_consol
                     .resonator_memory
                     .as_ref()
@@ -260,6 +263,22 @@ impl CognitiveLoopService {
                 trajectory_best_action: dynamics.fep.trajectory_best_action,
                 trajectory_surprise: dynamics.fep.trajectory_surprise,
                 trajectory_ode_steps: dynamics.fep.trajectory_ode_steps,
+                blanket_sensory_permeability: self
+                    .fep
+                    .enhanced_bridge
+                    .blanket
+                    .permeability()
+                    .sensory,
+                blanket_active_permeability: self.fep.enhanced_bridge.blanket.permeability().active,
+                blanket_effective_permeability: self
+                    .fep
+                    .enhanced_bridge
+                    .blanket
+                    .permeability()
+                    .effective,
+                blanket_trend: self.fep.enhanced_bridge.blanket.trend(),
+                blanket_coalescence_ready: self.fep.enhanced_bridge.blanket.coalescence_ready(0.6),
+                blanket_coalition_count: self.swarm_manager.coalitions().len(),
             },
             hierarchical_total_free_energy: feedback.self_model.hierarchical_total_free_energy,
             primitive_psi: feedback.consciousness.primitive_psi,
@@ -335,6 +354,23 @@ impl CognitiveLoopService {
                     && moral_anomaly_report.anomaly_score > 0.0,
                 harmony_entropy: topo_summary.harmony_entropy,
                 moral_attractor_detected: topo_summary.attractor_detected,
+                hodge_harmonic_fraction: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.harmonic)
+                    .unwrap_or(0.0),
+                hodge_gradient_fraction: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.gradient)
+                    .unwrap_or(0.0),
+                hodge_curl_fraction: topo_summary.hodge_fractions.map(|f| f.curl).unwrap_or(0.0),
+                hodge_critical_scale: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.critical_scale)
+                    .unwrap_or(f64::NAN),
+                hodge_at_criticality: topo_summary
+                    .hodge_fractions
+                    .map(|f| f.at_criticality)
+                    .unwrap_or(false),
                 in_active_rest: self.stats.in_active_rest,
                 stillness_dominance_streak: self.stats.stillness_dominance_streak,
                 unified_verdict: self
@@ -484,13 +520,13 @@ impl CognitiveLoopService {
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
             // Partnership / Phi-Dyad
-            relational_psi: self.social_mgr.social.relational_psi,
+            relational_psi: self.behavior.social_mgr.social.relational_psi,
             // Resonant Speech: response profile from neuromod bath signals.
             response_profile: {
                 let user_state = crate::resonant_speech::UserState::from_neuromod(
                     self.neuromod.bath.allostatic_load,
                     feedback.consciousness.consciousness_level,
-                    self.emotion_contagion.arousal,
+                    self.behavior.emotion_contagion.arousal,
                     self.neuromod.bath.oxytocin.effective(),
                 );
                 match user_state.cognitive_load {
@@ -552,13 +588,15 @@ impl CognitiveLoopService {
             metadata.smoothed_epistemic_uncertainty;
 
         // ── Social coherence telemetry ──
-        metadata.social_trust_current = self.social_mgr.social.social_trust;
-        metadata.social_cooperation_current = self.social_mgr.social.social_cooperation_rate;
+        metadata.social_trust_current = self.behavior.social_mgr.social.social_trust;
+        metadata.social_cooperation_current =
+            self.behavior.social_mgr.social.social_cooperation_rate;
         metadata.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
         metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
-        metadata.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
-        metadata.social_models_count = self.social_mgr.social.social_models_count;
-        metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
+        metadata.social_prediction_accuracy =
+            self.behavior.social_mgr.social.social_prediction_accuracy;
+        metadata.social_models_count = self.behavior.social_mgr.social.social_models_count;
+        metadata.social_mean_trust = self.behavior.social_mgr.social.social_mean_trust;
         metadata.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
         metadata.tom_exploration_triggered =
             self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
@@ -598,8 +636,8 @@ impl CognitiveLoopService {
             < COMPOUND_INSTABILITY_AGREEMENT
             && perception.urgency.error_slope > COMPOUND_INSTABILITY_ERROR_SLOPE
             && self.stats.total_cycles > 30;
-        metadata.modulation.flow_feedback_relaxed =
-            self.flow_state.in_flow && self.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
+        metadata.modulation.flow_feedback_relaxed = self.behavior.flow_state.in_flow
+            && self.behavior.flow_state.intensity > FLOW_INTENSITY_FEEDBACK;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
         // Session 10 telemetry (Session 11: lr_frozen from dynamics phase)
         metadata.modulation.confidence_crash_detected = dynamics.confidence_crash_detected;
@@ -647,8 +685,8 @@ impl CognitiveLoopService {
         metadata.modulation.confidence_rising_dampen = dynamics.neuromod.confidence_velocity
             > CONFIDENCE_VELOCITY_RISING_THRESHOLD
             && self.stats.total_cycles > 15;
-        metadata.modulation.flow_lr_boost =
-            self.flow_state.in_flow && self.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
+        metadata.modulation.flow_lr_boost = self.behavior.flow_state.in_flow
+            && self.behavior.flow_state.intensity > FLOW_INTENSITY_LR_THRESHOLD;
         metadata.modulation.fep_efficiency_boost = dynamics.fep.fep_accuracy
             > FEP_ACCURACY_EFFICIENCY_THRESHOLD
             && dynamics.fep.fep_complexity < FEP_COMPLEXITY_EFFICIENCY_THRESHOLD;
@@ -688,6 +726,7 @@ impl CognitiveLoopService {
         metadata.modulation.crash_binding_relaxed =
             self.carryover.quality.crash_freeze_remaining > 0;
         metadata.modulation.attention_fatigue_broca_gated = self
+            .consciousness
             .self_model_tier
             .attention_schema
             .as_ref()
@@ -848,11 +887,13 @@ impl CognitiveLoopService {
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
+            .consciousness
             .gwt_mgr
             .memory_flag
             .swap(false, std::sync::atomic::Ordering::Relaxed);
         metadata.gwt_perception_broadcasts =
-            self.gwt_mgr
+            self.consciousness
+                .gwt_mgr
                 .perception_count
                 .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
@@ -972,6 +1013,17 @@ impl CognitiveLoopService {
             metadata.cpg_mean_freq = ct.mean_freq as f32;
             metadata.cpg_motor_active = ct.motor_active;
             metadata.cpg_desync_alert = ct.desync_alert;
+        }
+
+        // ── Embodiment Bridge telemetry ──
+        #[cfg(feature = "humanoid")]
+        {
+            let et = &self.sensorimotor.embodiment_telemetry;
+            metadata.embodiment_total_steps = et.total_steps;
+            metadata.embodiment_control_effort = et.control_effort;
+            metadata.embodiment_prediction_error = et.prediction_error;
+            metadata.embodiment_platform = et.platform.clone();
+            metadata.embodiment_num_actuators = et.num_actuators as u32;
         }
 
         // ── Fabrication Manager telemetry ──
@@ -1118,6 +1170,12 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Muse telemetry ──
+        #[cfg(feature = "muse")]
+        {
+            metadata.muse = self.muse_manager.telemetry();
+        }
+
         // ── Substrate & convergence telemetry ──
         metadata.substrate = self.substrate_manager.telemetry(&self.config);
         // Populate flat substrate fields for backward-compatible access
@@ -1131,7 +1189,7 @@ impl CognitiveLoopService {
 
         // ── Thermal telemetry ──
         {
-            let thermal_signals = self.thermal_bridge.signals();
+            let thermal_signals = self.sensorimotor.thermal_bridge.signals();
             metadata.thermal = super::ThermalTelemetry {
                 thermal_level: thermal_signals.level as u8,
                 thermal_tau_factor: thermal_signals.tau_factor,
@@ -1230,7 +1288,7 @@ impl CognitiveLoopService {
         // Foveation bridge telemetry
         #[cfg(feature = "foveation")]
         {
-            if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
+            if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
                 if let Ok(fov) = fov_mutex.lock() {
                     let ft = fov.telemetry();
                     metadata.foveation = Some(super::FoveationBridgeTelemetry {
@@ -1261,6 +1319,12 @@ impl CognitiveLoopService {
                 .broca_manager
                 .as_ref()
                 .map(|m| m.last_telemetry().clone());
+        }
+
+        // Broca factcheck telemetry
+        #[cfg(feature = "mycelix")]
+        {
+            metadata.factcheck = Some(self.factcheck_bridge.telemetry());
         }
 
         metadata.consciousness.weight_convergence_state =
@@ -1420,7 +1484,7 @@ impl CognitiveLoopService {
         }
 
         // ── Knowledge Engine telemetry ──
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             let telem = km.telemetry();
             let sigs = km.signals();
             metadata.knowledge_graph_size = telem.graph_size;
@@ -1484,6 +1548,8 @@ impl CognitiveLoopService {
         {
             metadata.defense_actions_proposed = self.defense_actions_proposed;
             metadata.defense_actions_approved = self.defense_actions_approved;
+            metadata.immune_motor_halt =
+                self.carryover.quality.safety_motor_halt || self.carryover.quality.subsystem_veto;
         }
 
         // ── End-of-cycle stats ──
@@ -1494,7 +1560,8 @@ impl CognitiveLoopService {
             feedback.memory.codebook_evictions,
             feedback.memory.codebook_diversity,
             dynamics.fep.fep_surprise,
-            self.self_model_tier
+            self.consciousness
+                .self_model_tier
                 .self_reflection
                 .get_thresholds()
                 .surprise as f64,
@@ -1509,7 +1576,7 @@ impl CognitiveLoopService {
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut pred) = self.vision_sensory.cross_manifold_predictor {
+        if let Some(ref mut pred) = self.sensorimotor.vision_sensory.cross_manifold_predictor {
             pred.observe_cognitive(&perception.encoding.encoding_result.hdv);
         }
 
@@ -1627,11 +1694,11 @@ impl CognitiveLoopService {
         let feedback_consensus = self.feedback_state.end_cycle_ext(
             self.prediction_confidence,
             self.fep.lr_boost,
-            self.curiosity_drive.exploration_urge,
+            self.behavior.curiosity_drive.exploration_urge,
             self.carryover.learning.adaptive_threshold_scale,
             self.carryover.quality.consecutive_full_dampen,
-            self.flow_state.in_flow,
-            self.flow_state.intensity,
+            self.behavior.flow_state.in_flow,
+            self.behavior.flow_state.intensity,
         );
         // Track dampening streak for next cycle
         if self.feedback_state.feedback_dampened_count == 4 {
@@ -1709,12 +1776,14 @@ impl CognitiveLoopService {
                 self.adjust_exploration("subsystem_managers", integrated.exploration_delta as f32);
             }
             if integrated.arousal_delta != 0.0 {
-                self.emotion_contagion.arousal =
-                    (self.emotion_contagion.arousal + integrated.arousal_delta).clamp(0.0, 1.0);
+                self.behavior.emotion_contagion.arousal = (self.behavior.emotion_contagion.arousal
+                    + integrated.arousal_delta)
+                    .clamp(0.0, 1.0);
             }
             if integrated.valence_delta != 0.0 {
-                self.emotion_contagion.valence =
-                    (self.emotion_contagion.valence + integrated.valence_delta).clamp(-1.0, 1.0);
+                self.behavior.emotion_contagion.valence = (self.behavior.emotion_contagion.valence
+                    + integrated.valence_delta)
+                    .clamp(-1.0, 1.0);
             }
 
             // ── Act on subsystem flags ──────────────────────────────────
@@ -1735,7 +1804,7 @@ impl CognitiveLoopService {
             // ESCALATE_URGENCY: A subsystem detected a critical situation.
             // Boost arousal and suppress exploration to focus on the threat.
             if integrated.has_flag(output_flags::ESCALATE_URGENCY) {
-                self.emotion_contagion.arousal = (self.emotion_contagion.arousal
+                self.behavior.emotion_contagion.arousal = (self.behavior.emotion_contagion.arousal
                     + URGENCY_ESCALATION_AROUSAL_BOOST)
                     .clamp(0.0, 1.0);
                 self.scale_exploration("urgency_escalation", URGENCY_ESCALATION_EXPLORATION_SCALE);
@@ -1853,13 +1922,18 @@ impl CognitiveLoopService {
         // Final safety clamps — absolute last point in the cycle.
         // Late consciousness phases (integration, monitors) can multiply exploration_factor
         // below bounds set in cycle_quality.rs. Re-clamp here to guarantee invariants.
-        self.adaptive_behavior.exploration_factor =
-            self.adaptive_behavior.exploration_factor.clamp(0.1, 3.0);
-        self.adaptive_behavior.learning_rate_multiplier = self
+        self.behavior.adaptive_behavior.exploration_factor = self
+            .behavior
+            .adaptive_behavior
+            .exploration_factor
+            .clamp(0.1, 3.0);
+        self.behavior.adaptive_behavior.learning_rate_multiplier = self
+            .behavior
             .adaptive_behavior
             .learning_rate_multiplier
             .clamp(0.1, 2.0);
-        self.curiosity_drive.boredom = self.curiosity_drive.boredom.clamp(0.0, 1.5);
+        self.behavior.curiosity_drive.boredom =
+            self.behavior.curiosity_drive.boredom.clamp(0.0, 1.5);
 
         CycleResult {
             output: mem::take(&mut dynamics.core.output),

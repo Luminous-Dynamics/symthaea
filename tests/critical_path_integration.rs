@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for critical paths that previously lacked test coverage.
+//! Integration tests for critical paths that previously lacked test coverage.
 //!
 //! Focus areas:
 //! 1. **Cognitive loop feedback loops**: equation_v2 -> confidence, hierarchical_ltc -> confidence,

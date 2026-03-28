@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Cognitive Loop Validation Benchmark
 //!
 //! This benchmark validates the emergent HDC↔LTC bidirectional loop architecture.

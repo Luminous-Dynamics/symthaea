@@ -61,54 +61,57 @@ impl CognitiveLoopService {
                 if !graduates.is_empty() {
                     for grad in &graduates {
                         // Route graduate through resonator for importance scoring
-                        let grad_importance =
-                            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
-                                let res_dim = res_mem.resonator.config.dim;
-                                let grad_vals = &grad.embedding.values;
-                                if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
-                                    // Project to resonator dim and find best episode match
-                                    let projected: Vec<f32> =
-                                        grad_vals.iter().take(res_dim).copied().collect();
-                                    let best_sim = res_mem
-                                        .episodes
-                                        .iter()
-                                        .map(|ep| {
-                                            let dot: f32 = ep
-                                                .hv
-                                                .iter()
-                                                .zip(projected.iter())
-                                                .map(|(a, b)| a * b)
-                                                .sum();
-                                            let denom =
-                                                (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
-                                                    * projected
-                                                        .iter()
-                                                        .map(|x| x * x)
-                                                        .sum::<f32>()
-                                                        .sqrt())
-                                                .max(1e-8);
-                                            let sim = dot / denom;
-                                            if sim.is_finite() {
-                                                sim.clamp(-1.0, 1.0)
-                                            } else {
-                                                0.0
-                                            }
-                                        })
-                                        .fold(0.0f32, f32::max);
-                                    // High resonator match → boost importance (consolidation-worthy)
-                                    // Low match → novel content, still store but with base importance
-                                    ctx.pp_phi
-                                        + best_sim * super::super::thresholds::RESONATOR_MATCH_BOOST
-                                } else {
-                                    ctx.pp_phi
-                                }
+                        let grad_importance = if let Some(ref mut res_mem) =
+                            self.memory.memory_consol.resonator_memory
+                        {
+                            let res_dim = res_mem.resonator.config.dim;
+                            let grad_vals = &grad.embedding.values;
+                            if grad_vals.len() >= res_dim && !res_mem.episodes.is_empty() {
+                                // Project to resonator dim and find best episode match
+                                let projected: Vec<f32> =
+                                    grad_vals.iter().take(res_dim).copied().collect();
+                                let best_sim = res_mem
+                                    .episodes
+                                    .iter()
+                                    .map(|ep| {
+                                        let dot: f32 = ep
+                                            .hv
+                                            .iter()
+                                            .zip(projected.iter())
+                                            .map(|(a, b)| a * b)
+                                            .sum();
+                                        let denom = (ep
+                                            .hv
+                                            .iter()
+                                            .map(|x| x * x)
+                                            .sum::<f32>()
+                                            .sqrt()
+                                            * projected.iter().map(|x| x * x).sum::<f32>().sqrt())
+                                        .max(1e-8);
+                                        let sim = dot / denom;
+                                        if sim.is_finite() {
+                                            sim.clamp(-1.0, 1.0)
+                                        } else {
+                                            0.0
+                                        }
+                                    })
+                                    .fold(0.0f32, f32::max);
+                                // High resonator match → boost importance (consolidation-worthy)
+                                // Low match → novel content, still store but with base importance
+                                ctx.pp_phi
+                                    + best_sim * super::super::thresholds::RESONATOR_MATCH_BOOST
                             } else {
                                 ctx.pp_phi
-                            };
+                            }
+                        } else {
+                            ctx.pp_phi
+                        };
                         // Route through MemoryCoordinator for quality filtering instead of
                         // bypassing directly to fep.episodic_memory.encode().
-                        self.memory_consol.memory_coordinator.queue_graduation(
-                            crate::memory::memory_coordinator::GraduationEvent {
+                        self.memory
+                            .memory_consol
+                            .memory_coordinator
+                            .queue_graduation(crate::memory::memory_coordinator::GraduationEvent {
                                 content: grad.embedding.clone(),
                                 label: grad.id.clone(),
                                 steps_survived: (self.stats.total_cycles as u64)
@@ -118,8 +121,7 @@ impl CognitiveLoopService {
                                 coherence_at_graduation: ctx.coherence as f64,
                                 source: Default::default(),
                                 is_verified: false,
-                            },
-                        );
+                            });
                     }
                     tracing::debug!(
                         count = graduates.len(),
@@ -169,7 +171,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (meta_cognitive_accuracy, meta_cognitive_depth) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut meta) = self.self_model_tier.meta_cognition {
+                if let Some(ref mut meta) = self.consciousness.self_model_tier.meta_cognition {
                     meta.update_self_model(ctx.prediction_error);
                     meta.deepen_recursion();
                     let accuracy = meta.accuracy();
@@ -187,7 +189,8 @@ impl CognitiveLoopService {
                 }
             } else {
                 // Read cached accuracy/depth without updating (avoid 0.0 in telemetry on skip)
-                self.self_model_tier
+                self.consciousness
+                    .self_model_tier
                     .meta_cognition
                     .as_ref()
                     .map(|m| (m.accuracy(), m.depth()))
@@ -197,7 +200,7 @@ impl CognitiveLoopService {
         // ── Moral circularity → deepen meta-cognitive recursion ──
         // When β₁ > 0 (circular reasoning patterns detected in the moral
         // topology), trigger additional meta-cognitive introspection.
-        if let Some(ref mut meta) = self.self_model_tier.meta_cognition {
+        if let Some(ref mut meta) = self.consciousness.self_model_tier.meta_cognition {
             let topo = self.ethics_engine.moral_topology().last_summary();
             if topo.beta_1 > 0 {
                 meta.deepen_recursion();
@@ -219,15 +222,15 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (body_psi_modulation, body_valence, body_arousal) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut body) = self.vision_sensory.virtual_body {
+                if let Some(ref mut body) = self.sensorimotor.vision_sensory.virtual_body {
                     let signals = crate::cognitive_loop::virtual_body::CognitiveSignals {
                         prediction_error: ctx.prediction_error,
                         coherence: ctx.coherence,
                         prediction_confidence: self.prediction_confidence as f32,
                         unified_psi: ctx.unified_psi,
-                        flow_intensity: self.flow_state.intensity,
-                        in_flow: self.flow_state.in_flow,
-                        curiosity_boredom: self.curiosity_drive.boredom,
+                        flow_intensity: self.behavior.flow_state.intensity,
+                        in_flow: self.behavior.flow_state.in_flow,
+                        curiosity_boredom: self.behavior.curiosity_drive.boredom,
                         fep_learning_signal: self.fep.learning_signal,
                         error_trend: self.stats.error_trend,
                         cycles_per_second: self.stats.cycles_per_second,
@@ -272,37 +275,55 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // AFFECTIVE BRIDGE: Evaluate somatic markers from cognitive signals
         // Runs every cycle (lightweight: ~5 arithmetic ops + blend)
+        //
+        // Phase 1 Affect Consolidation: Feed somatic signals into the unified
+        // EmotionalBridge (UnifiedEmotionalState) so all consumers read from
+        // a single canonical source. Legacy AffectiveBridge still runs as
+        // fallback when enabled, but consumers read from unified state.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (affective_valence, affective_arousal) =
-            if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
-                let moral_score = self
-                    .ethics_values
-                    .last_moral_judgment
-                    .as_ref()
-                    .map(|j| j.moral_score)
-                    .unwrap_or(0.0);
-                // Social modulation: feed ToM signals into affect (Decety & Chaminade 2003)
-                // Social trust/cooperation injected by Mind module via set_social_signals()
-                let affect = bridge.evaluate_from_signals_with_social(
-                    ctx.prediction_error,
-                    ctx.surprise_triggered,
-                    ctx.unified_psi,
-                    moral_score,
-                    self.social_mgr.social.social_trust,
-                    self.social_mgr.social.social_cooperation_rate,
-                    0.0, // peer_valence: future — aggregate from social inbox
-                );
-                (affect.valence, affect.arousal)
-            } else {
-                (0.0, 0.5)
-            };
+        let moral_score = self
+            .ethics_values
+            .last_moral_judgment
+            .as_ref()
+            .map(|j| j.moral_score)
+            .unwrap_or(0.0);
+
+        // Primary path: update unified EmotionalBridge with somatic signals
+        self.unification_engine
+            .emotional
+            .update_from_somatic_signals(
+                ctx.prediction_error,
+                ctx.surprise_triggered,
+                ctx.unified_psi,
+                moral_score,
+                self.behavior.social_mgr.social.social_trust,
+                self.behavior.social_mgr.social.social_cooperation_rate,
+                0.0, // peer_valence: future — aggregate from social inbox
+            );
+
+        // Legacy fallback: keep AffectiveBridge in sync (deprecated — will be removed)
+        if let Some(ref mut bridge) = self.consciousness_state.affective_bridge {
+            bridge.evaluate_from_signals_with_social(
+                ctx.prediction_error,
+                ctx.surprise_triggered,
+                ctx.unified_psi,
+                moral_score,
+                self.behavior.social_mgr.social.social_trust,
+                self.behavior.social_mgr.social.social_cooperation_rate,
+                0.0,
+            );
+        }
+
+        // Read from unified state for downstream consumers
+        let unified_emo = self.unification_engine.emotional.state();
+        let affective_valence = unified_emo.valence as f32;
+        let affective_arousal = unified_emo.arousal as f32;
 
         // FEEDBACK: Positive affect broadens exploration (Fredrickson 2001 broaden-and-build)
-        if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD
-            && self.consciousness_state.affective_bridge.is_some()
-        {
-            self.curiosity_drive.boredom *=
+        // Now reads from unified state — no longer gated on AffectiveBridge being enabled
+        if affective_valence > super::super::thresholds::AFFECTIVE_VALENCE_BROADEN_THRESHOLD {
+            self.behavior.curiosity_drive.boredom *=
                 super::super::thresholds::AFFECTIVE_VALENCE_CURIOSITY_FACTOR;
         }
         // FEEDBACK: Arousal gates learning consolidation (Russell 1980 VAD model)
@@ -327,7 +348,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let narrative_self_psi = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+            if let Some(ref mut narrative) = self.consciousness.self_model_tier.narrative_self {
                 let significance = if ctx.moral_concern_detected {
                     super::super::thresholds::NARRATIVE_MORAL_SIGNIFICANCE
                 } else {
@@ -346,7 +367,8 @@ impl CognitiveLoopService {
             }
         } else {
             // Read cached self_phi without processing (avoid 0.0 triggering weak-identity feedback)
-            self.self_model_tier
+            self.consciousness
+                .self_model_tier
                 .narrative_self
                 .as_ref()
                 .map(|n| n.self_phi())
@@ -388,7 +410,7 @@ impl CognitiveLoopService {
             && narrative_self_psi < super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD
         {
             // Low self-coherence → amplify moral concern sensitivity
-            self.adaptive_behavior.attention_sensitivity *= 1.0
+            self.behavior.adaptive_behavior.attention_sensitivity *= 1.0
                 + (super::super::thresholds::NARRATIVE_SELF_WEAK_THRESHOLD as f32
                     - narrative_self_psi as f32)
                     * super::super::thresholds::NARRATIVE_SELF_MORAL_SENSITIVITY_SCALE;
@@ -397,7 +419,7 @@ impl CognitiveLoopService {
         // CROSS-COUPLING: Strong narrative identity stabilizes social trust (Baumeister & Leary 1995)
         // Science: Coherent self-identity supports consistent social relationships
         if narrative_self_psi > super::super::thresholds::NARRATIVE_SELF_HIGH_THRESHOLD {
-            self.social_mgr.social.social_trust *=
+            self.behavior.social_mgr.social.social_trust *=
                 super::super::thresholds::NARRATIVE_SELF_SOCIAL_TRUST_BOOST;
         }
 
@@ -450,7 +472,11 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let hierarchical_total_free_energy =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut hfe) = self.consciousness_monitors.hierarchical_free_energy {
+                if let Some(ref mut hfe) = self
+                    .consciousness
+                    .consciousness_monitors
+                    .hierarchical_free_energy
+                {
                     // FEEDBACK: Phi→precision coupling — higher integrated information
                     // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
                     // This creates a causal mechanism: consciousness improves perceptual accuracy.
@@ -469,7 +495,14 @@ impl CognitiveLoopService {
                         .map(|&x| x as f64)
                         .collect();
                     hfe.update_beliefs(&obs);
-                    hfe.total_free_energy()
+                    let decomp = hfe.compute_free_energy();
+                    // Feed HFE data to ThermodynamicManager
+                    self.thermodynamic_mgr.set_hfe(
+                        decomp.total,
+                        decomp.complexity,
+                        decomp.accuracy,
+                    );
+                    decomp.total
                 } else {
                     0.0
                 }
@@ -487,9 +520,9 @@ impl CognitiveLoopService {
                     + hierarchical_total_free_energy
                         * super::super::thresholds::HFE_EXPLORATION_DAMPING))
                 as f32;
-            self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
-                                                       // Boost LR proportional to free energy (poor model → learn harder)
-                                                       // Capped at +10% to avoid overshooting in short ablation windows
+            self.behavior.curiosity_drive.boredom *= fe_factor; // suppress exploration urge (gentler)
+                                                                // Boost LR proportional to free energy (poor model → learn harder)
+                                                                // Capped at +10% to avoid overshooting in short ablation windows
             let hfe_lr_boost = (1.0
                 + (hierarchical_total_free_energy * super::super::thresholds::HFE_LR_BOOST_SCALE)
                     .min(super::super::thresholds::HFE_LR_BOOST_MAX))
@@ -500,6 +533,9 @@ impl CognitiveLoopService {
             1.0
         };
 
+        // NOTE: Jarzynski→HFE and Onsager→coherence feedback now consolidated in
+        // ThermodynamicIntegration::run_cycle() (thermodynamic_integration.rs).
+
         module_timings.hierarchical_free_energy = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -507,8 +543,8 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let predictive_self_safety = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut pred_self) = self.self_model_tier.predictive_self {
-                if let Some(ref narrative) = self.self_model_tier.narrative_self {
+            if let Some(ref mut pred_self) = self.consciousness.self_model_tier.predictive_self {
+                if let Some(ref narrative) = self.consciousness.self_model_tier.narrative_self {
                     pred_self.observe(narrative);
                 }
 
@@ -572,7 +608,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let attention_schema_focus = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut schema) = self.self_model_tier.attention_schema {
+            if let Some(ref mut schema) = self.consciousness.self_model_tier.attention_schema {
                 let salience = ctx.prediction_error.max(0.1);
                 let update = schema.update(ctx.hv16_cached, salience);
                 let gain = if update.control_signal
@@ -589,7 +625,7 @@ impl CognitiveLoopService {
                 } else {
                     0.0
                 };
-                self.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
+                self.behavior.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
                 update.new_intensity
             } else {
                 0.0
@@ -616,7 +652,7 @@ impl CognitiveLoopService {
                 let focus_lock = (attention_schema_focus
                     - super::super::thresholds::ATTENTION_DEEP_FOCUS_THRESHOLD)
                     * super::super::thresholds::ATTENTION_FOCUS_LOCK_SCALE;
-                self.adaptive_behavior.exploration_factor *= (1.0 - focus_lock)
+                self.behavior.adaptive_behavior.exploration_factor *= (1.0 - focus_lock)
                     .max(super::super::thresholds::ATTENTION_MIN_EXPLORATION_IN_FOCUS);
             }
         }
@@ -625,7 +661,7 @@ impl CognitiveLoopService {
         // Science: Sustained attention on a single target degrades performance after ~30 cycles.
         // The schema's fatigue_level() reflects accumulated focus duration. When fatigue is
         // high, increase exploration to encourage attention re-allocation.
-        if let Some(ref schema) = self.self_model_tier.attention_schema {
+        if let Some(ref schema) = self.consciousness.self_model_tier.attention_schema {
             let fatigue = schema.fatigue_level();
             if fatigue > super::super::thresholds::VIGILANCE_FATIGUE_THRESHOLD {
                 // Graduated exploration push: 0.0 at fatigue=0.5, up to 0.04 at fatigue=1.0
@@ -701,6 +737,7 @@ impl CognitiveLoopService {
             hierarchical_total_free_energy,
             predictive_self_safety,
             predictive_behavioral_error: self
+                .consciousness
                 .self_model_tier
                 .predictive_self
                 .as_ref()
@@ -708,12 +745,14 @@ impl CognitiveLoopService {
                 .unwrap_or(0.0),
             attention_schema_focus,
             attention_fatigue: self
+                .consciousness
                 .self_model_tier
                 .attention_schema
                 .as_ref()
                 .map(|s| s.fatigue_level())
                 .unwrap_or(0.0),
             attention_prediction_accuracy: self
+                .consciousness
                 .self_model_tier
                 .attention_schema
                 .as_ref()

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Liquid-Mamba Full Pipeline Integration Tests
+//! # Liquid-Mamba Full Pipeline Integration Tests
 //!
 //! End-to-end tests that exercise the Liquid-Mamba fusion pipeline against the
 //! real mamba-130m model from HuggingFace. Each test is `#[ignore]` because the

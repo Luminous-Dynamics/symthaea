@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Crystal Reservoir: Bio-mimetic Spectro-Temporal Feature Extraction
 //!
 //! Replaces random projections with structured 2D Gabor filters modeled after

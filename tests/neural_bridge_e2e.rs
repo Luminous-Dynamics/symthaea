@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Neural Bridge Phase 2 End-to-End Pipeline Test
+//! Neural Bridge Phase 2 End-to-End Pipeline Test
 //!
 //! Tests the semantic -> HDC projection pipeline using synthetic embeddings
 //! (simulating BGE-M3 1024-dim output) through a random projection matrix

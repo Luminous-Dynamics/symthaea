@@ -47,7 +47,9 @@ pub fn bootstrap_from_encodings(
     let mut functions_indexed = 0;
     for (name, encoding) in functions {
         let fingerprint = TopologicalFingerprint::default_for_function();
-        manifold.insert(name, *encoding, fingerprint, 0.5); // neutral quality
+        // Without source code, we use the provided encoding directly.
+        // For topology-based clustering, prefer bootstrap_with_topology().
+        manifold.insert(name, *encoding, fingerprint, 0.5);
         functions_indexed += 1;
     }
 
@@ -63,6 +65,12 @@ pub fn bootstrap_from_encodings(
 /// More expensive but gives real topological fingerprints per function.
 /// For each function, builds a PDG from the source, converts to a simplicial
 /// complex, and computes Betti numbers for the topological fingerprint.
+///
+/// **Key**: The manifold encoding is the **topological fingerprint's HDC vector**
+/// blended with the original encoding, NOT the raw name-based encoding alone.
+/// This ensures functions with similar structure cluster together regardless
+/// of their names. Two bubble sorts will share the same β₁=2 fingerprint and
+/// land in the same fiber.
 pub fn bootstrap_with_topology(
     manifold: &mut ProgramManifold,
     functions: &[(String, BinaryHV, String)],
@@ -74,7 +82,13 @@ pub fn bootstrap_with_topology(
         let pdg = crate::pdg::ProgramDependenceGraph::from_rust_source(source, name);
         let complex = pdg.to_simplicial_complex();
         let fingerprint = TopologicalFingerprint::from_complex(&complex);
-        manifold.insert(name, *encoding, fingerprint, 0.5);
+
+        // Use topology-derived encoding as the PRIMARY manifold key.
+        // Functions with the same Betti numbers (β₀, β₁, β₂) produce identical
+        // topological HVs, so they naturally cluster into the same fiber.
+        // The original name-based encoding is preserved in the FiberPoint
+        // for downstream disambiguation.
+        manifold.insert(name, fingerprint.hdc_encoding, fingerprint, 0.5);
         functions_indexed += 1;
     }
 

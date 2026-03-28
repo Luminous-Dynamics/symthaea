@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Voice Onset Time (VOT) Continuum benchmark.
 //!
 //! Tests categorical perception along the VOT dimension — the time between

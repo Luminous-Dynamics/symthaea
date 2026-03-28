@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! API integration tests
+//! API integration tests
 //!
 //! Tests the API server endpoints using axum's router directly.
 //! Requires the `api_module` feature.

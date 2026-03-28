@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Somatic Error Bridge — Software errors as felt experience
 //!
 //! Maps infrastructure failures (lock poisoning, task panics, DB errors,

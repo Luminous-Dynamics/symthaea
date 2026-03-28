@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 21: Strategic Materials
+//! Genesis Mission Challenge 21: Strategic Materials
 //!
 //! Demonstrates HDC + CfC strategic materials prediction with
 //! O(1) prediction cost from 1 day to 50 years.

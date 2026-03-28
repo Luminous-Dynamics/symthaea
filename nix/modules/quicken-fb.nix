@@ -1,6 +1,4 @@
-# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-# SPDX-License-Identifier: AGPL-3.0-or-later
-# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root# NixOS Module: Symthaea Consciousness Boot Animation
+# NixOS Module: Symthaea Consciousness Boot Animation
 #
 # Runs the mycelial colonization animation (symthaea-quicken-fb) on bare-metal
 # DRM/KMS framebuffer during early boot, before the display manager starts.

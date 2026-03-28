@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Standard Benchmark Suite
+//! Standard Benchmark Suite
 //!
 //! Main benchmark suite (~30 min) covering core capabilities.
 //! Reference: BENCHMARKING_STRATEGY.md Section 36

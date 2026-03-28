@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-scale biological prediction using O(1) closed-form temporal jumps.
 //!
 //! A single HdcLtcUnifiedNeuron predicts cell state at ALL timescales

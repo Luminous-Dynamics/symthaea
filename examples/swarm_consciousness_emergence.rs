@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Swarm Consciousness Emergence Experiment
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Swarm Consciousness Emergence Experiment
 //!
 //! Tests whether collective consciousness emerges from groups of interacting agents.
 //! Measures collective Phi (via pairwise thought coherence), emergence ratios,

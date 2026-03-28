@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Symthaea Service Daemon
 //!
 //! A persistent service that runs the consciousness loop and accepts
@@ -286,7 +283,7 @@ fn default_search_limit() -> usize {
 /// Response to client
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
-#[allow(clippy::enum_variant_names, dead_code)]
+#[allow(clippy::enum_variant_names)]
 enum Response {
     /// Query response
     #[serde(rename = "response")]
@@ -626,46 +623,11 @@ struct ServiceState {
     voice: Option<VoiceConversation>,
     #[cfg(feature = "voice-tts")]
     voice_enabled: bool,
-    /// Channel for Holon HTTP bridge → consciousness loop.
-    /// HTTP handlers enqueue (device_id, SomaMessage); the consciousness loop
-    /// drains them into Symthaea.holon_enqueue_soma_message() each tick.
-    holon_inbound_rx: std::sync::Mutex<
-        std::sync::mpsc::Receiver<(String, symthaea::consciousness::holon_receiver::SomaMessage)>,
-    >,
-}
-
-/// Sender half for Holon HTTP bridge → consciousness loop.
-#[allow(dead_code)]
-type HolonSender =
-    std::sync::mpsc::Sender<(String, symthaea::consciousness::holon_receiver::SomaMessage)>;
-
-/// Drain the Holon inbound channel into Symthaea's HolonReceiver.
-///
-/// Separated into a function to avoid borrow conflicts between
-/// `holon_inbound_rx` (immutable borrow via Mutex) and `symthaea` (mutable borrow).
-fn drain_holon_channel(state: &mut ServiceState) {
-    let mut pending = Vec::new();
-    if let Ok(rx) = state.holon_inbound_rx.lock() {
-        for _ in 0..256 {
-            match rx.try_recv() {
-                Ok(msg) => pending.push(msg),
-                Err(_) => break,
-            }
-        }
-    }
-    for (device_id, msg) in pending {
-        state.symthaea.holon_enqueue_soma_message(device_id, msg);
-    }
-    state.symthaea.holon_process_pending();
 }
 
 impl ServiceState {
     async fn new(
         state_file: Option<PathBuf>,
-        holon_rx: std::sync::mpsc::Receiver<(
-            String,
-            symthaea::consciousness::holon_receiver::SomaMessage,
-        )>,
         #[cfg(feature = "voice-tts")] voice_enabled: bool,
         #[cfg(feature = "voice-tts")] voice_id: u8,
     ) -> Result<Self> {
@@ -721,7 +683,6 @@ impl ServiceState {
             voice,
             #[cfg(feature = "voice-tts")]
             voice_enabled,
-            holon_inbound_rx: std::sync::Mutex::new(holon_rx),
         })
     }
 
@@ -1600,58 +1561,8 @@ where
 }
 
 /// Background consciousness loop
-#[cfg(feature = "api_module")]
-async fn consciousness_loop_with_holon(
-    state: Arc<RwLock<ServiceState>>,
-    holon_http: Arc<symthaea::api::holon::HolonHttpState>,
-    interval_ms: u64,
-    _sleep_interval: u64,
-) {
-    let mut ticker = interval(Duration::from_millis(interval_ms));
-
-    loop {
-        ticker.tick().await;
-
-        // Drain Holon channel + update HTTP state
-        {
-            let mut s = state.write().await;
-            drain_holon_channel(&mut s);
-
-            // Sync state to HTTP handlers
-            let intro = s.symthaea.introspect();
-            holon_http.set_consciousness(intro.consciousness_level);
-            holon_http.peer_count.store(
-                s.symthaea.holon_soma_peer_count() as u32,
-                std::sync::atomic::Ordering::Relaxed,
-            );
-            let responses = s.symthaea.holon_drain_soma_outbound("soma-phone");
-            if !responses.is_empty() {
-                holon_http.push_outbound(responses);
-            }
-        }
-
-        // Consciousness maintenance (same as base loop)
-        {
-            let state = state.read().await;
-            let intro = state.symthaea.introspect();
-            let phi = intro.consciousness_level as f64;
-            let is_conscious = intro.consciousness_level > 0.5;
-            debug!(
-                "Consciousness loop: level={:.2}% | Φ={:.3} | self_loops={} | conscious={} | soma_peers={}",
-                intro.consciousness_level * 100.0,
-                phi,
-                intro.self_loops,
-                is_conscious,
-                holon_http.peer_count.load(std::sync::atomic::Ordering::Relaxed),
-            );
-        }
-    }
-}
-
-#[cfg(not(feature = "api_module"))]
 async fn consciousness_loop(
     state: Arc<RwLock<ServiceState>>,
-    #[allow(unused_variables)] holon_http: Option<()>, // placeholder — real holon state passed via consciousness_loop_with_holon
     interval_ms: u64,
     sleep_interval: u64,
 ) {
@@ -1661,16 +1572,11 @@ async fn consciousness_loop(
     loop {
         ticker.tick().await;
 
-        // Drain Holon inbound channel → Symthaea.holon_receiver
-        {
-            let mut s = state.write().await;
-            drain_holon_channel(&mut s);
-        }
-
         // Simple consciousness maintenance
         {
             let state = state.read().await;
             let intro = state.symthaea.introspect();
+            // Derive metrics from available data
             let phi = intro.consciousness_level as f64;
             let is_conscious = intro.consciousness_level > 0.5;
             debug!(
@@ -1723,11 +1629,9 @@ async fn main() -> Result<()> {
 
     // Initialize state
     info!("Initializing consciousness...");
-    let (holon_tx, holon_rx) = std::sync::mpsc::channel();
     let state = Arc::new(RwLock::new(
         ServiceState::new(
             args.state_file.clone(),
-            holon_rx,
             #[cfg(feature = "voice-tts")]
             args.voice,
             #[cfg(feature = "voice-tts")]
@@ -1781,58 +1685,11 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Start background consciousness loop (spawned after holon_http_state is created below)
-    // (moved below holon bridge setup so we can pass the shared state)
-
-    // Start Holon HTTP bridge for Soma mobile connections (port 5492)
-    // Requires `api_module` feature for Axum dependency.
-    #[cfg(feature = "api_module")]
-    {
-        let holon_http_state = Arc::new(symthaea::api::holon::HolonHttpState::new(holon_tx));
-
-        // Start background consciousness loop (with holon bridge draining)
-        let loop_state = Arc::clone(&state);
-        let loop_holon = Arc::clone(&holon_http_state);
-        tokio::spawn(async move {
-            consciousness_loop_with_holon(
-                loop_state,
-                loop_holon,
-                args.loop_interval,
-                args.sleep_interval,
-            )
-            .await;
-        });
-
-        let http_state = Arc::clone(&holon_http_state);
-        tokio::spawn(async move {
-            let app = symthaea::api::holon::holon_router(http_state);
-            match tokio::net::TcpListener::bind("0.0.0.0:5491").await {
-                Ok(listener) => {
-                    info!("Holon bridge listening on http://0.0.0.0:5491");
-                    println!("📱 Holon bridge: http://0.0.0.0:5491/holon/status");
-                    if let Err(e) = axum::serve(listener, app).await {
-                        error!("Holon bridge server error: {}", e);
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to bind Holon bridge on port 5492: {} (bridge disabled)",
-                        e
-                    );
-                }
-            }
-        });
-    }
-
-    // Without api_module: start consciousness loop without holon HTTP bridge
-    #[cfg(not(feature = "api_module"))]
-    {
-        let loop_state = Arc::clone(&state);
-        tokio::spawn(async move {
-            consciousness_loop(loop_state, None, args.loop_interval, args.sleep_interval).await;
-        });
-        info!("Holon bridge: disabled (build with --features api_module to enable)");
-    }
+    // Start background consciousness loop
+    let loop_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        consciousness_loop(loop_state, args.loop_interval, args.sleep_interval).await;
+    });
 
     // Start listening
     if let Some(socket_path) = args.socket {

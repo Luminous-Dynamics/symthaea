@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! nix-mind-daemon: background daemon for continuous NixOS awareness.
 //!
 //! Periodically observes the system state, encodes it into the HDC world model,

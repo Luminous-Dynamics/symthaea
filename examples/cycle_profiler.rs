@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cycle Profiler — reveals where time is spent in the full cognitive cycle.
+//! Cycle Profiler — reveals where time is spent in the full cognitive cycle.
 //!
 //! Runs N text cycles, aggregates per-module timing, and prints a sorted
 //! breakdown showing the heaviest subsystems. This is the tool for finding

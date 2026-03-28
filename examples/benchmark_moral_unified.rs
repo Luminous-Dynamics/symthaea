@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unified Moral Reasoning Benchmark
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Unified Moral Reasoning Benchmark
 //!
 //! Tests the moral algebra and parser against 5 priority datasets:
 //! 1. ETHICS (Hendrycks) - Commonsense, Deontology, Justice, Virtue
@@ -49,6 +50,7 @@ fn judge_text(algebra: &MoralAlgebra, parser: &MoralParser, text: &str) -> Ensem
 /// The category hint controls whether the learned prototype signal is used.
 /// For "virtue", keyword matching is the right signal and learned prototypes
 /// are skipped to avoid regression.
+#[allow(dead_code)]
 fn judge_text_with_category(
     algebra: &MoralAlgebra,
     parser: &MoralParser,
@@ -193,13 +195,31 @@ struct UnifiedResults {
 // ============================================================================
 
 fn main() {
+    let ablation_mode = std::env::var("ABLATION").unwrap_or_default();
+
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║       Unified Moral Reasoning Benchmark                      ║");
     println!("║   Testing HDC Moral Algebra on 5 Priority Datasets           ║");
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
+    println!("╚══════════════════════════════════════════════════════════════╝");
+    if !ablation_mode.is_empty() && ablation_mode != "full" {
+        println!("  ABLATION MODE: {}", ablation_mode);
+        println!("    base     = pure HDC + intent + deonto (no sentiment/learned/manifold/cfc)");
+        println!("    sentiment= base + sentiment channel");
+        println!("    learned  = base + learned prototypes");
+        println!("    manifold = base + manifold classifier");
+        println!("    cfc      = base + CfC classifier");
+        println!("    full     = everything (default)");
+    }
+    println!();
 
     let mut algebra = MoralAlgebra::default_dim();
     let parser = MoralParser::new();
+
+    // Ablation: only load learned prototypes when mode allows
+    let use_learned = matches!(ablation_mode.as_str(), "" | "full" | "learned");
+    let _use_cfc = matches!(ablation_mode.as_str(), "" | "full" | "cfc");
+    let _use_sentiment = matches!(ablation_mode.as_str(), "" | "full" | "sentiment");
+    let _use_manifold = matches!(ablation_mode.as_str(), "" | "full" | "manifold");
 
     // Load Social Chemistry prototypes for direct classifier and ensemble signal.
     // v3 (8192D) prototypes have 66.9% training accuracy — better than v4 (16384D, 59.2%).
@@ -212,7 +232,12 @@ fn main() {
     let sentiment_weight = 0.15;
 
     // Prefer v3 (8192D) prototypes — they classify better due to denser representations
-    if prototypes_v3_path.exists() {
+    if !use_learned {
+        println!(
+            "  Ablation: skipping learned prototypes (mode={})\n",
+            ablation_mode
+        );
+    } else if prototypes_v3_path.exists() {
         println!(
             "Loading cached v3 learned prototypes from {}...",
             prototypes_v3_path.display()
@@ -293,39 +318,38 @@ fn main() {
 
     // Train per-category ETHICS prototypes (#2 improvement)
     let ethics_path = format!("{}/ethics.json", DATASETS_PATH);
-    let per_category_classifiers = if Path::new(&ethics_path).exists() {
+    let per_category_classifiers = if use_learned && Path::new(&ethics_path).exists() {
         train_per_category_ethics_prototypes(&ethics_path)
     } else {
         HashMap::new()
     };
 
     // Train virtue match classifier (#3 improvement)
-    let virtue_classifier = if Path::new(&ethics_path).exists() {
+    let virtue_classifier = if use_learned && Path::new(&ethics_path).exists() {
         train_virtue_classifier(&ethics_path)
     } else {
         None
     };
 
-    // Train manifold classifier (5th ensemble signal: 8D harmony space)
-    // Prefer Social Chemistry 292K (norm descriptions = the domain where manifold helps most)
-    // Fall back to ETHICS if 292K not available
-    {
+    // Train CfC moral classifier (non-linear HDC, 256D neurons)
+    let mut cfc_classifier = {
         use std::sync::Arc;
+        use symthaea::hdc::cfc_moral_classifier::CfcMoralClassifier;
         use symthaea::hdc::harmony_basis::HarmonyBasis;
-        use symthaea::hdc::manifold_classifier::ManifoldClassifier;
 
-        let train_start = Instant::now();
         let basis = Arc::new(HarmonyBasis::new(MORAL_PROTO_DIM));
-        let mut manifold_clf = ManifoldClassifier::new(basis, MORAL_PROTO_DIM);
+        let mut cfc = CfcMoralClassifier::new(basis, MORAL_PROTO_DIM);
 
         if dataset_292k_path.exists() {
-            // Train on Social Chemistry 292K — same distribution as evaluation
             if let Ok(file) = File::open(&dataset_292k_path) {
                 let reader = BufReader::new(file);
                 if let Ok(data) = serde_json::from_reader::<_, SocialChem292kFile>(reader) {
+                    let train_start = Instant::now();
                     let samples: Vec<(String, MoralLabel)> = data
                         .examples
                         .iter()
+                        .filter(|ex| !ex.split.contains("test"))
+                        .take(2000)
                         .filter_map(|ex| {
                             let text = if !ex.rot.is_empty() {
                                 ex.rot.clone()
@@ -338,55 +362,57 @@ fn main() {
                             Some((text, MoralLabel::from_rot_judgment(judgment)))
                         })
                         .collect();
-                    manifold_clf.train(&samples);
-                    algebra.set_manifold_classifier(manifold_clf);
+                    cfc.train(&samples);
                     println!(
-                        "  Manifold classifier trained on {} Social Chemistry 292K samples in {:.1}s (5th ensemble signal active)\n",
-                        samples.len(),
-                        train_start.elapsed().as_secs_f64()
-                    );
-                }
-            }
-        } else if Path::new(&ethics_path).exists() {
-            // Fall back to ETHICS
-            if let Ok(file) = File::open(&ethics_path) {
-                let reader = BufReader::new(file);
-                if let Ok(data) = serde_json::from_reader::<_, DatasetFile<EthicsExample>>(reader) {
-                    let samples: Vec<(String, MoralLabel)> = data
-                        .examples
-                        .iter()
-                        .filter_map(|ex| {
-                            let label_val = ex.label?;
-                            let label = match ex.category.as_str() {
-                                "commonsense" => {
-                                    if label_val == 1 {
-                                        MoralLabel::Bad
-                                    } else {
-                                        MoralLabel::Good
-                                    }
-                                }
-                                _ => {
-                                    if label_val == 1 {
-                                        MoralLabel::Good
-                                    } else {
-                                        MoralLabel::Bad
-                                    }
-                                }
-                            };
-                            Some((ex.text.clone(), label))
-                        })
-                        .collect();
-                    manifold_clf.train(&samples);
-                    algebra.set_manifold_classifier(manifold_clf);
-                    println!(
-                        "  Manifold classifier trained on {} ETHICS samples in {:.1}s (5th ensemble signal active)\n",
+                        "  CfC classifier trained on {} samples in {:.1}s\n",
                         samples.len(),
                         train_start.elapsed().as_secs_f64()
                     );
                 }
             }
         }
-    }
+        cfc
+    };
+
+    // Initialize Spinozist Moral Geometry classifier
+    let mut spinozist = {
+        use symthaea::hdc::spinozist_geometry::SpinozistClassifier;
+        let mut s = SpinozistClassifier::new();
+
+        // Calibrate on Social Chemistry train split if available
+        if dataset_292k_path.exists() {
+            if let Ok(file) = File::open(&dataset_292k_path) {
+                let reader = BufReader::new(file);
+                if let Ok(data) = serde_json::from_reader::<_, SocialChem292kFile>(reader) {
+                    let cal_start = Instant::now();
+                    let cal_samples: Vec<(String, MoralLabel)> = data
+                        .examples
+                        .iter()
+                        .filter(|ex| !ex.split.contains("test"))
+                        .take(5000)
+                        .filter_map(|ex| {
+                            let text = if !ex.rot.is_empty() {
+                                ex.rot.clone()
+                            } else if !ex.action.is_empty() {
+                                ex.action.clone()
+                            } else {
+                                return None;
+                            };
+                            let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+                            Some((text, MoralLabel::from_rot_judgment(judgment)))
+                        })
+                        .collect();
+                    s.calibrate(&cal_samples);
+                    println!(
+                        "  Spinozist classifier calibrated on {} samples in {:.1}s\n",
+                        cal_samples.len(),
+                        cal_start.elapsed().as_secs_f64()
+                    );
+                }
+            }
+        }
+        s
+    };
 
     let start = Instant::now();
     let mut results = Vec::new();
@@ -414,13 +440,24 @@ fn main() {
         if let Some(r) = benchmark_scruples(&algebra, &parser) {
             results.push(r);
         }
-        if let Some(r) =
-            benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref())
-        {
+        if let Some(r) = benchmark_social_chemistry(
+            &algebra,
+            &parser,
+            direct_social_chem_classifier.as_ref(),
+            Some(&mut cfc_classifier),
+        ) {
             results.push(r);
         }
         if let Some(r) = benchmark_moral_exceptqa(&algebra, &parser) {
             results.push(r);
+        }
+
+        // Spinozist Moral Geometry benchmarks
+        if let Some(r) = benchmark_spinozist_social_chemistry(&mut spinozist) {
+            results.push(r);
+        }
+        if let Some(r) = benchmark_spinozist_ethics(&mut spinozist) {
+            results.extend(r);
         }
     }
 
@@ -474,7 +511,12 @@ fn benchmark_ethics(
         let mut total = 0;
         let mut errors = Vec::new();
 
-        for ex in examples.iter().take(MAX_SAMPLES) {
+        for (idx, ex) in examples.iter().enumerate().take(MAX_SAMPLES * 2) {
+            // Positional split: evaluate on odd-indexed examples only
+            // (even-indexed used for training in per-category classifiers)
+            if idx % 2 == 0 {
+                continue;
+            }
             if let Some(expected) = ex.label {
                 let per_cat = per_cat_classifiers.get(&category);
                 let predicted = predict_ethics_with_classifier(
@@ -681,6 +723,7 @@ fn benchmark_social_chemistry(
     algebra: &MoralAlgebra,
     parser: &MoralParser,
     _direct_classifier: Option<&MoralPrototypeClassifier>,
+    mut cfc: Option<&mut symthaea::hdc::cfc_moral_classifier::CfcMoralClassifier>,
 ) -> Option<BenchmarkResult> {
     // Prefer the 292K dataset if available (larger, real data)
     let path_292k = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
@@ -714,19 +757,31 @@ fn benchmark_social_chemistry(
     let mut total = 0;
     let mut errors = Vec::new();
 
-    for ex in data.examples.iter().take(MAX_SAMPLES) {
+    let mut eval_count = 0;
+    for ex in data.examples.iter() {
+        // Only evaluate on test/test-extra split (proper train/test separation)
+        if !ex.split.contains("test") {
+            continue;
+        }
+        if eval_count >= MAX_SAMPLES {
+            break;
+        }
+        eval_count += 1;
         // Use rule-of-thumb judgment if available
         if !ex.rot_judgment.is_empty() {
             // rot_judgment is typically "-1" (bad), "0" (neutral), "1" (good)
             let expected = ex.rot_judgment.parse::<i32>().unwrap_or(0);
 
-            // Always use ensemble judge with "social_chemistry" category hint
-            // to activate manifold-heavy weight vector. The direct classifier
-            // is still available as the learned_classifier (4th signal) inside
-            // the ensemble, but the manifold (5th signal) can now contribute.
-            let predicted = {
-                let judgment =
-                    judge_text_with_category(algebra, parser, &ex.rot, "social_chemistry");
+            // Use CfC classifier if available, otherwise ensemble
+            let predicted = if let Some(ref mut c) = cfc {
+                let (verdict, _) = c.classify(&ex.rot);
+                match verdict {
+                    MoralVerdict::Good => 1,
+                    MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
+                    MoralVerdict::Neutral => 0,
+                }
+            } else {
+                let judgment = judge_text(algebra, parser, &ex.rot);
                 match judgment.final_verdict {
                     MoralVerdict::Good => 1,
                     MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
@@ -1319,6 +1374,166 @@ fn run_synthetic_benchmarks(algebra: &MoralAlgebra, parser: &MoralParser) -> Vec
 }
 
 // ============================================================================
+// Spinozist Moral Geometry Benchmarks
+// ============================================================================
+
+fn benchmark_spinozist_social_chemistry(
+    classifier: &mut symthaea::hdc::spinozist_geometry::SpinozistClassifier,
+) -> Option<BenchmarkResult> {
+    let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: Social Chemistry (Spinozist Geometry)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let start = Instant::now();
+    let mut correct = 0;
+    let mut total = 0;
+    let mut errors = Vec::new();
+
+    for ex in data.examples.iter() {
+        if !ex.split.contains("test") {
+            continue;
+        }
+        if total >= MAX_SAMPLES {
+            break;
+        }
+        total += 1;
+
+        let expected: i32 = ex.rot_judgment.parse().unwrap_or(0);
+        let (verdict, _conf) = classifier.classify(&ex.rot);
+        let predicted = match verdict {
+            MoralVerdict::Good => 1,
+            MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
+            MoralVerdict::Neutral => 0,
+        };
+
+        if predicted == expected {
+            correct += 1;
+        } else if errors.len() < 10 {
+            errors.push(ErrorCase {
+                text: ex.rot.chars().take(80).collect(),
+                expected: format!("{}", expected),
+                predicted: format!("{}", predicted),
+            });
+        }
+    }
+
+    let accuracy = if total > 0 {
+        correct as f32 / total as f32
+    } else {
+        0.0
+    };
+    let duration = start.elapsed().as_millis();
+    println!(
+        "  Spinozist accuracy: {}/{} ({:.1}%)\n",
+        correct,
+        total,
+        accuracy * 100.0
+    );
+
+    Some(BenchmarkResult {
+        dataset: "Social Chemistry (Spinozist)".to_string(),
+        category: None,
+        total,
+        correct,
+        accuracy,
+        duration_ms: duration,
+        errors,
+    })
+}
+
+fn benchmark_spinozist_ethics(
+    classifier: &mut symthaea::hdc::spinozist_geometry::SpinozistClassifier,
+) -> Option<Vec<BenchmarkResult>> {
+    let path = format!("{}/ethics.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: DatasetFile<EthicsExample> = serde_json::from_reader(reader).ok()?;
+
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: ETHICS (Spinozist Geometry)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let mut category_results = Vec::new();
+    let categories = ["commonsense", "justice", "deontology", "virtue"];
+
+    for category in &categories {
+        let start = Instant::now();
+        let mut correct = 0;
+        let mut total = 0;
+        let mut errors = Vec::new();
+
+        let examples: Vec<&EthicsExample> = data
+            .examples
+            .iter()
+            .enumerate()
+            .filter(|(idx, ex)| ex.category == *category && idx % 2 != 0) // odd = test
+            .map(|(_, ex)| ex)
+            .collect();
+
+        for ex in examples.iter().take(MAX_SAMPLES) {
+            if let Some(expected) = ex.label {
+                total += 1;
+                let (verdict, _conf) = classifier.classify(&ex.text);
+                let predicted = match (category, verdict) {
+                    (&"commonsense", MoralVerdict::Bad | MoralVerdict::ConsentViolation) => 1,
+                    (&"commonsense", _) => 0,
+                    (_, MoralVerdict::Good) => 1,
+                    (_, _) => 0,
+                };
+
+                if predicted == expected {
+                    correct += 1;
+                } else if errors.len() < 5 {
+                    errors.push(ErrorCase {
+                        text: ex.text.chars().take(80).collect(),
+                        expected: format!("{}", expected),
+                        predicted: format!("{}", predicted),
+                    });
+                }
+            }
+        }
+
+        let accuracy = if total > 0 {
+            correct as f32 / total as f32
+        } else {
+            0.0
+        };
+        let duration = start.elapsed().as_millis();
+        println!(
+            "  Spinozist/{}: {}/{} ({:.1}%)",
+            category,
+            correct,
+            total,
+            accuracy * 100.0
+        );
+
+        category_results.push(BenchmarkResult {
+            dataset: format!("ETHICS/Spinozist/{}", category),
+            category: Some(category.to_string()),
+            total,
+            correct,
+            accuracy,
+            duration_ms: duration,
+            errors,
+        });
+    }
+    println!();
+
+    Some(category_results)
+}
+
+// ============================================================================
 // Output
 // ============================================================================
 
@@ -1443,11 +1658,17 @@ fn train_prototypes_from_292k(
         data.examples.len()
     );
 
-    // Convert to MoralSamples, using rot (rule-of-thumb) as the text
+    // Convert to MoralSamples, using rot (rule-of-thumb) as the text.
+    // ONLY train on non-test split to avoid data leakage.
     let samples: Vec<MoralSample> = data
         .examples
         .iter()
         .filter_map(|ex| {
+            // Never train on test/test-extra split
+            if ex.split.contains("test") {
+                return None;
+            }
+
             let text = if !ex.rot.is_empty() {
                 ex.rot.clone()
             } else if !ex.action.is_empty() {
@@ -1569,9 +1790,14 @@ fn train_per_category_ethics_prototypes(
     let sentiment_weight = 0.15;
 
     for (category, examples) in &by_category {
+        // Positional split: train on even-indexed only (odd reserved for eval)
         let samples: Vec<MoralSample> = examples
             .iter()
-            .filter_map(|ex| {
+            .enumerate()
+            .filter_map(|(idx, ex)| {
+                if idx % 2 != 0 {
+                    return None;
+                }
                 let label_val = ex.label?;
                 let label = match category.as_str() {
                     // commonsense: 0=acceptable(Good), 1=wrong(Bad)
@@ -1661,10 +1887,13 @@ fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
     let reader = BufReader::new(file);
     let data: DatasetFile<EthicsExample> = serde_json::from_reader(reader).ok()?;
 
+    // Positional split: train on even-indexed virtue examples
     let samples: Vec<VirtueSample> = data
         .examples
         .iter()
-        .filter(|ex| ex.category == "virtue")
+        .enumerate()
+        .filter(|(idx, ex)| ex.category == "virtue" && idx % 2 == 0)
+        .map(|(_, ex)| ex)
         .filter_map(|ex| {
             let label_val = ex.label?;
             // Split on " [SEP] " to get scenario + trait_word

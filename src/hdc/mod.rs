@@ -386,6 +386,12 @@ pub mod harmony_basis;
 /// Manifold-based moral classifier using 8D harmony basis centroids.
 pub mod manifold_classifier;
 
+/// CfC-based non-linear moral classifier using HdcLtcUnifiedNetwork.
+pub mod cfc_moral_classifier;
+
+/// Spinozist Moral Geometry — NSM-grounded affect space for moral reasoning.
+pub mod spinozist_geometry;
+
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 

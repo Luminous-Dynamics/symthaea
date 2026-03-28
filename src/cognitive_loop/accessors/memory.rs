@@ -39,24 +39,32 @@ impl CognitiveLoopService {
 
     /// Get the current causal graph (if causal enhancement is enabled)
     pub fn causal_graph(&self) -> Option<&CausalGraph> {
-        self.causal_enhancer.as_ref().map(|e| e.current_graph())
+        self.memory
+            .causal_enhancer
+            .as_ref()
+            .map(|e| e.current_graph())
     }
 
     /// Get discovered causal relationships history
     pub fn causal_discoveries(&self) -> Option<&[DiscoveredRelationship]> {
-        self.causal_enhancer
+        self.memory
+            .causal_enhancer
             .as_ref()
             .map(|e| e.discovered_relationships())
     }
 
     /// Get causal enhancer statistics
     pub fn causal_stats(&self) -> Option<crate::causal::CausalLoopStats> {
-        self.causal_enhancer.as_ref().map(|e| e.stats().clone())
+        self.memory
+            .causal_enhancer
+            .as_ref()
+            .map(|e| e.stats().clone())
     }
 
     /// Check if any causal structure has been discovered
     pub fn has_causal_structure(&self) -> bool {
-        self.causal_enhancer
+        self.memory
+            .causal_enhancer
             .as_ref()
             .map(|e| e.has_causal_structure())
             .unwrap_or(false)
@@ -70,12 +78,17 @@ impl CognitiveLoopService {
     pub fn episodic_replay_stats(
         &self,
     ) -> Option<crate::memory::episodic_replay::EpisodicMemoryStats> {
-        self.episodic_persistence.replay.as_ref().map(|r| r.stats())
+        self.memory
+            .episodic_persistence
+            .replay
+            .as_ref()
+            .map(|r| r.stats())
     }
 
     /// Get the number of stored episodes
     pub fn episodic_replay_count(&self) -> usize {
-        self.episodic_persistence
+        self.memory
+            .episodic_persistence
             .replay
             .as_ref()
             .map(|r| r.len())
@@ -84,7 +97,8 @@ impl CognitiveLoopService {
 
     /// Get top N episodes by Phi (highest consciousness moments)
     pub fn top_phi_episodes(&self, n: usize) -> Vec<crate::memory::episodic_replay::Episode> {
-        self.episodic_persistence
+        self.memory
+            .episodic_persistence
             .replay
             .as_ref()
             .map(|r| r.get_top_episodes(n))

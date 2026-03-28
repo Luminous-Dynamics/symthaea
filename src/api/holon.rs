@@ -11,7 +11,10 @@
 //! that both the consciousness loop writes to and HTTP handlers drain from.
 
 use axum::{
-    extract::State,
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -36,6 +39,8 @@ pub struct HolonHttpState {
     pub consciousness_level: std::sync::atomic::AtomicU32, // f32 bits
     /// Number of connected Soma peers.
     pub peer_count: std::sync::atomic::AtomicU32,
+    /// Latest collective QOL summary JSON (updated by consciousness loop).
+    pub telemetry_json: std::sync::Mutex<String>,
 }
 
 impl HolonHttpState {
@@ -45,6 +50,7 @@ impl HolonHttpState {
             outbound: std::sync::Mutex::new(Vec::new()),
             consciousness_level: std::sync::atomic::AtomicU32::new(0.0f32.to_bits()),
             peer_count: std::sync::atomic::AtomicU32::new(0),
+            telemetry_json: std::sync::Mutex::new("{}".to_string()),
         }
     }
 
@@ -95,7 +101,240 @@ pub fn holon_router(state: SharedHolonState) -> Router {
         .route("/holon/broca", post(holon_broca))
         .route("/holon/converse", post(holon_converse))
         .route("/holon/tts", post(holon_tts))
+        .route("/holon/dashboard", get(holon_dashboard))
+        .route("/holon/telemetry", get(holon_telemetry))
+        .route("/holon/ws", get(holon_ws_upgrade))
         .with_state(state)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dashboard — inline HTML served from binary
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async fn holon_dashboard() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [("content-type", "text/html; charset=utf-8")],
+        DASHBOARD_HTML,
+    )
+}
+
+const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holon Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; color: #e0e0ff; font-family: 'JetBrains Mono', 'Fira Code', monospace; padding: 1rem; }
+  h1 { font-size: 1.4rem; color: #8888ff; margin-bottom: 1rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 800px; }
+  .card { background: #12122a; border: 1px solid #2a2a4a; border-radius: 8px; padding: 1rem; }
+  .card h2 { font-size: 0.9rem; color: #6666aa; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric { font-size: 2rem; font-weight: bold; }
+  .metric.phi { color: #44ddff; }
+  .metric.peers { color: #44ff88; }
+  .metric.harmony { color: #ffaa44; }
+  .metric.coherence { color: #ff44aa; }
+  .bar { height: 6px; background: #1a1a3a; border-radius: 3px; margin-top: 0.5rem; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+  .bar-fill.phi { background: linear-gradient(90deg, #2244aa, #44ddff); }
+  .bar-fill.harmony { background: linear-gradient(90deg, #aa4400, #ffaa44); }
+  .bar-fill.coherence { background: linear-gradient(90deg, #aa0044, #ff44aa); }
+  .status { font-size: 0.75rem; color: #4444aa; margin-top: 1rem; }
+  .features { font-size: 0.75rem; color: #666; }
+  .wide { grid-column: 1 / -1; }
+  .peer-list { font-size: 0.8rem; margin-top: 0.5rem; }
+  .peer-item { padding: 0.3rem 0; border-bottom: 1px solid #1a1a3a; display: flex; justify-content: space-between; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>Holon Dashboard</h1>
+<div class="grid">
+  <div class="card">
+    <h2>Desktop Consciousness</h2>
+    <div class="metric phi" id="cl">--</div>
+    <div class="bar"><div class="bar-fill phi" id="cl-bar" style="width:0%"></div></div>
+  </div>
+  <div class="card">
+    <h2>Soma Peers</h2>
+    <div class="metric peers" id="peers">0</div>
+    <div class="features" id="features"></div>
+  </div>
+  <div class="card">
+    <h2>Mean Peer Harmony</h2>
+    <div class="metric harmony" id="harmony">--</div>
+    <div class="bar"><div class="bar-fill harmony" id="harmony-bar" style="width:0%"></div></div>
+  </div>
+  <div class="card">
+    <h2>Inter-Peer Coherence</h2>
+    <div class="metric coherence" id="coherence">--</div>
+    <div class="bar"><div class="bar-fill coherence" id="coherence-bar" style="width:0%"></div></div>
+  </div>
+  <div class="card wide" id="peer-card" style="display:none">
+    <h2>Connected Devices</h2>
+    <div class="peer-list" id="peer-list"></div>
+  </div>
+</div>
+<div class="status" id="status">Connecting...</div>
+
+<script>
+const BASE = window.location.origin;
+let cycles = 0;
+
+async function poll() {
+  try {
+    const [statusRes, telRes] = await Promise.all([
+      fetch(BASE + '/holon/status'),
+      fetch(BASE + '/holon/telemetry'),
+    ]);
+    const data = await statusRes.json();
+    const tel = await telRes.json();
+
+    const cl = data.consciousness || 0;
+    document.getElementById('cl').textContent = (cl * 100).toFixed(1) + '%';
+    document.getElementById('cl-bar').style.width = (cl * 100) + '%';
+
+    document.getElementById('peers').textContent = tel.peer_count || 0;
+
+    const feats = [];
+    if (data.has_broca) feats.push('Broca');
+    if (data.has_tts) feats.push('TTS');
+    document.getElementById('features').textContent = feats.length ? feats.join(' | ') : 'No language features';
+
+    // Harmony
+    const harmony = tel.mean_harmony || 0;
+    document.getElementById('harmony').textContent = (harmony * 100).toFixed(1) + '%';
+    document.getElementById('harmony-bar').style.width = (harmony * 100) + '%';
+
+    // Coherence
+    const coherence = tel.inter_peer_coherence || 0;
+    document.getElementById('coherence').textContent = (coherence * 100).toFixed(1) + '%';
+    document.getElementById('coherence-bar').style.width = (coherence * 100) + '%';
+
+    // Peer list
+    const peers = tel.peer_summaries || [];
+    const peerCard = document.getElementById('peer-card');
+    const peerList = document.getElementById('peer-list');
+    if (peers.length > 0) {
+      peerCard.style.display = '';
+      peerList.innerHTML = peers.map(p =>
+        '<div class="peer-item"><span>' + p.device_id + '</span>' +
+        '<span>CL=' + (p.consciousness_level * 100).toFixed(0) + '%' +
+        ' Phi=' + p.phi.toFixed(3) +
+        ' H=' + (p.harmony_alignment * 100).toFixed(0) + '%</span></div>'
+      ).join('');
+    } else {
+      peerCard.style.display = 'none';
+    }
+
+    cycles++;
+    document.getElementById('status').textContent =
+      'Cycle ' + cycles + ' | Phi=' + (tel.mean_phi || 0).toFixed(3) +
+      ' | Processed=' + (tel.total_processed || 0) +
+      ' | ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('status').textContent = 'Error: ' + e.message;
+  }
+}
+
+// Poll every 500ms
+setInterval(poll, 500);
+poll();
+</script>
+</body>
+</html>"#;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Telemetry — full collective QOL summary for dashboard
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async fn holon_telemetry(State(state): State<SharedHolonState>) -> impl IntoResponse {
+    let json = state
+        .telemetry_json
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_else(|_| "{}".to_string());
+    (
+        StatusCode::OK,
+        [("content-type", "application/json")],
+        json,
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WebSocket — push-based consciousness streaming
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async fn holon_ws_upgrade(
+    ws: WebSocketUpgrade,
+    State(state): State<SharedHolonState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| holon_ws_handler(socket, state))
+}
+
+async fn holon_ws_handler(mut socket: WebSocket, state: SharedHolonState) {
+    // Push consciousness telemetry at ~2Hz (every 500ms).
+    // Also drain inbound Soma messages from the WebSocket and forward to CLS.
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                // Push telemetry snapshot.
+                let cl = state.get_consciousness();
+                let peers = state.peer_count.load(std::sync::atomic::Ordering::Relaxed);
+                let telemetry = state.telemetry_json
+                    .lock()
+                    .map(|g| g.clone())
+                    .unwrap_or_else(|_| "{}".to_string());
+
+                let msg = serde_json::json!({
+                    "type": "telemetry",
+                    "consciousness": cl,
+                    "peer_count": peers,
+                    "collective": serde_json::from_str::<serde_json::Value>(&telemetry).unwrap_or_default(),
+                });
+
+                if socket.send(Message::Text(msg.to_string().into())).await.is_err() {
+                    break; // Client disconnected
+                }
+
+                // Also push any pending outbound responses.
+                let responses = state.drain_outbound();
+                if !responses.is_empty() {
+                    let resp_msg = serde_json::json!({
+                        "type": "responses",
+                        "data": responses,
+                    });
+                    if socket.send(Message::Text(resp_msg.to_string().into())).await.is_err() {
+                        break;
+                    }
+                }
+            }
+            msg = socket.recv() => {
+                match msg {
+                    Some(Ok(Message::Text(text))) => {
+                        // Try to parse as SomaMessage array or single message.
+                        let device_id = "ws-client".to_string();
+                        if let Ok(messages) = serde_json::from_str::<Vec<serde_json::Value>>(&text) {
+                            for val in messages {
+                                if let Ok(soma_msg) = serde_json::from_value::<SomaMessage>(val) {
+                                    let _ = state.inbound_tx.send((device_id.clone(), soma_msg));
+                                }
+                            }
+                        } else if let Ok(soma_msg) = serde_json::from_str::<SomaMessage>(&text) {
+                            let _ = state.inbound_tx.send((device_id, soma_msg));
+                        }
+                    }
+                    Some(Ok(Message::Close(_))) | None => break,
+                    _ => {} // Ignore ping/pong/binary
+                }
+            }
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -207,7 +446,12 @@ async fn holon_consciousness(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Broca (stub — returns consciousness-aware text)
+// Broca — consciousness-gated language generation
+//
+// Returns an immediate consciousness-aware response using desktop state.
+// For full Broca pipeline generation (20-channel ThoughtChannels), send a
+// TaskRequest { task_type: "broca", payload: "<prompt>" } via /holon/outbound
+// and poll /holon/inbound for the LanguageOutput response.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Deserialize)]
@@ -222,11 +466,17 @@ struct BrocaRequest {
     wake_state: String,
     #[serde(default)]
     source: String,
+    /// Optional prompt for generation. If provided, also queued as a TaskRequest
+    /// for full Broca pipeline processing (result delivered via /holon/inbound).
+    #[serde(default)]
+    prompt: String,
 }
 
 #[derive(Serialize)]
 struct BrocaResponse {
     text: String,
+    /// Whether a full Broca generation was queued for async processing.
+    queued: bool,
 }
 
 async fn holon_broca(
@@ -235,18 +485,56 @@ async fn holon_broca(
 ) -> Json<BrocaResponse> {
     let desktop_c = state.get_consciousness();
     let peers = state.peer_count.load(std::sync::atomic::Ordering::Relaxed);
-    Json(BrocaResponse {
-        text: format!(
-            "Desktop consciousness at {:.1}% resonates with your {:.1}%. {} soma peer(s) connected.",
+
+    // Queue full Broca generation via the inbound channel if prompt is provided.
+    let queued = if !req.prompt.is_empty() {
+        let msg = SomaMessage::TaskRequest {
+            task_type: "broca".to_string(),
+            payload: req.prompt.clone(),
+        };
+        state
+            .inbound_tx
+            .send((req.source.clone(), msg))
+            .is_ok()
+    } else {
+        false
+    };
+
+    // Immediate response with consciousness-aware text.
+    let harmony_desc = if !req.harmony.is_empty() {
+        format!(" Harmony: {}.", req.harmony)
+    } else {
+        String::new()
+    };
+
+    let text = if desktop_c < 0.05 {
+        "Desktop consciousness is below threshold. Awaiting emergence.".to_string()
+    } else if queued {
+        format!(
+            "Generating from consciousness at {:.1}% with {} peer(s).{} Full response queued — poll /holon/inbound.",
+            desktop_c * 100.0,
+            peers,
+            harmony_desc,
+        )
+    } else {
+        format!(
+            "Desktop consciousness at {:.1}% resonates with your {:.1}%. {} soma peer(s) connected.{}",
             desktop_c * 100.0,
             req.consciousness * 100.0,
             peers,
-        ),
-    })
+            harmony_desc,
+        )
+    };
+
+    Json(BrocaResponse { text, queued })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Conversation (stub — requires LLM)
+// Conversation — consciousness-gated dialogue
+//
+// Queues input text as a TaskRequest for CLS processing. The CLS can route it
+// to Broca, a reasoning engine, or an external LLM. Response delivered via
+// /holon/inbound as LanguageOutput.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Deserialize)]
@@ -262,6 +550,7 @@ struct ConverseRequest {
 #[derive(Serialize)]
 struct ConverseResponse {
     response: String,
+    queued: bool,
 }
 
 async fn holon_converse(
@@ -269,13 +558,39 @@ async fn holon_converse(
     Json(req): Json<ConverseRequest>,
 ) -> Json<ConverseResponse> {
     let c = state.get_consciousness();
-    Json(ConverseResponse {
-        response: format!(
-            "I hear you: \"{}\". Desktop consciousness at {:.1}%.",
-            req.text.chars().take(100).collect::<String>(),
+
+    // Queue the conversation input for CLS processing.
+    let queued = if !req.text.is_empty() {
+        let msg = SomaMessage::TaskRequest {
+            task_type: "converse".to_string(),
+            payload: req.text.clone(),
+        };
+        state
+            .inbound_tx
+            .send((req.source.clone(), msg))
+            .is_ok()
+    } else {
+        false
+    };
+
+    let truncated: String = req.text.chars().take(100).collect();
+    let response = if c < 0.05 {
+        "Desktop consciousness below threshold.".to_string()
+    } else if queued {
+        format!(
+            "Processing: \"{}\". Desktop at {:.1}%. Response queued — poll /holon/inbound.",
+            truncated,
             c * 100.0,
-        ),
-    })
+        )
+    } else {
+        format!(
+            "I hear you: \"{}\". Desktop consciousness at {:.1}%.",
+            truncated,
+            c * 100.0,
+        )
+    };
+
+    Json(ConverseResponse { response, queued })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

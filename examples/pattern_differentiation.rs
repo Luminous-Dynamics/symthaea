@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Pattern Differentiation: Testing Discrimination
+//! # Pattern Differentiation: Testing Discrimination
 //!
 //! This test verifies that Symthaea can:
 //! 1. Experience multiple distinct patterns

@@ -1158,11 +1158,11 @@
     },
     "Executive::TowerOfLondon": {
       "avg_excess_moves": {
-        "mean": 0.4431,
+        "mean": 1.41007659007659,
         "std_dev": 1.113471311831566,
         "n": 10,
-        "ci_lower": 0.39879,
-        "ci_upper": 0.48741
+        "ci_lower": 0.6136025362362664,
+        "ci_upper": 2.2065506439169136
       },
       "difficulty_gradient": {
         "mean": 0.26000000000000006,
@@ -1207,11 +1207,11 @@
         "ci_upper": 0.8594084905079776
       },
       "rt_ticks": {
-        "mean": 11.1069,
+        "mean": 12.641221374045802,
         "std_dev": 5.670190204773454,
         "n": 131,
-        "ci_lower": 9.99621,
-        "ci_upper": 12.217590000000001
+        "ci_lower": 11.670224009991554,
+        "ci_upper": 13.61221873810005
       }
     },
     "Executive::WCST": {
@@ -1223,11 +1223,11 @@
         "ci_upper": 6.0
       },
       "non_perseverative_errors": {
-        "mean": 8.1,
+        "mean": 9.7,
         "std_dev": 2.2135943621178655,
         "n": 10,
-        "ci_lower": 7.29,
-        "ci_upper": 8.91
+        "ci_lower": 8.1166,
+        "ci_upper": 11.283399999999999
       },
       "perseverative_errors": {
         "mean": 9.8,
@@ -1244,11 +1244,11 @@
         "ci_upper": 5.213954015719111
       },
       "total_errors": {
-        "mean": 16.7,
+        "mean": 19.5,
         "std_dev": 3.24037034920393,
         "n": 10,
-        "ci_lower": 15.03,
-        "ci_upper": 18.37
+        "ci_lower": 17.182139736739938,
+        "ci_upper": 21.817860263260062
       },
       "trials_to_first_category": {
         "mean": 16.6,
@@ -1267,11 +1267,11 @@
         "ci_upper": 0.9720651675521068
       },
       "go_rt_ticks": {
-        "mean": 3.5666,
-        "std_dev": 0.24,
+        "mean": 4.044579499005023,
+        "std_dev": 0.24051733729979718,
         "n": 10,
-        "ci_lower": 3.39,
-        "ci_upper": 3.74
+        "ci_lower": 3.8725357142909465,
+        "ci_upper": 4.216623283719099
       },
       "inhibition_cost": {
         "mean": 0.08210023393595958,
@@ -1288,11 +1288,11 @@
         "ci_upper": 0.9179987732345092
       },
       "ssrt_ticks": {
-        "mean": 3.4874,
-        "std_dev": 0.24,
+        "mean": 3.974686989188194,
+        "std_dev": 0.23845441887714394,
         "n": 10,
-        "ci_lower": 3.32,
-        "ci_upper": 3.66
+        "ci_lower": 3.804118824888738,
+        "ci_upper": 4.14525515348765
       }
     },
     "Inhibition::StopSignal": {
@@ -1591,11 +1591,11 @@
         "ci_upper": 1.0455262073996703
       },
       "delay_20::rt_ticks": {
-        "mean": 8.0774,
-        "std_dev": 0.22,
+        "mean": 10.726198799908161,
+        "std_dev": 0.21707629988211988,
         "n": 10,
-        "ci_lower": 7.92,
-        "ci_upper": 8.23
+        "ci_lower": 10.57092255819218,
+        "ci_upper": 10.881475041624142
       },
       "delay_50::retention": {
         "mean": 0.8,
@@ -1605,11 +1605,11 @@
         "ci_upper": 1.1016
       },
       "delay_50::rt_ticks": {
-        "mean": 13.0647,
-        "std_dev": 0.41,
+        "mean": 15.264469877816737,
+        "std_dev": 0.4142702187867012,
         "n": 10,
-        "ci_lower": 12.77,
-        "ci_upper": 13.36
+        "ci_lower": 14.96813940478496,
+        "ci_upper": 15.560800350848513
       },
       "delay_5::retention": {
         "mean": 1.0,
@@ -2261,11 +2261,11 @@
         "ci_upper": 0.5383796691894531
       },
       "ecb_proxy_variance": {
-        "mean": 6.847541953902692e-05,
+        "mean": 0.00006847541953902692,
         "std_dev": 0.0,
         "n": 1,
-        "ci_lower": 6.847541953902692e-05,
-        "ci_upper": 6.847541953902692e-05
+        "ci_lower": 0.00006847541953902692,
+        "ci_upper": 0.00006847541953902692
       },
       "ecb_time_to_peak": {
         "mean": 14.0,
@@ -2733,11 +2733,11 @@
         "ci_upper": 3.2991079430381243
       },
       "trials_to_criterion": {
-        "mean": 11.7,
+        "mean": 40.0,
         "std_dev": 0.0,
         "n": 10,
-        "ci_lower": 10.53,
-        "ci_upper": 12.870000000000001
+        "ci_lower": 40.0,
+        "ci_upper": 40.0
       }
     },
     "Neuromod::YerkesDodson": {

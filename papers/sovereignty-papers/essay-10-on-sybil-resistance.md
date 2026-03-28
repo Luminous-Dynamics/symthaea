@@ -62,7 +62,7 @@ The Sybil problem is not "can we verify that this is a unique person?" The Sybil
 
 ### III. Multi-Dimensional Resistance
 
-The four-dimensional consciousness credential described in Essay No. 7 addresses the Sybil problem not by solving identity (one dimension) but by requiring simultaneous presence across four independent verification channels.
+The four-dimensional domain-coupled credential described in Essay No. 7 addresses the Sybil problem not by solving identity (one dimension) but by requiring simultaneous presence across four independent verification channels.
 
 Consider an attacker who wishes to gain disproportionate governance influence in a consciousness-coupled system. They must simultaneously:
 
@@ -74,7 +74,7 @@ Consider an attacker who wishes to gain disproportionate governance influence in
 
 4. **Demonstrate ongoing, integrated engagement with the governed domain.** The attacker's fabricated identities must interact with different aspects of the governance domain in patterns that the integration measurement recognizes as coherent. Automated activity — bot-like patterns of monitoring, voting, and proposing — produces low integration scores because the activities are not genuinely connected to each other. The engagement dimension measures not the volume of activity but its integration, and integration requires the kind of cross-domain understanding that bots and sock puppets typically lack.
 
-The cost of a Sybil attack in a consciousness-coupled system is not the cost of creating fake identities. It is the cost of creating fake identities that are simultaneously verified, reputable, community-trusted, and domain-engaged — and maintaining all four dimensions continuously, because the credential expires every 24 hours.
+The cost of a Sybil attack in a domain-coupled credential system is not the cost of creating fake identities. It is the cost of creating fake identities that are simultaneously verified, reputable, community-trusted, and domain-engaged — and maintaining all four dimensions continuously, because the credential expires every 24 hours.
 
 In economic terms: the cost of a Sybil attack in a token-weighted system is the cost of the tokens (which can be borrowed via flash loan, as Beanstalk demonstrated). The cost of a Sybil attack in a consciousness-coupled system approaches the cost of genuine engagement with the governed domain — because the credential measures engagement, and there is no shortcut to real engagement that does not look, to the measurement system, like real engagement.[^5]
 

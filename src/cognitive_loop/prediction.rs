@@ -100,7 +100,7 @@ impl CognitiveLoopService {
         // Only re-query the causal graph every 41 cycles (co-prime with world model update)
         // to avoid redundant graph copies. Between updates, use uniform weighting.
         let causal_dims: Option<Vec<bool>> = if self.stats.total_cycles % 41 == 0 {
-            if let Some(ref enhancer) = self.causal_enhancer {
+            if let Some(ref enhancer) = self.memory.causal_enhancer {
                 let graph = enhancer.current_graph();
                 let mut has_edge = vec![false; dim];
                 for e in &graph.edges {

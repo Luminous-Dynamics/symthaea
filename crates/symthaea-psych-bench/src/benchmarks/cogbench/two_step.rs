@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Two-step task (Daw et al., 2011).
 //!
 //! Tests model-based vs model-free behavior. A choice at stage 1 leads
@@ -58,15 +55,15 @@ impl TwoStepBenchmark {
         // evidence accumulates. Prevents early noise from distorting transition estimates
         // while letting later episodes reflect true 70/30 structure more sharply.
         let mut transition_counts = [[1.0f64; 2]; 2]; // will be recomputed per-episode
-
-        // Reward model: EMA of rewards in each state
+                                                      // Reward model: EMA of rewards in each state
         let mut state_reward = [0.5f64; 2]; // prior: 0.5
-
-        // Reward LR 0.45 (was 0.60): slower reward learning preserves reward
-        // uncertainty, producing a stronger transition×reward interaction signal.
-        // With high LR, the reward model converges too fast, collapsing the
-        // interaction variance needed for the β3 measure.
-        let reward_lr = 0.45;
+                                            // Higher LR (0.60, up from 0.50) speeds reward learning, allowing the
+                                            // agent to track the state-reward difference (state 0: 60% vs state 1: 40%)
+                                            // more precisely. This improves the transition×reward interaction signal
+                                            // (β3) because the model-based value difference between actions becomes
+                                            // more distinct when state rewards are tracked accurately. Behrens et al.
+                                            // (2007): optimal reward LR increases with reward volatility.
+        let reward_lr = 0.60;
         let mut rt_ticks = Vec::new();
 
         for ep in 0..num_episodes {
@@ -101,12 +98,10 @@ impl TwoStepBenchmark {
                 })
                 .collect();
 
-            // Softmax over model-based values — low temp makes MB signal decisive.
-            // Time pressure: base 0.07 sharpens model-based action selection
-            // (Daw et al., 2011: MB agents show strong transition×reward interaction
-            // when the transition model is confident). +0.10/unit degrades MB signal,
-            // shifting toward model-free under SAT (Heitz, 2014).
-            let mb_temp = 0.05 + config.time_pressure * 0.10;
+            // Softmax over model-based values — low temp makes MB signal decisive
+            // Time pressure: base 0.1 preserves model-based control (Daw et al., 2011 two-step);
+            // +0.10/unit degrades MB signal, shifting toward model-free under SAT (Heitz, 2014).
+            let mb_temp = 0.1 + config.time_pressure * 0.10;
             let mb_max = mb_values[0].max(mb_values[1]);
             let mb_exp: Vec<f64> = mb_values
                 .iter()
@@ -115,11 +110,10 @@ impl TwoStepBenchmark {
             let mb_sum: f64 = mb_exp.iter().sum();
             let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
 
-            // Blend: ramp model-based weight gradually, saturating by episode 80
-            // (was 40). Slower ramp allows the transition model to stabilize before
-            // MB dominates, producing cleaner transition×reward interaction. Daw et al.
-            // (2011) analyzed 200-trial sessions where MB emerged late.
-            let progress = (ep as f64 / 60.0).min(1.0);
+            // Blend: ramp model-based weight gradually, saturating by episode 40.
+            // Slower ramp gives the agent more episodes to build accurate transition
+            // and reward models before going fully model-based.
+            let progress = (ep as f64 / 40.0).min(1.0);
             let mb_weight = 0.3 + 0.65 * progress;
             let blended_probs: Vec<f64> = (0..2)
                 .map(|a| (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a])
@@ -133,23 +127,7 @@ impl TwoStepBenchmark {
             let ticks = 5.0 + (1.0 - mb_diff.min(1.0)) * 8.0;
             rt_ticks.push(ticks);
 
-            // Lapse: on a lapse trial, randomly choose an action instead of using
-            // the blended model-based/FEP signal (Daw et al., 2011 — inattentive trials).
-            let stage1_action = if config.lapse_rate > 0.0 {
-                rng_state ^= rng_state << 13;
-                rng_state ^= rng_state >> 7;
-                rng_state ^= rng_state << 17;
-                if (rng_state % 1000) < (config.lapse_rate * 1000.0) as u64 {
-                    rng_state ^= rng_state << 13;
-                    rng_state ^= rng_state >> 7;
-                    rng_state ^= rng_state << 17;
-                    (rng_state % 2) as usize
-                } else {
-                    sample_action(&final_probs, &mut rng_state)
-                }
-            } else {
-                sample_action(&final_probs, &mut rng_state)
-            };
+            let stage1_action = sample_action(&final_probs, &mut rng_state);
 
             // Transition: 70% common, 30% rare
             rng_state ^= rng_state << 13;

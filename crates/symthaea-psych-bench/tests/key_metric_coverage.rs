@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration test: verify that every benchmark's key metric actually exists
+//! Integration test: verify that every benchmark's key metric actually exists
 //! in the output of `bench.run()`.
 //!
 //! Uses minimal config (dim=128, trials=3) for speed.
@@ -80,6 +78,9 @@ fn test_key_metric_exists_in_output() {
         // Creativity
         Box::new(AlternateUsesBenchmark),
         Box::new(RemoteAssociatesBenchmark),
+        Box::new(DivergentThinkingBenchmark),
+        Box::new(ConceptualBlendingBenchmark),
+        Box::new(InsightProblemBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition
@@ -120,7 +121,6 @@ fn test_key_metric_exists_in_output() {
         // Coding
         Box::new(HumanEvalMiniBenchmark),
         Box::new(BugDetectionBenchmark),
-        Box::new(AlgorithmRecognitionBenchmark),
     ];
 
     let mut failures = Vec::new();

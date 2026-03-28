@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Active Inference flight agent: precision/τ modulation at cognitive rate (25Hz).
 //!
 //! Wraps `symthaea_fep::ActiveInferenceAgent` with flight-specific precision
@@ -396,9 +393,6 @@ pub struct ActiveInferenceFlightAgent {
     current_fe: f64,
     /// Previous free energy.
     prev_fe: f64,
-    /// Optional consciousness context from Spore/Holon.
-    /// When set, modulates exploration gain and triggers emergency descent on Red.
-    consciousness_ctx: symthaea_core::ConsciousnessContext,
 }
 
 impl ActiveInferenceFlightAgent {
@@ -436,21 +430,7 @@ impl ActiveInferenceFlightAgent {
             consecutive_drop_tau: 0,
             current_fe: 0.0,
             prev_fe: 0.0,
-            consciousness_ctx: symthaea_core::ConsciousnessContext::DEFAULT,
         }
-    }
-
-    /// Update the consciousness context from Spore/Holon.
-    ///
-    /// When `is_emergency()`, the next `step()` will override setpoint to descend.
-    /// Exploration gain is modulated by phi and safety level.
-    pub fn set_consciousness_context(&mut self, ctx: symthaea_core::ConsciousnessContext) {
-        self.consciousness_ctx = ctx;
-    }
-
-    /// Current consciousness context.
-    pub fn consciousness_context(&self) -> &symthaea_core::ConsciousnessContext {
-        &self.consciousness_ctx
     }
 
     /// Build the 8D observation vector from flight state.
@@ -1119,25 +1099,6 @@ impl ActiveInferenceFlightAgent {
             }
         } else {
             self.high_fe_ticks = 0;
-        }
-
-        // ── Consciousness modulation ──────────────────────────────────────
-        // Scale exploration by consciousness context (phi, safety, harmony).
-        if let Some(ref mut noise) = result.exploration_noise {
-            let gain = self.consciousness_ctx.exploration_gain();
-            noise.thrust *= gain;
-            noise.roll_moment *= gain;
-            noise.pitch_moment *= gain;
-            noise.yaw_moment *= gain;
-            if gain == 0.0 {
-                result.exploration_noise = None;
-            }
-        }
-        // Emergency: override setpoint to descend to 0.3m altitude
-        if self.consciousness_ctx.is_emergency() {
-            result.setpoint_override = Some([state.position[0], state.position[1], 0.3]);
-            result.exploration_noise = None;
-            result.tau_factor = 0.7; // Fast response
         }
 
         // Update tracking state

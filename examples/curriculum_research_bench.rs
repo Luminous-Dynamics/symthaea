@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Curriculum Research Benchmark
+//! Curriculum Research Benchmark
 //!
 //! Measures the end-to-end pipeline: research → ingest → recall.
 

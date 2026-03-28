@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Sensor bridge: translates platform sensor data into neuromodulator nudges.
 //!
 //! The bridge receives raw sensor values from the platform layer (Android/iOS)

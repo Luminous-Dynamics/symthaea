@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Composite cognitive profile: aggregate 67 benchmarks into ~8 domain scores.
 //!
 //! Produces a "radar chart" data structure mapping cognitive domains to

@@ -3,7 +3,7 @@ name = "symthaea-hdc-store"
 version = "0.1.0"
 edition = "2021"
 description = "Zero-copy mmap'd BinaryHV storage with persistent LSH index"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }

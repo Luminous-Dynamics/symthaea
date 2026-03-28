@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Service Worker for Sovereign Inoculation progressive decentralization.
+// Service Worker for Sovereign Inoculation progressive decentralization.
 //
 // Strategy:
 // 1. Cache core WASM + HTML on first visit (offline capability)

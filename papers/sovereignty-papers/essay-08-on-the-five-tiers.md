@@ -38,7 +38,7 @@ But uniform power has its own failure mode, and honesty requires us to name it: 
 
 This is not an argument against democracy. It is an observation that democracy, as currently implemented, conflates the *right* to participate in governance with the *weight* of that participation. Every citizen should have the right to participate. Not every citizen should have the same governance weight on every question — because governance weight without corresponding consciousness of the governed domain produces the same feedback-loop severance that the 1602 architecture produces, just through a different mechanism.[^1]
 
-The five-tier system is designed to resolve this tension: full participation rights for everyone, graduated governance weight based on demonstrated consciousness of the governed domain.
+The five-tier system is designed to resolve this tension: full participation rights for everyone, graduated governance weight based on demonstrated domain-coupled credentialing — the four-dimensional assessment of presence, accountability, embeddedness, and engagement described in Essay No. 7.
 
 ---
 

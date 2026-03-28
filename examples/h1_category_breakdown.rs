@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! H1 Category Breakdown Analysis
+//! H1 Category Breakdown Analysis
 //!
 //! Analyzes which phenomenal/computational categories show the strongest
 //! topological differences to understand what drives the H1 effect.

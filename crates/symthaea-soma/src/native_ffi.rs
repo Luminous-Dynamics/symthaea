@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Native FFI: C-compatible interface for iOS (staticlib) and Android (JNI/cdylib).
 //!
 //! Exposes SomaEngine (mobile-embodied consciousness) through opaque pointer + extern "C" functions.
@@ -51,38 +48,19 @@ pub unsafe extern "C" fn soma_engine_new_with_config(
     Box::into_raw(Box::new(SomaEngine::new(config)))
 }
 
-/// Sentinel value written over freed engine pointers to detect double-free.
-/// Chosen to be unlikely to alias valid SomaEngine layout.
-const FREED_SENTINEL: u64 = 0xDEAD_50AA_DEAD_50AA;
-
 /// # Safety
 /// `engine` must be a valid pointer from `soma_engine_new*()`, or null (no-op).
 /// After calling this function, the pointer is invalid — do NOT use it again.
-/// A sentinel is written to detect double-free attempts.
+/// The first 8 bytes are overwritten with a sentinel to detect use-after-free.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_free(engine: *mut SomaEngine) {
-    if engine.is_null() {
-        return;
+    if !engine.is_null() {
+        drop(unsafe { Box::from_raw(engine) });
     }
-    // Read the first 8 bytes to check for sentinel (double-free detection).
-    let sentinel_ptr = engine as *const u64;
-    if unsafe { *sentinel_ptr } == FREED_SENTINEL {
-        // Already freed — silently ignore rather than UB.
-        return;
-    }
-    // Drop the engine.
-    drop(unsafe { Box::from_raw(engine) });
-    // Overwrite with sentinel so a second free() is detected.
-    // SAFETY: The memory was just deallocated by Box::from_raw + drop, but the
-    // allocator hasn't returned it yet in single-threaded FFI context. We write
-    // the sentinel to the (now-invalid) memory to detect double-free on next call.
-    // This is best-effort — not guaranteed to survive allocator reuse, but catches
-    // the common Kotlin/Swift pattern of calling free() in both onPause and onDestroy.
-    unsafe { std::ptr::write(engine as *mut u64, FREED_SENTINEL) };
 }
 
-/// Validate an engine pointer is not null and not freed.
-/// Returns the pointer as a mutable reference, or None if invalid.
+/// Validate an engine pointer is not null.
+/// Returns the pointer as a mutable reference, or null if invalid.
 ///
 /// # Safety
 /// `engine` must be a valid, non-null pointer from `soma_engine_new*()`.
@@ -90,27 +68,7 @@ unsafe fn validate_engine<'a>(engine: *mut SomaEngine) -> Option<&'a mut SomaEng
     if engine.is_null() {
         return None;
     }
-    // Check for freed sentinel (double-free / use-after-free detection).
-    let sentinel_ptr = engine as *const u64;
-    if unsafe { *sentinel_ptr } == FREED_SENTINEL {
-        return None;
-    }
     Some(unsafe { &mut *engine })
-}
-
-/// Validate an engine pointer for read-only access.
-///
-/// # Safety
-/// `engine` must be a valid, non-null pointer from `soma_engine_new*()`.
-unsafe fn validate_engine_ref<'a>(engine: *const SomaEngine) -> Option<&'a SomaEngine> {
-    if engine.is_null() {
-        return None;
-    }
-    let sentinel_ptr = engine as *const u64;
-    if unsafe { *sentinel_ptr } == FREED_SENTINEL {
-        return None;
-    }
-    Some(unsafe { &*engine })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -121,9 +79,7 @@ unsafe fn validate_engine_ref<'a>(engine: *const SomaEngine) -> Option<&'a SomaE
 /// `engine` must be valid. `input` may be null.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_cycle(engine: *mut SomaEngine, input: *const c_char) -> f32 {
-    let Some(engine) = (unsafe { validate_engine(engine) }) else {
-        return 0.0;
-    };
+    let engine = unsafe { &mut *engine };
     let text = if input.is_null() {
         ""
     } else {
@@ -139,9 +95,7 @@ pub unsafe extern "C" fn soma_engine_cycle_json(
     engine: *mut SomaEngine,
     input: *const c_char,
 ) -> *mut c_char {
-    let Some(engine) = (unsafe { validate_engine(engine) }) else {
-        return std::ptr::null_mut();
-    };
+    let engine = unsafe { &mut *engine };
     let text = if input.is_null() {
         ""
     } else {
@@ -161,37 +115,25 @@ pub unsafe extern "C" fn soma_engine_cycle_json(
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_consciousness_level(engine: *const SomaEngine) -> f32 {
-    let Some(engine) = (unsafe { validate_engine_ref(engine) }) else {
-        return 0.0;
-    };
-    engine.consciousness_level()
+    unsafe { &*engine }.consciousness_level()
 }
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_cycle_count(engine: *const SomaEngine) -> u64 {
-    let Some(engine) = (unsafe { validate_engine_ref(engine) }) else {
-        return 0;
-    };
-    engine.spore.current_cycle()
+    unsafe { &*engine }.spore.current_cycle()
 }
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_substrate_feasibility(engine: *const SomaEngine) -> f32 {
-    let Some(engine) = (unsafe { validate_engine_ref(engine) }) else {
-        return 0.0;
-    };
-    engine.spore.substrate_feasibility()
+    unsafe { &*engine }.spore.substrate_feasibility()
 }
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_harmony_alignment(engine: *const SomaEngine) -> f32 {
-    let Some(engine) = (unsafe { validate_engine_ref(engine) }) else {
-        return 0.0;
-    };
-    engine.spore.harmony_alignment()
+    unsafe { &*engine }.spore.harmony_alignment()
 }
 
 /// # Safety: `engine` must be valid.
@@ -199,20 +141,14 @@ pub unsafe extern "C" fn soma_engine_harmony_alignment(engine: *const SomaEngine
 pub unsafe extern "C" fn soma_engine_consciousness_report(
     engine: *const SomaEngine,
 ) -> *mut c_char {
-    let Some(engine) = (unsafe { validate_engine_ref(engine) }) else {
-        return std::ptr::null_mut();
-    };
-    let report = engine.consciousness_report();
+    let report = unsafe { &*engine }.consciousness_report();
     CString::new(report).map_or(std::ptr::null_mut(), |c| c.into_raw())
 }
 
 /// # Safety: `engine` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_neuromod_json(engine: *const SomaEngine) -> *mut c_char {
-    let Some(engine) = (unsafe { validate_engine_ref(engine) }) else {
-        return std::ptr::null_mut();
-    };
-    let json = engine.neuromod_json();
+    let json = unsafe { &*engine }.neuromod_json();
     CString::new(json).map_or(std::ptr::null_mut(), |c| c.into_raw())
 }
 
@@ -262,85 +198,6 @@ pub unsafe extern "C" fn soma_engine_dream_cycle(engine: *mut SomaEngine) -> u8 
 #[no_mangle]
 pub unsafe extern "C" fn soma_engine_dream_consolidate(engine: *mut SomaEngine) {
     unsafe { &mut *engine }.dream_consolidate();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Daily Rituals — Morning Alignment & Evening Reflection
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Generate a Morning Alignment ritual as JSON.
-///
-/// Returns a C string (caller must free with `soma_free_string`).
-/// # Safety: `engine` must be valid.
-#[no_mangle]
-pub unsafe extern "C" fn soma_engine_morning_ritual(
-    engine: *const SomaEngine,
-) -> *mut std::ffi::c_char {
-    let json = unsafe { &*engine }.morning_ritual_json();
-    std::ffi::CString::new(json)
-        .map(|c| c.into_raw())
-        .unwrap_or(std::ptr::null_mut())
-}
-
-/// Generate an Evening Reflection ritual as JSON.
-///
-/// Returns a C string (caller must free with `soma_free_string`).
-/// # Safety: `engine` must be valid.
-#[no_mangle]
-pub unsafe extern "C" fn soma_engine_evening_ritual(
-    engine: *const SomaEngine,
-) -> *mut std::ffi::c_char {
-    let json = unsafe { &*engine }.evening_ritual_json();
-    std::ffi::CString::new(json)
-        .map(|c| c.into_raw())
-        .unwrap_or(std::ptr::null_mut())
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Wellbeing Profiles
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Set the wellbeing profile by name (e.g., "adhd_support", "grief_mode").
-///
-/// Returns 1 if the profile was recognized, 0 otherwise.
-/// # Safety: `engine` must be valid, `name` must be a valid C string.
-#[no_mangle]
-pub unsafe extern "C" fn soma_engine_set_wellbeing_profile(
-    engine: *mut SomaEngine,
-    name: *const std::ffi::c_char,
-) -> u8 {
-    let name_str = unsafe { std::ffi::CStr::from_ptr(name) }
-        .to_str()
-        .unwrap_or("");
-    if unsafe { &mut *engine }.set_wellbeing_profile_by_name(name_str) {
-        1
-    } else {
-        0
-    }
-}
-
-/// Get the current wellbeing profile name as a C string.
-///
-/// # Safety: `engine` must be valid. Caller must free with `soma_free_string`.
-#[no_mangle]
-pub unsafe extern "C" fn soma_engine_wellbeing_profile_name(
-    engine: *const SomaEngine,
-) -> *mut std::ffi::c_char {
-    let name = unsafe { &*engine }.wellbeing_profile_name();
-    std::ffi::CString::new(name)
-        .map(|c| c.into_raw())
-        .unwrap_or(std::ptr::null_mut())
-}
-
-/// List all available wellbeing profiles as JSON.
-///
-/// # Safety: Caller must free with `soma_free_string`.
-#[no_mangle]
-pub unsafe extern "C" fn soma_engine_wellbeing_profiles_list() -> *mut std::ffi::c_char {
-    let json = symthaea_spore::SporeEngine::wellbeing_profiles_json();
-    std::ffi::CString::new(json)
-        .map(|c| c.into_raw())
-        .unwrap_or(std::ptr::null_mut())
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -847,29 +704,6 @@ mod tests {
         unsafe {
             soma_engine_free(std::ptr::null_mut());
             soma_string_free(std::ptr::null_mut());
-        }
-    }
-
-    #[test]
-    fn test_double_free_is_safe() {
-        let engine = soma_engine_new();
-        assert!(!engine.is_null());
-        unsafe {
-            soma_engine_free(engine);
-            // Second free should be silently ignored (sentinel detected).
-            soma_engine_free(engine);
-        }
-    }
-
-    #[test]
-    fn test_use_after_free_returns_defaults() {
-        let engine = soma_engine_new();
-        unsafe {
-            soma_engine_free(engine);
-            // All accessors should return safe defaults on freed pointer.
-            assert_eq!(soma_engine_consciousness_level(engine), 0.0);
-            assert_eq!(soma_engine_cycle_count(engine), 0);
-            assert_eq!(soma_engine_cycle(engine, std::ptr::null()), 0.0);
         }
     }
 }

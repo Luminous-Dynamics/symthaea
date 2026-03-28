@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Scientific Method Engine — Phase 4b of the math plan.
 //!
 //! Wires existing subsystems (HDC encoding, Bayesian statistics, propositional

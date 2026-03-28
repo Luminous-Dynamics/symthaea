@@ -686,14 +686,16 @@ impl EthicsEngine {
             harmonies_integrator,
             anomaly_config,
             None,
+            false,
         )
     }
 
-    /// Create with custom anomaly detection and optional pre-built dense `HarmonyBasis`.
+    /// Create with custom anomaly detection, optional pre-built dense `HarmonyBasis`,
+    /// and optional Hodge decomposition enablement.
     ///
-    /// When `dense_basis` is `Some`, it replaces the default n-gram-encoded basis,
-    /// ensuring harmony projection operates in the same semantic domain as the
-    /// dense encoder used for scenario embeddings.
+    /// When `enable_hodge` is true, sets `exact_betti` and `adaptive_rips_enabled`
+    /// in the MoralTopologyConfig, enabling vertex L₀ Hodge decomposition with
+    /// adaptive Rips threshold tracking.
     pub fn with_anomaly_config_and_basis(
         moral_parser: MoralParser,
         moral_algebra: MoralAlgebra,
@@ -701,6 +703,7 @@ impl EthicsEngine {
         harmonies_integrator: Option<HarmoniesIntegrator>,
         anomaly_config: MoralAnomalyConfig,
         dense_basis: Option<Arc<HarmonyBasis>>,
+        enable_hodge: bool,
     ) -> Self {
         let dim = moral_algebra.dim();
         let shared_basis = dense_basis.unwrap_or_else(|| Arc::new(HarmonyBasis::new(dim)));
@@ -708,6 +711,8 @@ impl EthicsEngine {
         let moral_topology = MoralTopology::with_anomaly_config(
             MoralTopologyConfig {
                 dim,
+                exact_betti: enable_hodge,
+                adaptive_rips_enabled: enable_hodge,
                 ..Default::default()
             },
             shared_basis.clone(),

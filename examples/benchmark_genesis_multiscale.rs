@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 14: Multi-Scale Physics
+//! Genesis Mission Challenge 14: Multi-Scale Physics
 //!
 //! Demonstrates:
 //! - Encode all 6 physical scales

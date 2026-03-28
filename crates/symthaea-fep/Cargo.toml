@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Free Energy Principle active inference — generative models, precision-weighted prediction errors, and motor control"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
 keywords = ["active-inference", "free-energy-principle", "neuroscience", "ai", "consciousness"]
@@ -13,3 +13,11 @@ categories = ["science", "algorithms"]
 
 [dependencies]
 serde = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "markov_blanket_bench"
+harness = false

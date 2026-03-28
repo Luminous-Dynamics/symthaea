@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Budding Dynamics Analyzer
+//! Budding Dynamics Analyzer
 //!
 //! Visualizes how the Cincinnati-LTC network grows (buds new nodes)
 //! in response to prediction errors over time.

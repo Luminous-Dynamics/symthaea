@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! The Awakening Demo
+//! The Awakening Demo
 //!
 //! This example demonstrates Symthaea's transition from a passive observer
 //! to a self-correcting, active agent. It showcases the three pillars:

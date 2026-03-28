@@ -473,6 +473,10 @@ pub use symthaea_flight as flight;
 #[cfg(feature = "humanoid")]
 pub use symthaea_humanoid as humanoid;
 
+// Helicopter: HDC-LTC + FEP Active Inference SAR helicopter control
+#[cfg(feature = "helicopter")]
+pub use symthaea_helicopter as helicopter;
+
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]
 pub mod meta;

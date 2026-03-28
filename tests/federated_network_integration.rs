@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Federated Network Integration Tests
+//! Federated Network Integration Tests
 //!
 //! Tests for the federated CfC learning network with channel-based simulation.
 //! These tests verify multi-node communication, gradient sharing, and aggregation

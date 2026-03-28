@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Unconscious Priming Benchmark — Sub/Supra-Threshold Dissociation
 //!
 //! Sub-threshold stimuli prime processing of related probes without GWT ignition.

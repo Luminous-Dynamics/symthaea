@@ -915,7 +915,489 @@ impl ProgramPatternLibrary {
             &["bubble", "sort", "swap"],
         );
 
+        // ── Extended patterns (Phase 2) ──
+        lib.extend_standard();
         lib
+    }
+
+    /// Add 30+ additional patterns covering common programming tasks.
+    fn extend_standard(&mut self) {
+        // Iterator adapters
+        self.add_with_meta(
+            "enumerate",
+            ProgramNode::map(
+                ProgramNode::atom("index_element_pair"),
+                ProgramNode::atom("collection"),
+            ),
+            "Enumerate elements with indices",
+            "(v: &[T]) -> Vec<(usize, &T)>",
+            "(v: list) -> list",
+            &["LIST"],
+            "LIST",
+            &["enumerate", "index", "indices", "numbered"],
+        );
+        self.add_with_meta(
+            "zip",
+            ProgramNode::map(
+                ProgramNode::atom("pair"),
+                ProgramNode::seq(vec![ProgramNode::atom("a"), ProgramNode::atom("b")]),
+            ),
+            "Zip two collections into pairs",
+            "(a: &[A], b: &[B]) -> Vec<(A, B)>",
+            "(a: list, b: list) -> list",
+            &["LIST", "LIST"],
+            "LIST",
+            &["zip", "pair", "combine", "merge"],
+        );
+        self.add_with_meta(
+            "take",
+            ProgramNode::filter(
+                ProgramNode::apply(
+                    ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("index"), ProgramNode::atom("n")],
+                ),
+                ProgramNode::atom("collection"),
+            ),
+            "Take first n elements",
+            "(v: &[T], n: usize) -> Vec<T>",
+            "(v: list, n: int) -> list",
+            &["LIST", "INT"],
+            "LIST",
+            &["take", "first", "head", "prefix", "limit"],
+        );
+        self.add_with_meta(
+            "skip",
+            ProgramNode::filter(
+                ProgramNode::apply(
+                    ProgramNode::op("GE"),
+                    vec![ProgramNode::atom("index"), ProgramNode::atom("n")],
+                ),
+                ProgramNode::atom("collection"),
+            ),
+            "Skip first n elements",
+            "(v: &[T], n: usize) -> Vec<T>",
+            "(v: list, n: int) -> list",
+            &["LIST", "INT"],
+            "LIST",
+            &["skip", "drop", "tail", "offset"],
+        );
+        self.add_with_meta(
+            "chunks",
+            ProgramNode::map(
+                ProgramNode::atom("slice_chunk"),
+                ProgramNode::atom("collection"),
+            ),
+            "Split into fixed-size chunks",
+            "(v: &[T], size: usize) -> Vec<&[T]>",
+            "(v: list, size: int) -> list",
+            &["LIST", "INT"],
+            "LIST",
+            &["chunk", "chunks", "batch", "partition", "window"],
+        );
+        self.add_with_meta(
+            "chain",
+            ProgramNode::reduce(
+                ProgramNode::atom("append"),
+                ProgramNode::atom("empty_list"),
+                ProgramNode::seq(vec![ProgramNode::atom("a"), ProgramNode::atom("b")]),
+            ),
+            "Chain two collections",
+            "(a: &[T], b: &[T]) -> Vec<T>",
+            "(a: list, b: list) -> list",
+            &["LIST", "LIST"],
+            "LIST",
+            &["chain", "concat", "concatenate", "append", "extend"],
+        );
+
+        // Error handling
+        self.add_with_meta(
+            "try_parse",
+            ProgramNode::branch(
+                ProgramNode::apply(
+                    ProgramNode::atom("parse_ok"),
+                    vec![ProgramNode::atom("input")],
+                ),
+                ProgramNode::apply(ProgramNode::atom("Ok"), vec![ProgramNode::atom("value")]),
+                ProgramNode::apply(ProgramNode::atom("Err"), vec![ProgramNode::atom("error")]),
+            ),
+            "Parse with Result error handling",
+            "(s: &str) -> Result<T, E>",
+            "(s: str) -> Result",
+            &["STRING"],
+            "RESULT",
+            &["parse", "try", "result", "convert", "from_str"],
+        );
+        self.add_with_meta(
+            "unwrap_or_default",
+            ProgramNode::branch(
+                ProgramNode::apply(ProgramNode::atom("is_some"), vec![ProgramNode::atom("opt")]),
+                ProgramNode::atom("inner"),
+                ProgramNode::atom("default"),
+            ),
+            "Unwrap Option with default",
+            "(opt: Option<T>, default: T) -> T",
+            "(opt, default) -> value",
+            &["OPTION"],
+            "VALUE",
+            &["unwrap", "default", "fallback", "option"],
+        );
+
+        // String processing
+        self.add_with_meta(
+            "split_string",
+            ProgramNode::apply(
+                ProgramNode::atom("split"),
+                vec![ProgramNode::atom("s"), ProgramNode::atom("delim")],
+            ),
+            "Split string by delimiter",
+            "(s: &str, delim: &str) -> Vec<&str>",
+            "(s: str, delim: str) -> list",
+            &["STRING", "STRING"],
+            "LIST",
+            &["split", "tokenize", "separate"],
+        );
+        self.add_with_meta(
+            "join_strings",
+            ProgramNode::reduce(
+                ProgramNode::atom("concat_sep"),
+                ProgramNode::atom("empty"),
+                ProgramNode::atom("parts"),
+            ),
+            "Join strings with separator",
+            "(parts: &[&str], sep: &str) -> String",
+            "(parts: list, sep: str) -> str",
+            &["LIST", "STRING"],
+            "STRING",
+            &["join", "concat", "combine", "separator"],
+        );
+        self.add_with_meta(
+            "trim_string",
+            ProgramNode::compose(ProgramNode::atom("trim"), ProgramNode::atom("identity")),
+            "Trim whitespace",
+            "(s: &str) -> &str",
+            "(s: str) -> str",
+            &["STRING"],
+            "STRING",
+            &["trim", "strip", "whitespace", "clean"],
+        );
+        self.add_with_meta(
+            "replace_string",
+            ProgramNode::apply(
+                ProgramNode::atom("replace"),
+                vec![
+                    ProgramNode::atom("s"),
+                    ProgramNode::atom("from"),
+                    ProgramNode::atom("to"),
+                ],
+            ),
+            "Replace in string",
+            "(s: &str, from: &str, to: &str) -> String",
+            "(s: str, old: str, new: str) -> str",
+            &["STRING", "STRING", "STRING"],
+            "STRING",
+            &["replace", "substitute", "swap"],
+        );
+        self.add_with_meta(
+            "contains_check",
+            ProgramNode::apply(
+                ProgramNode::atom("contains"),
+                vec![ProgramNode::atom("haystack"), ProgramNode::atom("needle")],
+            ),
+            "Check substring",
+            "(s: &str, pat: &str) -> bool",
+            "(s: str, pat: str) -> bool",
+            &["STRING", "STRING"],
+            "BOOL",
+            &["contains", "includes", "has", "substring"],
+        );
+
+        // HashMap operations
+        self.add_with_meta(
+            "frequency_count",
+            ProgramNode::reduce(
+                ProgramNode::atom("increment_count"),
+                ProgramNode::atom("empty_map"),
+                ProgramNode::atom("collection"),
+            ),
+            "Count frequency of elements",
+            "(v: &[T]) -> HashMap<T, usize>",
+            "(v: list) -> dict",
+            &["LIST"],
+            "MAP",
+            &["frequency", "count", "histogram", "occurrences", "tally"],
+        );
+        self.add_with_meta(
+            "group_by",
+            ProgramNode::reduce(
+                ProgramNode::atom("group_insert"),
+                ProgramNode::atom("empty_map"),
+                ProgramNode::atom("collection"),
+            ),
+            "Group elements by key",
+            "(v: &[T], key: impl Fn(&T) -> K) -> HashMap<K, Vec<T>>",
+            "(v: list, key: callable) -> dict",
+            &["LIST"],
+            "MAP",
+            &["group", "group_by", "categorize", "classify"],
+        );
+
+        // Numeric
+        self.add_with_meta(
+            "clamp",
+            ProgramNode::branch(
+                ProgramNode::apply(
+                    ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("x"), ProgramNode::atom("min")],
+                ),
+                ProgramNode::atom("min"),
+                ProgramNode::branch(
+                    ProgramNode::apply(
+                        ProgramNode::op("GT"),
+                        vec![ProgramNode::atom("x"), ProgramNode::atom("max")],
+                    ),
+                    ProgramNode::atom("max"),
+                    ProgramNode::atom("x"),
+                ),
+            ),
+            "Clamp between min and max",
+            "(x: T, min: T, max: T) -> T",
+            "(x, lo, hi) -> value",
+            &["INT", "INT", "INT"],
+            "INT",
+            &["clamp", "bound", "constrain", "limit"],
+        );
+        self.add_with_meta(
+            "power",
+            ProgramNode::iterate(
+                ProgramNode::seq(vec![
+                    ProgramNode::typed("1", "INT"),
+                    ProgramNode::atom("exp"),
+                ]),
+                ProgramNode::apply(
+                    ProgramNode::op("MUL"),
+                    vec![ProgramNode::atom("acc"), ProgramNode::atom("base")],
+                ),
+                ProgramNode::apply(
+                    ProgramNode::op("GT"),
+                    vec![ProgramNode::atom("exp"), ProgramNode::typed("0", "INT")],
+                ),
+            ),
+            "Compute base^exponent",
+            "(base: i64, exp: u32) -> i64",
+            "(base: int, exp: int) -> int",
+            &["INT", "INT"],
+            "INT",
+            &["power", "pow", "exponent", "raise"],
+        );
+        self.add_with_meta(
+            "average",
+            ProgramNode::apply(
+                ProgramNode::op("DIV"),
+                vec![
+                    ProgramNode::reduce(
+                        ProgramNode::op("ADD"),
+                        ProgramNode::typed("0", "FLOAT"),
+                        ProgramNode::atom("collection"),
+                    ),
+                    ProgramNode::apply(
+                        ProgramNode::op("LEN"),
+                        vec![ProgramNode::atom("collection")],
+                    ),
+                ],
+            ),
+            "Compute average",
+            "(v: &[f64]) -> f64",
+            "(v: list) -> float",
+            &["LIST"],
+            "FLOAT",
+            &["average", "mean", "avg"],
+        );
+        self.add_with_meta(
+            "median",
+            ProgramNode::seq(vec![
+                ProgramNode::apply(
+                    ProgramNode::op("SORT"),
+                    vec![ProgramNode::atom("collection")],
+                ),
+                ProgramNode::apply(
+                    ProgramNode::atom("middle"),
+                    vec![ProgramNode::atom("sorted")],
+                ),
+            ]),
+            "Find median",
+            "(v: &mut [f64]) -> f64",
+            "(v: list) -> float",
+            &["LIST"],
+            "FLOAT",
+            &["median", "middle", "midpoint"],
+        );
+
+        // Data transformation
+        self.add_with_meta(
+            "flatten",
+            ProgramNode::reduce(
+                ProgramNode::atom("append"),
+                ProgramNode::atom("empty_list"),
+                ProgramNode::atom("nested"),
+            ),
+            "Flatten nested collection",
+            "(v: &[Vec<T>]) -> Vec<T>",
+            "(v: list) -> list",
+            &["LIST"],
+            "LIST",
+            &["flatten", "flat", "unnest", "flat_map"],
+        );
+        self.add_with_meta(
+            "dedup",
+            ProgramNode::reduce(
+                ProgramNode::atom("add_if_new"),
+                ProgramNode::atom("empty_list"),
+                ProgramNode::atom("collection"),
+            ),
+            "Remove consecutive duplicates",
+            "(v: &mut Vec<T>)",
+            "(v: list) -> list",
+            &["LIST"],
+            "LIST",
+            &["dedup", "deduplicate", "unique", "distinct"],
+        );
+        self.add_with_meta(
+            "product",
+            ProgramNode::reduce(
+                ProgramNode::op("MUL"),
+                ProgramNode::typed("1", "INT"),
+                ProgramNode::atom("collection"),
+            ),
+            "Product of all elements",
+            "(v: &[i64]) -> i64",
+            "(v: list) -> int",
+            &["LIST"],
+            "INT",
+            &["product", "multiply", "mul", "prod"],
+        );
+        self.add_with_meta(
+            "any",
+            ProgramNode::reduce(
+                ProgramNode::op("OR"),
+                ProgramNode::typed("false", "BOOL"),
+                ProgramNode::map(
+                    ProgramNode::atom("predicate"),
+                    ProgramNode::atom("collection"),
+                ),
+            ),
+            "Any element matches predicate",
+            "(v: &[T], f: impl Fn(&T) -> bool) -> bool",
+            "(v: list, f: callable) -> bool",
+            &["LIST"],
+            "BOOL",
+            &["any", "some", "exists"],
+        );
+        self.add_with_meta(
+            "all",
+            ProgramNode::reduce(
+                ProgramNode::op("AND"),
+                ProgramNode::typed("true", "BOOL"),
+                ProgramNode::map(
+                    ProgramNode::atom("predicate"),
+                    ProgramNode::atom("collection"),
+                ),
+            ),
+            "All elements match predicate",
+            "(v: &[T], f: impl Fn(&T) -> bool) -> bool",
+            "(v: list, f: callable) -> bool",
+            &["LIST"],
+            "BOOL",
+            &["all", "every", "each"],
+        );
+        self.add_with_meta(
+            "find_first",
+            ProgramNode::compose(
+                ProgramNode::filter(
+                    ProgramNode::atom("predicate"),
+                    ProgramNode::atom("collection"),
+                ),
+                ProgramNode::atom("first"),
+            ),
+            "Find first matching element",
+            "(v: &[T], f: impl Fn(&T) -> bool) -> Option<&T>",
+            "(v: list, f: callable) -> value",
+            &["LIST"],
+            "OPTION",
+            &["find", "first", "search", "locate"],
+        );
+        self.add_with_meta(
+            "count_if",
+            ProgramNode::compose(
+                ProgramNode::filter(
+                    ProgramNode::atom("predicate"),
+                    ProgramNode::atom("collection"),
+                ),
+                ProgramNode::op("LEN"),
+            ),
+            "Count matching elements",
+            "(v: &[T], f: impl Fn(&T) -> bool) -> usize",
+            "(v: list, f: callable) -> int",
+            &["LIST"],
+            "INT",
+            &["count", "count_if", "tally"],
+        );
+
+        // I/O patterns
+        self.add_with_meta(
+            "read_file",
+            ProgramNode::apply(
+                ProgramNode::atom("read_to_string"),
+                vec![ProgramNode::atom("path")],
+            ),
+            "Read file to string",
+            "(path: &str) -> Result<String, std::io::Error>",
+            "(path: str) -> str",
+            &["STRING"],
+            "RESULT",
+            &["read", "file", "load", "open", "input"],
+        );
+        self.add_with_meta(
+            "write_file",
+            ProgramNode::apply(
+                ProgramNode::atom("write_all"),
+                vec![ProgramNode::atom("path"), ProgramNode::atom("contents")],
+            ),
+            "Write string to file",
+            "(path: &str, contents: &str) -> Result<(), std::io::Error>",
+            "(path: str, contents: str) -> None",
+            &["STRING", "STRING"],
+            "RESULT",
+            &["write", "save", "output", "store"],
+        );
+    }
+
+    /// Find two complementary patterns for compositional tasks.
+    pub fn compose_similar(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Option<(&PatternEntry, &PatternEntry, f32)> {
+        let top = self.find_top_k(query, 5);
+        if top.len() < 2 {
+            return None;
+        }
+        let mut best: Option<(usize, usize, f32)> = None;
+        for i in 0..top.len() {
+            for j in (i + 1)..top.len() {
+                let combined = (top[i].1 + top[j].1) / 2.0;
+                if combined < threshold {
+                    continue;
+                }
+                let inter_sim = top[i].0.encoding.similarity(&top[j].0.encoding);
+                if inter_sim > 0.7 {
+                    continue;
+                }
+                if best.is_none_or(|(_, _, s)| combined > s) {
+                    best = Some((i, j, combined));
+                }
+            }
+        }
+        best.map(|(i, j, s)| (top[i].0, top[j].0, s))
     }
 
     /// Add a named pattern to the library (simple form — metadata defaults).
@@ -1252,5 +1734,69 @@ mod tests {
             ones > 1000 && ones < 15000,
             "Branch encoding should be non-degenerate: {ones} ones"
         );
+    }
+
+    #[test]
+    fn test_extended_library_has_more_patterns() {
+        let lib = ProgramPatternLibrary::standard();
+        assert!(lib.patterns.len() >= 40, "Got {}", lib.patterns.len());
+    }
+
+    #[test]
+    fn test_extended_patterns_have_metadata() {
+        let lib = ProgramPatternLibrary::standard();
+        for entry in &lib.patterns {
+            assert!(
+                !entry.keywords.is_empty(),
+                "Pattern '{}' has no keywords",
+                entry.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_frequency_count_matches_histogram_query() {
+        let lib = ProgramPatternLibrary::standard();
+        let query = encode_task_description("count frequency histogram of elements");
+        assert!(lib.find_similar(&query, 0.50).is_some());
+    }
+
+    #[test]
+    fn test_average_matches_mean_query() {
+        let lib = ProgramPatternLibrary::standard();
+        let query = encode_task_description("compute the average mean of numbers");
+        assert!(lib.find_similar(&query, 0.50).is_some());
+    }
+
+    #[test]
+    fn test_read_file_matches_load_query() {
+        let lib = ProgramPatternLibrary::standard();
+        let query = encode_task_description("read load file contents");
+        assert!(lib.find_similar(&query, 0.50).is_some());
+    }
+
+    #[test]
+    fn test_compose_similar_finds_pair() {
+        let lib = ProgramPatternLibrary::standard();
+        let query = encode_task_description("read file count word frequency");
+        let result = lib.compose_similar(&query, 0.45);
+        assert!(result.is_some());
+        if let Some((first, second, score)) = result {
+            assert!(score >= 0.45);
+            assert_ne!(first.name, second.name);
+        }
+    }
+
+    #[test]
+    fn test_extended_encodings_non_degenerate() {
+        let lib = ProgramPatternLibrary::standard();
+        for entry in &lib.patterns {
+            let ones = entry.encoding.popcount();
+            assert!(
+                ones > 1000 && ones < 15000,
+                "Pattern '{}': {ones} ones",
+                entry.name
+            );
+        }
     }
 }

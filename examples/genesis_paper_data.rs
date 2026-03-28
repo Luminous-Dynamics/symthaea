@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Paper Data Generator
+//! Genesis Paper Data Generator
 //!
 //! Runs real simulations and outputs CSV data for the stewardship paper figures.
 //! Three outputs: heterozygosity decay, attachment trajectories, CfC vs simulation.

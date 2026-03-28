@@ -346,23 +346,6 @@ class ConsciousnessViewModel : ViewModel() {
         }
     }
 
-    /** Generate morning ritual JSON (blocking on engine dispatcher). */
-    suspend fun morningRitualJson(): String? = withContext(dispatcher) {
-        engine?.morningRitualJson()
-    }
-
-    /** Generate evening ritual JSON (blocking on engine dispatcher). */
-    suspend fun eveningRitualJson(): String? = withContext(dispatcher) {
-        engine?.eveningRitualJson()
-    }
-
-    /** Set wellbeing profile by name. */
-    fun setWellbeingProfile(name: String) {
-        viewModelScope.launch(dispatcher) {
-            engine?.setWellbeingProfile(name)
-        }
-    }
-
     /** Send user message and get Broca response. Tries Ollama first, falls back to BrocaLite. */
     fun converse(userText: String) {
         // Show user message immediately + mark thinking

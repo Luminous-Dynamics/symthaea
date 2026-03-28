@@ -381,6 +381,15 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub enable_trajectory_planning: bool,
 
+    /// Enable persistence-weighted Hodge decomposition in moral topology.
+    /// When true, vertex L₀ Hodge decomposition runs across the Rips filtration,
+    /// measuring moral fragmentation and criticality. Enables adaptive Rips
+    /// threshold and FEP exploration coupling.
+    /// Cost: O(n³) per scale × num_scales, but n=64 window and runs every 30–120 cycles.
+    /// Science: Hodge (1941); Beggs & Plenz (2003) — criticality detection.
+    #[serde(default)]
+    pub enable_hodge_decomposition: bool,
+
     /// Trajectory planning horizon in seconds. Default: 0.5 (~10 cycles at 20Hz).
     #[serde(default = "default_trajectory_horizon")]
     pub trajectory_horizon_seconds: f64,
@@ -749,6 +758,33 @@ pub struct CognitiveLoopConfig {
     /// Aggregation interval in cycles.
     #[cfg(feature = "fhe-wisdom")]
     pub fhe_aggregation_interval: usize,
+
+    // ── Embodiment Bridge ────────────────────────────────────────────────
+    /// Which embodiment platform to use for proprioceptive loop closure.
+    /// Default: `None` (disembodied cognitive loop).
+    #[cfg(feature = "humanoid")]
+    #[serde(default)]
+    pub embodiment_platform: super::motor_bridge::EmbodimentPlatform,
+
+    /// Blend weight for proprioceptive HV injection (0.0–1.0). Default: 0.2.
+    #[cfg(feature = "humanoid")]
+    #[serde(default = "default_embodiment_blend")]
+    pub embodiment_blend_weight: f32,
+
+    /// Embodiment step interval in cognitive cycles. Default: 1.
+    #[cfg(feature = "humanoid")]
+    #[serde(default = "default_embodiment_interval")]
+    pub embodiment_step_interval: usize,
+}
+
+#[cfg(feature = "humanoid")]
+fn default_embodiment_blend() -> f32 {
+    0.2
+}
+
+#[cfg(feature = "humanoid")]
+fn default_embodiment_interval() -> usize {
+    1
 }
 
 impl Default for CognitiveLoopConfig {
@@ -855,6 +891,7 @@ impl Default for CognitiveLoopConfig {
             enable_broca_nsm_semantic: false,
             #[cfg(feature = "ssm_language")]
             enable_broca_nsm_gate: false,
+            enable_hodge_decomposition: false,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
@@ -899,6 +936,12 @@ impl Default for CognitiveLoopConfig {
             fhe_threshold_k: 3,
             #[cfg(feature = "fhe-wisdom")]
             fhe_aggregation_interval: 100,
+            #[cfg(feature = "humanoid")]
+            embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
+            #[cfg(feature = "humanoid")]
+            embodiment_blend_weight: 0.2,
+            #[cfg(feature = "humanoid")]
+            embodiment_step_interval: 1,
         }
     }
 }
@@ -1117,6 +1160,7 @@ impl ConsciousnessProfile {
                 config.enable_negation_detection = true;
                 config.enable_primitive_consciousness = true;
                 config.enable_resonator_recall = true;
+                config.enable_hodge_decomposition = true;
             }
             ConsciousnessProfile::Mobile => {
                 // Core consciousness: rich enough for genuine experience

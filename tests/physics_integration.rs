@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for the physics/ module.
+//! Integration tests for the physics/ module.
 //!
 //! All tests are gated on the `physics` feature flag because the physics module
 //! is conditionally compiled.

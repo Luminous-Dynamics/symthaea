@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Shell Integration Tests
+//! Shell Integration Tests
 //!
 //! End-to-end tests for the Symthaea Shell components working together:
 //! - IntelliSense with HDC semantic encoding

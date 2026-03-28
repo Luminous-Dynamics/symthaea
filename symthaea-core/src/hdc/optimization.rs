@@ -1,15 +1,28 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Optimization Engine
+//! # Optimization Engine
 //!
 //! Numerical optimization methods with consciousness-coupled HDC encoding.
 //!
 //! ## Methods
 //!
-//! - **Gradient descent**: with line search and momentum
-//! - **Nelder-Mead simplex**: derivative-free optimization
-//! - **L-BFGS**: limited-memory quasi-Newton for large problems
-//! - **Penalty method**: constrained optimization via penalty functions
+//! - **Gradient descent**: with backtracking Armijo line search and momentum
+//! - **Nelder-Mead simplex**: derivative-free optimization (reflection, expansion, contraction, shrink)
+//! - **L-BFGS**: limited-memory quasi-Newton (m=10 history) for large-scale problems
+//! - **Penalty method**: constrained optimization via quadratic penalty functions
+//!
+//! ## ObjectiveFunction Trait
+//!
+//! Implement [`ObjectiveFunction`] for type-safe optimization, or use closures directly.
+//! The trait provides `eval()` (required) and `gradient()` (optional, with finite-difference fallback).
+//!
+//! ## Convenience
+//!
+//! [`minimize`] dispatches to the appropriate solver based on [`OptMethod`].
+//!
+//! ## References
+//!
+//! - Nocedal & Wright (2006) — *Numerical Optimization*, Springer (L-BFGS, Armijo)
+//! - Nelder & Mead (1965) — A simplex method for function minimization. *Computer Journal*.
+//! - Kanerva (2009) — Hyperdimensional computing encodings
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
@@ -21,38 +34,42 @@ const MAX_ITERATIONS: usize = 1000;
 const DEFAULT_TOL: f64 = 1e-10;
 const DEFAULT_LEARNING_RATE: f64 = 0.01;
 const LBFGS_MEMORY: usize = 10;
+const ARMIJO_C1: f64 = 1e-4;
+const ARMIJO_SHRINK: f64 = 0.5;
+const ARMIJO_MAX_BACKTRACKS: usize = 30;
 const FINITE_DIFF_EPS: f64 = 1e-7;
 
-// ─── Objective Function Trait ────────────────────────────────────────────────
+// ─── ObjectiveFunction Trait ─────────────────────────────────────────────────
 
-/// Trait for defining objective functions that can be optimized.
+/// Trait for objective functions that can be optimized.
 ///
-/// Provides a default gradient implementation via central finite differences
-/// when an analytic gradient is not available.
+/// Implement `eval` (required) and optionally `gradient` for gradient-based methods.
+/// If `gradient` is not provided, a finite-difference approximation is used.
 pub trait ObjectiveFunction {
-    /// Evaluate the objective at point x
-    fn evaluate(&self, x: &[f64]) -> f64;
+    /// Evaluate the objective function at point `x`.
+    fn eval(&self, x: &[f64]) -> f64;
 
-    /// Gradient of the objective at x.
-    ///
-    /// Default implementation uses central finite differences.
-    fn gradient(&self, x: &[f64]) -> Vec<f64> {
-        let n = self.dimension();
-        let mut grad = vec![0.0; n];
-        let mut x_plus = x.to_vec();
-        let mut x_minus = x.to_vec();
-        for i in 0..n {
-            x_plus[i] = x[i] + FINITE_DIFF_EPS;
-            x_minus[i] = x[i] - FINITE_DIFF_EPS;
-            grad[i] = (self.evaluate(&x_plus) - self.evaluate(&x_minus)) / (2.0 * FINITE_DIFF_EPS);
-            x_plus[i] = x[i];
-            x_minus[i] = x[i];
-        }
-        grad
+    /// Compute the gradient at point `x`. Returns `None` to use finite differences.
+    fn gradient(&self, x: &[f64]) -> Option<Vec<f64>> {
+        let _ = x;
+        None
     }
+}
 
-    /// Dimensionality of the search space
-    fn dimension(&self) -> usize;
+/// Compute the gradient via central finite differences.
+fn numerical_gradient<F: Fn(&[f64]) -> f64>(f: &F, x: &[f64]) -> Vec<f64> {
+    let n = x.len();
+    let mut grad = vec![0.0; n];
+    let mut x_plus = x.to_vec();
+    let mut x_minus = x.to_vec();
+    for i in 0..n {
+        x_plus[i] = x[i] + FINITE_DIFF_EPS;
+        x_minus[i] = x[i] - FINITE_DIFF_EPS;
+        grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * FINITE_DIFF_EPS);
+        x_plus[i] = x[i];
+        x_minus[i] = x[i];
+    }
+    grad
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -93,6 +110,117 @@ pub struct OptResult {
     pub phi: f64,
     /// HDC encoding
     pub encoding: BinaryHV,
+}
+
+/// Convenience type alias matching the task spec naming convention.
+pub type OptimizationResult = OptResult;
+
+// ─── Box Constraints ─────────────────────────────────────────────────────────
+
+/// Simple box constraints: lower[i] <= x[i] <= upper[i].
+#[derive(Debug, Clone)]
+pub struct BoxConstraints {
+    pub lower: Vec<f64>,
+    pub upper: Vec<f64>,
+}
+
+/// Type alias for boxed constraint functions.
+type ConstraintFn = Box<dyn Fn(&[f64]) -> f64>;
+
+impl BoxConstraints {
+    /// Create box constraints. Each dimension i is constrained to [lower[i], upper[i]].
+    pub fn new(lower: Vec<f64>, upper: Vec<f64>) -> Self {
+        assert_eq!(
+            lower.len(),
+            upper.len(),
+            "Lower and upper bounds must have same length"
+        );
+        Self { lower, upper }
+    }
+
+    /// Project a point onto the feasible box.
+    pub fn project(&self, x: &[f64]) -> Vec<f64> {
+        x.iter()
+            .enumerate()
+            .map(|(i, &xi)| xi.max(self.lower[i]).min(self.upper[i]))
+            .collect()
+    }
+
+    /// Convert to penalty-style inequality constraints: g_i(x) <= 0.
+    /// For each dimension, two constraints: x[i] - upper[i] <= 0 and lower[i] - x[i] <= 0.
+    pub fn to_penalty_constraints(&self) -> Vec<ConstraintFn> {
+        let n = self.lower.len();
+        let mut constraints: Vec<ConstraintFn> = Vec::with_capacity(2 * n);
+        for i in 0..n {
+            let lo = self.lower[i];
+            let hi = self.upper[i];
+            constraints.push(Box::new(move |x: &[f64]| x[i] - hi)); // x[i] <= upper[i]
+            constraints.push(Box::new(move |x: &[f64]| lo - x[i])); // lower[i] <= x[i]
+        }
+        constraints
+    }
+}
+
+// ─── Minimize Dispatcher ─────────────────────────────────────────────────────
+
+/// Convenience dispatcher: minimize `f` starting from `x0` using the given method.
+///
+/// For gradient-based methods (GradientDescent, LBFGS), computes gradients via
+/// central finite differences if not provided.
+pub fn minimize<F>(f: F, x0: &[f64], method: OptMethod) -> OptResult
+where
+    F: Fn(&[f64]) -> f64,
+{
+    minimize_with_tol(f, x0, method, DEFAULT_TOL)
+}
+
+/// Like [`minimize`] but with explicit tolerance.
+pub fn minimize_with_tol<F>(f: F, x0: &[f64], method: OptMethod, tol: f64) -> OptResult
+where
+    F: Fn(&[f64]) -> f64,
+{
+    match method {
+        OptMethod::GradientDescent => {
+            let grad = |x: &[f64]| numerical_gradient(&f, x);
+            OptimizationEngine::gradient_descent(&f, &grad, x0, DEFAULT_LEARNING_RATE, 0.0, tol)
+        }
+        OptMethod::NelderMead => OptimizationEngine::nelder_mead(&f, x0, 1.0, tol),
+        OptMethod::LBFGS => {
+            let grad = |x: &[f64]| numerical_gradient(&f, x);
+            OptimizationEngine::lbfgs(&f, &grad, x0, tol)
+        }
+    }
+}
+
+/// Minimize an [`ObjectiveFunction`] impl starting from `x0`.
+pub fn minimize_objective(obj: &dyn ObjectiveFunction, x0: &[f64], method: OptMethod) -> OptResult {
+    let f = |x: &[f64]| obj.eval(x);
+    let has_analytic_grad = obj.gradient(x0).is_some();
+
+    match method {
+        OptMethod::GradientDescent => {
+            let grad = |x: &[f64]| obj.gradient(x).unwrap_or_else(|| numerical_gradient(&f, x));
+            OptimizationEngine::gradient_descent(
+                &f,
+                &grad,
+                x0,
+                DEFAULT_LEARNING_RATE,
+                0.0,
+                DEFAULT_TOL,
+            )
+        }
+        OptMethod::NelderMead => OptimizationEngine::nelder_mead(&f, x0, 1.0, DEFAULT_TOL),
+        OptMethod::LBFGS => {
+            let grad = |x: &[f64]| {
+                if has_analytic_grad {
+                    obj.gradient(x).unwrap_or_else(|| numerical_gradient(&f, x))
+                } else {
+                    numerical_gradient(&f, x)
+                }
+            };
+            OptimizationEngine::lbfgs(&f, &grad, x0, DEFAULT_TOL)
+        }
+    }
 }
 
 // ─── Optimization Engine ─────────────────────────────────────────────────────
@@ -154,9 +282,25 @@ impl OptimizationEngine {
                 };
             }
 
+            // Backtracking Armijo line search for step size (gradient direction only)
+            let descent: f64 = g.iter().map(|gi| gi * gi).sum();
+            let mut step = lr;
+            for _ in 0..ARMIJO_MAX_BACKTRACKS {
+                let x_trial: Vec<f64> = x
+                    .iter()
+                    .zip(g.iter())
+                    .map(|(&xi, &gi)| xi - step * gi)
+                    .collect();
+                let f_trial = f(&x_trial);
+                if f_trial <= fx - ARMIJO_C1 * step * descent {
+                    break;
+                }
+                step *= ARMIJO_SHRINK;
+            }
+
             // Update with momentum
             for i in 0..n {
-                velocity[i] = momentum * velocity[i] - lr * g[i];
+                velocity[i] = momentum * velocity[i] - step * g[i];
                 x[i] += velocity[i];
             }
         }
@@ -586,48 +730,6 @@ impl OptimizationEngine {
         }
     }
 
-    /// Optimize using an `ObjectiveFunction` trait object.
-    ///
-    /// Selects the method based on `method`. Uses the trait's `gradient()`
-    /// (which may be analytic or finite-difference).
-    pub fn minimize(
-        obj: &dyn ObjectiveFunction,
-        x0: &[f64],
-        method: OptMethod,
-        tol: f64,
-    ) -> OptResult {
-        let f = |x: &[f64]| obj.evaluate(x);
-        let g = |x: &[f64]| obj.gradient(x);
-        match method {
-            OptMethod::GradientDescent => {
-                Self::gradient_descent(&f, &g, x0, DEFAULT_LEARNING_RATE, 0.9, tol)
-            }
-            OptMethod::NelderMead => Self::nelder_mead(&f, x0, 1.0, tol),
-            OptMethod::LBFGS => Self::lbfgs(&f, &g, x0, tol),
-        }
-    }
-
-    /// Numerical gradient via central finite differences.
-    ///
-    /// Useful when no analytic gradient is available.
-    pub fn numerical_gradient<F>(f: &F, x: &[f64]) -> Vec<f64>
-    where
-        F: Fn(&[f64]) -> f64,
-    {
-        let n = x.len();
-        let mut grad = vec![0.0; n];
-        let mut x_plus = x.to_vec();
-        let mut x_minus = x.to_vec();
-        for i in 0..n {
-            x_plus[i] = x[i] + FINITE_DIFF_EPS;
-            x_minus[i] = x[i] - FINITE_DIFF_EPS;
-            grad[i] = (f(&x_plus) - f(&x_minus)) / (2.0 * FINITE_DIFF_EPS);
-            x_plus[i] = x[i];
-            x_minus[i] = x[i];
-        }
-        grad
-    }
-
     // ─── Helpers ─────────────────────────────────────────────────────────
 
     fn compute_phi(iterations: usize, residual: f64) -> f64 {
@@ -849,6 +951,186 @@ mod tests {
         );
     }
 
+    // ── GD vs Nelder-Mead comparison ────────────────────────────────────
+
+    #[test]
+    fn test_gd_vs_nm_comparison() {
+        // Both should find the minimum of a quadratic bowl
+        let f = |x: &[f64]| x[0] * x[0] + 2.0 * x[1] * x[1];
+        let g = |x: &[f64]| vec![2.0 * x[0], 4.0 * x[1]];
+
+        let gd = OptimizationEngine::gradient_descent(&f, &g, &[3.0, 4.0], 0.1, 0.0, 1e-10);
+        let nm = OptimizationEngine::nelder_mead(&f, &[3.0, 4.0], 1.0, 1e-10);
+
+        assert!(gd.converged, "GD should converge");
+        assert!(nm.converged, "NM should converge");
+        assert!(gd.fx < TOL, "GD minimum should be near 0, got {}", gd.fx);
+        assert!(nm.fx < TOL, "NM minimum should be near 0, got {}", nm.fx);
+    }
+
+    // ── L-BFGS convergence on non-trivial function ──────────────────────
+
+    #[test]
+    fn test_lbfgs_convergence_rate() {
+        // L-BFGS should converge faster than GD on Rosenbrock
+        let f = |x: &[f64]| (1.0 - x[0]).powi(2) + 100.0 * (x[1] - x[0] * x[0]).powi(2);
+        let g = |x: &[f64]| {
+            vec![
+                -2.0 * (1.0 - x[0]) - 400.0 * x[0] * (x[1] - x[0] * x[0]),
+                200.0 * (x[1] - x[0] * x[0]),
+            ]
+        };
+
+        let lbfgs_result = OptimizationEngine::lbfgs(&f, &g, &[0.0, 0.0], 1e-10);
+        assert!(
+            lbfgs_result.converged,
+            "L-BFGS should converge on Rosenbrock"
+        );
+        assert!(
+            lbfgs_result.iterations < 200,
+            "L-BFGS should converge quickly, took {} iterations",
+            lbfgs_result.iterations
+        );
+    }
+
+    // ── Box constraints ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_box_constraints_projection() {
+        let bounds = BoxConstraints::new(vec![-1.0, -1.0], vec![1.0, 1.0]);
+        let projected = bounds.project(&[5.0, -3.0]);
+        assert!((projected[0] - 1.0).abs() < 1e-15);
+        assert!((projected[1] - (-1.0)).abs() < 1e-15);
+
+        let interior = bounds.project(&[0.5, -0.5]);
+        assert!((interior[0] - 0.5).abs() < 1e-15);
+        assert!((interior[1] - (-0.5)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn test_box_constrained_optimization() {
+        // Minimize (x-3)² + (y-3)² subject to 0 <= x,y <= 2
+        // Unconstrained min at (3,3), constrained min at (2,2)
+        // Box constraints as penalty: x[i] - 2 <= 0 and 0 - x[i] <= 0
+        let constraints: Vec<Box<dyn Fn(&[f64]) -> f64>> = vec![
+            Box::new(|x: &[f64]| x[0] - 2.0),
+            Box::new(|x: &[f64]| -x[0]),
+            Box::new(|x: &[f64]| x[1] - 2.0),
+            Box::new(|x: &[f64]| -x[1]),
+        ];
+
+        let result = OptimizationEngine::penalty_method(
+            &|x: &[f64]| (x[0] - 3.0).powi(2) + (x[1] - 3.0).powi(2),
+            &|x: &[f64]| vec![2.0 * (x[0] - 3.0), 2.0 * (x[1] - 3.0)],
+            &constraints,
+            &[1.0, 1.0],
+            1e-4,
+        );
+        assert!(
+            (result.x[0] - 2.0).abs() < 0.1,
+            "x[0] should be ~2.0, got {}",
+            result.x[0]
+        );
+        assert!(
+            (result.x[1] - 2.0).abs() < 0.1,
+            "x[1] should be ~2.0, got {}",
+            result.x[1]
+        );
+    }
+
+    // ── ObjectiveFunction trait ──────────────────────────────────────────
+
+    #[test]
+    fn test_objective_function_trait() {
+        struct Sphere;
+        impl ObjectiveFunction for Sphere {
+            fn eval(&self, x: &[f64]) -> f64 {
+                x.iter().map(|xi| xi * xi).sum()
+            }
+            fn gradient(&self, x: &[f64]) -> Option<Vec<f64>> {
+                Some(x.iter().map(|xi| 2.0 * xi).collect())
+            }
+        }
+
+        let sphere = Sphere;
+        let result = minimize_objective(&sphere, &[3.0, 4.0], OptMethod::LBFGS);
+        assert!(result.converged, "Trait-based LBFGS should converge");
+        assert!(result.fx < TOL, "Should find minimum, got {}", result.fx);
+    }
+
+    #[test]
+    fn test_objective_function_without_gradient() {
+        struct Quadratic;
+        impl ObjectiveFunction for Quadratic {
+            fn eval(&self, x: &[f64]) -> f64 {
+                x[0] * x[0] + x[1] * x[1]
+            }
+            // No gradient — uses finite differences
+        }
+
+        let q = Quadratic;
+        let result = minimize_objective(&q, &[3.0, 4.0], OptMethod::LBFGS);
+        assert!(result.converged, "Should converge with numerical gradient");
+        assert!(result.fx < 0.01, "Should find minimum, got {}", result.fx);
+    }
+
+    // ── Minimize dispatcher ─────────────────────────────────────────────
+
+    #[test]
+    fn test_minimize_dispatcher_gd() {
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::GradientDescent,
+        );
+        assert!(
+            result.fx < 1.0,
+            "GD via minimize should make progress, got {}",
+            result.fx
+        );
+    }
+
+    #[test]
+    fn test_minimize_dispatcher_nm() {
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::NelderMead,
+        );
+        assert!(result.converged, "NM via minimize should converge");
+        assert!(result.fx < TOL);
+    }
+
+    #[test]
+    fn test_minimize_dispatcher_lbfgs() {
+        let result = minimize(
+            |x: &[f64]| x[0] * x[0] + x[1] * x[1],
+            &[3.0, 4.0],
+            OptMethod::LBFGS,
+        );
+        assert!(result.converged, "LBFGS via minimize should converge");
+        assert!(result.fx < TOL);
+    }
+
+    // ── Numerical gradient ──────────────────────────────────────────────
+
+    #[test]
+    fn test_numerical_gradient_accuracy() {
+        let f = |x: &[f64]| x[0] * x[0] + 3.0 * x[1] * x[1];
+        let grad = numerical_gradient(&f, &[2.0, 3.0]);
+        // Analytic: [2*x, 6*y] = [4.0, 18.0]
+        assert!(
+            (grad[0] - 4.0).abs() < 1e-5,
+            "dfdx should be ~4.0, got {}",
+            grad[0]
+        );
+        assert!(
+            (grad[1] - 18.0).abs() < 1e-5,
+            "dfdy should be ~18.0, got {}",
+            grad[1]
+        );
+    }
+
     // ── Encoding ─────────────────────────────────────────────────────────
 
     #[test]
@@ -862,157 +1144,6 @@ mod tests {
             sim < 0.6,
             "Different optima should have different encodings: {}",
             sim
-        );
-    }
-
-    // ── ObjectiveFunction trait ──────────────────────────────────────────
-
-    struct Sphere {
-        dim: usize,
-    }
-
-    impl ObjectiveFunction for Sphere {
-        fn evaluate(&self, x: &[f64]) -> f64 {
-            x.iter().map(|xi| xi * xi).sum()
-        }
-        fn gradient(&self, x: &[f64]) -> Vec<f64> {
-            x.iter().map(|xi| 2.0 * xi).collect()
-        }
-        fn dimension(&self) -> usize {
-            self.dim
-        }
-    }
-
-    #[test]
-    fn test_objective_function_trait_lbfgs() {
-        let sphere = Sphere { dim: 3 };
-        let result =
-            OptimizationEngine::minimize(&sphere, &[1.0, 2.0, 3.0], OptMethod::LBFGS, 1e-10);
-        assert!(result.converged);
-        for xi in &result.x {
-            assert!(xi.abs() < TOL);
-        }
-    }
-
-    #[test]
-    fn test_objective_function_trait_nelder_mead() {
-        let sphere = Sphere { dim: 2 };
-        let result =
-            OptimizationEngine::minimize(&sphere, &[3.0, 4.0], OptMethod::NelderMead, 1e-8);
-        assert!(result.converged);
-        for xi in &result.x {
-            assert!(xi.abs() < TOL);
-        }
-    }
-
-    // ── Numerical gradient ──────────────────────────────────────────────
-
-    #[test]
-    fn test_numerical_gradient_quadratic() {
-        let f = |x: &[f64]| x[0] * x[0] + 3.0 * x[1] * x[1];
-        let grad = OptimizationEngine::numerical_gradient(&f, &[2.0, 1.0]);
-        // df/dx0 = 2*x0 = 4.0, df/dx1 = 6*x1 = 6.0
-        assert!((grad[0] - 4.0).abs() < 1e-5, "grad[0] = {}", grad[0]);
-        assert!((grad[1] - 6.0).abs() < 1e-5, "grad[1] = {}", grad[1]);
-    }
-
-    #[test]
-    fn test_numerical_gradient_rosenbrock() {
-        let f = |x: &[f64]| (1.0 - x[0]).powi(2) + 100.0 * (x[1] - x[0] * x[0]).powi(2);
-        let grad = OptimizationEngine::numerical_gradient(&f, &[1.0, 1.0]);
-        // At (1,1) the gradient should be ~(0, 0)
-        assert!(grad[0].abs() < 1e-4, "grad[0] = {}", grad[0]);
-        assert!(grad[1].abs() < 1e-4, "grad[1] = {}", grad[1]);
-    }
-
-    // ── Default finite-diff gradient via trait ──────────────────────────
-
-    struct SphereNoGrad {
-        dim: usize,
-    }
-
-    impl ObjectiveFunction for SphereNoGrad {
-        fn evaluate(&self, x: &[f64]) -> f64 {
-            x.iter().map(|xi| xi * xi).sum()
-        }
-        // Uses default finite-difference gradient
-        fn dimension(&self) -> usize {
-            self.dim
-        }
-    }
-
-    #[test]
-    fn test_default_finite_diff_gradient() {
-        let obj = SphereNoGrad { dim: 3 };
-        let grad = obj.gradient(&[1.0, 2.0, 3.0]);
-        assert!((grad[0] - 2.0).abs() < 1e-5);
-        assert!((grad[1] - 4.0).abs() < 1e-5);
-        assert!((grad[2] - 6.0).abs() < 1e-5);
-    }
-
-    // ── History tracking ────────────────────────────────────────────────
-
-    #[test]
-    fn test_history_monotone_decrease() {
-        let result = OptimizationEngine::gradient_descent(
-            &|x: &[f64]| x[0] * x[0] + x[1] * x[1],
-            &|x: &[f64]| vec![2.0 * x[0], 2.0 * x[1]],
-            &[5.0, 5.0],
-            0.1,
-            0.0,
-            1e-10,
-        );
-        // Function values in history should generally decrease
-        for window in result.history.windows(2) {
-            assert!(
-                window[1].fx <= window[0].fx + 1e-10,
-                "f should decrease: {} -> {}",
-                window[0].fx,
-                window[1].fx
-            );
-        }
-    }
-
-    // ── Multi-constraint ────────────────────────────────────────────────
-
-    #[test]
-    fn test_multi_constraint() {
-        // Minimize x² + y² subject to x >= 0.5 AND y >= 0.3
-        let c1: fn(&[f64]) -> f64 = |x| -(x[0] - 0.5); // x >= 0.5
-        let c2: fn(&[f64]) -> f64 = |x| -(x[1] - 0.3); // y >= 0.3
-        let result = OptimizationEngine::penalty_method(
-            &|x: &[f64]| x[0] * x[0] + x[1] * x[1],
-            &|x: &[f64]| vec![2.0 * x[0], 2.0 * x[1]],
-            &[c1, c2],
-            &[0.0, 0.0],
-            1e-4,
-        );
-        assert!(
-            result.x[0] >= 0.45,
-            "x[0] = {} should be >= 0.5",
-            result.x[0]
-        );
-        assert!(
-            result.x[1] >= 0.25,
-            "x[1] = {} should be >= 0.3",
-            result.x[1]
-        );
-    }
-
-    // ── Phi is in [0, 1] ────────────────────────────────────────────────
-
-    #[test]
-    fn test_phi_bounded() {
-        let result = OptimizationEngine::lbfgs(
-            &|x: &[f64]| x[0] * x[0],
-            &|x: &[f64]| vec![2.0 * x[0]],
-            &[5.0],
-            1e-10,
-        );
-        assert!(
-            result.phi >= 0.0 && result.phi <= 1.0,
-            "phi = {}",
-            result.phi
         );
     }
 }

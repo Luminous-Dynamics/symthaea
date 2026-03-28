@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Balloon Analogue Risk Task (BART).
 //!
 //! Tests risk-taking behavior: pump a balloon for increasing reward,
@@ -164,33 +161,11 @@ impl BartBenchmark {
             rng_state ^= rng_state << 17;
             // Time pressure: base noise 4 pumps; +6/unit widens decision jitter, modeling impulsive
             // pump-to-target estimation under urgency (Lejuez et al., 2002 BART; Heitz, 2014 SAT).
-            // Lapse rate: additional noise widens decision band (attention lapses → impulsive pumping).
-            let noise_range =
-                6 + (config.time_pressure * 6.0) as u64 + (config.lapse_rate * 12.0) as u64;
+            let noise_range = 6 + (config.time_pressure * 6.0) as u64;
             let noise = (rng_state % noise_range) as i64 - (noise_range as i64 / 2);
             let final_target = (adjusted_target as i64 + noise)
                 .max(1)
                 .min(max_pumps as i64) as usize;
-
-            // Lapse: on a lapse trial, randomly terminate early (impulsive cash-out).
-            // Models attentional lapses where the subject stops pumping prematurely
-            // without deliberation (Lejuez et al., 2002).
-            let final_target = if config.lapse_rate > 0.0 {
-                rng_state ^= rng_state << 13;
-                rng_state ^= rng_state >> 7;
-                rng_state ^= rng_state << 17;
-                if (rng_state % 1000) < (config.lapse_rate * 1000.0) as u64 {
-                    // Random early termination: pick a random pump count in [1, final_target]
-                    rng_state ^= rng_state << 13;
-                    rng_state ^= rng_state >> 7;
-                    rng_state ^= rng_state << 17;
-                    (rng_state % final_target.max(1) as u64) as usize + 1
-                } else {
-                    final_target
-                }
-            } else {
-                final_target
-            };
 
             // Execute pumps to target (may pop before reaching it)
             let mut pumps = 0usize;

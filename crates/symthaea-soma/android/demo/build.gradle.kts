@@ -7,23 +7,14 @@ plugins {
 android {
     namespace = "io.symthaea.soma.demo"
     compileSdk = 34
-    buildToolsVersion = "34.0.0"
+    buildToolsVersion = "34.0.0"  // Match Nix-provided SDK
 
     defaultConfig {
         applicationId = "io.symthaea.soma.demo"
-        minSdk = 26  // Android 8.0+ (covers 95%+ of active devices)
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
-    }
-
-    signingConfigs {
-        create("release") {
-            storeFile = file("../soma-release.keystore")
-            storePassword = System.getenv("SOMA_KEYSTORE_PASS") ?: "somasoma"
-            keyAlias = "soma"
-            keyPassword = System.getenv("SOMA_KEY_PASS") ?: "somasoma"
-        }
     }
 
     compileOptions {
@@ -41,11 +32,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false  // Disabled until ProGuard rules are tuned
-            signingConfig = signingConfigs.getByName("release")
-        }
-        debug {
-            applicationIdSuffix = ".debug"  // Can install debug alongside release
+            isMinifyEnabled = false
         }
     }
 }

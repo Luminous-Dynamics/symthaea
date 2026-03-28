@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Active Inference humanoid agent: precision/tau modulation at cognitive rate (10Hz).
 //!
 //! Wraps `symthaea_fep::ActiveInferenceAgent` with humanoid-specific balance priors.
@@ -141,9 +138,6 @@ pub struct ActiveInferenceHumanoidAgent {
     prev_fe: f64,
     /// Current task.
     task: HumanoidTask,
-    /// Optional consciousness context from Spore/Holon.
-    /// Low consciousness → conservative stance; Red safety → emergency crouch.
-    consciousness_ctx: symthaea_core::ConsciousnessContext,
 }
 
 impl ActiveInferenceHumanoidAgent {
@@ -180,21 +174,7 @@ impl ActiveInferenceHumanoidAgent {
             current_fe: 0.0,
             prev_fe: 0.0,
             task,
-            consciousness_ctx: symthaea_core::ConsciousnessContext::DEFAULT,
         }
-    }
-
-    /// Update the consciousness context from Spore/Holon.
-    ///
-    /// Low consciousness → conservative stance (reduced exploration).
-    /// SafetyLevel::Red → emergency crouch behavior.
-    pub fn set_consciousness_context(&mut self, ctx: symthaea_core::ConsciousnessContext) {
-        self.consciousness_ctx = ctx;
-    }
-
-    /// Current consciousness context.
-    pub fn consciousness_context(&self) -> &symthaea_core::ConsciousnessContext {
-        &self.consciousness_ctx
     }
 
     /// Build the 10D observation vector from humanoid state.
@@ -357,28 +337,6 @@ impl ActiveInferenceHumanoidAgent {
         } else {
             // Slow decay instead of hard reset
             self.high_fe_ticks = (self.high_fe_ticks - self.config.exploration_decay_rate).max(0.0);
-        }
-
-        // ── Consciousness modulation ──────────────────────────────────────
-        // Scale exploration by consciousness context.
-        if let Some(ref mut noise) = result.exploration_noise {
-            let gain = self.consciousness_ctx.exploration_gain();
-            for n in noise.iter_mut() {
-                *n *= gain;
-            }
-            if gain == 0.0 {
-                result.exploration_noise = None;
-            }
-        }
-        // Emergency: force conservative stance (raise tau for stability)
-        if self.consciousness_ctx.is_emergency() {
-            result.exploration_noise = None;
-            result.tau_factor = 1.5; // Slow, stable response
-            result.learning_rate_factor = 0.3; // Freeze learning
-        }
-        // High harmony → smoother control (slightly raise tau)
-        if self.consciousness_ctx.harmony_alignment > 0.7 {
-            result.tau_factor = result.tau_factor.max(1.05);
         }
 
         // Update tracking state

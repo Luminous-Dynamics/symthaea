@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Stop Signal Task (SST).
 //!
 //! Measures the latency of response inhibition (SSRT). On each trial,
@@ -59,7 +56,7 @@ impl StopSignalBenchmark {
         let diff_model = difficulty_model_for(self.name());
         let sig_mult = diff_model.signal_multiplier(config.difficulty);
         let go_threshold: f64 = (0.15 - pressure * 0.08) * sig_mult;
-        let stop_effectiveness: f64 = (0.80 - pressure * 0.20) * sig_mult;
+        let stop_effectiveness: f64 = (0.70 - pressure * 0.20) * sig_mult;
         // Softmax temperature: noisier decisions under pressure
         let temperature: f64 =
             (0.30 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);

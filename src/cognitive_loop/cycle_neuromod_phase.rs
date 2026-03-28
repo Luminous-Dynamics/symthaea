@@ -82,7 +82,8 @@ impl CognitiveLoopService {
         self.set_exploration(
             "d2_flexibility",
             (NEUROMOD_D2_FLEXIBILITY_BASELINE
-                + (self.curiosity_drive.exploration_urge - NEUROMOD_D2_FLEXIBILITY_BASELINE)
+                + (self.behavior.curiosity_drive.exploration_urge
+                    - NEUROMOD_D2_FLEXIBILITY_BASELINE)
                     * flex_scale as f64) as f32,
         );
 
@@ -90,9 +91,10 @@ impl CognitiveLoopService {
         self.adjust_confidence("neuromod_serotonin", self.neuromod.bath.confidence_delta());
 
         // ACh → attention sensitivity + threshold
-        self.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
-        self.adaptive_behavior.attention_sensitivity =
-            self.adaptive_behavior.attention_sensitivity.clamp(
+        self.behavior.adaptive_behavior.attention_sensitivity *=
+            self.neuromod.bath.attention_factor();
+        self.behavior.adaptive_behavior.attention_sensitivity =
+            self.behavior.adaptive_behavior.attention_sensitivity.clamp(
                 NEUROMOD_ATTENTION_SENSITIVITY_MIN,
                 NEUROMOD_ATTENTION_SENSITIVITY_MAX,
             );
@@ -101,10 +103,10 @@ impl CognitiveLoopService {
         // #3: Phasic NE burst → attentional reorienting (Corbetta & Shulman 2002)
         let ne_ph = self.neuromod.bath.ne_phasic();
         let ne_reorienting_boost = if ne_ph > NEUROMOD_NE_PHASIC_THRESHOLD {
-            self.adaptive_behavior.attention_sensitivity *=
+            self.behavior.adaptive_behavior.attention_sensitivity *=
                 1.0 + (ne_ph - NEUROMOD_NE_PHASIC_THRESHOLD) * NEUROMOD_NE_PHASIC_ATTENTION_GAIN;
-            self.adaptive_behavior.attention_sensitivity =
-                self.adaptive_behavior.attention_sensitivity.clamp(
+            self.behavior.adaptive_behavior.attention_sensitivity =
+                self.behavior.adaptive_behavior.attention_sensitivity.clamp(
                     NEUROMOD_ATTENTION_SENSITIVITY_MIN,
                     NEUROMOD_ATTENTION_SENSITIVITY_MAX,
                 );
@@ -119,16 +121,17 @@ impl CognitiveLoopService {
 
         // #6: Arousal ↔ NE bidirectional coupling (Berridge & Waterhouse 2003)
         // EMA: arousal pulled toward NE effective (10% per cycle)
-        let ne_arousal_before = self.emotion_contagion.arousal;
-        self.emotion_contagion.arousal = self.emotion_contagion.arousal
+        let ne_arousal_before = self.behavior.emotion_contagion.arousal;
+        self.behavior.emotion_contagion.arousal = self.behavior.emotion_contagion.arousal
             * NEUROMOD_AROUSAL_EMA_DECAY
             + self.neuromod.bath.noradrenaline.effective() * NEUROMOD_AROUSAL_EMA_INPUT;
         // Phasic NE burst → transient arousal spike
         if ne_ph > NEUROMOD_AROUSAL_PHASIC_THRESHOLD {
-            self.emotion_contagion.arousal += ne_ph * NEUROMOD_AROUSAL_PHASIC_SPIKE;
+            self.behavior.emotion_contagion.arousal += ne_ph * NEUROMOD_AROUSAL_PHASIC_SPIKE;
         }
-        self.emotion_contagion.arousal = self.emotion_contagion.arousal.clamp(0.0, 1.0);
-        let ne_arousal_feedback = self.emotion_contagion.arousal - ne_arousal_before;
+        self.behavior.emotion_contagion.arousal =
+            self.behavior.emotion_contagion.arousal.clamp(0.0, 1.0);
+        let ne_arousal_feedback = self.behavior.emotion_contagion.arousal - ne_arousal_before;
 
         // #7: Confidence crash detection → 5-HT emergency dip (Cools et al. 2008)
         let confidence_velocity =
@@ -145,18 +148,19 @@ impl CognitiveLoopService {
         self.carryover.quality.prev_confidence_for_crash = self.prediction_confidence;
 
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
-        let exploration_sht_drain =
-            if self.curiosity_drive.exploration_urge > NEUROMOD_EXPLORATION_DRAIN_BASELINE {
-                let drain = (self.curiosity_drive.exploration_urge
-                    - NEUROMOD_EXPLORATION_DRAIN_BASELINE)
-                    * NEUROMOD_EXPLORATION_DRAIN_FACTOR;
-                self.neuromod
-                    .bath
-                    .apply_exploration_cost(self.curiosity_drive.exploration_urge as f32);
-                drain as f32
-            } else {
-                0.0
-            };
+        let exploration_sht_drain = if self.behavior.curiosity_drive.exploration_urge
+            > NEUROMOD_EXPLORATION_DRAIN_BASELINE
+        {
+            let drain = (self.behavior.curiosity_drive.exploration_urge
+                - NEUROMOD_EXPLORATION_DRAIN_BASELINE)
+                * NEUROMOD_EXPLORATION_DRAIN_FACTOR;
+            self.neuromod
+                .bath
+                .apply_exploration_cost(self.behavior.curiosity_drive.exploration_urge as f32);
+            drain as f32
+        } else {
+            0.0
+        };
 
         // #11: GABA global inhibition (Olsen & Sieghart 2009)
         let gaba_inhibition = self.neuromod.bath.global_inhibition();
@@ -206,6 +210,75 @@ impl CognitiveLoopService {
         let neuromod_consciousness_mod = self.neuromod.bath.consciousness_modulation();
         let unified_psi = (unified_psi * neuromod_consciousness_mod as f64).clamp(0.0, 1.0);
 
+        // ── Hodge vertex harmonic → consciousness fragmentation modulation ──
+        // Vertex L₀ harmonic fraction measures moral FRAGMENTATION: high harmonic
+        // means moral meaning is trapped in disconnected clusters (β₀ > 1).
+        // This is the opposite of integration — it DAMPENS consciousness.
+        //
+        // At criticality (harmonic ∈ [0.2, 0.8]): the system is at the edge of
+        // chaos — maximally flexible and creative. We give a small BOOST here.
+        //
+        // Modulation:
+        //   harmonic < 0.2 (unified)     → +1% (good integration)
+        //   harmonic ∈ [0.2, 0.8] (critical) → +2% (edge-of-chaos creativity boost)
+        //   harmonic > 0.8 (fragmented)  → -5% (moral disintegration dampens consciousness)
+        //
+        // Science: Tononi (2004) — Phi collapses when components disconnect;
+        // Beggs & Plenz (2003) — criticality maximizes dynamic range;
+        // Shew & Plenz (2013) — neural systems optimize at criticality.
+        const HODGE_UNIFIED_BOOST: f64 = 0.01;
+        const HODGE_CRITICAL_BOOST: f64 = 0.02;
+        const HODGE_FRAGMENTED_DAMPING: f64 = 0.05;
+        let hodge_mod = {
+            let summary = self.ethics_engine.moral_topology().last_summary();
+            if let Some(ref fracs) = summary.hodge_fractions {
+                if fracs.at_criticality {
+                    1.0 + HODGE_CRITICAL_BOOST // Edge-of-chaos: creativity boost
+                } else if fracs.harmonic < 0.2 {
+                    1.0 + HODGE_UNIFIED_BOOST // Unified reasoning: mild boost
+                } else {
+                    1.0 - HODGE_FRAGMENTED_DAMPING // Fragmented: consciousness drops
+                }
+            } else {
+                1.0 // No fractions available — neutral
+            }
+        };
+        let unified_psi = (unified_psi * hodge_mod).clamp(0.0, 1.0);
+
+        // ── Hodge criticality → FEP exploration temperature modulation ──
+        // Over-connected (harmonic < 0.2): raise temperature → explore to break echo chamber
+        // Fragmented (harmonic > 0.8): lower temperature → focus on integration
+        // At criticality (0.2–0.8): no modulation (optimal zone)
+        // Additionally: fragile critical_scale → boost exploration
+        //               robust critical_scale → allow exploitation
+        // Science: Beggs & Plenz (2003) — criticality; Friston (2010) — precision.
+        if self.config.enable_hodge_decomposition {
+            const TEMP_MIN: f64 = 0.5;
+            const TEMP_MAX: f64 = 2.0;
+            let summary = self.ethics_engine.moral_topology().last_summary();
+            if let Some(ref fracs) = summary.hodge_fractions {
+                if fracs.harmonic < 0.2 {
+                    self.fep.agent.config.action_temperature += 0.3; // Explore
+                } else if fracs.harmonic > 0.8 {
+                    self.fep.agent.config.action_temperature *= 0.7; // Integrate
+                }
+            }
+            let cs_ema = self.ethics_engine.moral_topology().critical_scale_ema();
+            if cs_ema.is_finite() {
+                if cs_ema < 0.1 {
+                    self.fep.agent.config.action_temperature += 0.2; // Fragile → explore
+                } else if cs_ema > 0.5 {
+                    self.fep.agent.config.action_temperature *= 0.9; // Robust → exploit
+                }
+            }
+            self.fep.agent.config.action_temperature = self
+                .fep
+                .agent
+                .config
+                .action_temperature
+                .clamp(TEMP_MIN, TEMP_MAX);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.exp EXPERIENCE BUS: Update principled signals from cognitive state
         // Maps cycle values to 5 principled signals (Active Inference).
@@ -219,7 +292,7 @@ impl CognitiveLoopService {
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,
-                salience: self.curiosity_drive.exploration_urge as f32,
+                salience: self.behavior.curiosity_drive.exploration_urge as f32,
                 phi_monitor: unified_psi as f32,
             };
             bus.update_wisdom_from_signals();
@@ -278,7 +351,7 @@ impl CognitiveLoopService {
         // NE → surprise threshold (attention aperture), DA → compute budget.
         // Science: Corbetta & Shulman (2002) — NE modulates attentional scope.
         #[cfg(feature = "foveation")]
-        if let Some(ref fov_mutex) = self.vision_sensory.foveation_manager {
+        if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
             let ne = self.neuromod.bath.noradrenaline.effective();
             let da = self.neuromod.bath.dopamine.effective();
             if let Ok(mut fov) = fov_mutex.lock() {
@@ -358,7 +431,7 @@ mod tests {
     #[test]
     fn test_exploration_sht_drain_below_threshold() {
         let mut svc = make_service();
-        svc.curiosity_drive.exploration_urge = 0.2; // below threshold
+        svc.behavior.curiosity_drive.exploration_urge = 0.2; // below threshold
         let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
         assert_eq!(result.exploration_sht_drain, 0.0);
     }
@@ -370,13 +443,13 @@ mod tests {
         // begin_cycle + snapshot_cycle_start seeds the feedback consensus at 0.8.
         svc.feedback_state.begin_cycle();
         svc.feedback_state.snapshot_cycle_start(0.5, 0.01, 0.8, 1.0);
-        svc.curiosity_drive.exploration_urge = 0.8; // above threshold
+        svc.behavior.curiosity_drive.exploration_urge = 0.8; // above threshold
         let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
         assert!(
             result.exploration_sht_drain > 0.0,
             "expected sht drain > 0, got {}; exploration_urge was {}",
             result.exploration_sht_drain,
-            svc.curiosity_drive.exploration_urge
+            svc.behavior.curiosity_drive.exploration_urge
         );
     }
 

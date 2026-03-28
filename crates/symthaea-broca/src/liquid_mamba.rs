@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Liquid-Mamba Fusion (L-SSM): consciousness-gated SSM language generation.
 //!
 //! Fuses a pre-trained Mamba SSM with Symthaea's HDC-LTC cognitive loop.
@@ -578,7 +575,6 @@ impl LiquidMambaGenerator {
                     hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
-                    nsm_prime_coverage: 0.0,
                 }
             }
         }
@@ -611,7 +607,6 @@ impl LiquidMambaGenerator {
                     hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
-                    nsm_prime_coverage: 0.0,
                 }
             }
         }
@@ -817,7 +812,6 @@ impl LiquidMambaGenerator {
                         hallucination_flag: false,
                         output_hvs,
                         semantic_pe,
-                        nsm_prime_coverage: 0.0,
                     });
                 }
 
@@ -846,7 +840,6 @@ impl LiquidMambaGenerator {
                 hallucination_flag: false,
                 output_hvs,
                 semantic_pe,
-                nsm_prime_coverage: 0.0,
             })
         })();
 

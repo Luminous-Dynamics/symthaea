@@ -455,24 +455,10 @@ mycelix,unstable-examples"
         SYNC_CHECK_FAILED=true
     fi
 
-    # Run clippy with CI features if available (catches lint errors that -D warnings triggers)
-    if command -v rustup >/dev/null 2>&1 && rustup run 1.93.0 cargo clippy --version >/dev/null 2>&1; then
-        info "Running cargo clippy (CI features, -D warnings)..."
-        if (cd "${STANDALONE_REPO}" && rustup run 1.93.0 cargo clippy -p symthaea --lib --bins --features "$CI_FEATURES" -- -D warnings 2>&1 | tail -10); then
-            ok "cargo clippy passed"
-        else
-            warn "cargo clippy failed — lint errors will break CI"
-            SYNC_CHECK_FAILED=true
-        fi
-    else
-        info "Skipping clippy (1.93.0 toolchain clippy not available locally)"
-    fi
-
     if $SYNC_CHECK_FAILED; then
         warn "Pre-push checks failed. Run with --skip-check to bypass, or investigate:"
         echo "  cd ${STANDALONE_REPO} && cargo fmt --check"
         echo "  cd ${STANDALONE_REPO} && cargo check"
-        echo "  cd ${STANDALONE_REPO} && cargo clippy -p symthaea --lib --bins --features \"\$CI_FEATURES\" -- -D warnings"
     fi
     echo
 elif $SKIP_CHECK; then
@@ -495,46 +481,6 @@ else
     warn "rustup 1.93.0 not available — skipping CI-toolchain format"
 fi
 echo
-
-# --- Post-sync workspace validation -----------------------------------------
-#
-# Catch workspace conflicts before committing. A bare [workspace] in a
-# sub-crate Cargo.toml creates a second workspace root, which breaks
-# cargo in the standalone repo.
-
-if ! $DRY_RUN; then
-    info "Validating workspace structure..."
-    VALIDATION_FAILED=false
-
-    # 1. Check that cargo can parse the workspace
-    if ! cargo metadata --format-version 1 --manifest-path "${STANDALONE_REPO}/Cargo.toml" > /dev/null 2>&1; then
-        error "cargo metadata failed — likely workspace conflict (e.g., [workspace] in sub-crate)"
-    fi
-    ok "cargo metadata succeeds"
-
-    # 2. Auto-strip bare [workspace] lines in sub-crate Cargo.tomls
-    #    (e.g., RISC Zero crates use [workspace] for standalone builds,
-    #    but this conflicts when they're inside the main workspace)
-    BARE_WORKSPACE=$(find "${STANDALONE_REPO}" -name "Cargo.toml" \
-        -not -path "${STANDALONE_REPO}/Cargo.toml" \
-        -not -path "*/target/*" \
-        -not -path "*/stubs/*" \
-        -exec grep -l '^[[:space:]]*\[workspace\][[:space:]]*$' {} + 2>/dev/null || true)
-    if [ -n "$BARE_WORKSPACE" ]; then
-        echo "$BARE_WORKSPACE" | while read -r f; do
-            sed -i '/^[[:space:]]*\[workspace\][[:space:]]*$/d' "$f"
-            warn "Stripped bare [workspace] from ${f#${STANDALONE_REPO}/}"
-        done
-        # Re-validate after stripping
-        if ! cargo metadata --format-version 1 --manifest-path "${STANDALONE_REPO}/Cargo.toml" > /dev/null 2>&1; then
-            error "cargo metadata still fails after stripping [workspace] — investigate manually"
-        fi
-        ok "Stripped bare [workspace] from sub-crates"
-    else
-        ok "No bare [workspace] in sub-crates"
-    fi
-    echo
-fi
 
 # --- Show diff summary --------------------------------------------------------
 

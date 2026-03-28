@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Perceptual Crowding benchmark.
 //!
 //! Tests identification accuracy for peripheral targets when flanked by nearby
@@ -116,10 +113,7 @@ impl PerceptualCrowdingBenchmark {
                 // vision. HDC weighted bundles in high dimensions preserve target
                 // identity too well, so we model crowding as feature-level corruption:
                 // a fraction of the target's dimensions are replaced by flanker values.
-                // Corruption 0.70: stronger feature-level pooling (Parkes et al.,
-                // 2001) produces larger crowding magnitude, closer to the ~0.35
-                // effect size in Whitney & Levi (2011).
-                let corruption_rate = crowding_strength * 0.70;
+                let corruption_rate = crowding_strength * 0.65;
 
                 // Build the crowded representation by element-wise dimension masking:
                 // for each dimension, with probability corruption_rate, replace target

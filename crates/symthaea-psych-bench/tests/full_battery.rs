@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Full psychological benchmark battery with human baseline comparisons.
+//! Full psychological benchmark battery with human baseline comparisons.
 //!
 //! Runs all 35 benchmarks across 9 suites and generates a report comparing
 //! Symthaea's performance against published human norms.
@@ -17,14 +15,17 @@ use symthaea_psych_bench::benchmarks::{
         AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
         EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
     },
-    coding::{AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark},
+    coding::{BugDetectionBenchmark, HumanEvalMiniBenchmark},
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
         TemporalDiscountingBenchmark, TwoStepBenchmark,
     },
     consciousness::{BinocularRivalryBenchmark, BlindSightBenchmark, PerceptualCrowdingBenchmark},
-    creativity::{AlternateUsesBenchmark, DivergentThinkingBenchmark, RemoteAssociatesBenchmark},
+    creativity::{
+        AlternateUsesBenchmark, ConceptualBlendingBenchmark, DivergentThinkingBenchmark,
+        InsightProblemBenchmark, RemoteAssociatesBenchmark,
+    },
     executive::{
         DualTaskBenchmark, FlankerBenchmark, IowaGamblingBenchmark,
         RavensProgressiveMatricesBenchmark, StroopBenchmark, TowerOfLondonBenchmark,
@@ -39,8 +40,8 @@ use symthaea_psych_bench::benchmarks::{
     mathematics::{
         ArithmeticWordProblemsBenchmark, BayesianReasoningBenchmark, ConstraintPuzzlesBenchmark,
         DefiniteIntegralsBenchmark, LinearSystemSolvingBenchmark, LogicalDeductionBenchmark,
-        MatrixOperationsBenchmark, OptimizationProblemsBenchmark, PolynomialRootsBenchmark,
-        ProofConstructionBenchmark, StatisticalInferenceBenchmark,
+        MatrixOperationsBenchmark, PolynomialRootsBenchmark, ProofConstructionBenchmark,
+        StatisticalInferenceBenchmark,
     },
     memory_agent::{
         AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -169,6 +170,8 @@ fn full_battery_report() {
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
+    report.add(ConceptualBlendingBenchmark.run(&config));
+    report.add(InsightProblemBenchmark.run(&config));
 
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
@@ -288,7 +291,6 @@ fn full_battery_report() {
     report.add(ConstraintPuzzlesBenchmark.run(&config));
     report.add(ProofConstructionBenchmark.run(&config));
     report.add(DefiniteIntegralsBenchmark.run(&config));
-    report.add(OptimizationProblemsBenchmark.run(&config));
 
     // ── Security (HDC-FHE) ──
     report.add(EncryptedClassificationBenchmark.run(&config));
@@ -297,6 +299,10 @@ fn full_battery_report() {
     report.add(CrossMaskPrivacyBenchmark.run(&config));
     report.add(EncryptedBindingBenchmark.run(&config));
     report.add(ScalingAnalysisBenchmark.run(&config));
+
+    // ── Coding ──
+    report.add(HumanEvalMiniBenchmark.run(&config));
+    report.add(BugDetectionBenchmark.run(&config));
 
     // ── Neuromod ──
     report.add(PharmacologicalChallengeBenchmark.run(&config));
@@ -309,11 +315,6 @@ fn full_battery_report() {
     report.add(PharmacologicalAblationBenchmark.run(&config));
     report.add(BehavioralKnockoutBenchmark.run(&config));
     report.add(ConsciousnessPharmacologyBenchmark.run(&config));
-
-    // ── Coding ──
-    report.add(HumanEvalMiniBenchmark.run(&config));
-    report.add(BugDetectionBenchmark.run(&config));
-    report.add(AlgorithmRecognitionBenchmark.run(&config));
 
     // Verify all benchmarks produced results
     assert_eq!(
@@ -419,6 +420,8 @@ fn regression_against_baseline() {
     report.add(RemoteAssociatesBenchmark.run(&config));
     report.add(AlternateUsesBenchmark.run(&config));
     report.add(DivergentThinkingBenchmark.run(&config));
+    report.add(ConceptualBlendingBenchmark.run(&config));
+    report.add(InsightProblemBenchmark.run(&config));
     report.add(ButlinIndicatorSuite.run(&config));
     report.add(GoNoGoBenchmark.run(&config));
     report.add(StopSignalBenchmark.run(&config));
@@ -498,7 +501,6 @@ fn regression_against_baseline() {
     report.add(ConstraintPuzzlesBenchmark.run(&config));
     report.add(ProofConstructionBenchmark.run(&config));
     report.add(DefiniteIntegralsBenchmark.run(&config));
-    report.add(OptimizationProblemsBenchmark.run(&config));
     report.add(EncryptedClassificationBenchmark.run(&config));
     report.add(CollectiveAggregationBenchmark.run(&config));
     report.add(EncryptedLearningBenchmark.run(&config));

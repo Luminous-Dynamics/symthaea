@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # CfC Neural Networks with Backend Selection
 //!
 //! CPU-based Closed-form Continuous-time (CfC) networks using ndarray for matrix

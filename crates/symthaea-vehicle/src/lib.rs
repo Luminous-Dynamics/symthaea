@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-vehicle
 //!
 //! HDC-LTC + FEP Active Inference autonomous vehicle control via bicycle-model dynamics.

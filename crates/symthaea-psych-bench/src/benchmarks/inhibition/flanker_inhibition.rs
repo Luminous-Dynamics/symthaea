@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Eriksen Flanker Inhibition benchmark (Inhibition domain variant).
 //!
 //! While a Flanker task exists in the Executive domain (measuring conflict effect),
@@ -60,7 +57,7 @@ impl FlankerInhibitionBenchmark {
         // mandatorily pooled with the target (Eriksen & Eriksen, 1974).
         // With ~44% corruption on incongruent trials, the stimulus is moderately
         // ambiguous, producing interference_suppression closer to the 0.11 baseline.
-        let flanker_corruption: f32 = 0.38;
+        let flanker_corruption: f32 = 0.44;
 
         let mut congruent_correct = 0u32;
         let mut congruent_total = 0u32;

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! SleepSentinel - Sleep stage detection (Proof of Rest)
+//! SleepSentinel - Sleep stage detection (Proof of Rest)
 //!
 //! Classifies sleep stages based on EEG band power features,
 //! spectral ratios, spindle detection, and K-complex detection.

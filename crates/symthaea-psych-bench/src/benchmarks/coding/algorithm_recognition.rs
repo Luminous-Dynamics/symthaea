@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Algorithm Recognition benchmark.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Algorithm Recognition benchmark.
 //!
 //! Measures the ability to classify code snippets into algorithm families
 //! using HDC pattern matching. Each snippet implements a canonical algorithm

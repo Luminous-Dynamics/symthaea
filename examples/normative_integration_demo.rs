@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Normative Integration Demo (NI-1)
+//! Normative Integration Demo (NI-1)
 //!
 //! Demonstrates the bidirectional coupling between moral reasoning coherence
 //! and consciousness level in the real cognitive loop.

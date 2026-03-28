@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "RISC Zero guest methods for Symthaea ZK proofs"
 
+[workspace]
+
 [build-dependencies]
 risc0-build = "3.0"
 

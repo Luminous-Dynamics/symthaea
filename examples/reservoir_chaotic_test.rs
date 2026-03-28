@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Test Echo State Network on chaotic signals
+//! Test Echo State Network on chaotic signals
 //!
 //! Compares ESN performance vs baseline on:
 //! - Logistic map r=3.8 (chaotic)

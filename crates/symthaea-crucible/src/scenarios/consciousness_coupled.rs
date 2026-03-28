@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Consciousness-Coupled Scenarios (Option E)
 //!
 //! Tests how consciousness level (Phi/Psi) should affect moral reasoning.

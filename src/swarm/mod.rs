@@ -101,8 +101,48 @@ pub mod resonance_graph;
 #[cfg(feature = "mesh")]
 pub mod web_of_trust;
 
+/// Adaptive quality engine (AIMD + consciousness tiers).
+pub mod rdp_adaptive;
+/// Audio capture and playback with consciousness-gated quality.
+pub mod rdp_audio;
+/// Behavioral biometric continuous authentication via HDC.
+pub mod rdp_behavioral_auth;
+/// Screen capture abstraction (X11 SHM, Wayland PipeWire, test stubs).
+pub mod rdp_capture;
+/// Sovereign RDP client (frame consumer + input forwarder).
+pub mod rdp_client;
+/// Clipboard synchronization (bidirectional, consciousness-gated, scrubbed).
+pub mod rdp_clipboard;
+/// HDC patch quantization codec for RDP.
+pub mod rdp_codec;
+/// Encrypted file transfer with BLAKE3 integrity.
+pub mod rdp_file_transfer;
+/// Governance-gated session approval for sensitive support sessions.
+pub mod rdp_governance;
+/// Soma↔Holon RDP bridge for phone remote support.
+pub mod rdp_holon_bridge;
+/// Input injection (X11 XTest, Wayland virtual input, logging/noop).
+pub mod rdp_input;
 /// PQC-secured remote display protocol.
 pub mod rdp_protocol;
+/// RDP Protocol v3 extensions (Audio, Chat, RemoteExec, Clipboard).
+pub mod rdp_protocol_ext;
+/// PQC-encrypted session recording and playback.
+pub mod rdp_recording;
+/// Remote command execution with consciousness + MFDI gating.
+pub mod rdp_remote_exec;
+/// Egui renderer for RDP client.
+pub mod rdp_render_egui;
+/// Sovereign RDP server (tick-based frame producer).
+pub mod rdp_server;
+/// PQC-authenticated session lifecycle for RDP.
+pub mod rdp_session;
+/// Support ticket ↔ RDP session bridge with invite tokens and governance.
+pub mod rdp_support_bridge;
+/// Iroh QUIC transport layer (Handle/Actor pattern, stream multiplexing).
+pub mod rdp_transport;
+/// Unattended access daemon (MFDI-gated, time-bounded, audit-logged).
+pub mod rdp_unattended;
 
 // Re-exports
 pub use config::{

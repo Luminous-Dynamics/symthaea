@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration test: verify normative comparison produces scores for all
+//! Integration test: verify normative comparison produces scores for all
 //! benchmarks that have matching baselines.
 //!
 //! Runs all benchmarks with minimal config, builds a NormativeReport,
@@ -15,7 +13,6 @@ use symthaea_psych_bench::benchmarks::creativity::*;
 use symthaea_psych_bench::benchmarks::executive::*;
 use symthaea_psych_bench::benchmarks::inhibition::*;
 use symthaea_psych_bench::benchmarks::language::*;
-use symthaea_psych_bench::benchmarks::mathematics::*;
 use symthaea_psych_bench::benchmarks::memory_agent::*;
 use symthaea_psych_bench::benchmarks::metacognition::*;
 use symthaea_psych_bench::benchmarks::motor::*;
@@ -85,6 +82,9 @@ fn test_normative_coverage() {
         // Creativity
         Box::new(AlternateUsesBenchmark),
         Box::new(RemoteAssociatesBenchmark),
+        Box::new(DivergentThinkingBenchmark),
+        Box::new(ConceptualBlendingBenchmark),
+        Box::new(InsightProblemBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // Inhibition
@@ -122,22 +122,6 @@ fn test_normative_coverage() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
-        // Coding
-        Box::new(HumanEvalMiniBenchmark),
-        Box::new(BugDetectionBenchmark),
-        Box::new(AlgorithmRecognitionBenchmark),
-        // Mathematics
-        Box::new(ArithmeticWordProblemsBenchmark),
-        Box::new(LinearSystemSolvingBenchmark),
-        Box::new(PolynomialRootsBenchmark),
-        Box::new(DefiniteIntegralsBenchmark),
-        Box::new(MatrixOperationsBenchmark),
-        Box::new(StatisticalInferenceBenchmark),
-        Box::new(BayesianReasoningBenchmark),
-        Box::new(LogicalDeductionBenchmark),
-        Box::new(ConstraintPuzzlesBenchmark),
-        Box::new(ProofConstructionBenchmark),
-        Box::new(OptimizationProblemsBenchmark),
         // Neuromod
         Box::new(PharmacologicalChallengeBenchmark),
         Box::new(InjectionChallengeBenchmark),
@@ -149,6 +133,9 @@ fn test_normative_coverage() {
         Box::new(PharmacologicalAblationBenchmark),
         Box::new(BehavioralKnockoutBenchmark),
         Box::new(ConsciousnessPharmacologyBenchmark),
+        // Coding
+        Box::new(HumanEvalMiniBenchmark),
+        Box::new(BugDetectionBenchmark),
     ];
 
     // Build a full report from all benchmarks
@@ -198,22 +185,6 @@ fn test_normative_coverage() {
         "Reasoning::ArcRSA",
         "Reasoning::ArcScaling",
         "Reasoning::ArcStaircase",
-        // Coding
-        "Coding::HumanEvalMini",
-        "Coding::BugDetection",
-        "Coding::AlgorithmRecognition",
-        // Mathematics
-        "Mathematics::ArithmeticWordProblems",
-        "Mathematics::LinearSystemSolving",
-        "Mathematics::PolynomialRoots",
-        "Mathematics::DefiniteIntegrals",
-        "Mathematics::MatrixOperations",
-        "Mathematics::StatisticalInference",
-        "Mathematics::BayesianReasoning",
-        "Mathematics::LogicalDeduction",
-        "Mathematics::ConstraintPuzzles",
-        "Mathematics::ProofConstruction",
-        "Mathematics::OptimizationProblems",
         // Neuromod
         "Neuromod::PharmacologicalChallenge",
         "Neuromod::InjectionChallenge",

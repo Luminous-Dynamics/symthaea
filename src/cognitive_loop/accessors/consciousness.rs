@@ -30,9 +30,13 @@ impl CognitiveLoopService {
         let (pattern, pattern_confidence) =
             self.language_comm.voice_coherence.temporal.classify_state();
         let temporal_summary = self.language_comm.voice_coherence.temporal.summary();
-        let reflection_summary = self.self_model_tier.self_reflection.summary();
-        let thresholds = self.self_model_tier.self_reflection.get_thresholds();
-        let (emotion_nudge, _) = self.emotion_contagion.pattern_nudge();
+        let reflection_summary = self.consciousness.self_model_tier.self_reflection.summary();
+        let thresholds = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .get_thresholds();
+        let (emotion_nudge, _) = self.behavior.emotion_contagion.pattern_nudge();
 
         let consciousness_level = ConsciousnessSnapshot::compute_consciousness_level(
             self.prediction_confidence as f32,
@@ -40,7 +44,7 @@ impl CognitiveLoopService {
                 .voice_coherence
                 .bridge
                 .smoothed_coherence(),
-            self.flow_state.intensity,
+            self.behavior.flow_state.intensity,
             pattern_confidence,
         );
 
@@ -54,30 +58,35 @@ impl CognitiveLoopService {
             predictions_trustworthy: self.predictions_trustworthy(),
             effective_learning_rate: self.stats.adaptive_learning_rate,
             learning_effectiveness: self
+                .consciousness
                 .self_model_tier
                 .self_reflection
                 .learning_effectiveness(),
-            in_flow: self.flow_state.in_flow,
-            flow_intensity: self.flow_state.intensity,
-            flow_streak: self.flow_state.streak,
-            flow_learning_boost: self.flow_state.learning_boost,
-            boredom: self.curiosity_drive.boredom,
-            curiosity: self.curiosity_drive.curiosity,
-            exploration_urge: self.curiosity_drive.exploration_urge as f32,
-            exploring: self.curiosity_drive.should_explore(),
-            novelty_bonus: self.curiosity_drive.novelty_bonus,
-            emotional_valence: self.emotion_contagion.smoothed_valence(),
-            emotional_arousal: self.emotion_contagion.smoothed_arousal(),
+            in_flow: self.behavior.flow_state.in_flow,
+            flow_intensity: self.behavior.flow_state.intensity,
+            flow_streak: self.behavior.flow_state.streak,
+            flow_learning_boost: self.behavior.flow_state.learning_boost,
+            boredom: self.behavior.curiosity_drive.boredom,
+            curiosity: self.behavior.curiosity_drive.curiosity,
+            exploration_urge: self.behavior.curiosity_drive.exploration_urge as f32,
+            exploring: self.behavior.curiosity_drive.should_explore(),
+            novelty_bonus: self.behavior.curiosity_drive.novelty_bonus,
+            emotional_valence: self.unification_engine.emotional.state().valence as f32,
+            emotional_arousal: self.unification_engine.emotional.state().arousal as f32,
             has_emotional_content: self.has_emotional_content(),
             emotion_nudge,
-            self_assessment: self.self_model_tier.self_reflection.self_assessment,
+            self_assessment: self
+                .consciousness
+                .self_model_tier
+                .self_reflection
+                .self_assessment,
             reflection_count: reflection_summary.reflection_count,
             adjustments_made: reflection_summary.adjustments_made,
             next_reflection_in: reflection_summary.next_reflection_in,
-            action_hint: self.adaptive_behavior.action_hint,
-            speech_rate_multiplier: self.adaptive_behavior.speech_rate_multiplier,
-            pause_multiplier: self.adaptive_behavior.pause_multiplier,
-            learning_paused: self.adaptive_behavior.pause_learning,
+            action_hint: self.behavior.adaptive_behavior.action_hint,
+            speech_rate_multiplier: self.behavior.adaptive_behavior.speech_rate_multiplier,
+            pause_multiplier: self.behavior.adaptive_behavior.pause_multiplier,
+            learning_paused: self.behavior.adaptive_behavior.pause_learning,
             flow_threshold: thresholds.flow_error,
             boredom_threshold: thresholds.boredom,
             trust_threshold: thresholds.trust,
@@ -97,10 +106,10 @@ impl CognitiveLoopService {
             emotional_pattern: self.unification_engine.emotional.detect_pattern(),
             emotional_description: self.unification_engine.emotional.state().describe(),
             snapshot_timestamp_nanos: self.start_time.elapsed().as_nanos() as u64,
-            current_flow_duration_secs: self.flow_state.current_flow_duration_secs(),
-            total_flow_time_secs: self.flow_state.total_flow_time_with_current(),
-            flow_periods: self.flow_state.flow_periods,
-            avg_flow_duration_secs: self.flow_state.avg_flow_duration_secs,
+            current_flow_duration_secs: self.behavior.flow_state.current_flow_duration_secs(),
+            total_flow_time_secs: self.behavior.flow_state.total_flow_time_with_current(),
+            flow_periods: self.behavior.flow_state.flow_periods,
+            avg_flow_duration_secs: self.behavior.flow_state.avg_flow_duration_secs,
             fep_free_energy: self
                 .fep
                 .agent
@@ -166,7 +175,7 @@ impl CognitiveLoopService {
                 .voice_coherence
                 .bridge
                 .smoothed_coherence(),
-            self.flow_state.intensity,
+            self.behavior.flow_state.intensity,
             pattern_confidence,
         )
     }
@@ -298,7 +307,9 @@ impl CognitiveLoopService {
     pub fn consciousness_equation_v2(
         &self,
     ) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
-        self.consciousness_engine.consciousness_equation_v2()
+        self.consciousness
+            .consciousness_engine
+            .consciousness_equation_v2()
     }
 
     /// Borrow the hierarchical LTC (if enabled).
@@ -343,14 +354,18 @@ impl CognitiveLoopService {
         &self,
     ) -> Option<&crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>
     {
-        self.consciousness_engine.unified_consciousness_pipeline()
+        self.consciousness
+            .consciousness_engine
+            .unified_consciousness_pipeline()
     }
 
     /// Borrow the multi-modal integrator (owned by ConsciousnessEngine).
     pub fn multi_modal_integrator(
         &self,
     ) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
-        self.consciousness_engine.multi_modal_integrator()
+        self.consciousness
+            .consciousness_engine
+            .multi_modal_integrator()
     }
 
     /// Borrow the synthetic states NSM grounding (if enabled).

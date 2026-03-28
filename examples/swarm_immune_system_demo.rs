@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Swarm Immune System Demo
+//! Swarm Immune System Demo
 //!
 //! Demonstrates the 'Immune System' constraint:
 //! 1. Broadcast an optimization to the swarm.

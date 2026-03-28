@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unified TemporalPredictor benchmark across all Genesis domains.
+//! Unified TemporalPredictor benchmark across all Genesis domains.
 //!
 //! Demonstrates the O(1) closed-form CfC prediction pattern shared by
 //! all five Genesis temporal predictors via the `TemporalPredictor` trait.

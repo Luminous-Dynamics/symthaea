@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration test: hierarchical CfC world model predicts at multiple timescales.
+//! Integration test: hierarchical CfC world model predicts at multiple timescales.
 //!
 //! We feed a composite signal (fast sine + slow sine) and verify that:
 //! 1. The combined prediction error decreases over time as the model adapts.

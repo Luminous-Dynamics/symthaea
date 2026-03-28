@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration Tests for Newly Wired Components
+//! Integration Tests for Newly Wired Components
 //!
 //! This module tests the full integration of:
 //! 1. REPL -> Cognitive Loop -> FEP -> Motor System

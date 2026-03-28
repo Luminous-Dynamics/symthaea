@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Feeling of Knowing (FOK) benchmark.
 //!
 //! Tests metamemory accuracy: after failed recall, can the system predict
@@ -71,7 +68,7 @@ impl FeelingOfKnowingBenchmark {
         // Lapse_rate degrades metacognitive precision — models reduced
         // introspective accuracy under attentional lapses (Reder & Ritter 1992;
         // individual differences in metacognitive monitoring quality).
-        let fok_noise_range: f64 = (0.008 + config.lapse_rate * 0.10 + config.time_pressure * 0.08)
+        let fok_noise_range: f64 = (0.008 + config.lapse_rate * 0.04 + config.time_pressure * 0.08)
             / diff_model.signal_multiplier(config.difficulty);
 
         // ── Study phase ──
@@ -111,7 +108,7 @@ impl FeelingOfKnowingBenchmark {
             let sig_mult = diff_model.signal_multiplier(config.difficulty);
             // Lapse_rate degrades encoding quality — models reduced depth
             // of processing under attentional lapses (Craik & Lockhart 1972).
-            let lapse_encoding_penalty = config.lapse_rate * 0.30;
+            let lapse_encoding_penalty = config.lapse_rate * 0.15;
             let raw_enc = 0.55 + primacy + recency + attention_noise - lapse_encoding_penalty;
             let encoding = (0.5 + (raw_enc - 0.5) * sig_mult).clamp(0.20, 0.95);
 

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration test for the memory coordinator pipeline.
+//! Integration test for the memory coordinator pipeline.
 //!
 //! Exercises the full path: MemoryCoordinator signal updates → graduation
 //! queueing → episodic storage, verifying that the cross-tier memory

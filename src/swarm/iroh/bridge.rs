@@ -329,7 +329,39 @@ impl IrohBridgeActor {
                         vec![0.0; 4], // minimal payload — actual data in raw bytes
                         0.0,
                     );
-                    if let Err(e) = channel.send_consciousness(&cv).await {
+
+                    // Sign the CV if attestation is configured
+                    #[cfg(feature = "identity")]
+                    let send_result = if let Some(ref attestation) = self.attestation {
+                        let mgr = attestation.read();
+                        match mgr.attest(&cv) {
+                            Ok(attested) => {
+                                // Send attested CV (signature + signer key included)
+                                let attested_bytes = match bincode::serialize(&attested) {
+                                    Ok(b) => b,
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            peer = peer_id,
+                                            "Failed to serialize attested CV: {e}"
+                                        );
+                                        continue;
+                                    }
+                                };
+                                channel.send_consciousness(&cv).await
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to attest CV: {e}");
+                                channel.send_consciousness(&cv).await
+                            }
+                        }
+                    } else {
+                        channel.send_consciousness(&cv).await
+                    };
+
+                    #[cfg(not(feature = "identity"))]
+                    let send_result = channel.send_consciousness(&cv).await;
+
+                    if let Err(e) = send_result {
                         tracing::debug!(
                             peer = peer_id,
                             error = %e,

@@ -99,7 +99,8 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .exploration
             .propose(source, FeedbackProposal::Add(delta as f64));
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 
     /// Record a multiplicative scale proposal for exploration_urge and sync field.
@@ -112,7 +113,8 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .exploration
             .propose(source, FeedbackProposal::Scale(factor as f64));
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 
     /// Record a hard set proposal for exploration_urge and sync field.
@@ -121,7 +123,8 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .exploration
             .propose(source, FeedbackProposal::Set(value as f64));
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -218,7 +221,8 @@ impl super::super::CognitiveLoopService {
             priority,
             confidence,
         );
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -330,7 +334,8 @@ impl super::super::CognitiveLoopService {
             FeedbackProposal::Add(delta as f64),
             priority,
         );
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 
     /// Scale exploration with an explicit priority tier.
@@ -346,7 +351,8 @@ impl super::super::CognitiveLoopService {
             FeedbackProposal::Scale(factor as f64),
             priority,
         );
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 
     /// Set exploration with an explicit priority tier.
@@ -362,6 +368,7 @@ impl super::super::CognitiveLoopService {
             FeedbackProposal::Set(value as f64),
             priority,
         );
-        self.curiosity_drive.exploration_urge = self.feedback_state.effective_exploration();
+        self.behavior.curiosity_drive.exploration_urge =
+            self.feedback_state.effective_exploration();
     }
 }

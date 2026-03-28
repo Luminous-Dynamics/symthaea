@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Approximate MIP Algorithms for Large Systems
 //!
 //! Efficient heuristics for N > 10 where exhaustive search is infeasible.

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Cycle-Aware Pattern Recognition Example
+//! Cycle-Aware Pattern Recognition Example
 //!
 //! Tests the CycleAwareLtcRecognizer against periodic patterns to verify
 //! that the cycle detection layer improves recognition of deterministic

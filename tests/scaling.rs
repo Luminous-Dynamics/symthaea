@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Scaling Tests
+//! Scaling Tests
 //!
 //! Verifies system behavior under concurrent load:
 //! - Parallel Phi computation across topologies

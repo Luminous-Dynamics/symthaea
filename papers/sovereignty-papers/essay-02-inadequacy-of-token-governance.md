@@ -156,7 +156,7 @@ The share was invented in 1602. It has governed the world for 424 years. We prop
 
 ---
 
-*The Sovereignty Papers is a series of essays on consciousness-first governance for the post-state era. Essay No. 3: "The Consciousness Thesis" will argue that consciousness coupling is the minimum viable alignment mechanism for any coordination system operating at scale.*
+*The Sovereignty Papers is a series of essays on consciousness-first governance for the post-state era. Essay No. 3: "The Consciousness Thesis" will argue that consciousness coupling is a necessary alignment primitive for any coordination system operating at scale.*
 
 ---
 

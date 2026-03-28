@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Feedback Variable Integration — Consensus-based proposal system.
 //!
 //! All feedback variable mutations (`prediction_confidence`, `fep_lr_boost`,

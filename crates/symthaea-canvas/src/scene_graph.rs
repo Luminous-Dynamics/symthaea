@@ -48,6 +48,9 @@ pub enum NodeKind {
     Filter { id: String, filter_type: FilterType },
     /// Reference a defined gradient/filter (via url(#id)).
     UseFilter { filter_id: String },
+    /// SVG path element with raw path data string (e.g., "M 0 0 L 10 10 C ...").
+    /// Used by generative art systems (atelier) for arbitrary curves and L-system output.
+    Path { d: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,6 +186,15 @@ impl SceneNode {
     pub fn line(x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
         Self {
             kind: NodeKind::Line { x1, y1, x2, y2 },
+            transform: Transform::identity(),
+            style: Style::default(),
+            children: Vec::new(),
+        }
+    }
+
+    pub fn path(d: impl Into<String>) -> Self {
+        Self {
+            kind: NodeKind::Path { d: d.into() },
             transform: Transform::identity(),
             style: Style::default(),
             children: Vec::new(),

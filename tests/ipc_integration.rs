@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! IPC Integration Tests
+//! IPC Integration Tests
 //!
 //! Tests for the symthaea-service IPC protocol:
 //! - Request/Response round-trips

@@ -90,7 +90,14 @@ path = "src/bin/eval_crystal.rs"
 name = "train-rls"
 path = "src/bin/train_rls.rs"
 
+[[bin]]
+name = "train-ltc-supervised"
+path = "src/bin/train_ltc_supervised.rs"
+
 [dependencies]
+# Symthaea core — HdcLtcUnifiedNeuron, ContinuousHV, GenesisSeed
+symthaea-core = { path = "../../symthaea-core", default-features = false }
+
 # Core hashing
 blake3 = { workspace = true }
 
@@ -122,14 +129,17 @@ rand = { workspace = true }
 # Cache-tiled matrix multiply (AVX2 dgemm for batch accumulator)
 matrixmultiply = "0.3"
 
+# GPU-accelerated training via candle (CUDA auto-detection)
+candle-core = { workspace = true, optional = true }
+
 [dev-dependencies]
 criterion = "0.5"
 tempfile = "3.10"
 
 [features]
 default = []
-# Removed dead features: flac, gpu, bioacoustics, eeg (no cfg gates in source code)
-# Re-add when actual conditional compilation is implemented
+# GPU-accelerated LTC training via candle CUDA tensors
+gpu = ["candle-core/cuda"]
 
 [[bench]]
 name = "core_benchmarks"

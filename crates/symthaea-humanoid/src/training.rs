@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Humanoid training: multi-rate loop with PD baseline targets and adaptive curriculum.
 //!
 //! The trainer runs a multi-rate control loop:

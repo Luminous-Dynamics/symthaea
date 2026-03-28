@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Psychological benchmark implementations.
+//! Psychological benchmark implementations.
 
 pub mod affect;
 pub mod attention;
@@ -13,8 +11,6 @@ pub mod cogbench;
 pub mod consciousness;
 pub mod creativity;
 pub mod executive;
-#[cfg(feature = "external-benchmarks")]
-pub mod external;
 pub mod inhibition;
 pub mod institutional_reasoning;
 pub mod language;

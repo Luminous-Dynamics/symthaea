@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Psychological benchmark suite for Symthaea — WorM, CogBench, Butlin indicators, ToMBench, MemoryAgentBench"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
 keywords = ["psychology", "benchmarks", "consciousness", "neuroscience", "cognitive-science"]
@@ -15,7 +15,6 @@ categories = ["science", "algorithms"]
 default = []
 symthaea-backend = ["dep:symthaea"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
-external-benchmarks = []
 
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }

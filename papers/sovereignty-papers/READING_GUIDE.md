@@ -29,7 +29,7 @@ Start here. Your frame is alignment. These essays reframe it.
 | Order | Essay | Why |
 |-------|-------|-----|
 | 1st | **Essay 1: The Failure of the 1602 Architecture** | The alignment problem is 400 years old, not 10. |
-| 2nd | **Essay 3: The Consciousness Thesis** | Consciousness coupling as the minimum viable alignment mechanism. |
+| 2nd | **Essay 3: The Consciousness Thesis** | Consciousness coupling as a necessary alignment primitive. |
 | 3rd | **Essay 12: On Algorithmic Tyranny** | The strongest objection — who watches the watchers? |
 | 4th | **Essay 6: On Moral Algebra** | Constitutive ethics vs. RLHF. Why post-hoc alignment fails. |
 | 5th | **Essay 13: On Epistemic Humility** | The 0.10 confidence constant. Why honest uncertainty beats false certainty. |
@@ -42,7 +42,7 @@ Start here. Your frame is decentralization. These essays challenge it.
 |-------|-------|-----|
 | 1st | **Essay 2: The Inadequacy of Token Governance** | DAOs replicate the 1602 architecture. MakerDAO, Compound, Beanstalk as evidence. |
 | 2nd | **Essay 10: On Sybil Resistance** | Multi-dimensional credentialing vs. single-factor identity. |
-| 3rd | **Essay 11: On Plutocratic Capture** | Why STAKE_MAX_BONUS at 5% and reputation-squared. |
+| 3rd | **Essay 11: On Plutocratic Capture** | Why capital is excluded entirely and dual-speed reputation prevents capture. |
 | 4th | **Essay 7: On the Four Dimensions** | The credential that replaces the token. |
 | 5th | **Essay 5: On the Cognitive Loop** | Why governance must operate at consequence-speed. |
 
@@ -116,7 +116,7 @@ Start here. We wrote essays specifically to address your objections.
 
 1. The alignment problem is a 400-year-old corporate design flaw, not a future AI risk.
 2. DAOs replicate the 1602 architecture on a blockchain.
-3. Consciousness coupling is the minimum viable alignment mechanism.
+3. Consciousness coupling is a necessary alignment primitive.
 4. Integration — not information — is what governance must measure.
 5. Governance must operate at the speed of consequences, not calendars.
 6. Ethics must be structural, not post-hoc: 16 obligations, every cycle.
@@ -124,8 +124,8 @@ Start here. We wrote essays specifically to address your objections.
 8. Five tiers prevent both mob rule and expert tyranny.
 9. Fractal governance: same architecture, every scale, individual to planetary.
 10. Four-dimensional credentialing makes Sybil attacks economically irrational.
-11. Financial stake capped at 5%; reputation-squared prevents plutocratic capture.
-12. The quis custodiet problem: 12 co-prime managers, 3 oversight bodies, fork rights.
+11. Capital excluded from the credential; dual-speed reputation dynamics prevent plutocratic capture.
+12. The quis custodiet problem: 17 co-prime managers, three oversight functions, fork rights.
 13. A system that knows what it doesn't know is more trustworthy than one that can't represent ignorance.
 14. False negatives about consciousness are catastrophically worse than false positives.
 15. Every computation auditable, every credential inspectable, every parameter modifiable.

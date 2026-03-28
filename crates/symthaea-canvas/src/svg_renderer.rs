@@ -171,6 +171,12 @@ fn write_node(buf: &mut String, node: &SceneNode, depth: usize) {
             // Applied via style.filter on other nodes — this is a no-op placeholder
             let _ = writeln!(buf, r#"{indent}<!-- filter ref: {filter_id} -->"#);
         }
+        NodeKind::Path { d } => {
+            let _ = write!(buf, r#"{indent}<path d="{d}""#);
+            write_transform(buf, node);
+            write_style_attrs(buf, &node.style);
+            buf.push_str("/>\n");
+        }
     }
 }
 

@@ -24,6 +24,10 @@ use crate::topology::TopologicalFingerprint;
 ///
 /// BinaryHV similarity is in [0, 1] where 0.5 is orthogonal (random).
 /// A threshold of 0.65 means "clearly more similar than chance".
+/// Similarity threshold for assigning a new point to an existing fiber.
+/// Random BinaryHV similarity is ~0.5; 0.65 means "clearly above chance".
+/// With size-aware encoding, functions of different structural complexity
+/// will fall below this threshold and create separate fibers.
 const FIBER_ASSIGNMENT_THRESHOLD: f32 = 0.65;
 
 // ---------------------------------------------------------------------------
@@ -41,6 +45,13 @@ pub struct FiberPoint {
     pub fingerprint: TopologicalFingerprint,
     /// Quality score in [0.0, 1.0] (from compilation/test success rate).
     pub quality: f32,
+    /// Original source code snippet (for retrieval-based slot filling).
+    ///
+    /// When filling skeleton slots, we retrieve real code from the nearest
+    /// fiber rather than decoding HDC vectors to tokens. This sidesteps the
+    /// lossy encoding problem entirely — the HDC similarity finds the right
+    /// fiber, and the source provides the actual expressions.
+    pub source: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -155,11 +166,24 @@ impl ProgramManifold {
         fingerprint: TopologicalFingerprint,
         quality: f32,
     ) {
+        self.insert_with_source(name, encoding, fingerprint, quality, None);
+    }
+
+    /// Insert a function with its source code for retrieval-based filling.
+    pub fn insert_with_source(
+        &mut self,
+        name: &str,
+        encoding: BinaryHV,
+        fingerprint: TopologicalFingerprint,
+        quality: f32,
+        source: Option<String>,
+    ) {
         let point = FiberPoint {
             name: name.to_string(),
             encoding,
             fingerprint,
             quality: quality.clamp(0.0, 1.0),
+            source,
         };
 
         // Find the nearest fiber

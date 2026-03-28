@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Demo: Symthaea analyzing its own source code
+//! Demo: Symthaea analyzing its own source code
 //!
 //! This example demonstrates the consciousness-aware code understanding system
 //! by having Symthaea analyze its own implementation.

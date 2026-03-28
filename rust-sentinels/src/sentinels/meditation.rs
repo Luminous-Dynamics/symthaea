@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! MeditationSentinel - Meditation state detection (Proof of Focus)
+//! MeditationSentinel - Meditation state detection (Proof of Focus)
 //!
 //! Measures meditation depth and stability from EEG using alpha/theta
 //! patterns. Validated on OpenNeuro ds001787 with 5/5 checks passed.

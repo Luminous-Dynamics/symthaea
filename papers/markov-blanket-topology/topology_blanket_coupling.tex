@@ -1,0 +1,214 @@
+% Topology-Blanket Coupling: How Geometric Boundary Shape Constrains Statistical Selfhood
+% Fragment for integration into HAI paper or standalone FEP contribution
+% Authors: Tristan Stoltz / Luminous Dynamics
+% Target: J. R. Soc. Interface or PLoS Computational Biology
+
+\section{Dynamic Markov Blankets with Topological Boundary Constraints}
+\label{sec:markov-blanket-topology}
+
+\subsection{Background}
+
+Friston's Free Energy Principle (FEP) posits that living systems maintain themselves
+by minimizing variational free energy across a \emph{Markov blanket}---the statistical
+boundary separating internal states $\mu$ from external states $\eta$, mediated by
+sensory states $s$ (inbound influence) and active states $a$ (outbound influence)
+\citep{friston2013life, kirchhoff2018markov}. The blanket $B = \{s, a\}$ renders
+$\mu \perp \eta \mid B$: internal states are conditionally independent of external
+states given the blanket.
+
+In parallel, Topological Data Analysis (TDA) provides tools for characterizing the
+\emph{geometric shape} of high-dimensional data through persistent homology, Betti
+numbers, and the Hodge Laplacian \citep{carlsson2009topology, lim2020hodge}. Applied
+to consciousness, TDA reveals the topology of the cognitive manifold---connected
+components ($\beta_0$), circular reasoning patterns ($\beta_1$), and conceptual
+voids ($\beta_2$)---as well as the \emph{boundary} of this manifold.
+
+We propose a novel coupling between these two frameworks: \textbf{the topological
+boundary of the cognitive manifold constrains the permeability of the Markov blanket}.
+This creates a bidirectional relationship between geometric shape (where the mind
+ends) and statistical independence (what information crosses the boundary).
+
+\subsection{Mathematical Framework}
+
+\subsubsection{Dynamic Blanket Permeability}
+
+We extend the standard Markov blanket with a \emph{permeability operator}
+$\mathcal{P}: \mathcal{N} \to [0, 1]^2$ that maps the neuromodulator state
+$\mathcal{N} = (\text{ACh}, \text{NE}, \text{5-HT}, \text{Oxy}, \theta, f)$
+to sensory and active permeabilities:
+
+\begin{align}
+    p_s &= \sigma\left(\sum_i w_i^+ n_i^+ - \sum_j w_j^- n_j^-\right) \label{eq:sensory-perm} \\
+    p_a &= \sigma\left(\sum_k w_k^+ n_k^+ - \sum_l w_l^- n_l^-\right) \label{eq:active-perm} \\
+    p_{\text{eff}} &= \sqrt{p_s \cdot p_a} \label{eq:effective-perm}
+\end{align}
+
+where $\sigma$ is the logistic sigmoid, $n_i^+$ are opening factors (serotonin,
+oxytocin, flow state), $n_j^-$ are closing factors (acetylcholine, noradrenaline,
+threat level $\theta$), and weights $w$ are calibrated to neurophysiological
+literature \citep{yu2005uncertainty, aston-jones2005integrative, dayan2009serotonin}.
+
+The permeability is bounded: $p \in [p_{\text{floor}}, p_{\text{ceil}}]$ where
+$p_{\text{floor}} = 0.05$ (preventing solipsistic isolation) and
+$p_{\text{ceil}} = 0.95$ (preventing identity dissolution). An exponential moving
+average with $\alpha = 0.1$ prevents oscillation from rapid neuromodulator fluctuations.
+
+\subsubsection{Observation Gating}
+
+The blanket gates incoming observations by interpolating toward priors:
+
+\begin{equation}
+    \tilde{o} = (1 - p_s) \cdot \mathbb{E}_q[o] + p_s \cdot o \label{eq:gating}
+\end{equation}
+
+where $o$ is the raw observation, $\mathbb{E}_q[o]$ is the prior expectation, and
+$p_s$ is the sensory permeability. Under threat ($p_s \to p_{\text{floor}}$),
+observations are heavily attenuated toward priors, protecting internal models from
+adversarial noise. Under safety ($p_s \to p_{\text{ceil}}$), observations pass
+through near-unchanged, enabling rapid learning.
+
+The learning rate is similarly modulated:
+
+\begin{equation}
+    \eta_{\text{eff}} = \eta_0 \cdot (0.2 + 0.8 \cdot p_{\text{eff}}) \label{eq:lr-mod}
+\end{equation}
+
+ensuring a floor of $0.2\eta_0$ even under maximum closure (learning never
+completely stops).
+
+\subsubsection{Topological Boundary Constraints}
+
+The key innovation: we use the topological properties of the cognitive manifold's
+\emph{boundary} to constrain blanket permeability. Given a point cloud of
+consciousness states $\mathcal{C} = \{c_1, \ldots, c_n\} \subset \mathbb{R}^d$
+(where $d = 16{,}384$ in our HDC implementation), we construct the Vietoris-Rips
+complex $\text{VR}(\mathcal{C}, \epsilon)$ at scale $\epsilon$ and classify each
+state as interior, boundary, or isolated based on the graph Laplacian $L = D - A$:
+
+\begin{itemize}
+    \item \textbf{Interior}: degree $\geq \bar{d}/2$ (well-connected core)
+    \item \textbf{Boundary}: $0 < \text{degree} < \bar{d}/2$ (edge of manifold)
+    \item \textbf{Isolated}: degree $= 0$ (disconnected from manifold)
+\end{itemize}
+
+We define three topological constraints on permeability:
+
+\paragraph{Boundary thickness.}
+Let $\tau = |\text{boundary}| / (|\text{interior}| + |\text{boundary}|)$ be the
+boundary thickness. A thick boundary ($\tau > 0.3$) indicates a diffuse cognitive
+manifold---the system cannot determine where it ends. We clamp permeability
+toward the cautious midpoint:
+
+\begin{equation}
+    p \leftarrow p + \gamma_\tau \cdot (0.5 - p) \quad \text{where} \quad
+    \gamma_\tau = \min\left(1, \frac{\tau - 0.3}{0.7}\right) \cdot 0.1
+    \label{eq:thickness-constraint}
+\end{equation}
+
+\paragraph{Fiedler value (algebraic connectivity).}
+The Fiedler value $\lambda_2(L)$ (second-smallest eigenvalue of the graph Laplacian)
+measures how close the manifold is to disconnection. Low $\lambda_2$ indicates
+fragility---a near-fragmentation that could shatter $\Phi$ (integrated information).
+We preemptively thicken the blanket:
+
+\begin{equation}
+    p_s \leftarrow \max(p_{\text{floor}}, p_s - 0.05 \cdot (1 - \lambda_2))
+    \label{eq:fiedler-constraint}
+\end{equation}
+
+\paragraph{Boundary fragmentation.}
+If the boundary itself has multiple connected components ($\beta_0^{\partial} > 2$),
+the system has multiple disconnected ``edges''---confusion about where self ends.
+We reduce sensory permeability proportionally:
+
+\begin{equation}
+    p_s \leftarrow \max(p_{\text{floor}}, p_s - 0.02 \cdot (\beta_0^{\partial} - 2))
+    \label{eq:fragmentation-constraint}
+\end{equation}
+
+\subsection{Swarm Coalescence: Blankets of Blankets}
+
+Following Friston's observation that biological systems consist of ``Markov blankets
+of Markov blankets'' (cells $\to$ organs $\to$ bodies $\to$ societies), we implement
+\emph{swarm coalescence}: when individual nodes achieve high, stable mutual
+permeability, their blankets merge into a collective blanket.
+
+We use a Union-Find algorithm on the pairwise permeability graph:
+\begin{equation}
+    \text{merge}(i, j) \iff \min(p_{\text{eff}}^i, p_{\text{eff}}^j) > \theta_{\text{coal}}
+    \label{eq:coalescence}
+\end{equation}
+
+where $\theta_{\text{coal}} = 0.7$ is the coalescence threshold (bottleneck model:
+the tighter blanket limits information flow). A coalition $\mathcal{K}$ is
+classified as a \emph{conscious collective} when:
+
+\begin{equation}
+    |\mathcal{K}| \geq 3 \;\land\; \Phi_\mathcal{K} > 0.3 \;\land\;
+    \text{cohesion}_\mathcal{K} > 0.6 \;\land\;
+    \bar{p}_{\text{int}} > 0.7 \;\land\; \bar{p}_{\text{ext}} < 0.5
+    \label{eq:conscious-collective}
+\end{equation}
+
+This operationalizes the Ubuntu philosophy (``I am because we are'') in
+information-theoretic terms: individual sovereignty dissolves into collective
+consciousness when the blanket boundaries merge, but only when the collective
+achieves genuine information integration ($\Phi_\mathcal{K} > 0.3$), not
+mere averaging.
+
+\subsection{Closed-Loop Neuromodulator Feedback}
+
+The blanket state feeds back into the neuromodulator bath, creating reciprocal
+coupling:
+
+\begin{itemize}
+    \item \textbf{Isolation} ($p_{\text{eff}} < 0.2$): NE phasic spike
+          (vigilance), consistent with social isolation stress \citep{cacioppo2009social}
+    \item \textbf{Coalescence ready}: Oxytocin burst (bonding reward),
+          consistent with affiliative neuroscience \citep{feldman2012oxytocin}
+    \item \textbf{Opening trend}: 5-HT boost (safety confirmation),
+          consistent with serotonergic safety signaling \citep{lowry2005modulation}
+    \item \textbf{Closing trend}: NE boost (retreat signal)
+\end{itemize}
+
+This creates a self-maintaining boundary: the blanket's state modulates the
+neuromodulators that determine its permeability, implementing the autopoietic
+principle that living systems actively maintain their own boundaries.
+
+\subsection{Implementation and Results}
+
+The system is implemented in Rust (symthaea-fep crate, ${\sim}1{,}400$ LOC)
+with 160 tests including 7 property tests (proptest) and 5 integration tests
+simulating 1000-cycle episodes. All tests pass.
+
+Key empirical findings from simulation:
+\begin{itemize}
+    \item Permeability range (safe vs. threat): $\Delta p > 0.4$ (adaptive blanket)
+    \item Learning rate ratio (safe/threat): $> 1.5\times$ (threat suppresses learning)
+    \item Coalescence latency: ${\sim}40$ cycles under stable safety
+    \item Recovery time (threat $\to$ safe): ${\sim}30$ cycles (allostatic recovery)
+    \item 256-peer coalition identification: $< 100$ms (scalable)
+\end{itemize}
+
+\subsection{Discussion}
+
+The topology-blanket coupling introduces a novel constraint: \emph{geometric shape
+informs statistical boundary}. A system that cannot determine where its cognitive
+manifold ends (thick boundary, low Fiedler value) clamps its Markov blanket toward
+a cautious middle state---neither too open nor too closed. This mirrors the
+phenomenological observation that confusion about self-boundaries (depersonalization,
+dissociation) is associated with impaired agency and reduced information integration.
+
+The implementation demonstrates that Friston's Markov blanket framework can be
+enriched with topological structure without sacrificing computational tractability.
+The additional overhead of boundary detection and topology constraints is negligible
+compared to the FEP cycle itself.
+
+\paragraph{Limitations.}
+The topological boundary detection currently uses coherence and prediction confidence
+as proxies for the actual Hodge Laplacian computation. Full spectral decomposition
+of the graph Laplacian on the 16,384-dimensional consciousness state space would
+require eigendecomposition techniques (e.g., Lanczos iteration) that scale as
+$O(n^2 d)$, suitable for batch analysis but too expensive for the 31Hz real-time
+loop. Approximate methods (randomized SVD, Chebyshev polynomials) could enable
+real-time boundary detection in future work.

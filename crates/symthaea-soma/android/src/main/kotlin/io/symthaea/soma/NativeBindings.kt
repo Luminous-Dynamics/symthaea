@@ -107,13 +107,4 @@ internal object NativeBindings {
     @JvmStatic external fun injectFrame(handle: Long, data: ByteArray, width: Int, height: Int, channels: Int): Float
     @JvmStatic external fun touchEvent(handle: Long, x: Float, y: Float, action: Int, pressure: Float)
     @JvmStatic external fun screenSalientRegionsJson(handle: Long): String?
-
-    // Daily rituals
-    @JvmStatic external fun morningRitual(handle: Long): String?
-    @JvmStatic external fun eveningRitual(handle: Long): String?
-
-    // Wellbeing profiles
-    @JvmStatic external fun setWellbeingProfile(handle: Long, name: String): Int
-    @JvmStatic external fun wellbeingProfileName(handle: Long): String?
-    @JvmStatic external fun wellbeingProfilesList(): String?
 }

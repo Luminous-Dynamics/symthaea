@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Adversarial Moral Algebra Test Suite
+//! Adversarial Moral Algebra Test Suite
 //!
 //! Tests the moral algebra engine against adversarial, edge-case, and multi-party
 //! consent scenarios. This suite addresses risks R-2.1 (Moral Algebra Edge Cases)

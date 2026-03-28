@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Theory of Mind — perspective-taking and empathy for the Spore WASM kernel.
 //!
 //! Port of the desktop SocialManager / HumanPartnerModel subsystem into a

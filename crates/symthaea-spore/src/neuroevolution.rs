@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! MicroEvolver: tick-based neuroevolution for WASM consciousness kernel.
 //!
 //! Stripped-down evolutionary loop that evaluates at most 1-2 organisms per tick,

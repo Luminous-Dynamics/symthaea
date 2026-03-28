@@ -213,7 +213,7 @@ impl DomainPlugin for NixOsPlugin {
         // Extract File Paths (absolute or relative with extensions)
         let path_re =
             regex::Regex::new(r"(/[a-zA-Z0-9._\-/]+)|([a-zA-Z0-9._\-]+/[a-zA-Z0-9._\-/]+\.[a-z]+)")
-                .unwrap();
+                .expect("valid regex literal for file path extraction");
         for mat in path_re.find_iter(text) {
             let path = mat.as_str();
             // Basic sanity check: must contain a dot (for extension) or a slash

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Counterfactual dream engine for the Spore WASM consciousness kernel.
 //!
 //! Records high-surprise moments during cognitive cycles, then "dreams" by

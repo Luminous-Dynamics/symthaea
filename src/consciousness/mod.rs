@@ -483,12 +483,13 @@ pub use epistemic_tiers::{
 };
 pub use fep_active_inference::{
     ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
-    ActiveInferenceAgentStats, ActiveInferenceSummary, CognitiveLoopFEPBridge,
-    CognitiveLoopFEPResult, EligibilityTraces, ExpectedFreeEnergyComputer,
+    ActiveInferenceAgentStats, ActiveInferenceSummary, BlanketPermeability, BlanketTelemetry,
+    CognitiveLoopFEPBridge, CognitiveLoopFEPResult, EligibilityTraces, ExpectedFreeEnergyComputer,
     ExpectedFreeEnergyResult, FreeEnergyCalculator, FreeEnergyComponents, GenerativeModel,
-    HiddenState, ModelConfidenceTracker, Observation, PerceptionResult, PrecisionEstimator,
-    StateTransition, TemporalDifferenceLearner, TemporalDifferenceLearningConfig,
-    TemporalDifferenceLearningStats,
+    HiddenState, MarkovBoundaryOperator, MarkovPartition, ModelConfidenceTracker, Observation,
+    PerceptionResult, PermeabilityInputs, PrecisionEstimator, StateTransition, SwarmCoalition,
+    TemporalDifferenceLearner, TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
+    TopologyBoundaryInputs,
 };
 pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
 pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};

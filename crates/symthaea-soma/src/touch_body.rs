@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Touch-as-proprioception: maps Android touch events to consciousness-relevant signals.
 //!
 //! Touch is Soma's proprioceptive sense — her body IS the touchscreen. Each touch

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Prospective Memory Task.
 //!
 //! Tests the ability to remember to perform an action when a cue appears
@@ -139,12 +136,12 @@ impl ProspectiveMemoryBenchmark {
                 let context_noise = ContinuousHV::random(dim, rng);
                 let stimulus = ContinuousHV::weighted_bundle(
                     &[&pm_target, &noise, &context_noise],
-                    &[0.45, 0.30, 0.25],
+                    &[0.35, 0.35, 0.30],
                 );
 
                 // Check if PM intention is detected
                 let pm_sim = stimulus.similarity(&pm_intention) as f64;
-                let cue_threshold = 0.22 + (1.0 - pm_activation) * 0.20;
+                let cue_threshold = 0.27 + (1.0 - pm_activation) * 0.25;
 
                 if pm_sim > cue_threshold {
                     pm_hits += 1;

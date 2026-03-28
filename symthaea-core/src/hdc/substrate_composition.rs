@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Substrate Composition: Weighted Mixtures of Substrates
+// Substrate Composition: Weighted Mixtures of Substrates
 //
 // Models heterogeneous systems where consciousness runs on a weighted
 // combination of substrate types (e.g., 60% silicon + 40% neuromorphic).

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Binding vs Bundling: Betti Number Analysis
+//! Binding vs Bundling: Betti Number Analysis
 //!
 //! Uses Betti numbers (β₀, β₁, β₂) instead of unity score to avoid saturation.
 //! Tests whether HDC binding produces different topological signatures than bundling.

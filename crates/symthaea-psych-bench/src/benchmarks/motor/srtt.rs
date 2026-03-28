@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Serial Reaction Time Task (SRTT).
 //!
 //! Participants respond to stimuli appearing at one of four positions.
@@ -71,8 +68,7 @@ impl SrttBenchmark {
 
         // Training phase: build sequence knowledge via HDC transition binding
         let mut prev_pos: Option<usize> = None;
-        // Attention lapses degrade implicit learning rate (Nissen & Bullemer, 1987)
-        let learning_rate: f32 = 0.15 * (1.0 - config.lapse_rate as f32 * 0.5);
+        let learning_rate: f32 = 0.15; // EMA rate for transition accumulation
         for _block in 0..training_blocks {
             for step in 0..trials_per_block {
                 let pos_idx = sequence[step % sequence.len()];
@@ -120,11 +116,10 @@ impl SrttBenchmark {
                 let noise_degrade = config.effective_noise() as f32 * 0.4;
                 let mut sim = stimulus.similarity(pos) * (1.0 - noise_degrade);
                 // Prediction boost: learned transitions speed response to expected position
-                // Lapse_rate degrades implicit learning signal (Nissen & Bullemer, 1987)
                 if let Some(pp) = prev_pos {
                     let pred = transition_memory.bind(&positions[pp]);
                     let pred_sim = pred.similarity(pos).max(0.0);
-                    sim += pred_sim * (0.4 - config.lapse_rate as f32 * 0.15);
+                    sim += pred_sim * 0.4;
                 }
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
@@ -135,21 +130,7 @@ impl SrttBenchmark {
                 }
             }
 
-            // Attention lapses cause random responding (Nissen & Bullemer, 1987)
-            let seq_item_correct = if config.lapse_rate > 0.0 {
-                let lapse_seed = config.trial_seed("motor", "srtt_lapse", step);
-                if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
-                    // Random guess among 4 positions
-                    let guess_correct =
-                        (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 4) == pos_idx as u64;
-                    guess_correct
-                } else {
-                    best_idx == pos_idx
-                }
-            } else {
-                best_idx == pos_idx
-            };
-            if seq_item_correct {
+            if best_idx == pos_idx {
                 seq_correct += 1;
             }
 
@@ -187,20 +168,7 @@ impl SrttBenchmark {
                 }
             }
 
-            // Attention lapses cause random responding (Nissen & Bullemer, 1987)
-            let rand_item_correct = if config.lapse_rate > 0.0 {
-                let lapse_seed = config.trial_seed("motor", "srtt_lapse", test_trials + _step);
-                if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
-                    let guess_correct =
-                        (lapse_seed.wrapping_mul(0x517CC1B727220A95) % 4) == pos_idx as u64;
-                    guess_correct
-                } else {
-                    best_idx == pos_idx
-                }
-            } else {
-                best_idx == pos_idx
-            };
-            if rand_item_correct {
+            if best_idx == pos_idx {
                 rand_correct += 1;
             }
 

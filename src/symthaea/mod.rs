@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Symthaea Facade
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Symthaea Facade
 //!
 //! The primary entry point for the Symthaea consciousness system.
 //! Wraps [`ContinuousMind`] and [`ConsciousnessLanguageCore`] into a
@@ -2633,12 +2634,18 @@ impl Symthaea {
                         description,
                         proposer_did,
                         consciousness_phi,
+                        meta_awareness,
+                        coherence,
+                        care_activation,
                         alignment_score,
                     } => DispatchCommand::SubmitProposal {
                         correlation_id,
                         description,
                         proposer_did,
                         consciousness_phi,
+                        meta_awareness,
+                        coherence,
+                        care_activation,
                         alignment_score,
                     },
                     GDC::CastVote {
@@ -2647,16 +2654,28 @@ impl Symthaea {
                         voter_did,
                         approve,
                         rationale,
+                        consciousness_phi,
+                        meta_awareness,
+                        coherence,
+                        care_activation,
                     } => DispatchCommand::CastVote {
                         correlation_id,
                         proposal_id,
                         voter_did,
                         approve,
                         rationale,
+                        consciousness_phi,
+                        meta_awareness,
+                        coherence,
+                        care_activation,
                     },
                     GDC::QueryActiveProposals => DispatchCommand::QueryActiveProposals,
                     GDC::EvaluateAsset { .. } => {
                         // EvaluateAsset handled directly in the bridge — not dispatched to conductor
+                        continue;
+                    }
+                    GDC::DeclareCrisis { .. } => {
+                        // DeclareCrisis handled directly in the bridge — maps to civic::create_incident
                         continue;
                     }
                 };

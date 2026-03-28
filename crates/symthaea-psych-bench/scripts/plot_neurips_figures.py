@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-
-# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-# SPDX-License-Identifier: AGPL-3.0-or-later
-# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""Generate publication-ready NeurIPS figures from psych-bench JSON output.
+"""Generate publication-ready NeurIPS figures from psych-bench JSON output.
 
 Usage:
     python plot_neurips_figures.py /tmp/bench.json --output-dir /tmp/figs/

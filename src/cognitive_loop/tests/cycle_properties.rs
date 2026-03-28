@@ -880,7 +880,7 @@ fn test_exploration_urge_bounded() {
 
     for i in 0..50 {
         service.cycle(&format!("explore bound {i}"));
-        let urge = service.curiosity_drive().exploration_urge;
+        let urge = service.behavior.curiosity_drive.exploration_urge;
         assert!(
             (0.0..=1.0).contains(&urge),
             "Exploration urge out of [0.0, 1.0] at cycle {i}: {urge}"
@@ -988,7 +988,7 @@ fn test_attention_sensitivity_bounded_after_cycles() {
 
     for i in 0..30 {
         service.cycle(&format!("attn sens {i}"));
-        let sens = service.adaptive_behavior().attention_sensitivity;
+        let sens = service.behavior.adaptive_behavior.attention_sensitivity;
         assert!(
             (0.5..=2.0).contains(&sens),
             "Attention sensitivity out of [0.5, 2.0] at cycle {i}: {sens}"

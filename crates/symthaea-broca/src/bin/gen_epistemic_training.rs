@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Generate epistemically-grounded training data with full 4D cube channels.
 //!
 //! Unlike `gen_nsm_training_data.rs` which uses template selection, this generator

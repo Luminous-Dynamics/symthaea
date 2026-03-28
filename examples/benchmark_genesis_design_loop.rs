@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Genesis Mission Challenge 23: Design-Production Loop
+//! Genesis Mission Challenge 23: Design-Production Loop
 //!
 //! Demonstrates HDC + CfC + FEP design-production feedback with
 //! O(1) prediction cost from 0.1s to 1 day.

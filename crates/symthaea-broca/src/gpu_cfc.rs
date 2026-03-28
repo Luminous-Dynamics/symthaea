@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! GPU-accelerated CfC (Closed-form Continuous-time) network via candle tensors.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! GPU-accelerated CfC (Closed-form Continuous-time) network via candle tensors.
 //!
 //! Packs neuron states and weights into batched [N, D] tensors on GPU (CUDA),
 //! replacing the per-neuron CPU loops with batched CUDA kernel launches.
@@ -883,6 +884,7 @@ impl GpuTrainer {
             }
         }
         // Rebuild GPU embedding cache on controller (for non-GPU paths)
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
         ctrl.rebuild_gpu_cache();
         Ok(())
     }

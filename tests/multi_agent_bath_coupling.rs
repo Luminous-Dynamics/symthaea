@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Multi-Agent Bath Coupling Integration Test
+//! Multi-Agent Bath Coupling Integration Test
 //!
 //! Validates that two `CognitiveLoopService` instances synchronize their
 //! neuromodulator baths through oxytocin-mediated coupling.

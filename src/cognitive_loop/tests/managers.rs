@@ -56,13 +56,24 @@ fn voice_coherence_bridge_reset_restores_clean_state() {
 #[test]
 fn social_manager_default_values() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
-    assert!((service.social_mgr.social.external_reward - 0.0).abs() < f32::EPSILON);
-    assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
-    assert!((service.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
-    assert!((service.social_mgr.social.social_prediction_accuracy - 0.5).abs() < f32::EPSILON);
-    assert_eq!(service.social_mgr.social.social_models_count, 0);
-    assert!((service.social_mgr.social.social_mean_trust - 0.5).abs() < f32::EPSILON);
+    assert!((service.behavior.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
+    assert!((service.behavior.social_mgr.social.external_reward - 0.0).abs() < f32::EPSILON);
+    assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
+    assert!(
+        (service.behavior.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON
+    );
+    assert!(
+        (service
+            .behavior
+            .social_mgr
+            .social
+            .social_prediction_accuracy
+            - 0.5)
+            .abs()
+            < f32::EPSILON
+    );
+    assert_eq!(service.behavior.social_mgr.social.social_models_count, 0);
+    assert!((service.behavior.social_mgr.social.social_mean_trust - 0.5).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -72,22 +83,22 @@ fn social_manager_reset_restores_defaults() {
     service.set_social_signals(0.9, 0.8, 0.7, 10, 0.6);
     service.set_relational_psi(0.99);
     // Verify mutation
-    assert!((service.social_mgr.social.social_trust - 0.9).abs() < f32::EPSILON);
+    assert!((service.behavior.social_mgr.social.social_trust - 0.9).abs() < f32::EPSILON);
     // Reset
     service.reset();
     // Verify restored
-    assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
-    assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
+    assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
+    assert!((service.behavior.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
 }
 
 #[test]
 fn social_manager_phi_dyad_disabled_by_default() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Default config doesn't enable primitive consciousness, so phi_dyad is None
-    assert!(service.social_mgr.phi_dyad.is_none());
-    assert!(service.social_mgr.partner_model.is_none());
-    assert!(service.social_mgr.recent_ai_hvs.is_empty());
-    assert!(service.social_mgr.recent_input_hvs.is_empty());
+    assert!(service.behavior.social_mgr.phi_dyad.is_none());
+    assert!(service.behavior.social_mgr.partner_model.is_none());
+    assert!(service.behavior.social_mgr.recent_ai_hvs.is_empty());
+    assert!(service.behavior.social_mgr.recent_input_hvs.is_empty());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -99,12 +110,14 @@ fn gwt_manager_default_flags() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Memory flag should be false initially
     assert!(!service
+        .consciousness
         .gwt_mgr
         .memory_flag
         .load(std::sync::atomic::Ordering::Relaxed));
     // Perception count should be 0
     assert_eq!(
         service
+            .consciousness
             .gwt_mgr
             .perception_count
             .load(std::sync::atomic::Ordering::Relaxed),
@@ -116,7 +129,7 @@ fn gwt_manager_default_flags() {
 fn gwt_manager_gwt_enabled_by_default() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // GWT is enabled by default
-    assert!(service.gwt_mgr.gwt.is_some());
+    assert!(service.consciousness.gwt_mgr.gwt.is_some());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -157,8 +170,8 @@ fn full_service_reset_restores_all_managers() {
     // Reset
     service.reset();
     // All managers should be at clean state
-    assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
-    assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
+    assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
+    assert!((service.behavior.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     assert!(service
         .language_comm
         .voice_coherence
@@ -289,7 +302,7 @@ fn soak_social_signals_survive_500_cycles() {
         // External reward is consumed on first use, should be ~0 afterward
         if i > 0 {
             assert!(
-                service.social_mgr.social.external_reward.abs() < f32::EPSILON,
+                service.behavior.social_mgr.social.external_reward.abs() < f32::EPSILON,
                 "external_reward not consumed by cycle {i}"
             );
         }
@@ -402,13 +415,21 @@ fn test_mce_narrative_wiring() {
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     // N should start low (no episodes yet)
-    let n_start = service.master_equation.narrative_coherence.compute();
+    let n_start = service
+        .consciousness
+        .master_equation
+        .narrative_coherence
+        .compute();
     assert!(
         n_start < 0.2,
         "N should start low with no episodes, got {n_start}"
     );
     assert_eq!(
-        service.master_equation.narrative_coherence.episode_count(),
+        service
+            .consciousness
+            .master_equation
+            .narrative_coherence
+            .episode_count(),
         0
     );
 
@@ -417,9 +438,21 @@ fn test_mce_narrative_wiring() {
         let _ = service.cycle("narrative wiring test");
     }
 
-    let n_end = service.master_equation.narrative_coherence.compute();
-    let episodes = service.master_equation.narrative_coherence.episode_count();
-    let scenarios = service.master_equation.narrative_coherence.scenario_count();
+    let n_end = service
+        .consciousness
+        .master_equation
+        .narrative_coherence
+        .compute();
+    let episodes = service
+        .consciousness
+        .master_equation
+        .narrative_coherence
+        .episode_count();
+    let scenarios = service
+        .consciousness
+        .master_equation
+        .narrative_coherence
+        .scenario_count();
 
     // After 200 cycles, should have accumulated episodes from consolidation events
     assert!(

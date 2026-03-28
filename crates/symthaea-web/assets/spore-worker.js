@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Web Worker for Spore consciousness engine.
+// Web Worker for Spore consciousness engine.
 // Keeps experiments and heavy cycles off the main thread.
 
 import init, { SporeEngine } from './pkg/symthaea_spore.js';

@@ -434,4 +434,53 @@ impl FepModule {
     pub fn trajectory_history(&self) -> &VecDeque<TrajectoryRecord> {
         &self.trajectory_history
     }
+
+    // ── Markov Blanket Integration ───────────────────────────────────────
+
+    /// Update the Markov blanket permeability from neuromodulator state.
+    pub fn update_blanket_permeability(
+        &mut self,
+        acetylcholine: f64,
+        noradrenaline: f64,
+        serotonin: f64,
+        oxytocin: f64,
+        threat_level: f64,
+        flow_state: f64,
+        peer_trust: f64,
+    ) {
+        use crate::consciousness::fep_active_inference::PermeabilityInputs;
+        let inputs = PermeabilityInputs {
+            acetylcholine,
+            noradrenaline,
+            serotonin,
+            oxytocin,
+            threat_level,
+            peer_trust,
+            flow_state,
+        };
+        self.enhanced_bridge.update_blanket_permeability(&inputs);
+    }
+
+    /// Apply topological boundary constraints to the Markov blanket.
+    pub fn apply_topology_constraints(
+        &mut self,
+        boundary_thickness: f64,
+        fiedler_value: f64,
+        boundary_components: usize,
+    ) {
+        use crate::consciousness::fep_active_inference::TopologyBoundaryInputs;
+        let topo = TopologyBoundaryInputs {
+            boundary_thickness,
+            fiedler_value,
+            boundary_components,
+        };
+        self.enhanced_bridge
+            .blanket
+            .apply_topology_constraints(&topo);
+    }
+
+    /// Get the current effective blanket permeability.
+    pub fn blanket_effective_permeability(&self) -> f64 {
+        self.enhanced_bridge.blanket.permeability().effective
+    }
 }

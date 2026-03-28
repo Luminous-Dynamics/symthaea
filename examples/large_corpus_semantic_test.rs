@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Large Corpus Semantic Clustering Test
+//! # Large Corpus Semantic Clustering Test
 //!
 //! Tests HDC semantic clustering with a diverse corpus of 100+ sentences
 //! across 12 semantic categories, including challenging edge cases.

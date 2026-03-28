@@ -1,0 +1,37 @@
+\documentclass[11pt]{letter}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+
+\signature{Tristan Stoltz\\Luminous Dynamics\\tristan.stoltz@evolvingresonantcocreationism.com}
+\address{Luminous Dynamics\\Richardson, TX}
+
+\begin{document}
+
+\begin{letter}{Editorial Board\\PLoS Computational Biology}
+
+\opening{Dear Editors,}
+
+We are pleased to submit our manuscript, ``\textbf{Hyperdimensional Active Inference: Free Energy Principle in Vector Symbolic Architectures},'' for consideration as a Research Article in PLoS Computational Biology.
+
+\textbf{Summary.} This paper presents Hyperdimensional Active Inference (HAI), the first integration of the Free Energy Principle with Hyperdimensional Computing (HDC). By reformulating variational free energy in 16,384-dimensional hypervector space, we achieve $O(d)$ complexity where existing active inference implementations require $O(n^2)$--$O(n^3)$ matrix operations. The work introduces precision-weighted binding---a novel HDC operation for confidence-modulated feature composition---and derives eight interpretable motor commands directly from expected free energy minimization.
+
+\textbf{Key contributions:}
+\begin{enumerate}
+    \item \textbf{Computational efficiency}: $7.9\times$ total speedup over pymdp ($1.9\times$ belief inference, $15.8\times$ action selection) on standard benchmarks (T-Maze, Grid World), with success rates improving from 10--16\% to 88--100\%.
+    \item \textbf{Cross-domain validation}: 17 benchmarks spanning neuroscience (\textit{C.~elegans} connectome analysis, EEG seizure detection), ethics (92.9\% on ETHICS benchmark via compositional moral algebra---no pretrained language models), signal processing (94.5\% speaker identification), and federated learning (Byzantine tolerance validated to 34\%).
+    \item \textbf{Mathematical foundations}: 14 rigorous mathematics modules grounding HDC in established theory (information theory, IIT 3.0, Riemannian geometry, tensor algebra, causal calculus, and more).
+    \item \textbf{Open-source implementation}: Complete Rust codebase ($\sim$341K LOC, 6,750+ tests across 24 workspace crates), all benchmarks reproducible via standalone examples.
+\end{enumerate}
+
+\textbf{Relevance to PLoS Computational Biology.} This work addresses a core challenge in computational neuroscience: making the Free Energy Principle computationally tractable at scale. The biological validation (C.~elegans connectome, EEG analysis) and the brain-inspired HDC substrate align directly with the journal's scope. The open-source codebase and reproducible benchmarks align with PLoS's commitment to open science.
+
+\textbf{Novelty.} While Liquid AI (LFM2/LFM2.5) validates liquid neural networks commercially and FedHDC demonstrates federated HDC, no existing system integrates active inference with hyperdimensional computing. Our HDC moral algebra achieves 92.9\% on ETHICS using only vector operations---a fundamentally different approach from large language models.
+
+\textbf{Reproducibility.} All benchmarks are reproducible via standalone Rust examples with deterministic seeds. The complete codebase, raw timing data, and supplementary materials are available at \url{https://github.com/Luminous-Dynamics/symthaea}.
+
+\textbf{Data Availability.} All synthetic benchmarks are generated from code. External datasets used (Sleep-EDF, LibriSpeech, ETHICS, Social Chemistry 101) are publicly available under open licenses.
+
+\closing{Sincerely,}
+
+\end{letter}
+\end{document}

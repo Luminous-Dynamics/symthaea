@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mid-episode physical perturbations for domain randomization.
 //!
 //! When perturbations hit mid-episode, FEP's prediction error spikes, tau drops,

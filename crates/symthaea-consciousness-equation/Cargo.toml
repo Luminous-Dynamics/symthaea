@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Master Consciousness Equation: C(t) = σ(softmin(Φ,B,W,A,R,E,K;τ)) × [Σ(wᵢ×Cᵢ×γᵢ)/Σ(wᵢ)] × S × ρ(t) × M × N × Soc"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 
 [dependencies]
 serde = { workspace = true }

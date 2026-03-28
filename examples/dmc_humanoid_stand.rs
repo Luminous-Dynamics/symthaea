@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! DMC Humanoid Stand training example.
+//! DMC Humanoid Stand training example.
 //!
 //! Trains an HDC-LTC unified network (16,384D, 3×8 neurons) to control a
 //! bipedal humanoid for the DMC Stand task using FEP Active Inference for

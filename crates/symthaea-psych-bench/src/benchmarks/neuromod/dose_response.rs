@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Dose-Response Curve Benchmark — Monotonic Behavioral Output
 //!
 //! Graded dose sweeps (0.1–0.8) per transmitter verify monotonic behavioral

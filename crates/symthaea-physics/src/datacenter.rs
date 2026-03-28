@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Data Center Operations — Genesis Mission Challenge 20
 //!
 //! HDC + CfC + FEP architecture for data center monitoring.

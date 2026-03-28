@@ -1,6 +1,4 @@
-# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-# SPDX-License-Identifier: AGPL-3.0-or-later
-# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root# NixOS Module: Symthaea Recovery Partition Timer
+# NixOS Module: Symthaea Recovery Partition Timer
 #
 # Implements the Ahimsa 30-day recovery window (Task D). After installation,
 # the recovery partition (~32GB) is preserved for 30 days so the user can

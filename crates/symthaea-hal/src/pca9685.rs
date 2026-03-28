@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! PCA9685 16-channel 12-bit PWM controller driver.
 //!
 //! Generic over `embedded_hal::i2c::I2c` — works with both real hardware

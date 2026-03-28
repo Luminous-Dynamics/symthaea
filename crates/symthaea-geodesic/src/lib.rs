@@ -28,24 +28,47 @@
 //! - Structural equivalence across syntactic variations
 
 pub mod ast_bridge;
+pub mod codebase_bridge;
+pub mod composer;
+pub mod emitter_bridge;
 pub mod execution_oracle;
 pub mod manifold;
 pub mod manifold_bootstrap;
+pub mod noise;
 pub mod pdg;
+pub mod periodic_table;
+pub mod program_emitter;
+pub mod program_memory;
+pub mod resonant_explorer;
 pub mod sheaf;
 pub mod skeleton_synthesis;
 pub mod synthesis;
+pub mod token_codebook;
 pub mod topology;
+pub mod tri_oracle;
+pub mod understanding;
+pub mod verification;
 
 // Re-export key types for convenience.
+pub use codebase_bridge::{index_directory, index_file, IndexResult};
+pub use emitter_bridge::{
+    emit_rust_from_skeleton, skeleton_to_code_spec, skeleton_to_plan_steps, GeodesicCodeSpec,
+    GeodesicPlanAction, GeodesicPlanStep,
+};
 pub use execution_oracle::{ComplexityClass, ExecutionOracle, PredictionResult};
 pub use manifold::{Fiber, FiberPoint, ProgramManifold};
 pub use manifold_bootstrap::{bootstrap_from_encodings, bootstrap_with_topology, BootstrapResult};
 pub use pdg::ProgramDependenceGraph;
+pub use program_emitter::{emit_expression, emit_rust};
+pub use program_memory::{ProgramMemory, ProgramMemoryEntry};
+pub use resonant_explorer::{ExplorationConfig, ExplorationResult, ResonantExplorer};
 pub use sheaf::{CodeSheaf, LocalSection, SheafDiagnostic};
 pub use skeleton_synthesis::{
     active_inference_synthesize, build_skeleton_from_topology, fill_from_manifold,
     ActiveInferenceResult, SkeletonCombinator, SkeletonSlot, TopologicalSignature,
 };
 pub use synthesis::{CodeSpec, GeodesicSynthesizer, SynthesisConfig, SynthesisResult};
+pub use token_codebook::TokenCodebook;
 pub use topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};
+pub use tri_oracle::{TriOracle, TriOracleConfig, TriOracleScore};
+pub use verification::{verify_generated_code, VerificationResult};

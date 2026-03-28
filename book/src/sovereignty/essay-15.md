@@ -27,7 +27,7 @@ This is why transparency is not merely a desirable property of consciousness-cou
 
 ### II. Three Layers of Transparency
 
-The consciousness-coupled governance system implements transparency at three levels.
+The domain-coupled governance system implements transparency at three levels.
 
 **Algorithmic transparency.** The consciousness credential computation — the four-dimensional score, the tier derivation, the moral algebra evaluation, the integration measurement — is open-source. Every line of code that contributes to a governance credential is publicly available, auditable, and modifiable through consciousness-coupled governance. A participant who receives a consciousness score can trace every step of the computation: which identity assurance level was verified, how the reputation was calculated, which community attestations contributed and with what weight, how the engagement dimension was scored. There is no black box.[^1]
 

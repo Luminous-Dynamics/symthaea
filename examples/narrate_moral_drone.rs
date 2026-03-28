@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Narrated Moral Drone — Generates consciousness-driven vocal narration.
+//! Narrated Moral Drone — Generates consciousness-driven vocal narration.
 //!
 //! Each narration segment's voice quality (valence, arousal, consciousness level)
 //! is computed by running the text through Symthaea's real cognitive loop —

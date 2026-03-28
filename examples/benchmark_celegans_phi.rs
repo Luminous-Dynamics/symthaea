@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # C. elegans Connectome Φ Benchmark
+//! # C. elegans Connectome Φ Benchmark
 //!
 //! Validates Symthaea's Integrated Information (Φ) computation on the
 //! C. elegans nervous system - the only fully mapped connectome of any organism.

@@ -258,25 +258,25 @@ fn test_compute_reward_signal_clamped() {
 #[test]
 fn test_compute_reward_signal_consumes_external() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.social_mgr.social.external_reward = 0.7;
+    service.behavior.social_mgr.social.external_reward = 0.7;
     let _reward = service.compute_reward_signal(0.2, 0.3);
     // external_reward should be consumed (set to 0)
     assert!(
-        service.social_mgr.social.external_reward.abs() < f32::EPSILON,
+        service.behavior.social_mgr.social.external_reward.abs() < f32::EPSILON,
         "external_reward not consumed: {}",
-        service.social_mgr.social.external_reward
+        service.behavior.social_mgr.social.external_reward
     );
 }
 
 #[test]
 fn test_apply_strategy_modulation_exploratory() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let before = service.adaptive_behavior.exploration_factor;
+    let before = service.behavior.adaptive_behavior.exploration_factor;
     service.apply_strategy_modulation(ResponseStrategy::Exploratory);
     // Exploratory strategy sets a specific exploration factor
     assert!(
-        (service.adaptive_behavior.exploration_factor - before).abs() > f32::EPSILON
-            || service.adaptive_behavior.exploration_factor == 0.8,
+        (service.behavior.adaptive_behavior.exploration_factor - before).abs() > f32::EPSILON
+            || service.behavior.adaptive_behavior.exploration_factor == 0.8,
         "Exploratory strategy didn't modulate exploration_factor"
     );
 }
@@ -286,9 +286,9 @@ fn test_apply_strategy_modulation_concise() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     service.apply_strategy_modulation(ResponseStrategy::Concise);
     assert!(
-        (service.adaptive_behavior.speech_rate_multiplier - 1.2).abs() < f32::EPSILON,
+        (service.behavior.adaptive_behavior.speech_rate_multiplier - 1.2).abs() < f32::EPSILON,
         "Concise strategy should set speech_rate_multiplier to 1.2, got {}",
-        service.adaptive_behavior.speech_rate_multiplier
+        service.behavior.adaptive_behavior.speech_rate_multiplier
     );
 }
 
@@ -296,13 +296,13 @@ fn test_apply_strategy_modulation_concise() {
 fn test_reapply_strategy_preserves_stronger() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Set exploration very high
-    service.adaptive_behavior.exploration_factor = 0.95;
+    service.behavior.adaptive_behavior.exploration_factor = 0.95;
     service.reapply_strategy_modulation(ResponseStrategy::Exploratory);
     // reapply uses .max(), so should preserve the higher value
     assert!(
-        service.adaptive_behavior.exploration_factor >= 0.8,
+        service.behavior.adaptive_behavior.exploration_factor >= 0.8,
         "reapply should preserve higher exploration: {}",
-        service.adaptive_behavior.exploration_factor
+        service.behavior.adaptive_behavior.exploration_factor
     );
 }
 
@@ -339,7 +339,7 @@ fn test_step_fep_active_inference_high_error_response() {
     // The FEP system should have responded in some way
     // (exact behavior depends on action selection, but state should have changed)
     let state_changed = service.fep.lr_boost != initial_lr_boost
-        || service.curiosity_drive.exploration_urge > 0.0
+        || service.behavior.curiosity_drive.exploration_urge > 0.0
         || service.fep.agent.precision.sensory_precision != 1.0;
     // This is a soft assertion — FEP action is stochastic
     let _ = state_changed; // Just verify no panic
@@ -501,12 +501,12 @@ fn test_compute_equation_v2_no_equation() {
 fn test_compute_equation_v2_exploration_unaffected_at_zero() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let mut timings = super::super::ModuleTimings::default();
-    let initial_explore = service.curiosity_drive.exploration_urge;
+    let initial_explore = service.behavior.curiosity_drive.exploration_urge;
     let _ = service.compute_equation_v2_phase(0.5, 0.7, 0.3, 0.6, &mut timings);
     // Score=0.0, low-consciousness feedback (0.0 < 0.3) doesn't apply since eq is exactly 0.0
     // and condition is `> 0.0 && < 0.3`
     assert!(
-        (service.curiosity_drive.exploration_urge - initial_explore).abs() < f64::EPSILON,
+        (service.behavior.curiosity_drive.exploration_urge - initial_explore).abs() < f64::EPSILON,
         "Exploration changed at score=0.0"
     );
 }

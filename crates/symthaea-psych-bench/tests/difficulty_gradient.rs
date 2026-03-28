@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Difficulty gradient test: verify that increasing difficulty reduces accuracy.
 //!
 //! Runs Stroop at difficulty levels 0.0, 0.3, 0.6, 0.9 and verifies

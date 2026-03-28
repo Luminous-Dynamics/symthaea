@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Accurate retrieval task.
 //!
 //! Store N facts as HDC vectors, run delay ticks, then query
@@ -73,7 +70,7 @@ impl AccurateRetrievalBenchmark {
 
             // Time pressure: base 0.3 yields ~85% retrieval; +0.10/unit raises criterion,
             // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
-            let threshold = 0.25 + config.time_pressure as f32 * 0.10;
+            let threshold = 0.3 + config.time_pressure as f32 * 0.10;
             if max_sim > threshold {
                 retrieved += 1;
             }

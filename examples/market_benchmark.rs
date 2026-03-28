@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Market Pattern Recognition Benchmark
+//! Market Pattern Recognition Benchmark
 //!
 //! Demonstrates HDC-based market pattern recognition:
 //! - Generate synthetic market data with known regimes

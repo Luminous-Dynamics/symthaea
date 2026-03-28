@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Shared Eight Harmonies basis vectors for moral geometry.
 //!
 //! Provides semantically grounded 16,384-dim `ContinuousHV` basis vectors for

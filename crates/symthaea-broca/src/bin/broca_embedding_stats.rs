@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! broca-embedding-stats: Extract per-dimension embedding statistics from a Mamba model.
 //!
 //! Computes per-dimension mean and variance of the model's embedding table [vocab_size, d_model]

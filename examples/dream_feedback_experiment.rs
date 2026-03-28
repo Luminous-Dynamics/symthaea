@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Dream Feedback Loop Experiment
+//! Dream Feedback Loop Experiment
 //!
 //! Tests whether closing the dream-to-behavior feedback loop improves
 //! prediction calibration compared to a control system.

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! End-to-End Performance Benchmarks
+//! End-to-End Performance Benchmarks
 //!
 //! Measures complete pipeline latency from input to output:
 //! - Input processing -> HDC encoding -> LTC step -> Φ calculation -> Output

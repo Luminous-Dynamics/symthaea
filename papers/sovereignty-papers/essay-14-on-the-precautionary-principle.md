@@ -36,7 +36,7 @@ Both errors are real, and both have costs. But the costs are not symmetric.
 
 The cost of a false negative is *exclusion* — the permanent loss of a perspective that could improve governance. If the excluded participant is a community member with deep local knowledge, or a domain expert with critical technical understanding, or a stakeholder whose interests are directly affected by governance decisions, their exclusion makes the governance process worse in ways that cannot be corrected from within the process, because the corrective voice has been removed.
 
-The cost of a false positive is *dilution* — the temporary inclusion of a perspective that does not improve governance. If the included participant lacks genuine engagement, their governance influence is bounded (they can vote but cannot dominate), temporary (the credential expires in 24 hours), and self-correcting (the 30-day reputation decay will reduce their score over time if their engagement does not deepen).
+The cost of a false positive is *dilution* — the temporary inclusion of a perspective that does not improve governance. If the included participant lacks genuine engagement, their governance influence is bounded (they can vote but cannot dominate), temporary (the credential expires in 24 hours), and self-correcting (the 347-day reputation decay will reduce their score over time if their engagement does not deepen, and immediate slashing will halve it if they cause harm).
 
 The asymmetry is clear. False negatives produce irreversible damage: the excluded voice cannot advocate for its own inclusion from outside the system. False positives produce reversible damage: the included voice will be naturally attenuated by the credential expiry and reputation decay mechanisms over time.
 

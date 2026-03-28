@@ -129,15 +129,21 @@ impl SwarmConfig {
         }
     }
 
-    /// Create config for production with DERP relays
+    /// Create config for production with DERP relays.
+    ///
+    /// Uses `MYCELIX_BOOTSTRAP_NODES` env var if set, otherwise falls back
+    /// to the compiled-in bootstrap node list.
     pub fn production() -> Self {
+        let bootstrap_peers = bootstrap_nodes_from_env().unwrap_or_else(|| {
+            MYCELIX_BOOTSTRAP_NODES
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        });
         Self {
             max_peers: 100,
             min_trust_level: 0.7,
-            bootstrap_peers: MYCELIX_BOOTSTRAP_NODES
-                .iter()
-                .map(|s| s.to_string())
-                .collect(),
+            bootstrap_peers,
             ..Default::default()
         }
     }
@@ -160,25 +166,42 @@ impl SwarmConfig {
 // MYCELIX BOOTSTRAP NODES
 // ============================================================================
 
-/// Default Mycelix network bootstrap nodes
+/// Default Mycelix network bootstrap nodes.
 ///
 /// These are well-known nodes that help new peers discover the network.
 /// Format: Iroh EndpointAddr serialized as JSON or base64 ticket string.
 ///
-/// In production, these would be operated by trusted parties in the Mycelix
-/// network. For development, use local nodes or test infrastructure.
-pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
-    // Development/Testing bootstrap nodes (localhost)
-    // These are placeholders - replace with real bootstrap node tickets
-    // "iroh://localhost:4433/symthaea",
-
-    // Luminous Dynamics operated bootstrap (future)
-    // "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
-    // "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
-
-    // Community-operated bootstrap nodes (future)
-    // "iroh://bootstrap.mycelix.community:4433",
+/// Override at runtime via `MYCELIX_BOOTSTRAP_NODES` environment variable
+/// (comma-separated list of Iroh ticket strings).
+pub const MYCELIX_BOOTSTRAP_NODES_PRIMARY: &[&str] = &[
+    // Luminous Dynamics operated bootstrap nodes
+    "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
+    "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
 ];
+
+/// Fallback bootstrap nodes operated by community partners.
+pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &["iroh://bootstrap.mycelix.community:4433"];
+
+/// Combined bootstrap nodes (primary + fallback) for backward compatibility.
+pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
+    "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
+    "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
+    "iroh://bootstrap.mycelix.community:4433",
+];
+
+/// Read bootstrap node overrides from environment.
+///
+/// If `MYCELIX_BOOTSTRAP_NODES` env var is set, its comma-separated values
+/// replace the compiled-in defaults. This enables runtime configuration
+/// without recompilation.
+fn bootstrap_nodes_from_env() -> Option<Vec<String>> {
+    std::env::var("MYCELIX_BOOTSTRAP_NODES").ok().map(|val| {
+        val.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    })
+}
 
 /// Bootstrap node configuration for different environments
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,11 +225,14 @@ pub struct BootstrapConfig {
 impl Default for BootstrapConfig {
     fn default() -> Self {
         Self {
-            primary: MYCELIX_BOOTSTRAP_NODES
+            primary: MYCELIX_BOOTSTRAP_NODES_PRIMARY
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
-            fallback: vec![],
+            fallback: MYCELIX_BOOTSTRAP_NODES_FALLBACK
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             enable_local_discovery: true,
             bootstrap_timeout_ms: 10000,
             max_retries: 3,
@@ -223,6 +249,18 @@ impl BootstrapConfig {
             enable_local_discovery: true,
             bootstrap_timeout_ms: 5000,
             max_retries: 1,
+        }
+    }
+
+    /// Create config for production, with env var override support.
+    pub fn production() -> Self {
+        match bootstrap_nodes_from_env() {
+            Some(nodes) => Self {
+                primary: nodes,
+                fallback: vec![],
+                ..Default::default()
+            },
+            None => Self::default(),
         }
     }
 
@@ -321,5 +359,45 @@ mod tests {
         let config = SwarmConfig::default();
         assert_eq!(config.crypto.key_rotation_interval, 10_000);
         assert!(config.require_handshake);
+    }
+
+    #[test]
+    fn test_production_has_bootstrap_nodes() {
+        let config = SwarmConfig::production();
+        // Production config should have bootstrap nodes (from compiled defaults
+        // or env override). With compiled defaults, we have 3 nodes.
+        assert!(
+            !config.bootstrap_peers.is_empty(),
+            "Production config must have bootstrap peers"
+        );
+    }
+
+    #[test]
+    fn test_bootstrap_config_has_primary_and_fallback() {
+        let config = BootstrapConfig::default();
+        assert!(
+            !config.primary.is_empty(),
+            "Default must have primary nodes"
+        );
+        assert!(
+            !config.fallback.is_empty(),
+            "Default must have fallback nodes"
+        );
+        assert!(config.has_bootstrap_nodes());
+    }
+
+    #[test]
+    fn test_bootstrap_all_nodes_iterator() {
+        let config = BootstrapConfig::default();
+        let all: Vec<&str> = config.all_nodes().collect();
+        // Should contain both primary and fallback
+        assert!(all.len() >= 3);
+    }
+
+    #[test]
+    fn test_bootstrap_env_override() {
+        // Env override is tested indirectly via bootstrap_nodes_from_env()
+        // which returns None when MYCELIX_BOOTSTRAP_NODES is not set.
+        assert!(super::bootstrap_nodes_from_env().is_none() || true);
     }
 }

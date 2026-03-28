@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Layer 21 Deep Analysis
+//! Layer 21 Deep Analysis
 //!
 //! Investigates WHY Layer 21 shows stronger phenomenal effects than Layer 23.
 //!

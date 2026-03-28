@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! MTEB-subset evaluation — Retrieval (MRR@10, Recall@5) and Classification tasks.
 //!
 //! Tier 1 (always): Simulated embeddings — verifies pipeline produces finite metrics.

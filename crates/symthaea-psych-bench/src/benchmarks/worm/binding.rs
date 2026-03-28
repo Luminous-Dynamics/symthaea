@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Feature binding task.
 //!
 //! Tests whether WM correctly binds features (color+shape) together,
@@ -119,24 +116,8 @@ impl BindingBenchmark {
             .map(|item| item.similarity(&novel_hv))
             .fold(0.0f32, f32::max);
 
-        // Binding accuracy: correctly accept target AND reject lure.
-        // Use softmax over similarities to produce graded response, modeling
-        // signal detection (Luck & Vogel, 1997). Temperature controls how
-        // sharply the agent discriminates — lower = sharper distinction.
-        let binding_temp = 0.08_f32;
-        let max_sim = binding_sim.max(lure_sim);
-        let e_target = ((binding_sim - max_sim) / binding_temp).exp();
-        let e_lure = ((lure_sim - max_sim) / binding_temp).exp();
-        let p_target = e_target / (e_target + e_lure);
-        // Stochastic response via softmax probability
-        rng_state ^= rng_state << 13;
-        rng_state ^= rng_state >> 7;
-        rng_state ^= rng_state << 17;
-        let binding_correct = if (rng_state % 10000) as f32 / 10000.0 < p_target {
-            1.0
-        } else {
-            0.0
-        };
+        // Binding accuracy: correctly accept target AND reject lure
+        let binding_correct = if binding_sim > lure_sim { 1.0 } else { 0.0 };
 
         // Feature-only accuracy: correctly distinguish target from novel
         let feature_correct = if binding_sim > novel_sim { 1.0 } else { 0.0 };

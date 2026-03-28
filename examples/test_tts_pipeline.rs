@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! TTS Pipeline Integration Test
+//! TTS Pipeline Integration Test
 //!
 //! Tests the complete text-to-speech pipeline:
 //! Text → G2P (espeak-ng + Misaki vocab) → Kokoro ONNX → Audio samples

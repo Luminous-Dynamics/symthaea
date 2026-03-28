@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! GWT Gradual Asphyxiation Benchmark — Mapping the Threshold of Unconsciousness
 //!
 //! Gradually increases the GWT entry threshold from baseline (0.30) to near-extinction

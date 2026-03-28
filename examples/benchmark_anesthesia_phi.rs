@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Anesthesia Monitoring Φ Gradient Benchmark
+//! # Anesthesia Monitoring Φ Gradient Benchmark
 //!
 //! Validates Symthaea's Φ computation for tracking consciousness transitions
 //! during simulated anesthesia induction and recovery, using the PhiEngine

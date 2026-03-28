@@ -53,7 +53,7 @@ Breaking the feedback loop requires removing capital as the primary input to gov
 
 ### III. The Three Defenses
 
-The consciousness-coupled governance system described in this series implements three structural defenses against plutocratic capture. None is a parameter tweak. Each is an architectural decision that changes the relationship between capital and governance power.
+The domain-coupled governance system described in this series implements three structural defenses against plutocratic capture. None is a parameter tweak. Each is an architectural decision that changes the relationship between capital and governance power.
 
 **First: total exclusion of capital from the credential formula.** The consciousness credential is computed as a linear combination of four dimensions — identity, reputation, community, and engagement — with weights of 25%, 25%, 30%, and 20% respectively. No financial term appears in the formula.[^1] A participant who has invested $10 million in the governed domain and a participant who has invested nothing receive identical treatment. Their governance power is determined solely by their verified identity, their behavioral history, their community trust, and their domain engagement.
 
@@ -93,7 +93,7 @@ Under consciousness coupling, the remediation vote would have been dominated not
 
 Plutocratic capture is a zero-sum dynamic: the wealthy gain governance power at the expense of the community. Every additional unit of capital-based governance power that accrues to the wealthy is a unit taken from participants who may be more conscious of the governed domain but less wealthy.
 
-Consciousness coupling replaces this zero-sum dynamic with a positive-sum one. The only way to increase your governance power in a consciousness-coupled system is to increase your consciousness of the governed domain — to deepen your identity verification, to build a longer history of trustworthy behavior, to earn more community trust, and to engage more deeply with the domain's governance. Each of these actions, by definition, makes you a better governor. The system rewards exactly the behavior it needs.
+Domain-coupled credentialing replaces this zero-sum dynamic with a positive-sum one. The only way to increase your governance power in a domain-coupled system is to deepen your engagement with the governed domain — to deepen your identity verification, to build a longer history of trustworthy behavior, to earn more community trust, and to engage more deeply with the domain's governance. Each of these actions, by definition, makes you a better governor. The system rewards exactly the behavior it needs.
 
 Compare this to the 1602 architecture, where the way to increase your governance power is to accumulate more capital — an activity that may or may not correlate with domain understanding and that creates incentives to extract value from the governed domain (increasing your capital) rather than to steward it (increasing its health).
 

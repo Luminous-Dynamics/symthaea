@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Language-Specific Code Emitters
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Language-Specific Code Emitters
 //!
 //! Convert abstract code plans into language-specific source code.
 //! Each emitter follows the conventions of its target language.
@@ -761,7 +762,7 @@ fn infer_rust_body(
     if purpose_lower.contains("mode") {
         if params.len() == 1 && params[0].1.contains("Vec") {
             return format!(
-                "let mut counts = std::collections::HashMap::new();\n    for v in {0}.iter() {{\n        *counts.entry(v).or_insert(0usize) += 1;\n    }}\n    counts.into_iter().max_by_key(|&(_, c)| c).map(|(v, _)| *v).unwrap()",
+                "let mut counts = std::collections::HashMap::new();\n    for v in {0}.iter() {{\n        *counts.entry(v).or_insert(0usize) += 1;\n    }}\n    counts.into_iter().max_by_key(|&(_, c)| c).map(|(v, _)| *v).unwrap_or_default()",
                 params[0].0
             );
         }

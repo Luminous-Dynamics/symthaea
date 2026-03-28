@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! NRC-style safety level enum — always available (not feature-gated).
 //!
 //! Extracted from `safety::agent` so that modules like `defense.rs`,

@@ -114,7 +114,7 @@ fn quality_coherence_stable() {
 #[test]
 fn quality_boredom_dampens_confidence() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.curiosity_drive.boredom = 0.9;
+    service.behavior.curiosity_drive.boredom = 0.9;
     let initial_conf = service.prediction_confidence;
     let mut timings = ModuleTimings::default();
 
@@ -131,13 +131,13 @@ fn quality_boredom_dampens_confidence() {
 #[test]
 fn quality_exploration_homeostasis_clamps() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.curiosity_drive.exploration_urge = 1.0;
+    service.behavior.curiosity_drive.exploration_urge = 1.0;
     let mut timings = ModuleTimings::default();
 
     let _ = service.run_quality_and_homeostasis(0.5, false, 0.3, 1.0, 0.8, 0.8, &mut timings);
 
     // exploration_urge should be pulled back within ±0.5 of start (0.3)
-    let urge = service.curiosity_drive.exploration_urge;
+    let urge = service.behavior.curiosity_drive.exploration_urge;
     assert!(
         urge <= 0.8 + 0.01,
         "exploration should be clamped within budget: urge={urge}"
@@ -181,7 +181,7 @@ fn neuromod_confidence_crash_sht_dip() {
 #[test]
 fn neuromod_gaba_seizure_freezes() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let initial_exploration = service.curiosity_drive.exploration_urge;
+    let initial_exploration = service.behavior.curiosity_drive.exploration_urge;
     // Simulate seizure-like E/I imbalance: pump glutamate to spike ei_ratio > 1.5
     service.neuromod.bath.glutamate.produce(2.0);
     // Process E/I homeostasis to trigger seizure protection
@@ -207,9 +207,9 @@ fn neuromod_gaba_seizure_freezes() {
     // but NE exploration_delta Add() proposals leak small amounts through the
     // weighted average. Allow 0.02 tolerance above suppressed baseline.
     assert!(
-        service.curiosity_drive.exploration_urge <= initial_exploration * 0.5 + 0.02,
+        service.behavior.curiosity_drive.exploration_urge <= initial_exploration * 0.5 + 0.02,
         "seizure protection should heavily suppress exploration: {}",
-        service.curiosity_drive.exploration_urge
+        service.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -453,15 +453,15 @@ fn dynamics_resonator_empty_no_recall() {
 #[test]
 fn phi_divergence_boosts_exploration() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let initial = service.curiosity_drive.exploration_urge;
+    let initial = service.behavior.curiosity_drive.exploration_urge;
     // Simulate phi divergence boost via the helper
     // divergence = 0.3 → boost = (0.3 - 0.1).min(0.2) * 0.15 = 0.2 * 0.15 = 0.03
     service.adjust_exploration("phi_divergence", 0.03);
     assert!(
-        service.curiosity_drive.exploration_urge > initial,
+        service.behavior.curiosity_drive.exploration_urge > initial,
         "phi divergence should boost exploration: before={}, after={}",
         initial,
-        service.curiosity_drive.exploration_urge
+        service.behavior.curiosity_drive.exploration_urge
     );
 }
 
@@ -501,17 +501,29 @@ fn phi_zero_relational_no_oxy() {
 #[test]
 fn phi_trust_grows_with_coherence() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.social_mgr.partner_model =
+    service.behavior.social_mgr.partner_model =
         Some(crate::partnership::HumanPartnerModel::new("test_partner"));
-    let initial_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
+    let initial_trust = service
+        .behavior
+        .social_mgr
+        .partner_model
+        .as_ref()
+        .unwrap()
+        .trust;
 
     // Simulate coherence=0.8 → signal = (0.8 - 0.5) * 0.01 = 0.003
-    if let Some(ref mut model) = service.social_mgr.partner_model {
+    if let Some(ref mut model) = service.behavior.social_mgr.partner_model {
         let signal = (0.8f64 - 0.5) * 0.01;
         model.trust = ((model.trust as f64 + signal).clamp(0.0, 1.0) * 0.999) as f32;
     }
 
-    let final_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
+    let final_trust = service
+        .behavior
+        .social_mgr
+        .partner_model
+        .as_ref()
+        .unwrap()
+        .trust;
     assert!(
         final_trust > initial_trust,
         "high coherence should grow trust: before={}, after={}",
@@ -525,15 +537,21 @@ fn phi_trust_decays_slowly() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let mut partner = crate::partnership::HumanPartnerModel::new("test");
     partner.trust = 0.5;
-    service.social_mgr.partner_model = Some(partner);
+    service.behavior.social_mgr.partner_model = Some(partner);
 
     // Simulate coherence=0 → signal = (0.0 - 0.5) * 0.01 = -0.005
-    if let Some(ref mut model) = service.social_mgr.partner_model {
+    if let Some(ref mut model) = service.behavior.social_mgr.partner_model {
         let signal = (0.0f64 - 0.5) * 0.01;
         model.trust = ((model.trust as f64 + signal).clamp(0.0, 1.0) * 0.999) as f32;
     }
 
-    let final_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
+    let final_trust = service
+        .behavior
+        .social_mgr
+        .partner_model
+        .as_ref()
+        .unwrap()
+        .trust;
     assert!(
         final_trust < 0.5,
         "zero coherence should decrease trust: {}",
@@ -555,6 +573,7 @@ fn phi_trust_decays_slowly() {
 fn coordinator_signals_updated_after_cycle() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let initial_updates = service
+        .memory
         .memory_consol
         .memory_coordinator
         .stats
@@ -562,6 +581,7 @@ fn coordinator_signals_updated_after_cycle() {
     let _ = service.cycle("test memory signals");
     assert!(
         service
+            .memory
             .memory_consol
             .memory_coordinator
             .stats
@@ -579,25 +599,30 @@ fn coordinator_enriched_priority_modulates() {
 
     // Before any retrievals: enriched ≈ base + coherence_bonus
     let before = service
+        .memory
         .memory_consol
         .memory_coordinator
         .enriched_priority(base_priority, hash);
 
     // After recording retrievals
     service
+        .memory
         .memory_consol
         .memory_coordinator
         .record_retrieval(hash);
     service
+        .memory
         .memory_consol
         .memory_coordinator
         .record_retrieval(hash);
     service
+        .memory
         .memory_consol
         .memory_coordinator
         .record_retrieval(hash);
 
     let after = service
+        .memory
         .memory_consol
         .memory_coordinator
         .enriched_priority(base_priority, hash);

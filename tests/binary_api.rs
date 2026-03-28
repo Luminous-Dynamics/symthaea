@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! API Binary Integration Tests
+//! API Binary Integration Tests
 //!
 //! Tests for the `symthaea-api` HTTP server binary.
 //! Verifies server startup, health endpoints, and basic API functionality.

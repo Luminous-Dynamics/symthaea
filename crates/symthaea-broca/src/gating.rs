@@ -1208,7 +1208,7 @@ impl CodeGate {
         let error = channels.error_likelihood();
 
         // Early exit if all code channels are inactive
-        if syntax <= 0.0 && type_conf >= 1.0 && algo <= 0.0 && error <= 0.0 {
+        if syntax <= 0.0 && type_conf <= 0.0 && algo <= 0.0 && error <= 0.0 {
             return;
         }
 

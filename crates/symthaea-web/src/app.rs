@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use leptos::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
@@ -15,7 +12,6 @@ pub enum Tab {
     Topology,
     Experiments,
     Dreams,
-    Trends,
     Inoculate,
 }
 
@@ -107,23 +103,6 @@ pub fn App() -> impl IntoView {
                                 }
                             }
                         }
-                        // Accumulate trend history (rolling window of 100)
-                        {
-                            let cl = state.consciousness_level.get_untracked();
-                            let ha = state.harmony_alignment.get_untracked();
-                            state.trend_consciousness.update(|v| {
-                                v.push(cl);
-                                if v.len() > 100 {
-                                    v.remove(0);
-                                }
-                            });
-                            state.trend_harmony.update(|v| {
-                                v.push(ha);
-                                if v.len() > 100 {
-                                    v.remove(0);
-                                }
-                            });
-                        }
                         state.cycle_count.update(|c| *c += 1);
                     }
                 }
@@ -214,7 +193,6 @@ pub fn App() -> impl IntoView {
             <TabButton tab=Tab::Topology label="Topology" active=active_tab set_active=set_active_tab />
             <TabButton tab=Tab::Experiments label="Experiments" active=active_tab set_active=set_active_tab />
             <TabButton tab=Tab::Dreams label="Dreams" active=active_tab set_active=set_active_tab />
-            <TabButton tab=Tab::Trends label="Trends" active=active_tab set_active=set_active_tab />
             <TabButton tab=Tab::Inoculate label="Inoculate" active=active_tab set_active=set_active_tab />
         </nav>
 
@@ -230,9 +208,6 @@ pub fn App() -> impl IntoView {
             </Show>
             <Show when=move || active_tab.get() == Tab::Dreams>
                 <pages::dreams::DreamsPage />
-            </Show>
-            <Show when=move || active_tab.get() == Tab::Trends>
-                <pages::trends::TrendsPage />
             </Show>
             <Show when=move || active_tab.get() == Tab::Inoculate>
                 <pages::inoculate::InoculatePage />

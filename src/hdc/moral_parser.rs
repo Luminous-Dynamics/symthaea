@@ -1127,7 +1127,11 @@ impl MoralParser {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
                 let end = rest.find(['.', ';']).unwrap_or(rest.len());
-                let clause = rest[..end.min(120)].trim();
+                let mut limit = end.min(120);
+                while limit > 0 && !rest.is_char_boundary(limit) {
+                    limit -= 1;
+                }
+                let clause = rest[..limit].trim();
                 if !clause.is_empty() {
                     return Some(clause.to_string());
                 }

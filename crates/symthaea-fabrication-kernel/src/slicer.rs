@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mesh slicer: intersects a triangle mesh with horizontal planes to produce
 //! 2D contours for layer-by-layer fabrication (FDM/SLA 3D printing).
 //!

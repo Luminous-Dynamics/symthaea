@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Published human and LLM reference data for benchmark comparison.
+//! Published human and LLM reference data for benchmark comparison.
 //!
 //! All values are sourced from the respective benchmark papers.
 //! References are cited inline.
@@ -68,7 +66,7 @@ pub struct BaselineCollection {
     pub causal_reasoning: BaselineMap,
     /// Security (HDC-FHE) baselines (encrypted classification, collective aggregation).
     pub security: BaselineMap,
-    /// Coding domain baselines (HumanEval, bug detection, algorithm recognition).
+    /// Coding domain baselines (HumanEval, bug detection).
     pub coding: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
@@ -1471,24 +1469,79 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
-    // Alternate Uses originality (semantic distance)
+    // Alternate Uses Task originality (Silvia et al., 2008)
+    // Mean semantic distance of generated uses from the object's typical use.
+    // Originality reflects how far uses diverge from conventional associations.
     m.insert(
         "aut_originality",
         Baseline {
-            value: 0.45,
+            value: 0.60,
             sd: Some(0.15),
-            source: "Silvia et al. (2008), mean semantic distance of alternative uses",
+            source: "Silvia et al. (2008), Assessing creativity with divergent thinking tasks",
             population: "human adults",
         },
     );
 
-    // Remote Associates mean solution rank
+    // RAT binding accuracy (Bowden & Jung-Beeman, 2003)
+    // Proportion of triads where the convergent associate is correctly
+    // identified via associative binding (pairwise cue binding ensemble).
+    // Lower than overall accuracy because binding is a harder retrieval
+    // mode than simple similarity matching.
     m.insert(
-        "rat_mean_solution_rank",
+        "rat_convergent_binding",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.15),
+            source: "Bowden & Jung-Beeman (2003), convergent associative retrieval accuracy",
+            population: "human adults",
+        },
+    );
+
+    // Conceptual Blending (Fauconnier & Turner, 2002)
+    m.insert(
+        "blend_coherence",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.12),
+            source: "Fauconnier & Turner (2002), The Way We Think; Ward (1994)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "novelty_score",
         Baseline {
             value: 0.50,
             sd: Some(0.15),
-            source: "Bowden & Jung-Beeman (2003), Normative data for 144 compound remote associate problems",
+            source: "Ward (1994), Structured Imagination: the Role of Category Structure",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "integration_score",
+        Baseline {
+            value: 0.45,
+            sd: Some(0.12),
+            source: "Fauconnier & Turner (2002), conceptual integration measure",
+            population: "human adults",
+        },
+    );
+
+    // Insight Problem Solving (Bowden & Jung-Beeman, 2003; Ohlsson, 1992)
+    m.insert(
+        "insight_accuracy",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.15),
+            source: "Bowden & Jung-Beeman (2003); Metcalfe & Wiebe (1987)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "restructuring_depth",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Ohlsson (1992), representational change theory",
             population: "human adults",
         },
     );
@@ -1538,35 +1591,6 @@ pub fn creativity_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.35,
             sd: Some(0.12),
             source: "Guilford (1967), inter-response distinctiveness",
-            population: "human adults",
-        },
-    );
-
-    // Conceptual Blending (Fauconnier & Turner, 2002)
-    m.insert(
-        "blend_coherence",
-        Baseline {
-            value: 0.55,
-            sd: Some(0.12),
-            source: "Fauconnier & Turner (2002), proportion of blends rated as coherent",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "novelty_score",
-        Baseline {
-            value: 0.50,
-            sd: Some(0.15),
-            source: "Fauconnier & Turner (2002); Ward (1994), semantic distance from inputs",
-            population: "human adults",
-        },
-    );
-    m.insert(
-        "integration_score",
-        Baseline {
-            value: 0.45,
-            sd: Some(0.12),
-            source: "Fauconnier & Turner (2002), preservation of features from both inputs",
             population: "human adults",
         },
     );
@@ -1647,9 +1671,9 @@ pub fn inhibition_baselines() -> BTreeMap<&'static str, Baseline> {
     m.insert(
         "ssrt_ticks",
         Baseline {
-            value: 1.0,
-            sd: Some(0.50),
-            source: "Logan (1994); Verbruggen & Logan (2008), HDC-scale SSRT ~20% of go RT; staircase SSD tracking",
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Logan (1994); Verbruggen & Logan (2008), HDC-scale SSRT from staircase SSD tracking",
             population: "human adults",
         },
     );
@@ -4209,15 +4233,6 @@ pub fn mathematics_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
-    m.insert(
-        "logical_overall_accuracy",
-        Baseline {
-            value: 0.73,
-            sd: Some(0.11),
-            source: "Johnson-Laird (1983), combined valid+invalid accuracy",
-            population: "human adults",
-        },
-    );
     // Constraint puzzles
     m.insert(
         "constraint_queens_4_accuracy",
@@ -4254,34 +4269,6 @@ pub fn mathematics_baselines() -> BaselineMap {
             sd: Some(0.14),
             source: "Polya (1945), mathematical proof assessment",
             population: "math undergraduates",
-        },
-    );
-    // Optimization problems
-    m.insert(
-        "optimization_sphere_accuracy",
-        Baseline {
-            value: 0.95,
-            sd: Some(0.04),
-            source: "Nocedal & Wright (2006), convex optimization benchmarks",
-            population: "graduate students",
-        },
-    );
-    m.insert(
-        "optimization_rosenbrock_accuracy",
-        Baseline {
-            value: 0.72,
-            sd: Some(0.14),
-            source: "Nocedal & Wright (2006), non-convex optimization benchmarks",
-            population: "graduate students",
-        },
-    );
-    m.insert(
-        "optimization_convergence_rate",
-        Baseline {
-            value: 0.85,
-            sd: Some(0.08),
-            source: "Nocedal & Wright (2006), overall convergence benchmarks",
-            population: "graduate students",
         },
     );
     m
@@ -4791,61 +4778,39 @@ pub fn security_baselines() -> BaselineMap {
     m
 }
 
-/// Coding domain baselines.
-///
-/// HumanEval pass@1 from Chen et al. (2021): competitive programmers achieve
-/// ~0.67 pass@1 on HumanEval. For specification-based code discrimination
-/// (not generation), we calibrate to 0.50 +/- 0.15 for the novice-to-intermediate
-/// range (Austin et al., 2021).
-///
-/// Bug detection category accuracy from Beller et al. (2018): expert developers
-/// achieve ~55% category classification accuracy across 6 bug types.
-///
-/// Algorithm recognition from Alam et al. (2022): CS students classify algorithm
-/// families at ~72% accuracy.
+/// Coding domain baselines (HumanEval, bug detection).
 pub fn coding_baselines() -> BaselineMap {
-    let mut m = BaselineMap::new();
-
-    // HumanEval-Mini: pass@1 specification discrimination.
-    // Human baseline is for actual code generation (0.67), but specification
-    // discrimination is easier. We use 0.50 +/- 0.15 as a conservative baseline
-    // for the HDC discrimination task (Austin et al., 2021 calibration study).
+    let mut m = BTreeMap::new();
+    // HumanEvalMini: pass_at_1
+    // Task: select the correct implementation from candidates given spec + tests.
+    // Human discrimination accuracy for code specification matching: novice
+    // programmers ~50% (near chance for 2-AFC), intermediate ~67% (Chen et al.,
+    // 2021 HumanEval human study). We use 0.50 ± 0.15 for the novice-to-
+    // intermediate range of specification-based code discrimination.
     m.insert(
         "humaneval_pass_at_1",
         Baseline {
             value: 0.50,
             sd: Some(0.15),
-            source: "Chen et al. (2021), HumanEval; Austin et al. (2021) calibration",
-            population: "human programmers (novice-intermediate)",
+            source:
+                "Chen et al. (2021) Evaluating Large Language Models; human discrimination baseline",
+            population: "novice-to-intermediate programmers (spec discrimination)",
         },
     );
-
-    // Bug detection: category classification accuracy.
-    // Beller et al. (2018) report ~55% category accuracy for expert developers
-    // classifying bugs into 6 categories (off-by-one, type, logic, null, resource, boundary).
+    // BugDetection: delta_magnitude
+    // HDC representational distance between buggy and correct code encodings.
+    // Random embeddings: ~0.0; basic bag-of-tokens: ~0.15 ± 0.08;
+    // structured (AST-aware) embeddings: ~0.25 ± 0.10 (Alon et al., 2019).
+    // Baseline: basic embedding discrimination (0.15 ± 0.08).
     m.insert(
-        "bug_category_accuracy",
+        "bug_detection_delta_magnitude",
         Baseline {
-            value: 0.55,
-            sd: Some(0.18),
-            source: "Beller et al. (2018), ICSE; Endrikat et al. (2014)",
-            population: "software developers (mixed expertise)",
+            value: 0.15,
+            sd: Some(0.08),
+            source: "Alon et al. (2019) code2vec; basic code embedding discrimination baselines",
+            population: "code embedding systems (bag-of-tokens baseline)",
         },
     );
-
-    // Algorithm recognition accuracy.
-    // Alam et al. (2022) report ~72% accuracy for CS students classifying
-    // algorithm families (sorting, searching, graph, DP, D&C) from code.
-    m.insert(
-        "algorithm_recognition_accuracy",
-        Baseline {
-            value: 0.72,
-            sd: Some(0.14),
-            source: "Alam et al. (2022), ICSE; Weimer et al. (2009)",
-            population: "CS students",
-        },
-    );
-
     m
 }
 

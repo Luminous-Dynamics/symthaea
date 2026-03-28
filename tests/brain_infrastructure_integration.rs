@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for the brain/ and infrastructure/ modules.
+//! Integration tests for the brain/ and infrastructure/ modules.
 //!
 //! Tests cover:
 //! - Actor system creation, message passing, and tick simulation

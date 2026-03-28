@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Qwen3 Grouped-Query Attention with Rotary Position Embeddings
 //!
 //! Implements GQA where `num_kv_heads < num_heads` — each KV head serves

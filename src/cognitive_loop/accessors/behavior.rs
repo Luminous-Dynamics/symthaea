@@ -26,91 +26,91 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Check if currently in flow state
-        pub fn in_flow(&self) -> bool { self.flow_state.in_flow }
+        pub fn in_flow(&self) -> bool { self.behavior.flow_state.in_flow }
 
         /// Get flow state intensity (0.0 to 1.0)
-        pub fn flow_intensity(&self) -> f32 { self.flow_state.intensity }
+        pub fn flow_intensity(&self) -> f32 { self.behavior.flow_state.intensity }
 
         /// Get flow state streak (consecutive flow-compatible cycles)
-        pub fn flow_streak(&self) -> u32 { self.flow_state.streak }
+        pub fn flow_streak(&self) -> u32 { self.behavior.flow_state.streak }
 
         /// Get current flow state reference
-        pub(crate) fn flow_state(&self) -> &FlowState { &self.flow_state }
+        pub(crate) fn flow_state(&self) -> &FlowState { &self.behavior.flow_state }
 
         /// Get flow learning boost multiplier
-        pub fn flow_learning_boost(&self) -> f32 { self.flow_state.learning_boost }
+        pub fn flow_learning_boost(&self) -> f32 { self.behavior.flow_state.learning_boost }
 
         // ═══════════════════════════════════════════════════════════════════
         // EMOTION CONTAGION
         // ═══════════════════════════════════════════════════════════════════
 
-        /// Get current emotional valence from content analysis
-        pub fn emotional_valence(&self) -> f32 { self.emotion_contagion.smoothed_valence() }
+        /// Get current emotional valence (from unified emotional state)
+        pub fn emotional_valence(&self) -> f32 { self.unification_engine.emotional.state().valence as f32 }
 
-        /// Get current emotional arousal
-        pub fn emotional_arousal(&self) -> f32 { self.emotion_contagion.smoothed_arousal() }
+        /// Get current emotional arousal (from unified emotional state)
+        pub fn emotional_arousal(&self) -> f32 { self.unification_engine.emotional.state().arousal as f32 }
 
         /// Get emotion-based pattern nudge suggestion
-        pub fn emotion_pattern_nudge(&self) -> (Option<ConsciousnessPattern>, f32) { self.emotion_contagion.pattern_nudge() }
+        pub fn emotion_pattern_nudge(&self) -> (Option<ConsciousnessPattern>, f32) { self.behavior.emotion_contagion.pattern_nudge() }
 
         /// Get emotion contagion reference
-        pub(crate) fn emotion_contagion(&self) -> &EmotionContagion { &self.emotion_contagion }
+        pub(crate) fn emotion_contagion(&self) -> &EmotionContagion { &self.behavior.emotion_contagion }
 
         // ═══════════════════════════════════════════════════════════════════
         // CURIOSITY DRIVE
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get current boredom level (0.0 to 1.0)
-        pub fn boredom(&self) -> f32 { self.curiosity_drive.boredom }
+        pub fn boredom(&self) -> f32 { self.behavior.curiosity_drive.boredom }
 
         /// Get curiosity level (0.0 to 1.0)
-        pub fn curiosity(&self) -> f32 { self.curiosity_drive.curiosity }
+        pub fn curiosity(&self) -> f32 { self.behavior.curiosity_drive.curiosity }
 
         /// Check if curiosity-triggered exploration should occur
-        pub fn curiosity_should_explore(&self) -> bool { self.curiosity_drive.should_explore() }
+        pub fn curiosity_should_explore(&self) -> bool { self.behavior.curiosity_drive.should_explore() }
 
         /// Get curiosity drive reference
-        pub(crate) fn curiosity_drive(&self) -> &CuriosityDrive { &self.curiosity_drive }
+        pub(crate) fn curiosity_drive(&self) -> &CuriosityDrive { &self.behavior.curiosity_drive }
 
         /// Get current exploration urge (0.0 to 1.0)
-        pub fn curiosity_drive_exploration_urge(&self) -> f64 { self.curiosity_drive.exploration_urge }
+        pub fn curiosity_drive_exploration_urge(&self) -> f64 { self.behavior.curiosity_drive.exploration_urge }
 
         /// Get novelty bonus for learning
-        pub fn novelty_bonus(&self) -> f32 { self.curiosity_drive.novelty_bonus }
+        pub fn novelty_bonus(&self) -> f32 { self.behavior.curiosity_drive.novelty_bonus }
 
         /// Check if the system is bored (needs new stimuli)
-        pub fn is_bored(&self) -> bool { self.curiosity_drive.boredom > 0.5 }
+        pub fn is_bored(&self) -> bool { self.behavior.curiosity_drive.boredom > 0.5 }
 
         // ═══════════════════════════════════════════════════════════════════
         // SELF-REFLECTION
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get current self-assessment
-        pub fn self_assessment(&self) -> SelfAssessment { self.self_model_tier.self_reflection.self_assessment }
+        pub fn self_assessment(&self) -> SelfAssessment { self.consciousness.self_model_tier.self_reflection.self_assessment }
 
         /// Get self-reflection summary
-        pub fn reflection_summary(&self) -> ReflectionSummary { self.self_model_tier.self_reflection.summary() }
+        pub fn reflection_summary(&self) -> ReflectionSummary { self.consciousness.self_model_tier.self_reflection.summary() }
 
         /// Get adapted thresholds from self-reflection
-        pub fn adapted_thresholds(&self) -> ReflectionThresholds { self.self_model_tier.self_reflection.get_thresholds() }
+        pub fn adapted_thresholds(&self) -> ReflectionThresholds { self.consciousness.self_model_tier.self_reflection.get_thresholds() }
 
         /// Get current recommendations from self-reflection
-        pub fn recommendations(&self) -> &[Recommendation] { &self.self_model_tier.self_reflection.recommendations }
+        pub fn recommendations(&self) -> &[Recommendation] { &self.consciousness.self_model_tier.self_reflection.recommendations }
 
         /// Get number of reflections performed
-        pub fn reflection_count(&self) -> u64 { self.self_model_tier.self_reflection.reflection_count }
+        pub fn reflection_count(&self) -> u64 { self.consciousness.self_model_tier.self_reflection.reflection_count }
 
         /// Get learning effectiveness score
-        pub fn learning_effectiveness(&self) -> f32 { self.self_model_tier.self_reflection.learning_effectiveness() }
+        pub fn learning_effectiveness(&self) -> f32 { self.consciousness.self_model_tier.self_reflection.learning_effectiveness() }
 
         /// Check if system needs calibration
-        pub fn needs_calibration(&self) -> bool { self.self_model_tier.self_reflection.self_assessment == SelfAssessment::NeedsCalibration }
+        pub fn needs_calibration(&self) -> bool { self.consciousness.self_model_tier.self_reflection.self_assessment == SelfAssessment::NeedsCalibration }
 
         /// Check if system is performing optimally
-        pub fn is_optimal(&self) -> bool { self.self_model_tier.self_reflection.self_assessment == SelfAssessment::Optimal }
+        pub fn is_optimal(&self) -> bool { self.consciousness.self_model_tier.self_reflection.self_assessment == SelfAssessment::Optimal }
 
         /// Get self-reflection reference
-        pub(crate) fn self_reflection(&self) -> &SelfReflection { &self.self_model_tier.self_reflection }
+        pub(crate) fn self_reflection(&self) -> &SelfReflection { &self.consciousness.self_model_tier.self_reflection }
 
         // ═══════════════════════════════════════════════════════════════════
         // VOICE FEEDBACK (simple delegators)
@@ -130,7 +130,7 @@ impl CognitiveLoopService {
         pub fn cognitive_depth(&self) -> CognitiveDepth { self.cognitive_depth }
 
         /// Get thalamic routing statistics (reflex_rate, cortical_rate, deep_rate)
-        pub fn thalamic_stats(&self) -> (f32, f32, f32) { self.thalamic_router.routing_stats() }
+        pub fn thalamic_stats(&self) -> (f32, f32, f32) { self.behavior.thalamic_router.routing_stats() }
 
         /// Get the emotional pattern (Stable/Escalating/Calming/Volatile)
         pub fn emotional_pattern(&self) -> EmotionalPattern { self.unification_engine.emotional.detect_pattern() }
@@ -171,41 +171,41 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get current adaptive behavior
-        pub(crate) fn adaptive_behavior(&self) -> &AdaptiveBehavior { &self.adaptive_behavior }
+        pub(crate) fn adaptive_behavior(&self) -> &AdaptiveBehavior { &self.behavior.adaptive_behavior }
 
         /// Get current action hint
-        pub fn action_hint(&self) -> ActionHint { self.adaptive_behavior.action_hint }
+        pub fn action_hint(&self) -> ActionHint { self.behavior.adaptive_behavior.action_hint }
 
         /// Check if system should seek more input/clarification
-        pub fn should_seek_input(&self) -> bool { self.adaptive_behavior.should_seek_input() }
+        pub fn should_seek_input(&self) -> bool { self.behavior.adaptive_behavior.should_seek_input() }
 
         /// Check if system is in a confident state
-        pub fn is_confident(&self) -> bool { self.adaptive_behavior.is_confident() }
+        pub fn is_confident(&self) -> bool { self.behavior.adaptive_behavior.is_confident() }
 
         /// Get description of current adaptive state
-        pub fn state_description(&self) -> &'static str { self.adaptive_behavior.description() }
+        pub fn state_description(&self) -> &'static str { self.behavior.adaptive_behavior.description() }
 
         /// Get speech rate multiplier for voice synthesis
-        pub fn speech_rate_multiplier(&self) -> f32 { self.adaptive_behavior.speech_rate_multiplier }
+        pub fn speech_rate_multiplier(&self) -> f32 { self.behavior.adaptive_behavior.speech_rate_multiplier }
 
         /// Get pause duration multiplier for voice synthesis
-        pub fn pause_multiplier(&self) -> f32 { self.adaptive_behavior.pause_multiplier }
+        pub fn pause_multiplier(&self) -> f32 { self.behavior.adaptive_behavior.pause_multiplier }
 
         /// Get attention sensitivity for input processing
-        pub fn attention_sensitivity(&self) -> f32 { self.adaptive_behavior.attention_sensitivity }
+        pub fn attention_sensitivity(&self) -> f32 { self.behavior.adaptive_behavior.attention_sensitivity }
 
         /// Get exploration factor for decision making
-        pub fn exploration_factor(&self) -> f32 { self.adaptive_behavior.exploration_factor }
+        pub fn exploration_factor(&self) -> f32 { self.behavior.adaptive_behavior.exploration_factor }
     }
 
     /// Check if emotional content is significant
     pub fn has_emotional_content(&self) -> bool {
-        self.emotion_contagion.smoothed_valence().abs() > 0.2
+        (self.unification_engine.emotional.state().valence as f32).abs() > 0.2
     }
 
     /// Force an immediate reflection cycle
     pub fn force_reflect(&mut self) -> Vec<Recommendation> {
-        self.self_model_tier.self_reflection.reflect()
+        self.consciousness.self_model_tier.self_reflection.reflect()
     }
 
     /// Update voice feedback with synthesis output metrics
@@ -235,7 +235,7 @@ impl CognitiveLoopService {
                     .voice_coherence
                     .bridge
                     .smoothed_coherence(),
-                self.flow_state.intensity,
+                self.behavior.flow_state.intensity,
                 pattern_confidence,
             );
 
@@ -367,7 +367,7 @@ impl CognitiveLoopService {
     /// Blended with internal prediction-error-based reward at 50% weight.
     /// Resets to 0.0 after consumption in the next cycle.
     pub fn provide_reward(&mut self, reward: f32) {
-        self.social_mgr.social.external_reward = reward.clamp(-1.0, 1.0);
+        self.behavior.social_mgr.social.external_reward = reward.clamp(-1.0, 1.0);
     }
 
     /// Inject social signals from Mind module's SocialCoherence.
@@ -384,11 +384,12 @@ impl CognitiveLoopService {
         models_count: usize,
         mean_trust: f32,
     ) {
-        self.social_mgr.social.social_trust = trust.clamp(0.0, 1.0);
-        self.social_mgr.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
-        self.social_mgr.social.social_prediction_accuracy = prediction_accuracy.clamp(0.0, 1.0);
-        self.social_mgr.social.social_models_count = models_count;
-        self.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_trust = trust.clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_prediction_accuracy =
+            prediction_accuracy.clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_models_count = models_count;
+        self.behavior.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
 
     /// Inject epistemic cube data from the facade's StructuredThought.
@@ -414,7 +415,7 @@ impl CognitiveLoopService {
     /// Set the relational Psi from an external dyad computation.
     /// This is called by the Symthaea facade after computing Phi_dyad.
     pub fn set_relational_psi(&mut self, psi: f64) {
-        self.social_mgr.social.relational_psi = psi;
+        self.behavior.social_mgr.social.relational_psi = psi;
     }
 
     /// Inject a governance event into the GovernanceManager for processing.
@@ -474,6 +475,30 @@ impl CognitiveLoopService {
         for outcome in outcomes {
             self.governance_mgr.inject_outcome(outcome);
         }
+    }
+
+    /// Drain pending crisis events and forward them to the Mycelix civic bridge.
+    ///
+    /// Call from the host application between cycles to dispatch crisis events
+    /// to the Holochain emergency-incidents zome. Each event is forwarded via
+    /// `MycelixBridge::dispatch_crisis()`.
+    #[cfg(all(feature = "mycelix", feature = "safety-agents"))]
+    pub fn poll_bridge_crisis(
+        &mut self,
+        bridge: &mut crate::consciousness::mycelix_bridge::MycelixBridge,
+    ) {
+        let events: Vec<_> = self.pending_crisis_events.drain(..).collect();
+        for event in &events {
+            bridge.dispatch_crisis(event);
+        }
+    }
+
+    /// Drain pending crisis events without a bridge (for testing or logging).
+    #[cfg(feature = "safety-agents")]
+    pub fn drain_pending_crisis_events(
+        &mut self,
+    ) -> Vec<super::super::civic_crisis_detector::CivicCrisisEvent> {
+        self.pending_crisis_events.drain(..).collect()
     }
 
     /// Override the epistemic mesh with collective network data.
@@ -590,7 +615,7 @@ impl CognitiveLoopService {
     pub(crate) fn process_governance_learning(&mut self) {
         // 1. Feed governance reward to provide_reward()
         if let Some(reward) = self.governance_mgr.take_latest_reward() {
-            self.social_mgr.social.external_reward = reward.clamp(-1.0, 1.0);
+            self.behavior.social_mgr.social.external_reward = reward.clamp(-1.0, 1.0);
         }
 
         // 2. Update KosmicSong harmonic weights from governance feedback
@@ -839,10 +864,12 @@ impl CognitiveLoopService {
     ) {
         let combined = identity * 0.25 + reputation * 0.25 + community * 0.30 + engagement * 0.20;
 
-        self.social_mgr.social.social_trust = (community as f32).clamp(0.0, 1.0);
-        self.social_mgr.social.social_cooperation_rate = (reputation as f32).clamp(0.0, 1.0);
-        self.social_mgr.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
-        self.social_mgr.social.social_prediction_accuracy = (identity as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_trust = (community as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_cooperation_rate =
+            (reputation as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_prediction_accuracy =
+            (identity as f32).clamp(0.0, 1.0);
 
         // Modulate oxytocin from community dimension (social bonding).
         // Community trust maps to 0.0–0.3 oxytocin injection (conservative range).
@@ -866,6 +893,66 @@ impl CognitiveLoopService {
         &self,
     ) -> std::sync::mpsc::Sender<super::super::managers::swarm_manager::SwarmEvent> {
         self.swarm_event_tx.clone()
+    }
+
+    /// Take ownership of the safety alert receiver.
+    ///
+    /// The host application calls this once at startup and spawns a thread/task
+    /// to drain alerts and forward them to desktop notifications, Slack, email,
+    /// or any monitoring system. Returns `None` if already taken.
+    pub fn take_safety_alert_receiver(
+        &self,
+    ) -> Option<std::sync::mpsc::Receiver<super::super::safety_alert::SafetyAlert>> {
+        self.safety_alert_rx.lock().ok()?.take()
+    }
+
+    /// Enable network attestation for the cognitive loop.
+    ///
+    /// Creates a `NetworkService`, initializes Ed25519 attestation, and spawns
+    /// an attestation-aware bridge that feeds verified swarm events into the
+    /// cognitive loop's Phase B drain.
+    ///
+    /// This is the **production wiring point** for P2P consciousness sharing
+    /// with cryptographic verification. Call once after CLS construction.
+    ///
+    /// # Requirements
+    /// - `identity` feature must be enabled
+    /// - `swarm` feature must be enabled for real networking (stub without)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let mut cls = CognitiveLoopService::new(config)?;
+    /// let rt = tokio::runtime::Handle::current();
+    /// rt.block_on(cls.enable_network_attestation())?;
+    /// ```
+    #[cfg(feature = "identity")]
+    pub async fn enable_network_attestation(&self) -> anyhow::Result<()> {
+        use super::super::managers::network_service_bridge::NetworkServiceBridge;
+        use crate::swarm::{NetworkService, SwarmConfig};
+
+        let swarm_config = SwarmConfig::production();
+        let mut service = NetworkService::new(swarm_config)
+            .await
+            .map_err(|e| anyhow::anyhow!("NetworkService init failed: {e}"))?;
+
+        let attestation_mgr = service
+            .initialize_attestation()
+            .map_err(|e| anyhow::anyhow!("Attestation init failed: {e}"))?;
+
+        let tx = self.swarm_event_sender();
+        let _bridge = NetworkServiceBridge::spawn_with_attestation(
+            &service,
+            tx,
+            Some(attestation_mgr.clone()),
+        );
+
+        let pubkey = attestation_mgr.read().public_key_hex().to_string();
+        tracing::info!(
+            pubkey = %&pubkey[..16],
+            "Network attestation enabled — verified CV exchange active"
+        );
+
+        Ok(())
     }
 
     /// Take the mesh outbound receiver (one-shot — returns None after first call).
@@ -954,6 +1041,18 @@ impl CognitiveLoopService {
     /// Total messages processed by the HolonReceiver.
     pub fn holon_total_processed(&self) -> u64 {
         self.holon_receiver.total_processed()
+    }
+
+    /// Clone the Holon inbound sender for use by HTTP handlers.
+    ///
+    /// The channel is created eagerly at CLS construction. Clone the returned
+    /// sender and pass it to `HolonHttpState::new(tx)` so HTTP handlers can
+    /// inject SomaMessages into the cognitive loop. The receiver is drained
+    /// non-blocking in Phase B before `holon_receiver.process_inbound()`.
+    pub fn holon_inbound_sender(
+        &self,
+    ) -> std::sync::mpsc::Sender<(String, crate::consciousness::holon_receiver::SomaMessage)> {
+        self.holon_inbound_tx.clone()
     }
 
     // ========================================================================
@@ -1089,7 +1188,7 @@ impl CognitiveLoopService {
     ///
     /// Science: Pearl (2009) — deeper causal understanding → more confident moral reasoning.
     pub(crate) fn cross_couple_knowledge_ethics(&mut self) {
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             let depth = km.signals().causal_depth;
             if depth.is_finite()
                 && depth > super::super::thresholds::KNOWLEDGE_ETHICS_CAUSAL_DEPTH_THRESHOLD
@@ -1261,7 +1360,7 @@ impl CognitiveLoopService {
 
     /// Access the vision and sensory manager.
     pub fn vision_sensory(&self) -> &super::super::vision_sensory_manager::VisionAndSensoryManager {
-        &self.vision_sensory
+        &self.sensorimotor.vision_sensory
     }
 
     /// Get the current unified ethical verdict.

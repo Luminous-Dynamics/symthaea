@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Neural Bridge v2: Unified Text → HDC Pipeline
 //!
 //! Complete pipeline from raw text to 16,384-dimensional HDC vectors

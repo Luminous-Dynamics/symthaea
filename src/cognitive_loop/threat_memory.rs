@@ -47,10 +47,14 @@ pub enum ThreatSignalKind {
     DispatchLoop,
     /// Attempt to manipulate consciousness metrics (Phi/coherence spoofing).
     ConsciousnessManipulation,
+    /// Coordinated cartel attack (from CartelDetector).
+    CartelAttack,
+    /// Systematic oppression pattern in governance.
+    GovernanceOppression,
 }
 
 impl ThreatSignalKind {
-    /// Return the one-hot index for this threat kind (0-6).
+    /// Return the one-hot index for this threat kind (0-8).
     fn one_hot_index(self) -> usize {
         match self {
             Self::ProposalFlood => 0,
@@ -60,6 +64,8 @@ impl ThreatSignalKind {
             Self::TimingAnomaly => 4,
             Self::DispatchLoop => 5,
             Self::ConsciousnessManipulation => 6,
+            Self::CartelAttack => 7,
+            Self::GovernanceOppression => 8,
         }
     }
 
@@ -78,6 +84,8 @@ impl ThreatSignalKind {
             SK::TimingAnomaly => Self::TimingAnomaly,
             SK::DispatchLoop => Self::DispatchLoop,
             SK::ConsciousnessManipulation => Self::ConsciousnessManipulation,
+            SK::CartelAttack => Self::CartelAttack,
+            SK::GovernanceOppression => Self::GovernanceOppression,
         }
     }
 }

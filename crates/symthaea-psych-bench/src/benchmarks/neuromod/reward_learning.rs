@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Reward Learning benchmark: DA reward prediction error.
 //!
 //! Science: Schultz (1997) — midbrain dopamine neurons encode reward prediction error.
@@ -54,11 +51,9 @@ impl RewardLearningBenchmark {
         // Asymmetric learning rates (Frank et al., 2007): phasic DA dips
         // (negative RPE) drive faster unlearning than DA bursts drive acquisition.
         // This is a core feature of the basal ganglia Go/NoGo pathway asymmetry.
-        let lr_pos = 0.15 * (1.0 - config.lapse_rate * 0.5); // DA burst → Go pathway
-                                                             // Lapse_rate also degrades learning rate — models reduced
-                                                             // encoding under attentional lapses (Daw et al. 2006).
-        let lr_neg = 0.25 * (1.0 - config.lapse_rate * 0.5);
-        let base_temperature = 0.3 + config.lapse_rate * 0.15; // noisier choices
+        let lr_pos = 0.15; // DA burst → Go pathway
+        let lr_neg = 0.25; // DA dip → NoGo pathway (faster unlearning)
+        let base_temperature = 0.3;
 
         // Lapse rate: random responding on a fraction of trials (models
         // attention lapses / individual differences for ICC reliability)
@@ -93,13 +88,6 @@ impl RewardLearningBenchmark {
         let mut reversal_criterion_met = false;
         let mut phase2_b_choices = 0usize;
         let mut recent_rpe_magnitude = 0.0_f64; // EMA of |negative RPE|
-
-        // Sliding window for reversal criterion (Cools et al., 2002):
-        // standard reversal paradigms use a moving window (e.g., 5 consecutive
-        // correct choices) rather than cumulative rate, which is biased against
-        // early reversal detection.
-        const WINDOW_SIZE: usize = 5;
-        let mut recent_choices: [usize; WINDOW_SIZE] = [0; WINDOW_SIZE];
 
         for trial in 0..40 {
             // Surprise-driven exploration: boost temperature when recent negative
@@ -140,14 +128,9 @@ impl RewardLearningBenchmark {
                 }
             }
 
-            // Update sliding window
-            recent_choices[trial % WINDOW_SIZE] = choice;
-
-            // Sliding window criterion: 4/5 recent choices must be B (choice==1)
-            // Only check after enough trials for a full window
-            if !reversal_criterion_met && trial >= WINDOW_SIZE - 1 {
-                let window_b: usize = recent_choices.iter().filter(|&&c| c == 1).count();
-                if window_b >= 4 {
+            if !reversal_criterion_met && trial > 5 {
+                let recent_b = phase2_b_choices as f64 / (trial + 1) as f64;
+                if recent_b > criterion {
                     reversal_criterion_trials = trial + 1;
                     reversal_criterion_met = true;
                 }

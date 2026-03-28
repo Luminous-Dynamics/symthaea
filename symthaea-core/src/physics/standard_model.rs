@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Standard Model: The Axioms of Reality
 //!
 //! Layer 1 of the Physics Hierarchy: fundamental particles that cannot be

@@ -121,4 +121,4 @@ MUJOCO_LOG.TXT
 pulse.html
 benchmarks/external/**/helm-repo/
 benchmarks/external/**/.git/
-/symthaea/
+symthaea/

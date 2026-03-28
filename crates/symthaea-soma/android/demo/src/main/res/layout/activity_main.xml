@@ -435,46 +435,6 @@
 
     </LinearLayout>
 
-    <!-- Daily rituals -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="6dp">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnMorning"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="morning"
-            android:textColor="#FFD700"
-            android:textSize="10sp"
-            android:fontFamily="sans-serif-light"
-            android:layout_marginEnd="4dp"
-            app:strokeColor="#33FFD700"
-            app:strokeWidth="1dp"
-            app:rippleColor="#22FFD700" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnEvening"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="evening"
-            android:textColor="#9370DB"
-            android:textSize="10sp"
-            android:fontFamily="sans-serif-light"
-            android:layout_marginStart="4dp"
-            app:strokeColor="#339370DB"
-            app:strokeWidth="1dp"
-            app:rippleColor="#229370DB" />
-
-    </LinearLayout>
-
     <!-- Avatar selection -->
     <HorizontalScrollView
         android:layout_width="match_parent"

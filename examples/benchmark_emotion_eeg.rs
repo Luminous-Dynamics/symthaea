@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Emotion Recognition from EEG Benchmark
+//! # Emotion Recognition from EEG Benchmark
 //!
 //! Tests Symthaea's EmotionSentinel (Project Pathos) on emotion detection
 //! from multi-channel EEG using the Valence-Arousal circumplex model.

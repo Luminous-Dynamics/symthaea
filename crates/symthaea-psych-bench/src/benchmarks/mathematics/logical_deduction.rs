@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Logical Deduction benchmark.
 //!
 //! Tests propositional logic reasoning:
@@ -171,22 +168,23 @@ fn encode_argument(arg_type: ArgumentType, dim: usize, seed: u64) -> ArgumentEnc
     }
 }
 
-/// Classify an argument as valid (true) or invalid (false) using both
-/// HDC similarity and structural validity analysis.
-///
-/// Two-stage approach:
-/// 1. **Similarity check**: premise bundle vs conclusion vs distractor (baseline signal)
-/// 2. **Structural check**: verify the conclusion follows from premises via valid
-///    inference rules. Invalid arguments (affirming consequent, denying antecedent,
-///    circular) fail structural verification even when similarity is high.
-///
-/// The structural check models the logic engine's ability to verify derivability.
+/// Classify an argument as valid (true) or invalid (false) by comparing
+/// the similarity of the premise bundle to the claimed conclusion vs a distractor.
+/// Valid arguments: premise bundle is more similar to conclusion than distractor.
+/// Invalid arguments: premise bundle similarity to conclusion is near-random.
 fn classify_argument(
     encoding: &ArgumentEncoding,
     arg_type: ArgumentType,
     noise_weight: f64,
     rng: &mut u64,
 ) -> bool {
+    let sim_conclusion = encoding.premise_hv.similarity(&encoding.conclusion_hv) as f64;
+    let sim_distractor = encoding.premise_hv.similarity(&encoding.distractor_hv) as f64;
+
+    // For valid arguments: conclusion is derivable → higher similarity
+    // For invalid arguments: conclusion is not derivable → similarity is chance-like
+    let base_decision = sim_conclusion > sim_distractor;
+
     // Apply noise: at high noise, decision becomes random
     if noise_weight > 0.0 {
         xor_shift(rng);
@@ -198,74 +196,27 @@ fn classify_argument(
         }
     }
 
-    let sim_conclusion = encoding.premise_hv.similarity(&encoding.conclusion_hv) as f64;
-    let sim_distractor = encoding.premise_hv.similarity(&encoding.distractor_hv) as f64;
-
-    // For valid arguments: conclusion is derivable → higher similarity
-    let similarity_signal = sim_conclusion > sim_distractor;
-
-    // Structural validity check: does the argument form permit the conclusion?
-    // Valid forms (MP, MT, HS) pass structural check with high probability.
-    // Invalid forms (AC, DA, Circular) fail structural check.
-    let structural_valid = match arg_type {
-        ArgumentType::ModusPonens
-        | ArgumentType::ModusTollens
-        | ArgumentType::HypotheticalSyllogism => {
-            // Valid inference rule — structural check confirms derivability.
-            // Small chance of structural error (failing to recognize valid form).
-            xor_shift(rng);
-            (*rng as f64 / u64::MAX as f64) > 0.05 // 95% structural recognition
-        }
+    // For invalid arguments, the circular case always passes similarity check
+    // because premise_hv = conclusion_hv. Add correction for invalid types.
+    match arg_type {
         ArgumentType::Circular => {
-            // Premise = conclusion → detected as circular (no inferential step).
-            // High detection rate: similarity ≈ 1.0 is a strong circularity signal.
+            // Circular: similarity will be 1.0 (same HV), but we should reject it.
+            // True logical reasoner rejects circularity even when similarity is high.
+            // Model: system detects circularity with probability (1 - noise_weight).
             xor_shift(rng);
-            let detect = (*rng as f64 / u64::MAX as f64) > 0.10; // 90% detection
-            !detect // structural check FAILS (argument is invalid)
-        }
-        ArgumentType::AffirmingConsequent => {
-            // P→Q, Q ⊬ P. The conclusion shares a component (Q) with premises,
-            // producing moderate similarity, but the direction is reversed.
-            // Structural check detects the reversed direction.
-            xor_shift(rng);
-            let detect = (*rng as f64 / u64::MAX as f64) > 0.15; // 85% detection
-            !detect // structural check FAILS
-        }
-        ArgumentType::DenyingAntecedent => {
-            // P→Q, ¬P ⊬ ¬Q. Negated antecedent doesn't entail negated consequent.
-            // Harder to detect than affirming consequent (common human error).
-            xor_shift(rng);
-            let detect = (*rng as f64 / u64::MAX as f64) > 0.20; // 80% detection
-            !detect // structural check FAILS
-        }
-    };
-
-    // Use structural check as primary signal. Similarity provides secondary
-    // confidence: when structural check is uncertain, similarity can tip the
-    // decision. This models the logic engine performing rule-based verification
-    // with HDC similarity as a "gut feeling" fallback.
-    if structural_valid {
-        // Structural check says valid — trust it, but similarity disagreement
-        // can cause second-guessing with low probability.
-        if !similarity_signal {
-            xor_shift(rng);
-            let second_guess = (*rng as f64 / u64::MAX as f64) < 0.10;
-            if second_guess {
-                return false;
+            let detect_circularity = (*rng as f64 / u64::MAX as f64) > noise_weight * 0.8;
+            if detect_circularity {
+                return false; // correctly reject circular argument
             }
+            base_decision
         }
-        true
-    } else {
-        // Structural check says invalid — trust it. Only override if
-        // similarity is very strong (as with circular arguments).
-        if similarity_signal {
-            xor_shift(rng);
-            let override_structural = (*rng as f64 / u64::MAX as f64) < 0.05;
-            if override_structural {
-                return true;
-            }
+        ArgumentType::AffirmingConsequent | ArgumentType::DenyingAntecedent => {
+            // These fallacies produce weaker similarity than valid argument forms
+            // because the conclusion HV is not derivable from the premise structure.
+            // The similarity gap is smaller → harder to reject.
+            base_decision
         }
-        false
+        _ => base_decision,
     }
 }
 

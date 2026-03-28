@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-Transmitter Synergy Benchmark
 //!
 //! Validates paired transmitter interactions via a 2×2 factorial design.

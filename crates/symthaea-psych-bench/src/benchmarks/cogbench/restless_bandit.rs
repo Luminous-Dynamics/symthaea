@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Restless bandit task.
 //!
 //! Tests metacognitive sensitivity (QSR): whether the agent's confidence
@@ -53,16 +50,10 @@ impl RestlessBanditBenchmark {
         // Dual-horizon EMA: fast tracks drift, slow provides stability.
         // Blending catches non-stationary shifts faster while reducing
         // noisy overreaction (cf. Behrens et al. 2007 volatility estimation).
-        // Initialize EMAs to match arm starting values (0.3-0.75 range),
-        // avoiding cold-start mismatch that delays learning.
-        let mut arm_ema_fast: Vec<f64> = arm_values.clone();
-        let mut arm_ema_slow: Vec<f64> = arm_values.clone();
-        // Fast alpha 0.70 (was 0.80): less overreaction to single noisy samples
-        // while still tracking drift. Slow alpha 0.50 (was 0.45): slightly more
-        // weight on recent observations for non-stationary environments
-        // (Speekenbrink & Konstantinidis 2015).
-        let ema_alpha_fast = 0.70;
-        let ema_alpha_slow = 0.50;
+        let mut arm_ema_fast: Vec<f64> = vec![0.5; num_arms];
+        let mut arm_ema_slow: Vec<f64> = vec![0.5; num_arms];
+        let ema_alpha_fast = 0.8;
+        let ema_alpha_slow = 0.45;
         // Track last-pull time per arm (recency-aware exploration)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
         let mut arm_last_pull: Vec<usize> = vec![0; num_arms];
@@ -100,19 +91,16 @@ impl RestlessBanditBenchmark {
                         } else {
                             f64::MAX
                         };
-                        // Recency: arms not pulled recently get extra bonus (stale estimates).
-                        // In restless bandits, stale estimates are unreliable and must be
-                        // refreshed (Speekenbrink & Konstantinidis 2015). Weight 0.20 (was 0.10)
-                        // makes staleness a meaningful exploration driver.
+                        // Recency: arms not pulled recently get extra bonus (stale estimates)
                         let staleness = (trial - arm_last_pull[i]) as f64;
                         let recency_bonus = (staleness / 10.0).min(0.5);
-                        // Time pressure: base UCB scale 0.08 (tuned for restless bandit).
-                        // Moderate exploration tracks drifting arms (Speekenbrink &
-                        // Konstantinidis 2015) but excessive exploration sacrifices
-                        // exploitation accuracy. 0.08 balances tracking vs harvesting.
+                        // Time pressure: base UCB scale 0.12 (Daw et al., 2006 restless bandit).
+                        // For restless bandits, moderate exploration is critical to track drifting
+                        // arm values (Speekenbrink & Konstantinidis 2015). Too little exploration
+                        // causes stale estimates and worse long-run accuracy.
                         // +0.10/unit inflates under deadline.
-                        let ucb_scale = 0.08 + config.time_pressure * 0.10;
-                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.12)
+                        let ucb_scale = 0.12 + config.time_pressure * 0.10;
+                        (i, ema + count_bonus * ucb_scale + recency_bonus * 0.1)
                     })
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)

@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! LanceDB Consciousness Pipeline Integration Tests
+//! LanceDB Consciousness Pipeline Integration Tests
 //!
 //! Tests that LanceDB storage works correctly within the consciousness pipeline:
 //! memory accumulation, retrieval-based context influence, and persistence

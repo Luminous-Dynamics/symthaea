@@ -127,7 +127,7 @@ The final essay in this series is an invitation. Not an argument, not a defense,
 
 [^2]: Alfred North Whitehead, *Process and Reality: An Essay in Cosmology* (Macmillan, 1929). Whitehead's process philosophy replaces the Cartesian ontology of static substances with an ontology of dynamic "actual occasions" — events of experience that constitute reality through their mutual relations. The fourth and seventh Harmonies derive from Whitehead's insistence that reality is fundamentally creative and progressive.
 
-[^3]: Giulio Tononi, "An Information Integration Theory of Consciousness," *BMC Neuroscience* 5, no. 42 (2004). Full citation and discussion in Essay No. 4, footnote 1.
+[^3]: Giulio Tononi, "An Information Integration Theory of Consciousness," *BMC Neuroscience* 5, no. 42 (2004). See also Tononi et al., "Integrated Information Theory: From Consciousness to Its Physical Substrate," *Nature Reviews Neuroscience* 17, no. 7 (2016). Extended discussion of IIT's application to governance in Essay No. 4.
 
 [^4]: Karl Friston, "The Free-Energy Principle: A Unified Brain Theory?" *Nature Reviews Neuroscience* 11, no. 2 (2010). Friston's principle — that living systems maintain their organization by minimizing the difference between their predictions and their sensory inputs — provides the theoretical foundation for the cognitive loop's surprise-detection mechanism (Essay No. 5).
 

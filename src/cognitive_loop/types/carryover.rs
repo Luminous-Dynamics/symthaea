@@ -190,16 +190,6 @@ pub struct QualityMetrics {
     pub(crate) last_consciousness_state: String,
     /// Last epistemic confidence (cached from gate evaluation).
     pub(crate) last_epistemic_confidence: f32,
-    /// Epistemic Cube E-tier from last StructuredThought domain context (0-4, None = no cube).
-    pub(crate) last_cube_e_tier: Option<u8>,
-    /// Epistemic Cube N-tier (0-3, None = no cube).
-    pub(crate) last_cube_n_tier: Option<u8>,
-    /// Epistemic Cube M-tier (0-3, None = no cube).
-    pub(crate) last_cube_m_tier: Option<u8>,
-    /// Epistemic Cube H-value (harmonic coherence, 0.0-1.0).
-    pub(crate) last_cube_h_value: f32,
-    /// Epistemic Cube quality score (0.0-1.0).
-    pub(crate) last_cube_quality: f32,
     /// Last unified pipeline consciousness score (cached).
     pub(crate) last_pipeline_consciousness: f64,
     /// Whether narrative-GWT vetoed the previous cycle (suppresses learning)
@@ -281,6 +271,12 @@ pub struct QualityMetrics {
     /// Whether a subsystem VETO_ACTION flag was set this cycle.
     /// Reset at cycle start. When true, motor output should be suppressed.
     pub(crate) subsystem_veto: bool,
+    /// Safety enforcement: motor halt (Red level). Set in Phase 3.5.
+    /// When true, ALL motor output must be blocked — both embodiment and file I/O.
+    pub(crate) safety_motor_halt: bool,
+    /// Safety enforcement: motor read-only (Orange level). Set in Phase 3.5.
+    /// When true, only read-only motor output is permitted.
+    pub(crate) safety_motor_readonly: bool,
     /// LR momentum: EMA of recent effective LR.
     pub(crate) lr_momentum_ema: f32,
     /// Previous metacognitive prediction (expected consciousness level).
@@ -316,6 +312,17 @@ pub struct QualityMetrics {
     pub(crate) wm_knowledge_grounding: f64,
     /// Number of knowledge facts injected into working memory this cycle.
     pub(crate) wm_knowledge_injection_count: u8,
+    // ── Epistemic Cube Tiers ─────────────────────────────────────────
+    /// Last computed empirical tier (0–4).
+    pub(crate) last_cube_e_tier: Option<u8>,
+    /// Last computed normative tier (0–3).
+    pub(crate) last_cube_n_tier: Option<u8>,
+    /// Last computed materiality tier (0–3).
+    pub(crate) last_cube_m_tier: Option<u8>,
+    /// Last computed Harmony-value (0.0–1.0).
+    pub(crate) last_cube_h_value: f32,
+    /// Last computed cube quality composite.
+    pub(crate) last_cube_quality: f32,
 }
 
 impl Default for QualityMetrics {
@@ -331,11 +338,6 @@ impl Default for QualityMetrics {
             last_affective_valence: 0.0,
             last_consciousness_state: String::new(),
             last_epistemic_confidence: 0.5,
-            last_cube_e_tier: None,
-            last_cube_n_tier: None,
-            last_cube_m_tier: None,
-            last_cube_h_value: 0.25,
-            last_cube_quality: 0.0,
             last_pipeline_consciousness: 0.0,
             narrative_veto_active: false,
             cached_prefrontal_veto: false,
@@ -370,6 +372,8 @@ impl Default for QualityMetrics {
             confidence_calibration_bias: 0.0,
             confidence_calibration_count: 0,
             subsystem_veto: false,
+            safety_motor_halt: false,
+            safety_motor_readonly: false,
             lr_momentum_ema: 1.0,
             prev_metacognitive_prediction: 0.0,
             sleep_pressure: 0.0,
@@ -386,6 +390,11 @@ impl Default for QualityMetrics {
             mechanism_activations: std::collections::HashMap::new(),
             wm_knowledge_grounding: 0.0,
             wm_knowledge_injection_count: 0,
+            last_cube_e_tier: None,
+            last_cube_n_tier: None,
+            last_cube_m_tier: None,
+            last_cube_h_value: 0.0,
+            last_cube_quality: 0.0,
         }
     }
 }
@@ -481,4 +490,7 @@ pub struct CycleCarryover {
     pub gwt_broadcast_occurred: bool,
     /// GWT winning coalition size from previous cycle (0 if no broadcast)
     pub gwt_coalition_size: u32,
+    /// Injected code reasoning context from CodingAgent (one-shot: consumed by cycle).
+    #[cfg(feature = "reasoning_engine")]
+    pub injected_code_context: Option<crate::consciousness::reasoning_engine::CodeReasoningContext>,
 }

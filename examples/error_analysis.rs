@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Error Analysis for Causal Discovery
+//! # Error Analysis for Causal Discovery
 //!
 //! Analyzes which pairs Majority Voting gets wrong and identifies patterns.
 //! Uses only the imports that work from the existing benchmark system.

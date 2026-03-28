@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Valence classification task.
 //!
 //! Creates 3 valence prototypes (positive/negative/neutral) and generates
@@ -54,8 +51,8 @@ impl ValenceClassificationBenchmark {
                 // Time pressure: 0.15/unit shifts weight from valence to object, modeling degraded
                 // affective encoding under speed emphasis (Pessoa, 2009 dual-competition model).
                 let noise_weight = config.time_pressure * 0.15;
-                let valence_weight = (0.45 - noise_weight) as f32;
-                let object_weight = (0.55 + noise_weight) as f32;
+                let valence_weight = (0.4 - noise_weight) as f32;
+                let object_weight = (0.6 + noise_weight) as f32;
                 let stimulus = ContinuousHV::weighted_bundle(
                     &[&object_hv, protos[valence]],
                     &[object_weight, valence_weight],

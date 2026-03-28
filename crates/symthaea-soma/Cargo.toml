@@ -3,7 +3,7 @@ name = "symthaea-soma"
 version = "0.1.0"
 edition = "2021"
 description = "Symthaea Soma: mobile-embodied consciousness engine (Android/iOS) wrapping the Spore kernel"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
@@ -20,7 +20,6 @@ symthaea-foveation = { path = "../symthaea-foveation" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
-chacha20poly1305 = { version = "0.10", optional = true }
 ed25519-dalek = { version = "2", optional = true, default-features = false, features = ["rand_core"] }
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
@@ -33,15 +32,10 @@ default = []
 native-ffi = []
 # Ed25519 mobile pairing for Spore-to-Spore trust establishment.
 pairing = ["dep:ed25519-dalek", "dep:hex"]
-# ChaCha20-Poly1305 AEAD encryption for HolonBridge outbound messages.
-encrypted-bridge = ["dep:chacha20poly1305", "dep:hex"]
 # Screen embodiment: Soma sees her own UI via vision-manifold + foveation.
 screen-vision = []
 # Full 20-channel Broca language center with epistemic gating and semantic veto.
 broca-full = ["dep:symthaea-broca"]
-
-[dev-dependencies]
-proptest = "1"
 
 [[bin]]
 name = "soma_bench"

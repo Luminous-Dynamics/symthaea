@@ -429,6 +429,56 @@ pub struct HodgeDecomposition {
     pub harmonic: Vec<f64>,
 }
 
+impl HodgeDecomposition {
+    fn norm_sq(v: &[f64]) -> f64 {
+        v.iter().map(|x| x * x).sum()
+    }
+
+    /// Total signal energy (||exact||² + ||coexact||² + ||harmonic||²).
+    pub fn total_energy(&self) -> f64 {
+        Self::norm_sq(&self.exact) + Self::norm_sq(&self.coexact) + Self::norm_sq(&self.harmonic)
+    }
+
+    /// Fraction of signal energy in the harmonic component (0.0–1.0).
+    /// Topologically-protected global resonance modes.
+    pub fn harmonic_fraction(&self) -> f64 {
+        let total = self.total_energy();
+        if total < 1e-15 {
+            return 0.0;
+        }
+        Self::norm_sq(&self.harmonic) / total
+    }
+
+    /// Fraction in the gradient (exact) component (0.0–1.0).
+    /// Hierarchical, feed-forward information transfer.
+    pub fn gradient_fraction(&self) -> f64 {
+        let total = self.total_energy();
+        if total < 1e-15 {
+            return 0.0;
+        }
+        Self::norm_sq(&self.exact) / total
+    }
+
+    /// Fraction in the curl (coexact) component (0.0–1.0).
+    /// Recurrent, rotational information cycling.
+    pub fn curl_fraction(&self) -> f64 {
+        let total = self.total_energy();
+        if total < 1e-15 {
+            return 0.0;
+        }
+        Self::norm_sq(&self.coexact) / total
+    }
+
+    /// All three fractions: (gradient, curl, harmonic). Sum ≈ 1.0.
+    pub fn fractions(&self) -> (f64, f64, f64) {
+        (
+            self.gradient_fraction(),
+            self.curl_fraction(),
+            self.harmonic_fraction(),
+        )
+    }
+}
+
 /// Betti numbers computed from the Hodge Laplacian.
 ///
 /// beta_k = dim(ker(L_k)) counts the number of k-dimensional "holes":

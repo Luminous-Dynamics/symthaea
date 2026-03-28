@@ -603,14 +603,14 @@ impl CognitiveLoopService {
 
         // Track A-1: Causal chain → episodic memory consolidation boost
         if !chain_cycle_numbers.is_empty() {
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 replay.boost_causal_consolidation(&chain_cycle_numbers, 0.15);
             }
         }
 
         // Track A-3: Continuity gaps → demand replay
         if continuity_replay_needed {
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 replay.trigger_demand_replay();
             }
         }

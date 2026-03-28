@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Paper Topology Table Generator
+//! # Paper Topology Table Generator
 //!
 //! Runs Phi-guided architecture search across all 10 topology types and outputs
 //! a paper-ready table of topology metrics (Betti numbers, Euler characteristic,

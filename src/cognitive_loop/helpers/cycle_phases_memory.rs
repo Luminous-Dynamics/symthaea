@@ -31,7 +31,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         // Gate codebook growth on epistemic approval — don't learn from rejected inputs
         if epistemic_gate_approved {
-            if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+            if let Some(ref mut res_mem) = self.memory.memory_consol.resonator_memory {
                 let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok
                     && self.config.resonator_growth_interval > 0
@@ -85,7 +85,7 @@ impl CognitiveLoopService {
 
             // Track A-2: Causal chain content → resonator codebook symbols
             if !causal_codebook_entries.is_empty() {
-                if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+                if let Some(ref mut res_mem) = self.memory.memory_consol.resonator_memory {
                     for (label, hv) in causal_codebook_entries {
                         if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                             if semantic_cb.len() < self.config.resonator_max_symbols
@@ -113,6 +113,7 @@ impl CognitiveLoopService {
             && self.stats.total_cycles > 0
         {
             let top_eps = self
+                .memory
                 .episodic_persistence
                 .replay
                 .as_ref()
@@ -120,7 +121,7 @@ impl CognitiveLoopService {
                 .unwrap_or_default();
 
             if !top_eps.is_empty() {
-                if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+                if let Some(ref mut res_mem) = self.memory.memory_consol.resonator_memory {
                     let dim = res_mem.resonator.config.dim;
                     if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                         for ep in &top_eps {
@@ -181,7 +182,7 @@ impl CognitiveLoopService {
             % crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_DIVERSITY_INTERVAL
             == 0
         {
-            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
+            if let Some(ref res_mem) = self.memory.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n >= 2 {
@@ -223,7 +224,7 @@ impl CognitiveLoopService {
             % crate::cognitive_loop::thresholds::MEMORY_CODEBOOK_UTILIZATION_INTERVAL
             == 0
         {
-            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
+            if let Some(ref res_mem) = self.memory.memory_consol.resonator_memory {
                 if let Some(semantic_cb) = res_mem.resonator.codebooks.first() {
                     let n = semantic_cb.symbols.len();
                     if n > 0 && compressed_state.len() == res_mem.resonator.config.dim {
@@ -320,10 +321,10 @@ impl CognitiveLoopService {
         //   (b) semantic memory returned zero hits (retrieval miss)
         // The periodic 100-cycle floor is still enforced by should_replay().
         let _t = Instant::now();
-        if let Some(ref mut replay) = self.episodic_persistence.replay {
+        if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
             let avg_err = self.stats.avg_prediction_error;
             let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
-            let semantic_miss = self.memory_consol.semantic_memory.stats().semantic_misses > 0
+            let semantic_miss = self.memory.memory_consol.semantic_memory.stats().semantic_misses > 0
                 && memory_context_boost == 0.0 // no episodic memories recalled this cycle
                 && self.stats.total_cycles > 10;
 
@@ -348,7 +349,7 @@ impl CognitiveLoopService {
         // - Memory coordinator needs &mut phi_episodic_replay after replay completes
         let _t = Instant::now();
         let mut memory_db_flushed = false;
-        if let Some(ref mut replay) = self.episodic_persistence.replay {
+        if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
             let coherence_summary = self.language_comm.voice_coherence.bridge.summary();
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
@@ -362,7 +363,7 @@ impl CognitiveLoopService {
                 current_phi,
                 self.stats.total_cycles as u64,
                 prediction_error,
-                self.emotion_contagion.smoothed_valence(),
+                self.unification_engine.emotional.state().valence as f32,
                 coherence_summary.coherence,
             )
             .with_dopamine(self.neuromod.bath.dopamine.effective())
@@ -465,7 +466,10 @@ impl CognitiveLoopService {
                             for ep in &top_eps_for_tracking {
                                 let hash =
                                     crate::memory::memory_coordinator::content_hash(&ep.input);
-                                self.memory_consol.memory_coordinator.record_retrieval(hash);
+                                self.memory
+                                    .memory_consol
+                                    .memory_coordinator
+                                    .record_retrieval(hash);
                             }
                         }
 
@@ -473,7 +477,7 @@ impl CognitiveLoopService {
                         // Science: Stickgold (2005) — sleep replay extracts gist representations
                         // After episodic replay, factorize top episodes through the resonator to
                         // extract clean semantic components and strengthen codebook representations.
-                        if let Some(ref mut res_mem) = self.memory_consol.resonator_memory {
+                        if let Some(ref mut res_mem) = self.memory.memory_consol.resonator_memory {
                             if !res_mem.resonator.codebooks.is_empty() {
                                 let res_dim = res_mem.resonator.config.dim;
                                 let top_eps = replay.get_top_episodes(3);
@@ -526,7 +530,7 @@ impl CognitiveLoopService {
         if !self.cantor_dream.broadcast_buffer.is_empty() {
             // Refresh persistent engine's codebook from resonator memory (additive — new entries
             // supplement existing consolidated knowledge rather than replacing it)
-            if let Some(ref res_mem) = self.memory_consol.resonator_memory {
+            if let Some(ref res_mem) = self.memory.memory_consol.resonator_memory {
                 for cb in &res_mem.resonator.codebooks {
                     for (label, continuous_vec) in &cb.symbols {
                         let mut bytes = [0u8; 2048];
@@ -645,7 +649,7 @@ impl CognitiveLoopService {
             && self.stats.total_cycles % 50 == 0
             && self.stats.total_cycles > 50
         {
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 // Variance = E[X²] - E[X]² (from EMA-tracked moments)
                 let error_variance = (self.stats.avg_prediction_error_sq
                     - self.stats.avg_prediction_error * self.stats.avg_prediction_error)
@@ -662,7 +666,8 @@ impl CognitiveLoopService {
                 .bridge
                 .smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_consol
+            self.memory
+                .memory_consol
                 .memory_coordinator
                 .update_signals_with_sigma(
                     coord_phi,
@@ -670,8 +675,9 @@ impl CognitiveLoopService {
                     self.carryover.consciousness.last_sigma,
                 );
 
-            if let Some(ref mut replay) = self.episodic_persistence.replay {
+            if let Some(ref mut replay) = self.memory.episodic_persistence.replay {
                 let graduated = self
+                    .memory
                     .memory_consol
                     .memory_coordinator
                     .process_graduations(replay);
@@ -691,26 +697,28 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         if self.stats.total_cycles % 199 == 0
             && self.stats.total_cycles > 0
-            && self.episodic_persistence.db.is_some()
+            && self.memory.episodic_persistence.db.is_some()
         {
             use std::sync::atomic::Ordering;
 
             if !self
+                .memory
                 .episodic_persistence
                 .flush_in_progress
                 .load(Ordering::Relaxed)
             {
-                if let Some(ref replay) = self.episodic_persistence.replay {
+                if let Some(ref replay) = self.memory.episodic_persistence.replay {
                     let top_episodes = replay.get_top_episodes(16);
                     if !top_episodes.is_empty() {
-                        let Some(db) = self.episodic_persistence.db.clone() else {
+                        let Some(db) = self.memory.episodic_persistence.db.clone() else {
                             return EpisodicReplayResult {
                                 surprise_replay_batch_size: 0,
                                 phasic_da_replay_boost: 0,
                                 memory_db_flushed: false,
                             };
                         };
-                        let flush_guard = self.episodic_persistence.flush_in_progress.clone();
+                        let flush_guard =
+                            self.memory.episodic_persistence.flush_in_progress.clone();
                         flush_guard.store(true, Ordering::Relaxed);
 
                         let records: Vec<crate::databases::MemoryRecord> = top_episodes

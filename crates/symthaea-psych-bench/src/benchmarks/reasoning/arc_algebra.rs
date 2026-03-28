@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ARC Rule Algebra Probes benchmark (SYNTHETIC — tests HDC algebra, not reasoning).
 //!
 //! **Honesty note:** This benchmark explicitly tests algebraic properties of the

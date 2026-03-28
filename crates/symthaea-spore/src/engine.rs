@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! SporeEngine: the core consciousness loop for WASM targets.
+//! SporeEngine: the core consciousness loop for WASM targets.
 
 use crate::broca::BrocaLite;
 #[cfg(feature = "broca-pipeline")]
@@ -855,7 +853,10 @@ impl SporeEngine {
         self.trend_history
             .maybe_record(crate::persistence::QolSnapshot {
                 cycle: self.cycle_count,
-                timestamp_secs: self.cycle_count, // cycle count as monotonic proxy (SystemTime panics on wasm32)
+                timestamp_secs: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
                 consciousness_level,
                 harmony_alignment,
                 metacog_accuracy: 0.0,
@@ -2161,16 +2162,6 @@ impl SporeEngine {
             })
             .map(|h| h.name())
             .unwrap_or("Harmony")
-    }
-
-    /// All eight harmony scores as a JSON array.
-    pub fn harmony_scores_json(&self) -> String {
-        let c = self.last_consciousness;
-        let scores: Vec<f32> = Harmony::all()
-            .iter()
-            .map(|h| self.harmony_score(h, c))
-            .collect();
-        serde_json::to_string(&scores).unwrap_or_else(|_| "[]".to_string())
     }
 
     /// Evaluate alignment with the Eight Harmonies ethical framework.

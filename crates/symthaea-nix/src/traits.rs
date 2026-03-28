@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Local trait and type definitions for the symthaea-nix crate.
 //!
 //! These are standalone definitions that mirror the main symthaea crate's types,

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! BrocaCheckpoint: save/load trained Broca models with integrity verification.
 //!
 //! Uses rmp-serde (MessagePack) for self-describing serialization and blake3
@@ -128,48 +125,8 @@ pub struct BrocaCheckpoint {
     /// regardless of enabled features. Bincode can't round-trip `serde_json::Value` (untagged enum).
     #[serde(default)]
     pub liquid_mamba_config: Option<String>,
-    /// Learned logit projection head weights: [projection_dim × HDC_DIMENSION], row-major.
-    /// Projects CfC output to lower-dimensional space for improved token discrimination.
-    #[serde(default)]
-    pub logit_projection_weights: Option<Vec<f32>>,
     /// Blake3 integrity checksum (set to zeros before hashing).
     pub checksum: [u8; 32],
-}
-
-/// Legacy checkpoint layout (without logit_projection_weights).
-/// Used for backward-compatible deserialization of older checkpoints.
-#[derive(Deserialize)]
-struct BrocaCheckpointLegacy {
-    version: u32,
-    token_embeddings: Vec<ContinuousHV>,
-    network_state: HdcLtcUnifiedNetwork,
-    vocab: VocabFile,
-    config: BrocaConfig,
-    training_epoch: usize,
-    training_loss: f32,
-    adam_state: Option<AdamState>,
-    projection_weights: Option<Vec<f32>>,
-    liquid_mamba_config: Option<String>,
-    checksum: [u8; 32],
-}
-
-impl From<BrocaCheckpointLegacy> for BrocaCheckpoint {
-    fn from(legacy: BrocaCheckpointLegacy) -> Self {
-        Self {
-            version: legacy.version,
-            token_embeddings: legacy.token_embeddings,
-            network_state: legacy.network_state,
-            vocab: legacy.vocab,
-            config: legacy.config,
-            training_epoch: legacy.training_epoch,
-            training_loss: legacy.training_loss,
-            adam_state: legacy.adam_state,
-            projection_weights: legacy.projection_weights,
-            liquid_mamba_config: legacy.liquid_mamba_config,
-            logit_projection_weights: None,
-            checksum: legacy.checksum,
-        }
-    }
 }
 
 impl BrocaCheckpoint {
@@ -187,7 +144,6 @@ impl BrocaCheckpoint {
             adam_state: self.adam_state.clone(),
             projection_weights: self.projection_weights.clone(),
             liquid_mamba_config: self.liquid_mamba_config.clone(),
-            logit_projection_weights: self.logit_projection_weights.clone(),
             checksum: [0u8; 32],
         };
 
@@ -236,43 +192,23 @@ impl BrocaCheckpoint {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        // Try MessagePack current format (with logit_projection_weights)
-        let checkpoint: Self = match rmp_serde::from_slice::<Self>(&buffer) {
-            Ok(ckpt) => {
-                if !ckpt.verify() {
-                    tracing::warn!(
-                        "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
-                    );
-                }
-                ckpt
+        // Try MessagePack (current format) first
+        let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
+            // MessagePack checkpoint — verify integrity
+            if !ckpt.verify() {
+                tracing::warn!(
+                    "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
+                );
             }
-            Err(e1) => {
-                tracing::debug!("msgpack v2 failed: {e1}");
-                // Legacy MessagePack (without logit_projection_weights)
-                match rmp_serde::from_slice::<BrocaCheckpointLegacy>(&buffer) {
-                    Ok(legacy) => {
-                        tracing::info!(
-                            "Loaded legacy Broca checkpoint (pre-projection) — upgrading"
-                        );
-                        legacy.into()
-                    }
-                    Err(e2) => {
-                        tracing::debug!("msgpack legacy failed: {e2}");
-                        // Bincode fallback
-                        match bincode::deserialize::<BrocaCheckpointLegacy>(&buffer) {
-                            Ok(legacy) => {
-                                tracing::warn!("Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack");
-                                legacy.into()
-                            }
-                            Err(e3) => {
-                                anyhow::bail!(
-                                    "Failed to deserialize BrocaCheckpoint:\n  msgpack v2: {e1}\n  msgpack legacy: {e2}\n  bincode: {e3}"
-                                );
-                            }
-                        }
-                    }
-                }
-            }
+            ckpt
+        } else {
+            // Fall back to bincode (legacy format) — skip verify since hash format changed
+            let ckpt = bincode::deserialize::<Self>(&buffer)
+                .context("Failed to deserialize BrocaCheckpoint (tried msgpack + bincode)")?;
+            tracing::warn!(
+                "Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack"
+            );
+            ckpt
         };
 
         if checkpoint.version > CHECKPOINT_VERSION {
@@ -347,7 +283,6 @@ impl BrocaGenerator {
             adam_state,
             projection_weights,
             liquid_mamba_config,
-            logit_projection_weights: self.controller().projection_weights().map(|w| w.to_vec()),
             checksum: [0u8; 32],
         };
 
@@ -380,22 +315,6 @@ impl BrocaGenerator {
         *gen.controller_mut().token_embeddings_mut() = checkpoint.token_embeddings;
         // Restore network state (weights, momentums, etc.)
         *gen.controller_mut().network_mut() = checkpoint.network_state;
-
-        // Restore logit projection head weights if present.
-        // projection_dim is #[serde(skip)], so we infer it from weight dimensions.
-        if let Some(proj_weights) = checkpoint.logit_projection_weights {
-            let total = proj_weights.len();
-            let dim = symthaea_core::hdc::HDC_DIMENSION;
-            let proj_dim = total / dim;
-            if proj_dim > 0 && proj_dim * dim == total {
-                // Enable projection on the controller, then overwrite with trained weights
-                gen.controller_mut().enable_projection(genesis, proj_dim);
-                if let Some(w) = gen.controller_mut().projection_weights_mut() {
-                    *w = proj_weights;
-                }
-                gen.controller_mut().refresh_projected_embeddings();
-            }
-        }
 
         Ok((
             gen,
@@ -881,7 +800,6 @@ mod tests {
             adam_state: None,
             projection_weights: None,
             liquid_mamba_config: None,
-            logit_projection_weights: None,
             checksum: [0u8; 32],
         };
         checkpoint.checksum = checkpoint.compute_checksum();

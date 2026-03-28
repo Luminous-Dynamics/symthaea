@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # CfC GPU/CPU Equivalence Tests
+//! # CfC GPU/CPU Equivalence Tests
 //!
 //! This module verifies that the GPU-accelerated CfC implementation produces
 //! results equivalent to the CPU implementation within floating-point tolerance.

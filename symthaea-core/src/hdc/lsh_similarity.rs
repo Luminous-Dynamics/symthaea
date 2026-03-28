@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Session 7C: LSH-Backed Similarity Search - Revolutionary Adaptive Algorithm
 //!
 //! This module integrates SimHash LSH (Session 6B verified: 9.2x-100x speedup)

@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Horizon task: exploration vs exploitation.
 //!
 //! Measures directed exploration (choosing informative actions) and
@@ -37,11 +34,10 @@ impl HorizonBenchmark {
 
         let good_arm_value = 0.8;
         let bad_arm_value = 0.3;
-        // Lower LR preserves residual uncertainty after forced-choice phase,
-        // driving continued exploration in free-choice phase. Human data
-        // (Wilson et al. 2014) shows ~35% directed exploration even after
-        // learning — requires agents to remain uncertain about arm values.
-        let learning_rate = 0.22;
+        // Higher LR helps build stronger arm-value distinctions during the
+        // short forced-choice phase, enabling more informed exploration
+        // decisions in the free-choice phase.
+        let learning_rate = 0.35;
 
         // Bayesian arm tracking: mean value + observation count
         let mut arm_mean = [0.5f64; 2]; // uninformative prior
@@ -70,19 +66,17 @@ impl HorizonBenchmark {
             let remaining = (num_choices - choice_idx) as f64;
             // Exploration bonus: UCB-like term scaled by remaining horizon.
             // With longer horizon, information is more valuable (Wilson et al. 2014).
-            // Coefficient 0.80 (was 0.55) provides an information bonus large enough
-            // to overcome the full value gap (~0.50) on early free-choice trials
+            // Coefficient 0.55 provides an information bonus large enough to
+            // overcome the learned value gap (~0.35) on early free-choice trials
             // when the less-observed arm has low count (1-2 observations).
             // Human directed exploration at horizon 6 is ~35% (Wilson et al. 2014),
             // driven by the "information bonus" — participants choose the less-known
             // arm even when its expected value is lower. Thompson sampling analyses
             // (Chapelle & Li, 2011) show that optimal exploration rate increases
             // with the uncertainty-to-value-gap ratio.
-            // Floor 0.40 (was 0.0): even at horizon 1, information has residual value
-            // because the agent may encounter similar decisions in future blocks.
             let exploration_bonus = |count: u64| -> f64 {
-                let info_value = 0.80 / (count as f64 + 1.0).sqrt();
-                info_value * (0.40 + 0.60 * (remaining / 6.0).min(1.0))
+                let info_value = 0.55 / (count as f64 + 1.0).sqrt();
+                info_value * (remaining / 6.0).min(1.0)
             };
 
             let score0 = arm_mean[0] + exploration_bonus(arm_count[0]);

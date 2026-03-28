@@ -79,9 +79,16 @@ pub mod liquid_hdc;
 pub mod liquid_projection;
 pub mod lm;
 pub mod ltc;
+#[cfg(feature = "gpu")]
+pub mod ltc_gpu;
+pub mod ltc_training;
 pub mod models;
+
+// Unified HDC-LTC architecture (reuses symthaea-core)
+pub mod audio_hdc_encoder;
 pub mod multiscale_scorer;
 pub mod phoneme;
+pub mod phoneme_hdc_ltc;
 pub mod rls;
 pub mod streaming;
 pub mod temporal_grammar;

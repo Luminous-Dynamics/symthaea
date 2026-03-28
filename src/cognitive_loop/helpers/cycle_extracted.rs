@@ -201,11 +201,13 @@ impl CognitiveLoopService {
             .temporal
             .classify_state()
             .0;
-        let prior_valence = self.emotion_contagion.prosody_valence();
+        let prior_valence = self.unification_engine.emotional.state().valence as f32;
         let prior_error = self.stats.avg_prediction_error;
-        self.cognitive_depth =
-            self.thalamic_router
-                .route_from_cycle(prior_error, prior_pattern, prior_valence);
+        self.cognitive_depth = self.behavior.thalamic_router.route_from_cycle(
+            prior_error,
+            prior_pattern,
+            prior_valence,
+        );
     }
 
     /// Detect negation polarity across safety-critical terms.
@@ -236,10 +238,13 @@ impl CognitiveLoopService {
         reasoning_lr_factor: f32,
     ) -> f32 {
         let base_lr = self.combined_learning_rate();
-        let base = self.adaptive_behavior.effective_learning_rate(base_lr);
+        let base = self
+            .behavior
+            .adaptive_behavior
+            .effective_learning_rate(base_lr);
 
-        let flow_factor = self.flow_state.learning_boost;
-        let curiosity_factor = self.curiosity_drive.novelty_bonus;
+        let flow_factor = self.behavior.flow_state.learning_boost;
+        let curiosity_factor = self.behavior.curiosity_drive.novelty_bonus;
         let cognitive_mod = geometric_mean(&[
             flow_factor.max(0.01),
             semantic_lr_factor.max(0.01),
@@ -412,8 +417,8 @@ impl CognitiveLoopService {
             // Memory valence biases current emotional state (emotional re-experiencing)
             if memory_valence_avg.abs() > MEMORY_VALENCE_THRESHOLD {
                 let valence_nudge = memory_valence_avg * MEMORY_VALENCE_NUDGE_SCALE;
-                self.emotion_contagion.valence =
-                    (self.emotion_contagion.valence + valence_nudge).clamp(-1.0, 1.0);
+                self.behavior.emotion_contagion.valence =
+                    (self.behavior.emotion_contagion.valence + valence_nudge).clamp(-1.0, 1.0);
             }
             // Memory Phi primes consciousness expectation
             if memory_phi_avg > MEMORY_PHI_PRIME_THRESHOLD {
@@ -448,8 +453,9 @@ impl CognitiveLoopService {
 
             if should_explore {
                 surprise_triggered = true;
-                let current_threshold = self.curiosity_drive.get_boredom_threshold();
-                self.curiosity_drive
+                let current_threshold = self.behavior.curiosity_drive.get_boredom_threshold();
+                self.behavior
+                    .curiosity_drive
                     .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
                 let expl_factor = bridge.exploration_factor;
                 deferred_exploration_delta = Some(expl_factor * SURPRISE_EXPLORATION_FACTOR_SCALE);
@@ -489,13 +495,13 @@ impl CognitiveLoopService {
             .voice
             .summary()
             .phi_adjustment;
-        let flow_psi = if self.flow_state.in_flow {
-            self.flow_state.intensity * FLOW_PSI_WEIGHT
+        let flow_psi = if self.behavior.flow_state.in_flow {
+            self.behavior.flow_state.intensity * FLOW_PSI_WEIGHT
         } else {
             0.0
         };
-        let relational_psi_contrib = if self.social_mgr.social.relational_psi > 0.0 {
-            self.social_mgr.social.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
+        let relational_psi_contrib = if self.behavior.social_mgr.social.relational_psi > 0.0 {
+            self.behavior.social_mgr.social.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
         } else {
             0.0
         };
@@ -567,10 +573,10 @@ impl CognitiveLoopService {
 
         let enriched_reward = internal_reward + fep_bonus;
 
-        let cycle_reward = if self.social_mgr.social.external_reward.abs() > f32::EPSILON {
+        let cycle_reward = if self.behavior.social_mgr.social.external_reward.abs() > f32::EPSILON {
             let blended = enriched_reward * REWARD_EXTERNAL_BLEND
-                + self.social_mgr.social.external_reward * REWARD_EXTERNAL_BLEND;
-            self.social_mgr.social.external_reward = 0.0; // consume
+                + self.behavior.social_mgr.social.external_reward * REWARD_EXTERNAL_BLEND;
+            self.behavior.social_mgr.social.external_reward = 0.0; // consume
             blended
         } else {
             enriched_reward
@@ -588,19 +594,21 @@ impl CognitiveLoopService {
     ) {
         match strategy {
             ResponseStrategy::Exploratory => {
-                self.adaptive_behavior.exploration_factor = STRATEGY_EXPLORATORY_FACTOR;
+                self.behavior.adaptive_behavior.exploration_factor = STRATEGY_EXPLORATORY_FACTOR;
             }
             ResponseStrategy::Detailed => {
-                self.adaptive_behavior.attention_sensitivity = STRATEGY_DETAILED_SENSITIVITY;
+                self.behavior.adaptive_behavior.attention_sensitivity =
+                    STRATEGY_DETAILED_SENSITIVITY;
             }
             ResponseStrategy::Concise => {
-                self.adaptive_behavior.speech_rate_multiplier = STRATEGY_CONCISE_SPEECH_RATE;
+                self.behavior.adaptive_behavior.speech_rate_multiplier =
+                    STRATEGY_CONCISE_SPEECH_RATE;
             }
             ResponseStrategy::Clarifying => {
-                self.adaptive_behavior.exploration_factor = STRATEGY_CLARIFYING_FACTOR;
+                self.behavior.adaptive_behavior.exploration_factor = STRATEGY_CLARIFYING_FACTOR;
             }
             ResponseStrategy::Supportive => {
-                self.adaptive_behavior.pause_multiplier = STRATEGY_SUPPORTIVE_PAUSE;
+                self.behavior.adaptive_behavior.pause_multiplier = STRATEGY_SUPPORTIVE_PAUSE;
             }
         }
     }
@@ -616,28 +624,33 @@ impl CognitiveLoopService {
     ) {
         match strategy {
             ResponseStrategy::Exploratory => {
-                self.adaptive_behavior.exploration_factor = self
+                self.behavior.adaptive_behavior.exploration_factor = self
+                    .behavior
                     .adaptive_behavior
                     .exploration_factor
                     .max(STRATEGY_EXPLORATORY_FACTOR);
             }
             ResponseStrategy::Detailed => {
-                self.adaptive_behavior.attention_sensitivity *= STRATEGY_DETAILED_SENSITIVITY;
+                self.behavior.adaptive_behavior.attention_sensitivity *=
+                    STRATEGY_DETAILED_SENSITIVITY;
             }
             ResponseStrategy::Concise => {
-                self.adaptive_behavior.speech_rate_multiplier = self
+                self.behavior.adaptive_behavior.speech_rate_multiplier = self
+                    .behavior
                     .adaptive_behavior
                     .speech_rate_multiplier
                     .max(STRATEGY_CONCISE_SPEECH_RATE);
             }
             ResponseStrategy::Clarifying => {
-                self.adaptive_behavior.exploration_factor = self
+                self.behavior.adaptive_behavior.exploration_factor = self
+                    .behavior
                     .adaptive_behavior
                     .exploration_factor
                     .min(STRATEGY_CLARIFYING_FACTOR);
             }
             ResponseStrategy::Supportive => {
-                self.adaptive_behavior.pause_multiplier = self
+                self.behavior.adaptive_behavior.pause_multiplier = self
+                    .behavior
                     .adaptive_behavior
                     .pause_multiplier
                     .max(STRATEGY_SUPPORTIVE_PAUSE);
@@ -708,10 +721,17 @@ impl CognitiveLoopService {
                 // Tighten trust via precision
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
-                    self.self_model_tier.self_reflection.trust_threshold =
-                        (self.self_model_tier.self_reflection.trust_threshold * 0.9
-                            + precision_mod * 0.1)
-                            .clamp(0.1, 0.9);
+                    self.consciousness
+                        .self_model_tier
+                        .self_reflection
+                        .trust_threshold = (self
+                        .consciousness
+                        .self_model_tier
+                        .self_reflection
+                        .trust_threshold
+                        * 0.9
+                        + precision_mod * 0.1)
+                        .clamp(0.1, 0.9);
                 }
             }
             _ => {}
@@ -959,10 +979,18 @@ impl CognitiveLoopService {
                 Priority::Safety,
             );
 
-            self.self_model_tier.self_reflection.trust_threshold =
-                (self.self_model_tier.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
+            self.consciousness
+                .self_model_tier
+                .self_reflection
+                .trust_threshold = (self
+                .consciousness
+                .self_model_tier
+                .self_reflection
+                .trust_threshold
+                * 1.2)
+                .clamp(0.1, 0.95);
 
-            self.adaptive_behavior.pause_multiplier *= MORAL_CONCERN_PAUSE_BOOST;
+            self.behavior.adaptive_behavior.pause_multiplier *= MORAL_CONCERN_PAUSE_BOOST;
 
             if moral_judgment.consent_violation
                 || moral_judgment
@@ -1004,7 +1032,10 @@ impl CognitiveLoopService {
                 .iter()
                 .any(|v| v.contains("perfect") || v.contains("duty"))
             {
-                self.self_model_tier.self_reflection.force_reflection();
+                self.consciousness
+                    .self_model_tier
+                    .self_reflection
+                    .force_reflection();
                 self.carryover.learning.subsystem_lr_factor *= MORAL_DUTY_LR_FACTOR;
                 moral_steering_category = "duty";
             } else if !moral_judgment.violations.is_empty() {
@@ -1064,8 +1095,12 @@ impl CognitiveLoopService {
         prediction_error: f32,
         coherence: f32,
     ) {
-        let adapted_thresholds = self.self_model_tier.self_reflection.get_thresholds();
-        self.flow_state.update_with_thresholds(
+        let adapted_thresholds = self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .get_thresholds();
+        self.behavior.flow_state.update_with_thresholds(
             pattern,
             prediction_error,
             coherence,
@@ -1075,9 +1110,10 @@ impl CognitiveLoopService {
         );
 
         // Curiosity drive — route exploration mutation through feedback system
-        self.curiosity_drive
+        self.behavior
+            .curiosity_drive
             .set_boredom_threshold(adapted_thresholds.boredom);
-        match self.curiosity_drive.update(prediction_error) {
+        match self.behavior.curiosity_drive.update(prediction_error) {
             super::super::drives::ExplorationUpdate::Set(val) => {
                 self.set_exploration("curiosity_drive_boredom", val);
             }
@@ -1103,14 +1139,22 @@ impl CognitiveLoopService {
         }
 
         // Self-reflection
-        self.self_model_tier.self_reflection.record_cycle(
-            prediction_error,
-            self.flow_state.in_flow,
-            self.curiosity_drive.should_explore(),
-            self.prediction_confidence as f32,
-        );
-        if self.self_model_tier.self_reflection.should_reflect() {
-            let recommendations = self.self_model_tier.self_reflection.reflect();
+        self.consciousness
+            .self_model_tier
+            .self_reflection
+            .record_cycle(
+                prediction_error,
+                self.behavior.flow_state.in_flow,
+                self.behavior.curiosity_drive.should_explore(),
+                self.prediction_confidence as f32,
+            );
+        if self
+            .consciousness
+            .self_model_tier
+            .self_reflection
+            .should_reflect()
+        {
+            let recommendations = self.consciousness.self_model_tier.self_reflection.reflect();
             for rec in &recommendations {
                 if rec.confidence < REFLECTION_CONFIDENCE_THRESHOLD {
                     continue;

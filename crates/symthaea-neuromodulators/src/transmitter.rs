@@ -62,6 +62,14 @@ pub struct Transmitter {
     /// High-exposure threshold offset above baseline (default 0.2).
     #[serde(default = "default_tolerance_threshold")]
     pub tolerance_threshold: f32,
+    /// Michaelis-Menten V_max: maximum clearance rate (default 0.15).
+    /// Science: Torres et al. (2003) — monoamine transporter kinetics.
+    #[serde(default = "default_mm_v_max")]
+    pub mm_v_max: f32,
+    /// Michaelis-Menten K_m: half-saturation constant (default 0.4).
+    /// Science: Torres et al. (2003) — DAT K_m ≈ 0.2μM normalized.
+    #[serde(default = "default_mm_k_m")]
+    pub mm_k_m: f32,
 }
 
 fn default_tolerance_onset() -> u32 {
@@ -78,6 +86,12 @@ fn default_withdrawal_recovery() -> f32 {
 }
 fn default_tolerance_threshold() -> f32 {
     0.2
+}
+fn default_mm_v_max() -> f32 {
+    0.15
+}
+fn default_mm_k_m() -> f32 {
+    0.4
 }
 
 impl Default for Transmitter {
@@ -96,6 +110,8 @@ impl Default for Transmitter {
             withdrawal_duration: 30,
             withdrawal_recovery_rate: 1.01,
             tolerance_threshold: 0.2,
+            mm_v_max: 0.15,
+            mm_k_m: 0.4,
         }
     }
 }
@@ -151,8 +167,19 @@ impl Transmitter {
     ///
     /// Phasic component decays fast (×(1-phasic_decay) per cycle, ~5-cycle half-life).
     pub fn reuptake(&mut self) {
-        // Exponential return to baseline
-        self.level += (self.baseline - self.level) * self.reuptake_rate;
+        // Michaelis-Menten clearance toward baseline (Torres et al. 2003).
+        // At low deviation: linear (backward-compatible with old reuptake_rate).
+        // At high deviation: saturates at V_max (transporters fully occupied).
+        let delta = self.level - self.baseline;
+        let abs_delta = delta.abs();
+        if abs_delta > 1e-6 {
+            let clearance = self.mm_v_max * abs_delta / (self.mm_k_m + abs_delta);
+            if delta > 0.0 {
+                self.level -= clearance;
+            } else {
+                self.level += clearance;
+            }
+        }
         self.level = self.level.clamp(0.0, 1.0);
         // Fast phasic decay: Grace (1991) — burst signals are transient
         self.phasic *= 1.0 - self.phasic_decay;

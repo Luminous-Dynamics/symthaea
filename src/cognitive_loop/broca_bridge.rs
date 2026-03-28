@@ -79,10 +79,8 @@ pub struct BrocaConsciousnessSignals {
     pub cube_h_value: f32,
     /// Epistemic quality score: E×0.4 + N×0.35 + M×0.25 (normalized 0-1).
     pub cube_quality: f32,
-    /// Pre-computed HDC encoding of the epistemic cube coordinate via NSM grounding.
-    /// When present, blended with the thought HV to semantically encode the epistemic
-    /// position (what we know, how we know it, how certain we are).
-    pub epistemic_cube_hv: Option<symthaea_core::hdc::ContinuousHV>,
+    /// Code channels from CodingAgent: [syntax_complexity, type_confidence, algorithm_pattern, error_likelihood]
+    pub code_channels: Option<[f32; 4]>,
 }
 
 // Re-export telemetry type from the types module.
@@ -253,31 +251,20 @@ impl BrocaManager {
             channels.set_epistemic_cube(e, n, m, signals.cube_h_value, signals.cube_quality);
         }
 
-        // Blend semantic HV with epistemic cube HV when both available.
-        // The epistemic cube HV encodes *what kind of knowledge this is* (NSM grounded),
-        // while semantic HV encodes *what the knowledge is about*.
-        let combined_semantic_hv: Option<symthaea_core::hdc::ContinuousHV> =
-            match (&signals.semantic_hv, &signals.epistemic_cube_hv) {
-                (Some(sem), Some(epi)) => {
-                    // Blend: 70% semantic content, 30% epistemic framing
-                    let mut blended = sem.clone();
-                    blended.lerp_in_place(epi, 0.7, 0.3);
-                    Some(blended)
-                }
-                (Some(sem), None) => Some(sem.clone()),
-                (None, Some(epi)) => Some(epi.clone()),
-                (None, None) => None,
-            };
+        // Set code channels from CodingAgent injection (channels 24–27).
+        if let Some([sc, tc, ap, el]) = signals.code_channels {
+            channels.set_code(sc, tc, ap, el);
+        }
 
         // Multi-turn context: use generate_continuing() after the first turn
         // to preserve CfC temporal context.
         // Pass NSM semantic HV and active primes through when available.
         let result = if self.multi_turn_depth > 0 && self.turn_count > 0 {
             self.generator.generate_continuing(&channels)
-        } else if combined_semantic_hv.is_some() || !signals.detected_primitives.is_empty() {
+        } else if signals.semantic_hv.is_some() || !signals.detected_primitives.is_empty() {
             self.generator.generate_with_semantic(
                 &channels,
-                combined_semantic_hv.as_ref(),
+                signals.semantic_hv.as_ref(),
                 &signals.detected_primitives,
             )
         } else {

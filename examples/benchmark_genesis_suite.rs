@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Unified Genesis Benchmark Suite — HTML + JSON Report
+//! Unified Genesis Benchmark Suite — HTML + JSON Report
 //!
 //! Runs all domain predictors, collects results, and generates an
 //! HTML report with domain registry, O(1) cost proof, prediction drift,

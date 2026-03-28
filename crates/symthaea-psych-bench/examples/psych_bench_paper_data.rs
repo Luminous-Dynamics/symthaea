@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Generate CSV data files for the Psych-Bench BRM paper.
 //!
 //! Runs the full benchmark suite and produces 8 CSV files consumed
@@ -32,9 +29,6 @@ use symthaea_psych_bench::benchmarks::clinical::{
     AllianceMaintenanceBenchmark, CognitiveDistortionBenchmark, CrisisDetectionBenchmark,
     EmpathicAccuracyBenchmark, MotivationalInterviewingBenchmark, TherapeuticResponseBenchmark,
 };
-use symthaea_psych_bench::benchmarks::coding::{
-    AlgorithmRecognitionBenchmark, BugDetectionBenchmark, HumanEvalMiniBenchmark,
-};
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
@@ -62,8 +56,8 @@ use symthaea_psych_bench::benchmarks::language::{
 use symthaea_psych_bench::benchmarks::mathematics::{
     ArithmeticWordProblemsBenchmark, BayesianReasoningBenchmark, ConstraintPuzzlesBenchmark,
     DefiniteIntegralsBenchmark, LinearSystemSolvingBenchmark, LogicalDeductionBenchmark,
-    MatrixOperationsBenchmark, OptimizationProblemsBenchmark, PolynomialRootsBenchmark,
-    ProofConstructionBenchmark, StatisticalInferenceBenchmark,
+    MatrixOperationsBenchmark, PolynomialRootsBenchmark, ProofConstructionBenchmark,
+    StatisticalInferenceBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -259,7 +253,7 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(institutional_reasoning::WeightedDecompositionBenchmark),
         Box::new(institutional_reasoning::InstitutionalStabilityBenchmark),
         Box::new(institutional_reasoning::InstitutionalIsomorphismBenchmark),
-        // Mathematics (11)
+        // Mathematics (10)
         Box::new(ArithmeticWordProblemsBenchmark),
         Box::new(LinearSystemSolvingBenchmark),
         Box::new(PolynomialRootsBenchmark),
@@ -270,7 +264,6 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(ConstraintPuzzlesBenchmark),
         Box::new(ProofConstructionBenchmark),
         Box::new(DefiniteIntegralsBenchmark),
-        Box::new(OptimizationProblemsBenchmark),
         // Security (HDC-FHE) (6)
         Box::new(EncryptedClassificationBenchmark),
         Box::new(CollectiveAggregationBenchmark),
@@ -278,10 +271,6 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(CrossMaskPrivacyBenchmark),
         Box::new(EncryptedBindingBenchmark),
         Box::new(ScalingAnalysisBenchmark),
-        // Coding (3)
-        Box::new(HumanEvalMiniBenchmark),
-        Box::new(BugDetectionBenchmark),
-        Box::new(AlgorithmRecognitionBenchmark),
         // Neuromod (14 — trait-based)
         Box::new(AttentionNetworkBenchmark),
         Box::new(MoodInductionBenchmark),
@@ -1116,86 +1105,6 @@ fn main() {
         eprintln!("  Panel (d): Dose-Response curves done");
 
         eprintln!("  Wrote {}", path.display());
-    }
-
-    // ── CSV 9: normative_forest.csv (forest plot data) ─────────
-    eprintln!("\nGenerating normative_forest.csv...");
-    {
-        let forest_csv = report.forest_plot_csv();
-        let path = out.join("normative_forest.csv");
-        fs::write(&path, &forest_csv).unwrap();
-        let n_rows = forest_csv.lines().count().saturating_sub(1); // minus header
-        eprintln!("  Wrote {} ({} rows)", path.display(), n_rows);
-    }
-
-    // ── CSV 10: cross_seed_stability.csv ─────────────────────────
-    eprintln!("\nGenerating cross_seed_stability.csv (5 seeds)...");
-    {
-        let stability_seeds: Vec<u64> = vec![42, 123, 789, 1337, 2718];
-        let seed_composites: Vec<Vec<(String, f64)>> = stability_seeds
-            .par_iter()
-            .map(|&s| {
-                let seed_config = BenchmarkConfig {
-                    seed: s,
-                    ..config.clone()
-                };
-                let mut seed_report = BenchmarkReport::new();
-                for bench in &benchmarks {
-                    seed_report.add(bench.run(&seed_config));
-                }
-                eprintln!("  Seed {} done", s);
-                seed_report
-                    .composite_scores()
-                    .into_iter()
-                    .map(|(domain, cs)| (domain, cs.mean_z))
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        let path = out.join("cross_seed_stability.csv");
-        let mut f = fs::File::create(&path).unwrap();
-        // Header: domain, seed_42, seed_123, ..., mean, sd
-        write!(f, "domain").unwrap();
-        for s in &stability_seeds {
-            write!(f, ",seed_{}", s).unwrap();
-        }
-        writeln!(f, ",mean,sd").unwrap();
-
-        // Collect all domain names from first seed
-        let domain_names: Vec<String> = seed_composites[0].iter().map(|(d, _)| d.clone()).collect();
-
-        let mut overall_sds = Vec::new();
-        for domain in &domain_names {
-            write!(f, "{}", domain).unwrap();
-            let mut scores = Vec::new();
-            for composites in &seed_composites {
-                let score = composites
-                    .iter()
-                    .find(|(d, _)| d == domain)
-                    .map(|(_, z)| *z)
-                    .unwrap_or(0.0);
-                write!(f, ",{:.6}", score).unwrap();
-                scores.push(score);
-            }
-            let mean = scores.iter().sum::<f64>() / scores.len() as f64;
-            let var = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scores.len() as f64;
-            let sd = var.sqrt();
-            writeln!(f, ",{:.6},{:.6}", mean, sd).unwrap();
-            overall_sds.push(sd);
-        }
-
-        let mean_sd = if overall_sds.is_empty() {
-            0.0
-        } else {
-            overall_sds.iter().sum::<f64>() / overall_sds.len() as f64
-        };
-        eprintln!(
-            "  Wrote {} ({} domains × {} seeds, mean SD={:.4})",
-            path.display(),
-            domain_names.len(),
-            stability_seeds.len(),
-            mean_sd
-        );
     }
 
     eprintln!(

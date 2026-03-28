@@ -60,7 +60,7 @@ Ostrom identified eight design principles for successful commons governance:
 
 These principles, derived from empirical study of hundreds of commons institutions across multiple continents, describe the conditions under which communities successfully govern shared resources over long periods — sometimes centuries.
 
-The Mycelix commons cluster implements every one of Ostrom's principles. This is not a coincidence. It is a design requirement.[^3]
+The Mycelix commons cluster addresses all eight of Ostrom's principles, implementing most fully and acknowledging gaps where work remains. An independent mapping scores the implementation at 32 out of 40 possible points (80%), with the primary gap in Principle 1 — clearly defined resource-level boundaries, which the consciousness credential addresses at the participant level but not yet at the resource level.[^3] The mapping is a design requirement, not a coincidence.
 
 **Clearly defined boundaries** are implemented through the consciousness credential: only participants who meet the domain-specific consciousness threshold can govern the commons. The boundary is not geographic or financial. It is engagement-based — you govern the water commons if you are conscious of the water commons.
 

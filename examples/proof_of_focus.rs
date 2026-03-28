@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Proof of Focus - Golden Spike Integration Test for Meditation/Flow
+//! Proof of Focus - Golden Spike Integration Test for Meditation/Flow
 //!
 //! This example completes the Consciousness Trilogy:
 //! - **Proof of Rest** (Unconscious) - Sleep verification

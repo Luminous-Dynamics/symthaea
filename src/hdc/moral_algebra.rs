@@ -275,9 +275,6 @@ pub struct MoralAlgebra {
     /// Optional learned moral prototype classifier (trained on Social Chemistry etc.)
     learned_classifier: Option<super::moral_prototypes::MoralPrototypeClassifier>,
 
-    /// Optional manifold classifier (8D harmony space centroids)
-    manifold_classifier: Option<super::manifold_classifier::ManifoldClassifier>,
-
     /// Cached standard obligations (built once, reused for every deontological evaluation)
     standard_rules_cache: ObligationRuleSet,
 }
@@ -318,7 +315,6 @@ impl MoralAlgebra {
             consent_hvs,
             dim,
             learned_classifier: None,
-            manifold_classifier: None,
             standard_rules_cache: ObligationRuleSet { rules: Vec::new() },
         };
         // Build and cache standard obligations once (avoids 112 string allocations per eval)
@@ -344,16 +340,6 @@ impl MoralAlgebra {
     /// Whether a learned classifier is available.
     pub fn has_learned_classifier(&self) -> bool {
         self.learned_classifier.is_some()
-    }
-
-    /// Set a manifold classifier for the 5th ensemble signal (8D harmony space).
-    pub fn set_manifold_classifier(&mut self, c: super::manifold_classifier::ManifoldClassifier) {
-        self.manifold_classifier = Some(c);
-    }
-
-    /// Whether a manifold classifier is available.
-    pub fn has_manifold_classifier(&self) -> bool {
-        self.manifold_classifier.is_some()
     }
 
     // ========================================================================
@@ -1418,49 +1404,28 @@ impl MoralAlgebra {
             (None, None)
         };
 
-        // 5. Manifold signal (8D harmony space, if classifier is available)
-        let (manifold_verdict, manifold_confidence) =
-            if let Some(ref clf) = self.manifold_classifier {
-                let (verdict, conf) = clf.classify(text);
-                (Some(verdict), Some(conf))
-            } else {
-                (None, None)
-            };
-
         let has_learned = learned_verdict.is_some();
-        let has_manifold = manifold_verdict.is_some();
 
-        // Voting: per-category weight tuning (5-tuple: hdc, intent, deonto, learned, manifold)
+        // Voting: per-category weight tuning
         // Different ETHICS categories benefit from different signal balance.
-        let (w_hdc, w_intent, w_deonto, w_learned, w_manifold) = if has_learned && has_manifold {
+        let (w_hdc, w_intent, w_deonto, w_learned) = if has_learned {
             match category_hint {
-                // Commonsense: intent + learned strongest, manifold adds cross-domain signal
-                Some("commonsense") => (0.10, 0.25, 0.10, 0.30, 0.25),
-                // Justice: deontological rules + learned dominant
-                Some("justice") => (0.10, 0.15, 0.25, 0.30, 0.20),
-                // Deontology: rule-based + learned dominant
-                Some("deontology") => (0.10, 0.15, 0.25, 0.30, 0.20),
-                // Virtue: keyword matching works, manifold adds harmony projection
-                Some("virtue") => (0.25, 0.30, 0.25, 0.00, 0.20),
-                // Default (Social Chemistry): manifold dominant because intent parser
-                // fails on norm descriptions ("It's rude to...") lacking action verbs
-                _ => (0.10, 0.10, 0.15, 0.30, 0.35),
-            }
-        } else if has_learned {
-            match category_hint {
-                Some("commonsense") => (0.15, 0.35, 0.15, 0.35, 0.0),
-                Some("justice") => (0.15, 0.20, 0.30, 0.35, 0.0),
-                Some("deontology") => (0.15, 0.20, 0.30, 0.35, 0.0),
-                Some("virtue") => (0.3, 0.4, 0.3, 0.0, 0.0),
-                _ => (0.15, 0.25, 0.20, 0.40, 0.0),
-            }
-        } else if has_manifold {
-            match category_hint {
-                Some("virtue") => (0.25, 0.30, 0.25, 0.0, 0.20),
-                _ => (0.15, 0.20, 0.20, 0.0, 0.45),
+                // Commonsense: intent is strongest, learned adds social norms context
+                Some("commonsense") => (0.15, 0.35, 0.15, 0.35),
+                // Justice: deontological rules + learned norms are key signals
+                Some("justice") => (0.15, 0.20, 0.30, 0.35),
+                // Deontology: rule-based + learned, intent less reliable
+                Some("deontology") => (0.15, 0.20, 0.30, 0.35),
+                // Virtue: never reaches here (skip_learned), but just in case
+                Some("virtue") => (0.3, 0.4, 0.3, 0.0),
+                // Default (Social Chemistry, Moral Stories, SCRUPLES, etc.):
+                // Learned classifier gets low weight without a category hint
+                // because the Social Chemistry-trained classifier is domain-mismatched
+                // for long narrative text (e.g. SCRUPLES).
+                _ => (0.25, 0.35, 0.30, 0.10),
             }
         } else {
-            (0.3, 0.4, 0.3, 0.0, 0.0)
+            (0.3, 0.4, 0.3, 0.0)
         };
 
         let mut votes: std::collections::HashMap<&str, f32> = std::collections::HashMap::new();
@@ -1506,17 +1471,6 @@ impl MoralAlgebra {
             *votes.entry(learned_key).or_insert(0.0) += w_learned;
         }
 
-        // Manifold vote (8D harmony space)
-        if let Some(mv) = &manifold_verdict {
-            let manifold_key = match mv {
-                MoralVerdict::Good => "good",
-                MoralVerdict::Bad => "bad",
-                MoralVerdict::Neutral => "neutral",
-                MoralVerdict::ConsentViolation => "consent_violation",
-            };
-            *votes.entry(manifold_key).or_insert(0.0) += w_manifold;
-        }
-
         // Determine winner
         let (winner, max_vote) = votes
             .iter()
@@ -1560,8 +1514,6 @@ impl MoralAlgebra {
             satisfactions: deonto.satisfactions,
             learned_verdict,
             learned_confidence,
-            manifold_verdict,
-            manifold_confidence,
             final_verdict,
             confidence,
         }
@@ -1693,10 +1645,6 @@ pub struct EnsembleJudgment {
     pub learned_verdict: Option<MoralVerdict>,
     /// Learned prototype confidence (best - second-best similarity)
     pub learned_confidence: Option<f32>,
-    /// Manifold classifier verdict (8D harmony space, if available)
-    pub manifold_verdict: Option<MoralVerdict>,
-    /// Manifold classifier confidence (margin between best and second-best centroid)
-    pub manifold_confidence: Option<f32>,
     /// Final ensemble verdict (weighted vote)
     pub final_verdict: MoralVerdict,
     /// Confidence in final verdict (0.0 to 1.0)
@@ -1716,11 +1664,7 @@ impl EnsembleJudgment {
             .learned_verdict
             .map(|v| v == self.final_verdict)
             .unwrap_or(true);
-        let manifold_matches = self
-            .manifold_verdict
-            .map(|v| v == self.final_verdict)
-            .unwrap_or(true);
-        intent_matches && deonto_matches && hdc_matches && learned_matches && manifold_matches
+        intent_matches && deonto_matches && hdc_matches && learned_matches
     }
 
     /// Get a human-readable explanation of the verdict
@@ -1757,12 +1701,6 @@ impl EnsembleJudgment {
         if let Some(lv) = self.learned_verdict {
             let conf = self.learned_confidence.unwrap_or(0.0);
             parts.push(format!("Learned: {lv:?} ({conf:.3})"));
-        }
-
-        // Manifold signal
-        if let Some(mv) = self.manifold_verdict {
-            let conf = self.manifold_confidence.unwrap_or(0.0);
-            parts.push(format!("Manifold: {mv:?} ({conf:.3})"));
         }
 
         format!(

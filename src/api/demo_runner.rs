@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Demo runner wrapping CognitiveLoopService for the WebSocket demo.
 //!
 //! Manages cycle execution and input state for the live demo.
@@ -32,7 +29,6 @@ pub struct DemoRunner {
 impl DemoRunner {
     /// Create a new demo runner with default configuration.
     pub fn new() -> anyhow::Result<Self> {
-        #[allow(unused_mut)]
         let mut config = CognitiveLoopConfig::default();
         #[cfg(feature = "vision-manifold")]
         {
@@ -332,7 +328,6 @@ impl DemoRunner {
 
     /// Reset the service to initial state.
     pub fn reset(&mut self) {
-        #[allow(unused_mut)]
         let mut config = CognitiveLoopConfig::default();
         #[cfg(feature = "vision-manifold")]
         {

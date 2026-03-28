@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root// Full pipeline integration tests — no feature gate required
+// Full pipeline integration tests — no feature gate required
 
 // ==================================================================================
 // Full Pipeline Integration Test: 15 Improvements Wired End-to-End

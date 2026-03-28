@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Benchmark reporting: JSON/CSV output and summary formatting.
+//! Benchmark reporting: JSON/CSV output and summary formatting.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -254,7 +252,7 @@ pub struct BenchmarkResult {
     /// Per-trial trace data (populated when `config.trial_trace` is true).
     #[serde(default)]
     pub trial_trace: Vec<super::trial_analysis::TrialOutcome>,
-    /// Optional notes (e.g. honesty disclaimers, comparison context).
+    /// Optional diagnostic notes from the benchmark run.
     #[serde(default)]
     pub notes: Vec<String>,
 }
@@ -658,10 +656,19 @@ impl BenchmarkReport {
             ("originality_score", "originality_score", &bl.creativity),
             ("flexibility_score", "flexibility_score", &bl.creativity),
             ("elaboration_score", "elaboration_score", &bl.creativity),
+            // Remote Associates convergent binding (Creativity)
+            (
+                "convergent_binding",
+                "rat_convergent_binding",
+                &bl.creativity,
+            ),
             // Conceptual Blending (Creativity)
             ("blend_coherence", "blend_coherence", &bl.creativity),
             ("novelty_score", "novelty_score", &bl.creativity),
             ("integration_score", "integration_score", &bl.creativity),
+            // Insight Problem (Creativity)
+            ("insight_accuracy", "insight_accuracy", &bl.creativity),
+            ("restructuring_depth", "restructuring_depth", &bl.creativity),
             // Flanker Inhibition (Inhibition)
             (
                 "congruent_accuracy",
@@ -765,11 +772,6 @@ impl BenchmarkReport {
                 "constraint_queens_8_accuracy",
                 &bl.mathematics,
             ),
-            (
-                "variance_estimation_accuracy",
-                "variance_estimation_accuracy",
-                &bl.mathematics,
-            ),
             ("tautology_accuracy", "tautology_accuracy", &bl.mathematics),
             (
                 "derivation_accuracy",
@@ -779,21 +781,6 @@ impl BenchmarkReport {
             (
                 "integration_accuracy",
                 "integration_accuracy",
-                &bl.mathematics,
-            ),
-            (
-                "sphere_accuracy",
-                "optimization_sphere_accuracy",
-                &bl.mathematics,
-            ),
-            (
-                "rosenbrock_accuracy",
-                "optimization_rosenbrock_accuracy",
-                &bl.mathematics,
-            ),
-            (
-                "convergence_rate",
-                "optimization_convergence_rate",
                 &bl.mathematics,
             ),
             // Institutional Reasoning
@@ -962,10 +949,9 @@ impl BenchmarkReport {
             ("accuracy_at_scale", "accuracy_at_scale", &bl.security),
             // Coding domain
             ("pass_at_1", "humaneval_pass_at_1", &bl.coding),
-            ("category_accuracy", "bug_category_accuracy", &bl.coding),
             (
-                "algorithm_accuracy",
-                "algorithm_recognition_accuracy",
+                "delta_magnitude",
+                "bug_detection_delta_magnitude",
                 &bl.coding,
             ),
         ];
@@ -1001,6 +987,16 @@ impl BenchmarkReport {
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("overall_accuracy", "rat_overall_accuracy", &bl.creativity);
+            push_specific(
+                "mean_solution_rank",
+                "rat_mean_solution_rank",
+                &bl.creativity,
+            );
+            push_specific(
+                "convergent_binding",
+                "rat_convergent_binding",
+                &bl.creativity,
+            );
         }
         if benchmark.contains("StrangeStory") {
             push_specific("overall_accuracy", "strange_story_accuracy", &bl.tombench);
@@ -1220,9 +1216,10 @@ impl BenchmarkReport {
         if benchmark.contains("Calibration") {
             push_specific("rt_ticks", "calibration_rt_ticks", &bl.metacognition);
         }
-        // Creativity RT mappings
+        // Creativity metric mappings
         if benchmark.contains("AlternateUses") {
             push_specific("rt_ticks", "aut_rt_ticks", &bl.creativity);
+            push_specific("originality", "aut_originality", &bl.creativity);
         }
         if benchmark.contains("RemoteAssociates") {
             push_specific("rt_ticks", "rat_rt_ticks", &bl.creativity);
@@ -1577,22 +1574,6 @@ impl BenchmarkReport {
         // CausalReasoning::InterventionEffect
         if benchmark.contains("InterventionEffect") && benchmark.contains("CausalReasoning") {
             push_specific("causal_score", "causal_score", &bl.causal_reasoning);
-        }
-
-        // Mathematics: benchmark-specific key metrics not in generic mappings
-        if benchmark.contains("LogicalDeduction") {
-            push_specific(
-                "overall_accuracy",
-                "logical_overall_accuracy",
-                &bl.mathematics,
-            );
-        }
-        if benchmark.contains("StatisticalInference") {
-            push_specific(
-                "distribution_classification_accuracy",
-                "mean_estimation_accuracy",
-                &bl.mathematics,
-            );
         }
 
         // Only return comparisons relevant to this benchmark
@@ -2113,6 +2094,7 @@ pub fn calibration_class_of(benchmark: &str) -> &'static str {
         "AlternateUses",
         "DivergentThinking",
         "ConceptualBlending",
+        "InsightProblem",
         "FlankerInhibition",
         "CategoricalPerception",
         "PerceptualCrowding",
@@ -2185,7 +2167,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("EmotionalStroop") => "negative_accuracy",
         b if b.contains("Stroop") && !b.contains("Strange") => "incongruent_accuracy",
         b if b.contains("FlankerInhibition") => "interference_suppression",
-        b if b.contains("Flanker") => "incongruent_accuracy",
+        b if b.contains("Flanker") => "flanker_effect",
         b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
         b if b.contains("Iowa") || b.contains("IGT") => "overall_net_score",
         b if b.contains("Ravens") => "overall_accuracy",
@@ -2211,26 +2193,27 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Butlin") => "mean_quality_score",
         b if b.contains("ValenceClassification") => "valence_accuracy",
         b if b.contains("MoodCongruent") => "congruence_ratio",
-        b if b.contains("RemoteAssociates") => "overall_accuracy",
-        b if b.contains("AlternateUses") => "fluency",
+        b if b.contains("RemoteAssociates") => "convergent_binding",
+        b if b.contains("AlternateUses") => "originality",
         b if b.contains("DivergentThinking") => "originality_score",
         b if b.contains("ConceptualBlending") => "blend_coherence",
+        b if b.contains("InsightProblem") => "insight_accuracy",
         b if b.contains("GoNoGo") => "nogo_accuracy",
         b if b.contains("AttentionalBlink") => "lag3_t2_accuracy",
         b if b.contains("ProspectiveMemory") => "pm_hit_rate",
         b if b.contains("StopSignal") => "ssrt_ticks",
-        b if b.contains("VisualSearch") => "conjunction_search_accuracy",
+        b if b.contains("VisualSearch") => "search_asymmetry",
         b if b.contains("FeelingOfKnowing") => "fok_gamma",
         b if b.contains("DualTask") => "dual_task_cost",
         b if b.contains("SART") => "commission_errors",
         b if b.contains("PVT") => "vigilance_decrement",
         b if b.contains("CPT") => "d_prime",
-        b if b.contains("SRTT") => "sequence_accuracy",
+        b if b.contains("SRTT") => "learning_effect",
         b if b.contains("FittsLaw") => "fitts_r_squared",
         b if b.contains("Bimanual") => "coordination_cost",
         b if b.contains("GardenPath") => "disambiguation_cost",
         b if b.contains("SemanticCoherence") => "coherence_mean",
-        b if b.contains("LexicalDecision") => "word_accuracy",
+        b if b.contains("LexicalDecision") => "lexicality_effect",
         b if b.contains("SemanticPriming") => "priming_effect",
         b if b.contains("UltimatumGame") => "fairness_sensitivity",
         b if b.contains("PrisonersDilemma") => "cooperation_rate",
@@ -2287,7 +2270,6 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LogicalDeduction") => "overall_accuracy",
         b if b.contains("ConstraintPuzzle") => "queens_4_accuracy",
         b if b.contains("ProofConstruction") => "tautology_accuracy",
-        b if b.contains("OptimizationProblem") => "sphere_accuracy",
         // CausalReasoning domain (must be before generic "CausalChain" arm below)
         b if b.contains("CausalReasoning::CausalChain")
             || (b.contains("CausalChain") && b.contains("CausalReasoning")) =>
@@ -2328,8 +2310,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CollectiveAggregation") => "aggregation_fidelity",
         // Coding domain
         b if b.contains("HumanEvalMini") => "pass_at_1",
-        b if b.contains("BugDetection") => "category_accuracy",
-        b if b.contains("AlgorithmRecognition") => "algorithm_accuracy",
+        b if b.contains("BugDetection") => "delta_magnitude",
         _ => "overall_accuracy",
     }
 }
@@ -2670,22 +2651,6 @@ impl BenchmarkReport {
                             &bl.butlin,
                             &bl.inhibition,
                             &bl.attention,
-                            &bl.reasoning,
-                            &bl.sustained_attention,
-                            &bl.motor,
-                            &bl.language,
-                            &bl.social,
-                            &bl.binding,
-                            &bl.spatial,
-                            &bl.causal_reasoning,
-                            &bl.speech,
-                            &bl.consciousness,
-                            &bl.substrate,
-                            &bl.clinical,
-                            &bl.institutional_reasoning,
-                            &bl.mathematics,
-                            &bl.security,
-                            &bl.coding,
                         ];
                         baseline_maps.iter().find_map(|bm| {
                             bm.values()
@@ -3156,6 +3121,7 @@ mod tests {
         use crate::benchmarks::butlin::*;
         use crate::benchmarks::causal_reasoning;
         use crate::benchmarks::clinical::*;
+        use crate::benchmarks::coding::*;
         use crate::benchmarks::cogbench::*;
         use crate::benchmarks::consciousness::*;
         use crate::benchmarks::creativity::*;
@@ -3227,6 +3193,7 @@ mod tests {
             Box::new(RemoteAssociatesBenchmark),
             Box::new(DivergentThinkingBenchmark),
             Box::new(ConceptualBlendingBenchmark),
+            Box::new(InsightProblemBenchmark),
             // Butlin
             Box::new(ButlinIndicatorSuite),
             // Inhibition
@@ -3322,7 +3289,6 @@ mod tests {
             Box::new(ConstraintPuzzlesBenchmark),
             Box::new(ProofConstructionBenchmark),
             Box::new(DefiniteIntegralsBenchmark),
-            Box::new(OptimizationProblemsBenchmark),
             // Security (HDC-FHE)
             Box::new(EncryptedClassificationBenchmark),
             Box::new(CollectiveAggregationBenchmark),
@@ -3330,6 +3296,9 @@ mod tests {
             Box::new(CrossMaskPrivacyBenchmark),
             Box::new(EncryptedBindingBenchmark),
             Box::new(ScalingAnalysisBenchmark),
+            // Coding
+            Box::new(HumanEvalMiniBenchmark),
+            Box::new(BugDetectionBenchmark),
         ]
     }
 

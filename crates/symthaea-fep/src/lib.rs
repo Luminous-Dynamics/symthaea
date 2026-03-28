@@ -141,6 +141,7 @@ mod agent;
 mod bridge;
 mod free_energy;
 mod generative_model;
+pub mod markov_blanket;
 mod motor;
 mod td_learning;
 mod types;
@@ -170,3 +171,8 @@ pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 pub use motor::MotorSystem;
 
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
+
+pub use markov_blanket::{
+    identify_coalitions, BlanketPermeability, BlanketTelemetry, MarkovBoundaryOperator,
+    MarkovPartition, PermeabilityInputs, SwarmCoalition, TopologyBoundaryInputs,
+};

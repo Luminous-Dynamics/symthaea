@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Antagonist Profiles Benchmark — Named Receptor Blockade Validation
 //!
 //! Validates named antagonist convenience methods (D2, GABA-A, 5-HT2A)

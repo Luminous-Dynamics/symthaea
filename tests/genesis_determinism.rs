@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! End-to-end determinism test for the cognitive loop's genesis seeding.
+//! End-to-end determinism test for the cognitive loop's genesis seeding.
 //!
 //! Verifies that two HdcLtcBridge instances initialized with the same genesis
 //! phrase produce identical outputs when given identical inputs, and that a

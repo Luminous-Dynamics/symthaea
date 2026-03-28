@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Broca-lite: lightweight language generation for the Spore WASM kernel.
 //!
 //! Implements a tiny autoregressive text generator that translates
@@ -2505,45 +2502,6 @@ impl BrocaLite {
 }
 
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// BrocaBackend trait implementation
-// ---------------------------------------------------------------------------
-
-impl crate::broca_backend::BrocaBackend for BrocaLite {
-    fn tier(&self) -> crate::broca_backend::BrocaTier {
-        crate::broca_backend::BrocaTier::Lite
-    }
-
-    fn vocab_size(&self) -> usize {
-        VOCAB_SIZE
-    }
-
-    fn supports_epistemic_gating(&self) -> bool {
-        true // BrocaLite has EpistemicGate
-    }
-
-    fn is_ready(&self) -> bool {
-        true // BrocaLite is always ready (deterministic init)
-    }
-
-    fn generate_from_context(
-        &mut self,
-        ctx: &crate::broca_backend::GenerationContext,
-    ) -> GenerationResult {
-        let channels = ThoughtChannels::from_cycle(
-            ctx.consciousness_level,
-            ctx.prediction_error,
-            ctx.harmony_alignment,
-            ctx.neuromodulators,
-        );
-        self.generate(&channels, ctx.max_tokens)
-    }
-
-    fn reset(&mut self) {
-        self.controller.reset();
-    }
-}
-
 // Tests
 // ---------------------------------------------------------------------------
 

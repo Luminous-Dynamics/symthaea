@@ -1,7 +1,5 @@
 #![cfg(feature = "school_learning")]
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Integration tests for the school learning module.
+//! Integration tests for the school learning module.
 //!
 //! Tests the full learning lifecycle: curriculum management, recommendation,
 //! learning execution, mastery progression, and hallucination detection.

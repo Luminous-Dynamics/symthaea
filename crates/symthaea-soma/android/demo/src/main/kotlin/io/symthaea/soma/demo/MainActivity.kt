@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
-import android.util.Log
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -370,16 +369,6 @@ class MainActivity : AppCompatActivity() {
             it.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         }
 
-        // Daily rituals — Morning Alignment & Evening Reflection
-        binding.btnMorning.setOnClickListener {
-            it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-            playRitual(isEvening = false)
-        }
-        binding.btnEvening.setOnClickListener {
-            it.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-            playRitual(isEvening = true)
-        }
-
         binding.btnOllama.setOnClickListener {
             val host = binding.ollamaHost.text.toString().trim()
             if (host.isNotEmpty()) {
@@ -542,7 +531,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val TAG = "SomDemo"
         private const val PERMISSION_REQUEST_CODE = 1001
         private const val SCREEN_CAPTURE_REQUEST = 1002
     }
@@ -746,59 +734,6 @@ class MainActivity : AppCompatActivity() {
         }
         screenCaptureActive = state.screenCaptureActive
         binding.btnVision.text = if (screenCaptureActive) "blind" else "vision"
-    }
-
-    // ═══ Daily Rituals ═══
-
-    private fun playRitual(isEvening: Boolean) {
-        lifecycleScope.launch {
-            val json = if (isEvening) {
-                viewModel.eveningRitualJson()
-            } else {
-                viewModel.morningRitualJson()
-            }
-
-            if (json == null || json == "{}") {
-                Log.w(TAG, "No ritual generated")
-                return@launch
-            }
-
-            // Parse phases and narrate each one via TTS
-            try {
-                val ritual = org.json.JSONObject(json)
-                val phases = ritual.optJSONArray("phases") ?: return@launch
-                val ritualType = if (isEvening) "Evening Reflection" else "Morning Alignment"
-                Log.i(TAG, "$ritualType: ${phases.length()} phases")
-
-                for (i in 0 until phases.length()) {
-                    val phase = phases.getJSONObject(i)
-                    val narration = phase.optString("narration", "")
-                    val durationMs = phase.optLong("duration_ms", 5000)
-
-                    if (narration.isNotEmpty()) {
-                        voiceBridge?.speak(narration, urgent = false)
-                    }
-
-                    // Haptic pulse for phase transition
-                    vibrator?.let { v ->
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            v.vibrate(VibrationEffect.createOneShot(80, 120))
-                        }
-                    }
-
-                    // Wait for phase duration (shortened for demo — full duration in production)
-                    kotlinx.coroutines.delay((durationMs / 3).coerceIn(1000, 5000))
-                }
-
-                // Evening: trigger dream consolidation after ritual
-                if (isEvening) {
-                    viewModel.dreamConsolidate()
-                    ambientTone.playDreamChord = true
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Ritual playback error", e)
-            }
-        }
     }
 
     // ═══ Consciousness milestone ceremonies ═══

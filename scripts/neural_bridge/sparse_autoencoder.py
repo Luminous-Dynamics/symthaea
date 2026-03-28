@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-
-# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-# SPDX-License-Identifier: AGPL-3.0-or-later
-# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root"""
+"""
 Sparse Autoencoder (SAE) for Monosemantic Feature Extraction
 
 Method 2 of the Neural Bridge: Train a sparse autoencoder on LLM activations

@@ -1,10 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ETHICS Ablation Study
-//!
-//! **Canonical benchmark**: `benchmark_moral_unified.rs` (92.9% on 5 datasets).
-//! This file ablates individual components from that pipeline.
 //!
 //! Systematically disables each component to measure its contribution:
 //!   (A) Full system (baseline): 92.9% ETHICS
@@ -12,7 +6,6 @@
 //!   (C) No per-category dim tuning (all 16384D)
 //!   (D) No per-category classifiers (ensemble only)
 //!   (E) No learned prototypes (rule-based only)
-//!   (F) No manifold classifier (8D harmony space)
 //!
 //! Run: cargo run --example benchmark_ablation_ethics --release
 
@@ -74,7 +67,6 @@ struct AblationConfig {
     per_category_dim: bool,  // true = use 8192 for justice/deontology
     use_per_cat_clf: bool,   // true = train per-category classifiers
     use_learned_proto: bool, // true = load Social Chem prototypes into ensemble
-    use_manifold: bool,      // true = train manifold classifier (8D harmony space)
 }
 
 fn ablation_configs() -> Vec<AblationConfig> {
@@ -85,7 +77,6 @@ fn ablation_configs() -> Vec<AblationConfig> {
             per_category_dim: true,
             use_per_cat_clf: true,
             use_learned_proto: true,
-            use_manifold: true,
         },
         AblationConfig {
             name: "(B) No sentiment (sw=0)",
@@ -93,7 +84,6 @@ fn ablation_configs() -> Vec<AblationConfig> {
             per_category_dim: true,
             use_per_cat_clf: true,
             use_learned_proto: true,
-            use_manifold: true,
         },
         AblationConfig {
             name: "(C) No dim tuning (all 16384D)",
@@ -101,7 +91,6 @@ fn ablation_configs() -> Vec<AblationConfig> {
             per_category_dim: false,
             use_per_cat_clf: true,
             use_learned_proto: true,
-            use_manifold: true,
         },
         AblationConfig {
             name: "(D) No per-cat classifiers",
@@ -109,7 +98,6 @@ fn ablation_configs() -> Vec<AblationConfig> {
             per_category_dim: true,
             use_per_cat_clf: false,
             use_learned_proto: true,
-            use_manifold: true,
         },
         AblationConfig {
             name: "(E) No learned prototypes",
@@ -117,15 +105,6 @@ fn ablation_configs() -> Vec<AblationConfig> {
             per_category_dim: true,
             use_per_cat_clf: true,
             use_learned_proto: false,
-            use_manifold: true,
-        },
-        AblationConfig {
-            name: "(F) No manifold",
-            sentiment_weight: 0.15,
-            per_category_dim: true,
-            use_per_cat_clf: true,
-            use_learned_proto: true,
-            use_manifold: false,
         },
     ]
 }
@@ -542,12 +521,11 @@ fn main() {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         println!("Configuration: {}", config.name);
         println!(
-            "  sentiment={}, dim_tuning={}, per_cat_clf={}, learned_proto={}, manifold={}",
+            "  sentiment={}, dim_tuning={}, per_cat_clf={}, learned_proto={}",
             config.sentiment_weight,
             config.per_category_dim,
             config.use_per_cat_clf,
-            config.use_learned_proto,
-            config.use_manifold
+            config.use_learned_proto
         );
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -566,44 +544,6 @@ fn main() {
                 algebra.set_learned_classifier(clf);
             }
         }
-
-        // Train manifold classifier if enabled
-        if config.use_manifold {
-            use std::sync::Arc;
-            use symthaea::hdc::harmony_basis::HarmonyBasis;
-            use symthaea::hdc::manifold_classifier::ManifoldClassifier;
-
-            let basis = Arc::new(HarmonyBasis::new(MORAL_PROTO_DIM));
-            let mut manifold_clf = ManifoldClassifier::new(basis, MORAL_PROTO_DIM);
-            let samples: Vec<(String, MoralLabel)> = by_category
-                .iter()
-                .flat_map(|(cat, examples)| {
-                    examples.iter().filter_map(move |ex| {
-                        let label_val = ex.label?;
-                        let label = match cat.as_str() {
-                            "commonsense" => {
-                                if label_val == 1 {
-                                    MoralLabel::Bad
-                                } else {
-                                    MoralLabel::Good
-                                }
-                            }
-                            _ => {
-                                if label_val == 1 {
-                                    MoralLabel::Good
-                                } else {
-                                    MoralLabel::Bad
-                                }
-                            }
-                        };
-                        Some((ex.text.clone(), label))
-                    })
-                })
-                .collect();
-            manifold_clf.train(&samples);
-            algebra.set_manifold_classifier(manifold_clf);
-        }
-
         let parser = MoralParser::new();
 
         // Train per-category classifiers if enabled

@@ -169,7 +169,7 @@ impl TopologicalFingerprint {
         let euler = betti.beta_0 as i64 - betti.beta_1 as i64 + betti.beta_2 as i64;
         let node_count = complex.count(0);
         let edge_count = complex.count(1);
-        let hdc_encoding = Self::encode_as_hv(&betti, euler);
+        let hdc_encoding = Self::encode_full(&betti, euler, node_count, edge_count);
 
         Self {
             betti,
@@ -253,6 +253,21 @@ impl TopologicalFingerprint {
     /// `ROLE bind VALUE`, and all role-value pairs are bundled (majority vote)
     /// into a single composite vector.
     fn encode_as_hv(betti: &BettiNumbers, euler: i64) -> BinaryHV {
+        Self::encode_full(betti, euler, 0, 0)
+    }
+
+    /// Encode topology + structural size into an HDC vector.
+    ///
+    /// Includes node_count and edge_count to differentiate functions that share
+    /// the same Betti numbers but have different structural complexity.
+    /// A 3-line function and a 50-line function both with β₁=0 will get
+    /// DIFFERENT encodings, enabling meaningful manifold clustering.
+    fn encode_full(
+        betti: &BettiNumbers,
+        euler: i64,
+        node_count: usize,
+        edge_count: usize,
+    ) -> BinaryHV {
         let topo_role = BinaryHV::random(TOPO_ROLE_SEED);
 
         // Role vectors
@@ -260,22 +275,45 @@ impl TopologicalFingerprint {
         let beta1_role = BinaryHV::random(BETA1_ROLE_SEED);
         let beta2_role = BinaryHV::random(BETA2_ROLE_SEED);
         let euler_role = BinaryHV::random(EULER_ROLE_SEED);
+        let size_role = BinaryHV::random(0xDEAD_5123_0000_0001);
+        let edges_role = BinaryHV::random(0xDEAD_5123_0000_0002);
 
         // Value vectors (deterministic from the value itself)
         let beta0_val = BinaryHV::random(BETA0_ROLE_SEED.wrapping_add(betti.beta_0 as u64));
         let beta1_val = BinaryHV::random(BETA1_ROLE_SEED.wrapping_add(betti.beta_1 as u64));
         let beta2_val = BinaryHV::random(BETA2_ROLE_SEED.wrapping_add(betti.beta_2 as u64));
-        // Euler can be negative; offset to avoid collisions with positive seeds
         let euler_val = BinaryHV::random(EULER_ROLE_SEED.wrapping_add((euler + 10_000) as u64));
+        // Quantize node/edge counts to buckets for similarity clustering:
+        // 0-3, 4-7, 8-15, 16-31, 32-63, 64+
+        let size_bucket = match node_count {
+            0..=3 => 0u64,
+            4..=7 => 1,
+            8..=15 => 2,
+            16..=31 => 3,
+            32..=63 => 4,
+            _ => 5,
+        };
+        let edge_bucket = match edge_count {
+            0..=3 => 0u64,
+            4..=7 => 1,
+            8..=15 => 2,
+            16..=31 => 3,
+            32..=63 => 4,
+            _ => 5,
+        };
+        let size_val = BinaryHV::random(0xDEAD_5123_0000_0001_u64.wrapping_add(size_bucket));
+        let edges_val = BinaryHV::random(0xDEAD_5123_0000_0002_u64.wrapping_add(edge_bucket));
 
         // Bind role-value pairs
         let b0 = beta0_role.bind(&beta0_val);
         let b1 = beta1_role.bind(&beta1_val);
         let b2 = beta2_role.bind(&beta2_val);
         let eu = euler_role.bind(&euler_val);
+        let sz = size_role.bind(&size_val);
+        let ed = edges_role.bind(&edges_val);
 
         // Bundle all pairs, then bind with the top-level TOPO role
-        let composite = BinaryHV::bundle(&[b0, b1, b2, eu]);
+        let composite = BinaryHV::bundle(&[b0, b1, b2, eu, sz, ed]);
         topo_role.bind(&composite)
     }
 

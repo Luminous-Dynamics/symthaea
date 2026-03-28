@@ -53,7 +53,7 @@ This is the property we seek in a governance architecture. The consciousness cre
 
 ### III. The Cluster Architecture
 
-Mycelix implements fractal governance through a cluster architecture: sixteen domain-specific clusters, each containing multiple governance zomes (modules), all operating on the same consciousness-coupling infrastructure.[^1]
+Mycelix implements fractal governance through a cluster architecture: seven primary clusters (Commons, Civic, Hearth, Identity, Governance, Finance, Personal) plus nine additional domain clusters (Health, Mail, Supply Chain, Marketplace, Knowledge, Energy, Climate, Music, Space), each containing multiple governance zomes, all operating on the same consciousness-coupling infrastructure.[^1]
 
 Each cluster governs a specific domain: water, food, housing, care, transport, justice, emergency response, media, energy, finance, health, education, and others. Within each cluster, the governance mechanisms are identical — the same four-dimensional consciousness credential, the same five tiers, the same 24-hour credential expiry — but the *engagement dimension* is domain-specific. A participant's engagement with the water commons is measured by their interactions with water governance. Their engagement with the food network is measured by their interactions with food governance. A single participant may have different consciousness scores in different domains, and therefore different governance tiers in different domains.
 

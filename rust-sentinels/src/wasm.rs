@@ -1,6 +1,4 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! WebAssembly bindings for browser-based consciousness detection
+//! WebAssembly bindings for browser-based consciousness detection
 //!
 //! Enable with `--features wasm` and compile with `wasm-pack build`
 //!

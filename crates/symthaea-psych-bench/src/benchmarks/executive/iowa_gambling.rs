@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Iowa Gambling Task (IGT).
 //!
 //! Tests decision-making under ambiguity with somatic markers / loss aversion.
@@ -81,14 +78,8 @@ impl IowaGamblingBenchmark {
         // Loss aversion 2.7 above K&T's 2.25 reflects the principled asymmetry
         // in HDC magnitude encoding where loss signals have greater
         // representational fidelity (Yechiam & Hochman, 2013).
-        // Person-specific somatic learning: higher lapse_rate subjects have noisier
-        // somatic marker acquisition (Damasio, 1994; individual differences in
-        // ventromedial PFC function modulate somatic marker fidelity).
-        let somatic_alpha = 0.18 * fep_lr_multiplier * (1.0 + config.lapse_rate * 0.4);
-        // Person-specific loss aversion: lapse-prone subjects are less loss-averse
-        // (Damasio, 1994 — somatic marker hypothesis; higher lapse_rate reflects
-        // weaker affective signals that normally amplify loss salience).
-        let loss_aversion = 2.7f32 * (1.0 - config.lapse_rate as f32 * 0.2);
+        let somatic_alpha = 0.18 * fep_lr_multiplier;
+        let loss_aversion = 2.7f32;
 
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block
@@ -151,18 +142,6 @@ impl IowaGamblingBenchmark {
                 if r < cumsum {
                     chosen = i;
                     break;
-                }
-            }
-
-            // Attention lapse: on a fraction of trials proportional to lapse_rate,
-            // randomly pick a deck instead of using the learned expected value.
-            // Models attentional failures that disrupt somatic marker guidance
-            // (Bechara et al., 1994; Denburg et al., 2005).
-            if config.lapse_rate > 0.0 {
-                let lapse_seed = config.trial_seed("igt", "lapse", trial);
-                if (lapse_seed % 10000) as f64 / 10000.0 < config.lapse_rate {
-                    let choice_seed = config.trial_seed("igt", "lapse_choice", trial);
-                    chosen = choice_seed as usize % 4;
                 }
             }
 

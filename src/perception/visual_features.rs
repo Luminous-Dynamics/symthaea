@@ -1,6 +1,3 @@
-// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Visual Perception - Giving Sophia the ability to "see" and understand images
 //!
 //! Uses `image` and `imageproc` crates for computer vision capabilities.

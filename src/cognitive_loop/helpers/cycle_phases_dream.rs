@@ -45,6 +45,7 @@ impl CognitiveLoopService {
             // Science: Tononi (2015) — consciousness = integrated information = memory salience
             // Narrative→Dream coupling (Conway 2005): self-relevant memories encode preferentially.
             let narrative_salience = self
+                .consciousness
                 .self_model_tier
                 .narrative_self
                 .as_ref()
@@ -61,7 +62,7 @@ impl CognitiveLoopService {
             // chains boost consolidation priority for offline integration.
             // Science: Festinger (1957) — cognitive dissonance drives consolidation;
             //          Hobson & Friston (2012) — active inference in dreams consolidates causal models.
-            if let Some(ref km) = self.knowledge_manager {
+            if let Some(ref km) = self.memory.knowledge_manager {
                 let sigs = km.signals();
                 // Active contradictions boost consolidation by 20%
                 if sigs.contradiction_signal.is_finite() && sigs.contradiction_signal > 0.0 {
@@ -179,7 +180,18 @@ impl CognitiveLoopService {
             };
             let dynamic_normal_interval =
                 (dynamic_normal_interval as f32 * stillness_depth_factor) as usize;
-            let dynamic_normal_interval = dynamic_normal_interval.max(3); // never faster than every 3 cycles
+            // Moral fragmentation → dream urgency: high L₀ harmonic = isolated clusters
+            let fragmentation_factor = {
+                let summary = self.ethics_engine.moral_topology().last_summary();
+                match summary.hodge_fractions {
+                    Some(ref f) if f.harmonic > 0.8 => 0.5,
+                    Some(ref f) if f.harmonic > 0.5 => 0.8,
+                    _ => 1.0,
+                }
+            };
+            let dynamic_normal_interval =
+                (dynamic_normal_interval as f64 * fragmentation_factor) as usize;
+            let dynamic_normal_interval = dynamic_normal_interval.max(3);
             if matches!(urgency, super::super::CycleUrgency::Cruise)
                 || urgency.should_run(self.stats.total_cycles, 10, dynamic_normal_interval, 5)
             {
@@ -200,7 +212,9 @@ impl CognitiveLoopService {
                             // Dream→Narrative coupling: dream insights feed narrative self-model.
                             // Science: Revonsuo (2000) — dreaming enhances threat simulation
                             // and narrative integration of novel experiences.
-                            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+                            if let Some(ref mut narrative) =
+                                self.consciousness.self_model_tier.narrative_self
+                            {
                                 narrative.process_experience(
                                     hv16_cached,
                                     &format!("dream_insight_{}", result.insights),
@@ -215,13 +229,16 @@ impl CognitiveLoopService {
                             // Science: Walker (2009) — sleep-dependent memory consolidation
                             // strengthens autobiographical narrative structure.
                             // Valence: phi improvement is intrinsically positive.
-                            self.master_equation.narrative_coherence.add_episode(
-                                format!(
-                                    "dream_insight_{}_phi{:.3}",
-                                    result.insights, result.best_phi_improvement
-                                ),
-                                (result.best_phi_improvement as f64 * 0.5).clamp(-0.5, 0.5),
-                            );
+                            self.consciousness
+                                .master_equation
+                                .narrative_coherence
+                                .add_episode(
+                                    format!(
+                                        "dream_insight_{}_phi{:.3}",
+                                        result.insights, result.best_phi_improvement
+                                    ),
+                                    (result.best_phi_improvement as f64 * 0.5).clamp(-0.5, 0.5),
+                                );
                         }
                     }
                     Err(e) => {
@@ -236,7 +253,7 @@ impl CognitiveLoopService {
                 // Science: Rasch & Born (2013) — targeted memory reactivation during
                 // NREM sleep selectively strengthens task-relevant memory traces.
                 if dream_phi_improvement > 0.0 {
-                    if let Some(ref mut km) = self.knowledge_manager {
+                    if let Some(ref mut km) = self.memory.knowledge_manager {
                         let topics = km.top_grounded_facts(
                             super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM,
                         );
@@ -363,7 +380,7 @@ impl CognitiveLoopService {
         // ── Knowledge → Episodic memory bridge ───────────────────────────
         // Promote high-confidence facts to episodic memory during dreams.
         // Science: Tse et al. (2007) — schema-consistent facts consolidate rapidly
-        if let Some(ref km) = self.knowledge_manager {
+        if let Some(ref km) = self.memory.knowledge_manager {
             if let Some(ref mut bus) = self.experience_bus {
                 let signals = km.signals();
                 if signals.relevance > 0.3 {
@@ -388,8 +405,12 @@ impl CognitiveLoopService {
         // retrieval counts), distill them into semantic knowledge graph facts.
         // Science: Stickgold & Walker (2013) — sleep-dependent memory consolidation;
         //          McClelland et al. (1995) — complementary learning systems theory.
-        if let Some(ref mut km) = self.knowledge_manager {
-            let top = self.memory_consol.memory_coordinator.most_replayed(5);
+        if let Some(ref mut km) = self.memory.knowledge_manager {
+            let top = self
+                .memory
+                .memory_consol
+                .memory_coordinator
+                .most_replayed(5);
             for (content_hash, replay_count) in &top {
                 if *replay_count >= 3 {
                     let label = format!("episode_0x{:016x}", content_hash);

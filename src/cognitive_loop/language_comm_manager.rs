@@ -25,6 +25,9 @@ pub struct LanguageAndCommunicationManager {
 
     /// User state inference for adaptive response generation.
     pub user_state: Option<crate::user_state_inference::UserStateInference>,
+    /// Code channels injected by CodingAgent for Broca's CodeGate.
+    /// `[syntax_complexity, type_confidence, algorithm_pattern, error_likelihood]`
+    pub broca_code_channels: Option<[f32; 4]>,
 }
 
 impl std::fmt::Debug for LanguageAndCommunicationManager {
