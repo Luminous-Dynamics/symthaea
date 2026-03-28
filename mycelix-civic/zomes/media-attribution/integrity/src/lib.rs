@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Attribution Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Attribution Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 use hdi::prelude::*;
 use mycelix_bridge_entry_types::{check_author_match, check_link_author_match};

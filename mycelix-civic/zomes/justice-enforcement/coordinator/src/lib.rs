@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Enforcement Coordinator Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Enforcement Coordinator Zome
 //!
 //! Manages the execution of decisions, remedy enforcement,
 //! and cross-hApp coordination for dispute resolution outcomes.

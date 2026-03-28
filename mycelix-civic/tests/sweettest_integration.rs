@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Mycelix Civic — Sweettest Integration Tests
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Mycelix Civic — Sweettest Integration Tests
 //!
 //! Tests the unified Civic cluster DNA: justice, emergency, media
 //! domain zomes + civic-bridge.

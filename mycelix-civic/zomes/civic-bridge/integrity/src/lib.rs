@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Civic Bridge Integrity Zome
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Civic Bridge Integrity Zome
 //!
 //! Unified bridge for cross-domain integration within the Civic cluster.
 //! Replaces the 3 separate bridge zomes from justice, emergency, and media.
