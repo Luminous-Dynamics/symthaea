@@ -602,7 +602,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Career Intelligence
         // ============================================================
         Commands::Careers { field, json } => {
-            let profiles = edunet_standards_ingest::career_profile::all_career_profiles();
+            let profiles = edunet_standards_ingest::career_profile::all_career_profiles_enriched();
             let filtered: Vec<_> = if field == "all" {
                 profiles.iter().collect()
             } else {

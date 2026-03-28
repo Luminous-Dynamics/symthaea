@@ -771,11 +771,88 @@ pub fn embedded_emerging_fields() -> Vec<CareerProfile> {
     ]
 }
 
-/// Get career profile for a field name (fuzzy match).
-pub fn get_career_profile(field: &str) -> Option<&'static CareerProfile> {
-    // We use a static reference via lazy_static pattern
-    // For now, search embedded list
-    None // caller should use embedded_career_profiles() directly
+/// Load O*NET enrichment data (bundled at compile time) and merge into profiles.
+pub fn enrich_profiles_with_onet(profiles: &mut [CareerProfile]) {
+    let onet_json = include_str!("../data/onet_enrichment.json");
+    let onet_data: std::collections::HashMap<String, serde_json::Value> =
+        serde_json::from_str(onet_json).unwrap_or_default();
+
+    for profile in profiles.iter_mut() {
+        if let Some(data) = onet_data.get(&profile.field) {
+            // Only enrich if not already populated
+            if profile.required_skills.is_empty() {
+                if let Some(skills) = data.get("skills").and_then(|v| v.as_array()) {
+                    profile.required_skills = skills
+                        .iter()
+                        .filter_map(|s| {
+                            Some(RequiredSkill {
+                                name: s.get("name")?.as_str()?.to_string(),
+                                importance: s.get("importance")?.as_f64()? as f32,
+                                category: "O*NET".to_string(),
+                            })
+                        })
+                        .collect();
+                }
+            }
+
+            if profile.work_activities.is_empty() {
+                if let Some(acts) = data.get("activities").and_then(|v| v.as_array()) {
+                    profile.work_activities = acts
+                        .iter()
+                        .filter_map(|a| {
+                            Some(WorkActivity {
+                                name: a.get("name")?.as_str()?.to_string(),
+                                importance: a.get("importance")?.as_f64()? as f32,
+                            })
+                        })
+                        .collect();
+                }
+            }
+
+            if profile.technology_tools.is_empty() {
+                if let Some(tech) = data.get("tech").and_then(|v| v.as_array()) {
+                    profile.technology_tools = tech
+                        .iter()
+                        .filter_map(|t| {
+                            Some(TechnologyTool {
+                                name: t.get("name")?.as_str()?.to_string(),
+                                category: t.get("category")?.as_str().unwrap_or("Software").to_string(),
+                            })
+                        })
+                        .collect();
+                }
+            }
+
+            if profile.work_values.is_none() {
+                if let Some(wv) = data.get("work_values").and_then(|v| v.as_object()) {
+                    if !wv.is_empty() {
+                        profile.work_values = Some(WorkValues {
+                            achievement: wv.get("Achievement").and_then(|v| v.as_f64()).unwrap_or(3.0) as f32,
+                            independence: wv.get("Independence").and_then(|v| v.as_f64()).unwrap_or(3.0) as f32,
+                            recognition: wv.get("Recognition").and_then(|v| v.as_f64()).unwrap_or(3.0) as f32,
+                            relationships: wv.get("Relationships").and_then(|v| v.as_f64()).unwrap_or(3.0) as f32,
+                            support: wv.get("Support").and_then(|v| v.as_f64()).unwrap_or(3.0) as f32,
+                            working_conditions: wv.get("Working Conditions").and_then(|v| v.as_f64()).unwrap_or(3.0) as f32,
+                        });
+                    }
+                }
+            }
+
+            // Set O*NET SOC code
+            if profile.onet_soc_code.is_none() {
+                if let Some(soc) = data.get("soc").and_then(|v| v.as_str()) {
+                    profile.onet_soc_code = Some(soc.to_string());
+                }
+            }
+        }
+    }
+}
+
+/// All career profiles, enriched with real O*NET data.
+pub fn all_career_profiles_enriched() -> Vec<CareerProfile> {
+    let mut profiles = all_career_profiles();
+    enrich_profiles_with_onet(&mut profiles);
+    profiles
 }
 
 /// Format a career profile as a human-readable summary.

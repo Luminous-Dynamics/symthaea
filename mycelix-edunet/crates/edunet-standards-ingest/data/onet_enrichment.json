@@ -1,0 +1,966 @@
+{
+  "Software Development": {
+    "soc": "15-1252.00",
+    "skills": [
+      {
+        "name": "Programming",
+        "importance": 4.0
+      },
+      {
+        "name": "Critical Thinking",
+        "importance": 3.88
+      },
+      {
+        "name": "Judgment and Decision Making",
+        "importance": 3.62
+      },
+      {
+        "name": "Reading Comprehension",
+        "importance": 3.5
+      },
+      {
+        "name": "Active Learning",
+        "importance": 3.5
+      }
+    ],
+    "activities": [
+      {
+        "name": "Working with Computers",
+        "importance": 4.61
+      },
+      {
+        "name": "Processing Information",
+        "importance": 4.38
+      },
+      {
+        "name": "Making Decisions and Solving Problems",
+        "importance": 4.34
+      },
+      {
+        "name": "Thinking Creatively",
+        "importance": 4.33
+      },
+      {
+        "name": "Communicating with Supervisors, Peers, or Subordinates",
+        "importance": 4.23
+      }
+    ],
+    "tech": [
+      {
+        "name": "Adobe Acrobat",
+        "category": "Document management software",
+        "hot": true
+      },
+      {
+        "name": "Adobe After Effects",
+        "category": "Video creation and editing software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Creative Cloud software",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Illustrator",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      },
+      {
+        "name": "Adobe InDesign",
+        "category": "Desktop publishing software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Photoshop",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      }
+    ],
+    "work_values": {},
+    "related": [
+      {
+        "soc": "15-1299.08",
+        "title": "Computer Systems Engineers/Architects"
+      },
+      {
+        "soc": "15-1211.00",
+        "title": "Computer Systems Analysts"
+      },
+      {
+        "soc": "15-1253.00",
+        "title": "Software Quality Assurance Analysts and Testers"
+      },
+      {
+        "soc": "15-1251.00",
+        "title": "Computer Programmers"
+      },
+      {
+        "soc": "15-1242.00",
+        "title": "Database Administrators"
+      }
+    ]
+  },
+  "Data Science & AI": {
+    "soc": "15-2051.00",
+    "skills": [],
+    "activities": [],
+    "tech": [
+      {
+        "name": "Alteryx software",
+        "category": "Business intelligence and data analysis software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Elastic Compute Cloud EC2",
+        "category": "Data base user interface and query software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Redshift",
+        "category": "Data base user interface and query software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Web Services AWS software",
+        "category": "Data base user interface and query software",
+        "hot": true
+      },
+      {
+        "name": "Apache Airflow",
+        "category": "Procedure management software",
+        "hot": true
+      },
+      {
+        "name": "Apache Cassandra",
+        "category": "Data base management system software",
+        "hot": true
+      }
+    ],
+    "work_values": {},
+    "related": [
+      {
+        "soc": "15-2041.00",
+        "title": "Statisticians"
+      },
+      {
+        "soc": "43-9111.00",
+        "title": "Statistical Assistants"
+      },
+      {
+        "soc": "13-2099.01",
+        "title": "Financial Quantitative Analysts"
+      },
+      {
+        "soc": "15-2031.00",
+        "title": "Operations Research Analysts"
+      },
+      {
+        "soc": "19-1029.01",
+        "title": "Bioinformatics Scientists"
+      }
+    ]
+  },
+  "Healthcare (Nursing)": {
+    "soc": "29-1141.00",
+    "skills": [
+      {
+        "name": "Social Perceptiveness",
+        "importance": 4.12
+      },
+      {
+        "name": "Active Listening",
+        "importance": 4.0
+      },
+      {
+        "name": "Speaking",
+        "importance": 4.0
+      },
+      {
+        "name": "Critical Thinking",
+        "importance": 4.0
+      },
+      {
+        "name": "Coordination",
+        "importance": 4.0
+      }
+    ],
+    "activities": [
+      {
+        "name": "Assisting and Caring for Others",
+        "importance": 4.94
+      },
+      {
+        "name": "Documenting/Recording Information",
+        "importance": 4.86
+      },
+      {
+        "name": "Getting Information",
+        "importance": 4.76
+      },
+      {
+        "name": "Updating and Using Relevant Knowledge",
+        "importance": 4.65
+      },
+      {
+        "name": "Communicating with Supervisors, Peers, or Subordinates",
+        "importance": 4.6
+      }
+    ],
+    "tech": [
+      {
+        "name": "Apache Spark",
+        "category": "Business intelligence and data analysis software",
+        "hot": true
+      },
+      {
+        "name": "eClinicalWorks EHR software",
+        "category": "Medical software",
+        "hot": true
+      },
+      {
+        "name": "Epic Systems",
+        "category": "Medical software",
+        "hot": true
+      },
+      {
+        "name": "Google Docs",
+        "category": "Word processing software",
+        "hot": true
+      },
+      {
+        "name": "Henry Schein Dentrix",
+        "category": "Medical software",
+        "hot": true
+      },
+      {
+        "name": "Kronos Workforce Timekeeper",
+        "category": "Time accounting software",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 5.33,
+      "Working Conditions": 4.83,
+      "Recognition": 4.67,
+      "Relationships": 6.33,
+      "Support": 6.0,
+      "Independence": 5.33
+    },
+    "related": [
+      {
+        "soc": "29-1141.01",
+        "title": "Acute Care Nurses"
+      },
+      {
+        "soc": "29-1171.00",
+        "title": "Nurse Practitioners"
+      },
+      {
+        "soc": "29-1141.03",
+        "title": "Critical Care Nurses"
+      },
+      {
+        "soc": "29-1141.04",
+        "title": "Clinical Nurse Specialists"
+      },
+      {
+        "soc": "29-2061.00",
+        "title": "Licensed Practical and Licensed Vocational Nurses"
+      }
+    ]
+  },
+  "Education (K-12 Teaching)": {
+    "soc": "25-2021.00",
+    "skills": [
+      {
+        "name": "Learning Strategies",
+        "importance": 4.25
+      },
+      {
+        "name": "Instructing",
+        "importance": 4.25
+      },
+      {
+        "name": "Speaking",
+        "importance": 4.12
+      },
+      {
+        "name": "Active Listening",
+        "importance": 4.0
+      },
+      {
+        "name": "Critical Thinking",
+        "importance": 4.0
+      }
+    ],
+    "activities": [
+      {
+        "name": "Training and Teaching Others",
+        "importance": 4.48
+      },
+      {
+        "name": "Assisting and Caring for Others",
+        "importance": 4.14
+      },
+      {
+        "name": "Working with Computers",
+        "importance": 4.12
+      },
+      {
+        "name": "Establishing and Maintaining Interpersonal Relationships",
+        "importance": 4.09
+      },
+      {
+        "name": "Coaching and Developing Others",
+        "importance": 4.09
+      }
+    ],
+    "tech": [
+      {
+        "name": "Google Docs",
+        "category": "Word processing software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Excel",
+        "category": "Spreadsheet software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Office software",
+        "category": "Office suite software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Outlook",
+        "category": "Electronic mail software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft PowerPoint",
+        "category": "Presentation software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft SharePoint",
+        "category": "Document management software",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 5.67,
+      "Working Conditions": 5.0,
+      "Recognition": 4.33,
+      "Relationships": 6.33,
+      "Support": 5.0,
+      "Independence": 5.33
+    },
+    "related": [
+      {
+        "soc": "25-2031.00",
+        "title": "Secondary School Teachers, Except Special and Career/Technical Education"
+      },
+      {
+        "soc": "25-2022.00",
+        "title": "Middle School Teachers, Except Special and Career/Technical Education"
+      },
+      {
+        "soc": "25-3011.00",
+        "title": "Adult Basic Education, Adult Secondary Education, and English as a Second Language Instructors"
+      },
+      {
+        "soc": "25-2012.00",
+        "title": "Kindergarten Teachers, Except Special Education"
+      },
+      {
+        "soc": "25-3041.00",
+        "title": "Tutors"
+      }
+    ]
+  },
+  "Finance & Economics": {
+    "soc": "13-2051.00",
+    "skills": [],
+    "activities": [],
+    "tech": [
+      {
+        "name": "Alteryx software",
+        "category": "Business intelligence and data analysis software",
+        "hot": true
+      },
+      {
+        "name": "Apache Hive",
+        "category": "Data base management system software",
+        "hot": true
+      },
+      {
+        "name": "Google Docs",
+        "category": "Word processing software",
+        "hot": true
+      },
+      {
+        "name": "IBM SPSS Statistics",
+        "category": "Analytical or scientific software",
+        "hot": true
+      },
+      {
+        "name": "Intuit QuickBooks",
+        "category": "Accounting software",
+        "hot": true
+      },
+      {
+        "name": "Marketo Marketing Automation",
+        "category": "Sales and marketing software",
+        "hot": true
+      }
+    ],
+    "work_values": {},
+    "related": [
+      {
+        "soc": "13-2052.00",
+        "title": "Personal Financial Advisors"
+      },
+      {
+        "soc": "41-3031.00",
+        "title": "Securities, Commodities, and Financial Services Sales Agents"
+      },
+      {
+        "soc": "11-3031.03",
+        "title": "Investment Fund Managers"
+      },
+      {
+        "soc": "13-2054.00",
+        "title": "Financial Risk Specialists"
+      },
+      {
+        "soc": "13-2099.01",
+        "title": "Financial Quantitative Analysts"
+      }
+    ]
+  },
+  "Scientific Research": {
+    "soc": "19-1042.00",
+    "skills": [
+      {
+        "name": "Writing",
+        "importance": 4.25
+      },
+      {
+        "name": "Speaking",
+        "importance": 4.12
+      },
+      {
+        "name": "Science",
+        "importance": 4.12
+      },
+      {
+        "name": "Active Learning",
+        "importance": 4.12
+      },
+      {
+        "name": "Reading Comprehension",
+        "importance": 4.0
+      }
+    ],
+    "activities": [
+      {
+        "name": "Updating and Using Relevant Knowledge",
+        "importance": 4.58
+      },
+      {
+        "name": "Communicating with Supervisors, Peers, or Subordinates",
+        "importance": 4.47
+      },
+      {
+        "name": "Thinking Creatively",
+        "importance": 4.32
+      },
+      {
+        "name": "Getting Information",
+        "importance": 4.27
+      },
+      {
+        "name": "Making Decisions and Solving Problems",
+        "importance": 4.26
+      }
+    ],
+    "tech": [
+      {
+        "name": "Adobe Photoshop",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      },
+      {
+        "name": "ESRI ArcGIS software",
+        "category": "Geographic information system",
+        "hot": true
+      },
+      {
+        "name": "IBM SPSS Statistics",
+        "category": "Analytical or scientific software",
+        "hot": true
+      },
+      {
+        "name": "Linux",
+        "category": "Operating system software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Excel",
+        "category": "Spreadsheet software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Office software",
+        "category": "Office suite software",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 5.67,
+      "Working Conditions": 5.5,
+      "Recognition": 5.67,
+      "Relationships": 4.33,
+      "Support": 3.33,
+      "Independence": 5.67
+    },
+    "related": [
+      {
+        "soc": "19-1029.03",
+        "title": "Geneticists"
+      },
+      {
+        "soc": "19-1021.00",
+        "title": "Biochemists and Biophysicists"
+      },
+      {
+        "soc": "29-1222.00",
+        "title": "Physicians, Pathologists"
+      },
+      {
+        "soc": "19-1022.00",
+        "title": "Microbiologists"
+      },
+      {
+        "soc": "29-2011.00",
+        "title": "Medical and Clinical Laboratory Technologists"
+      }
+    ]
+  },
+  "Legal Professions": {
+    "soc": "23-1011.00",
+    "skills": [
+      {
+        "name": "Speaking",
+        "importance": 4.62
+      },
+      {
+        "name": "Reading Comprehension",
+        "importance": 4.5
+      },
+      {
+        "name": "Active Listening",
+        "importance": 4.5
+      },
+      {
+        "name": "Critical Thinking",
+        "importance": 4.5
+      },
+      {
+        "name": "Writing",
+        "importance": 4.25
+      }
+    ],
+    "activities": [
+      {
+        "name": "Getting Information",
+        "importance": 4.62
+      },
+      {
+        "name": "Communicating with Supervisors, Peers, or Subordinates",
+        "importance": 4.59
+      },
+      {
+        "name": "Making Decisions and Solving Problems",
+        "importance": 4.57
+      },
+      {
+        "name": "Evaluating Information to Determine Compliance with Standards",
+        "importance": 4.51
+      },
+      {
+        "name": "Resolving Conflicts and Negotiating with Others",
+        "importance": 4.49
+      }
+    ],
+    "tech": [
+      {
+        "name": "Adobe Acrobat",
+        "category": "Document management software",
+        "hot": true
+      },
+      {
+        "name": "Google Analytics",
+        "category": "Data mining software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Access",
+        "category": "Data base user interface and query software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Excel",
+        "category": "Spreadsheet software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Office software",
+        "category": "Office suite software",
+        "hot": true
+      },
+      {
+        "name": "Microsoft Outlook",
+        "category": "Electronic mail software",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 6.0,
+      "Working Conditions": 6.0,
+      "Recognition": 6.33,
+      "Relationships": 4.0,
+      "Support": 4.33,
+      "Independence": 6.0
+    },
+    "related": [
+      {
+        "soc": "23-1012.00",
+        "title": "Judicial Law Clerks"
+      },
+      {
+        "soc": "23-1021.00",
+        "title": "Administrative Law Judges, Adjudicators, and Hearing Officers"
+      },
+      {
+        "soc": "23-1023.00",
+        "title": "Judges, Magistrate Judges, and Magistrates"
+      },
+      {
+        "soc": "23-1022.00",
+        "title": "Arbitrators, Mediators, and Conciliators"
+      },
+      {
+        "soc": "13-1041.03",
+        "title": "Equal Opportunity Representatives and Officers"
+      }
+    ]
+  },
+  "Creative Arts & Design": {
+    "soc": "27-1024.00",
+    "skills": [
+      {
+        "name": "Active Listening",
+        "importance": 3.75
+      },
+      {
+        "name": "Speaking",
+        "importance": 3.38
+      },
+      {
+        "name": "Writing",
+        "importance": 3.25
+      },
+      {
+        "name": "Critical Thinking",
+        "importance": 3.25
+      },
+      {
+        "name": "Active Learning",
+        "importance": 3.25
+      }
+    ],
+    "activities": [],
+    "tech": [
+      {
+        "name": "Adobe Acrobat",
+        "category": "Document management software",
+        "hot": true
+      },
+      {
+        "name": "Adobe After Effects",
+        "category": "Video creation and editing software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Creative Cloud software",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Illustrator",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      },
+      {
+        "name": "Adobe InDesign",
+        "category": "Desktop publishing software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Photoshop",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 5.67,
+      "Working Conditions": 4.5,
+      "Recognition": 4.67,
+      "Relationships": 4.0,
+      "Support": 4.0,
+      "Independence": 5.33
+    },
+    "related": [
+      {
+        "soc": "27-1014.00",
+        "title": "Special Effects Artists and Animators"
+      },
+      {
+        "soc": "27-1011.00",
+        "title": "Art Directors"
+      },
+      {
+        "soc": "15-1255.00",
+        "title": "Web and Digital Interface Designers"
+      },
+      {
+        "soc": "27-1013.00",
+        "title": "Fine Artists, Including Painters, Sculptors, and Illustrators"
+      },
+      {
+        "soc": "43-9031.00",
+        "title": "Desktop Publishers"
+      }
+    ]
+  },
+  "Environmental Science & Sustainability": {
+    "soc": "19-2041.00",
+    "skills": [
+      {
+        "name": "Reading Comprehension",
+        "importance": 4.0
+      },
+      {
+        "name": "Active Listening",
+        "importance": 4.0
+      },
+      {
+        "name": "Writing",
+        "importance": 4.0
+      },
+      {
+        "name": "Speaking",
+        "importance": 4.0
+      },
+      {
+        "name": "Science",
+        "importance": 4.0
+      }
+    ],
+    "activities": [
+      {
+        "name": "Evaluating Information to Determine Compliance with Standards",
+        "importance": 4.64
+      },
+      {
+        "name": "Getting Information",
+        "importance": 4.56
+      },
+      {
+        "name": "Working with Computers",
+        "importance": 4.42
+      },
+      {
+        "name": "Analyzing Data or Information",
+        "importance": 4.41
+      },
+      {
+        "name": "Communicating with People Outside the Organization",
+        "importance": 4.41
+      }
+    ],
+    "tech": [
+      {
+        "name": "Adobe Acrobat",
+        "category": "Document management software",
+        "hot": true
+      },
+      {
+        "name": "Adobe Illustrator",
+        "category": "Graphics or photo imaging software",
+        "hot": true
+      },
+      {
+        "name": "Autodesk AutoCAD",
+        "category": "Computer aided design CAD software",
+        "hot": true
+      },
+      {
+        "name": "Bentley MicroStation",
+        "category": "Computer aided design CAD software",
+        "hot": true
+      },
+      {
+        "name": "C++",
+        "category": "Object or component oriented development software",
+        "hot": true
+      },
+      {
+        "name": "ESRI ArcGIS software",
+        "category": "Geographic information system",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 5.0,
+      "Working Conditions": 4.67,
+      "Recognition": 5.0,
+      "Relationships": 4.0,
+      "Support": 3.67,
+      "Independence": 5.0
+    },
+    "related": [
+      {
+        "soc": "13-1041.01",
+        "title": "Environmental Compliance Inspectors"
+      },
+      {
+        "soc": "17-2081.00",
+        "title": "Environmental Engineers"
+      },
+      {
+        "soc": "19-2041.03",
+        "title": "Industrial Ecologists"
+      },
+      {
+        "soc": "19-4042.00",
+        "title": "Environmental Science and Protection Technicians, Including Health"
+      },
+      {
+        "soc": "19-1031.00",
+        "title": "Conservation Scientists"
+      }
+    ]
+  },
+  "Cybersecurity": {
+    "soc": "15-1212.00",
+    "skills": [
+      {
+        "name": "Reading Comprehension",
+        "importance": 4.0
+      },
+      {
+        "name": "Critical Thinking",
+        "importance": 3.88
+      },
+      {
+        "name": "Active Listening",
+        "importance": 3.75
+      },
+      {
+        "name": "Complex Problem Solving",
+        "importance": 3.75
+      },
+      {
+        "name": "Speaking",
+        "importance": 3.62
+      }
+    ],
+    "activities": [
+      {
+        "name": "Working with Computers",
+        "importance": 4.7
+      },
+      {
+        "name": "Getting Information",
+        "importance": 4.5
+      },
+      {
+        "name": "Identifying Objects, Actions, and Events",
+        "importance": 4.29
+      },
+      {
+        "name": "Evaluating Information to Determine Compliance with Standards",
+        "importance": 4.12
+      },
+      {
+        "name": "Processing Information",
+        "importance": 4.09
+      }
+    ],
+    "tech": [
+      {
+        "name": "AJAX",
+        "category": "Web platform development software",
+        "hot": true
+      },
+      {
+        "name": "Amazon DynamoDB",
+        "category": "Data base management system software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Elastic Compute Cloud EC2",
+        "category": "Data base user interface and query software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Redshift",
+        "category": "Data base user interface and query software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Web Services AWS CloudFormation",
+        "category": "Cloud-based management software",
+        "hot": true
+      },
+      {
+        "name": "Amazon Web Services AWS software",
+        "category": "Data base user interface and query software",
+        "hot": true
+      }
+    ],
+    "work_values": {
+      "Achievement": 4.67,
+      "Working Conditions": 5.67,
+      "Recognition": 4.33,
+      "Relationships": 4.33,
+      "Support": 5.33,
+      "Independence": 5.33
+    },
+    "related": [
+      {
+        "soc": "15-1299.05",
+        "title": "Information Security Engineers"
+      },
+      {
+        "soc": "15-1299.04",
+        "title": "Penetration Testers"
+      },
+      {
+        "soc": "15-1299.06",
+        "title": "Digital Forensics Analysts"
+      },
+      {
+        "soc": "15-1244.00",
+        "title": "Network and Computer Systems Administrators"
+      },
+      {
+        "soc": "15-1211.00",
+        "title": "Computer Systems Analysts"
+      }
+    ]
+  }
+}
