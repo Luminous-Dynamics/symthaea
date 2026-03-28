@@ -597,3 +597,20 @@ mod tests {
         assert!(matches!(comp.audio, AudioData::I16(_)));
     }
 }
+
+pub mod ablation;
+pub mod audio_feedback;
+pub mod binaural;
+pub mod collaborative;
+pub mod consciousness_reverb;
+pub mod mixing;
+pub mod musical_inference;
+pub mod percussion;
+pub mod phi_optimizer;
+pub mod sidechain;
+pub mod spectral_vocoder;
+pub mod substrate_timbre;
+pub mod synesthesia;
+pub mod temporal_hierarchy;
+pub mod timbre_space;
+pub mod wavetable;

@@ -23,6 +23,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<BiometricsCtx>()
             .init_resource::<LeviathanState>()
             .init_resource::<GovernanceLog>()
+            .init_resource::<systems::consciousness::PlayerConsciousness>()
             .init_resource::<systems::rendering::TelemetryTimer>()
             .init_resource::<systems::postprocess::ConsciousnessVisuals>()
             .init_resource::<systems::postprocess::CameraTrauma>()
@@ -95,6 +96,9 @@ impl Plugin for SymtropyPlugin {
                     systems::harmonies::harmony_visual_system,
                     systems::harmonies::sanctuary_system,
                     systems::scavenge::scavenge_pickup_system,
+                    // Consciousness equation (7-theory synthesis)
+                    systems::consciousness::player_consciousness_system,
+                    systems::consciousness::npc_consciousness_system,
                     // HUD + minimap
                     systems::rendering::hud_system,
                     systems::minimap::update_minimap,

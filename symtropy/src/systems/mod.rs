@@ -4,6 +4,7 @@
 
 // Core gameplay systems
 pub mod audio;
+pub mod consciousness;
 pub mod fep_behavior;
 pub mod harmonies;
 pub mod input;

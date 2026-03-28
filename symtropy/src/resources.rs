@@ -6,7 +6,8 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 use symthaea_biometrics::input_telemetry::InputTelemetryEncoder;
 use symthaea_biometrics::stress_model::PlayerStressModel;
-use symthaea_muse::live_output::LiveMuseOutput;
+// TODO: re-enable when symthaea-muse compiles with muse-live
+// use symthaea_muse::live_output::LiveMuseOutput;
 
 /// Player behavioral biometrics state.
 #[derive(Resource)]
@@ -163,6 +164,4 @@ impl TileGrid {
 // Live Audio Output (H1.2)
 // ============================================================================
 
-/// Real-time audio output (Option because cpal may fail).
-#[derive(Resource)]
-pub struct AudioOutput(pub Option<LiveMuseOutput>);
+// AudioOutput moved to systems/audio.rs as AudioState

@@ -1,44 +1,37 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Audio system: stress + Leviathan state → live generative music.
+//! Audio system: computes consciousness-driven musical state.
+//!
+//! When symthaea-muse compiles with muse-live, this wires to cpal speakers.
+//! Currently runs in "composition mode" — state computed but not output.
 
 use bevy::prelude::*;
 use symthaea_biometrics::muse_bridge::stress_to_musical_state;
-use symthaea_muse::live_output::LiveMuseOutput;
-use symthaea_muse::MuseConfig;
+use symthaea_muse::MusicalState;
 
-use crate::resources::{AudioOutput, BiometricsCtx, LeviathanState, SleepPhase};
+use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase};
 
-/// Initialize the live audio output device.
-pub fn setup_audio(mut commands: Commands) {
-    let config = MuseConfig {
-        num_partials: 10,
-        ..MuseConfig::horror()
-    };
-    match LiveMuseOutput::new(config) {
-        Ok(output) => {
-            info!("Live audio: device opened at {}Hz", output.sample_rate());
-            commands.insert_resource(AudioOutput(Some(output)));
-        }
-        Err(e) => {
-            warn!("Audio device unavailable: {e} — running silent");
-            commands.insert_resource(AudioOutput(None));
-        }
-    }
+/// Cached audio state for the current frame.
+#[derive(Resource, Default)]
+pub struct AudioState {
+    pub current: Option<MusicalState>,
 }
 
-/// Update audio synthesis from stress state and Leviathan phase.
+/// Initialize audio (composition mode).
+pub fn setup_audio(mut commands: Commands) {
+    commands.insert_resource(AudioState::default());
+    info!("Audio system initialized (composition mode)");
+}
+
+/// Update audio synthesis state from stress and Leviathan phase.
 pub fn audio_system(
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
-    audio: Res<AudioOutput>,
+    mut audio: ResMut<AudioState>,
 ) {
-    let Some(ref output) = audio.0 else { return };
-
     let stress = biometrics.encoder.compute_stress_vector();
     let mut state = stress_to_musical_state(&stress, &biometrics.model);
 
-    // Blend Leviathan danger into audio
     match leviathan.phase {
         SleepPhase::Dormant => {
             state.harmony_activations[7] = (state.harmony_activations[7] + 0.3).min(1.0);
@@ -61,5 +54,5 @@ pub fn audio_system(
         }
     }
 
-    output.update_state(&state);
+    audio.current = Some(state);
 }
