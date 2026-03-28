@@ -194,6 +194,27 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Batch-generate lessons, assessments, and flashcards for curriculum nodes
+    BatchGenerate {
+        /// Curriculum JSON file (unified graph or single subject)
+        file: PathBuf,
+        /// Output directory for generated content
+        #[arg(long, short = 'o', default_value = "generated_content")]
+        output_dir: PathBuf,
+        /// Minimum coherence threshold (0.0-1.0)
+        #[arg(long, default_value_t = 0.6)]
+        quality_threshold: f32,
+        /// Filter by subject (substring match)
+        #[arg(long, short = 's')]
+        subject: Option<String>,
+        /// Filter by grade level
+        #[arg(long, short = 'g')]
+        grade: Option<String>,
+        /// Resume from previous progress
+        #[arg(long)]
+        resume: bool,
+    },
+
     /// Find an optimal learning path through the curriculum graph
     Plan {
         /// Curriculum JSON file (unified graph)
@@ -622,6 +643,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let doc = source.fetch_career_pathway(&field, limit).await?;
             eprintln!("Got {} nodes ({} occupations + skills)", doc.nodes.len(), limit);
             write_document(&doc, output.as_deref(), true)?;
+        }
+
+        // ============================================================
+        // Batch Content Generation
+        // ============================================================
+        Commands::BatchGenerate {
+            file,
+            output_dir,
+            quality_threshold,
+            subject,
+            grade,
+            resume,
+        } => {
+            let content = std::fs::read_to_string(&file)?;
+            let standards = edunet_content_gen::ingest::load_curriculum_json(&content)
+                .map_err(|e| format!("Failed to load curriculum: {e}"))?;
+
+            eprintln!(
+                "Loaded {} standards from {}",
+                standards.len(),
+                file.display()
+            );
+
+            let pipeline = edunet_content_gen::pipeline::ContentPipeline::new(
+                edunet_content_gen::mock::MockGenerator,
+            )
+            .with_quality_threshold(quality_threshold);
+
+            let filter = if let Some(ref subj) = subject {
+                edunet_content_gen::batch::NodeFilter::BySubject(subj.clone())
+            } else if let Some(ref g) = grade {
+                edunet_content_gen::batch::NodeFilter::ByGradeLevel(g.clone())
+            } else {
+                edunet_content_gen::batch::NodeFilter::All
+            };
+
+            let progress_file = if resume {
+                output_dir.join("batch_progress.json")
+            } else {
+                let _ = std::fs::remove_file(output_dir.join("batch_progress.json"));
+                output_dir.join("batch_progress.json")
+            };
+
+            let config = edunet_content_gen::batch::BatchConfig {
+                output_dir: output_dir.clone(),
+                progress_file,
+                quality_threshold,
+                filter,
+                ..Default::default()
+            };
+
+            let report = edunet_content_gen::batch::run_batch(&pipeline, &standards, &config);
+            edunet_content_gen::batch::print_report(&report);
         }
 
         // ============================================================

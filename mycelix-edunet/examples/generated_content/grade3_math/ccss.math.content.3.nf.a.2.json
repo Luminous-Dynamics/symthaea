@@ -1,0 +1,406 @@
+{
+  "node_id": "CCSS.Math.Content.3.NF.A.2",
+  "lesson": {
+    "standard_code": "CCSS.Math.Content.3.NF.A.2",
+    "title": "CCSS.Math.Content.3.NF.A.2: Understand a fraction as a number on the number line; rep...",
+    "grade_level": "Grade3",
+    "bloom_level": "Understand",
+    "explanation": "A fraction tells us about equal parts of a whole. When we write 1/4, the bottom number (4) tells us how many equal parts, and the top number (1) tells us how many parts we're talking about. Imagine cutting a pizza into 4 equal slices — each slice is 1/4 of the pizza!",
+    "examples": [
+      {
+        "problem": "Show 3/4 of a pizza.",
+        "steps": [
+          {
+            "instruction": "Draw a circle for the whole pizza",
+            "result": "one whole pizza"
+          },
+          {
+            "instruction": "Divide it into 4 equal slices",
+            "result": "4 equal parts"
+          },
+          {
+            "instruction": "Shade 3 of the slices",
+            "result": "3 parts shaded"
+          }
+        ],
+        "answer": "3/4 of the pizza is shaded.",
+        "visual_description": null
+      },
+      {
+        "problem": "Show 2/6 on a number line.",
+        "steps": [
+          {
+            "instruction": "Draw a line from 0 to 1",
+            "result": "number line ready"
+          },
+          {
+            "instruction": "Divide into 6 equal spaces",
+            "result": "6 equal segments"
+          },
+          {
+            "instruction": "Count 2 spaces from 0 and mark",
+            "result": "point at 2/6"
+          }
+        ],
+        "answer": "2/6 is located at the second mark.",
+        "visual_description": null
+      },
+      {
+        "problem": "Sarah ate 2/8 of a chocolate bar. What fraction did she eat?",
+        "steps": [
+          {
+            "instruction": "The bar is divided into 8 equal pieces",
+            "result": "8 equal parts"
+          },
+          {
+            "instruction": "Sarah ate 2 pieces",
+            "result": "2 out of 8"
+          },
+          {
+            "instruction": "Write the fraction: 2/8",
+            "result": "2/8 of the bar"
+          }
+        ],
+        "answer": "Sarah ate 2/8 of the chocolate bar.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      },
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      },
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      },
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      },
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      },
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      },
+      {
+        "question": "A pie is cut into 6 equal slices. Maria eats 2 slices. What fraction of the pie did she eat?",
+        "answer": "2/6",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many total equal pieces is the pie cut into?",
+          "The bottom number is the total pieces, the top is how many she ate."
+        ],
+        "explanation": "There are 6 equal parts (denominator) and Maria ate 2 (numerator): 2/6.",
+        "distractors": [
+          "2/3",
+          "6/2",
+          "1/3"
+        ]
+      }
+    ],
+    "hints": [
+      "What operation do you think this problem is asking you to use? Look for clue words in the problem.",
+      "Try drawing a picture with equal groups. How many groups are there? How many are in each group?",
+      "Set up a multiplication equation: ___ x ___ = ? The number of groups goes first, then the number in each group. Now multiply to find the total."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "fraction",
+        "definition": "A number that names part of a whole or part of a group",
+        "example_usage": "1/2 of a pizza is a fraction."
+      },
+      {
+        "term": "numerator",
+        "definition": "The top number in a fraction; tells how many parts",
+        "example_usage": "In 3/4, the numerator is 3."
+      },
+      {
+        "term": "denominator",
+        "definition": "The bottom number in a fraction; tells how many equal parts in all",
+        "example_usage": "In 3/4, the denominator is 4."
+      },
+      {
+        "term": "equivalent fractions",
+        "definition": "Fractions that name the same amount",
+        "example_usage": "1/2 and 2/4 are equivalent fractions."
+      },
+      {
+        "term": "unit fraction",
+        "definition": "A fraction with 1 as the numerator",
+        "example_usage": "1/3 and 1/8 are unit fractions."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "A bigger denominator means a bigger fraction.",
+        "correction": "A bigger denominator means more parts, so each part is smaller. 1/8 < 1/4.",
+        "why_students_think_this": "Students assume bigger numbers always mean bigger amounts, not realizing that more parts means smaller pieces."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.8500001,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.8500001,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CCSS.Math.Content.3.NF.A.2",
+    "title": "Assessment: Understand a fraction as a number on the number line; represent fractions on a number line diagram.",
+    "items": [
+      {
+        "question": "What is the product of 6 and 3?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "18",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: 6 groups of 3."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What does 1/4 mean?",
+      "back": "1 part out of 4 equal parts of a whole.",
+      "tags": [
+        "CCSS.Math.Content.3.NF.A.2",
+        "Grade3",
+        "Number and Operations—Fractions"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.8500001,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-28T11:04:12"
+}

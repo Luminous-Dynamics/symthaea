@@ -1,0 +1,411 @@
+{
+  "node_id": "CCSS.Math.Content.3.OA.C.7",
+  "lesson": {
+    "standard_code": "CCSS.Math.Content.3.OA.C.7",
+    "title": "CCSS.Math.Content.3.OA.C.7: Fluently multiply and divide within 100, using strategies...",
+    "grade_level": "Grade3",
+    "bloom_level": "Apply",
+    "explanation": "Multiplication has special properties that make it easier to use. The commutative property means 3 x 5 = 5 x 3 (order doesn't matter). The associative property means (2 x 3) x 4 = 2 x (3 x 4) (grouping doesn't matter). The distributive property lets us break apart: 6 x 7 = 6 x (5 + 2) = 30 + 12 = 42.",
+    "examples": [
+      {
+        "problem": "There are 5 baskets. Each basket has 3 oranges. How many oranges in total?",
+        "steps": [
+          {
+            "instruction": "Draw 5 groups, each with 3 circles",
+            "result": "5 groups of 3"
+          },
+          {
+            "instruction": "Count all the circles: 3 + 3 + 3 + 3 + 3",
+            "result": "15"
+          },
+          {
+            "instruction": "Write the equation: 5 x 3 = 15",
+            "result": "5 x 3 = 15"
+          }
+        ],
+        "answer": "There are 15 oranges in total.",
+        "visual_description": null
+      },
+      {
+        "problem": "Show 4 x 6 using an array.",
+        "steps": [
+          {
+            "instruction": "Draw 4 rows",
+            "result": "4 rows drawn"
+          },
+          {
+            "instruction": "Put 6 dots in each row",
+            "result": "4 rows of 6 dots"
+          },
+          {
+            "instruction": "Count the total: 6 + 6 + 6 + 6 = 24",
+            "result": "24 dots total"
+          }
+        ],
+        "answer": "4 x 6 = 24",
+        "visual_description": null
+      },
+      {
+        "problem": "A farmer plants 7 rows of tomato plants with 4 plants in each row. How many plants?",
+        "steps": [
+          {
+            "instruction": "Identify the groups: 7 rows",
+            "result": "7 groups"
+          },
+          {
+            "instruction": "Identify how many in each: 4 plants per row",
+            "result": "4 in each group"
+          },
+          {
+            "instruction": "Multiply: 7 x 4 = 28",
+            "result": "28 plants"
+          }
+        ],
+        "answer": "The farmer planted 28 tomato plants.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "How many stars in total? 3 groups of 2 stars.",
+        "answer": "6",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about how many groups there are.",
+          "Draw the groups and count."
+        ],
+        "explanation": "3 groups of 2 means 3 x 2 = 6 stars.",
+        "distractors": [
+          "5",
+          "8",
+          "32"
+        ]
+      },
+      {
+        "question": "How many stars in total? 3 groups of 2 stars.",
+        "answer": "6",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about how many groups there are.",
+          "Draw the groups and count."
+        ],
+        "explanation": "3 groups of 2 means 3 x 2 = 6 stars.",
+        "distractors": [
+          "5",
+          "8",
+          "32"
+        ]
+      },
+      {
+        "question": "A classroom has 5 tables. Each table has 4 chairs. How many chairs are there?",
+        "answer": "20",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is being counted in equal groups?",
+          "5 groups of 4: try skip counting by 4."
+        ],
+        "explanation": "5 tables with 4 chairs each: 5 x 4 = 20 chairs.",
+        "distractors": [
+          "9",
+          "15",
+          "24"
+        ]
+      },
+      {
+        "question": "A classroom has 5 tables. Each table has 4 chairs. How many chairs are there?",
+        "answer": "20",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is being counted in equal groups?",
+          "5 groups of 4: try skip counting by 4."
+        ],
+        "explanation": "5 tables with 4 chairs each: 5 x 4 = 20 chairs.",
+        "distractors": [
+          "9",
+          "15",
+          "24"
+        ]
+      },
+      {
+        "question": "A bookshelf has 8 shelves. Each shelf holds 7 books. How many books fit on the bookshelf?",
+        "answer": "56",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many groups? How many in each group?",
+          "Write it as a multiplication: 8 x 7 = ?"
+        ],
+        "explanation": "8 shelves with 7 books each: 8 x 7 = 56 books.",
+        "distractors": [
+          "15",
+          "48",
+          "63"
+        ]
+      },
+      {
+        "question": "A bookshelf has 8 shelves. Each shelf holds 7 books. How many books fit on the bookshelf?",
+        "answer": "56",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many groups? How many in each group?",
+          "Write it as a multiplication: 8 x 7 = ?"
+        ],
+        "explanation": "8 shelves with 7 books each: 8 x 7 = 56 books.",
+        "distractors": [
+          "15",
+          "48",
+          "63"
+        ]
+      },
+      {
+        "question": "A bookshelf has 8 shelves. Each shelf holds 7 books. How many books fit on the bookshelf?",
+        "answer": "56",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "How many groups? How many in each group?",
+          "Write it as a multiplication: 8 x 7 = ?"
+        ],
+        "explanation": "8 shelves with 7 books each: 8 x 7 = 56 books.",
+        "distractors": [
+          "15",
+          "48",
+          "63"
+        ]
+      }
+    ],
+    "hints": [
+      "What operation do you think this problem is asking you to use? Look for clue words in the problem.",
+      "Try drawing a picture with equal groups. How many groups are there? How many are in each group?",
+      "Set up a multiplication equation: ___ x ___ = ? The number of groups goes first, then the number in each group. Now multiply to find the total."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "product",
+        "definition": "The answer when two numbers are multiplied",
+        "example_usage": "The product of 3 and 4 is 12."
+      },
+      {
+        "term": "factor",
+        "definition": "A number being multiplied",
+        "example_usage": "In 3 x 4 = 12, the factors are 3 and 4."
+      },
+      {
+        "term": "array",
+        "definition": "Objects arranged in equal rows and columns",
+        "example_usage": "An array of 3 rows and 4 columns shows 3 x 4."
+      },
+      {
+        "term": "equation",
+        "definition": "A math sentence with an equals sign",
+        "example_usage": "5 x 3 = 15 is an equation."
+      },
+      {
+        "term": "equal groups",
+        "definition": "Groups that all have the same number of objects",
+        "example_usage": "4 bags of 5 apples are equal groups."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Multiplication always makes numbers bigger.",
+        "correction": "Multiplication by 1 gives the same number, and by 0 gives 0. For example, 5 x 1 = 5 and 5 x 0 = 0.",
+        "why_students_think_this": "Students mostly see examples with factors greater than 1 early on, so they overgeneralize."
+      },
+      {
+        "misconception": "3 x 4 and 4 x 3 mean different things because the groups are different.",
+        "correction": "While the stories may differ (3 groups of 4 vs. 4 groups of 3), the product is the same: 12.",
+        "why_students_think_this": "Students confuse the meaning of the factors with the result of the operation."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.8500001,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.8500001,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CCSS.Math.Content.3.OA.C.7",
+    "title": "Assessment: Fluently multiply and divide within 100, using strategies such as the relationship between multiplication and division (e.g., knowing that 8 × 5 = 40, one knows 40 ÷ 5 = 8) or properties of operations. By the end of Grade 3, know from memory all products of two one-digit numbers.",
+    "items": [
+      {
+        "question": "What is the product of 6 and 3?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "18",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: 6 groups of 3."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "A baker makes 6 trays of cookies. Each tray has 8 cookies. How many cookies did the baker make?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "48",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "What equation represents this problem?"
+      },
+      {
+        "question": "Jake says 5 x 4 = 20 and 4 x 5 = 20. Is he correct? Why do both give the same answer?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Yes, both equal 20 because multiplication is commutative — order does not change the product.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "What property of multiplication does this show?"
+      },
+      {
+        "question": "Lisa solved 7 x 3 by adding 7 + 7 + 7. Did she use a correct strategy? Is there a better way?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Yes, 7 + 7 + 7 = 21 = 7 x 3 is correct. An alternative: 7 x 3 = (5 x 3) + (2 x 3) = 15 + 6 = 21.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Compare the two strategies. Which is faster for bigger numbers?"
+      },
+      {
+        "question": "Write your own word problem that can be solved with 3 x 9 = 27.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Example: A store has 3 shelves with 9 toys on each shelf. How many toys are there?",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Make sure your problem uses equal groups."
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What does 5 x 3 mean?",
+      "back": "5 groups of 3, which equals 15.",
+      "tags": [
+        "CCSS.Math.Content.3.OA.C.7",
+        "Grade3",
+        "Operations and Algebraic Thinking"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.8500001,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-28T11:04:12"
+}

@@ -1,0 +1,396 @@
+{
+  "node_id": "CCSS.Math.Content.3.G.A.1",
+  "lesson": {
+    "standard_code": "CCSS.Math.Content.3.G.A.1",
+    "title": "CCSS.Math.Content.3.G.A.1: Understand that shapes in different categories (e.g., rho...",
+    "grade_level": "Grade3",
+    "bloom_level": "Apply",
+    "explanation": "Shapes have special properties we can describe. A quadrilateral has 4 sides. A rhombus has 4 equal sides. A rectangle has 4 right angles. A square is both! We can sort shapes into categories by their properties.",
+    "examples": [
+      {
+        "problem": "Solve: There are 6 boxes with 4 crayons each. How many crayons?",
+        "steps": [
+          {
+            "instruction": "Identify: 6 groups of 4",
+            "result": "6 x 4"
+          },
+          {
+            "instruction": "Use skip counting: 4, 8, 12, 16, 20, 24",
+            "result": "counted 6 fours"
+          },
+          {
+            "instruction": "Write the equation: 6 x 4 = 24",
+            "result": "24 crayons"
+          }
+        ],
+        "answer": "There are 24 crayons in total.",
+        "visual_description": null
+      },
+      {
+        "problem": "Solve: There are 6 boxes with 4 crayons each. How many crayons?",
+        "steps": [
+          {
+            "instruction": "Identify: 6 groups of 4",
+            "result": "6 x 4"
+          },
+          {
+            "instruction": "Use skip counting: 4, 8, 12, 16, 20, 24",
+            "result": "counted 6 fours"
+          },
+          {
+            "instruction": "Write the equation: 6 x 4 = 24",
+            "result": "24 crayons"
+          }
+        ],
+        "answer": "There are 24 crayons in total.",
+        "visual_description": null
+      },
+      {
+        "problem": "Solve: There are 6 boxes with 4 crayons each. How many crayons?",
+        "steps": [
+          {
+            "instruction": "Identify: 6 groups of 4",
+            "result": "6 x 4"
+          },
+          {
+            "instruction": "Use skip counting: 4, 8, 12, 16, 20, 24",
+            "result": "counted 6 fours"
+          },
+          {
+            "instruction": "Write the equation: 6 x 4 = 24",
+            "result": "24 crayons"
+          }
+        ],
+        "answer": "There are 24 crayons in total.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      },
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      },
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      },
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      },
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      },
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      },
+      {
+        "question": "There are 4 vases. Each vase has 6 flowers. How many flowers are there in all?",
+        "answer": "24",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about equal groups.",
+          "4 x 6: try skip counting by 6 four times."
+        ],
+        "explanation": "4 groups of 6: 4 x 6 = 24 flowers.",
+        "distractors": [
+          "10",
+          "18",
+          "26"
+        ]
+      }
+    ],
+    "hints": [
+      "What operation do you think this problem is asking you to use? Look for clue words in the problem.",
+      "Try drawing a picture with equal groups. How many groups are there? How many are in each group?",
+      "Set up a multiplication equation: ___ x ___ = ? The number of groups goes first, then the number in each group. Now multiply to find the total."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "operation",
+        "definition": "A mathematical process like addition or multiplication",
+        "example_usage": "Multiplication is an operation."
+      },
+      {
+        "term": "strategy",
+        "definition": "A plan for solving a problem",
+        "example_usage": "Skip counting is a strategy for multiplication."
+      },
+      {
+        "term": "unknown",
+        "definition": "A number we need to find",
+        "example_usage": "In 3 x ? = 12, the unknown is 4."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Math problems only have one way to solve them.",
+        "correction": "Most problems can be solved multiple ways. Drawing pictures, using number lines, or writing equations are all valid.",
+        "why_students_think_this": "Students are often shown only one method and assume alternatives are wrong."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.8500001,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.8500001,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CCSS.Math.Content.3.G.A.1",
+    "title": "Assessment: Understand that shapes in different categories (e.g., rhombuses, rectangles, and others) may share attributes (e.g., having four sides), and that the shared attributes can define a larger category (e.g., quadrilaterals). Recognize rhombuses, rectangles, and squares as examples of quadrilaterals, and draw examples of quadrilaterals that do not belong to any of these subcategories.",
+    "items": [
+      {
+        "question": "What is the product of 6 and 3?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "18",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: 6 groups of 3."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      },
+      {
+        "question": "Explain what 4 x 5 means using words or a picture.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "4 x 5 means 4 groups of 5 objects, which is 20 objects total.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Draw a picture to help you explain."
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is a product in multiplication?",
+      "back": "The answer when two numbers are multiplied together.",
+      "tags": [
+        "CCSS.Math.Content.3.G.A.1",
+        "Grade3",
+        "Geometry"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.8500001,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-28T11:04:12"
+}

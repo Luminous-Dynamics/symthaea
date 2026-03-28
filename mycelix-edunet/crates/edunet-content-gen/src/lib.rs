@@ -37,6 +37,7 @@
 //! assert!(!lesson.explanation.is_empty());
 //! ```
 
+pub mod batch;
 pub mod channels;
 pub mod ingest;
 pub mod mock;
