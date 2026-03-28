@@ -683,6 +683,7 @@ default-mind = [
     "safety-agents",
     "cpg",
     "spectral_state",
+    "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
 ]
 networked-mind = [  # UNTESTED: not in CI matrix (pure bundle)
     "default-mind",
