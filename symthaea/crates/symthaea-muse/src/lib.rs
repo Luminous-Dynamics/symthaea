@@ -45,6 +45,7 @@ pub mod pitch;
 pub mod rhythm;
 pub mod stream;
 pub mod streaming;
+pub mod training;
 pub mod structure;
 pub mod synth;
 pub mod voice;

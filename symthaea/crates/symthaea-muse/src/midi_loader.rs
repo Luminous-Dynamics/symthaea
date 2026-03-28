@@ -73,13 +73,20 @@ pub fn parse_midi(data: &[u8]) -> Result<Vec<Note>, MidiLoadError> {
     Ok(notes)
 }
 
-/// Load all MIDI files from a directory.
+/// Load all MIDI files from a directory (recursively).
 pub fn load_melodies(dir: &Path) -> Vec<Vec<Note>> {
     let mut melodies = Vec::new();
+    load_melodies_recursive(dir, &mut melodies);
+    melodies
+}
+
+fn load_melodies_recursive(dir: &Path, melodies: &mut Vec<Vec<Note>>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "mid" || ext == "midi") {
+            if path.is_dir() {
+                load_melodies_recursive(&path, melodies);
+            } else if path.extension().map_or(false, |ext| ext == "mid" || ext == "midi") {
                 if let Ok(notes) = load_midi(&path) {
                     if !notes.is_empty() {
                         melodies.push(notes);
@@ -88,7 +95,6 @@ pub fn load_melodies(dir: &Path) -> Vec<Vec<Note>> {
             }
         }
     }
-    melodies
 }
 
 /// MIDI loading error.

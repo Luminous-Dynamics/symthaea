@@ -26,6 +26,12 @@ pub struct NeuralMelody {
     network: HdcLtcUnifiedNetwork,
     /// HDC dimension used for encoding/decoding.
     dim: usize,
+    /// Trainable decode weights: applied to output before sigmoid.
+    /// Default: all 1.0 (no modification). Training adjusts these
+    /// to shape the pitch/velocity/onset mappings.
+    decode_weights: Vec<f32>,
+    /// Trainable decode biases.
+    decode_biases: Vec<f32>,
 }
 
 impl NeuralMelody {
@@ -54,7 +60,29 @@ impl NeuralMelody {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
 
-        Self { network, dim }
+        Self {
+            network,
+            dim,
+            decode_weights: vec![3.0, 2.0, 2.0], // default scaling for pitch, vel, onset
+            decode_biases: vec![0.0; 3],
+        }
+    }
+
+    /// Set trainable decode parameters (weights and biases).
+    ///
+    /// Called by the training loop to inject perturbed parameters.
+    /// `projections` should have 2 vectors: [weights(3), biases(3)].
+    pub fn set_projections(&mut self, projections: Vec<ContinuousHV>) {
+        if projections.len() >= 2 {
+            let w = &projections[0].values;
+            let b = &projections[1].values;
+            for i in 0..3.min(w.len()) {
+                self.decode_weights[i] = w[i];
+            }
+            for i in 0..3.min(b.len()) {
+                self.decode_biases[i] = b[i];
+            }
+        }
     }
 
     /// Encode cognitive state into a hypervector input for the network.
@@ -91,23 +119,21 @@ impl NeuralMelody {
     fn decode_frame(&self, output: &ContinuousHV) -> (f32, f32, f32) {
         let vals = &output.values;
 
-        // First dimension: pitch selector [0, 1]
+        // Trainable decode: weight * value + bias → sigmoid
         let pitch_sel = if !vals.is_empty() {
-            sigmoid(vals[0] * 3.0)
+            sigmoid(vals[0] * self.decode_weights[0] + self.decode_biases[0])
         } else {
             0.5
         };
 
-        // Second dimension: velocity
         let velocity = if vals.len() > 1 {
-            sigmoid(vals[1] * 2.0).clamp(0.1, 1.0)
+            sigmoid(vals[1] * self.decode_weights[1] + self.decode_biases[1]).clamp(0.1, 1.0)
         } else {
             0.5
         };
 
-        // Third dimension: onset probability
         let onset = if vals.len() > 2 {
-            sigmoid(vals[2] * 2.0)
+            sigmoid(vals[2] * self.decode_weights[2] + self.decode_biases[2])
         } else {
             0.7
         };
