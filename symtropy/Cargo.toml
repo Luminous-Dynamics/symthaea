@@ -12,7 +12,8 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_sprite", "bevy_sprite_render",
     "bevy_text", "bevy_ui", "bevy_ui_render",
     "bevy_winit", "bevy_color", "bevy_state",
-    "bevy_log", "multi_threaded", "x11",
+    "bevy_log", "bevy_post_process", "bevy_shader",
+    "multi_threaded", "x11",
     "default_font", "png",
 ] }
 

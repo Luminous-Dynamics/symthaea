@@ -10,4 +10,5 @@ pub mod governance;
 pub mod input;
 pub mod leviathan;
 pub mod player;
+pub mod postprocess;
 pub mod rendering;

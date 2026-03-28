@@ -68,7 +68,7 @@ fn level_map() -> Vec<Vec<u8>> {
 
 /// Spawn the camera, level, player, NPCs, fusion core, and Leviathan.
 pub fn setup_world(mut commands: Commands) {
-    // Camera
+    // Camera (TODO: add Bloom + ChromaticAberration when bevy_post_process features stabilize)
     commands.spawn((Camera2d, Transform::from_xyz(0.0, 0.0, 999.0)));
 
     let map = level_map();

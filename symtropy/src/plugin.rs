@@ -24,6 +24,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<LeviathanState>()
             .init_resource::<GovernanceLog>()
             .init_resource::<systems::rendering::TelemetryTimer>()
+            .init_resource::<systems::postprocess::ConsciousnessVisuals>()
             // Dark background — the void outside the Markov blanket
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
             .init_resource::<FrameCounter>()
@@ -72,6 +73,8 @@ impl Plugin for SymtropyPlugin {
                     systems::leviathan::leviathan_system,
                     systems::leviathan::victory_check_system,
                     systems::audio::audio_system,
+                    // Post-processing (consciousness visuals)
+                    systems::postprocess::update_consciousness_visuals,
                     systems::rendering::camera_follow_system,
                     systems::rendering::visual_stress_system,
                     systems::rendering::leviathan_visual_system,
