@@ -30,6 +30,7 @@ pub mod config;
 pub mod consciousness;
 pub mod consciousness_epidemiology;
 pub mod disasters;
+pub mod interplanetary_consciousness;
 pub mod economy;
 pub mod education;
 pub mod empirical;
@@ -1342,8 +1343,12 @@ impl MultiWorldSimulator {
                     "Titan" => 0.138,
                     _ => 1.0,
                 };
+                // Centrifuge habitats (Manufacturing Breakthrough) enable full-g reproduction.
+                // Genetic Engineering enables risky low-g reproduction (higher infant mortality).
                 let has_centrifuge = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
-                world.reproduction_viable = gravity >= 0.38 || has_centrifuge;
+                let has_gene_therapy = self.disaster_engine.tech_tree.is_achieved("Genetic Engineering");
+                world.reproduction_viable = gravity >= 0.38 || has_centrifuge
+                    || (has_gene_therapy && gravity >= 0.13); // Gene therapy makes 0.13g+ marginally viable
                 // Mars is borderline (0.38g) — viable but with health risks
             }
 
@@ -1525,6 +1530,29 @@ impl MultiWorldSimulator {
                     "Colony constitution ratified",
                 ));
             }
+        }
+
+        // Dunbar number transitions (Dunbar 1992).
+        // Population crossing 150 or 1500 triggers governance restructuring crisis.
+        // Direct trust networks break down at ~150; hierarchical management required at ~1500.
+        {
+            let mut dunbar_events = Vec::new();
+            for world in &self.worlds {
+                let pop = world.population();
+                for (threshold, desc) in [(150, "direct trust to formal roles"), (1500, "community to bureaucracy")] {
+                    let key = format!("dunbar_{}_{}", world.id, threshold);
+                    if pop >= threshold && pop < threshold + 50
+                        && !self.events.iter().any(|e| e.description.contains(&key))
+                    {
+                        dunbar_events.push(CivEvent::new(
+                            self.current_tick, Some(world.id), CivEventType::ConstitutionalAmendment,
+                            format!("{}: DUNBAR TRANSITION at pop {} — {} required. [{}]",
+                                world.name, pop, desc, key),
+                        ));
+                    }
+                }
+            }
+            self.events.extend(dunbar_events);
         }
 
         // Phase 6b: Per-world consciousness-gated governance with anti-tyranny invariants

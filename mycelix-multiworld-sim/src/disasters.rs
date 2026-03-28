@@ -582,10 +582,10 @@ impl TechTree {
                     earliest_tick: FISSION_EARLIEST,
                     latest_tick: FISSION_LATEST,
                     base_probability: 0.025,
-                    prerequisites: vec![(1, 1.5)], // engineering > 1.5
+                    prerequisites: vec![(0, 1.5)], // engineering (sector 0) > 1.5
                     prerequisite_milestones: vec![],
                     effects: TechEffects {
-                        tech_level_boost: vec![(1, 0.5), (4, 0.2)],
+                        tech_level_boost: vec![(0, 0.5), (4, 0.2)], // boost engineering + science
                         power_multiplier: 2.0,
                         propulsion_unlock: false,
                         resource_efficiency: 1.2,

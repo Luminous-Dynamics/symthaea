@@ -70,9 +70,11 @@ impl NarrativeEngine {
         // 1. Population crash detection (>10% drop in any world)
         for (name, _loc, pop, _joy, sadness, desire, care, _ss) in worlds {
             if let Some((_, prev_pop)) = self.prev_populations.iter().find(|(n, _)| n == name) {
-                if *prev_pop > 20 && *pop < *prev_pop {
+                if *prev_pop > 10 && *pop < *prev_pop {
                     let drop_frac = 1.0 - (*pop as f64 / *prev_pop as f64);
-                    if drop_frac > 0.10 {
+                    // Lower threshold for small colonies (5% for <100 pop, 10% for larger)
+                    let threshold = if *prev_pop < 100 { 0.05 } else { 0.10 };
+                    if drop_frac > threshold {
                         let severity = if drop_frac > 0.30 { 4 } else if drop_frac > 0.20 { 3 } else { 2 };
                         let response = if *care > 0.5 {
                             format!("The survivors rallied with extraordinary mutual aid (care: {:.2})", care)
@@ -210,8 +212,51 @@ impl NarrativeEngine {
             self.narrated_milestones.push("Laschamp".into());
         }
 
-        // 6. Refugee crisis (from affect-driven migration)
-        // Already handled by CivEvent in tick_interworld — we detect it from population shifts
+        // 6. Population milestones (first time a world crosses 1000, 5000, 10000)
+        for (name, _loc, pop, joy, _sadness, _desire, care, _ss) in worlds {
+            for threshold in [100, 500, 1000, 5000, 10000] {
+                let key = format!("pop_{}_{}", name, threshold);
+                if *pop >= threshold && !self.narrated_milestones.contains(&key) {
+                    self.events.push(NarrativeEvent {
+                        tick, year,
+                        world: Some(name.clone()),
+                        crisis: format!("{} reached {} population", name, threshold),
+                        response: if *joy > 0.5 {
+                            "Celebration marked the milestone — the colony felt its own permanence".into()
+                        } else {
+                            "The milestone passed quietly — survival remained the focus".into()
+                        },
+                        outcome: if *care > 0.5 {
+                            "Community bonds strengthened with scale".into()
+                        } else {
+                            "Growing pains tested institutional capacity".into()
+                        },
+                        severity: if threshold >= 5000 { 3 } else { 1 },
+                        joy: *joy, sadness: 0.0, desire: 0.0, care: *care,
+                    });
+                    self.narrated_milestones.push(key);
+                }
+            }
+        }
+
+        // 7. Active disaster overload (5+ simultaneous disasters)
+        if active_disaster_count >= 5 {
+            let key = format!("overload_{}", tick / 120); // Once per 10 years max
+            if !self.narrated_milestones.contains(&key) {
+                self.events.push(NarrativeEvent {
+                    tick, year,
+                    world: None,
+                    crisis: format!("{} simultaneous disasters overwhelming civilization response", active_disaster_count),
+                    response: "Emergency coordinators struggled to triage across multiple crises".into(),
+                    outcome: "Resource allocation became zero-sum — saving one colony meant neglecting another".into(),
+                    severity: 3,
+                    joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                });
+                self.narrated_milestones.push(key);
+            }
+        }
+
+        // 8. Refugee crisis detection
 
         // Update state for next tick
         self.prev_populations = worlds.iter()
