@@ -3,9 +3,10 @@
 //! Global ECS resources for Symtropy.
 
 use bevy::prelude::*;
+use std::collections::HashMap;
 use symthaea_biometrics::input_telemetry::InputTelemetryEncoder;
 use symthaea_biometrics::stress_model::PlayerStressModel;
-// MuseConfig and LiveMuseOutput will be used when cpal audio is wired in.
+use symthaea_muse::live_output::LiveMuseOutput;
 
 /// Player behavioral biometrics state.
 #[derive(Resource)]
@@ -113,3 +114,38 @@ impl GovernanceLog {
         }
     }
 }
+
+// ============================================================================
+// Tile Grid (H1.1 — wall collision)
+// ============================================================================
+
+/// Spatial lookup for tile walkability. O(1) collision checks.
+#[derive(Resource, Default)]
+pub struct TileGrid {
+    /// Map from (grid_x, grid_y) → walkable.
+    pub cells: HashMap<(i32, i32), bool>,
+    /// Tile size in pixels.
+    pub tile_size: f32,
+    /// Grid origin offset (half-width, half-height in tiles).
+    pub origin_col: i32,
+    pub origin_row: i32,
+    pub cols: i32,
+    pub rows: i32,
+}
+
+impl TileGrid {
+    /// Check if a world-space position is walkable.
+    pub fn is_walkable(&self, world_x: f32, world_y: f32) -> bool {
+        let col = ((world_x / self.tile_size) + self.origin_col as f32).round() as i32;
+        let row = (self.origin_row as f32 - (world_y / self.tile_size)).round() as i32;
+        self.cells.get(&(col, row)).copied().unwrap_or(false)
+    }
+}
+
+// ============================================================================
+// Live Audio Output (H1.2)
+// ============================================================================
+
+/// Real-time audio output (Option because cpal may fail).
+#[derive(Resource)]
+pub struct AudioOutput(pub Option<LiveMuseOutput>);

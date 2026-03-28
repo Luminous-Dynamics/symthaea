@@ -136,9 +136,10 @@ pub fn fep_behavior_system(
     }
 }
 
-/// Move NPCs toward their targets.
+/// Move NPCs toward their targets with wall collision.
 pub fn npc_movement_system(
     mut query: Query<(&mut Transform, &MoveTarget), With<CrewNpc>>,
+    tile_grid: Option<Res<crate::resources::TileGrid>>,
     time: Res<Time>,
 ) {
     for (mut tf, target) in &mut query {
@@ -148,8 +149,19 @@ pub fn npc_movement_system(
             let dist = dir.length();
             if dist > 2.0 && target.speed > 0.0 {
                 let move_vec = dir.normalize() * target.speed * time.delta_secs();
-                tf.translation.x += move_vec.x;
-                tf.translation.y += move_vec.y;
+                let new_x = tf.translation.x + move_vec.x;
+                let new_y = tf.translation.y + move_vec.y;
+                if let Some(ref grid) = tile_grid {
+                    if grid.is_walkable(new_x, tf.translation.y) {
+                        tf.translation.x = new_x;
+                    }
+                    if grid.is_walkable(tf.translation.x, new_y) {
+                        tf.translation.y = new_y;
+                    }
+                } else {
+                    tf.translation.x = new_x;
+                    tf.translation.y = new_y;
+                }
             }
         }
     }

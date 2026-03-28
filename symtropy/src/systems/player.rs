@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 
 use crate::components::{Flashlight, FusionCore, NoiseEmitter, Player};
-use crate::resources::BiometricsCtx;
+use crate::resources::{BiometricsCtx, TileGrid};
 
 /// Normal movement speed (pixels/second).
 const WALK_SPEED: f32 = 100.0;
@@ -18,10 +18,11 @@ const SPRINT_NOISE: f32 = 0.6;
 /// Standing noise decay factor.
 const NOISE_DECAY: f32 = 0.85;
 
-/// Move player with WASD, sprint with Shift.
+/// Move player with WASD, sprint with Shift. Wall collision via TileGrid.
 pub fn player_movement_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut query: Query<(&mut Transform, &mut NoiseEmitter), With<Player>>,
+    tile_grid: Option<Res<TileGrid>>,
     time: Res<Time>,
 ) {
     let Ok((mut transform, mut noise)) = query.single_mut() else {
@@ -44,11 +45,26 @@ pub fn player_movement_system(
 
     if direction != Vec2::ZERO {
         direction = direction.normalize();
-        let sprinting = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+        let sprinting =
+            keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
         let speed = if sprinting { SPRINT_SPEED } else { WALK_SPEED };
 
-        transform.translation.x += direction.x * speed * time.delta_secs();
-        transform.translation.y += direction.y * speed * time.delta_secs();
+        let new_x = transform.translation.x + direction.x * speed * time.delta_secs();
+        let new_y = transform.translation.y + direction.y * speed * time.delta_secs();
+
+        // Wall collision: check each axis independently (allows wall sliding)
+        if let Some(ref grid) = tile_grid {
+            if grid.is_walkable(new_x, transform.translation.y) {
+                transform.translation.x = new_x;
+            }
+            if grid.is_walkable(transform.translation.x, new_y) {
+                transform.translation.y = new_y;
+            }
+        } else {
+            // No grid yet (first frame) — allow movement
+            transform.translation.x = new_x;
+            transform.translation.y = new_y;
+        }
 
         noise.level = if sprinting { SPRINT_NOISE } else { WALK_NOISE };
     } else {
