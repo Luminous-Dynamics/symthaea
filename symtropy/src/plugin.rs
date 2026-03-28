@@ -31,6 +31,8 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<FrameCounter>()
             .init_resource::<crate::resources::DungeonSeed>()
             .init_resource::<systems::minimap::ExploredTiles>()
+            .init_resource::<systems::harmonies::LocalHarmonyState>()
+            .init_resource::<systems::scavenge::CollectedPrimitives>()
             // Startup: camera + audio (always needed)
             .add_systems(Startup, systems::audio::setup_audio)
             // Main menu
@@ -47,6 +49,7 @@ impl Plugin for SymtropyPlugin {
                     systems::menu::setup_loading,
                     systems::rendering::setup_world,
                     systems::minimap::setup_minimap,
+                    systems::scavenge::spawn_scavenge_items,
                 ).chain(),
             )
             .add_systems(
@@ -87,6 +90,12 @@ impl Plugin for SymtropyPlugin {
                     systems::rendering::camera_follow_system,
                     systems::rendering::visual_stress_system,
                     systems::rendering::leviathan_visual_system,
+                    // Harmonies + scavenging
+                    systems::harmonies::harmony_update_system,
+                    systems::harmonies::harmony_visual_system,
+                    systems::harmonies::sanctuary_system,
+                    systems::scavenge::scavenge_pickup_system,
+                    // HUD + minimap
                     systems::rendering::hud_system,
                     systems::minimap::update_minimap,
                 )
