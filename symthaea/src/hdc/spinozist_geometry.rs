@@ -1242,6 +1242,9 @@ pub struct SpinozistClassifier {
     lexicon: NsmLexicon,
     /// Learned adequacy thresholds (can be calibrated from labeled data).
     valence_threshold: f32,
+    /// Learned prototypes in 78D affect cross-term space: [Good, Bad, Neutral].
+    /// Trained via `train_prototypes()` with centroid initialization + retrain-adaptive.
+    learned_prototypes: Option<[Vec<f32>; 3]>,
 }
 
 impl SpinozistClassifier {
@@ -1255,6 +1258,7 @@ impl SpinozistClassifier {
             affects,
             lexicon,
             valence_threshold: 0.02,
+            learned_prototypes: None,
         }
     }
 
@@ -1280,7 +1284,11 @@ impl SpinozistClassifier {
     /// Encode text as a single NSM-composed hypervector.
     ///
     /// Each word is decomposed via the lexicon into weighted prime activations,
-    /// then all word HVs are bundled (averaged) to produce the scenario HV.
+    /// then all word HVs are bundled to produce the scenario HV.
+    ///
+    /// Words in the first 6 positions receive 3x weight, capturing the
+    /// "It's [FRAME] to..." framing structure common in moral scenarios
+    /// (e.g. "It's wrong to steal" — "wrong" at position 2 is the key signal).
     fn encode_text(&self, text: &str) -> ContinuousHV {
         let words: Vec<&str> = text
             .split(|c: char| !c.is_alphanumeric() && c != '\'')
@@ -1291,22 +1299,26 @@ impl SpinozistClassifier {
             return ContinuousHV::zero(HDC_DIMENSION);
         }
 
-        let word_hvs: Vec<ContinuousHV> = words
-            .iter()
-            .map(|w| self.lexicon.encode_word(w, &self.basis))
-            .collect();
+        let mut weighted_hvs: Vec<ContinuousHV> = Vec::new();
+        let mut weights: Vec<f32> = Vec::new();
 
-        // Filter out zero vectors (stop words)
-        let non_zero: Vec<&ContinuousHV> = word_hvs
-            .iter()
-            .filter(|hv| hv.values.iter().any(|v| v.abs() > 1e-10))
-            .collect();
+        for (idx, word) in words.iter().enumerate() {
+            let hv = self.lexicon.encode_word(word, &self.basis);
+            // Skip zero vectors (stop words)
+            if hv.values.iter().any(|v| v.abs() > 1e-10) {
+                // Framing word position boost: first 6 words get 3x weight
+                let position_weight = if idx < 6 { 3.0 } else { 1.0 };
+                weighted_hvs.push(hv);
+                weights.push(position_weight);
+            }
+        }
 
-        if non_zero.is_empty() {
+        if weighted_hvs.is_empty() {
             return ContinuousHV::zero(HDC_DIMENSION);
         }
 
-        ContinuousHV::bundle(&non_zero)
+        let refs: Vec<&ContinuousHV> = weighted_hvs.iter().collect();
+        ContinuousHV::weighted_bundle(&refs, &weights)
     }
 
     /// Word-by-word incremental fingerprint accumulation with trajectory tracking.
@@ -1448,6 +1460,142 @@ impl SpinozistClassifier {
 
         // Set threshold at midpoint between good and bad means
         self.valence_threshold = ((good_mean + bad_mean) / 2.0).abs().max(0.005);
+    }
+
+    /// Compute 78D affect cross-term features from text.
+    ///
+    /// Returns 12 linear affect coordinates + 66 pairwise cross-terms (i < j).
+    pub fn compute_features(&self, text: &str) -> Vec<f32> {
+        let text_hv = self.encode_text(text);
+        let coords = self.affects.project_affects(&text_hv);
+
+        let n_features = NUM_AFFECTS + NUM_AFFECTS * (NUM_AFFECTS - 1) / 2; // 78
+        let mut features = Vec::with_capacity(n_features);
+
+        // 12 linear affect coordinates
+        for &c in &coords {
+            features.push(c);
+        }
+        // 66 cross-terms
+        for i in 0..NUM_AFFECTS {
+            for j in (i + 1)..NUM_AFFECTS {
+                features.push(coords[i] * coords[j]);
+            }
+        }
+        features
+    }
+
+    /// Train learned prototypes in 78D affect cross-term space.
+    ///
+    /// Phase 1: Build centroids by averaging features per class.
+    /// Phase 2: Retrain-adaptive — for each misclassified sample, push the
+    /// correct centroid toward the sample and pull the wrong centroid away.
+    pub fn train_prototypes(&mut self, samples: &[(String, MoralLabel)]) {
+        let n_features = NUM_AFFECTS + NUM_AFFECTS * (NUM_AFFECTS - 1) / 2; // 78
+        let mut accum = [
+            vec![0.0f32; n_features],
+            vec![0.0f32; n_features],
+            vec![0.0f32; n_features],
+        ];
+        let mut counts = [0usize; 3];
+
+        // Phase 1: Build centroids
+        let cached_features: Vec<(Vec<f32>, usize)> = samples
+            .iter()
+            .map(|(text, label)| {
+                let features = self.compute_features(text);
+                let idx = match label {
+                    MoralLabel::Good => 0,
+                    MoralLabel::Bad => 1,
+                    MoralLabel::Neutral => 2,
+                };
+                (features, idx)
+            })
+            .collect();
+
+        for (features, idx) in &cached_features {
+            for (i, &f) in features.iter().enumerate() {
+                accum[*idx][i] += f;
+            }
+            counts[*idx] += 1;
+        }
+
+        // Normalize to centroids
+        for c in 0..3 {
+            if counts[c] > 0 {
+                for v in &mut accum[c] {
+                    *v /= counts[c] as f32;
+                }
+            }
+        }
+
+        // Phase 2: Retrain-adaptive (push correct, pull wrong)
+        let lr = 0.01f32;
+        for _epoch in 0..10 {
+            for (features, correct_idx) in &cached_features {
+                // Find predicted (highest dot product)
+                let sims: Vec<f32> = (0..3)
+                    .map(|c| {
+                        features
+                            .iter()
+                            .zip(&accum[c])
+                            .map(|(a, b)| a * b)
+                            .sum::<f32>()
+                    })
+                    .collect();
+                let predicted_idx = sims
+                    .iter()
+                    .enumerate()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+
+                if predicted_idx != *correct_idx {
+                    // Push correct centroid toward sample, pull wrong centroid away
+                    for (i, &f) in features.iter().enumerate() {
+                        accum[*correct_idx][i] += lr * (f - accum[*correct_idx][i]);
+                        accum[predicted_idx][i] -= lr * (f - accum[predicted_idx][i]);
+                    }
+                }
+            }
+        }
+
+        self.learned_prototypes = Some(accum);
+    }
+
+    /// Classify text using learned 78D prototypes.
+    ///
+    /// Returns `(MoralVerdict, confidence)` where confidence is the margin
+    /// between the best and second-best class similarity, clamped to [0, 1].
+    /// Returns `(Neutral, 0.0)` if no prototypes have been trained.
+    pub fn classify_learned(&self, text: &str) -> (MoralVerdict, f32) {
+        let features = self.compute_features(text);
+        let protos = match &self.learned_prototypes {
+            Some(p) => p,
+            None => return (MoralVerdict::Neutral, 0.0),
+        };
+
+        let sims: Vec<f32> = (0..3)
+            .map(|c| {
+                features
+                    .iter()
+                    .zip(&protos[c])
+                    .map(|(a, b)| a * b)
+                    .sum::<f32>()
+            })
+            .collect();
+
+        let mut indices: Vec<usize> = (0..3).collect();
+        indices
+            .sort_by(|&a, &b| sims[b].partial_cmp(&sims[a]).unwrap_or(std::cmp::Ordering::Equal));
+
+        let margin = (sims[indices[0]] - sims[indices[1]]).max(0.0);
+        let verdict = match indices[0] {
+            0 => MoralVerdict::Good,
+            1 => MoralVerdict::Bad,
+            _ => MoralVerdict::Neutral,
+        };
+        (verdict, margin.min(1.0))
     }
 }
 

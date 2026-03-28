@@ -31,9 +31,12 @@ use symthaea_core::hdc::hdc_ltc_unified::{
 use symthaea_core::hdc::HDC_DIMENSION;
 
 use super::harmony_basis::HarmonyBasis;
-use super::moral_algebra::MoralVerdict;
+use super::moral_algebra::{ConsentState, MoralIntent, MoralVerdict};
+use super::moral_parser::MoralParser;
 use super::moral_prototypes::MoralLabel;
-use super::spinozist_geometry::{AffectBasis, NsmLexicon, NsmPrimeBasis, NUM_AFFECTS};
+use super::spinozist_geometry::{
+    AffectBasis, FluctuatioAnimi, MoralFingerprint, NsmLexicon, NsmPrimeBasis, NUM_AFFECTS,
+};
 
 /// Configuration for the CfC moral classifier.
 #[derive(Debug, Clone)]
@@ -65,8 +68,18 @@ impl Default for CfcMoralConfig {
     }
 }
 
-/// Number of Spinozist cross-term features: 12 linear + C(12,2) = 78.
-const NUM_SPINOZIST_FEATURES: usize = NUM_AFFECTS + (NUM_AFFECTS * (NUM_AFFECTS - 1)) / 2;
+/// Number of base Spinozist cross-term features: 12 linear + C(12,2) = 78.
+const NUM_BASE_SPINOZIST_FEATURES: usize = NUM_AFFECTS + (NUM_AFFECTS * (NUM_AFFECTS - 1)) / 2;
+
+/// Number of structural features from MoralParser: intent, consent, negation = 3.
+const NUM_STRUCTURAL_FEATURES: usize = 3;
+
+/// Number of tension features from FluctuatioAnimi: total_tension, max_pair_tension = 2.
+const NUM_TENSION_FEATURES: usize = 2;
+
+/// Total number of features: 78 base + 3 structural + 2 tension = 83.
+const NUM_SPINOZIST_FEATURES: usize =
+    NUM_BASE_SPINOZIST_FEATURES + NUM_STRUCTURAL_FEATURES + NUM_TENSION_FEATURES;
 
 /// Internals for Spinozist affect-space encoding.
 ///
@@ -77,6 +90,7 @@ struct SpinozistInternals {
     nsm_basis: NsmPrimeBasis,
     affect_basis: AffectBasis,
     lexicon: NsmLexicon,
+    parser: MoralParser,
 }
 
 impl SpinozistInternals {
@@ -85,14 +99,19 @@ impl SpinozistInternals {
         let nsm_basis = NsmPrimeBasis::new();
         let affect_basis = AffectBasis::new(&nsm_basis);
         let lexicon = NsmLexicon::new();
+        let parser = MoralParser::new();
         Self {
             nsm_basis,
             affect_basis,
             lexicon,
+            parser,
         }
     }
 
-    /// Encode full text as a single HV via lexicon word decomposition + bundle.
+    /// Encode full text as a single HV via lexicon word decomposition + weighted bundle.
+    ///
+    /// Words in the first 6 positions receive 3x weight, capturing the
+    /// "It's [FRAME] to..." framing structure common in moral scenarios.
     fn encode_text(&self, text: &str) -> ContinuousHV {
         let words: Vec<&str> = text
             .split(|c: char| !c.is_alphanumeric() && c != '\'')
@@ -103,22 +122,26 @@ impl SpinozistInternals {
             return ContinuousHV::zero(HDC_DIMENSION);
         }
 
-        let word_hvs: Vec<ContinuousHV> = words
-            .iter()
-            .map(|w| self.lexicon.encode_word(w, &self.nsm_basis))
-            .collect();
+        let mut weighted_hvs: Vec<ContinuousHV> = Vec::new();
+        let mut weights: Vec<f32> = Vec::new();
 
-        // Filter out zero vectors (stop words)
-        let non_zero: Vec<&ContinuousHV> = word_hvs
-            .iter()
-            .filter(|hv| hv.values.iter().any(|v| v.abs() > 1e-10))
-            .collect();
+        for (idx, word) in words.iter().enumerate() {
+            let hv = self.lexicon.encode_word(word, &self.nsm_basis);
+            // Skip zero vectors (stop words)
+            if hv.values.iter().any(|v| v.abs() > 1e-10) {
+                // Framing word position boost: first 6 words get 3x weight
+                let position_weight = if idx < 6 { 3.0 } else { 1.0 };
+                weighted_hvs.push(hv);
+                weights.push(position_weight);
+            }
+        }
 
-        if non_zero.is_empty() {
+        if weighted_hvs.is_empty() {
             return ContinuousHV::zero(HDC_DIMENSION);
         }
 
-        ContinuousHV::bundle(&non_zero)
+        let refs: Vec<&ContinuousHV> = weighted_hvs.iter().collect();
+        ContinuousHV::weighted_bundle(&refs, &weights)
     }
 
     /// Encode a single word as a CFC_NEURON_DIM-sized HV for Whiteheadian
@@ -215,12 +238,14 @@ impl CfcMoralClassifier {
     }
 
     /// Encode text into a morally-structured CfC input vector via Spinozist
-    /// affect geometry.
+    /// affect geometry, structural parsing, and fluctuatio tension.
     ///
     /// 1. Encode text via NsmLexicon → weighted bundle of prime HVs
     /// 2. Project onto 12 Spinozist affect dimensions
     /// 3. Build 78 features: 12 linear + 66 cross-terms (i < j)
-    /// 4. Project 78 features to CFC_NEURON_DIM via deterministic random matrix
+    /// 4. Add 3 structural features from MoralParser (intent, consent, negation)
+    /// 5. Add 2 tension features from FluctuatioAnimi
+    /// 6. Project 83 features to CFC_NEURON_DIM via deterministic random matrix
     ///
     /// Cross-terms capture interactions like HARM×CARE (moral tension),
     /// DECEPTION×CONSENT (consent violation), JOY×SADNESS (ambivalence).
@@ -231,7 +256,7 @@ impl CfcMoralClassifier {
         // Project onto 12 affect dimensions
         let coords = self.spinozist.affect_basis.project_affects(&text_hv);
 
-        // Build feature vector: 12 linear + 66 cross-terms (i<j) = 78 features
+        // Build feature vector: 12 linear + 66 cross-terms (i<j) = 78 base features
         let mut features = Vec::with_capacity(NUM_SPINOZIST_FEATURES);
         for &c in &coords {
             features.push(c);
@@ -241,6 +266,32 @@ impl CfcMoralClassifier {
                 features.push(coords[i] * coords[j]);
             }
         }
+
+        // Structural features from MoralParser (3 features)
+        let parsed = self.spinozist.parser.parse(text);
+        features.push(match parsed.intent {
+            MoralIntent::Good => 1.0f32,
+            MoralIntent::Bad => -1.0,
+            MoralIntent::Neutral | MoralIntent::Unknown => 0.0,
+        });
+        features.push(match parsed.consent {
+            ConsentState::Given => 1.0f32,
+            ConsentState::Implied => 0.5,
+            ConsentState::Absent => -0.5,
+            ConsentState::Denied => -1.0,
+        });
+        features.push(if parsed.has_negation { 1.0f32 } else { 0.0 });
+
+        // Tension features from FluctuatioAnimi (2 features)
+        let fingerprint = MoralFingerprint::from_coords(coords);
+        let fluctuatio = FluctuatioAnimi::from_fingerprint(&fingerprint);
+        features.push(fluctuatio.max_tension);
+        let max_pair_tension = fluctuatio
+            .tensions
+            .first()
+            .map(|t| t.2)
+            .unwrap_or(0.0);
+        features.push(max_pair_tension);
 
         // Project to CFC_NEURON_DIM via deterministic random matrix
         let mut result = vec![0.0f32; CFC_NEURON_DIM];
