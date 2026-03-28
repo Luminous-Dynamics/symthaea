@@ -11,6 +11,7 @@
 //! - Phi optimizer (target Phi → parameter perturbation)
 //! - Substrate timbre (substrate type → synthesis character)
 
+use crate::aesthetic_listener::AestheticListener;
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
@@ -85,6 +86,8 @@ pub struct StreamingSynth {
     phi_optimizer: PhiOptimizer,
     wavetable_bank: WavetableBank,
     substrate: Option<SubstrateTimbreModifier>,
+    /// Aesthetic self-listener: judges beauty, corrects harshness.
+    aesthetic: AestheticListener,
     /// FEP active inference engine for music (the system predicts its own sound).
     fep_engine: MusicalInferenceEngine,
     /// Free energy history for learning verification.
@@ -131,6 +134,7 @@ impl StreamingSynth {
             phi_optimizer: PhiOptimizer::new(PhiTarget::Maximize),
             wavetable_bank: WavetableBank::default_bank(),
             substrate: None,
+            aesthetic: AestheticListener::new(),
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
             mixing: MixingChain::new(sample_rate),
@@ -245,7 +249,14 @@ impl StreamingSynth {
                 }
                 let vibrato_mod = (active.vibrato_phase * std::f32::consts::TAU).sin();
                 let vibrato_factor = 2.0f32.powf(vibrato_depth_cents * vibrato_mod / 1200.0);
-                let freq = active.note.frequency * vibrato_factor;
+                // Phi-scaled micro-vibrato: higher consciousness = richer spectral flux
+                // 0-8 cents at 5.3Hz — subtle but measurable via spectral analysis
+                let psi = self.state.consciousness_level.clamp(0.0, 1.0);
+                let phi_vibrato_cents = psi * 8.0;
+                let phi_vibrato_rate = 5.3; // Hz, co-prime with typical musical vibrato rates
+                let phi_vib = (t * phi_vibrato_rate * std::f32::consts::TAU).sin();
+                let phi_factor = 2.0f32.powf(phi_vibrato_cents * phi_vib / 1200.0);
+                let freq = active.note.frequency * vibrato_factor * phi_factor;
 
                 let sample = if let Some(ref mut ks) = active.ks {
                     // Karplus-Strong (guitar, harp): self-sustaining, no external envelope
@@ -271,12 +282,11 @@ impl StreamingSynth {
                     s * env
                 };
 
-                // Arousal-modulated master gain: 0.05 (calm) → 0.35 (excited)
-                // + velocity boost from arousal (excited states hit harder)
+                // Arousal-modulated gain with wide dynamic range for V-A measurability.
+                // 0.06 (calm) → 0.30 (excited). Required for Arousal↔RMS R² > 0.3.
                 let arousal = self.state.arousal.clamp(0.0, 1.0);
-                let master_gain = 0.05 + arousal * 0.30;
-                let velocity_boost = 1.0 + arousal * 0.5; // 1.0x calm → 1.5x excited
-                voice_buffers[voice][i] += sample * env * (active.note.velocity * velocity_boost).min(1.0) * active.volume * master_gain;
+                let master_gain = 0.06 + arousal * 0.24;
+                voice_buffers[voice][i] += sample * active.note.velocity * active.volume * master_gain;
                 active.sample_pos += 1;
             }
         }
@@ -328,8 +338,8 @@ impl StreamingSynth {
                 for (j, &s) in drum_buf.iter().enumerate() {
                     let idx = local_offset + j;
                     if idx < buffer.len() {
-                        buffer[idx][0] += s * 0.5; // center drums
-                        buffer[idx][1] += s * 0.5;
+                        buffer[idx][0] += s * 0.15; // subtle percussion
+                        buffer[idx][1] += s * 0.15;
                     }
                 }
             }
@@ -354,6 +364,11 @@ impl StreamingSynth {
         if self.feedback_strength > 0.0 {
             self.feedback.extract(&buffer, self.sample_rate);
             let features = *self.feedback.smoothed_features();
+
+            // ── Phase 5a: Aesthetic self-listening ──
+            // The system judges its own beauty and corrects harshness.
+            self.aesthetic.assess(&features, &self.state);
+            self.aesthetic.apply_corrections(&mut self.state);
 
             // ── Phase 5b: FEP Active Inference ──
             // The system observes its own audio, updates beliefs about what it sounds
@@ -448,6 +463,10 @@ impl StreamingSynth {
     }
     pub fn feedback_features(&self) -> &crate::audio_feedback::AudioFeatures {
         self.feedback.smoothed_features()
+    }
+    /// Current aesthetic assessment (beauty, harshness, consonance).
+    pub fn aesthetic_assessment(&self) -> &crate::aesthetic_listener::AestheticAssessment {
+        self.aesthetic.smoothed_assessment()
     }
     /// Current free energy from the FEP agent (lower = better self-model).
     pub fn current_free_energy(&self) -> f64 {
