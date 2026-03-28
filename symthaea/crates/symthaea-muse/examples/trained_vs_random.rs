@@ -3,14 +3,17 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Compare compositions with random vs trained melody projections.
 //!
-//! Generates MIDI files across 4 emotional states for A/B comparison.
+//! Generates WAV audio + MIDI files across 4 emotional states for A/B listening.
+//! Output goes to `audio_output/` (WAV) and `target/trained-vs-random/` (MIDI).
 //!
 //! ```bash
 //! cargo run -p symthaea-muse --example trained_vs_random --release
+//! # Then play: audio_output/trained_joyful_neural.wav
 //! ```
 
 use std::path::Path;
 use symthaea_muse::{compose, MuseConfig, MusicalState, MelodyMode};
+use symthaea_muse::export::{export_wav, ExportFormat};
 use symthaea_muse::rhythm::compute_tempo;
 use symthaea_muse::critic::evaluate_composition;
 
@@ -19,8 +22,10 @@ fn main() {
     println!("  Trained vs Random: A/B Comparison");
     println!("═══════════════════════════════════════════════════════\n");
 
-    let out_dir = Path::new("target/trained-vs-random");
-    std::fs::create_dir_all(out_dir).ok();
+    let midi_dir = Path::new("target/trained-vs-random");
+    let audio_dir = Path::new("audio_output");
+    std::fs::create_dir_all(midi_dir).ok();
+    std::fs::create_dir_all(audio_dir).ok();
 
     let states: Vec<(&str, MusicalState)> = vec![
         ("serene", MusicalState {
@@ -72,13 +77,15 @@ fn main() {
         let classic = compose(&config_classic, state, 42);
         let classic_verdict = evaluate_composition(&classic, state);
         let tempo_c = compute_tempo(&config_classic, state);
-        classic.to_midi_file(&out_dir.join(format!("{name}_classic.mid")), tempo_c).ok();
+        classic.to_midi_file(&midi_dir.join(format!("{name}_classic.mid")), tempo_c).ok();
+        export_wav(&classic, &audio_dir.join(format!("trained_{name}_classic.wav")), ExportFormat::WavF32).ok();
 
         // Neural (trained projections loaded automatically in compose)
         let neural = compose(&config_neural, state, 42);
         let neural_verdict = evaluate_composition(&neural, state);
         let tempo_n = compute_tempo(&config_neural, state);
-        neural.to_midi_file(&out_dir.join(format!("{name}_neural.mid")), tempo_n).ok();
+        neural.to_midi_file(&midi_dir.join(format!("{name}_neural.mid")), tempo_n).ok();
+        export_wav(&neural, &audio_dir.join(format!("trained_{name}_neural.wav")), ExportFormat::WavF32).ok();
 
         let delta = neural_verdict.composite - classic_verdict.composite;
         println!(
@@ -94,7 +101,8 @@ fn main() {
     println!("  N = Neural (trained on MAESTRO)");
     println!("  note = note count, mel = melodic interest, comp = composite score");
     println!("  Δcomp = Neural minus Classic (positive = Neural better)\n");
-    println!("  MIDI files: target/trained-vs-random/");
-    println!("  Load {{state}}_classic.mid and {{state}}_neural.mid in a DAW.");
-    println!("  Listen for: phrases, contour, rhythmic coherence.\n");
+    println!("  WAV audio: audio_output/trained_{{state}}_{{classic,neural}}.wav");
+    println!("  MIDI data: target/trained-vs-random/{{state}}_{{classic,neural}}.mid\n");
+    println!("  Play the WAV files directly — no DAW needed.");
+    println!("  Listen for: phrases, contour, rhythmic coherence, emotional tone.\n");
 }
