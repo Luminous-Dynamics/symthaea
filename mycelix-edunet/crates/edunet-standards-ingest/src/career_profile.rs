@@ -74,6 +74,35 @@ pub struct CareerProfile {
     pub women_pct: Option<f32>,
     /// Underrepresented minorities in field (%, latest data).
     pub urm_pct: Option<f32>,
+
+    // ---- Enriched Data (O*NET-sourced, optional) ----
+    /// Top work activities (what you actually do day-to-day).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub work_activities: Vec<WorkActivity>,
+    /// Top required skills with importance ratings.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub required_skills: Vec<RequiredSkill>,
+    /// Key technologies, software, and equipment.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub technology_tools: Vec<TechnologyTool>,
+    /// Work value ratings (6 dimensions).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_values: Option<WorkValues>,
+    /// Work-life balance characteristics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_life_balance: Option<WorkLifeBalance>,
+    /// Typical career progression stages with salary.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub career_stages: Vec<CareerStage>,
+    /// Related occupations you could transition to.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub career_transitions: Vec<CareerTransition>,
+    /// If this is an emerging field, its metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emerging_field: Option<EmergingField>,
+    /// O*NET SOC code (e.g., "15-1252.00").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onet_soc_code: Option<String>,
 }
 
 /// BLS job growth outlook categories.
@@ -102,6 +131,98 @@ pub struct SdgGoal {
     pub title: String,
     /// How this field contributes.
     pub contribution: String,
+}
+
+// ============================================================
+// Enriched Career Intelligence Types
+// ============================================================
+
+/// What you actually do day-to-day (O*NET Generalized Work Activities).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkActivity {
+    pub name: String,
+    /// Importance (1.0-5.0).
+    pub importance: f32,
+}
+
+/// A skill required for the occupation (O*NET Skills taxonomy).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequiredSkill {
+    pub name: String,
+    /// Importance (1.0-5.0).
+    pub importance: f32,
+    /// Category.
+    pub category: String,
+}
+
+/// Specific technology, software, or equipment used.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TechnologyTool {
+    pub name: String,
+    /// "ProgrammingLanguage", "Software", "Platform", "Framework", "Equipment"
+    pub category: String,
+}
+
+/// O*NET Work Values (6 dimensions, each 1.0-5.0).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkValues {
+    pub achievement: f32,
+    pub independence: f32,
+    pub recognition: f32,
+    pub relationships: f32,
+    pub support: f32,
+    pub working_conditions: f32,
+}
+
+/// Work-life balance characteristics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkLifeBalance {
+    pub hours_per_week: Option<f32>,
+    /// 0.0-1.0 (1.0 = fully flexible).
+    pub schedule_flexibility: Option<f32>,
+    /// 0.0-1.0 (1.0 = fully remote).
+    pub remote_availability: Option<f32>,
+    /// 1-5 (1=sedentary, 5=very heavy).
+    pub physical_demands: Option<u8>,
+    /// 1-5 subjective stress level.
+    pub stress_level: Option<u8>,
+}
+
+/// A stage in a career progression timeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CareerStage {
+    pub title: String,
+    pub years_experience: u8,
+    pub typical_salary_usd: u32,
+    pub key_responsibilities: Vec<String>,
+}
+
+/// A related occupation you could transition to.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CareerTransition {
+    pub target_field: String,
+    /// Skill overlap (0-100%).
+    pub skill_overlap_pct: u8,
+    pub gap_skills: Vec<String>,
+    pub transition_months: Option<u8>,
+    /// "Higher", "Similar", "Lower"
+    pub salary_direction: String,
+}
+
+/// An emerging career field not yet in traditional databases.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmergingField {
+    pub parent_fields: Vec<String>,
+    /// "Nascent", "Emerging", "Establishing", "Maturing"
+    pub maturity: String,
+    pub estimated_practitioners: Option<u32>,
+    pub emergence_year: Option<u16>,
+    /// Projected 5-year growth multiplier (e.g., 3.0 = triple).
+    pub growth_multiplier_5yr: Option<f32>,
+    pub key_organizations: Vec<String>,
+    pub foundation_skills: Vec<String>,
+    /// Connection to Luminous Dynamics / Symthaea.
+    pub luminous_connection: Option<String>,
 }
 
 impl CareerProfile {
@@ -139,7 +260,20 @@ impl CareerProfile {
 /// Embedded career profiles for major fields.
 /// Data sourced from BLS Occupational Outlook Handbook (2024-2034 projections),
 /// O*NET, NSF NCSES, Georgetown CEW.
+/// Default values for the enriched fields (used by profiles that haven't been enriched yet).
+fn enriched_defaults() -> (Vec<WorkActivity>, Vec<RequiredSkill>, Vec<TechnologyTool>, Option<WorkValues>, Option<WorkLifeBalance>, Vec<CareerStage>, Vec<CareerTransition>, Option<EmergingField>, Option<String>) {
+    (vec![], vec![], vec![], None, None, vec![], vec![], None, None)
+}
+
+/// All career profiles — established + emerging fields.
+pub fn all_career_profiles() -> Vec<CareerProfile> {
+    let mut all = embedded_career_profiles();
+    all.extend(embedded_emerging_fields());
+    all
+}
+
 pub fn embedded_career_profiles() -> Vec<CareerProfile> {
+    let d = enriched_defaults;
     vec![
         CareerProfile {
             field: "Software Development".into(),
@@ -167,6 +301,51 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(3.2),
             women_pct: Some(22.0),
             urm_pct: Some(15.0),
+            // ---- Enriched ----
+            work_activities: vec![
+                WorkActivity { name: "Analyzing Data or Information".into(), importance: 4.5 },
+                WorkActivity { name: "Making Decisions and Solving Problems".into(), importance: 4.3 },
+                WorkActivity { name: "Thinking Creatively".into(), importance: 4.2 },
+                WorkActivity { name: "Updating and Using Relevant Knowledge".into(), importance: 4.5 },
+                WorkActivity { name: "Interacting With Computers".into(), importance: 4.8 },
+            ],
+            required_skills: vec![
+                RequiredSkill { name: "Programming".into(), importance: 4.8, category: "Technical".into() },
+                RequiredSkill { name: "Complex Problem Solving".into(), importance: 4.5, category: "CrossFunctional".into() },
+                RequiredSkill { name: "Critical Thinking".into(), importance: 4.3, category: "Basic".into() },
+                RequiredSkill { name: "Systems Analysis".into(), importance: 4.0, category: "Technical".into() },
+                RequiredSkill { name: "Active Learning".into(), importance: 4.2, category: "Basic".into() },
+            ],
+            technology_tools: vec![
+                TechnologyTool { name: "Python".into(), category: "ProgrammingLanguage".into() },
+                TechnologyTool { name: "JavaScript".into(), category: "ProgrammingLanguage".into() },
+                TechnologyTool { name: "Git".into(), category: "Software".into() },
+                TechnologyTool { name: "Docker".into(), category: "Platform".into() },
+                TechnologyTool { name: "AWS/Azure/GCP".into(), category: "Platform".into() },
+                TechnologyTool { name: "SQL".into(), category: "ProgrammingLanguage".into() },
+            ],
+            work_values: Some(WorkValues {
+                achievement: 4.2, independence: 3.8, recognition: 3.5,
+                relationships: 3.0, support: 3.3, working_conditions: 4.5,
+            }),
+            work_life_balance: Some(WorkLifeBalance {
+                hours_per_week: Some(40.0), schedule_flexibility: Some(0.8),
+                remote_availability: Some(0.85), physical_demands: Some(1),
+                stress_level: Some(3),
+            }),
+            career_stages: vec![
+                CareerStage { title: "Junior Developer".into(), years_experience: 0, typical_salary_usd: 79_000, key_responsibilities: vec!["Write code under guidance".into(), "Fix bugs".into(), "Write tests".into()] },
+                CareerStage { title: "Mid-Level Developer".into(), years_experience: 3, typical_salary_usd: 110_000, key_responsibilities: vec!["Own features end-to-end".into(), "Code review".into(), "Mentor juniors".into()] },
+                CareerStage { title: "Senior Developer".into(), years_experience: 6, typical_salary_usd: 150_000, key_responsibilities: vec!["Architecture decisions".into(), "Technical leadership".into(), "Cross-team collaboration".into()] },
+                CareerStage { title: "Staff/Principal Engineer".into(), years_experience: 10, typical_salary_usd: 200_000, key_responsibilities: vec!["Org-wide technical strategy".into(), "Solve ambiguous problems".into(), "Define standards".into()] },
+            ],
+            career_transitions: vec![
+                CareerTransition { target_field: "Data Science & AI".into(), skill_overlap_pct: 72, gap_skills: vec!["Statistics".into(), "ML algorithms".into()], transition_months: Some(6), salary_direction: "Similar".into() },
+                CareerTransition { target_field: "Product Management".into(), skill_overlap_pct: 55, gap_skills: vec!["Business strategy".into(), "User research".into()], transition_months: Some(12), salary_direction: "Higher".into() },
+                CareerTransition { target_field: "Cybersecurity".into(), skill_overlap_pct: 65, gap_skills: vec!["Network security".into(), "Threat modeling".into()], transition_months: Some(6), salary_direction: "Similar".into() },
+            ],
+            emerging_field: None,
+            onet_soc_code: Some("15-1252.00".into()),
         },
         CareerProfile {
             field: "Data Science & AI".into(),
@@ -195,6 +374,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(4.5),
             women_pct: Some(27.0),
             urm_pct: Some(12.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Healthcare (Nursing)".into(),
@@ -222,6 +404,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(5.0),
             women_pct: Some(85.0),
             urm_pct: Some(28.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Education (K-12 Teaching)".into(),
@@ -250,6 +435,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(8.0),
             women_pct: Some(76.0),
             urm_pct: Some(22.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Finance & Economics".into(),
@@ -277,6 +465,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(4.0),
             women_pct: Some(42.0),
             urm_pct: Some(18.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Scientific Research".into(),
@@ -306,6 +497,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(12.0),
             women_pct: Some(35.0),
             urm_pct: Some(14.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Legal Professions".into(),
@@ -333,6 +527,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(6.5),
             women_pct: Some(38.0),
             urm_pct: Some(16.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Creative Arts & Design".into(),
@@ -360,6 +557,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(9.0),
             women_pct: Some(55.0),
             urm_pct: Some(20.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Environmental Science & Sustainability".into(),
@@ -390,6 +590,9 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(7.0),
             women_pct: Some(45.0),
             urm_pct: Some(12.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
         },
         CareerProfile {
             field: "Cybersecurity".into(),
@@ -417,6 +620,153 @@ pub fn embedded_career_profiles() -> Vec<CareerProfile> {
             payback_years: Some(3.5),
             women_pct: Some(24.0),
             urm_pct: Some(18.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: None, onet_soc_code: None,
+        },
+    ]
+}
+
+/// Emerging career fields not yet in traditional databases.
+pub fn embedded_emerging_fields() -> Vec<CareerProfile> {
+    vec![
+        CareerProfile {
+            field: "AI Safety & Alignment".into(),
+            median_salary_usd: Some(145_000), entry_salary_usd: Some(90_000), senior_salary_usd: Some(250_000),
+            employment_thousands: Some(5), growth_rate_pct: Some(50.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(2), typical_education: "Master's/PhD".into(), years_of_education: Some(20),
+            related_cip_codes: vec!["11.0701".into(), "42.0101".into()],
+            industry_gdp_billions: None, rd_funding_billions: Some(2.0), global_market_billions: Some(8.0),
+            automation_risk: Some(0.01), ai_augmentation: Some(0.90),
+            sdg_alignment: vec![SdgGoal { number: 16, title: "Peace, Justice & Strong Institutions".into(), contribution: "Ensuring AI systems are safe and aligned with human values".into() }],
+            societal_impact_score: Some(95), degree_roi_20yr_thousands: Some(1_200), payback_years: Some(4.0),
+            women_pct: Some(25.0), urm_pct: Some(10.0),
+            work_activities: vec![WorkActivity { name: "Analyzing Data or Information".into(), importance: 4.8 }, WorkActivity { name: "Thinking Creatively".into(), importance: 4.5 }],
+            required_skills: vec![RequiredSkill { name: "Machine Learning".into(), importance: 4.8, category: "Technical".into() }, RequiredSkill { name: "Ethics/Philosophy".into(), importance: 4.5, category: "CrossFunctional".into() }],
+            technology_tools: vec![TechnologyTool { name: "Python".into(), category: "ProgrammingLanguage".into() }, TechnologyTool { name: "PyTorch".into(), category: "Framework".into() }],
+            work_values: Some(WorkValues { achievement: 4.8, independence: 4.0, recognition: 3.5, relationships: 3.0, support: 3.2, working_conditions: 4.0 }),
+            work_life_balance: Some(WorkLifeBalance { hours_per_week: Some(45.0), schedule_flexibility: Some(0.7), remote_availability: Some(0.8), physical_demands: Some(1), stress_level: Some(3) }),
+            career_stages: vec![CareerStage { title: "Research Engineer".into(), years_experience: 0, typical_salary_usd: 90_000, key_responsibilities: vec!["Implement safety evaluations".into()] }, CareerStage { title: "Senior Researcher".into(), years_experience: 5, typical_salary_usd: 180_000, key_responsibilities: vec!["Lead alignment research".into()] }],
+            career_transitions: vec![CareerTransition { target_field: "Data Science & AI".into(), skill_overlap_pct: 85, gap_skills: vec![], transition_months: Some(3), salary_direction: "Similar".into() }],
+            emerging_field: Some(EmergingField { parent_fields: vec!["Data Science & AI".into(), "Philosophy".into()], maturity: "Nascent".into(), estimated_practitioners: Some(5_000), emergence_year: Some(2016), growth_multiplier_5yr: Some(5.0), key_organizations: vec!["Anthropic".into(), "OpenAI".into(), "DeepMind".into(), "MIRI".into()], foundation_skills: vec!["Machine Learning".into(), "Ethics".into(), "Mathematics".into()], luminous_connection: Some("Core concern of Symthaea's moral algebra and ethics engine".into()) }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Consciousness Computing".into(),
+            median_salary_usd: Some(120_000), entry_salary_usd: Some(75_000), senior_salary_usd: Some(200_000),
+            employment_thousands: Some(1), growth_rate_pct: Some(100.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(1), typical_education: "PhD".into(), years_of_education: Some(22),
+            related_cip_codes: vec!["11.0701".into(), "42.0101".into(), "38.0101".into()],
+            industry_gdp_billions: None, rd_funding_billions: Some(0.5), global_market_billions: Some(2.0),
+            automation_risk: Some(0.01), ai_augmentation: Some(0.95),
+            sdg_alignment: vec![SdgGoal { number: 9, title: "Industry, Innovation & Infrastructure".into(), contribution: "Next-generation computing paradigm".into() }, SdgGoal { number: 3, title: "Good Health & Well-being".into(), contribution: "Consciousness measurement for clinical applications".into() }],
+            societal_impact_score: Some(90), degree_roi_20yr_thousands: None, payback_years: None,
+            women_pct: Some(20.0), urm_pct: Some(8.0),
+            work_activities: vec![WorkActivity { name: "Thinking Creatively".into(), importance: 5.0 }, WorkActivity { name: "Analyzing Data or Information".into(), importance: 4.8 }],
+            required_skills: vec![RequiredSkill { name: "HDC/Hyperdimensional Computing".into(), importance: 5.0, category: "Technical".into() }, RequiredSkill { name: "IIT/Phi Measurement".into(), importance: 4.8, category: "Technical".into() }, RequiredSkill { name: "Rust Programming".into(), importance: 4.5, category: "Technical".into() }],
+            technology_tools: vec![TechnologyTool { name: "Rust".into(), category: "ProgrammingLanguage".into() }, TechnologyTool { name: "Python/PyPhi".into(), category: "Framework".into() }, TechnologyTool { name: "NixOS".into(), category: "Platform".into() }],
+            work_values: Some(WorkValues { achievement: 5.0, independence: 4.5, recognition: 3.0, relationships: 3.5, support: 2.5, working_conditions: 3.5 }),
+            work_life_balance: Some(WorkLifeBalance { hours_per_week: Some(50.0), schedule_flexibility: Some(0.6), remote_availability: Some(0.9), physical_demands: Some(1), stress_level: Some(3) }),
+            career_stages: vec![CareerStage { title: "Research Associate".into(), years_experience: 0, typical_salary_usd: 75_000, key_responsibilities: vec!["Implement HDC models".into()] }, CareerStage { title: "Lead Researcher".into(), years_experience: 5, typical_salary_usd: 150_000, key_responsibilities: vec!["Design consciousness architectures".into()] }],
+            career_transitions: vec![],
+            emerging_field: Some(EmergingField { parent_fields: vec!["Computer Science".into(), "Neuroscience".into(), "Philosophy".into()], maturity: "Nascent".into(), estimated_practitioners: Some(500), emergence_year: Some(2020), growth_multiplier_5yr: Some(10.0), key_organizations: vec!["Luminous Dynamics".into(), "Allen Institute".into(), "Tononi Lab (UW)".into()], foundation_skills: vec!["HDC".into(), "IIT".into(), "CfC/LTC".into(), "Rust".into(), "Nix".into()], luminous_connection: Some("This IS Symthaea — the Holographic Liquid Brain. Our core domain.".into()) }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Climate Technology".into(),
+            median_salary_usd: Some(95_000), entry_salary_usd: Some(60_000), senior_salary_usd: Some(170_000),
+            employment_thousands: Some(50), growth_rate_pct: Some(25.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(10), typical_education: "Bachelor's/Master's".into(), years_of_education: Some(18),
+            related_cip_codes: vec!["03.0104".into(), "14.0101".into()],
+            industry_gdp_billions: Some(45.0), rd_funding_billions: Some(25.0), global_market_billions: Some(700.0),
+            automation_risk: Some(0.05), ai_augmentation: Some(0.70),
+            sdg_alignment: vec![SdgGoal { number: 13, title: "Climate Action".into(), contribution: "Direct climate intervention".into() }, SdgGoal { number: 7, title: "Affordable & Clean Energy".into(), contribution: "Renewable energy technology".into() }],
+            societal_impact_score: Some(98), degree_roi_20yr_thousands: Some(500), payback_years: Some(6.0),
+            women_pct: Some(35.0), urm_pct: Some(15.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: Some(EmergingField { parent_fields: vec!["Environmental Science".into(), "Engineering".into()], maturity: "Emerging".into(), estimated_practitioners: Some(200_000), emergence_year: Some(2015), growth_multiplier_5yr: Some(3.0), key_organizations: vec!["Tesla".into(), "Breakthrough Energy".into(), "IEA".into()], foundation_skills: vec!["Engineering".into(), "Data Science".into(), "Policy".into()], luminous_connection: Some("Mycelix climate cluster tracks carbon and renewable energy".into()) }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Quantum Computing".into(),
+            median_salary_usd: Some(140_000), entry_salary_usd: Some(85_000), senior_salary_usd: Some(230_000),
+            employment_thousands: Some(10), growth_rate_pct: Some(30.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(3), typical_education: "PhD".into(), years_of_education: Some(22),
+            related_cip_codes: vec!["40.0801".into(), "11.0701".into()],
+            industry_gdp_billions: None, rd_funding_billions: Some(5.0), global_market_billions: Some(65.0),
+            automation_risk: Some(0.02), ai_augmentation: Some(0.80),
+            sdg_alignment: vec![SdgGoal { number: 9, title: "Industry, Innovation & Infrastructure".into(), contribution: "Next-generation computing".into() }],
+            societal_impact_score: Some(80), degree_roi_20yr_thousands: Some(900), payback_years: Some(5.0),
+            women_pct: Some(20.0), urm_pct: Some(10.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: Some(EmergingField { parent_fields: vec!["Physics".into(), "Computer Science".into()], maturity: "Emerging".into(), estimated_practitioners: Some(15_000), emergence_year: Some(2019), growth_multiplier_5yr: Some(4.0), key_organizations: vec!["IBM".into(), "Google Quantum AI".into(), "IonQ".into(), "Rigetti".into()], foundation_skills: vec!["Quantum Mechanics".into(), "Linear Algebra".into(), "Programming".into()], luminous_connection: Some("Symthaea's SubstrateType::QuantumComputer models quantum consciousness substrates".into()) }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Decentralized Governance".into(),
+            median_salary_usd: Some(100_000), entry_salary_usd: Some(65_000), senior_salary_usd: Some(180_000),
+            employment_thousands: Some(20), growth_rate_pct: Some(20.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(5), typical_education: "Bachelor's".into(), years_of_education: Some(16),
+            related_cip_codes: vec!["11.0701".into(), "45.1001".into()],
+            industry_gdp_billions: None, rd_funding_billions: Some(1.0), global_market_billions: Some(30.0),
+            automation_risk: Some(0.05), ai_augmentation: Some(0.75),
+            sdg_alignment: vec![SdgGoal { number: 16, title: "Peace, Justice & Strong Institutions".into(), contribution: "Decentralized democratic infrastructure".into() }, SdgGoal { number: 10, title: "Reduced Inequalities".into(), contribution: "Community-owned governance systems".into() }],
+            societal_impact_score: Some(92), degree_roi_20yr_thousands: Some(600), payback_years: Some(5.0),
+            women_pct: Some(28.0), urm_pct: Some(18.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: Some(EmergingField { parent_fields: vec!["Computer Science".into(), "Political Science".into()], maturity: "Emerging".into(), estimated_practitioners: Some(50_000), emergence_year: Some(2017), growth_multiplier_5yr: Some(3.0), key_organizations: vec!["Holochain/Holo".into(), "Ethereum Foundation".into(), "RadicalxChange".into()], foundation_skills: vec!["Distributed Systems".into(), "Cryptography".into(), "Governance Theory".into()], luminous_connection: Some("Mycelix IS decentralized governance — 16 Holochain cluster architecture".into()) }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Space Economy".into(),
+            median_salary_usd: Some(115_000), entry_salary_usd: Some(70_000), senior_salary_usd: Some(190_000),
+            employment_thousands: Some(80), growth_rate_pct: Some(15.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(8), typical_education: "Bachelor's/Master's".into(), years_of_education: Some(18),
+            related_cip_codes: vec!["14.0201".into(), "40.0801".into()],
+            industry_gdp_billions: Some(469.0), rd_funding_billions: Some(30.0), global_market_billions: Some(630.0),
+            automation_risk: Some(0.08), ai_augmentation: Some(0.65),
+            sdg_alignment: vec![SdgGoal { number: 9, title: "Industry, Innovation & Infrastructure".into(), contribution: "Space-based infrastructure".into() }],
+            societal_impact_score: Some(75), degree_roi_20yr_thousands: Some(700), payback_years: Some(5.0),
+            women_pct: Some(24.0), urm_pct: Some(12.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: Some(EmergingField { parent_fields: vec!["Aerospace Engineering".into(), "Physics".into()], maturity: "Establishing".into(), estimated_practitioners: Some(300_000), emergence_year: Some(2012), growth_multiplier_5yr: Some(2.0), key_organizations: vec!["SpaceX".into(), "Blue Origin".into(), "NASA".into(), "ESA".into()], foundation_skills: vec!["Aerospace Engineering".into(), "Physics".into(), "Systems Engineering".into()], luminous_connection: Some("Mycelix space cluster + multiworld-sim for interplanetary infrastructure".into()) }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Longevity & Biotech".into(),
+            median_salary_usd: Some(105_000), entry_salary_usd: Some(65_000), senior_salary_usd: Some(200_000),
+            employment_thousands: Some(30), growth_rate_pct: Some(20.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(5), typical_education: "PhD".into(), years_of_education: Some(22),
+            related_cip_codes: vec!["26.0101".into(), "26.1201".into()],
+            industry_gdp_billions: None, rd_funding_billions: Some(15.0), global_market_billions: Some(110.0),
+            automation_risk: Some(0.03), ai_augmentation: Some(0.85),
+            sdg_alignment: vec![SdgGoal { number: 3, title: "Good Health & Well-being".into(), contribution: "Extending healthy human lifespan".into() }],
+            societal_impact_score: Some(88), degree_roi_20yr_thousands: Some(450), payback_years: Some(8.0),
+            women_pct: Some(45.0), urm_pct: Some(12.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: Some(EmergingField { parent_fields: vec!["Biology".into(), "Medicine".into()], maturity: "Emerging".into(), estimated_practitioners: Some(50_000), emergence_year: Some(2013), growth_multiplier_5yr: Some(3.5), key_organizations: vec!["Altos Labs".into(), "Calico (Alphabet)".into(), "Unity Biotechnology".into()], foundation_skills: vec!["Molecular Biology".into(), "Bioinformatics".into(), "Statistics".into()], luminous_connection: None }),
+            onet_soc_code: None,
+        },
+        CareerProfile {
+            field: "Synthetic Biology".into(),
+            median_salary_usd: Some(100_000), entry_salary_usd: Some(60_000), senior_salary_usd: Some(180_000),
+            employment_thousands: Some(15), growth_rate_pct: Some(25.0), growth_outlook: GrowthOutlook::MuchFaster,
+            annual_openings_thousands: Some(3), typical_education: "PhD".into(), years_of_education: Some(22),
+            related_cip_codes: vec!["26.0101".into(), "14.0501".into()],
+            industry_gdp_billions: None, rd_funding_billions: Some(8.0), global_market_billions: Some(35.0),
+            automation_risk: Some(0.05), ai_augmentation: Some(0.80),
+            sdg_alignment: vec![SdgGoal { number: 2, title: "Zero Hunger".into(), contribution: "Engineered crops and food production".into() }, SdgGoal { number: 3, title: "Good Health & Well-being".into(), contribution: "Engineered therapeutics and diagnostics".into() }],
+            societal_impact_score: Some(85), degree_roi_20yr_thousands: Some(400), payback_years: Some(9.0),
+            women_pct: Some(40.0), urm_pct: Some(14.0),
+            work_activities: vec![], required_skills: vec![], technology_tools: vec![],
+            work_values: None, work_life_balance: None, career_stages: vec![],
+            career_transitions: vec![], emerging_field: Some(EmergingField { parent_fields: vec!["Biology".into(), "Engineering".into()], maturity: "Emerging".into(), estimated_practitioners: Some(30_000), emergence_year: Some(2010), growth_multiplier_5yr: Some(3.0), key_organizations: vec!["Ginkgo Bioworks".into(), "Zymergen".into(), "iGEM Foundation".into()], foundation_skills: vec!["Molecular Biology".into(), "Genetic Engineering".into(), "Bioinformatics".into()], luminous_connection: None }),
+            onet_soc_code: None,
         },
     ]
 }
@@ -512,5 +862,42 @@ mod tests {
         assert_eq!(format_thousands(132270), "132,270");
         assert_eq!(format_thousands(1000), "1,000");
         assert_eq!(format_thousands(500), "500");
+    }
+
+    #[test]
+    fn test_all_profiles_includes_emerging() {
+        let all = all_career_profiles();
+        assert!(all.len() > embedded_career_profiles().len());
+        assert!(all.iter().any(|p| p.emerging_field.is_some()));
+    }
+
+    #[test]
+    fn test_software_dev_enriched() {
+        let profiles = embedded_career_profiles();
+        let sw = profiles.iter().find(|p| p.field.contains("Software")).unwrap();
+        assert!(!sw.work_activities.is_empty());
+        assert!(!sw.required_skills.is_empty());
+        assert!(!sw.technology_tools.is_empty());
+        assert!(sw.work_values.is_some());
+        assert!(sw.work_life_balance.is_some());
+        assert!(!sw.career_stages.is_empty());
+        assert!(!sw.career_transitions.is_empty());
+        assert!(sw.onet_soc_code.is_some());
+    }
+
+    #[test]
+    fn test_emerging_field_consciousness() {
+        let emerging = embedded_emerging_fields();
+        let cc = emerging.iter().find(|p| p.field.contains("Consciousness")).unwrap();
+        assert!(cc.emerging_field.is_some());
+        let ef = cc.emerging_field.as_ref().unwrap();
+        assert!(ef.luminous_connection.is_some());
+        assert!(ef.maturity == "Nascent");
+    }
+
+    #[test]
+    fn test_emerging_fields_count() {
+        let emerging = embedded_emerging_fields();
+        assert_eq!(emerging.len(), 8);
     }
 }
