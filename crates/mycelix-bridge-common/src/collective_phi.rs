@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! # Collective Phi — Group Consciousness Measurement
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Collective Phi — Group Consciousness Measurement
 //!
 //! Measures whether a group of agents is *thinking together* (high integration)
 //! or just averaging independent opinions (low integration).

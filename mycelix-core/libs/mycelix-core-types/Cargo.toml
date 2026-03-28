@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Core types for the Mycelix ecosystem - K-Vector, E/N/M Classification, GIS v4 types"
 license = "MIT OR Apache-2.0"
+authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
 repository = "https://github.com/luminous-dynamics/mycelix"
+readme = "README.md"
 
 [lib]
 name = "mycelix_core_types"

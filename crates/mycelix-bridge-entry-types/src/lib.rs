@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Mycelix Bridge Entry Types — Shared DHT entry structs for cluster bridges
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Mycelix Bridge Entry Types — Shared DHT entry structs for cluster bridges
 //!
 //! Provides the canonical entry types stored on the DHT by both the Commons
 //! and Civic bridge integrity zomes. Each integrity zome wraps these in its

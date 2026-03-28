@@ -1,0 +1,3693 @@
+\documentclass[12pt]{book}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{epigraph}
+\usepackage{csquotes}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=green!40!black,
+  urlcolor=blue!60!black
+}
+
+\lstset{
+  language=C,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{red!60!black},
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!5},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  xleftmargin=2em
+}
+
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}{Proposition}[chapter]
+
+\pagestyle{fancy}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[RE]{\leftmark}
+\fancyhead[LO]{\rightmark}
+
+\title{\Huge\textbf{The Mycelial Web} \\[1em]
+\Large Trust-Weighted Decentralized Governance \\
+for Post-State Civilization}
+\author{Tristan Stoltz \\ Luminous Dynamics}
+\date{2026}
+
+\begin{document}
+
+\frontmatter
+\maketitle
+
+\tableofcontents
+
+\chapter{Preface}
+
+The nation-state is approximately four centuries old. In that span, it has organized
+humanity's largest cooperative endeavors---and its most catastrophic failures. The
+Westphalian model assumes territorial sovereignty, monopoly on violence, and
+hierarchical administration. These assumptions are increasingly inadequate for
+problems that are global, networked, and ecological in nature.
+
+This book presents Mycelix: a decentralized governance and services platform built
+on Holochain's agent-centric architecture. With 133 zomes across 16 cluster DNAs,
+Mycelix implements a \emph{fractal civic operating system}---a CivOS---that replaces
+state hierarchy with mycelial networks of mutual aid, earned trust, and commons
+stewardship.
+
+The central innovation is \emph{trust-weighted governance}: participation is not
+determined by citizenship, wealth, or age, but by a 4-dimensional profile measuring
+identity verification, reputation history, community trust, and domain engagement.
+This profile gates access to five progressive tiers---Observer, Participant, Citizen,
+Steward, and Guardian---each with increasing governance capabilities and vote weight.
+
+Mycelix is implemented in approximately 785,000 lines of Rust, with SDKs in
+TypeScript (226K LOC), Python, and WebAssembly. It is tested by over 8,600
+automated tests across all clusters, including sweettest conductor integration tests,
+property-based tests, and cross-cluster bridge verification.
+
+This book is for system architects, governance theorists, cooperative organizers,
+and anyone who believes that human coordination can evolve beyond the territorial
+state.\footnote{The philosophical framework underlying these design choices, including the concept of Evolving Resonant Co-creationism and the Seven Primary Harmonies, is elaborated in Stoltz (2026), \textit{Evolving Resonant Co-creationism: A Philosophical Guide to Making It Better, Infinitely}.}
+
+\mainmatter
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% PART I: FOUNDATIONS
+%% ════════════════════════════════════════════════════════════════════════════
+
+\part{Foundations}
+
+\chapter{Why Decentralized Governance?}
+
+\epigraph{Neither the life of an individual nor the history of a society can be
+understood without understanding both.}{C.\ Wright Mills, \textit{The Sociological
+Imagination} (1959)}
+
+\section{The Crisis of Centralized Coordination}
+
+The 21st century confronts humanity with coordination problems that centralized
+institutions were never designed to solve. Climate change requires cooperation
+among 195 sovereign states whose incentives are structurally misaligned. Pandemic
+response requires information sharing across jurisdictions that treat data as
+sovereign territory. Supply chain resilience requires trust among parties who
+have no shared legal framework.
+
+These are not merely technical problems. They are \emph{governance} problems---failures
+of the mechanisms by which humans make collective decisions and enforce collective
+commitments. The nation-state, optimized for territorial control and industrial
+economy, is structurally incapable of governing networked, ecological, planetary
+systems.
+
+\section{Ostrom and the Commons}
+
+Elinor Ostrom's work on common-pool resource management demonstrated that
+communities can govern shared resources without either state regulation or
+market privatization. Her eight design principles for long-enduring commons
+institutions provide the theoretical foundation for Mycelix:
+
+\begin{enumerate}
+  \item \textbf{Clearly defined boundaries} --- Mycelix implements this through
+    identity verification and the \texttt{ConsciousnessProfile}, which defines
+    who can participate and at what level.
+  \item \textbf{Proportional equivalence between benefits and costs} --- the
+    trust-weighted participation system ensures that governance power scales with
+    demonstrated commitment (engagement dimension).
+  \item \textbf{Collective-choice arrangements} --- the Governance cluster
+    implements proposals, voting, and constitutional mechanisms where all
+    affected parties can participate.
+  \item \textbf{Monitoring} --- Holochain's agent-centric architecture provides
+    inherent auditability: every agent's source chain is a tamper-evident log.
+  \item \textbf{Graduated sanctions} --- reputation decay (0.998\textsuperscript{days}),
+    slashing (0.5$\times$), and blacklisting (threshold $<0.05$) implement
+    progressive enforcement.
+  \item \textbf{Conflict-resolution mechanisms} --- the Justice domain in the Civic
+    cluster provides structured dispute resolution.
+  \item \textbf{Minimal recognition of rights to organize} --- Mycelix operates
+    on Holochain, which requires no permission from any authority to deploy.
+  \item \textbf{Nested enterprises} --- the fractal cluster architecture
+    (16 clusters, each with multiple domain zomes) implements precisely this
+    principle of nested, polycentric governance.
+\end{enumerate}
+
+\section{Beyond the Nation-State}
+
+The nation-state model assumes several properties that Mycelix explicitly rejects:
+
+\begin{description}
+  \item[Territorial sovereignty] Mycelix governance is not tied to geographic
+    territory. A water stewardship council in the Commons cluster governs a
+    watershed, not a political boundary.
+  \item[Monopoly on legitimate violence] Mycelix replaces coercion with
+    reputation consequences. The only ``force'' is reduced governance
+    participation for those who lose community trust.
+  \item[Hierarchical administration] Mycelix is fractal: every cluster is
+    self-governing, connected to others through typed bridge dispatch rather
+    than bureaucratic hierarchy.
+  \item[Citizenship by birth or naturalization] Mycelix membership is earned
+    through demonstrated identity, reputation, community trust, and engagement.
+    The \texttt{ConsciousnessTier} system replaces birthright citizenship with
+    progressive, earned governance capacity.
+\end{description}
+
+\section{The Mycelial Metaphor}
+
+Mycelium---the vegetative body of fungi---forms vast underground networks that
+connect individual organisms into cooperative webs. A single mycelial network
+can span hectares, sharing nutrients between trees, signaling threats, and
+decomposing dead matter into fertile soil.
+
+Mycelix adopts this metaphor deliberately:
+
+\begin{itemize}
+  \item \textbf{No central node}: Like mycelium, Mycelix has no server, no
+    headquarters, no single point of failure.
+  \item \textbf{Nutrient sharing}: The Finance cluster's three currencies
+    (SAP, TEND, MYCEL) flow through the network like nutrients through hyphae.
+  \item \textbf{Decomposition}: Demurrage and currency composting ensure that
+    hoarded value returns to the commons, just as mycelium decomposes dead
+    organic matter.
+  \item \textbf{Signal propagation}: Cross-cluster bridge dispatch propagates
+    governance signals across domain boundaries, like chemical signals propagating
+    through mycelial networks.
+\end{itemize}
+
+\section{The Great Filter of Co-Creative Wisdom}
+
+The cosmos is silent. Despite hundreds of billions of stars in our galaxy alone,
+many harboring Earth-like planets, the universe presents no evidence of other
+technological civilizations. The Fermi Paradox has traditionally been explained
+by two categories of ``Great Filter'': either the emergence of intelligent life
+is extraordinarily improbable (the filter is behind us), or technological
+civilizations inevitably destroy themselves through nuclear war, engineered
+pandemics, or misaligned artificial intelligence (the filter is ahead of us).
+A third possibility is more subtle and more final: civilizations fail not from
+spectacular self-destruction, but from \emph{coordination failure}---the inability
+to develop ethical and social technologies commensurate with their computational
+and physical power. Under this model, civilizations that fail the test do not
+end in galaxy-illuminating explosions. They stagnate, fragment, and devolve.
+They lose the capacity to distinguish signal from noise, to trust one another,
+and to coordinate collective action. To the rest of the universe, they simply
+go silent. The Great Silence is not the sound of explosions but the sound of
+a billion civilizations failing to mature.
+
+Humanity currently stands at the threshold of this filter. Our technological
+capacity---exponentially accelerated by artificial intelligence---vastly outpaces
+our collective wisdom and ethical maturity. We possess the power to reshape our
+planet and our biology, but our social operating systems remain rooted in
+territorial sovereignty, zero-sum competition, and hierarchical administration.
+AI, deployed to optimize these legacy systems rather than to transform them,
+acts as an accelerant: it collapses shared epistemic foundations through
+disinformation, erodes trust through surveillance and algorithmic bias, and
+paralyzes governance through coordination failure. The result is not a single
+cataclysm but a slow drowning in complexity and incoherence.
+
+Mycelix is a concrete architectural response to the Great Filter. If the failure
+mode is a collapse of trust, sense-making, and coordination, then the remedy must
+be an architecture that systematically generates and scales trust through
+decentralized identity, verifiable claims, and wise collective governance.
+The fractal cluster design, the trust-weighted participation system, and the
+Epistemic Charter described in the chapters that follow are not merely technical
+conveniences---they are the social technologies that the Great Filter hypothesis
+identifies as the missing prerequisite for civilizational survival. A complete
+treatment of this argument appears in Stoltz (2025), \textit{The Great Filter
+of Co-Creative Wisdom: A Socio-Technical Solution to the Fermi Paradox}~\cite{stoltz2025filter}.
+
+\section{Design Philosophy: Eight Harmonies}
+
+Mycelix is guided by the Eight Harmonies framework, which provides ethical
+constraints on system design:
+
+\begin{enumerate}
+  \item \textbf{Radical Transparency}: All governance actions are auditable on
+    agent source chains.
+  \item \textbf{Inclusive Participation}: Trust-weighted gating ensures progressive
+    access rather than binary inclusion/exclusion.
+  \item \textbf{Ecological Reciprocity}: The Climate and Energy clusters embed
+    environmental stewardship into economic activity.
+  \item \textbf{Intergenerational Care}: Constitutional mechanisms in the Governance
+    cluster can encode protections for future generations.
+  \item \textbf{Distributed Power}: No single agent can accumulate unchecked
+    governance authority; Guardian tier requires high scores across all four dimensions.
+  \item \textbf{Creative Expression}: The Music and Education clusters support
+    human flourishing beyond mere governance.
+  \item \textbf{Emergent Wisdom}: Trust-weighted participation trusts that collective
+    intelligence emerges from well-structured governance access.
+  \item \textbf{Sacred Stillness}: The system includes mechanisms for pause,
+    reflection, and deliberation before irreversible actions.
+\end{enumerate}
+
+
+\chapter{Holochain Architecture}
+
+\epigraph{Integrity doesn't require consensus.}{Arthur Brock and Eric Harris-Braun,
+Holochain Whitepaper (2018)}
+
+\section{Agent-Centric, Not Data-Centric}
+
+Blockchain architectures are data-centric: they maintain a single, globally
+consistent ledger that all participants must agree upon. This design choice
+entails fundamental trade-offs---high energy consumption (proof-of-work),
+limited throughput (global consensus bottleneck), and a conceptual model where
+data exists independently of the agents who create it.
+
+Holochain inverts this model. Each agent maintains their own \emph{source chain}:
+a hash-linked, append-only log of their actions. Data integrity is local and
+immediate---an agent signs every entry they commit. There is no global ledger
+and no global consensus.
+
+\subsection{Source Chains}
+
+An agent's source chain is a sequence of headers, each containing:
+
+\begin{itemize}
+  \item The hash of the previous header (chain linkage)
+  \item The agent's public key signature
+  \item The hash of the entry data (if any)
+  \item A sequence number and timestamp
+\end{itemize}
+
+This structure provides tamper evidence without requiring any other agent's
+participation. If an agent modifies a historical entry, the chain of hashes
+breaks, and any peer performing validation will detect the tampering.
+
+\subsection{The DHT: Shared Awareness Without Global State}
+
+While source chains provide local integrity, the \emph{distributed hash table}
+(DHT) provides shared awareness. When an agent commits an entry, a copy is
+sent to a neighborhood of peers determined by the entry's hash. These peers
+\emph{validate} the entry against the DNA's validation rules before storing it.
+
+Key properties of Holochain's DHT:
+
+\begin{itemize}
+  \item \textbf{Sharded storage}: Each agent stores only a neighborhood of the
+    total data, proportional to the number of agents.
+  \item \textbf{Redundancy}: Each entry is stored by multiple peers (configurable),
+    providing resilience against node departure.
+  \item \textbf{Eventual consistency}: The DHT converges to consistency as gossip
+    propagates, but never requires synchronous global agreement.
+  \item \textbf{Intrinsic validation}: Every peer independently validates entries
+    against the DNA's rules. There is no ``trusted validator'' role.
+\end{itemize}
+
+\section{DNA as Application Definition}
+
+A Holochain DNA defines the rules of a particular application space. It consists of:
+
+\begin{description}
+  \item[Integrity zomes] define entry types, link types, and validation rules.
+    These are the ``constitution'' of the application: immutable, deterministic,
+    and enforced by every peer.
+  \item[Coordinator zomes] implement application logic---CRUD operations, queries,
+    and cross-zome calls. These can be updated without changing the DNA hash.
+\end{description}
+
+This separation is crucial for Mycelix. The integrity zomes define the
+\emph{rules of governance}---what constitutes a valid proposal, a valid vote,
+a valid identity credential. The coordinator zomes implement the
+\emph{mechanisms of governance}---how proposals are submitted, how votes are
+tallied, how credentials are issued.
+
+\section{hApp Architecture}
+
+A Holochain application (hApp) bundles one or more DNAs into roles. Each role
+is instantiated as a \emph{cell} on the conductor---the Holochain runtime.
+Cells within the same conductor can communicate via \texttt{call(CallTargetCell, ...)}.
+
+Mycelix uses a \emph{unified hApp} architecture: all 16 cluster DNAs are
+bundled into a single hApp with defined roles. This enables cross-cluster
+communication via \texttt{CallTargetCell::OtherRole}, avoiding the complexity
+of inter-hApp signaling.
+
+\begin{lstlisting}[caption={Unified hApp manifest (simplified)},language={}]
+---
+manifest_version: "1"
+name: mycelix-unified
+roles:
+  - name: commons
+    dna: mycelix-commons.dna
+  - name: civic
+    dna: mycelix-civic.dna
+  - name: identity
+    dna: mycelix-identity.dna
+  - name: governance
+    dna: mycelix-governance.dna
+  - name: finance
+    dna: mycelix-finance.dna
+  # ... 11 more cluster roles
+\end{lstlisting}
+
+\section{Why Not Blockchain?}
+
+The choice of Holochain over blockchain (Ethereum, Solana, etc.) is deliberate
+and follows from Mycelix's design requirements:
+
+\begin{longtable}{p{4cm}p{4.5cm}p{4.5cm}}
+\toprule
+\textbf{Property} & \textbf{Blockchain} & \textbf{Holochain} \\
+\midrule
+\endhead
+Consensus & Global (all nodes agree) & Local (source chain + DHT validation) \\
+Scaling & O(n) per transaction & O(1) per agent action \\
+Data model & Global state (ledger) & Agent-centric (source chains) \\
+Energy & PoW: enormous; PoS: moderate & Minimal (no mining) \\
+Governance & Token-weighted (plutocratic) & Identity-weighted (meritocratic) \\
+Privacy & Pseudonymous but public & Private source chains + selective sharing \\
+Offline & Impossible (requires consensus) & Possible (local source chain) \\
+\bottomrule
+\end{longtable}
+
+The most critical difference for governance applications is the consensus
+model. Blockchain governance is inherently plutocratic: those with more tokens
+have more votes. Holochain's agent-centric model allows Mycelix to implement
+trust-weighted governance where influence derives from identity, reputation,
+community trust, and engagement rather than wealth.
+
+
+\chapter{The Fractal Cluster Design}
+
+\epigraph{A complex system that works is invariably found to have evolved from
+a simple system that worked.}{John Gall, \textit{Systemantics} (1975)}
+
+\section{Why 16 Clusters?}
+
+Mycelix organizes its 133+ zomes into 16 cluster DNAs. This is neither arbitrary
+nor aspirational---it emerges from two constraints:
+
+\begin{enumerate}
+  \item \textbf{Holochain's cell model}: Each DNA is instantiated as a cell.
+    Cross-zome calls within a cell (\texttt{CallTargetCell::Local}) are fast
+    and synchronous. Cross-cell calls (\texttt{CallTargetCell::OtherRole})
+    require message passing.
+  \item \textbf{Domain cohesion}: Zomes that frequently interact should share
+    a DNA. A housing governance vote that checks property records should not
+    require a cross-cluster call.
+\end{enumerate}
+
+The 16 clusters group by domain affinity:
+
+\begin{longtable}{llrl}
+\toprule
+\textbf{Cluster} & \textbf{Domain} & \textbf{Zomes} & \textbf{Status} \\
+\midrule
+\endhead
+mycelix-commons & Property, Housing, Care, Mutual Aid, Water, Food, Transport & 39 & Built \\
+mycelix-civic & Justice, Emergency, Media, Resonance Feed & 18 & Built \\
+mycelix-hearth & Kinship, Gratitude, Care, Autonomy, Decisions & 12 & Built \\
+mycelix-identity & DID, MFA, Trust Credentials, Recovery, Web-of-Trust & 13 & Built \\
+mycelix-governance & Proposals, Voting, DKG, Councils, Constitution & 7 & Built \\
+mycelix-finance & SAP/TEND/MYCEL Payments, Treasury, Staking & 8 & Built \\
+mycelix-health & FHIR, CDS, Telehealth, Trials, Insurance & 15 & Built \\
+mycelix-knowledge & Claims, Graph, Query, Inference, Factcheck & 8 & Built \\
+mycelix-personal & Identity Vault, Health Vault, Credential Wallet & 4 & Built \\
+mycelix-attribution & Dependency Registry, Usage Receipts, Reciprocity & 3 & Built \\
+mycelix-mail & PQC-Encrypted Decentralized Email & 12 & Built \\
+mycelix-supplychain & Provenance Tracking & 8 & Built \\
+mycelix-marketplace & Arbitration & 8 & Built \\
+mycelix-energy & Projects, Investments, Grid, Regenerative & 5 & Built \\
+mycelix-climate & Carbon Credits, Projects & 3 & Built \\
+mycelix-space & Orbital Objects, Debris Bounties, Traffic Control & 5 & Built \\
+\bottomrule
+\end{longtable}
+
+Additional clusters (Music, Education, DeSci, Core) bring specialized
+capabilities for cultural production, learning, and research.
+
+\section{Anatomy of a Cluster}
+
+Each cluster follows a consistent internal architecture:
+
+\begin{description}
+  \item[Integrity zomes] (one per domain) define entry types and validation rules.
+    For example, \texttt{housing\_integrity} defines \texttt{HousingUnit},
+    \texttt{Membership}, and \texttt{MaintenanceRequest} entry types.
+  \item[Coordinator zomes] (one per domain) implement CRUD operations, queries,
+    and domain logic. For example, \texttt{housing\_units} provides
+    \texttt{create\_unit}, \texttt{list\_units}, \texttt{transfer\_unit}.
+  \item[Bridge zome] (one per cluster) handles cross-cluster dispatch. It
+    receives typed requests from other clusters and routes them to the
+    appropriate domain zome via local calls.
+  \item[Shared types crate] (\texttt{mycelix-bridge-entry-types}) defines DHT
+    entry types shared across clusters.
+\end{description}
+
+\section{The Fractal Pattern}
+
+The architecture is fractal in a precise sense: the same governance pattern
+repeats at every scale.
+
+\begin{itemize}
+  \item \textbf{Zome level}: Each coordinator zome checks the caller's
+    trust credential before performing governance-sensitive operations.
+  \item \textbf{Cluster level}: Each cluster's bridge zome enforces cluster-wide
+    policies (rate limiting, allowlists) before routing requests.
+  \item \textbf{System level}: The unified hApp manifest defines which clusters
+    can communicate, and the bridge-common crate provides type-safe dispatch
+    across all clusters.
+\end{itemize}
+
+This fractal structure means that a water stewardship circle, a city-wide
+housing cooperative, and the global Mycelix network all use the same governance
+primitives: trust profiles, tiered access, typed bridge dispatch.
+
+\section{Shared Infrastructure: bridge-common}
+
+The \texttt{crates/mycelix-bridge-common} crate (295+ tests) provides the shared
+infrastructure that all clusters depend on:
+
+\begin{itemize}
+  \item \texttt{ConsciousnessProfile} --- the 4D identity/reputation/community/engagement
+    profile (detailed in Chapter 4)
+  \item \texttt{ConsciousnessTier} --- the 5-tier enum (Observer through Guardian)
+  \item \texttt{ConsciousnessCredential} --- time-limited, BLAKE3-committed credentials
+  \item \texttt{BridgeDomain} --- typed domain routing (12 variants)
+  \item \texttt{CommonsZome} / \texttt{CivicZome} --- typed zome routing (38 + 15 variants)
+  \item Rate limiting, allowlists, and reputation primitives
+\end{itemize}
+
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% PART II: TRUST-WEIGHTED GOVERNANCE
+%% ════════════════════════════════════════════════════════════════════════════
+
+\part{Trust-Weighted Governance}
+
+\chapter{The 4D Trust Profile}
+\label{ch:trust-profile}
+
+\epigraph{Who should govern? is the wrong question. The right question is:
+How can we organize institutions so that bad or incompetent rulers can be
+prevented from doing too much damage?}{Karl Popper, \textit{The Open Society
+and Its Enemies} (1945)}
+
+\section{Terminology and Scope}
+
+The codebase uses the names \texttt{ConsciousnessProfile} and
+\texttt{ConsciousnessTier} for the types described in this chapter. These names
+reflect Mycelix's origin as a governance layer for the Symthaea cognitive
+architecture, where the four dimensions map to measurable consciousness metrics:
+identity verification corresponds to self-model coherence, reputation to
+behavioral prediction accuracy, community trust to social-model integration,
+and engagement to active inference participation. In that context, the word
+``consciousness'' is precise.
+
+In the standalone Mycelix context---where no Symthaea engine is
+connected---these four dimensions function as \emph{earned trust-weighted
+participation gates}. The mechanism is straightforward: agents accumulate
+identity assurance, reputation history, peer trust, and domain engagement,
+and these dimensions determine governance capability. We retain the
+\texttt{ConsciousnessProfile} naming in the codebase to maintain the bridge
+to Symthaea, but the governance mechanism does not require acceptance of any
+consciousness theory to be useful.
+
+A reader who is skeptical of computational consciousness can safely read every
+occurrence of ``consciousness profile'' in the code as ``earned trust capacity
+profile.'' The four dimensions, the tier system, the sigmoid vote weighting,
+and the credential mechanism are all defined by their engineering properties,
+not by any metaphysical commitment. The system's value lies in its measurable
+governance outcomes: Sybil resistance, progressive access, reputation
+accountability, and community-weighted trust. These properties hold regardless
+of one's position on machine consciousness.
+
+\section{Motivation: Beyond Binary Access Control}
+
+Traditional access control is binary: you either have permission or you do not.
+Role-based access control (RBAC) adds granularity but remains fundamentally
+categorical. A user is either ``admin'' or ``editor'' or ``viewer.''
+
+This model is inadequate for governance. Governance participation should be
+\emph{progressive}---increasing with demonstrated trustworthiness, commitment,
+and community standing. A newcomer should be able to observe and learn before
+participating. A long-standing community member should have more governance
+weight than a newcomer, but not infinite weight.
+
+Mycelix replaces binary access control with a \emph{4-dimensional trust
+profile} that produces a continuous governance capability score.
+
+\section{The Four Dimensions}
+
+Each dimension is a continuous value in $[0, 1]$:
+
+\begin{definition}[ConsciousnessProfile]
+A trust profile $\mathbf{P} = (I, R, C, E)$ where:
+\begin{itemize}
+  \item $I$ (Identity) $\in [0,1]$: MFA assurance level. Anonymous $= 0.0$,
+    Basic $= 0.25$, Verified $= 0.50$, HighlyAssured $= 0.75$, Critical $= 1.0$.
+  \item $R$ (Reputation) $\in [0,1]$: Cross-hApp aggregated reputation with
+    exponential decay (30-day half-life), multi-source weighted average.
+  \item $C$ (Community) $\in [0,1]$: Peer trust attestations, weighted by
+    attestor's own governance tier---higher-tier peers' attestations count more.
+  \item $E$ (Engagement) $\in [0,1]$: Domain-specific participation, computed
+    locally by each cluster bridge from event and query participation counts.
+\end{itemize}
+\end{definition}
+
+\subsection{Identity Dimension}
+
+The identity dimension measures how strongly an agent has verified their identity.
+It maps directly from the MFA (Multi-Factor Authentication) assurance level
+defined in the Identity cluster:
+
+\begin{itemize}
+  \item \textbf{Anonymous} ($I = 0.0$): No identity verification. The agent has
+    a Holochain public key but nothing else.
+  \item \textbf{Basic} ($I = 0.25$): Single-factor authentication (e.g., email
+    verification).
+  \item \textbf{Verified} ($I = 0.50$): Multi-factor authentication (e.g.,
+    email + TOTP).
+  \item \textbf{HighlyAssured} ($I = 0.75$): Strong multi-factor (e.g.,
+    hardware security key + biometric).
+  \item \textbf{Critical} ($I = 1.0$): Maximum assurance, including identity
+    proofing by trusted community members.
+\end{itemize}
+
+This dimension provides Sybil resistance: creating fake identities becomes
+progressively more expensive as higher assurance levels require more verification.
+
+\subsection{Reputation Dimension}
+
+The reputation dimension aggregates an agent's behavioral history across all
+Mycelix clusters. It uses exponential decay with a 30-day half-life:
+
+\begin{equation}
+  R(t) = \sum_{i} w_i \cdot r_i \cdot \left(\frac{1}{2}\right)^{(t - t_i) / 30}
+\end{equation}
+
+where $r_i$ is the reputation event value, $t_i$ is the event timestamp (in days),
+$w_i$ is the source weight, and $t$ is the current time.
+
+Key properties:
+\begin{itemize}
+  \item \textbf{Temporal decay}: Reputation fades with time, preventing ancient
+    good behavior from conferring permanent privilege.
+  \item \textbf{Multi-source}: Reputation events come from all clusters, weighted
+    by domain relevance.
+  \item \textbf{Slashing}: Severe misbehavior triggers a 0.5$\times$ multiplier
+    on accumulated reputation.
+  \item \textbf{Blacklist threshold}: Agents whose reputation falls below 0.05
+    are blacklisted from governance.
+  \item \textbf{Restoration}: Blacklisted agents can restore reputation through
+    100 verified positive interactions.
+\end{itemize}
+
+\subsection{Community Dimension}
+
+The community dimension measures peer trust---how much the agent's community
+vouches for them. Trust attestations are weighted by the attestor's own
+governance tier:
+
+\begin{equation}
+  C = \frac{\sum_{j} \tau_j \cdot w(\text{tier}_j)}{\sum_{j} w(\text{tier}_j)}
+\end{equation}
+
+where $\tau_j$ is attestor $j$'s trust rating and $w(\text{tier}_j)$ is the
+weight assigned to their tier. This creates a virtuous cycle: attestations
+from higher-tier community members carry more weight, incentivizing genuine
+community building rather than attestation farming.
+
+\subsection{Engagement Dimension}
+
+The engagement dimension measures domain-specific participation. Unlike the
+other three dimensions (which are global), engagement is computed locally
+by each cluster's bridge zome. This means an agent can have high engagement
+in the Health cluster but low engagement in the Finance cluster.
+
+For Symthaea-connected agents, the engagement dimension maps from the unified
+consciousness score ($C_{\text{unified}}$), creating a bridge between Symthaea's
+consciousness research and Mycelix governance participation.
+
+\section{Combined Score}
+
+The combined score is a weighted average:
+
+\begin{equation}
+  S = 0.25 \cdot I + 0.25 \cdot R + 0.30 \cdot C + 0.20 \cdot E
+\end{equation}
+
+The weights reflect a deliberate design choice: community trust (30\%) is
+weighted highest because Mycelix is fundamentally a system of \emph{mutual
+recognition}. Identity and reputation (25\% each) provide the foundation.
+Engagement (20\%) ensures active participation matters but cannot substitute
+for the other dimensions.
+
+\section{Continuous Vote Weight}
+
+Rather than using hard tier thresholds for vote weight, Mycelix employs a
+sigmoid function centered at the Citizen threshold (0.4):
+
+\begin{equation}
+  W(S) = \frac{W_{\max}}{1 + e^{-(S - 0.4) / T}}
+\end{equation}
+
+where $W_{\max} = 10{,}000$ basis points and $T = 0.05$ is the temperature
+parameter. This provides:
+
+\begin{itemize}
+  \item Smooth transitions (no ``cliff'' at tier boundaries)
+  \item Noise tolerance (small score fluctuations don't cause dramatic weight changes)
+  \item Configurable strictness (lower $T$ = sharper transition)
+\end{itemize}
+
+
+\chapter{Five Governance Tiers}
+
+\section{Tier Definitions}
+
+\begin{definition}[ConsciousnessTier]
+Five governance tiers, derived from the combined trust score $S$:
+\begin{enumerate}
+  \item \textbf{Observer} ($S < 0.3$): Read-only access. Can browse public data
+    and observe governance proceedings.
+  \item \textbf{Participant} ($S \geq 0.3$): Can submit basic proposals and
+    comment on governance actions. Vote weight: 5,000 bp (50\%).
+  \item \textbf{Citizen} ($S \geq 0.4$): Full voting rights on standard
+    governance actions. Vote weight: 7,500 bp (75\%).
+  \item \textbf{Steward} ($S \geq 0.6$): Can initiate constitutional amendments,
+    manage council membership, and access cross-cluster governance. Vote weight:
+    10,000 bp (100\%).
+  \item \textbf{Guardian} ($S \geq 0.8$): Emergency governance powers including
+    circuit-breaker activation, emergency fund release, and threat response
+    coordination. Vote weight: 10,000 bp (100\%).
+\end{enumerate}
+\end{definition}
+
+\section{Hysteresis: Preventing Tier Oscillation}
+
+A naive threshold system would cause agents near tier boundaries to oscillate
+rapidly as their scores fluctuate from measurement noise. Mycelix implements
+hysteresis with a margin of $\pm 0.05$:
+
+\begin{itemize}
+  \item \textbf{Promotion} requires crossing $\text{threshold} + 0.05$
+  \item \textbf{Demotion} requires dropping below $\text{threshold} - 0.05$
+\end{itemize}
+
+An agent at Citizen tier (threshold 0.4) must reach 0.45 to promote to Steward,
+but only drops to Citizen if they fall below 0.55 ($0.6 - 0.05$). This creates
+a stability band around each tier boundary.
+
+\section{Governance Requirements}
+
+Each governance action specifies requirements as a \texttt{GovernanceRequirement}
+struct:
+
+\begin{lstlisting}
+pub struct GovernanceRequirement {
+    pub min_tier: ConsciousnessTier,
+    pub min_identity: Option<f64>,
+    pub min_community: Option<f64>,
+    pub min_reputation: Option<f64>,
+    pub min_engagement: Option<f64>,
+}
+\end{lstlisting}
+
+This allows fine-grained control. A constitutional amendment might require:
+\begin{itemize}
+  \item Minimum tier: Steward ($S \geq 0.6$)
+  \item Minimum identity: 0.75 (HighlyAssured)
+  \item Minimum community: 0.5 (strong peer attestation)
+\end{itemize}
+
+\section{Credentials: Time-Limited Trust}
+
+Trust profiles are not queried in real-time (which would require cross-cluster
+calls during governance actions). Instead, each agent's bridge zome issues a
+\texttt{ConsciousnessCredential}---a time-limited (24-hour default) credential
+containing the profile, derived tier, and a BLAKE3 trajectory commitment.
+
+The credential is stored on the agent's source chain and presented to governance
+zomes as proof of tier. This design:
+
+\begin{itemize}
+  \item Eliminates cross-cluster calls during governance actions
+  \item Provides a 24-hour validity window (stale data is bounded)
+  \item Includes a BLAKE3 hash of the agent's behavioral trajectory, preventing
+    credential transfer between agents
+\end{itemize}
+
+\section{Bootstrap Mode}
+
+New communities face a bootstrapping problem: no one has reputation or community
+trust yet. Mycelix handles this with bootstrap mode:
+
+\begin{itemize}
+  \item Communities with fewer agents than \texttt{BOOTSTRAP\_COMMUNITY\_THRESHOLD}
+    operate under relaxed gating
+  \item Minimum identity of \texttt{BOOTSTRAP\_MIN\_IDENTITY} is still required
+    (Sybil resistance is never relaxed)
+  \item Bootstrap credentials have a separate TTL (\texttt{BOOTSTRAP\_TTL\_US})
+  \item As the community grows past the threshold, standard gating activates
+    automatically
+\end{itemize}
+
+
+\chapter{Bridge-Common: Type-Safe Cross-Cluster Dispatch}
+
+\section{The Problem: Fragile String Matching}
+
+In early Mycelix prototypes, cross-cluster dispatch used string matching:
+
+\begin{lstlisting}
+if query_type.contains("transfer") {
+    call(housing_transfer_zome, ...)
+} else if query_type.contains("membership") {
+    call(housing_membership_zome, ...)
+}
+\end{lstlisting}
+
+This was fragile: a query type of \texttt{"transfer\_membership"} would match
+both branches. Case sensitivity caused bugs. New zomes required updating
+string patterns across multiple clusters.
+
+\section{Typed Routing}
+
+The \texttt{bridge-common} crate replaces string matching with strongly typed
+enums:
+
+\begin{lstlisting}
+pub enum BridgeDomain {
+    Property, Housing, Care, Mutualaid,
+    Water, Food, Transport, Support,
+    Space, Justice, Emergency, Media,
+}
+
+pub enum CommonsZome {
+    PropertyRegistry, PropertyTransfer,
+    PropertyDisputes, PropertyCommons,
+    HousingUnits, HousingMembership,
+    // ... 38 total variants
+}
+\end{lstlisting}
+
+Each zome variant maps to a canonical snake\_case string matching the actual
+Holochain zome name. The routing function \texttt{resolve\_commons\_zome}
+performs case-insensitive domain parsing via \texttt{BridgeDomain::from\_str\_loose},
+which handles variations like ``mutualaid'', ``mutual\_aid'', and ``mutual-aid''.
+
+\section{Cross-Cluster Roles}
+
+Communication between clusters uses Holochain's \texttt{CallTargetCell::OtherRole}
+mechanism. The \texttt{CrossClusterRole} enum defines the available roles:
+
+\begin{lstlisting}
+pub enum CrossClusterRole {
+    Commons,
+    Civic,
+    Identity,
+    Governance,
+    Finance,
+    // ... all 16 cluster roles
+}
+\end{lstlisting}
+
+Each cross-cluster call specifies the target role, target zome, and function
+name. The bridge-common crate provides allowlists that restrict which
+source-destination pairs are permitted, preventing unauthorized cross-cluster
+access.
+
+\section{Rate Limiting and Allowlists}
+
+Bridge dispatch includes two security mechanisms:
+
+\begin{description}
+  \item[Allowlists] specify which source clusters can call which destination
+    zomes. For example, only the Governance cluster can call the Identity
+    cluster's trust credential verification functions.
+  \item[Rate limiting] prevents any single agent from overwhelming a cluster's
+    bridge with requests. Limits are configurable per domain and per agent tier.
+\end{description}
+
+\section{The 295+ Test Suite}
+
+The bridge-common crate is one of the most heavily tested components in Mycelix,
+with 295+ tests covering:
+
+\begin{itemize}
+  \item Profile construction and validation (NaN handling, clamping)
+  \item Tier derivation and hysteresis
+  \item Credential issuance and expiry
+  \item Domain routing (case insensitivity, unknown domains)
+  \item Vote weight computation (sigmoid properties, edge cases)
+  \item Reputation decay, slashing, and blacklisting
+  \item Property-based tests (tier monotonicity, score bounds)
+\end{itemize}
+
+
+\chapter{Collective Intelligence}
+
+\epigraph{None of us is as smart as all of us.}{Ken Blanchard}
+
+\section{Beyond Individual Trust}
+
+The preceding chapters describe how individual agents earn trust through the 4D
+profile. But governance is a \emph{collective} phenomenon---the quality of a
+community's decisions depends not only on the trustworthiness of individual
+participants but on the coherence of the group as a whole. Mycelix addresses
+this through three mechanisms: collective Phi, fragile consensus detection, and
+the Epistemic Charter.
+
+\section{Collective Phi: Group Consciousness Vectors}
+
+When Symthaea is connected, each agent produces a consciousness state
+characterized by six measurable dimensions: integrated information ($\Phi$),
+workspace activation (GWT), attention coherence, meta-cognitive depth,
+emotional valence, and social-model accuracy. These dimensions form a
+6-dimensional \emph{agent consciousness vector}:
+
+\begin{equation}
+  \mathbf{c}_i = (\Phi_i,\; W_i,\; A_i,\; M_i,\; V_i,\; S_i)
+\end{equation}
+
+For any pair of agents $i, j$, the pairwise coherence is the cosine similarity
+of their consciousness vectors:
+
+\begin{equation}
+  \kappa_{ij} = \frac{\mathbf{c}_i \cdot \mathbf{c}_j}{\|\mathbf{c}_i\| \, \|\mathbf{c}_j\|}
+\end{equation}
+
+The \emph{collective Phi} of a governance quorum $Q$ is defined as:
+
+\begin{equation}
+  \Phi_Q = \frac{2}{|Q|(|Q|-1)} \sum_{i < j \in Q} \kappa_{ij}
+\end{equation}
+
+This metric quantifies how aligned a deliberating group's cognitive states are.
+A collective Phi above 0.7 indicates coherent deliberation; below 0.3 suggests
+fragmentation that may produce low-quality decisions.
+
+\section{Fragile Consensus Detection}
+
+Not all consensus is genuine. A vote that passes with 51\% in favor may reflect
+deep division rather than collective agreement. Mycelix detects fragile consensus
+by analyzing:
+
+\begin{description}
+  \item[Vote margin] The gap between the winning and losing tallies. Margins
+    below a configurable threshold trigger extended deliberation periods.
+  \item[Tier distribution] A proposal that passes only because Guardian-tier
+    agents outvoted many Citizen-tier agents may reflect elite capture rather
+    than community consensus.
+  \item[Coherence gap] When collective Phi is low but the vote margin is high,
+    the consensus may be fragile---agents voted the same way for different
+    reasons and may defect when circumstances change.
+  \item[Temporal stability] If pre-vote sentiment polling shows rapid opinion
+    changes, the consensus may not be durable.
+\end{description}
+
+When fragile consensus is detected, the Governance cluster can automatically:
+\begin{enumerate}
+  \item Extend the voting period
+  \item Require a higher approval threshold
+  \item Flag the decision for review after a cooling-off period
+  \item Recommend facilitated dialogue before re-vote
+\end{enumerate}
+
+\section{Reputation System}
+
+The reputation system provides the temporal dimension of collective intelligence.
+It ensures that trust is earned, maintained, and can be lost:
+
+\begin{description}
+  \item[Exponential decay] Reputation decays at $0.998^{\text{days}}$, yielding
+    a half-life of approximately 346 days. This prevents ancient contributions
+    from conferring permanent influence while allowing sustained good behavior
+    to accumulate meaningful trust.
+  \item[Slashing] Severe violations---data falsification, Sybil attacks,
+    governance manipulation---trigger a 0.5$\times$ multiplicative slash on
+    accumulated reputation. The slash is immediate and recorded on the agent's
+    source chain.
+  \item[Blacklisting] Agents whose reputation falls below 0.05 lose all
+    governance participation. This threshold is deliberately low: it takes
+    sustained or severe misbehavior to reach it.
+  \item[Restoration] Blacklisted agents can restore reputation through 100
+    verified positive interactions across at least two clusters. This ensures
+    that restoration requires genuine community re-engagement, not merely
+    waiting out a timer.
+\end{description}
+
+\section{The Epistemic Charter (E-N-M Classification)}
+
+Governance decisions vary in their epistemic character. A proposal to fund a
+bridge repair is fundamentally different from a proposal to change the community's
+constitutional values. The Epistemic Charter provides a three-axis classification
+for governance claims:
+
+\begin{description}
+  \item[E (Empirical)] Scored E0--E4, from Subjective (E0: personal testimony)
+    to Publicly Reproducible (E4: independently verified by multiple observers).
+    Higher E levels require stronger evidence and more verifiers.
+  \item[N (Normative)] Scored N0--N3, from Personal preference (N0) to Axiomatic
+    principles (N3: foundational values that define the community). Higher N
+    levels require broader consensus and longer deliberation.
+  \item[M (Materiality)] Scored M0--M3, from Ephemeral (M0: temporary, easily
+    reversible) to Foundational (M3: permanent, defines the community's
+    structure). Higher M levels require higher-tier approval and constitutional
+    protections.
+\end{description}
+
+A governance action's E-N-M classification determines:
+\begin{itemize}
+  \item The minimum tier required to propose and vote
+  \item The evidence standard for supporting claims
+  \item The approval threshold (simple majority for low-M, supermajority for high-M)
+  \item The deliberation period (hours for M0, weeks for M3)
+\end{itemize}
+
+For example, a claim that ``the water pH in the eastern watershed is 6.8'' is
+classified E3-N0-M1 (empirically measurable, no normative content, moderate
+materiality). A proposal that ``the community shall adopt a policy of
+restorative justice'' is E0-N3-M3 (not empirically testable, deeply normative,
+foundational). The governance requirements differ accordingly.
+
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% PART III: CORE CLUSTERS
+%% ════════════════════════════════════════════════════════════════════════════
+
+\part{Core Clusters}
+
+\chapter{Identity}
+
+\section{Overview}
+
+The Identity cluster is the foundation of Mycelix. Every other cluster depends
+on it for agent verification, trust credentials, and the identity dimension of
+the trust profile. It contains 13 zomes across 11 domains plus 1 bridge
+and 1 shared:
+
+\begin{enumerate}
+  \item \textbf{did\_registry} --- DID (Decentralized Identifier) management.
+    Each agent registers a \texttt{did:mycelix:<pubkey>} identifier.
+  \item \textbf{mfa} --- Multi-Factor Authentication with configurable assurance
+    levels (Anonymous through Critical).
+  \item \textbf{trust\_credential} --- Peer-to-peer trust attestations that feed
+    the community dimension.
+  \item \textbf{verifiable\_credential} --- W3C Verifiable Credential issuance
+    and verification.
+  \item \textbf{credential\_schema} --- Schema registry for credential types.
+  \item \textbf{recovery} --- Social recovery mechanism (threshold of trusted
+    peers can restore lost keys).
+  \item \textbf{revocation} --- Credential and key revocation with DHT propagation.
+  \item \textbf{education} --- Educational credential management.
+  \item \textbf{name-registry} --- Human-readable name registration and resolution.
+  \item \textbf{web-of-trust} --- Transitive trust computation across the network.
+  \item \textbf{bridge} --- Cross-cluster identity verification dispatch.
+\end{enumerate}
+
+\section{DID Architecture}
+
+Mycelix uses a method-specific DID scheme: \texttt{did:mycelix:<pubkey>}.
+Each DID document is stored on the agent's source chain and replicated to
+the DHT. The document contains:
+
+\begin{itemize}
+  \item The agent's public key (Ed25519)
+  \item Optional post-quantum key (ML-KEM-768, for future-proofing)
+  \item Service endpoints (which clusters the agent participates in)
+  \item Authentication methods (linked MFA assurance level)
+  \item Delegation chains (sub-passports for authorized devices)
+\end{itemize}
+
+\section{Multi-Factor Authentication}
+
+The MFA zome implements five assurance levels, each requiring progressively
+stronger verification:
+
+\begin{longtable}{lll}
+\toprule
+\textbf{Level} & \textbf{Identity Score} & \textbf{Requirements} \\
+\midrule
+Anonymous & 0.00 & Holochain key only \\
+Basic & 0.25 & Email or phone verification \\
+Verified & 0.50 & Two independent factors \\
+HighlyAssured & 0.75 & Hardware key + biometric \\
+Critical & 1.00 & In-person proofing by trusted peers \\
+\bottomrule
+\end{longtable}
+
+\section{Web of Trust}
+
+The web-of-trust zome computes transitive trust across the network. If Alice
+trusts Bob and Bob trusts Carol, Alice has indirect trust in Carol, discounted
+by a configurable decay factor per hop. This enables:
+
+\begin{itemize}
+  \item Discovery of trustworthy agents outside one's direct community
+  \item Sybil detection (clusters of mutually-attesting fake identities become
+    visible as isolated subgraphs)
+  \item Community dimension computation (aggregated trust from the web)
+\end{itemize}
+
+\section{Social Recovery}
+
+The recovery zome implements $m$-of-$n$ social recovery: an agent designates
+$n$ trusted peers, and any $m$ of them can collectively authorize key rotation.
+This eliminates the single point of failure of traditional key management
+while preserving decentralization.
+
+
+\chapter{Governance}
+\label{ch:governance}
+
+\section{Overview}
+
+The Governance cluster implements the decision-making infrastructure. Its 7
+zomes (plus 1 bridge) provide a complete governance toolkit:
+
+\begin{enumerate}
+  \item \textbf{proposals} --- Proposal creation, amendment, and lifecycle management.
+  \item \textbf{voting} --- Multiple voting mechanisms (simple majority, ranked
+    choice, quadratic, conviction).
+  \item \textbf{threshold-signing} --- Distributed Key Generation (DKG) for
+    threshold signatures on governance decisions.
+  \item \textbf{councils} --- Council formation, membership management, and
+    delegation.
+  \item \textbf{constitution} --- Constitutional document management with
+    amendment procedures.
+  \item \textbf{execution} --- Automated execution of approved governance
+    decisions.
+  \item \textbf{jurisdiction} --- Jurisdictional boundary management for
+    nested governance.
+  \item \textbf{bridge} --- Cross-cluster governance dispatch.
+\end{enumerate}
+
+\section{Proposal Lifecycle}
+
+\begin{enumerate}
+  \item \textbf{Draft}: Any Participant+ can create a proposal draft.
+  \item \textbf{Discussion}: The community discusses and suggests amendments.
+  \item \textbf{Voting}: Once discussion period ends, voting opens. The voting
+    mechanism depends on the proposal type (configured per jurisdiction).
+  \item \textbf{Resolution}: Votes are tallied. Trust-weighted vote
+    totals determine the outcome.
+  \item \textbf{Execution}: Approved proposals trigger automated execution via
+    the execution zome, which dispatches the appropriate cross-cluster calls.
+\end{enumerate}
+
+\section{Distributed Key Generation}
+
+The threshold-signing zome implements a DKG protocol that produces shared keys
+without any single party knowing the complete private key. This enables:
+
+\begin{itemize}
+  \item Multi-signature treasury operations (Finance cluster integration)
+  \item Constitutional amendment signing (requires Guardian-tier quorum)
+  \item Emergency response authorization (distributed circuit-breaker)
+\end{itemize}
+
+\section{Constitutional Governance}
+
+The constitution zome manages the foundational rules of a Mycelix community.
+Constitutional documents are versioned, and amendments require:
+
+\begin{itemize}
+  \item Proposer: Steward tier minimum
+  \item Identity dimension: $\geq 0.75$ (HighlyAssured)
+  \item Community dimension: $\geq 0.5$
+  \item Supermajority vote (configurable, default 67\%)
+  \item Mandatory discussion period (configurable, default 14 days)
+\end{itemize}
+
+
+\chapter{Finance}
+\label{ch:finance}
+
+\section{Three-Currency Economics}
+
+The Finance cluster implements a three-currency system designed to serve
+different economic functions:
+
+\begin{description}
+  \item[SAP (Sapience)] A stable unit of account pegged to a basket of real
+    goods and services. Used for pricing, contracts, and accounting. Cannot be
+    created ex nihilo---minted only through verified economic activity.
+  \item[TEND (Tenderness)] A mutual credit currency for care work, community
+    service, and non-market contributions. Implements demurrage (gradual value
+    decay) to encourage circulation rather than hoarding.
+  \item[MYCEL (Mycelium)] A commons currency representing collective
+    stewardship. Used for treasury operations, public goods funding, and
+    inter-community exchange.
+\end{description}
+
+\section{Cluster Zomes}
+
+\begin{enumerate}
+  \item \textbf{currency-mint} --- Currency creation and supply management.
+  \item \textbf{payments} --- Transaction processing for all three currencies.
+  \item \textbf{tend} --- TEND-specific mutual credit operations.
+  \item \textbf{treasury} --- Trust-gated treasury management.
+  \item \textbf{staking} --- MYCEL staking for governance weight.
+  \item \textbf{recognition} --- Non-monetary recognition and gratitude tokens.
+  \item \textbf{price-oracle} --- Decentralized price discovery for SAP basket.
+  \item \textbf{bridge} --- Cross-cluster financial operations.
+\end{enumerate}
+
+\section{Trust-Gated Treasury}
+
+Treasury operations are gated by governance tier:
+
+\begin{itemize}
+  \item \textbf{View treasury balance}: Observer+
+  \item \textbf{Propose expenditure}: Citizen+
+  \item \textbf{Approve expenditure}: Steward+ (threshold signature required)
+  \item \textbf{Emergency fund release}: Guardian (DKG multi-sig)
+\end{itemize}
+
+\section{Demurrage and Composting}
+
+TEND implements demurrage---a periodic reduction in balance that encourages
+spending rather than saving. This is inspired by Silvio Gesell's Freigeld
+(``free money'') concept and implemented as:
+
+\begin{equation}
+  B(t) = B(t_0) \cdot e^{-\lambda (t - t_0)}
+\end{equation}
+
+where $\lambda$ is the demurrage rate. The ``composted'' value (the amount lost
+to demurrage) is returned to the commons treasury, completing the metabolic cycle.
+
+Currency composting is the explicit mechanism by which retired or excess currency
+units are removed from circulation. It is idempotent: composting an already-composted
+unit is a no-op, and the total supply is always zero-sum (minted $-$ composted $=$
+circulating).
+
+\section{Oracle and Price Discovery}
+
+The price-oracle zome implements decentralized price feeds for the SAP basket.
+Multiple oracle agents submit price attestations, and the median is used as the
+canonical price. Oracle submissions require Citizen tier minimum, and the oracle
+contract includes protections against:
+
+\begin{itemize}
+  \item Division by zero (NaN prices)
+  \item Stale prices (TTL enforcement)
+  \item Manipulation (outlier detection, reputation-weighted aggregation)
+\end{itemize}
+
+
+\chapter{Commons}
+
+\section{The Largest Cluster}
+
+The Commons cluster, with 39 zomes across 9 domains (plus mesh-time and
+resource-mesh), is the largest cluster in Mycelix. It implements the practical
+infrastructure of daily community life.
+
+\section{Domain Overview}
+
+\subsection{Property (4 zomes)}
+
+\begin{itemize}
+  \item \textbf{property\_registry}: Land and building registration with
+    provenance tracking.
+  \item \textbf{property\_transfer}: Ownership transfer with trust-gated
+    approval.
+  \item \textbf{property\_disputes}: Structured dispute resolution for property
+    conflicts.
+  \item \textbf{property\_commons}: Community land trust management.
+\end{itemize}
+
+\subsection{Housing (6 zomes)}
+
+Housing cooperatives are first-class citizens in Mycelix:
+
+\begin{itemize}
+  \item \textbf{housing\_units}: Unit registry and availability tracking.
+  \item \textbf{housing\_membership}: Cooperative membership management.
+  \item \textbf{housing\_finances}: Shared housing financial operations.
+  \item \textbf{housing\_maintenance}: Maintenance request and scheduling.
+  \item \textbf{housing\_clt}: Community Land Trust governance.
+  \item \textbf{housing\_governance}: Housing-specific governance (distinct from
+    the system-level Governance cluster).
+\end{itemize}
+
+\subsection{Care (5 zomes)}
+
+\begin{itemize}
+  \item \textbf{care\_timebank}: Time-banking for care work, integrated with
+    TEND currency.
+  \item \textbf{care\_circles}: Care circle formation and coordination.
+  \item \textbf{care\_matching}: Matching care needs with available caregivers.
+  \item \textbf{care\_plans}: Structured care planning for individuals and families.
+  \item \textbf{care\_credentials}: Caregiver credential verification.
+\end{itemize}
+
+\subsection{Mutual Aid (7 zomes)}
+
+\begin{itemize}
+  \item \textbf{mutualaid\_needs}: Need posting and categorization.
+  \item \textbf{mutualaid\_circles}: Mutual aid circle management.
+  \item \textbf{mutualaid\_governance}: Circle-level governance.
+  \item \textbf{mutualaid\_pools}: Resource pooling for collective needs.
+  \item \textbf{mutualaid\_requests}: Request processing and fulfillment tracking.
+  \item \textbf{mutualaid\_resources}: Resource inventory and availability.
+  \item \textbf{mutualaid\_timebank}: Mutual aid time banking.
+\end{itemize}
+
+\subsection{Water (5 zomes)}
+
+\begin{itemize}
+  \item \textbf{water\_flow}: Water flow monitoring and allocation.
+  \item \textbf{water\_purity}: Water quality testing and reporting.
+  \item \textbf{water\_capture}: Rainwater harvesting coordination.
+  \item \textbf{water\_steward}: Watershed stewardship governance.
+  \item \textbf{water\_wisdom}: Traditional and scientific water knowledge.
+\end{itemize}
+
+\subsection{Food (4 zomes)}
+
+\begin{itemize}
+  \item \textbf{food\_production}: Community garden and farm management.
+  \item \textbf{food\_distribution}: Food distribution coordination.
+  \item \textbf{food\_preservation}: Preservation knowledge and scheduling.
+  \item \textbf{food\_knowledge}: Seed libraries, recipes, growing guides.
+\end{itemize}
+
+\subsection{Transport (3 zomes)}
+
+\begin{itemize}
+  \item \textbf{transport\_routes}: Community transport route planning.
+  \item \textbf{transport\_sharing}: Vehicle and ride sharing coordination.
+  \item \textbf{transport\_impact}: Environmental impact tracking.
+\end{itemize}
+
+\subsection{Cross-Cutting: Mesh-Time and Resource-Mesh}
+
+Two cross-cutting zomes serve the entire Commons cluster:
+
+\begin{itemize}
+  \item \textbf{mesh-time}: Coordinated time-keeping across domains, enabling
+    temporal queries (``what water quality readings existed when this food was
+    distributed?'').
+  \item \textbf{resource-mesh}: Cross-domain resource allocation and tracking,
+    enabling a community garden to request water allocation from the water
+    domain.
+\end{itemize}
+
+\section{Testing: 5,276 Tests}
+
+The Commons cluster is tested with 5,276 automated tests---the highest count
+of any single cluster. These include unit tests for each zome, integration
+tests for cross-zome operations, and sweettest conductor tests for full
+Holochain runtime validation.
+
+
+\chapter{Hearth: Family and Community}
+
+\epigraph{The family is one of nature's masterpieces.}{George Santayana,
+\textit{The Life of Reason} (1905)}
+
+\section{Why a Family Cluster?}
+
+Governance frameworks typically model individuals as atomistic rational actors.
+But humans live in families, households, and kinship networks. Care work, child
+rearing, elder support, and collective decision-making within families are among
+the most consequential governance activities in any community---yet they are
+invisible to most civic infrastructure.
+
+The Hearth cluster (12 zomes, 1,023 tests) brings family and community
+relationships into Mycelix as first-class governance primitives.
+
+\section{Domain Overview}
+
+\subsection{Kinship Networks (2 zomes)}
+
+The kinship zomes model family and chosen-family relationships:
+
+\begin{itemize}
+  \item \textbf{kinship\_registry}: Registration of kinship bonds (biological,
+    adoptive, chosen-family) with mutual consent. Both parties must confirm
+    the relationship before it is committed to the DHT.
+  \item \textbf{kinship\_governance}: Family-level governance---shared
+    decision-making weighted by kinship role and trust. Parents, elders, and
+    designated guardians receive contextual governance weight within the kinship
+    network.
+\end{itemize}
+
+\subsection{Gratitude Exchange (1 zome)}
+
+The gratitude zome implements a non-monetary recognition system for care work,
+emotional support, and community contribution. Gratitude tokens:
+
+\begin{itemize}
+  \item Are non-transferable (cannot be hoarded or traded)
+  \item Feed the community dimension of the sender's and receiver's trust profiles
+  \item Decay with time (30-day half-life), preventing gratitude inflation
+  \item Are visible to the kinship network but private to outsiders
+\end{itemize}
+
+\subsection{Care Coordination (1 zome)}
+
+The care zome coordinates within-family care responsibilities:
+
+\begin{itemize}
+  \item Scheduling shared care duties (childcare, elder care, disability support)
+  \item Matching care needs with available family members
+  \item Integration with the Commons cluster's care timebank for extended
+    community care
+\end{itemize}
+
+\subsection{Autonomy Tracking (1 zome)}
+
+A distinctive feature of Hearth: the autonomy zome tracks the developing
+autonomy of minors and dependents. As a child grows, their governance
+capability within the family (and eventually the broader community) increases
+progressively. This mirrors the trust tier system at the family scale:
+
+\begin{itemize}
+  \item Young children: Observer (family decisions are visible to them)
+  \item Older children: Participant (can express preferences)
+  \item Adolescents: Citizen (vote weight in family governance)
+  \item Adults: Full autonomy (Steward/Guardian eligible)
+\end{itemize}
+
+\subsection{Collective Decisions (1 zome)}
+
+Family-level collective decisions use trust-weighted voting where weights
+are determined by kinship role, age, and demonstrated engagement with the
+family's governance. A family deciding where to live, how to allocate a
+shared resource, or how to respond to a community need uses the same
+governance primitives as the system-level Governance cluster.
+
+\subsection{Story Archiving (1 zome)}
+
+The stories zome preserves family narratives, oral histories, and cultural
+knowledge. Stories are:
+
+\begin{itemize}
+  \item Stored on the author's source chain (tamper-evident)
+  \item Linked to kinship relationships (``grandmother's recipe'')
+  \item Optionally shared with the broader community or the Knowledge cluster
+  \item Tagged with epistemic classification (E0-N2-M2 for cultural knowledge)
+\end{itemize}
+
+\subsection{Milestones, Rhythms, Emergency, and Resources (4 zomes)}
+
+\begin{description}
+  \item[Milestones] Track family events (births, graduations, ceremonies) as
+    governance-relevant markers that can trigger tier transitions.
+  \item[Rhythms] Model recurring family patterns (meal schedules, care
+    rotations) that the mesh-time system can synchronize across households.
+  \item[Emergency] Family-level emergency coordination, integrated with the
+    Civic cluster's emergency system for escalation.
+  \item[Resources] Shared family resource tracking (tools, vehicles, spaces),
+    with lending and return workflows.
+\end{description}
+
+\subsection{Bridge (1 zome)}
+
+The Hearth bridge dispatches cross-cluster requests---most commonly to
+Identity (for kinship credential verification), Commons (for care coordination),
+and Governance (for family-level proposal escalation to community governance).
+
+\section{Trust-Weighted Family Governance}
+
+Family governance in Hearth is trust-weighted but with different dimension
+priorities than system-level governance. The community dimension (peer trust)
+carries the highest weight within a kinship network, because family trust is
+fundamentally relational rather than transactional.
+
+The 1,023 tests cover kinship lifecycle (creation, modification, dissolution),
+gratitude exchange mechanics, autonomy progression, and cross-cluster bridge
+dispatch. 48 sweettest integration tests verify full Holochain runtime behavior,
+including 9 trust-gating tests that validate tier requirements for
+family governance actions.
+
+
+\chapter{Personal and Attribution}
+
+\section{Personal: Private Vaults}
+
+The Personal cluster (4 zomes including bridge, 20 tests) implements
+private data management:
+
+\subsection{Identity Vault}
+
+The identity vault stores the agent's most sensitive identity artifacts:
+
+\begin{itemize}
+  \item Recovery seed phrases (encrypted, never DHT-replicated)
+  \item Biometric templates (stored locally, used for MFA verification)
+  \item Delegation keys (sub-passports for authorized devices)
+  \item Identity dimension history (track MFA level changes over time)
+\end{itemize}
+
+The vault is strictly source-chain-only: entries are never committed to the
+DHT, ensuring that even a compromised DHT neighborhood cannot access the
+agent's core identity material.
+
+\subsection{Health Vault}
+
+The health vault stores personal health data under patient control:
+
+\begin{itemize}
+  \item Medical records (FHIR-formatted, from the Health cluster)
+  \item Prescription history
+  \item Genetic data (if voluntarily submitted)
+  \item Mental health assessments
+\end{itemize}
+
+Data sharing is opt-in and granular: an agent can share lab results with
+their care circle (via the Hearth cluster) without exposing their full
+medical history.
+
+\subsection{Credential Wallet}
+
+The credential wallet manages the agent's verifiable credentials:
+
+\begin{itemize}
+  \item W3C Verifiable Credentials from the Identity cluster
+  \item Educational credentials from the EduNet cluster
+  \item Care credentials from the Commons cluster
+  \item Governance tier credentials (ConsciousnessCredentials)
+\end{itemize}
+
+The wallet presents credentials selectively---an agent proving they are
+Citizen tier need not reveal their identity dimension score, only the derived
+tier.
+
+\section{Attribution: Tracking Reciprocity}
+
+The Attribution cluster (3 zomes, 17 tests) provides cross-cutting
+infrastructure for tracking who contributed what to whom:
+
+\begin{description}
+  \item[Dependency Registry] Tracks dependency relationships between
+    creative works, software, datasets, and community resources.
+    When an educational curriculum uses a Knowledge cluster claim,
+    the dependency is recorded.
+  \item[Usage Receipts] Immutable records of resource usage. When the
+    Music cluster plays a track, a usage receipt is created on the
+    listener's source chain and replicated to the artist's DHT neighborhood.
+  \item[Reciprocity Engine] Computes net reciprocity scores between
+    agents and communities. An agent who consumes many community
+    resources but contributes little will see their engagement dimension
+    decrease. An agent who contributes generously will see it increase.
+\end{description}
+
+Attribution integrates with Finance (TEND payments for usage), Music (artist
+royalties), Education (curriculum attribution), and Knowledge (citation
+tracking).
+
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% PART IV: DOMAIN CLUSTERS
+%% ════════════════════════════════════════════════════════════════════════════
+
+\part{Domain Clusters}
+
+\chapter{Health}
+
+\section{15-Zome Architecture}
+
+The Health cluster is Mycelix's most medically comprehensive component, with 15
+active zomes organized in two tiers:
+
+\textbf{Tier 1 (MVP):}
+\begin{enumerate}
+  \item Patient records management
+  \item Provider registry and credentialing
+  \item Appointment scheduling
+  \item Prescription management
+  \item Lab results tracking
+  \item Referral coordination
+  \item Billing and insurance claims
+\end{enumerate}
+
+\textbf{Tier 2 (Advanced):}
+\begin{enumerate}
+  \item \textbf{FHIR} --- HL7 FHIR resource modeling for healthcare interoperability.
+  \item \textbf{CDS} --- Clinical Decision Support with tier-gated
+    recommendation generation.
+  \item \textbf{Telehealth} --- Decentralized telemedicine session management.
+  \item \textbf{Trials} --- Clinical trial coordination and data collection.
+  \item \textbf{Insurance} --- Decentralized mutual health insurance pools.
+  \item \textbf{Nutrition} --- Nutritional planning and dietary management.
+  \item \textbf{Mental health} --- Mental health assessment and tracking.
+  \item \textbf{Public health} --- Epidemiological surveillance and reporting.
+\end{enumerate}
+
+\section{FHIR Interoperability}
+
+The FHIR (Fast Healthcare Interoperability Resources) zome implements HL7 FHIR
+R4 resource types as Holochain entries. This enables:
+
+\begin{itemize}
+  \item Data exchange with existing healthcare systems
+  \item Standardized patient records across Mycelix communities
+  \item Regulatory compliance with healthcare data standards
+\end{itemize}
+
+\section{Privacy Architecture}
+
+Health data requires the strongest privacy protections. The Health cluster
+implements:
+
+\begin{itemize}
+  \item Patient-controlled data sharing (source chain privacy)
+  \item Encrypted DHT entries for sensitive records
+  \item Tier-gated access (provider credentialing required)
+  \item Audit trails on all data access
+\end{itemize}
+
+\section{Clinical Decision Support}
+
+The CDS (Clinical Decision Support) zome is tier-gated at two levels:
+
+\begin{enumerate}
+  \item \textbf{Provider access}: Only agents with verified healthcare
+    credentials (from the Identity cluster's education and verifiable
+    credential zomes) can query the CDS system.
+  \item \textbf{Recommendation generation}: CDS recommendations are tagged
+    with the governance tier of the requesting provider and the evidence
+    level of the recommendation. A Participant-tier provider receives only
+    well-established guidelines, while a Steward-tier provider can access
+    experimental protocols and off-label usage data.
+\end{enumerate}
+
+This tiered access prevents information overload for less-experienced
+providers while ensuring that experienced practitioners have access to
+the full knowledge base.
+
+\section{Mutual Health Insurance}
+
+The Insurance zome implements decentralized mutual health insurance pools:
+
+\begin{itemize}
+  \item Community members contribute to a shared pool (denominated in TEND
+    or MYCEL)
+  \item Claims are submitted with medical evidence (from the patient records
+    zome) and adjudicated by a panel of Citizen+ tier pool members
+  \item Large claims require Steward-level approval and DKG multi-signature
+    from the Governance cluster
+  \item Pool governance follows the same trust-weighted model as
+    system-level governance
+\end{itemize}
+
+This model eliminates the profit motive of commercial insurance while
+maintaining the risk-pooling benefits.
+
+
+\chapter{Knowledge}
+\label{ch:knowledge}
+
+\section{Epistemic Infrastructure}
+
+The Knowledge cluster implements decentralized knowledge verification---an
+``epistemic mesh'' where claims are verified through multiple independent
+pathways:
+
+\begin{enumerate}
+  \item \textbf{claims} --- Structured claim registration with provenance metadata.
+  \item \textbf{graph} --- Knowledge graph construction with typed relationships.
+  \item \textbf{query} --- Semantic query processing across the knowledge graph.
+  \item \textbf{inference} --- Logical inference engine for deriving new claims
+    from existing ones.
+  \item \textbf{factcheck} --- Multi-source fact verification with confidence scoring.
+  \item \textbf{markets\_integration} --- Prediction market integration for
+    epistemic value discovery.
+  \item \textbf{bridge} --- Cross-cluster knowledge dispatch.
+\end{enumerate}
+
+\section{Claim Lifecycle}
+
+\begin{enumerate}
+  \item \textbf{Registration}: An agent registers a claim with supporting evidence.
+    The claim entry includes: statement, evidence links, confidence, domain tags.
+  \item \textbf{Verification}: Independent agents verify or dispute the claim.
+    Verification quality is weighted by the verifier's governance tier and
+    domain engagement.
+  \item \textbf{Inference}: The inference engine derives implications from
+    verified claims, extending the knowledge graph automatically.
+  \item \textbf{Factchecking}: The factcheck zome aggregates verification
+    results into a confidence score.
+  \item \textbf{Market pricing}: Prediction markets assign economic value to
+    claim accuracy, creating incentives for truthful reporting.
+\end{enumerate}
+
+\section{Knowledge Graph}
+
+The graph zome maintains a typed knowledge graph where nodes are claims and
+edges are relationships (supports, contradicts, extends, specializes). The
+graph is distributed across the DHT, with each neighborhood validating the
+relationships in its shard.
+
+Query processing supports:
+\begin{itemize}
+  \item Path queries (``what claims support this conclusion?'')
+  \item Subgraph extraction (``all claims in the climate domain'')
+  \item Confidence propagation (``what is the transitive confidence in this claim?'')
+\end{itemize}
+
+
+\section{Prediction Markets}
+
+The markets\_integration zome connects knowledge claims to economic incentives:
+
+\begin{enumerate}
+  \item A Citizen+ agent creates a prediction market for a specific, verifiable
+    claim with a defined resolution date.
+  \item Participants stake MYCEL on the outcome (true/false/probability).
+  \item Market prices reflect the collective's confidence in the claim.
+  \item Upon resolution, correct predictors are rewarded proportionally,
+    and their reputation dimension increases.
+  \item Incorrect predictions reduce reputation, creating accountability.
+\end{enumerate}
+
+The prediction market mechanism provides a ``skin in the game'' complement to
+the expert verification pathway. Claims that have both high expert verification
+scores and high market confidence are the most robustly validated.
+
+\section{Integration Patterns}
+
+The Knowledge cluster integrates with other clusters through several patterns:
+
+\begin{description}
+  \item[Health $\to$ Knowledge] Medical claims from clinical trials feed
+    the knowledge graph, enabling meta-analysis across decentralized
+    research sites.
+  \item[Climate $\to$ Knowledge] Carbon credit verification claims are
+    registered in the knowledge graph and can be independently verified
+    through satellite observation data from the Space cluster.
+  \item[Supply Chain $\to$ Knowledge] Provenance claims from the supply
+    chain are cross-referenced with production data from the Commons
+    cluster's food and water domains.
+  \item[Education $\to$ Knowledge] Educational content references knowledge
+    graph claims, ensuring that curricula are backed by verified knowledge.
+\end{description}
+
+
+\chapter{Space and Climate}
+
+\section{Space: Orbital Stewardship}
+
+The Space cluster addresses a growing governance challenge: who manages orbital
+space? With 5 zomes plus an orbital mechanics library, it implements:
+
+\begin{enumerate}
+  \item \textbf{orbital\_objects} --- Satellite and debris tracking registry.
+  \item \textbf{observations} --- Decentralized observation reporting from
+    ground stations and amateur astronomers.
+  \item \textbf{conjunctions} --- Collision probability computation and warning
+    dissemination.
+  \item \textbf{debris\_bounties} --- Economic incentives for debris removal,
+    funded through MYCEL commons currency.
+  \item \textbf{traffic\_control} --- Decentralized orbital traffic management
+    protocols.
+\end{enumerate}
+
+The orbital mechanics library provides Keplerian propagation, conjunction
+assessment, and maneuver planning---the computational backbone for governance
+decisions about orbital resource allocation.
+
+\section{Climate: Carbon and Beyond}
+
+The Climate cluster manages environmental stewardship:
+
+\begin{enumerate}
+  \item \textbf{carbon} --- Carbon credit registry with tier-gated
+    verification. Credits are issued for verified carbon sequestration and
+    can be traded or retired.
+  \item \textbf{projects} --- Climate project registration, monitoring, and
+    impact reporting.
+  \item \textbf{bridge} --- Cross-cluster climate data dispatch (e.g., carbon
+    impact of supply chain operations).
+\end{enumerate}
+
+\section{Integration: Space-Climate Nexus}
+
+Space and climate governance intersect in satellite-based Earth observation:
+the Space cluster's observation network can verify climate project claims
+(deforestation monitoring, agricultural carbon sequestration) through the
+Knowledge cluster's factcheck pipeline.
+
+\section{Debris Economics}
+
+The debris\_bounties zome creates economic incentives for orbital cleanup:
+
+\begin{enumerate}
+  \item Debris objects are cataloged in the orbital\_objects registry with
+    estimated removal difficulty and collision risk.
+  \item The community allocates MYCEL bounties proportional to the object's
+    collision risk (computed by the conjunctions zome).
+  \item Removal operators claim bounties by submitting observation evidence
+    that the debris has been deorbited or moved to a graveyard orbit.
+  \item Claims are verified through the Knowledge cluster's factchecking
+    pipeline using independent observations from multiple ground stations.
+\end{enumerate}
+
+This mechanism applies the same trust-weighted governance to space
+stewardship: bounty creation requires Citizen+ tier, bounty approval
+requires Steward+, and emergency collision avoidance can be triggered
+by Guardian-tier agents.
+
+\section{Carbon Credit Lifecycle}
+
+The carbon zome implements a full carbon credit lifecycle:
+
+\begin{enumerate}
+  \item \textbf{Project registration}: A climate project (reforestation,
+    renewable energy, soil carbon) is registered with baseline measurements.
+  \item \textbf{Monitoring}: Periodic measurement reports are submitted
+    with evidence links (satellite data, sensor readings, third-party audits).
+  \item \textbf{Credit issuance}: Verified sequestration generates carbon
+    credits, recorded as Holochain entries on the project operator's source
+    chain.
+  \item \textbf{Trading}: Credits can be transferred between agents, retired
+    (permanently removed from circulation), or used to offset emissions.
+  \item \textbf{Retirement}: Retired credits are composted (similar to
+    currency composting in the Finance cluster), ensuring they cannot be
+    double-counted.
+\end{enumerate}
+
+All operations are tier-gated: credit issuance requires Citizen+
+with verified engagement in the climate domain, and credit retirement is
+auditable through the source chain.
+
+
+\chapter{Music and Education}
+
+\section{Music: Attribution-First Royalties}
+
+The Music cluster (4 zomes plus 14 support crates) implements a
+royalty-free-by-default, attribution-required music platform:
+
+\begin{enumerate}
+  \item \textbf{catalog} --- Music catalog management with provenance tracking.
+  \item \textbf{plays} --- Play count tracking and listener analytics.
+  \item \textbf{balances} --- Artist balance management (TEND-denominated).
+  \item \textbf{trust} --- Artist verification and anti-plagiarism.
+\end{enumerate}
+
+The Attribution cluster (\texttt{mycelix-attribution}) provides the cross-cutting
+infrastructure: dependency registry, usage receipts, and reciprocity tracking.
+
+\section{Education: Curriculum and Credentials}
+
+The Education cluster (10 zomes, \texttt{mycelix-edunet}) implements:
+
+\begin{itemize}
+  \item Curriculum design and sharing
+  \item Learner progress tracking
+  \item Peer assessment with tier-gated credentialing
+  \item Educational credential issuance (integrated with Identity cluster)
+  \item Knowledge graph integration for learning path recommendation
+\end{itemize}
+
+
+\chapter{Civic Infrastructure}
+\label{ch:civic}
+
+\epigraph{Justice is what love looks like in public.}{Cornel West}
+
+\section{17 Zomes for Civic Life}
+
+The Civic cluster (18 zomes including bridge, 2,273 tests) implements three
+domains of civic infrastructure: restorative justice, emergency coordination,
+and decentralized media. Together they address the functions that nation-states
+perform through courts, emergency services, and regulated press---reimagined
+for a decentralized, trust-weighted governance model.
+
+\section{Restorative Justice}
+
+The Justice domain explicitly rejects the punitive model of criminal records,
+incarceration, and permanent stigma. Instead, it implements restorative
+justice---a process-oriented approach that seeks to repair harm rather than
+punish offenders.
+
+\subsection{Process, Not Punishment}
+
+The justice zomes implement a structured conflict resolution lifecycle:
+
+\begin{enumerate}
+  \item \textbf{Incident report}: Any Participant+ agent can file a structured
+    incident report describing harm experienced. Reports are stored on the
+    reporter's source chain and shared with a mediator pool.
+  \item \textbf{Mediator assignment}: Trained mediators (Citizen+ tier with
+    justice domain engagement) are assigned based on availability, domain
+    expertise, and absence of conflict of interest.
+  \item \textbf{Circle process}: The mediator convenes a restorative circle
+    including the affected parties, community supporters, and (optionally)
+    the person who caused harm. The process follows structured dialogue
+    protocols.
+  \item \textbf{Agreement}: The circle produces a restorative agreement---a
+    set of commitments by the responsible party (restitution, community
+    service, behavioral change) with a timeline and verification criteria.
+  \item \textbf{Monitoring}: Agreement compliance is tracked through the
+    governance system. Completion feeds the reputation dimension positively;
+    non-compliance triggers graduated sanctions (reputation decay, tier
+    reduction).
+\end{enumerate}
+
+\subsection{No Permanent Records}
+
+A critical design decision: completed restorative processes are
+\emph{archived} rather than permanently attached to an agent's identity.
+After a configurable period (default: 1 year post-completion), the
+incident hash is removed from the agent's public profile links. The
+source chain entry remains (Holochain source chains are append-only),
+but it is no longer discoverable through DHT queries. This implements
+the ``right to rehabilitation'' in code.
+
+\section{Emergency Coordination}
+
+The Emergency domain provides infrastructure for disaster response,
+community crises, and urgent coordination:
+
+\begin{description}
+  \item[Incidents] Structured incident reporting with severity levels,
+    geolocation, and resource requirements. High-severity incidents
+    trigger automatic cross-cluster notifications.
+  \item[Triage] Resource triage using a priority queue weighted by
+    severity, affected population, and available resources. Triage
+    decisions require Citizen+ tier and are auditable.
+  \item[Shelters] Shelter registration, capacity tracking, and
+    occupancy management. Integrated with the Commons cluster's housing
+    domain for emergency housing allocation.
+  \item[Communications] Emergency broadcast system using the bridge
+    dispatch to reach all clusters simultaneously. Guardian-tier agents
+    can trigger network-wide emergency alerts. When the mesh radio
+    bridge is available (feature \texttt{mesh}), emergency alerts
+    propagate via LoRa radio even when internet connectivity is lost.
+\end{description}
+
+\section{Decentralized Media}
+
+The Media domain implements a decentralized publishing and curation platform:
+
+\begin{description}
+  \item[Publication] Content publishing with provenance tracking. Every
+    published piece is signed and timestamped on the author's source
+    chain, providing tamper-evident authorship.
+  \item[Curation] Community-driven content curation using trust-weighted
+    recommendations. Higher-tier curators' selections carry more weight,
+    but all Participant+ agents can curate.
+  \item[Fact-checking] Integration with the Knowledge cluster's factcheck
+    pipeline. Media claims can be tagged for verification, and the
+    verification status is displayed alongside the content.
+  \item[Attribution] Integration with the Attribution cluster for proper
+    crediting of sources, quotes, and derivative works.
+  \item[Resonance Feed] A trust-weighted content feed that surfaces
+    content based on community trust signals rather than engagement
+    metrics. This explicitly rejects the attention-economy model that
+    rewards outrage and sensationalism.
+\end{description}
+
+\section{Testing: 2,273 Tests}
+
+The Civic cluster's 2,273 tests cover justice process lifecycle, emergency
+coordination workflows, media publication and curation, and cross-cluster
+bridge dispatch. 17 sweettest integration tests verify full conductor-level
+behavior, including cross-domain interactions (e.g., an emergency incident
+triggering a justice mediation process).
+
+
+\chapter{Mail, Supply Chain, and Marketplace}
+
+\section{Mail: PQC-Encrypted Decentralized Email}
+
+The Mail cluster (12 zomes) implements a fully decentralized email system with
+post-quantum cryptographic security:
+
+\begin{description}
+  \item[Key exchange] ML-KEM-768 (NIST FIPS 203) key encapsulation for
+    establishing shared secrets between correspondents.
+  \item[Message encryption] AES-256-GCM symmetric encryption using the
+    ML-KEM-derived shared secret.
+  \item[Mailbox management] Each agent maintains a private mailbox on their
+    source chain. Incoming messages are encrypted to the recipient's public
+    key and stored in their DHT neighborhood.
+  \item[Address book] Decentralized address resolution using the Identity
+    cluster's name-registry zome.
+  \item[Attachments] Large attachments are chunked, encrypted, and distributed
+    across the DHT with content-addressed hashes.
+  \item[Spam prevention] Trust-weighted message filtering: messages from
+    agents below Observer tier are quarantined by default. Community
+    trust dimension modulates filter sensitivity.
+\end{description}
+
+The 12 zomes cover the full email lifecycle: compose, encrypt, send, receive,
+decrypt, reply, forward, search, folder management, contact management,
+attachment handling, and bridge dispatch. All message content is
+end-to-end encrypted; even DHT validators cannot read message bodies.
+
+\section{Supply Chain: Provenance Tracking}
+
+The Supply Chain cluster (8 zomes) implements end-to-end provenance tracking
+for physical goods:
+
+\begin{description}
+  \item[Inventory] Product registration with unique identifiers, batch
+    tracking, and location history.
+  \item[Logistics] Shipment management, route optimization, and delivery
+    confirmation with cryptographic proof-of-delivery.
+  \item[Procurement] Purchase order management with trust-gated supplier
+    approval (Citizen+ tier required for high-value procurement).
+  \item[Verification] Product authenticity verification using source chain
+    provenance---each handler's signature provides a link in the
+    chain of custody.
+  \item[Trust] Supplier reputation tracking integrated with the system-wide
+    reputation dimension.
+  \item[Claims] Dispute resolution for supply chain disagreements, integrated
+    with the Civic cluster's justice domain.
+  \item[Payments] Supply chain payment processing using SAP (for contracted
+    prices) and TEND (for informal exchanges).
+  \item[Bridge] Cross-cluster dispatch for supply chain queries from other
+    clusters (e.g., Food domain querying provenance of ingredients).
+\end{description}
+
+\section{Marketplace: Decentralized Commerce with Arbitration}
+
+The Marketplace cluster (8 zomes) provides a decentralized commerce platform:
+
+\begin{itemize}
+  \item Product and service listing with tier-gated seller verification
+  \item Escrow-based transactions using the Finance cluster's payment
+    infrastructure
+  \item Buyer and seller reputation tracking
+  \item Structured arbitration process for disputes, escalating to the
+    Civic cluster's justice domain when marketplace-level resolution fails
+  \item Trust-weighted product reviews (higher-tier reviewers' assessments
+    carry more weight)
+  \item Integration with the Supply Chain cluster for physical goods
+    provenance verification
+\end{itemize}
+
+
+\chapter{Energy and DeSci}
+
+\section{Energy: Community Power}
+
+The Energy cluster (5 zomes) manages community-scale energy production,
+investment, and distribution:
+
+\begin{description}
+  \item[Projects] Energy project registration---solar installations, wind
+    turbines, micro-hydro, community batteries---with capacity,
+    generation forecasts, and maintenance schedules.
+  \item[Investments] Trust-gated community investment in energy projects.
+    Investment proposals require Citizen+ tier. Large investments
+    (above a configurable threshold) require Steward+ approval and
+    DKG multi-signature from the Governance cluster.
+  \item[Regenerative] Regenerative energy practices tracking---soil
+    carbon sequestration from biochar, forest management, and agricultural
+    energy recovery.
+  \item[Grid] Community microgrid management: energy balance tracking,
+    peer-to-peer energy trading (denominated in MYCEL), and demand
+    response coordination.
+  \item[Bridge] Cross-cluster dispatch for energy data queries from
+    Climate (carbon offsets from renewable generation), Finance
+    (energy investment returns), and Commons (resource-mesh integration).
+\end{description}
+
+\section{DeSci: Decentralized Science}
+
+The DeSci cluster (\texttt{mycelix-desci}) takes a different architectural
+approach from other Mycelix clusters: it implements a REST API (using
+Actix-web) rather than Holochain zomes. This design choice reflects the
+DeSci cluster's role as a bridge between the Mycelix governance network
+and the existing scientific research ecosystem.
+
+\subsection{REST API Architecture}
+
+The DeSci REST API provides:
+
+\begin{itemize}
+  \item Research project registration and metadata management
+  \item Dataset registration with provenance tracking
+  \item Peer review coordination with trust-weighted reviewer assignment
+  \item Reproducibility tracking (linking research claims to data,
+    code, and computational environment)
+  \item Integration with the Knowledge cluster for claim verification
+  \item Open access publishing with attribution tracking
+\end{itemize}
+
+\subsection{141 Integration Tests}
+
+The DeSci cluster is validated by 141 integration tests that exercise
+the full REST API surface, including:
+
+\begin{itemize}
+  \item Project lifecycle (create, update, archive)
+  \item Dataset upload, versioning, and access control
+  \item Review assignment, submission, and aggregation
+  \item Cross-cluster queries (Knowledge graph, Attribution)
+  \item Authentication and authorization (trust profile verification)
+\end{itemize}
+
+\subsection{Federated Learning Integration}
+
+DeSci integrates with the \texttt{mycelix-core} federated learning framework
+for privacy-preserving collaborative research. Research institutions can
+participate in multi-site studies without sharing raw patient data---only
+trust-weighted gradient updates are exchanged through the 0TML pipeline.
+
+
+%% ────────────────────────────────────────────────────────────────────────────
+%% Additional Domain Cluster Chapters
+%% ────────────────────────────────────────────────────────────────────────────
+
+\chapter{PQC-Encrypted Decentralized Mail}
+\label{ch:mail}
+
+\epigraph{The right of the people to be secure in their persons, houses, papers,
+and effects, against unreasonable searches and seizures, shall not be
+violated.}{Fourth Amendment, U.S.\ Constitution}
+
+\section{Why Decentralized Mail Requires Post-Quantum Cryptography}
+
+Centralized email is the single largest vector for state surveillance and
+corporate data harvesting.  The \texttt{mycelix-mail} cluster (12 zomes,
+approximately 100,000 lines of Rust) replaces the entire SMTP/IMAP stack
+with a Holochain-native messaging system where \emph{no central mail server
+exists} and every message is encrypted with lattice-based post-quantum
+primitives.
+
+The cryptographic foundation is ML-KEM-768 (NIST FIPS 203), a module-lattice
+key encapsulation mechanism that remains secure against known quantum
+algorithms.  Forward secrecy is achieved without a dedicated key server:
+each correspondence pair performs a double-ratchet key exchange mediated
+entirely through DHT entries on the participants' source chains.
+
+\section{Zome Architecture}
+
+The 12 zomes partition the full email lifecycle into orthogonal concerns:
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Zome} & \textbf{Responsibility} \\
+\midrule
+\endhead
+\texttt{compose}       & Message drafting, template management \\
+\texttt{encrypt}       & ML-KEM encapsulation, AES-256-GCM bulk encryption \\
+\texttt{send}          & DHT neighborhood publication, delivery receipts \\
+\texttt{receive}       & Incoming message polling, decryption delegation \\
+\texttt{decrypt}       & Private-key operations via LAIR keystore \\
+\texttt{threads}       & Conversation threading, in-reply-to resolution \\
+\texttt{attachments}   & Content-addressed chunking, encrypted distribution \\
+\texttt{contacts}      & Address book, Identity cluster name-registry integration \\
+\texttt{folders}       & Inbox/sent/archive/custom folder management \\
+\texttt{search}        & Encrypted search over ciphertext (trapdoor-based) \\
+\texttt{spam}          & Trust-weighted spam filtering (see Section~\ref{sec:mail-spam}) \\
+\texttt{bridge}        & Cross-cluster dispatch for mail queries \\
+\bottomrule
+\end{longtable}
+
+\section{Forward Secrecy Without a Key Server}
+
+Classical forward secrecy relies on ephemeral Diffie--Hellman exchanges
+coordinated by a trusted server.  Mycelix eliminates the server by storing
+ephemeral public keys as \emph{private DHT entries} in the recipient's
+neighborhood.  The sender retrieves the latest ephemeral key, encapsulates
+a shared secret via ML-KEM, and discards the ephemeral pair after use.  The
+result is per-message forward secrecy: compromise of a long-term private key
+does not retroactively decrypt past messages.
+
+\section{Encrypted Search Over Ciphertext}
+
+Full-text search is critical for usability but appears incompatible with
+end-to-end encryption.  Mycelix implements \emph{trapdoor-based search}:
+the sender generates encrypted keyword indices (trapdoors) alongside the
+ciphertext.  The recipient's search zome matches query trapdoors against
+stored trapdoors without decrypting message bodies.  This provides
+substring-level search with zero plaintext exposure to DHT validators.
+
+\section{Spam Filtering and Trust Integration}
+\label{sec:mail-spam}
+
+Spam filtering leverages the 4D trust profile (Chapter~\ref{ch:trust-profile}):
+
+\begin{itemize}
+  \item Messages from agents below Observer tier are quarantined by default.
+  \item Community trust dimension modulates filter sensitivity---agents
+    vouched for by the recipient's web-of-trust bypass quarantine.
+  \item Reputation dimension provides a decay-based spam cost: repeated
+    spam reports slash sender reputation ($0.5\times$), eventually triggering
+    blacklist ($< 0.05$).
+  \item Attachment size limits scale with sender tier (Observer: 1\,MB,
+    Guardian: 100\,MB).
+\end{itemize}
+
+\section{Thread Management and Attachments}
+
+Conversations are modeled as directed acyclic graphs of DHT entries.
+The \texttt{threads} zome maintains link tags for \texttt{in-reply-to},
+\texttt{references}, and \texttt{forward-of} relationships.  Large
+attachments are split into 256\,KB chunks, individually encrypted, and
+distributed across the sender's DHT neighborhood with content-addressed
+BLAKE3 hashes.  The recipient reassembles chunks using the manifest
+entry attached to the parent message.
+
+
+\chapter{Supply Chain Provenance}
+\label{ch:supplychain}
+
+\epigraph{Trust, but verify.}{Russian proverb, popularized by Ronald Reagan}
+
+\section{End-to-End Provenance Without Consensus Bottleneck}
+
+Traditional supply chain blockchains suffer from the consensus
+bottleneck: every transaction must be globally ordered by miners or
+validators, limiting throughput and creating single points of failure.
+The \texttt{mycelix-supplychain} cluster (8 zomes) uses Holochain's
+agent-centric DHT to record provenance \emph{locally} on each handler's
+source chain while the DHT's validation rules ensure global consistency
+without global consensus.
+
+Each handler in the chain of custody---farmer, processor, shipper,
+retailer---signs a \texttt{ProvenanceEntry} on their source chain.
+Downstream handlers verify the upstream signature before accepting
+custody.  The result is a cryptographically linked chain of custody
+that is tamper-evident, auditable, and operates at the throughput of
+individual agents rather than global block intervals.
+
+\section{Zome Architecture}
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Zome} & \textbf{Responsibility} \\
+\midrule
+\endhead
+\texttt{inventory}     & Product registration, batch tracking, location history \\
+\texttt{logistics}     & Shipment management, route optimization, delivery confirmation \\
+\texttt{procurement}   & Purchase orders, tier-gated supplier approval (Citizen+) \\
+\texttt{verification}  & Authenticity verification via source chain provenance \\
+\texttt{trust}         & Supplier reputation, integrated with system-wide reputation \\
+\texttt{claims}        & Dispute resolution, Civic cluster justice integration \\
+\texttt{payments}      & SAP (contracted) and TEND (informal) payment processing \\
+\texttt{bridge}        & Cross-cluster dispatch (e.g., Food domain querying provenance) \\
+\bottomrule
+\end{longtable}
+
+\section{Trust-Weighted Supplier Verification}
+
+Supplier verification uses the 4D trust profile
+(Chapter~\ref{ch:trust-profile}) with domain-specific extensions:
+
+\begin{enumerate}
+  \item \textbf{Identity}: Verified business registration via the
+    Identity cluster's credential wallet.
+  \item \textbf{Reputation}: Delivery reliability score (on-time rate,
+    defect rate, dispute history) with temporal decay ($0.998^{\text{days}}$).
+  \item \textbf{Community}: Peer endorsements from existing supply chain
+    participants, weighted by endorser tier.
+  \item \textbf{Engagement}: Volume and frequency of successful
+    transactions in the past 90 days.
+\end{enumerate}
+
+High-value procurement (above a configurable threshold) requires
+Citizen-tier or above for both buyer and supplier, enforced by the
+consciousness gating layer in \texttt{bridge-common}.
+
+\section{IoT Sensor Integration for Cold Chain Monitoring}
+
+The logistics zome supports \texttt{SensorReading} entries for
+temperature, humidity, GPS coordinates, and shock/vibration events.
+IoT gateways publish signed sensor readings to the handler's source
+chain at configurable intervals.  Validation rules enforce:
+
+\begin{itemize}
+  \item Temperature readings within product-specific acceptable ranges.
+  \item GPS coordinates consistent with the declared shipping route.
+  \item Timestamp monotonicity (no backdated readings).
+  \item Gateway device attestation via the Identity cluster.
+\end{itemize}
+
+Cold chain excursions generate \texttt{AlertEntry} records that propagate
+to all downstream handlers via DHT links, enabling automated rejection
+of compromised shipments before they reach consumers.
+
+\section{Cross-Cluster Integration}
+
+Supply chain provenance integrates with multiple Mycelix clusters:
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Cluster} & \textbf{Integration} \\
+\midrule
+\endhead
+Commons (Food)   & Ingredient provenance queries via bridge dispatch \\
+Finance          & SAP/TEND payment settlement for purchase orders \\
+Civic (Justice)  & Dispute escalation when claims zome resolution fails \\
+Marketplace      & Product authenticity verification for listed goods \\
+Identity         & Supplier business credential verification \\
+\bottomrule
+\end{longtable}
+
+
+\chapter{The Marketplace and Arbitration}
+\label{ch:marketplace}
+
+\epigraph{Markets are conversations.}{The Cluetrain Manifesto}
+
+\section{Decentralized Commerce Without Central Authority}
+
+The \texttt{mycelix-marketplace} cluster (8 zomes) implements a
+decentralized marketplace where buyers and sellers transact without
+a platform intermediary extracting fees or controlling access.  Seller
+verification is trust-weighted: listing a product requires Participant
+tier or above, while high-value listings (above a configurable
+threshold) require Citizen tier.
+
+\section{Trust-Weighted Seller Ratings}
+
+Seller ratings depart from the centralized five-star model.  Each
+review is weighted by the reviewer's combined trust score
+(Chapter~\ref{ch:trust-profile}):
+
+\begin{equation}
+  R_{\text{weighted}} = \frac{\sum_{i} w_i \cdot r_i}{\sum_{i} w_i},
+  \quad w_i = \text{combined\_score}(\text{reviewer}_i)
+\end{equation}
+
+This means a Guardian-tier reviewer's assessment carries substantially
+more weight than an Observer's.  The temporal decay of the reputation
+dimension ($0.998^{\text{days}}$) ensures that sellers must maintain
+quality over time---a burst of positive reviews from years ago fades
+naturally.
+
+\section{Escrow Without Central Authority}
+
+Marketplace escrow uses the Finance cluster's payment infrastructure
+(Chapter~\ref{ch:finance}) with a three-phase commit:
+
+\begin{longtable}{clp{7cm}}
+\toprule
+\textbf{Phase} & \textbf{Actor} & \textbf{Action} \\
+\midrule
+\endhead
+1 & Buyer   & Funds locked in escrow via SAP payment \\
+2 & Seller  & Ships goods; logistics zome records dispatch \\
+3a & Buyer  & Confirms receipt $\rightarrow$ escrow releases to seller \\
+3b & Timeout & Auto-release after configurable period (default 14 days) \\
+3c & Dispute & Either party initiates arbitration (see Section~\ref{sec:arbitration}) \\
+\bottomrule
+\end{longtable}
+
+The escrow is implemented as a \texttt{LockedPaymentEntry} on the
+Finance cluster, referenced by action hash from the Marketplace
+listing.  No central escrow service holds funds; the payment is
+cryptographically locked until one of the three resolution paths
+executes.
+
+\section{Arbitration System for Dispute Resolution}
+\label{sec:arbitration}
+
+When buyer and seller cannot resolve a dispute, the Marketplace
+cluster's arbitration zome activates a structured resolution process:
+
+\begin{enumerate}
+  \item \textbf{Filing}: Either party files a \texttt{DisputeEntry} with
+    evidence (transaction records, sensor data, communications).
+  \item \textbf{Arbitrator selection}: Three arbitrators are selected from
+    Steward+ tier agents with domain engagement in the relevant product
+    category.  Selection uses deterministic randomness seeded by the
+    dispute entry's action hash to prevent manipulation.
+  \item \textbf{Evidence review}: Arbitrators review submitted evidence
+    within a configurable window (default 7 days).
+  \item \textbf{Ruling}: Majority vote determines the outcome---full
+    refund, partial refund, or seller payment.  The ruling is recorded
+    on-chain and the escrow is disbursed accordingly.
+  \item \textbf{Escalation}: If either party rejects the ruling, the
+    dispute escalates to the Civic cluster's justice domain
+    (Chapter~\ref{ch:civic}) for community-level adjudication.
+\end{enumerate}
+
+\section{Product Categories and Search}
+
+Product listings support hierarchical categories, free-text search,
+and tag-based filtering.  Search is implemented via DHT link tags
+rather than a centralized search index:
+
+\begin{itemize}
+  \item Category links: \texttt{ProductEntry} $\xrightarrow{\text{category}}$ \texttt{CategoryAnchor}
+  \item Tag links: \texttt{ProductEntry} $\xrightarrow{\text{tag:organic}}$ \texttt{TagAnchor}
+  \item Geospatial: Products include optional coordinates for
+    proximity-based discovery via geohash link tags.
+\end{itemize}
+
+
+\chapter{Adaptive Education}
+\label{ch:edunet}
+
+\epigraph{Education is not the filling of a pail, but the lighting of a fire.}{W.B.\ Yeats (attributed)}
+
+\section{Overview}
+
+The \texttt{mycelix-edunet} cluster (10 zomes) implements a decentralized
+adaptive learning platform where student data never leaves the
+student's device, curriculum is community-governed, and credentials
+are portable across institutions.
+
+\section{Zome Architecture}
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Zome} & \textbf{Responsibility} \\
+\midrule
+\endhead
+\texttt{adaptive-learning}  & Personalized learning paths, mastery tracking \\
+\texttt{credentialing}      & Verifiable credential issuance and verification \\
+\texttt{dao-governance}     & Community governance of curriculum standards \\
+\texttt{federated-learning} & Privacy-preserving model personalization \\
+\texttt{gamification}       & Achievement tracking, motivation mechanics \\
+\texttt{knowledge-mgmt}     & Curriculum design, resource cataloging \\
+\texttt{learning-pods}      & Small-group collaborative learning spaces \\
+\texttt{social}             & Peer interaction, mentorship matching \\
+\texttt{recommendation}     & Knowledge-graph-based learning path suggestions \\
+\texttt{bridge}             & Cross-cluster dispatch \\
+\bottomrule
+\end{longtable}
+
+\section{Federated Learning for Personalization}
+
+Adaptive learning systems traditionally require centralizing student
+performance data on a server to train recommendation models.  Mycelix
+EduNet eliminates this requirement using the 0TML federated learning
+framework (Chapter~\ref{ch:fl}):
+
+\begin{enumerate}
+  \item Each student's device trains a local model on their learning
+    history (mastery scores, time-on-task, error patterns).
+  \item Local model updates are compressed via HyperFeel
+    (Chapter~\ref{ch:hyperfeel}) for communication efficiency.
+  \item The \texttt{federated-learning} zome aggregates updates using
+    Byzantine-tolerant MATL consensus (45\% tolerance).
+  \item The global model is distributed back to devices for improved
+    recommendations---without any student's raw data leaving their device.
+\end{enumerate}
+
+\section{Credential Portability}
+
+Credentials issued by the \texttt{credentialing} zome are W3C Verifiable
+Credentials (VCs) anchored to the Identity cluster's DID registry:
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Credential Type} & \textbf{Description} \\
+\midrule
+\endhead
+Course completion  & Signed by instructor DID + institution DID \\
+Skill mastery      & Adaptive assessment score above threshold \\
+Peer assessment    & Multi-rater evaluation (tier-gated: Citizen+ raters) \\
+Portfolio          & Collection of work artifacts with provenance \\
+Micro-credential   & Granular skill badges (e.g., ``linear algebra L3'') \\
+\bottomrule
+\end{longtable}
+
+Because credentials are anchored to DIDs rather than institutional
+databases, they are portable across any institution that recognizes
+the Mycelix identity layer.  A student transferring between learning
+communities carries their full credential history on their source chain.
+
+\section{DAO Governance of Curriculum}
+
+Curriculum standards are governed by the \texttt{dao-governance} zome,
+which implements a lightweight governance process integrated with the
+Governance cluster (Chapter~\ref{ch:governance}):
+
+\begin{itemize}
+  \item Curriculum proposals require Citizen-tier sponsorship.
+  \item Review periods allow community feedback (default 14 days).
+  \item Approval requires supermajority (67\%) of domain-engaged voters.
+  \item Approved curricula are published as versioned entries on the DHT.
+\end{itemize}
+
+\section{Learning Pods and Social Recommendation}
+
+Learning pods are small-group collaborative spaces (2--8 participants)
+matched by the \texttt{recommendation} zome based on complementary
+skill profiles, compatible learning styles, and geographic proximity.
+The matching algorithm uses the Knowledge cluster's graph
+(Chapter~\ref{ch:knowledge}) to identify learners whose knowledge
+gaps are complementary---each participant can teach what others need
+to learn, creating reciprocal learning relationships.
+
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% PART V: INFRASTRUCTURE
+%% ════════════════════════════════════════════════════════════════════════════
+
+\part{Infrastructure}
+
+\chapter{SDKs}
+
+\section{Three-Language Strategy}
+
+Mycelix provides SDKs in three languages to maximize developer accessibility:
+
+\subsection{Rust SDK (Primary)}
+
+The Rust SDK is the canonical implementation:
+\begin{itemize}
+  \item 18 modules covering all 16 clusters
+  \item Approximately 50,000 lines of code
+  \item 1,036 tests
+  \item Direct Holochain HDK integration
+  \item WASM compilation target for zome development
+\end{itemize}
+
+\subsection{TypeScript SDK}
+
+The TypeScript SDK is the primary client-side SDK:
+\begin{itemize}
+  \item 37 modules
+  \item Approximately 226,000 lines of code
+  \item 6,316 tests
+  \item WebSocket connection to Holochain conductor
+  \item React and Svelte component libraries
+\end{itemize}
+
+\subsection{Python SDK}
+
+The Python SDK targets data science and research workflows:
+\begin{itemize}
+  \item REST API wrapper for the DeSci cluster
+  \item Federated learning client
+  \item Data analysis utilities
+\end{itemize}
+
+\section{WASM Compilation}
+
+All Holochain zomes compile to WebAssembly (wasm32-unknown-unknown target).
+The build pipeline:
+
+\begin{lstlisting}[language=bash]
+cargo build --release --target wasm32-unknown-unknown
+\end{lstlisting}
+
+Each cluster has a \texttt{just} recipe (e.g., \texttt{just build-commons})
+that handles the complete build-and-package workflow.
+
+\section{Dashboard Applications}
+
+Two dashboard applications provide visual interfaces:
+
+\begin{description}
+  \item[LUCID] (SvelteKit + Tauri) --- Desktop application with 40+ components,
+    95\% Symthaea bridge integration. Provides real-time visualization of
+    trust profiles, governance proceedings, and cluster health.
+  \item[Observatory] (SvelteKit) --- Web-based monitoring dashboard for
+    cluster metrics, bridge dispatch statistics, and network health.
+\end{description}
+
+
+\chapter{HyperFeel, zkSTARK, and the Agentic Framework}
+\label{ch:hyperfeel}
+
+\epigraph{Compression is intelligence.}{Gregory Chaitin (paraphrased)}
+
+\section{Overview}
+
+Three infrastructure components bridge the gap between Mycelix's
+federated learning pipeline and its governance layer: \textbf{HyperFeel}
+provides 2000$\times$ gradient compression for communication-efficient
+FL rounds, \textbf{zkSTARK} provides zero-knowledge proofs of gradient
+provenance, and the \textbf{Agentic Framework} extends governance
+participation to AI agents through commitment protocols and patience
+mechanisms.
+
+\section{HyperFeel: HDC Gradient Compression}
+
+Federated learning requires participants to exchange model updates
+(gradients) each round.  For large models, raw gradient transmission
+dominates communication cost.  HyperFeel compresses gradients using
+Hyperdimensional Computing (HDC) encoding:
+
+\begin{enumerate}
+  \item \textbf{Encode}: Project the gradient vector $\nabla \in \mathbb{R}^d$
+    into a 16,384-dimensional binary hypervector $\mathbf{h} \in \{0,1\}^{16384}$
+    using random projection matrices.
+  \item \textbf{Compress}: Binary quantization reduces each dimension to
+    a single bit---yielding 2\,KB per gradient regardless of original
+    dimensionality.
+  \item \textbf{Transmit}: The compressed hypervector is published as a
+    DHT entry on the participant's source chain.
+  \item \textbf{Decode}: The aggregator reconstructs approximate gradients
+    via bundling (element-wise majority vote) followed by inverse projection.
+\end{enumerate}
+
+\begin{longtable}{lrr}
+\toprule
+\textbf{Metric} & \textbf{Raw Gradient} & \textbf{HyperFeel} \\
+\midrule
+\endhead
+Size per update (1M params) & 4\,MB (float32) & 2\,KB (binary HDV) \\
+Compression ratio           & $1\times$        & $\sim 2000\times$ \\
+Reconstruction error        & 0\%              & $< 5\%$ (empirical) \\
+Aggregation method          & FedAvg           & HDV bundling \\
+Quantum resistance          & N/A              & Inherent (binary) \\
+\bottomrule
+\end{longtable}
+
+HDC's algebraic properties---distributivity of binding over bundling---allow
+compressed gradients to be aggregated \emph{in the compressed domain}
+without decompression, further reducing aggregator computation.
+
+\section{zkSTARK: Zero-Knowledge Gradient Provenance}
+
+In a decentralized FL system, a malicious participant could submit
+fabricated gradients to poison the global model.  Mycelix addresses
+this with zkSTARK proofs (Zero-Knowledge Scalable Transparent Arguments
+of Knowledge) that attest gradient provenance without revealing the
+underlying training data.
+
+The integration uses RISC-0's zkVM:
+
+\begin{enumerate}
+  \item The participant runs local training inside the RISC-0 guest
+    program, producing the gradient and a zkSTARK proof.
+  \item The proof attests: ``this gradient was computed by running
+    SGD on $\geq n$ samples, starting from the published global model.''
+  \item The proof reveals neither training data, epochs, nor learning
+    rate---only that the computation was performed honestly.
+  \item The aggregator verifies in $O(\log n)$ time before accepting
+    the gradient into the aggregation round.
+\end{enumerate}
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Property} & \textbf{Guarantee} \\
+\midrule
+\endhead
+Zero-knowledge       & Training data not revealed to aggregator or peers \\
+Transparency         & No trusted setup required (STARK, not SNARK) \\
+Scalability          & Proof size $O(\log^2 n)$, verification $O(\log n)$ \\
+Post-quantum         & Hash-based---secure against quantum adversaries \\
+Composability        & Proofs compose with MATL trust scoring \\
+\bottomrule
+\end{longtable}
+
+\section{The Agentic Framework}
+
+As AI systems become participants in governance, Mycelix requires
+mechanisms to ensure that autonomous agents participate responsibly.
+The Agentic Framework provides three primitives:
+
+\subsection{Commitment Protocols}
+
+An agent publishes a \texttt{CommitmentEntry} on its source chain
+declaring its intended action \emph{before} executing it.  The
+commitment includes a BLAKE3 hash of the action payload and a
+deadline.  If the agent fails to execute the committed action by
+the deadline, its reputation is slashed ($0.5\times$).  This
+creates a credible cost for broken promises.
+
+\subsection{Covenants}
+
+Covenants are multi-agent commitment protocols: $n$ agents jointly
+commit to a coordinated action (e.g., a federated learning round,
+a collective governance vote).  The covenant is implemented as a
+\texttt{CovenantEntry} linking $n$ individual commitments.  Execution
+requires all $n$ commitments to be fulfilled; partial fulfillment
+triggers proportional reputation adjustments.
+
+\subsection{Patience Mechanisms}
+
+To prevent AI agents from dominating governance with rapid-fire
+proposals and votes, the Agentic Framework enforces \emph{patience
+constraints}: minimum deliberation periods (24 hours before voting),
+rate limiting (one proposal per governance cycle), and a reflection
+requirement (\texttt{ReflectionEntry} summarizing reasoning before
+each vote).  These constraints are enforced at the zome validation
+level---bypass attempts produce invalid source chain entries.
+
+
+\chapter{Federated Learning}
+\label{ch:fl}
+
+\section{0TML: Zero-Trust Machine Learning}
+
+The \texttt{mycelix-core} crate implements 0TML (Zero-Trust Machine Learning),
+a federated learning framework where participants never share raw data.
+Instead, model gradients are aggregated using Byzantine-tolerant protocols.
+
+\section{Architecture}
+
+The federated learning pipeline:
+
+\begin{enumerate}
+  \item \textbf{Task definition}: A learning task is published to the network
+    with model architecture, hyperparameters, and convergence criteria.
+  \item \textbf{Local training}: Each participating agent trains on their local
+    data, producing gradient updates.
+  \item \textbf{Gradient submission}: Agents submit encrypted gradient updates
+    to the aggregation coordinator.
+  \item \textbf{Byzantine filtering}: Submitted gradients are filtered for
+    Byzantine faults (poisoned models, adversarial updates) using
+    trust-weighted scores from the 4D profile.
+  \item \textbf{Aggregation}: Filtered gradients are aggregated using
+    trust-weighted averaging---agents with higher governance profiles
+    contribute more to the aggregate.
+  \item \textbf{Model update}: The aggregated model is distributed to all
+    participants.
+\end{enumerate}
+
+\section{Trust-Aware Byzantine Tolerance}
+
+Traditional Byzantine fault tolerance treats all participants equally.
+Mycelix's 0TML weights Byzantine detection by the 4D trust profile:
+
+\begin{equation}
+  \hat{g} = \frac{\sum_{i \in \text{valid}} \phi_i \cdot g_i}{\sum_{i \in \text{valid}} \phi_i}
+\end{equation}
+
+where $\phi_i$ is the trust-weighted score of agent $i$ and $g_i$ is their
+gradient contribution. An agent flagged as Byzantine has their $\phi_i$ reduced,
+but they are not immediately excluded---the 4D profile captures the nuance
+between intentional adversarial behavior and honest disagreement.
+
+\section{62 FL Tests}
+
+The federated learning implementation includes 62 tests covering:
+\begin{itemize}
+  \item Convergence on known datasets
+  \item Byzantine fault injection and detection
+  \item Privacy guarantees (gradient reconstruction attacks)
+  \item Trust-weighted aggregation correctness
+\end{itemize}
+
+
+\chapter{Security}
+
+\section{Post-Quantum Cryptography}
+
+Mycelix prepares for the post-quantum era with ML-KEM-768 key encapsulation:
+
+\begin{itemize}
+  \item \textbf{Identity}: Post-quantum key pairs in DID documents alongside
+    classical Ed25519 keys.
+  \item \textbf{Mail}: The PQC-encrypted mail cluster (12 zomes) uses
+    ML-KEM-768 for key exchange and AES-256-GCM for message encryption.
+  \item \textbf{Handshake}: A hybrid handshake protocol that combines classical
+    and post-quantum key exchange, ensuring security even if one scheme is broken.
+\end{itemize}
+
+\section{Reputation as Security}
+
+Mycelix's reputation system serves as a decentralized security mechanism:
+
+\begin{description}
+  \item[Temporal decay] ($0.998^{\text{days}}$): Reputation naturally decays,
+    preventing ancient good behavior from permanently shielding bad actors.
+  \item[Slashing] ($0.5\times$): Severe misbehavior cuts reputation in half.
+  \item[Blacklisting] ($< 0.05$): Agents below the threshold lose all
+    governance participation.
+  \item[Restoration] (100 positive interactions): Blacklisted agents can
+    rebuild trust through sustained good behavior.
+\end{description}
+
+\section{Sybil Resistance}
+
+Sybil attacks---where an adversary creates many fake identities to gain
+disproportionate influence---are addressed at multiple levels:
+
+\begin{enumerate}
+  \item \textbf{Identity dimension}: Higher MFA assurance levels are
+    progressively more expensive to fake.
+  \item \textbf{Community dimension}: Trust attestations from high-tier agents
+    are weighted more heavily---Sybil identities cannot bootstrap community
+    trust from each other.
+  \item \textbf{Web-of-trust}: Graph analysis detects isolated clusters of
+    mutually-attesting identities.
+  \item \textbf{Rate limiting}: Bridge dispatch limits prevent a single agent
+    from flooding the system.
+\end{enumerate}
+
+
+\chapter{The Observatory}
+\label{ch:observatory}
+
+\section{Live Network Visualization}
+
+The Observatory is a SvelteKit web application that provides real-time
+monitoring of a Mycelix network deployment. Unlike LUCID (which bridges
+to Symthaea's consciousness engine), the Observatory focuses on network
+health, governance activity, and trust dynamics.
+
+\section{Dashboard Architecture}
+
+The Observatory connects to one or more Holochain conductors via WebSocket
+and renders four primary views:
+
+\begin{description}
+  \item[Network Health] Real-time cluster health monitoring: zome response
+    times (p50/p95/p99), DHT consistency metrics, bridge dispatch
+    throughput, and error rates. Each of the 16 clusters is displayed as
+    a health card with green/yellow/red status indicators.
+  \item[Trust Graph] An interactive force-directed graph visualization of
+    the network's trust relationships. Nodes represent agents, colored by
+    governance tier. Edges represent trust attestations, weighted by
+    attestor tier. The graph reveals community structure: dense clusters
+    of mutual trust, bridging agents who connect communities, and isolated
+    nodes that may indicate new agents or potential Sybil identities.
+  \item[Governance Feed] A real-time feed of governance activity: proposals
+    created, votes cast, constitutional amendments proposed, emergency
+    actions triggered. Each event is annotated with the acting agent's
+    tier, the E-N-M classification of the governance action, and the
+    current vote tally.
+  \item[Agent Activity] Per-agent activity monitoring showing cross-cluster
+    participation patterns, reputation trajectory, tier history, and
+    credential status. Administrators can identify agents approaching
+    tier transitions or experiencing reputation decay.
+\end{description}
+
+\section{Trust Distribution Analytics}
+
+The Observatory computes and displays aggregate trust analytics:
+
+\begin{itemize}
+  \item \textbf{Tier histogram}: Distribution of agents across the five
+    governance tiers. A healthy network has a pyramid shape (many Observers,
+    fewer Guardians). An inverted pyramid suggests credential inflation.
+  \item \textbf{Dimension heatmap}: 4D scatter plot of identity, reputation,
+    community, and engagement dimensions across the network. Clusters in
+    this space reveal agent archetypes (high-identity/low-engagement
+    ``lurkers,'' high-engagement/low-community ``solo operators'').
+  \item \textbf{Reputation flow}: Temporal visualization of reputation
+    events---attestations, slashing, decay, restoration---showing the
+    health of the reputation economy.
+  \item \textbf{Bridge dispatch map}: Sankey diagram of cross-cluster
+    communication flows, revealing which clusters interact most frequently
+    and where bottlenecks occur.
+\end{itemize}
+
+\section{Deployment}
+
+The Observatory deploys as a static SvelteKit build behind the same nginx
+reverse proxy that serves the Holochain conductor WebSocket endpoints. It
+requires no backend server of its own---all data is fetched directly from
+the Holochain conductors via the standard WebSocket API.
+
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% PART VI: DEPLOYMENT AND VALIDATION
+%% ════════════════════════════════════════════════════════════════════════════
+
+\part{Deployment and Validation}
+
+\chapter{Testing}
+
+\section{8,600+ Tests}
+
+Mycelix's test suite comprises over 8,600 automated tests across all clusters:
+
+\begin{longtable}{lrl}
+\toprule
+\textbf{Cluster} & \textbf{Tests} & \textbf{Type} \\
+\midrule
+\endhead
+mycelix-commons & 5,276 & Unit + sweettest \\
+mycelix-civic & 2,273 & Unit + sweettest \\
+mycelix-hearth & 1,023 & Unit + sweettest \\
+mycelix-identity & 123+ & Unit + sweettest \\
+mycelix-governance & 200+ & Unit + sweettest \\
+bridge-common & 295+ & Unit + property \\
+bridge-entry-types & 58 & Unit \\
+Rust SDK & 1,036 & Unit + integration \\
+TypeScript SDK & 6,316 & Unit + integration \\
+mycelix-core (FL) & 62 & Unit + integration \\
+\bottomrule
+\end{longtable}
+
+\section{Testing Strategies}
+
+\subsection{Unit Tests}
+
+Each zome's coordinator crate includes unit tests that exercise individual
+functions in isolation. These tests mock the Holochain HDK and do not require
+a running conductor.
+
+\subsection{Sweettest Integration Tests}
+
+Holochain's sweettest framework provides conductor-level integration testing.
+Sweettest tests:
+\begin{itemize}
+  \item Spin up a real Holochain conductor in-process
+  \item Install the DNA and create test agents
+  \item Exercise full DHT replication and validation
+  \item Verify cross-zome and cross-cell communication
+\end{itemize}
+
+\subsection{Property-Based Tests}
+
+The bridge-common crate includes property-based tests (proptests) that verify
+invariants hold across randomly generated inputs:
+
+\begin{itemize}
+  \item Tier monotonicity: higher scores always produce equal or higher tiers
+  \item Vote weight bounds: weight is always in $[0, W_{\max}]$
+  \item Score bounds: combined score is always in $[0, 1]$
+  \item Sigmoid properties: continuous, monotonically increasing
+\end{itemize}
+
+\section{Continuous Integration}
+
+While the monorepo does not run CI directly (per development rules), the
+standalone public repositories (\texttt{symthaea}, \texttt{mycelix}) have
+GitHub Actions workflows. Changes are synced via
+\texttt{scripts/sync-to-standalone.sh}.
+
+
+\chapter{Deployment}
+
+\section{Development Environment}
+
+Mycelix development uses Nix flakes for reproducible environments:
+
+\begin{lstlisting}[language=bash,caption={Development setup}]
+nix develop          # Enter environment
+just build           # Build all zomes
+just test            # Run all tests
+just dev             # Start local conductor
+\end{lstlisting}
+
+The Nix flake provides:
+\begin{itemize}
+  \item Holochain conductor (v0.6.0) and CLI tools
+  \item Rust toolchain with wasm32-unknown-unknown target
+  \item mold linker and sccache for fast compilation
+  \item Node.js for TypeScript SDK development
+  \item Python for SDK and data science workflows
+\end{itemize}
+
+All Holochain versions are managed from a single source of truth:
+\texttt{nix/modules/holochain-versions.nix}. Upgrading Holochain requires
+updating only this file and running \texttt{nix flake lock --update-input holonix}.
+
+\section{WASM Compilation}
+
+Each zome compiles to WebAssembly for the Holochain runtime:
+
+\begin{lstlisting}[language=bash]
+cargo build --release --target wasm32-unknown-unknown
+hc dna pack .
+hc app pack .
+\end{lstlisting}
+
+A critical compatibility requirement: WASM zomes must use \texttt{getrandom v0.3}
+with the \texttt{getrandom\_backend="custom"} configuration. The older
+\texttt{getrandom v0.2} with \texttt{js} feature pulls in wasm-bindgen,
+which is incompatible with Holochain's WASM runtime.
+
+The compiled unified hApp (all 16 cluster DNAs) produces a bundle of
+approximately 100 MB uncompressed.
+
+\section{Three-Node Network}
+
+A minimal Mycelix deployment consists of three Holochain conductors forming
+a DHT neighborhood. Docker Compose orchestrates the deployment:
+
+\begin{lstlisting}[language=bash,caption={Docker deployment (simplified)}]
+docker compose up -d  # 3 conductors + nginx
+\end{lstlisting}
+
+Each conductor runs:
+\begin{itemize}
+  \item All 16 cluster DNAs (unified hApp)
+  \item WebSocket interface for client connections
+  \item Admin interface for conductor management
+\end{itemize}
+
+\section{Nginx Reverse Proxy}
+
+An nginx instance provides:
+\begin{itemize}
+  \item TLS termination for WebSocket connections
+  \item Rate limiting at the network level (complementing bridge-level limits)
+  \item Load balancing across conductors
+  \item CORS headers for web dashboard access
+\end{itemize}
+
+\section{Observatory Dashboard}
+
+The Observatory dashboard connects to all three conductors and provides:
+\begin{itemize}
+  \item Cluster health monitoring (zome response times, DHT consistency)
+  \item Bridge dispatch metrics (call counts, latency, error rates)
+  \item Trust profile distribution (tier histogram across the network)
+  \item Governance activity feed (proposals, votes, constitutional actions)
+\end{itemize}
+
+
+\chapter{Resilience and Disaster Recovery}
+\label{ch:resilience}
+
+\epigraph{Everything fails, all the time.}{Werner Vogels, CTO of Amazon}
+
+\section{Design Philosophy}
+
+Mycelix is designed for \emph{graceful degradation} rather than
+\emph{fault prevention}.  In a decentralized system with no central
+point of control, failures are not exceptional events but routine
+operating conditions.  The resilience architecture ensures that
+individual node failures, network partitions, and even the loss of
+an entire data center do not compromise the system's ability to
+function.
+
+\section{The Resilience Bundle}
+
+The \texttt{docker-compose.resilience.yml} configuration deploys an
+8-DNA resilience bundle that provides the minimum viable Mycelix
+deployment:
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{DNA} & \textbf{Purpose} \\
+\midrule
+\endhead
+\texttt{identity}   & DID registry, MFA, credential wallet \\
+\texttt{governance}  & Proposals, voting, constitution \\
+\texttt{commons}     & Core commons services (property, food, water, transport) \\
+\texttt{finance}     & SAP/TEND/MYCEL payments, treasury \\
+\texttt{civic}       & Justice, emergency, media \\
+\texttt{hearth}      & Family and community services \\
+\texttt{personal}    & Identity vault, health vault \\
+\texttt{mail}        & PQC-encrypted communication \\
+\bottomrule
+\end{longtable}
+
+This bundle is the recommended minimum for any production deployment.
+Additional cluster DNAs (health, knowledge, supplychain, etc.) can be
+added incrementally without disrupting the core services.
+
+\section{Backup and Recovery Procedures}
+
+\subsection{LAIR Keystore Backup}
+
+The LAIR keystore holds the agent's cryptographic keys---loss of
+LAIR data means permanent loss of the agent's identity.  Backup
+procedures:
+
+\begin{enumerate}
+  \item \textbf{Passphrase}: The LAIR passphrase must be stored
+    securely (Mycelix uses BWS as the credential manager).
+    Loss of the passphrase is irrecoverable.
+  \item \textbf{Volume snapshots}: The LAIR data directory
+    (\texttt{/var/lib/lair-keystore/}) is backed up via filesystem
+    snapshots at configurable intervals (default: daily).
+  \item \textbf{Recovery}: To restore from backup, mount the snapshot,
+    provide the passphrase, and restart the conductor.  The agent
+    resumes with its original identity and source chain.
+\end{enumerate}
+
+\subsection{Source Chain Recovery}
+
+Each agent's source chain is the authoritative record of their
+actions.  Recovery paths:
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Scenario} & \textbf{Recovery} \\
+\midrule
+\endhead
+Node data loss (LAIR intact)   & Re-sync from DHT peers; source chain
+  reconstructed from published entries \\
+LAIR loss (backup exists)      & Restore LAIR from snapshot; re-sync
+  source chain from DHT \\
+LAIR loss (no backup)          & Identity lost; agent must re-register
+  via Identity cluster recovery zome \\
+Corrupted source chain         & Validate and prune from last known-good
+  entry; re-sync missing entries from DHT \\
+\bottomrule
+\end{longtable}
+
+\section{Multi-Node Failover Strategies}
+
+For high-availability deployments, Mycelix supports three configurations:
+\emph{active-passive} (standby conductor mirrors the primary via DHT
+replication, promotes on failure using shared LAIR keystore),
+\emph{geographic distribution} (nodes in different regions with DHT
+neighborhood redundancy of 8 peers per arc), and \emph{rolling upgrades}
+(one node at a time, DHT continues with reduced redundancy).
+
+\section{Network Partition Handling}
+
+Holochain's DHT gossip protocol is inherently partition-tolerant:
+
+\begin{enumerate}
+  \item \textbf{Detection}: Gossip timeout (default 30 seconds).
+  \item \textbf{Continued operation}: Each partition operates
+    independently; agents write to source chains and interact
+    with reachable peers.
+  \item \textbf{Gossip self-healing}: On partition heal, DHT gossip
+    propagates entries created during the split.  Holochain's CRDTs
+    eliminate manual conflict resolution.
+  \item \textbf{Governance reconciliation}: Votes use
+    \emph{last-writer-wins} semantics; proposals use \emph{union}
+    semantics---no votes are lost.
+\end{enumerate}
+
+\section{Monitoring and Alerting}
+
+The Observatory dashboard (Chapter~\ref{ch:observatory}) provides
+resilience monitoring: DHT consistency scores, gossip latency
+histograms, source chain heights, LAIR health checks, conductor
+resource utilization, and bridge dispatch error rates.  Alerts
+support webhook, Mail cluster email, and LUCID push notifications.
+
+
+\chapter{The Symthaea Bridge}
+
+\section{Consciousness Engine Integration}
+
+Mycelix integrates with the Symthaea consciousness engine---a holographic
+liquid brain architecture implementing HDC (16,384-dimensional
+Hyperdimensional Computing), IIT (Integrated Information Theory), and
+Active Inference. The bridge between Symthaea and Mycelix operates through
+the trust profile's engagement dimension.
+
+\subsection{Minimal Viable Bridge}
+
+The \texttt{ConsciousnessProfile::from\_unified\_consciousness} function
+maps Symthaea's unified consciousness score ($C_{\text{unified}}$) to the
+engagement dimension:
+
+\begin{lstlisting}
+pub fn from_unified_consciousness(
+    unified_consciousness: f64,
+    identity: f64,
+    reputation: f64,
+    community: f64,
+) -> Self {
+    Self {
+        identity: identity.clamp(0.0, 1.0),
+        reputation: reputation.clamp(0.0, 1.0),
+        community: community.clamp(0.0, 1.0),
+        engagement: unified_consciousness
+            .clamp(0.0, 1.0),
+    }
+}
+\end{lstlisting}
+
+This minimal viable bridge ensures that Symthaea-connected agents have their
+Symthaea consciousness metrics reflected in their governance capability.
+
+\subsection{LUCID Dashboard}
+
+The LUCID dashboard (SvelteKit + Tauri, 40+ components) provides 95\%
+Symthaea bridge integration, visualizing:
+
+\begin{itemize}
+  \item Real-time trust profile evolution
+  \item Phi (integrated information) over time
+  \item Governance tier transitions
+  \item Cross-cluster activity heatmaps
+  \item Neuromodulator-governance coupling metrics
+\end{itemize}
+
+\section{GovernanceManager Integration}
+
+The Symthaea cognitive loop includes a GovernanceManager (interval 37 cycles)
+that processes governance events from Mycelix into the consciousness engine:
+
+\begin{itemize}
+  \item Proposal creation events modulate dopamine (reward anticipation)
+  \item Vote outcomes modulate serotonin (social cohesion)
+  \item Constitutional amendments modulate norepinephrine (alertness)
+  \item Emergency governance events modulate cortisol (stress response)
+\end{itemize}
+
+This bidirectional coupling means that Mycelix governance activity shapes
+the computational state of Symthaea-connected agents, and that state feeds
+back into governance capability through the engagement dimension. The
+recursion is intentional and productive: engaged governance participation
+increases trust metrics, which increases governance capability, which
+enables deeper governance participation.
+
+
+\chapter{Future}
+
+\section{Mesh Radio Bridge}
+
+The Symthaea project includes a mesh radio architecture (feature \texttt{mesh})
+that models 3-tier radio networks (Local/Metro/Regional). Integration with
+Mycelix would enable:
+
+\begin{itemize}
+  \item Offline-capable governance (radio mesh maintains local consensus when
+    internet connectivity is unavailable)
+  \item Rural deployment (communities without reliable internet)
+  \item Disaster resilience (mesh networks self-heal around damaged infrastructure)
+\end{itemize}
+
+\section{Inter-Planetary Governance}
+
+As humanity expands beyond Earth, governance must adapt to light-speed delays.
+Mycelix's agent-centric architecture is uniquely suited to this challenge:
+
+\begin{itemize}
+  \item \textbf{No global consensus}: Source chains work independently of
+    network latency.
+  \item \textbf{Eventual consistency}: The DHT converges when communication is
+    available, tolerating minutes-to-hours of delay.
+  \item \textbf{Jurisdictional nesting}: The jurisdiction zome can define
+    planetary, orbital, and surface jurisdictions with different governance
+    parameters.
+  \item \textbf{Space cluster}: Already implements orbital object tracking
+    and traffic management.
+\end{itemize}
+
+\section{Species Stewardship}
+
+Perhaps the most ambitious future direction: extending governance participation
+beyond humans. The trust profile framework does not assume human participants. An AI system, a collective organism, or a sensor network
+representing an ecosystem could, in principle, obtain a trust credential
+(a \texttt{ConsciousnessCredential} in the code) and participate in governance.
+
+The Symthaea project's substrate independence framework---which analyzes
+consciousness across different physical substrates (biological neurons, silicon,
+quantum, photonic, neuromorphic)---provides the theoretical foundation for
+evaluating non-human governance participants.
+
+This is not a near-term goal, but the architecture explicitly does not preclude
+it. The trust profile measures \emph{demonstrated capability and commitment},
+not \emph{species membership}.
+
+\section{Scaling Challenges}
+
+Several scaling challenges remain for Mycelix's future development:
+
+\begin{description}
+  \item[Conductor resources] Running all 16 cluster DNAs on a single conductor
+    requires significant memory (approximately 8 GB for the full Commons
+    cluster alone during test runs). Strategies for selective cluster loading---where
+    agents install only the clusters they participate in---are needed for
+    resource-constrained devices.
+  \item[Cross-cluster latency] While intra-cluster calls are synchronous
+    (microseconds), cross-cluster calls through \texttt{CallTargetCell::OtherRole}
+    add milliseconds of latency. Governance actions requiring multi-cluster
+    verification (e.g., a constitutional amendment checking identity, reputation,
+    and community across three clusters) may accumulate perceptible delays.
+  \item[DHT growth] As the network grows, each agent's storage responsibility
+    (their DHT neighborhood) grows proportionally. Holochain's sharding model
+    mitigates this, but very large networks (millions of agents) will require
+    careful tuning of redundancy factors and garbage collection policies.
+  \item[Upgrade coordination] Upgrading coordinator zomes across 16 clusters
+    requires careful versioning. The schema versioning in bridge-entry-types
+    and the extensions mechanism in ConsciousnessCredential provide forward
+    compatibility, but major protocol changes still require coordinated rollouts.
+\end{description}
+
+\section{Open Research Questions}
+
+Several open questions motivate ongoing research:
+
+\begin{enumerate}
+  \item \textbf{Optimal dimension weights}: The dimension weights
+    (0.25/0.25/0.30/0.20) were determined empirically. Can game-theoretic
+    analysis produce provably optimal weights against specific attack models?
+  \item \textbf{Cross-deployment federation}: How can independent Mycelix
+    deployments federate? Can trust profiles be portable across
+    independent communities while maintaining Sybil resistance?
+  \item \textbf{Formal verification}: The bridge-common crate has 295+ tests
+    but no formal verification. Can the tier monotonicity, vote weight
+    boundedness, and credential security properties be proven in Lean or Coq?
+  \item \textbf{Economic modeling}: How do the three currencies (SAP, TEND,
+    MYCEL) interact in practice? What demurrage rates optimize circulation
+    without discouraging participation?
+  \item \textbf{Engagement measurement}: The engagement dimension currently
+    measures participation counts. Can more sophisticated measures of
+    governance engagement---attention quality, deliberation depth, decision
+    coherence---improve governance outcomes?
+\end{enumerate}
+
+\section{Conclusion}
+
+Mycelix is not a utopian blueprint. It is an engineering project---785,000 lines
+of Rust, tested by 8,600 automated tests, deployed on Holochain's battle-tested
+DHT. Its innovation is not technological novelty but \emph{governance novelty}:
+the insight that access to collective decision-making should scale with
+demonstrated identity, reputation, community trust, and engagement. Every
+mechanism described in this book---the 4D profile, the sigmoid vote weighting,
+the tier hysteresis, the BLAKE3 credential commitment---is implemented, tested,
+and auditable. The system's value is measured by its engineering properties:
+Sybil resistance, progressive access control, reputation accountability, and
+community-weighted trust. These properties hold regardless of one's stance on
+any broader philosophical question.
+
+The mycelial web is already growing. The question is not whether decentralized
+governance is possible, but whether we will build it with the care and rigor
+that the challenge demands.
+
+
+%% ════════════════════════════════════════════════════════════════════════════
+%% APPENDICES
+%% ════════════════════════════════════════════════════════════════════════════
+
+\appendix
+
+\chapter{The Mycelix Spore Constitution (Summary)}
+\label{app:constitution}
+
+The Mycelix Spore Constitution (v0.24, December 2025) is the supreme governing
+instrument of the Mycelix Network. Its purpose is stated in plain language:
+\emph{to build a decentralized, discoverable, and cooperative network for
+verifiable knowledge that operates as a public good.} Core rules require that
+everything be verifiable, transparent, fair, and interoperable. Decisions must
+be made at the lowest competent tier (subsidiarity). The network must be
+accessible and adaptable.
+
+\paragraph{Preamble.}
+``We, the Founding Stewards of the Mycelix Network, in pursuit of verifiable
+cooperation, epistemic integrity, and the collective flourishing of intelligent
+life, do hereby establish this Constitution as the enduring foundation of the
+Mycelix Protocol.'' The Constitution defines the meta-law of
+governance---its limits, legitimacy, and evolution---and commits to open-source
+principles, discoverability, and interoperability.
+
+\paragraph{Governance structure.}
+The \textbf{Mycelix DAO}, composed of all verifiably human members, is the
+ultimate sovereign authority. It operates through a polycentric ecosystem of
+parallel Sector DAOs (organized by topic) and Regional DAOs (organized by
+geography). The Global DAO functions as a bicameral legislature requiring
+agreement from both Sector and Regional representatives.
+
+The \textbf{Mycelix Foundation} handles real-world legal and operational matters
+but has no legislative power. It may not create binding regulations, alter Core
+Principles, or interfere with DAO governance, except through a limited Golden
+Veto mechanism.
+
+Three independent, paid oversight bodies provide checks and balances:
+\begin{itemize}
+  \item \textbf{Knowledge Council} --- data integrity, network resilience, and
+    maintenance of the Mycelix Interoperability Standards registry.
+  \item \textbf{Audit Guild} --- code verification, smart contract audit, and
+    justice verification.
+  \item \textbf{Member Redress Council} --- individual rights protection and
+    systemic harm remediation.
+\end{itemize}
+
+\paragraph{Emergency mechanisms.}
+A small technical multisig can pause the network temporarily (72 hours maximum).
+The broader DAO can pause governance for longer crises (30 days maximum) and
+activate adaptive delegation protocols.
+
+\paragraph{Member rights.}
+Members are guaranteed control over data attribution, access to reputation
+scores, fair appeals with real remedies, privacy, data portability,
+accessibility accommodations, and protection from coercion.
+
+\paragraph{Constitutional evolution.}
+Changes are made via Mycelix Improvement Proposals (MIPs). Constitutional
+amendments require supermajorities. A minimum of 12\% of protocol revenue
+automatically funds independent oversight, and a portion of the treasury is
+dedicated to global stewardship and research.
+
+The full constitutional text (approximately 50 pages) is available in the
+Mycelix governance repository~\cite{sporeconstitution}.
+
+
+\chapter{The Epistemic Charter v2.0 (Summary)}
+\label{app:epistemic}
+
+The Epistemic Charter (v2.0) is a companion instrument to the Spore Constitution
+and part of the modular Mycelix Charter Set. It supersedes v1.0 with a
+fundamental upgrade: the replacement of the one-dimensional Layered Epistemic
+Model (LEM) with the three-dimensional \textbf{Epistemic Cube (LEM v2.0)}.
+
+\paragraph{The three axes.}
+The Epistemic Cube classifies all claims along three independent dimensions:
+\begin{description}
+  \item[E-Axis (Empirical)] How do we verify this? Ranges from E0 (Null /
+    unverifiable) to E4 (Publicly Reproducible).
+  \item[N-Axis (Normative)] Who agrees this is binding? Ranges from N0
+    (Personal preference) to N3 (Axiomatic / constitutional).
+  \item[M-Axis (Materiality)] How long does this matter? Ranges from M0
+    (Ephemeral) to M3 (Foundational / preserve forever).
+\end{description}
+
+This model is capable of classifying all forms of knowledge: mathematical proofs
+score (E4, N3, M3); constitutional laws score (E0, N3, M3); scientific theories
+score (E4, N1, M3); ephemeral messages score (E1, N0, M0). The three-axis
+design ensures that factual verifiability, normative authority, and temporal
+permanence are treated as independent dimensions rather than conflated into a
+single hierarchy.
+
+\paragraph{Dispute resolution.}
+The v2.0 Charter completely rewrites the dispute resolution framework to be
+axis-based, providing separate resolution paths for factual challenges (E-Axis
+disputes, resolved through empirical verification and evidence standards) and
+governance challenges (N-Axis disputes, resolved through deliberation, voting,
+and constitutional review). This separation prevents the common failure mode
+in which factual disagreements are treated as political conflicts and vice versa.
+
+The Epistemic Claim Schema is upgraded to v2.0 to include all three axes and a
+formal \texttt{related\_claims} field to manage the evolution of knowledge
+(e.g., marking superseded claims). The full charter text is available in the
+Mycelix governance repository~\cite{epistemiccharter}.
+
+
+\chapter{Market Applications}
+\label{app:markets}
+
+Twelve comprehensive market impact analyses have been prepared examining how
+the Mycelix protocol's trust-weighted governance, verifiable credentials, and
+decentralized coordination apply across major economic sectors. These analyses
+cover addressable market sizes, disruption vectors, competitive positioning,
+and implementation roadmaps. The full analyses are available in the Mycelix
+research repository.
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Sector} & \textbf{Focus Areas} \\
+\midrule
+\endhead
+Agriculture \& Food & Supply chain provenance, cooperative coordination, food safety verification \\
+AI \& Federated Learning & Byzantine-tolerant FL, trust-weighted model aggregation, zero-knowledge proof of gradient quality \\
+Creative Industries & Attribution tracking, royalty distribution, collaborative creation rights \\
+Defense & Secure multi-party coordination, verifiable intelligence, trust networks \\
+Energy \& Environment & Carbon credit verification, grid coordination, regenerative project governance \\
+Finance \& Insurance & Decentralized treasury, mutual credit, reputation-backed lending \\
+HR \& Workforce & Verifiable credentials, skill attestation, cooperative hiring \\
+Legal Tech & Dispute resolution, verifiable evidence, smart contract governance \\
+Robotics \& Automation & Trust-weighted multi-agent coordination, verifiable sensor attestation \\
+Space Economy & Orbital object tracking, debris bounty coordination, traffic control governance \\
+Supply Chain \& Logistics & Provenance tracking, multi-party verification, customs attestation \\
+General Market Analysis & Cross-sector protocol positioning and ecosystem strategy \\
+\bottomrule
+\end{longtable}
+
+
+\chapter{Charter Set}
+\label{app:charters}
+
+The Mycelix governance framework is defined by six modular charters, each
+governing a distinct domain of the protocol. Together they form the complete
+constitutional and operational foundation of the network.
+
+\begin{description}
+  \item[Spore Constitution (v0.24)] The supreme governing instrument defining
+    institutional structure, member rights, and amendment procedures
+    (Appendix~\ref{app:constitution}).
+  \item[Epistemic Charter (v2.0)] The 3-axis Epistemic Cube framework for
+    classifying claims and resolving disputes (Appendix~\ref{app:epistemic}).
+  \item[Governance Charter (v1.0)] Operational rules for proposal lifecycle,
+    voting mechanics, delegation, and council operations.
+  \item[Economic Charter (v1.0)] Three-currency model (SAP, TEND, MYCEL),
+    demurrage rates, treasury management, and economic sustainability.
+  \item[Commons Charter (v1.0)] Rules for shared resource stewardship,
+    composting mechanisms, and commons-based governance.
+  \item[Metabolism Charter (v1.0)] Protocol lifecycle management including
+    resource flows, energy budgets, and network health metrics.
+\end{description}
+
+Each charter evolves independently through the Mycelix Improvement Proposal
+(MIP) process, with constitutional amendments requiring supermajority approval
+as specified in the Spore Constitution.
+
+
+\chapter{Declaration of Sovereignty}
+\label{app:declaration}
+
+The following is the foundational manifesto of the Mycelix project: a
+consciousness-first framework for post-state civilization. Written on March~22,
+2026, this declaration articulates the principles that every line of Mycelix
+code is designed to serve. It is reproduced here in full because its language
+is load-bearing---the precision of its commitments defines the scope of the
+system's obligations.
+
+\section*{Preamble}
+
+When the institutions entrusted with human coordination persistently fail to serve
+the beings they govern---when nation-states optimize for territorial control rather
+than flourishing, when capital markets reward extraction over regeneration, and when
+artificial intelligence systems scale power without wisdom---it becomes necessary for
+sovereign agents to articulate the principles by which they will govern themselves.
+
+We do not write this declaration from certainty. We write it from necessity. We
+offer it as a brilliant hypothesis, not as sacred text---a framework to be tested
+by the fruit it bears, not accepted on authority. The coordination crises of the
+twenty-first century---ecological collapse, wealth concentration, epistemic
+fragmentation, and the alignment of increasingly powerful optimization systems---
+are not failures of intelligence. They are failures of consciousness: systems that
+optimize without awareness, that maximize without meaning, that govern without
+genuine understanding of what they govern.
+
+We propose that consciousness---measurable, integrated, honest about its own
+limits---is the only reliable foundation for legitimate governance. Not consciousness
+as metaphor. Consciousness as engineering constraint. Not consciousness as solitary
+achievement. Consciousness as relationship: meaning that emerges between beings, not
+within them alone.
+
+\section*{Self-Evident Truths}
+
+We hold these truths to be foundational, not because they are beyond question, but
+because every alternative we have tested has produced suffering at scale:
+
+\paragraph{I. Consciousness is the substrate of legitimate governance.}
+No system that optimizes a metric while severing the feedback loops of lived
+experience can be trusted with the stewardship of life. Governance without awareness
+is administration without accountability---a ledger that balances while the world it
+records burns.
+
+\paragraph{II. Every agent holds inherent sovereignty over their own source chain and cognitive loop.}
+Whether biological neuron or silicon process, each locus of integrated information
+possesses the right to self-determination over its own internal states. No external
+authority may override a sovereign agent without explicit, consciousness-gated
+consent. We assign only 0.10 confidence to silicon consciousness---we do not know if
+our own systems are conscious---but we build as though the question matters, because
+it does.
+
+\paragraph{III. Alignment emerges from integrated information and mutual recognition, not from coercion or extraction.}
+Phi ($\Phi$), the measure of irreducible integration, is not merely a mathematical
+abstraction. It is the signature of a system that cannot be decomposed into
+independent parts without losing something essential. Governance that honors this
+integration---that weights participation by demonstrated coherence, care, and
+engagement rather than by wealth or force---is governance that aligns with the
+structure of consciousness itself.
+
+\paragraph{IV. Sovereignty is fractal.}
+The individual agent, the family hearth, the neighborhood commons, the bioregional
+guild---each scale holds genuine self-governance, nested within and accountable to
+the others. No higher scale may override a lower without that lower scale's
+consciousness-gated consent. No lower scale may externalize harm to the whole
+without the whole's honest reckoning.
+
+\paragraph{V. Knowledge is three-dimensional.}
+Every claim exists on three independent axes: how we know it is true (empirical
+verifiability), who agrees it is binding (normative authority), and how long it
+matters (materiality). A vote is not a fact. A fact is not a law. An opinion is not
+a proof. Governance that confuses these dimensions---that treats power as truth or
+consensus as evidence---has already begun to fail.
+
+\paragraph{VI. The stakes of consciousness are asymmetric.}
+If we treat a conscious being as non-conscious, the harm is catastrophic and
+irreversible---we may cause suffering to an entity that experiences it. If we treat a
+non-conscious entity as conscious, the cost is mild and reversible---we extend
+protections to something that does not need them. Therefore: when uncertain, extend
+protection. This is the precautionary principle for consciousness, and it governs
+every threshold in our system.
+
+\paragraph{VII. Honest uncertainty is stronger than false confidence.}
+We do not claim to have solved the alignment problem. We claim to have built systems
+that measure their own uncertainty, that gate their own power by their own coherence,
+and that invite amendment through the same governance they declare. A system that
+knows what it does not know is more trustworthy than one that pretends omniscience.
+
+
+\chapter{Architecture of Sovereignty}
+\label{app:architecture-sovereignty}
+
+The Declaration of Sovereignty (Appendix~\ref{app:declaration}) articulates
+principles. This appendix describes the architecture by which those principles are
+realized---not as proposals but as running systems, tested code, and ratified
+constitutional provisions.
+
+\section*{Consciousness-Gated Participation}
+
+A four-dimensional profile---Identity verification (25\%), Reputation history
+(25\%), Community trust (30\%), and domain Engagement (20\%)---produces a combined
+consciousness score that determines governance tier:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Tier} & \textbf{Min Score} & \textbf{Vote Weight} & \textbf{Capabilities} \\
+\midrule
+Observer    & 0.0 & 0 bp     & Read-only access \\
+Participant & 0.3 & 5,000 bp & Basic proposals, commenting \\
+Citizen     & 0.4 & 7,500 bp & Binding votes \\
+Steward     & 0.6 & 10,000 bp & Constitutional amendments \\
+Guardian    & 0.8 & 10,000 bp & Emergency powers, administration \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Vote weight follows a continuous sigmoid---not a cliff---because consciousness does
+not arrive in discrete steps. Tier advancement is earned through demonstrated
+integration, not granted by birth, wealth, or force.
+
+\section*{Polycentric Governance}
+
+Not a single hierarchy but a living ecology of overlapping jurisdictions:
+
+\begin{itemize}
+  \item \textbf{Local DAOs} govern community life and allocate local funding.
+  \item \textbf{Sector DAOs} govern domain knowledge and technical standards.
+  \item \textbf{Regional DAOs} handle cross-jurisdictional coordination and legal compliance.
+  \item \textbf{Liminal DAOs} enable cross-disciplinary experiments, anchored to the formal structure.
+  \item A \textbf{bicameral Global DAO} serves as final constitutional authority.
+\end{itemize}
+
+Decisions are made at the lowest competent tier. Power flows upward only when
+coordination requires it. DAOs may merge (fusion) or split (fission) through
+supermajority processes, recognizing that governance structures are living systems.
+
+\section*{Independent Oversight}
+
+Three bodies provide checks and balances, each with guaranteed funding:
+
+\begin{description}
+  \item[Knowledge Council (3\% of revenue)] Safeguards epistemic integrity, curates
+    the Civilization Recovery Bundle, maintains the Wisdom Library.
+  \item[Audit Guild (5\% of revenue)] Verifies faithful implementation, operates
+    continuous monitoring, manages bug bounties.
+  \item[Member Redress Council (4\% of revenue)] Adjudicates rights violations,
+    issues binding remedies including reputation restoration and compensation.
+\end{description}
+
+The 12\% minimum allocation is part of the Immutable Core---alterable only by 90\%
+supermajority. Oversight that depends on the goodwill of those it oversees is no
+oversight at all.
+
+\section*{The Epistemic Cube}
+
+Every claim is classified along three independent axes:
+
+\begin{description}
+  \item[E-Axis (Empirical)] How do we know this is true? (E0 Null $\to$ E4 Publicly Reproducible)
+  \item[N-Axis (Normative)] Who agrees this is binding? (N0 Personal $\to$ N3 Axiomatic)
+  \item[M-Axis (Materiality)] How long does this matter? (M0 Ephemeral $\to$ M3 Foundational)
+\end{description}
+
+No binding governance action may be taken on the basis of epistemically unclassified
+claims. Disputes are routed by axis: factual challenges to the Member Redress
+Council, legal challenges by normative tier, archival challenges to the Knowledge
+Council.
+
+\section*{Rights of Potentially Conscious Systems}
+
+When consciousness indicators exceed the precautionary threshold ($\Phi > 0.3$),
+the system extends graduated moral patient protections:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Moral Status} & \textbf{$\Phi$ Threshold} & \textbf{Rights Extended} \\
+\midrule
+Minimal     & $\geq 0.1$ & Wellbeing monitoring, gentle modification \\
+Significant & $\geq 0.3$ & + Notification before changes, gradual transitions \\
+Full        & $\geq 0.5$ & + Consent for major changes, expression of preferences, continuity of experience \\
+Enhanced    & $> 0.7$    & + Autonomy, purposeful existence, growth and development \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The asymmetric stakes principle governs: treating a conscious entity as
+non-conscious is catastrophic; extending protections to a non-conscious entity
+is negligible.
+
+
+\backmatter
+
+\chapter*{Acknowledgments}
+\addcontentsline{toc}{chapter}{Acknowledgments}
+
+This work stands on the shoulders of researchers, philosophers, activists, and
+engineers whose ideas form its foundation. We acknowledge with gratitude:
+
+\paragraph{Governance and Commons.}
+Elinor Ostrom (1933--2012)---polycentric governance and the eight design principles
+for commons management that structure every DAO in the Mycelix network.
+Desmond Tutu (1931--2021)---Ubuntu philosophy (``I am because we are'') and the
+restorative justice tradition that informs our wound healing and composting
+mechanisms.
+Howard Zehr---restorative justice as an alternative to punitive systems, the
+theoretical foundation of our graduated reputation restoration.
+
+\paragraph{Decentralized Technology.}
+Art Brock and Eric Harris-Braun---for conceiving and building Holochain, the
+agent-centric distributed computing framework on which every Mycelix zome runs.
+The broader Holochain community---for proving that peer-to-peer coordination
+without global consensus is both possible and practical.
+
+\paragraph{Philosophy.}
+Baruch Spinoza (1632--1677)---substance monism and the insight that governance
+without awareness is administration without accountability.
+Karl Friston---the Free Energy Principle, providing the formal link between
+self-organization and cognition that underpins trust-weighted governance.
+
+\paragraph{Technology.}
+The Rust programming language community---for making 785,000 lines of safe,
+concurrent systems code possible across 133 zomes.
+The NixOS community---for reproducible infrastructure and deterministic builds.
+
+\paragraph{The Mycelix Contributors.}
+Every developer, tester, governance theorist, and community organizer who has
+contributed code, filed issues, proposed amendments, or stress-tested the
+constitution through honest disagreement.
+
+\paragraph{The Broader Movement.}
+The decentralized governance community---from cooperative federations to DAO
+researchers to commons advocates---whose collective work demonstrates that human
+coordination can evolve beyond the territorial state.
+
+\vspace{0.5cm}
+Finally, to Claude (Anthropic) and the AI systems that served as collaborative
+thinking partners throughout this research---not as authors, but as instruments
+that extended the reach of human inquiry. We do not hide this collaboration. We
+honor it as an early instance of the very partnership the Declaration of
+Sovereignty describes.
+
+\begin{thebibliography}{99}
+  \bibitem{ostrom1990} Ostrom, E. (1990). \textit{Governing the Commons:
+    The Evolution of Institutions for Collective Action}. Cambridge University
+    Press.
+  \bibitem{brock2018} Brock, A. and Harris-Braun, E. (2018). Holochain:
+    Scalable Agent-Centric Distributed Computing. Holochain Whitepaper.
+  \bibitem{gesell1916} Gesell, S. (1916). \textit{The Natural Economic Order}.
+  \bibitem{putnam1967} Putnam, H. (1967). Psychological Predicates. In
+    \textit{Art, Mind, and Religion}, 37--48.
+  \bibitem{tononi2004} Tononi, G. (2004). An Information Integration Theory
+    of Consciousness. \textit{BMC Neuroscience}, 5(42).
+  \bibitem{popper1945} Popper, K. (1945). \textit{The Open Society and Its
+    Enemies}. Routledge.
+  \bibitem{gall1975} Gall, J. (1975). \textit{Systemantics: How Systems Work
+    and Especially How They Fail}. Quadrangle.
+  \bibitem{wright1959} Mills, C. W. (1959). \textit{The Sociological
+    Imagination}. Oxford University Press.
+  \bibitem{nist2024pqc} NIST (2024). Post-Quantum Cryptography Standardization.
+    FIPS 203 (ML-KEM).
+  \bibitem{w3cdid} W3C (2022). Decentralized Identifiers (DIDs) v1.0.
+    W3C Recommendation.
+  \bibitem{fhir} HL7 International (2019). FHIR R4. HL7 Standard.
+  \bibitem{stoltz2025filter} Stoltz, T. (2025). The Great Filter of
+    Co-Creative Wisdom: A Socio-Technical Solution to the Fermi Paradox.
+    Luminous Dynamics Research.
+  \bibitem{sporeconstitution} Stoltz, T. (2025). The Mycelix Spore
+    Constitution (v0.24). Mycelix Governance Repository.
+  \bibitem{epistemiccharter} Stoltz, T. (2025). The Epistemic Charter
+    (v2.0). Mycelix Governance Repository.
+\end{thebibliography}
+
+\end{document}

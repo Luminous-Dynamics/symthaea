@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Multi-dimensional consciousness profile for governance gating.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Multi-dimensional consciousness profile for governance gating.
 //!
 //! Replaces the single MATL score (40% MFA + 60% reputation) with a
 //! 4-dimensional `ConsciousnessProfile` that gates governance actions

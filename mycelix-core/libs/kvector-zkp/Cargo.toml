@@ -5,6 +5,8 @@ edition = "2021"
 authors = ["Luminous Dynamics <contact@luminous-dynamics.org>"]
 description = "Zero-knowledge STARK proofs for K-Vector validation in Mycelix"
 license = "Apache-2.0"
+repository = "https://github.com/luminous-dynamics/mycelix"
+readme = "README.md"
 
 [features]
 default = ["parallel"]
@@ -17,7 +19,7 @@ gpu = ["dep:wgpu", "dep:pollster"]  # GPU acceleration (experimental)
 winterfell = "0.13"
 
 # Core types
-mycelix-core-types = { path = "../mycelix-core-types" }
+mycelix-core-types = { version = "0.1.0", path = "../mycelix-core-types" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

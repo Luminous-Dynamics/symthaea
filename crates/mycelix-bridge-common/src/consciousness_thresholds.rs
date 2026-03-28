@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root//! Canonical consciousness threshold configuration — single source of truth.
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Canonical consciousness threshold configuration — single source of truth.
 //!
 //! All Mycelix components import these values instead of hardcoding their own.
 //! FL core, governance, and personal cluster all reference this module for

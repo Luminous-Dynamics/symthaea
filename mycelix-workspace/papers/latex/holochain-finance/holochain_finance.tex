@@ -1,0 +1,446 @@
+\documentclass[11pt,twocolumn]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=green!40!black,urlcolor=blue!60!black}
+
+\lstset{
+  language=Rust,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{red!60!black},
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+
+\title{Three-Currency Economics on Holochain:\\SAP, TEND, and MYCEL with\\Consciousness-Gated Treasury}
+\author{Tristan Stoltz \\ Luminous Dynamics \\ \texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
+\date{March 2026}
+
+\begin{document}
+
+\twocolumn[
+\begin{@twocolumnfalse}
+\maketitle
+
+\begin{abstract}
+We present a three-currency economic system implemented on Holochain's agent-centric
+architecture with 8 coordinator zomes. The system distinguishes three economic
+functions---stable accounting (SAP), care-oriented mutual credit (TEND), and commons
+stewardship (MYCEL)---each with distinct monetary properties: SAP is commodity-backed
+and non-inflationary; TEND implements Gesellian demurrage to encourage circulation;
+MYCEL represents collective stewardship and funds public goods. Treasury operations
+are consciousness-gated, requiring progressive governance tiers for increasing levels
+of financial authority. We describe the implementation of four critical financial
+operations---oracle price feeds, mutual credit issuance, concurrent demurrage
+computation, and currency composting---and report on hardening fixes for division-by-zero,
+TEND race conditions, concurrent demurrage overflow, and oracle-to-TEND call ordering.
+All 10 financial operations are consciousness-gated through shared verification
+functions, and the system includes Sybil resistance through consciousness-tier
+requirements on currency minting.
+\end{abstract}
+\end{@twocolumnfalse}
+]
+
+\section{Introduction}
+
+Most cryptocurrency projects implement a single currency optimized for a single
+function: Bitcoin for store of value, stablecoins for unit of account, Ethereum
+for programmable transactions. Real economies, however, require multiple monetary
+instruments serving distinct purposes~\cite{lietaer2001}.
+
+Bernard Lietaer argued that monetary monocultures are fragile: when a single
+currency fails, the entire economy suffers. Complementary currencies---local
+exchange systems, time banks, mutual credit networks---provide resilience through
+diversity~\cite{lietaer2004}.
+
+We implement this insight on Holochain with three currencies, each designed for
+a different economic function:
+
+\begin{description}[nosep]
+  \item[SAP (Sapience)] Stable unit of account. Backed by a basket of real
+    goods and services. Used for pricing, contracts, and inter-community exchange.
+  \item[TEND (Tenderness)] Mutual credit for care work and community service.
+    Implements demurrage (value decay) to encourage circulation. Named for the
+    tenderness of care labor.
+  \item[MYCEL (Mycelium)] Commons currency for collective stewardship.
+    Used for treasury operations, public goods funding, and regenerative
+    investment.
+\end{description}
+
+\section{Architecture}
+
+\subsection{Eight Zomes}
+
+\begin{enumerate}[nosep]
+  \item \textbf{currency-mint}: Supply management for all three currencies.
+    Minting requires consciousness-gated authorization.
+  \item \textbf{payments}: Transaction processing. Handles transfers, batch
+    payments, and cross-currency exchanges.
+  \item \textbf{tend}: TEND-specific mutual credit operations including
+    credit line management, demurrage computation, and composting.
+  \item \textbf{treasury}: Commons treasury management with multi-signature
+    (DKG) authorization for large expenditures.
+  \item \textbf{staking}: MYCEL staking for governance weight amplification.
+  \item \textbf{recognition}: Non-monetary recognition tokens for gratitude
+    and appreciation.
+  \item \textbf{price-oracle}: Decentralized price feeds for the SAP basket.
+  \item \textbf{bridge}: Cross-cluster financial dispatch.
+\end{enumerate}
+
+\subsection{Holochain Advantages for Finance}
+
+Holochain's agent-centric model provides several advantages for financial
+applications:
+
+\begin{itemize}[nosep]
+  \item \textbf{Double-spend prevention}: Each agent's source chain is
+    append-only. A double-spend would require forking the source chain,
+    which is detectable by DHT validators.
+  \item \textbf{No transaction fees}: Unlike blockchain, Holochain has no
+    per-transaction gas fees. This makes micro-transactions viable.
+  \item \textbf{Offline transactions}: Agents can create transactions on
+    their source chain while offline, syncing when connectivity returns.
+  \item \textbf{Privacy}: Balances are on the agent's source chain, not a
+    public ledger. Only the counterparty and DHT validators see transaction
+    details.
+\end{itemize}
+
+\section{SAP: Stable Unit of Account}
+
+\subsection{Basket Backing}
+
+SAP is pegged to a basket of real goods and services, defined by the community.
+A typical basket might include:
+
+\begin{itemize}[nosep]
+  \item 1 kg of locally-grown grain
+  \item 1 hour of basic skilled labor
+  \item 1 kWh of renewable energy
+  \item 1 liter of clean water
+\end{itemize}
+
+The basket composition is governed by the Governance cluster (Steward+
+required to modify). The price-oracle zome aggregates price attestations
+for each basket component.
+
+\subsection{Minting}
+
+SAP cannot be created ex nihilo. Minting occurs only when:
+\begin{enumerate}[nosep]
+  \item An agent contributes a basket-equivalent of real goods/services
+    to the community
+  \item The contribution is verified by at least two Citizen-tier attestors
+  \item The currency-mint zome issues SAP proportional to the basket value
+\end{enumerate}
+
+This makes SAP supply a function of real economic activity rather than
+arbitrary monetary policy.
+
+\section{TEND: Mutual Credit with Demurrage}
+
+\subsection{Mutual Credit}
+
+TEND operates as a mutual credit system~\cite{riegel1944}: every TEND
+created as a positive balance simultaneously creates an equal negative
+balance. The total TEND supply across the network is always zero:
+
+\begin{equation}
+  \sum_{i} B_i^{\text{TEND}}(t) = 0 \quad \forall t
+\end{equation}
+
+This property is enforced by the integrity zome: the validation rule
+verifies that each TEND transaction creates equal and opposite entries
+on the sender's and receiver's source chains.
+
+\subsection{Demurrage}
+
+TEND implements Gesellian demurrage~\cite{gesell1916}: balances decay
+over time to encourage circulation:
+
+\begin{equation}
+  B(t) = B(t_0) \cdot e^{-\lambda(t - t_0)}
+\end{equation}
+
+where $\lambda$ is the demurrage rate. The ``composted'' value (the decay)
+returns to the commons treasury:
+
+\begin{equation}
+  D(t_0, t) = B(t_0) - B(t) = B(t_0)(1 - e^{-\lambda(t - t_0)})
+\end{equation}
+
+\begin{proposition}[Demurrage zero-sum invariant]
+With demurrage, the total TEND supply (positive + negative balances +
+composted treasury) remains zero:
+\begin{equation}
+  \sum_{i} B_i(t) + T_{\text{compost}}(t) = 0
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Each demurrage deduction from a positive balance is added to the compost
+treasury. Each demurrage reduction of a negative balance is subtracted
+from the compost treasury. Both operations preserve the zero-sum invariant.
+\end{proof}
+
+\subsection{Concurrent Demurrage}
+
+A critical implementation challenge: demurrage must be computed correctly
+when multiple transactions interact with the same balance concurrently.
+
+The initial implementation had a counter overflow vulnerability: if two
+concurrent transactions each computed demurrage on the same balance, the
+second transaction would double-count the decay. The fix: demurrage is
+computed exactly once per balance-modifying operation, using the source
+chain's timestamp ordering as the canonical timeline.
+
+\section{MYCEL: Commons Currency}
+
+\subsection{Collective Stewardship}
+
+MYCEL represents collective stewardship capacity. It is:
+\begin{itemize}[nosep]
+  \item Minted by community-wide consensus (Governance cluster)
+  \item Held in the commons treasury
+  \item Spent on public goods, infrastructure, and regenerative investment
+  \item Stakeable for governance weight amplification
+\end{itemize}
+
+\subsection{Staking}
+
+MYCEL staking locks tokens for a configurable period, providing:
+\begin{itemize}[nosep]
+  \item Governance weight amplification (staked MYCEL increases vote weight)
+  \item Treasury stability (locked tokens reduce circulating supply)
+  \item Commitment signaling (staking demonstrates long-term alignment)
+\end{itemize}
+
+Staking does not generate yield (this is not DeFi). The benefit is
+governance influence, not financial return.
+
+\section{Consciousness-Gated Treasury}
+
+\subsection{Tiered Access}
+
+Treasury operations are gated by consciousness tier:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Operation} & \textbf{Min. Tier} \\
+\midrule
+View balance & Observer \\
+Propose expenditure & Citizen \\
+Approve expenditure ($< 1\%$ treasury) & Steward \\
+Approve expenditure ($\geq 1\%$ treasury) & Steward + DKG \\
+Emergency fund release & Guardian + DKG \\
+Modify SAP basket & Steward + supermajority \\
+\bottomrule
+\end{tabular}
+\caption{Consciousness-gated treasury operations.}
+\end{table}
+
+\subsection{Shared Verification Functions}
+
+All 10 consciousness-gated financial operations use two shared verification
+functions in \texttt{mycelix-finance/zomes/shared}:
+
+\begin{lstlisting}
+pub fn verify_participant_tier(
+    cred: &ConsciousnessCredential
+) -> ExternResult<()> {
+    if cred.tier < ConsciousnessTier::Participant {
+        return Err(wasm_error!("Insufficient tier"));
+    }
+    if cred.is_expired(now_us()?) {
+        return Err(wasm_error!("Expired credential"));
+    }
+    Ok(())
+}
+
+pub fn verify_citizen_tier(
+    cred: &ConsciousnessCredential
+) -> ExternResult<()> {
+    if cred.tier < ConsciousnessTier::Citizen {
+        return Err(wasm_error!("Insufficient tier"));
+    }
+    if cred.is_expired(now_us()?) {
+        return Err(wasm_error!("Expired credential"));
+    }
+    Ok(())
+}
+\end{lstlisting}
+
+\section{Price Oracle}
+
+\subsection{Decentralized Price Feeds}
+
+The price-oracle zome aggregates price attestations from multiple oracle agents:
+
+\begin{enumerate}[nosep]
+  \item Oracle agents (Citizen+ tier) submit price attestations for SAP basket
+    components
+  \item Attestations include: item, price, timestamp, confidence
+  \item The oracle computes the median price (robust to outliers)
+  \item Stale attestations (beyond TTL) are excluded
+\end{enumerate}
+
+\subsection{Hardening}
+
+Four critical bugs were fixed during security hardening:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Oracle division-by-zero}: When no valid attestations exist,
+    the median computation divided by zero. Fix: return \texttt{None} when
+    attestation count is zero.
+  \item \textbf{TEND race condition}: Concurrent TEND issuance could create
+    unbalanced credit lines. Fix: source chain sequencing with optimistic
+    locking.
+  \item \textbf{Concurrent demurrage}: Double-counted decay on concurrent
+    balance access. Fix: single demurrage computation per balance modification.
+  \item \textbf{Missing oracle$\to$TEND call}: The TEND pricing function
+    did not call the oracle for current SAP-TEND exchange rate. Fix: added
+    cross-zome call with fallback to last known rate.
+\end{enumerate}
+
+\section{Currency Composting}
+
+\subsection{Lifecycle}
+
+Currencies have a lifecycle: minting $\to$ circulation $\to$ composting.
+Composting is the explicit removal of currency units from circulation:
+
+\begin{itemize}[nosep]
+  \item TEND: Demurrage automatically composts value over time
+  \item SAP: Manual composting when backing goods are consumed
+  \item MYCEL: Governance-authorized composting of excess supply
+\end{itemize}
+
+\subsection{Idempotency}
+
+Currency composting is idempotent: composting an already-composted unit is
+a no-op. This was a hardening fix---the original implementation allowed
+double-composting, which would undercount the circulating supply.
+
+\subsection{Zero-Sum Invariant}
+
+For all three currencies, the invariant holds:
+
+\begin{equation}
+  \text{minted} - \text{composted} = \text{circulating}
+\end{equation}
+
+This is enforced by the integrity zome and verified by DHT validators.
+
+\section{Sybil Resistance in Finance}
+
+Financial Sybil attacks (creating fake identities to obtain multiple credit
+lines) are prevented by:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Consciousness gating}: Currency minting requires Citizen+
+    tier, which requires verified identity ($I \geq 0.5$)
+  \item \textbf{Credit line limits}: TEND credit lines are proportional to
+    the agent's consciousness profile score
+  \item \textbf{Reputation consequences}: Financial misbehavior triggers
+    reputation slashing ($0.5\times$), affecting all governance participation
+  \item \textbf{Cross-cluster visibility}: The Identity cluster's web-of-trust
+    can detect clusters of financially-interconnected Sybil identities
+\end{enumerate}
+
+\section{Non-Monetary Recognition}
+
+The recognition zome provides non-monetary appreciation tokens:
+
+\begin{itemize}[nosep]
+  \item Gratitude tokens (from Hearth cluster integration)
+  \item Skill recognition (from Education cluster integration)
+  \item Community service badges
+  \item Milestone acknowledgments
+\end{itemize}
+
+These tokens have no monetary value but contribute to the reputation dimension
+of the consciousness profile, creating a positive feedback loop between
+community participation and governance capability.
+
+\section{Evaluation}
+
+\subsection{Security Hardening Results}
+
+The four hardening fixes (Section~7.2) were discovered through a combination
+of code review and sweettest integration testing. The TEND race condition
+required a 3-agent concurrent test scenario with a BadNonce retry mechanism
+in the sweettest framework.
+
+\subsection{Design Trade-offs}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Property} & \textbf{Mycelix} & \textbf{DeFi} \\
+\midrule
+Tx fees & Zero & Gas fees \\
+Privacy & Source chain & Public ledger \\
+Yield & None (by design) & APY incentives \\
+Governance & Consciousness & Token-weighted \\
+Backing & Real goods & Algorithmic \\
+\bottomrule
+\end{tabular}
+\caption{Mycelix Finance vs. DeFi comparison.}
+\end{table}
+
+\section{Related Work}
+
+\textbf{Mutual credit on Holochain}: Holo\-chain was designed partly for
+mutual credit~\cite{brock2018}. Our contribution is the three-currency
+design with consciousness gating.
+
+\textbf{Circles UBI}~\cite{circles2019}: Ethereum-based mutual credit with
+social graph trust. Similar goals but limited by blockchain costs and
+single-currency design.
+
+\textbf{Grassroots Economics}~\cite{ruddick2015}: Community currency
+implementations in Kenya. Validates demurrage and mutual credit in practice
+but uses centralized infrastructure.
+
+\section{Conclusion}
+
+Three-currency economics on Holochain provides monetary diversity without
+the overhead of blockchain consensus. SAP, TEND, and MYCEL serve distinct
+economic functions---stable accounting, care labor, and collective
+stewardship---with consciousness-gated treasury operations ensuring that
+financial power scales with demonstrated governance capability rather than
+accumulated wealth. The hardening of four critical financial bugs demonstrates
+the importance of rigorous security review in decentralized financial systems,
+and the zero-sum invariants provide formal guarantees of monetary integrity.
+
+\begin{thebibliography}{99}
+  \bibitem{lietaer2001} Lietaer, B. (2001). \textit{The Future of Money}.
+    Random House.
+  \bibitem{lietaer2004} Lietaer, B. (2004). Complementary Currencies in Japan Today.
+    \textit{International Journal of Community Currency Research}, 8.
+  \bibitem{gesell1916} Gesell, S. (1916). \textit{The Natural Economic Order}.
+  \bibitem{riegel1944} Riegel, E. C. (1944). \textit{Private Enterprise Money}.
+  \bibitem{brock2018} Brock, A. and Harris-Braun, E. (2018). Holochain:
+    Scalable Agent-Centric Distributed Computing.
+  \bibitem{circles2019} Circles (2019). Circles: A Decentralized Universal Basic Income.
+  \bibitem{ruddick2015} Ruddick, W. et al. (2015). Complementary Currencies for
+    Sustainable Development in Kenya. \textit{IJCCR}, 19.
+\end{thebibliography}
+
+\end{document}
