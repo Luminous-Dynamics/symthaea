@@ -160,6 +160,10 @@ impl PopulationEngine {
             .any(|a| a.sex == BiologicalSex::Male && a.life_stage(current_tick).can_reproduce());
 
         if has_males && world.population() < world.max_population {
+            // Calibration anchor: `empirical::COLONIAL_BIRTH_RATE_PER_YEAR` (0.03/yr, >3%)
+            // gives ~0.0025/month. Agent-level fertility() already produces comparable
+            // rates when multiplied by nutrition and cultural modifiers.
+            //
             // Nutrition modifier based on food availability
             let nutrition_modifier = world
                 .resources
@@ -200,7 +204,15 @@ impl PopulationEngine {
                     death_tick: None,
                     sex: child_sex,
                     world_id: world.id,
-                    health: rng.next_gaussian(0.9, 0.05).clamp(0.3, 1.0),
+                    health: {
+                        // Realism G: Inbreeding depression reduces child health.
+                        // Wright's F > 0.1: noticeable fitness effects.
+                        // F > 0.25: severe (lethal alleles expressed).
+                        let f = Self::inbreeding_coefficient(world, current_tick);
+                        let base = rng.next_gaussian(0.9, 0.05);
+                        let penalty = if f > 0.1 { (f - 0.1) * 2.0 } else { 0.0 };
+                        (base - penalty).clamp(0.2, 1.0)
+                    },
                     skills: SkillVector::new(),
                     education_level: 0.0,
                     consciousness: ConsciousnessState::nascent(),
@@ -227,6 +239,7 @@ impl PopulationEngine {
                             .unwrap_or(0.0);
                         (mother_trauma * 0.5).min(1.0)
                     },
+                    cumulative_dose_sv: 0.0,
                 };
 
                 events.push(CivEvent::new(
@@ -274,8 +287,29 @@ impl PopulationEngine {
     }
 
     /// Check if the world has at least 20 adults.
+    ///
+    /// Calibration anchor: `empirical::MVP_50_500_RULE_SHORT_TERM` (50) is the IUCN
+    /// minimum for short-term genetic health. We use 20 adults as a more permissive
+    /// threshold for small founding colonies. Below `empirical::BEACHHEAD_BOTTLENECK_THRESHOLD`
+    /// (50 adults), colony failure risk increases sharply (island biogeography, Royal Society 2022).
     pub fn minimum_viable_population(world: &World, current_tick: u32) -> bool {
         world.adults(current_tick) >= 20
+    }
+
+    /// Genetic viability score [0.0, 1.0] — 0 = doomed, 1 = stable.
+    /// Accounts for effective population size and immigration rate.
+    pub fn genetic_viability(world: &World, _current_tick: u32) -> f64 {
+        let pop = world.population().max(1) as f64;
+        let ne = pop * 0.25; // Conservative Ne/N ratio
+        let immigrant_frac = world.agents.iter()
+            .filter(|a| a.is_alive() && a.is_immigrant)
+            .count() as f64 / pop;
+
+        // Viability curve: sigmoid centered at Ne=200
+        let base = 1.0 / (1.0 + (-0.02 * (ne - 200.0)).exp());
+        // Immigration boost: each immigrant generation rescues ~m of diversity
+        let boosted = base + immigrant_frac * (1.0 - base) * 2.0;
+        boosted.clamp(0.0, 1.0)
     }
 
     /// Genetic diversity proxy incorporating both founder effect and immigration.
@@ -513,6 +547,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
+                    cumulative_dose_sv: 0.0,
             };
             world.next_agent_id += 1;
             world.agents.push(agent);

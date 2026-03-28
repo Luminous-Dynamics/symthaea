@@ -79,6 +79,10 @@ pub enum CivEventType {
     MoraleContagion,
     /// Population has exceeded the dynamic carrying capacity of the world.
     CarryingCapacityExceeded,
+    /// Resontia vault or maglev corridor construction completed.
+    ResontiaInfrastructureBuilt,
+    /// Resontia evacuation event (population moved to vaults).
+    ResontiaEvacuation,
 }
 
 impl CivEvent {

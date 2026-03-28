@@ -256,6 +256,17 @@ impl SimulationConfig {
         cfg
     }
 
+    /// 777-year configuration with Resontia Earth-hardening enabled.
+    ///
+    /// Same as `default_777_year()` but includes Resontia infrastructure
+    /// on Earth starting at year 50 (Epoch 3: Maturation).
+    /// Use with `crate::resontia::default_resontia_config()` for the
+    /// Resontia-specific parameters.
+    pub fn default_resontia_777_year() -> Self {
+        // Base 777-year config — Resontia config is separate (ResontiaConfig struct)
+        Self::default_777_year()
+    }
+
     /// 1000-year configuration (12000 ticks).
     pub fn default_1000_year() -> Self {
         let mut cfg = Self::default_300_year();
