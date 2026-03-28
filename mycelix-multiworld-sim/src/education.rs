@@ -480,6 +480,16 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
+            power_generation_kw: 0.0,
+            power_demand_kw: 0.0,
+            narrative_identity: crate::world::NarrativeIdentity::default(),
+            maintenance_hours_required: 0.0,
+            maintenance_hours_available: 0.0,
+            bus_factor_critical: 0,
+            pathogen_pressure: 0.0,
+            civilizational_phi: 0.0,
+            trust_level: 0.7,
+            earth_funding: 1.0,
         }
     }
 

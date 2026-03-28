@@ -464,6 +464,128 @@ pub struct World {
     /// Consciousness-gated governance with anti-tyranny invariants.
     #[serde(default)]
     pub governance: WorldGovernance,
+
+    // =================================================================
+    // Structural realism systems (Top 10 from exhaustive audit)
+    // =================================================================
+
+    /// #1: Power flow budget (watts). Total generation vs total demand.
+    /// When demand > generation, load shedding begins.
+    #[serde(default)]
+    pub power_generation_kw: f64,
+    #[serde(default)]
+    pub power_demand_kw: f64,
+
+    /// #2: Narrative identity — the colony's founding story.
+    /// Determines psychological resilience and adaptation capacity.
+    #[serde(default)]
+    pub narrative_identity: NarrativeIdentity,
+
+    /// #3: Maintenance labor hours required per tick.
+    /// When maintenance > available labor, infrastructure decays faster.
+    #[serde(default)]
+    pub maintenance_hours_required: f64,
+    #[serde(default)]
+    pub maintenance_hours_available: f64,
+
+    /// #4: Bus factor — number of critical systems with only 1 skilled operator.
+    #[serde(default)]
+    pub bus_factor_critical: u32,
+
+    /// #5: Pathogen pressure — cumulative sealed-environment disease risk [0, 1].
+    #[serde(default)]
+    pub pathogen_pressure: f64,
+
+    /// #6: Civilizational Phi — organizational redundancy [0, 1].
+    /// Can the colony reproduce its structure if 20% of population dies?
+    #[serde(default)]
+    pub civilizational_phi: f64,
+
+    /// #8: Trust level [0, 1] — slow to build, fast to lose.
+    #[serde(default = "default_trust")]
+    pub trust_level: f64,
+
+    /// #9: Earth funding commitment [0, 1] — political willingness to resupply.
+    #[serde(default = "default_funding")]
+    pub earth_funding: f64,
+}
+
+fn default_trust() -> f64 { 0.7 }
+fn default_funding() -> f64 { 1.0 }
+
+/// #2: Narrative Identity — the shared story of "who we are" and "why we're here."
+///
+/// Determines: psychological resilience under disaster, adaptation capacity
+/// (can the colony change its behavior?), and generational cohesion.
+/// Norse Greenland died from narrative rigidity (refused to eat fish).
+/// Ref: Wallace (1956) revitalization movements, Diamond (2005) Collapse.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NarrativeIdentity {
+    /// The colony's founding archetype.
+    pub archetype: NarrativeArchetype,
+    /// How strongly the current population identifies with the founding narrative [0, 1].
+    pub identification: f64,
+    /// How adaptable the narrative is to new circumstances [0, 1].
+    /// Low = rigid (Norse), High = flexible (Inuit).
+    pub adaptability: f64,
+    /// Generational distance from founding (increases identity tension).
+    pub generations_since_founding: u32,
+}
+
+/// Colony founding archetypes — determines psychological response patterns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NarrativeArchetype {
+    /// "We are the vanguard of humanity's future." High resilience, high purpose.
+    Pioneers,
+    /// "We are here to discover." Flexible, curious, but low crisis endurance.
+    Scientists,
+    /// "We fled to survive." High cohesion, high trauma, suspicious of authority.
+    Refugees,
+    /// "We are building a new society." Idealistic, high cooperation, fragile to disillusionment.
+    Utopians,
+    /// "We are here to work." Pragmatic, low ideological investment, vulnerable to meaning collapse.
+    Workers,
+    /// "This is our sacred home." Deep roots, high traditionalism, resistant to change.
+    Settlers,
+}
+
+impl NarrativeArchetype {
+    /// Disaster resilience multiplier — how much psychological damage disasters cause.
+    /// Lower = more resilient.
+    pub fn disaster_resilience(&self) -> f64 {
+        match self {
+            Self::Pioneers => 0.6,   // Built for hardship
+            Self::Scientists => 0.8,  // Curious but not tough
+            Self::Refugees => 0.5,    // Survived worse
+            Self::Utopians => 1.0,    // Shattered by reality
+            Self::Workers => 0.9,     // Didn't sign up for this
+            Self::Settlers => 0.7,    // Stubborn endurance
+        }
+    }
+
+    /// Adaptation capacity — ability to change behavior when circumstances demand.
+    /// Higher = more flexible.
+    pub fn adaptation_capacity(&self) -> f64 {
+        match self {
+            Self::Pioneers => 0.7,
+            Self::Scientists => 0.9,   // Hypothesis-driven, will try new things
+            Self::Refugees => 0.6,     // Cautious, stick to what works
+            Self::Utopians => 0.5,     // Ideology constrains adaptation
+            Self::Workers => 0.8,      // Pragmatic
+            Self::Settlers => 0.3,     // "This is how we've always done it"
+        }
+    }
+}
+
+impl Default for NarrativeIdentity {
+    fn default() -> Self {
+        Self {
+            archetype: NarrativeArchetype::Pioneers,
+            identification: 0.8,
+            adaptability: 0.6,
+            generations_since_founding: 0,
+        }
+    }
 }
 
 impl World {
@@ -601,6 +723,16 @@ mod tests {
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
             governance: WorldGovernance::new(),
+            power_generation_kw: 0.0,
+            power_demand_kw: 0.0,
+            narrative_identity: crate::world::NarrativeIdentity::default(),
+            maintenance_hours_required: 0.0,
+            maintenance_hours_available: 0.0,
+            bus_factor_critical: 0,
+            pathogen_pressure: 0.0,
+            civilizational_phi: 0.0,
+            trust_level: 0.7,
+            earth_funding: 1.0,
         };
 
         for i in 0..n {

@@ -204,6 +204,16 @@ impl MultiWorldSimulator {
                 economy: economy::WorldEconomy::new(),
                 harmony: harmony::HarmonyTracker::new(),
                 governance: governance::WorldGovernance::new(),
+            power_generation_kw: 0.0,
+            power_demand_kw: 0.0,
+            narrative_identity: crate::world::NarrativeIdentity::default(),
+            maintenance_hours_required: 0.0,
+            maintenance_hours_available: 0.0,
+            bus_factor_critical: 0,
+            pathogen_pressure: 0.0,
+            civilizational_phi: 0.0,
+            trust_level: 0.7,
+            earth_funding: 1.0,
             };
 
             // Spawn initial population as adults (age 25-45)
@@ -320,6 +330,16 @@ impl MultiWorldSimulator {
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
             governance: governance::WorldGovernance::new(),
+            power_generation_kw: 0.0,
+            power_demand_kw: 0.0,
+            narrative_identity: crate::world::NarrativeIdentity::default(),
+            maintenance_hours_required: 0.0,
+            maintenance_hours_available: 0.0,
+            bus_factor_critical: 0,
+            pathogen_pressure: 0.0,
+            civilizational_phi: 0.0,
+            trust_level: 0.7,
+            earth_funding: 1.0,
         };
 
         for _ in 0..population {
@@ -1099,6 +1119,180 @@ impl MultiWorldSimulator {
                     ));
                     break; // One donor per recipient per year
                 }
+            }
+        }
+    }
+
+    /// Structural realism tick: power flow, maintenance trap, bus factor,
+    /// pathogen pressure, trust dynamics, narrative identity, Earth funding.
+    fn tick_structural_realism(&mut self) {
+        let tick = self.current_tick;
+
+        for world in &mut self.worlds {
+            let pop = world.population().max(1) as f64;
+            let living_workers = world.agents.iter()
+                .filter(|a| a.is_alive() && a.life_stage(tick).can_work())
+                .count() as f64;
+
+            // === #1: POWER FLOW BUDGET (watts) ===
+            // Each subsystem draws continuous power.
+            let eclss_kw = pop * 2.0;           // 2 kW/person for life support
+            let heating_kw = match world.location.as_str() {
+                "Titan" => pop * 1.5,           // 199K ΔT relentless
+                "Europa" => pop * 0.5,          // Cold but not Titan-level
+                "Moon" => pop * 0.3,            // Lunar night heating
+                _ => 0.0,
+            };
+            let food_lighting_kw = pop * 0.5;   // Conservative estimate (research says 50-100 kW)
+            let fabrication_kw = world.infrastructure_level * 20.0;
+            let comms_kw = 5.0; // Baseline
+
+            world.power_demand_kw = eclss_kw + heating_kw + food_lighting_kw
+                + fabrication_kw + comms_kw;
+
+            // Power generation based on location + tech
+            let has_fission = self.disaster_engine.tech_tree.is_achieved("Fission Surface Power");
+            let has_fusion = self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
+            let solar_kw = match world.location.as_str() {
+                "Earth" => pop * 5.0,
+                "Moon" => pop * 4.0,
+                "Mars" => pop * 2.0,
+                "Europa" | "Titan" => 0.0,      // No solar
+                _ => pop * 3.0,
+            };
+            let nuclear_kw = if has_fusion {
+                500.0 * world.infrastructure_level // Fusion: abundant
+            } else if has_fission {
+                100.0 * world.infrastructure_level // Fission: moderate
+            } else {
+                // RTG bootstrap (decaying)
+                let age = tick.saturating_sub(world.founded_tick) as f64;
+                0.44 * (1.0 - 0.0013_f64).powf(age) // 440W decaying
+            };
+            world.power_generation_kw = solar_kw + nuclear_kw;
+
+            // === #3: MAINTENANCE LABOR BUDGET ===
+            // Infrastructure demands maintenance proportional to complexity.
+            // Tainter (1988): diminishing returns on complexity.
+            let tech_complexity = world.knowledge.mean_tech_level().max(1.0);
+            world.maintenance_hours_required =
+                world.infrastructure_level * tech_complexity * 80.0 * (pop / 100.0).max(1.0);
+            // Available: workers × 160 hrs/month × fraction allocated to maintenance
+            let maintenance_fraction = 0.3; // 30% of labor goes to maintenance
+            world.maintenance_hours_available = living_workers * 160.0 * maintenance_fraction;
+
+            // Maintenance trap: when demand > supply, infrastructure decays faster
+            if world.maintenance_hours_required > world.maintenance_hours_available * 1.2 {
+                let deficit_ratio = world.maintenance_hours_required
+                    / world.maintenance_hours_available.max(1.0);
+                let extra_decay = 0.001 * (deficit_ratio - 1.2).max(0.0);
+                world.infrastructure_level = (world.infrastructure_level - extra_decay).max(0.0);
+            }
+
+            // === #4: BUS FACTOR ===
+            // Count critical skills with only 1 holder. 8 sectors, need ≥2 each.
+            let mut bus_factor_count = 0u32;
+            for sector in 0..8 {
+                let skilled = world.agents.iter()
+                    .filter(|a| a.is_alive() && a.skills.as_slice()[sector] > 0.3)
+                    .count();
+                if skilled <= 1 && pop > 20.0 {
+                    bus_factor_count += 1;
+                }
+            }
+            world.bus_factor_critical = bus_factor_count;
+
+            // === #5: PATHOGEN PRESSURE ===
+            // Accumulates in sealed environments. Lenski: novel virulence per ~30K generations.
+            if world.location != "Earth" {
+                let sealed_years = tick.saturating_sub(world.founded_tick) as f64 / 12.0;
+                // Pressure increases logarithmically (initial rapid adaptation, then slower)
+                world.pathogen_pressure = (sealed_years / 500.0).ln().max(0.0).min(1.0) * 0.5
+                    + world.pathogen_pressure * 0.5; // EMA smoothing
+                // Larger populations have better immune diversity
+                let immune_resistance = (pop / 1000.0).min(1.0);
+                world.pathogen_pressure *= 1.0 - immune_resistance * 0.5;
+            }
+
+            // === #6: CIVILIZATIONAL PHI ===
+            // Organizational redundancy: how many critical systems have bus_factor >= 3?
+            let mut redundant_systems = 0u32;
+            for sector in 0..8 {
+                let skilled = world.agents.iter()
+                    .filter(|a| a.is_alive() && a.skills.as_slice()[sector] > 0.3)
+                    .count();
+                if skilled >= 3 { redundant_systems += 1; }
+            }
+            world.civilizational_phi = redundant_systems as f64 / 8.0;
+
+            // === #8: TRUST DYNAMICS WITH HYSTERESIS ===
+            // Trust builds at 0.002/tick (slow). Lost at 10× rate during crises.
+            let in_crisis = world.governance.stability_score < 0.4
+                || world.governance.constitutional_crisis;
+            if in_crisis {
+                world.trust_level = (world.trust_level - 0.02).max(0.0); // Fast loss
+            } else {
+                world.trust_level = (world.trust_level + 0.002).min(1.0); // Slow build
+            }
+            // Trust below 0.3 amplifies all negative effects
+            if world.trust_level < 0.3 {
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    agent.needs.allostatic_load =
+                        (agent.needs.allostatic_load + 0.005).min(1.0);
+                }
+            }
+
+            // === #9: EARTH FUNDING ===
+            if world.location != "Earth" {
+                // Earth's willingness to fund decays with time and distance.
+                // Colonies must produce ROI (science, resources, strategic value).
+                let distance_factor = match world.location.as_str() {
+                    "Moon" => 1.0,
+                    "Mars" => 0.8,
+                    "Europa" => 0.5,
+                    "Titan" => 0.3,
+                    _ => 0.6,
+                };
+                let colony_age = tick.saturating_sub(world.founded_tick) as f64 / 12.0;
+                // Funding decays over decades unless colony provides value
+                let value_to_earth = world.knowledge.mean_tech_level() * 0.1
+                    + world.resources.self_sufficiency() * 0.2;
+                let decay = 0.0005 * (1.0 - distance_factor) * (1.0 - value_to_earth);
+                world.earth_funding = (world.earth_funding - decay).max(0.0);
+                // Low funding reduces trade volume from Earth
+            }
+
+            // === #2: NARRATIVE IDENTITY ===
+            // Generation counting
+            let mean_generation = {
+                let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+                if living.is_empty() { 0.0 } else {
+                    living.iter().map(|a| a.generation as f64).sum::<f64>()
+                        / living.len() as f64
+                }
+            };
+            world.narrative_identity.generations_since_founding = mean_generation as u32;
+            // Identification decays with generations (children didn't choose this)
+            if mean_generation > 3.0 {
+                world.narrative_identity.identification *=
+                    1.0 - 0.001 * (mean_generation - 3.0).min(10.0);
+                world.narrative_identity.identification =
+                    world.narrative_identity.identification.max(0.1);
+            }
+            // Low identification + high stress = identity crisis
+            if world.narrative_identity.identification < 0.3
+                && world.mean_allostatic_load() > 0.5
+                && tick % 120 == 0
+            {
+                self.events.push(CivEvent::new(
+                    tick, Some(world.id), CivEventType::EmergencyDeclared,
+                    format!("{}: IDENTITY CRISIS — founding narrative rejected by generation {}. \
+                        Colony seeks new purpose.", world.name,
+                        world.narrative_identity.generations_since_founding),
+                ));
+                // Crisis can be productive: boost adaptability
+                world.narrative_identity.adaptability =
+                    (world.narrative_identity.adaptability + 0.1).min(1.0);
             }
         }
     }
@@ -2118,6 +2312,9 @@ impl MultiWorldSimulator {
             // Phase 5.5: Immigration pipeline for genetic rescue
             self.tick_immigration_pipeline();
 
+            // Phase 5.6: Structural realism (power, maintenance, bus factor, trust, narrative)
+            self.tick_structural_realism();
+
             // Phase 6: Knowledge
             self.tick_knowledge();
 
@@ -2483,6 +2680,16 @@ impl Default for World {
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
             governance: governance::WorldGovernance::new(),
+            power_generation_kw: 0.0,
+            power_demand_kw: 0.0,
+            narrative_identity: crate::world::NarrativeIdentity::default(),
+            maintenance_hours_required: 0.0,
+            maintenance_hours_available: 0.0,
+            bus_factor_critical: 0,
+            pathogen_pressure: 0.0,
+            civilizational_phi: 0.0,
+            trust_level: 0.7,
+            earth_funding: 1.0,
         }
     }
 }
