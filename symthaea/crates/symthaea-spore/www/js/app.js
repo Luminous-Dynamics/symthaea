@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // ==================================================================
 // app.js — Main application logic: state, tabs, worker, init
 // ==================================================================
@@ -322,6 +325,15 @@
       state.conversationStats.coherence = coh;
       var cohEl = document.getElementById('t-coherence');
       if (cohEl) cohEl.textContent = coh.toFixed(2);
+    }
+
+    // Consciousness music: feed cycle data to audio synthesis
+    if (window.consciousnessMusic && window.consciousnessMusic.isRunning()) {
+      window.consciousnessMusic.renderChunk(
+        result.consciousness_level,
+        state.harmonyValues,
+        result.neuromodulators
+      );
     }
 
     // Update topology nodes if available
