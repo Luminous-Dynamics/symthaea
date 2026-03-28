@@ -106,6 +106,10 @@ pub struct MultiWorldSimulator {
     carrying_capacity_base: std::collections::HashMap<u32, usize>,
     /// Narrative engine: generates memorable event descriptions from affect + disaster data.
     pub narrative_engine: narrative::NarrativeEngine,
+    /// Resontia Earth-hardening infrastructure.
+    pub resontia_infra: resontia::ResontiaInfrastructure,
+    /// Resontia configuration.
+    pub resontia_config: resontia::ResontiaConfig,
 }
 
 impl MultiWorldSimulator {
@@ -133,7 +137,14 @@ impl MultiWorldSimulator {
             morale_contagion: std::collections::HashMap::new(),
             carrying_capacity_base: std::collections::HashMap::new(),
             narrative_engine: narrative::NarrativeEngine::new(),
+            resontia_infra: resontia::ResontiaInfrastructure::new(),
+            resontia_config: resontia::ResontiaConfig::default(),
         }
+    }
+
+    /// Enable Resontia Earth-hardening for this simulation.
+    pub fn enable_resontia(&mut self) {
+        self.resontia_config = resontia::default_resontia_config();
     }
 
     /// Initialize worlds that should exist at tick 0.
@@ -991,6 +1002,107 @@ impl MultiWorldSimulator {
         }
     }
 
+    /// Fix 2: Immigration pipeline for genetic rescue.
+    ///
+    /// When outer colonies face genetic bottleneck (viability < 0.5), Earth/Moon/Mars
+    /// send settlers during transfer windows. This is the lifeline that makes small
+    /// founding populations survivable — without it, Europa (200) and Titan (150)
+    /// hit F > 0.0625 within ~10 generations.
+    ///
+    /// Smith (2014): sustained immigration of even 1-2 individuals per generation
+    /// can maintain heterozygosity indefinitely (the "one migrant per generation" rule).
+    fn tick_immigration_pipeline(&mut self) {
+        // Run every 12 ticks (annually) and only when migration is enabled
+        if !self.config.policy.migration_enabled || self.current_tick % 12 != 0 {
+            return;
+        }
+        if self.worlds.len() < 2 { return; }
+
+        let has_fusion_drive = self.disaster_engine.tech_tree.is_achieved("Fusion Drive")
+            || self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
+
+        // Identify colonies needing genetic rescue
+        let needs_rescue: Vec<(usize, f64)> = self.worlds.iter().enumerate()
+            .filter(|(_, w)| w.location != "Earth" && w.population() > 0)
+            .map(|(i, w)| (i, PopulationEngine::genetic_viability(w, self.current_tick)))
+            .filter(|(_, v)| *v < 0.5)
+            .collect();
+
+        // Identify donor worlds (population > 1000, can spare settlers)
+        let donors: Vec<usize> = self.worlds.iter().enumerate()
+            .filter(|(_, w)| w.population() > 1000)
+            .map(|(i, _)| i)
+            .collect();
+
+        if donors.is_empty() || needs_rescue.is_empty() { return; }
+
+        for (recipient_idx, viability) in needs_rescue {
+            // Find best donor with open transfer window
+            for &donor_idx in &donors {
+                if donor_idx == recipient_idx { continue; }
+
+                let (synodic, _) = interworld::InterWorldEngine::orbital_params(
+                    &self.worlds[donor_idx].location,
+                    &self.worlds[recipient_idx].location,
+                );
+                let window_open = has_fusion_drive || synodic == 0
+                    || self.current_tick % synodic.max(1) as u32 == 0;
+
+                if !window_open { continue; }
+
+                // Send settlers: more when viability is lower
+                let n_settlers = if viability < 0.2 { 10 } else { 5 };
+                let n_settlers = n_settlers.min(self.worlds[donor_idx].population() / 50);
+                if n_settlers == 0 { continue; }
+
+                // Select healthy young adults from donor
+                let dest_id = self.worlds[recipient_idx].id;
+                let dest_name = self.worlds[recipient_idx].name.clone();
+                let donor_name = self.worlds[donor_idx].name.clone();
+
+                let settler_ids: Vec<u64> = self.worlds[donor_idx].agents.iter()
+                    .filter(|a| a.is_alive() && a.health > 0.7
+                        && a.age_years(self.current_tick) > 20.0
+                        && a.age_years(self.current_tick) < 40.0
+                        && !a.is_immigrant)
+                    .take(n_settlers)
+                    .map(|a| a.id)
+                    .collect();
+
+                // Collect settlers first, then modify both worlds to avoid double borrow.
+                let mut settlers_to_move: Vec<agent::CivAgent> = Vec::new();
+                let mut death_ids: Vec<u64> = Vec::new();
+                for id in &settler_ids {
+                    if let Some(agent) = self.worlds[donor_idx].agents.iter().find(|a| a.id == *id) {
+                        let mut settler = agent.clone();
+                        settler.world_id = dest_id;
+                        settler.is_immigrant = true;
+                        settler.partner_id = None;
+                        settlers_to_move.push(settler);
+                        death_ids.push(*id);
+                    }
+                }
+                let moved = settlers_to_move.len();
+                // Mark donors as dead
+                for id in &death_ids {
+                    if let Some(agent) = self.worlds[donor_idx].agents.iter_mut().find(|a| a.id == *id) {
+                        agent.death_tick = Some(self.current_tick);
+                    }
+                }
+                // Add settlers to recipient
+                self.worlds[recipient_idx].agents.extend(settlers_to_move);
+                if moved > 0 {
+                    self.events.push(CivEvent::new(
+                        self.current_tick, Some(dest_id), CivEventType::Migration,
+                        format!("GENETIC RESCUE: {} settlers from {} → {} (viability {:.0}%)",
+                            moved, donor_name, dest_name, viability * 100.0),
+                    ));
+                    break; // One donor per recipient per year
+                }
+            }
+        }
+    }
+
     fn tick_knowledge(&mut self) {
         // Phase 6: Education, skill growth, and technology advancement.
         let tick = self.current_tick;
@@ -1538,7 +1650,22 @@ impl MultiWorldSimulator {
                     // colonies lose up to 50% fewer people to disasters. Mean Phi acts
                     // as a collective awareness multiplier for evacuation efficiency.
                     let mean_phi = world.mean_phi();
-                    let effective_loss = effects.population_loss_fraction * cascade_mult * (1.0 - mean_phi * 0.5);
+                    let mut effective_loss = effects.population_loss_fraction * cascade_mult * (1.0 - mean_phi * 0.5);
+
+                    // Resontia Earth-hardening: vaults reduce Earth casualties.
+                    // Compute mitigation inline to avoid borrow conflicts.
+                    if world.location == "Earth" && self.resontia_config.enabled
+                        && self.resontia_infra.vault_count > 0
+                    {
+                        let vault_cap = self.resontia_infra.vault_capacity;
+                        let pop = world.population();
+                        let mitigated_fraction = if pop > 0 {
+                            (vault_cap as f64 / pop as f64).min(0.9)
+                        } else {
+                            0.0
+                        };
+                        effective_loss *= 1.0 - mitigated_fraction;
+                    }
 
                     // Population loss: kill a fraction of living agents (random selection)
                     if effective_loss > 0.0 {
@@ -1957,6 +2084,16 @@ impl MultiWorldSimulator {
                 }
                 let dem_events =
                     PopulationEngine::tick_demographics(&mut world, &mut self.rng, self.current_tick);
+                // Fix 3: Genetic Engineering eliminates inbreeding depression.
+                // Newborns with health penalties from inbreeding get gene therapy.
+                if self.disaster_engine.tech_tree.is_achieved("Genetic Engineering") {
+                    for agent in world.agents.iter_mut() {
+                        if agent.birth_tick == self.current_tick && agent.health < 0.85 {
+                            agent.health = agent.health.max(0.85);
+                        }
+                    }
+                }
+
                 phase1_events.extend(dem_events);
                 self.worlds[i] = world;
             }
@@ -1977,6 +2114,9 @@ impl MultiWorldSimulator {
 
             // Phase 5: Inter-world
             self.tick_interworld();
+
+            // Phase 5.5: Immigration pipeline for genetic rescue
+            self.tick_immigration_pipeline();
 
             // Phase 6: Knowledge
             self.tick_knowledge();
@@ -2111,6 +2251,23 @@ impl MultiWorldSimulator {
 
             // Phase 10: Emergencies
             self.tick_emergencies();
+
+            // Phase 10.5: Resontia construction (if enabled)
+            if self.resontia_config.enabled {
+                if let Some(earth) = self.worlds.iter().find(|w| w.location == "Earth") {
+                    let earth_clone = earth.clone();
+                    let (resontia_events, _) = resontia::tick_resontia(
+                        &mut self.resontia_infra,
+                        &self.resontia_config,
+                        &earth_clone,
+                        self.current_tick,
+                        0, // no disaster this call — just construction
+                        None,
+                        &mut self.rng,
+                    );
+                    self.events.extend(resontia_events);
+                }
+            }
 
             // Phase 11: Epoch evaluation
             self.tick_epoch_evaluation();

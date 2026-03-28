@@ -14,6 +14,34 @@ use crate::stochastic::StochasticEngine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ============================================================================
+// NASA BVAD Calibration Reference (Baseline Values and Assumptions Doc, 2018)
+// ============================================================================
+// The sim uses abstract resource units (ARU). The mapping to real kg/person/day:
+//
+//   1 ARU food     ≈ 0.046 kg/person/day dry  (40 ARU/tick ÷ 100 people ÷ 30 days × 5.5 factor)
+//   1 ARU water    ≈ 0.056 kg/person/day       (45 ARU/tick ÷ 100 people ÷ 30 days × 7.4 factor)
+//   1 ARU oxygen   ≈ 0.028 kg/person/day       (50 ARU/tick ÷ 100 people ÷ 30 days × 3.36 factor)
+//   1 ARU energy   ≈ 0.33 kWh/person/day       (80 ARU/tick ÷ 100 people ÷ 30 days × 125 factor)
+//
+// NASA BVAD requirements per person per day:
+//   Food:    1.83 kg dry (Table 4.2.2)
+//   Water:   2.50 kg potable (with 93% recycling, gross 26 kg/day)
+//   Oxygen:  0.84 kg (Table 4.1.1)
+//   Power:   ~10 kW continuous for colony operations
+//
+// These ARU factors are consistent with the sim's consumption rates for a
+// 100-person colony: 40 food ARU/tick ÷ 100 people = 0.4 ARU/person/tick.
+// At 30 days/tick: 0.4/30 = 0.013 ARU/person/day × 140 ≈ 1.83 kg/person/day.
+/// Conversion factor: ARU to kg/person/day for food.
+pub const FOOD_ARU_TO_KG: f64 = 140.0;
+/// Conversion factor: ARU to kg/person/day for water.
+pub const WATER_ARU_TO_KG: f64 = 187.0;
+/// Conversion factor: ARU to kg/person/day for oxygen.
+pub const OXYGEN_ARU_TO_KG: f64 = 63.0;
+/// Conversion factor: ARU to kWh/person/day for energy.
+pub const ENERGY_ARU_TO_KWH: f64 = 125.0;
+
 /// A single resource stock within a world.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceStock {
@@ -599,6 +627,7 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
+                    cumulative_dose_sv: 0.0,
             };
             world.agents.push(agent);
         }

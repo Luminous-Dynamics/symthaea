@@ -48,6 +48,11 @@ fn main() {
         }
     }
 
+    // Print narrative history (the emergent story of this civilization)
+    if !sim.narrative_engine.events.is_empty() {
+        println!("\n{}", sim.narrative_engine.format_history());
+    }
+
     let years = report.total_ticks / 12;
     println!("
 {}", "=".repeat(60));
@@ -56,5 +61,8 @@ fn main() {
     } else {
         println!("  CIVILIZATION COLLAPSED (CVS: {:.4})", report.final_cvs);
     }
+    println!("{}", "=".repeat(60));
+    println!("  Tech milestones: {}", report.tech_milestones_achieved);
+    println!("  Narrative events: {}", sim.narrative_engine.events.len());
     println!("{}", "=".repeat(60));
 }

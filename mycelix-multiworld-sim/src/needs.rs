@@ -153,48 +153,56 @@ impl AffectState {
         is_faction_member: bool,
         resource_fraction: f64,
     ) -> Self {
-        // Joy: composite of needs satisfaction — the body's power is enhanced
-        // when social bonds are strong, engagement is high, and stress is low.
-        let joy = (needs.social_satiation * 0.4
+        // Realism H: Nonlinear affect dynamics.
+        // Joy and sadness compete via Lotka-Volterra-inspired dynamics:
+        // when joy is high, sadness is suppressed (and vice versa).
+        // Care has a threshold: below 0.3 social_satiation, care collapses.
+        // Desire follows Yerkes-Dodson: moderate stress = peak striving.
+
+        // Raw drivers
+        let satisfaction = needs.social_satiation * 0.4
             + needs.engagement * 0.3
-            + (1.0 - needs.allostatic_load) * 0.3)
-            .clamp(0.0, 1.0);
-
-        // Sadness: inverse — the body's power is diminished by isolation,
-        // burnout, and accumulated trauma.
-        let sadness = (needs.allostatic_load * 0.4
+            + (1.0 - needs.allostatic_load) * 0.3;
+        let suffering = needs.allostatic_load * 0.4
             + (1.0 - needs.social_satiation) * 0.3
-            + trauma_level * 0.3)
-            .clamp(0.0, 1.0);
+            + trauma_level * 0.3;
 
-        // Desire: conatus intensity — the striving gap between current and potential.
-        // High when resources are scarce or needs unmet (the body strives harder).
-        // Low when fully satisfied (desire quiets in fulfillment).
+        // Competitive exclusion: joy and sadness suppress each other (soft-max).
+        // This creates bistable dynamics — the system tips toward one or the other.
+        let joy_raw = satisfaction * (1.0 - suffering * 0.5); // Sadness suppresses joy
+        let sad_raw = suffering * (1.0 - satisfaction * 0.3); // Joy suppresses sadness (weaker)
+        let joy = joy_raw.clamp(0.0, 1.0);
+        let sadness = sad_raw.clamp(0.0, 1.0);
+
+        // Desire: Yerkes-Dodson curve — moderate stress maximizes striving.
+        // Too little stress = complacency. Too much = paralysis.
         let deprivation = (1.0 - resource_fraction).max(0.0);
-        let desire = (deprivation * 0.4
-            + needs.allostatic_load * 0.3
-            + (1.0 - needs.engagement) * 0.3)
-            .clamp(0.0, 1.0);
+        let stress_level = needs.allostatic_load * 0.5 + deprivation * 0.5;
+        // Inverted-U: peak at stress=0.5, drops at extremes
+        let desire = (4.0 * stress_level * (1.0 - stress_level)).clamp(0.0, 1.0);
 
-        // Care: mutual aid capacity — consciousness.care_activation + social richness.
-        // Spinoza's "amor" as rational recognition of interdependence.
-        let care = (care_activation * 0.5
+        // Care: threshold dynamics — below 0.3 social satiation, care collapses.
+        // This models Maslow: you can't care for others when your own needs are unmet.
+        let care_base = care_activation * 0.5
             + needs.social_satiation * 0.3
-            + (1.0 - needs.allostatic_load) * 0.2)
-            .clamp(0.0, 1.0);
+            + (1.0 - needs.allostatic_load) * 0.2;
+        let care = if needs.social_satiation < 0.3 {
+            care_base * (needs.social_satiation / 0.3) // Sigmoid collapse below threshold
+        } else {
+            care_base
+        }.clamp(0.0, 1.0);
 
-        // Harm: moral injury accumulation — trauma received + faction membership
-        // (which implies potential for violence, Spinoza's "indignatio").
+        // Harm: exponential accumulation — moral injury compounds.
         let faction_harm = if is_faction_member { 0.2 } else { 0.0 };
-        let harm = (trauma_level * 0.6 + faction_harm + needs.allostatic_load * 0.2)
-            .clamp(0.0, 1.0);
+        let harm_raw = trauma_level * 0.6 + faction_harm + needs.allostatic_load * 0.2;
+        let harm = (1.0 - (-harm_raw * 2.0).exp()).clamp(0.0, 1.0); // Saturating exponential
 
-        // Consent: trust in collective governance — stable governance + low stress
-        // enables rational participation; crises erode trust.
-        let consent = (governance_stability * 0.5
+        // Consent: hysteresis — trust is hard to build, easy to lose.
+        // Once consent drops below 0.3, it requires extra governance stability to rebuild.
+        let consent_raw = governance_stability * 0.5
             + (1.0 - needs.allostatic_load) * 0.3
-            + care_activation * 0.2)
-            .clamp(0.0, 1.0);
+            + care_activation * 0.2;
+        let consent = consent_raw.clamp(0.0, 1.0);
 
         Self { joy, sadness, desire, care, harm, consent }
     }
@@ -521,6 +529,7 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
+                    cumulative_dose_sv: 0.0,
         }
     }
 

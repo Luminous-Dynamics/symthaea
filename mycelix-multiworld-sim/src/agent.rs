@@ -246,6 +246,10 @@ pub struct CivAgent {
     pub generation: u16,
     /// Intergenerational trauma level [0.0, 1.0].
     pub trauma_level: f64,
+    /// Realism E: Cumulative radiation dose (Sieverts lifetime).
+    /// Linear no-threshold model: 5% cancer risk per Sv (ICRP 103).
+    /// Earth background: ~0.002 Sv/year. Europa: ~54 Sv/year unshielded.
+    pub cumulative_dose_sv: f64,
 }
 
 impl CivAgent {
@@ -290,18 +294,47 @@ impl CivAgent {
         base * (-0.5 * ((age - peak) / sigma).powi(2)).exp()
     }
 
-    /// Gompertz-Makeham monthly mortality rate, modified by health.
+    /// Gompertz-Makeham monthly mortality rate, modified by health and tech era.
+    ///
     /// M(x) = alpha * exp(beta * x) + lambda
-    /// where x = age in years, alpha = 0.00003, beta = 0.085, lambda = 0.0001
+    ///
+    /// Parameters evolve with medical technology (lifespan research calibration):
+    /// - `alpha_mult`: reduces initial mortality (senolytics, public health)
+    /// - `beta_mult`: reduces aging rate itself (reprogramming, negligible senescence)
+    /// - `lambda_mult`: reduces background mortality (medical infrastructure)
+    ///
+    /// Space health penalties:
+    /// - Radiation: cumulative_dose_sv increases cancer risk (linear no-threshold, ICRP 103)
+    /// - Low gravity: accelerates bone/cardiovascular aging
+    /// - Isolation: amplifies background mortality for small populations
+    ///
+    /// Sources: Pyrkov et al. (2021) Nature Comms (resilience wall 120-150yr);
+    /// NASA-STD-3001 (radiation limits); Frankham (1995) (Ne/N ratios).
     pub fn mortality_rate(&self, current_tick: u32) -> f64 {
+        self.mortality_rate_with_modifiers(current_tick, 1.0, 1.0, 1.0)
+    }
+
+    /// Mortality rate with tech-era modifiers for Gompertz parameters.
+    pub fn mortality_rate_with_modifiers(
+        &self,
+        current_tick: u32,
+        alpha_mult: f64,
+        beta_mult: f64,
+        lambda_mult: f64,
+    ) -> f64 {
         let age = self.age_years(current_tick);
-        let alpha = 0.00003;
-        let beta = 0.085;
-        let lambda = 0.0001;
+        let alpha = 0.00003 * alpha_mult;
+        let beta = 0.085 * beta_mult;
+        let lambda = 0.0001 * lambda_mult;
         let base_annual = alpha * (beta * age).exp() + lambda;
-        // Convert to monthly and modify by health (low health = higher mortality)
+
+        // Health modifier (existing)
         let health_modifier = 1.0 + 2.0 * (1.0 - self.health);
-        (base_annual / 12.0) * health_modifier
+
+        // Radiation cancer risk: 5% excess risk per Sv (ICRP 103)
+        let radiation_modifier = 1.0 + self.cumulative_dose_sv * 0.05;
+
+        (base_annual / 12.0) * health_modifier * radiation_modifier
     }
 
     /// Effective labor output: skill total * health * life-stage factor * engagement.
@@ -344,6 +377,7 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
+                    cumulative_dose_sv: 0.0,
         }
     }
 

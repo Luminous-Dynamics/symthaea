@@ -242,11 +242,11 @@ impl SimulationConfig {
         cfg.total_ticks = 777 * TICKS_PER_YEAR;
         cfg.initial_worlds.push(WorldSeedConfig {
             name: "Europa Station".into(), location: "Europa".into(),
-            founding_tick: 2400, initial_population: 30, initial_resources: 0.15,
+            founding_tick: 2400, initial_population: 200, initial_resources: 0.15,
         });
         cfg.initial_worlds.push(WorldSeedConfig {
             name: "Titan Outpost".into(), location: "Titan".into(),
-            founding_tick: 3600, initial_population: 20, initial_resources: 0.1,
+            founding_tick: 3600, initial_population: 150, initial_resources: 0.1,
         });
         cfg.epoch_configs.push(EpochConfig {
             id: 10, name: "Millennium".into(),
@@ -273,11 +273,11 @@ impl SimulationConfig {
         cfg.total_ticks = 1000 * TICKS_PER_YEAR;
         cfg.initial_worlds.push(WorldSeedConfig {
             name: "Europa Station".into(), location: "Europa".into(),
-            founding_tick: 2400, initial_population: 30, initial_resources: 0.15,
+            founding_tick: 2400, initial_population: 200, initial_resources: 0.15,
         });
         cfg.initial_worlds.push(WorldSeedConfig {
             name: "Titan Outpost".into(), location: "Titan".into(),
-            founding_tick: 3600, initial_population: 20, initial_resources: 0.1,
+            founding_tick: 3600, initial_population: 150, initial_resources: 0.1,
         });
         cfg.epoch_configs.push(EpochConfig {
             id: 10, name: "Millennium".into(),

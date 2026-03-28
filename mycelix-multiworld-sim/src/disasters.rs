@@ -770,6 +770,26 @@ impl TechTree {
                     achieved: false,
                     achieved_tick: None,
                 },
+                // Fix 3: Genetic Engineering eliminates inbreeding depression.
+                // Enables small colonies to maintain genetic diversity via CRISPR/
+                // Yamanaka factor therapies. Realistic timeline: 2060-2200.
+                // Rejuvenate Bio (2024): 109% lifespan increase in mice with OSK.
+                TechMilestone {
+                    name: "Genetic Engineering".into(),
+                    earliest_tick: CRYO_MATERIALS_EARLIEST,   // Year 20
+                    latest_tick: FUSION_DRIVE_LATEST,          // Year 400
+                    base_probability: 0.004,
+                    prerequisites: vec![(4, 2.5), (2, 2.0)], // science + medicine
+                    prerequisite_milestones: vec![],
+                    effects: TechEffects {
+                        tech_level_boost: vec![(2, 0.8), (4, 0.3)],
+                        power_multiplier: 1.0,
+                        propulsion_unlock: false,
+                        resource_efficiency: 1.0,
+                    },
+                    achieved: false,
+                    achieved_tick: None,
+                },
                 TechMilestone {
                     name: "Terraforming Precursor".into(),
                     earliest_tick: TERRAFORMING_PRECURSOR_EARLIEST,
@@ -2806,7 +2826,7 @@ mod tests {
     #[test]
     fn test_default_tech_tree_has_correct_milestones() {
         let tree = TechTree::default_tree();
-        assert_eq!(tree.milestones.len(), 15); // 6 original + 9 extended
+        assert_eq!(tree.milestones.len(), 16); // 6 original + 10 extended (incl. Genetic Engineering)
         assert_eq!(tree.milestones[0].name, "NTP Demonstration");
         assert_eq!(tree.milestones[3].name, "Fusion Grid Scale");
         // Fusion Grid Scale requires Fusion Demo

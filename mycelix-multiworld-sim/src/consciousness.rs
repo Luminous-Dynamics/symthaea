@@ -350,6 +350,7 @@ mod tests {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
+                    cumulative_dose_sv: 0.0,
         }
     }
 
