@@ -827,6 +827,280 @@ pub struct GradeRangeInput {
     pub max_grade: GradeLevel,
 }
 
+// ============== Curriculum Import ==============
+
+/// Input for importing a curriculum document (from edunet-standards-ingest JSON).
+///
+/// This is the bridge between the CLI tool's JSON output and the Holochain DHT.
+/// Call this function with the parsed JSON to populate the knowledge graph.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CurriculumImportInput {
+    /// Nodes to create (from the "nodes" array in the JSON).
+    pub nodes: Vec<ImportNode>,
+    /// Edges to create (from the "edges" array in the JSON).
+    pub edges: Vec<ImportEdge>,
+}
+
+/// A node from the curriculum JSON, mapped to KnowledgeNode fields.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ImportNode {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    #[serde(default)]
+    pub node_type: String,
+    #[serde(default)]
+    pub difficulty: String,
+    #[serde(default)]
+    pub domain: String,
+    #[serde(default)]
+    pub subdomain: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub estimated_hours: u32,
+    #[serde(default)]
+    pub grade_levels: Vec<String>,
+    #[serde(default)]
+    pub bloom_level: String,
+    #[serde(default)]
+    pub subject_area: String,
+}
+
+/// An edge from the curriculum JSON, mapped to LearningEdge fields.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ImportEdge {
+    pub from: String,
+    pub to: String,
+    #[serde(default)]
+    pub edge_type: String,
+    #[serde(default)]
+    pub strength_permille: u16,
+    #[serde(default)]
+    pub rationale: String,
+}
+
+/// Result of a curriculum import operation.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CurriculumImportResult {
+    pub nodes_created: u32,
+    pub edges_created: u32,
+    pub node_hashes: Vec<(String, ActionHash)>,
+    pub errors: Vec<String>,
+}
+
+/// Import a curriculum document into the knowledge graph.
+///
+/// Creates KnowledgeNode entries for each node and LearningEdge entries
+/// for each edge. Returns a mapping of node IDs to their ActionHashes
+/// for downstream use.
+#[hdk_extern]
+pub fn import_curriculum(input: CurriculumImportInput) -> ExternResult<CurriculumImportResult> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let now = timestamp_to_i64(sys_time()?);
+
+    let mut node_hashes: Vec<(String, ActionHash)> = Vec::new();
+    let mut id_to_hash: HashMap<String, ActionHash> = HashMap::new();
+    let mut errors: Vec<String> = Vec::new();
+
+    // Phase 1: Create all nodes
+    for import_node in &input.nodes {
+        let node_type = match import_node.node_type.as_str() {
+            "Concept" => knowledge_integrity::NodeType::Concept,
+            "Skill" => knowledge_integrity::NodeType::Skill,
+            "Topic" => knowledge_integrity::NodeType::Topic,
+            "Course" => knowledge_integrity::NodeType::Course,
+            "Assessment" => knowledge_integrity::NodeType::Assessment,
+            "Project" => knowledge_integrity::NodeType::Project,
+            _ => knowledge_integrity::NodeType::Concept,
+        };
+
+        let difficulty = match import_node.difficulty.as_str() {
+            "Beginner" => DifficultyLevel::Beginner,
+            "Intermediate" => DifficultyLevel::Intermediate,
+            "Advanced" => DifficultyLevel::Advanced,
+            "Expert" => DifficultyLevel::Expert,
+            _ => DifficultyLevel::Intermediate,
+        };
+
+        let grade_levels: Vec<GradeLevel> = import_node
+            .grade_levels
+            .iter()
+            .filter_map(|g| parse_grade_level(g))
+            .collect();
+
+        let bloom_level = match import_node.bloom_level.as_str() {
+            "Remember" => Some(knowledge_integrity::BloomLevel::Remember),
+            "Understand" => Some(knowledge_integrity::BloomLevel::Understand),
+            "Apply" => Some(knowledge_integrity::BloomLevel::Apply),
+            "Analyze" => Some(knowledge_integrity::BloomLevel::Analyze),
+            "Evaluate" => Some(knowledge_integrity::BloomLevel::Evaluate),
+            "Create" => Some(knowledge_integrity::BloomLevel::Create),
+            _ => None,
+        };
+
+        let subject_area = parse_subject_area(&import_node.subject_area);
+
+        let node = KnowledgeNode {
+            title: import_node.title.clone(),
+            description: import_node.description.clone(),
+            node_type,
+            difficulty,
+            domain: import_node.domain.clone(),
+            subdomain: if import_node.subdomain.is_empty() {
+                None
+            } else {
+                Some(import_node.subdomain.clone())
+            },
+            tags: import_node.tags.clone(),
+            estimated_hours: import_node.estimated_hours,
+            skill_alignments: vec![],
+            related_courses: vec![],
+            creator: caller.clone(),
+            status: NodeStatus::Active, // imported nodes are immediately active
+            created_at: now,
+            modified_at: now,
+            version: 1,
+            grade_levels,
+            bloom_level,
+            subject_area,
+            academic_standards: vec![],
+        };
+
+        match create_node(node) {
+            Ok(hash) => {
+                id_to_hash.insert(import_node.id.clone(), hash.clone());
+                node_hashes.push((import_node.id.clone(), hash));
+            }
+            Err(e) => {
+                errors.push(format!("Failed to create node '{}': {}", import_node.id, e));
+            }
+        }
+    }
+
+    // Phase 2: Create edges (using the hash mapping)
+    let mut edges_created = 0u32;
+    for import_edge in &input.edges {
+        let source_hash = match id_to_hash.get(&import_edge.from) {
+            Some(h) => h.clone(),
+            None => {
+                errors.push(format!(
+                    "Edge source '{}' not found in imported nodes",
+                    import_edge.from
+                ));
+                continue;
+            }
+        };
+        let target_hash = match id_to_hash.get(&import_edge.to) {
+            Some(h) => h.clone(),
+            None => {
+                errors.push(format!(
+                    "Edge target '{}' not found in imported nodes",
+                    import_edge.to
+                ));
+                continue;
+            }
+        };
+
+        let edge_type = match import_edge.edge_type.as_str() {
+            "Requires" => EdgeType::Requires,
+            "Recommends" => EdgeType::Recommends,
+            "RelatedTo" => EdgeType::RelatedTo,
+            "PartOf" => EdgeType::PartOf,
+            "LeadsTo" => EdgeType::LeadsTo,
+            "AlternativeTo" => EdgeType::AlternativeTo,
+            "Specializes" => EdgeType::Specializes,
+            "AppliedIn" => EdgeType::AppliedIn,
+            _ => EdgeType::Recommends,
+        };
+
+        let edge = LearningEdge {
+            source_node: source_hash,
+            target_node: target_hash,
+            edge_type,
+            strength_permille: import_edge.strength_permille,
+            rationale: import_edge.rationale.clone(),
+            proposer: caller.clone(),
+            status: EdgeStatus::Approved, // imported edges are pre-approved
+            upvotes: 0,
+            downvotes: 0,
+            created_at: now,
+        };
+
+        match propose_edge(edge) {
+            Ok(_) => edges_created += 1,
+            Err(e) => {
+                errors.push(format!(
+                    "Failed to create edge '{}' -> '{}': {}",
+                    import_edge.from, import_edge.to, e
+                ));
+            }
+        }
+    }
+
+    Ok(CurriculumImportResult {
+        nodes_created: node_hashes.len() as u32,
+        edges_created,
+        node_hashes,
+        errors,
+    })
+}
+
+/// Parse a grade level string to the GradeLevel enum.
+fn parse_grade_level(s: &str) -> Option<GradeLevel> {
+    match s {
+        "PreK" => Some(GradeLevel::PreK),
+        "Kindergarten" => Some(GradeLevel::Kindergarten),
+        "Grade1" => Some(GradeLevel::Grade1),
+        "Grade2" => Some(GradeLevel::Grade2),
+        "Grade3" => Some(GradeLevel::Grade3),
+        "Grade4" => Some(GradeLevel::Grade4),
+        "Grade5" => Some(GradeLevel::Grade5),
+        "Grade6" => Some(GradeLevel::Grade6),
+        "Grade7" => Some(GradeLevel::Grade7),
+        "Grade8" => Some(GradeLevel::Grade8),
+        "Grade9" => Some(GradeLevel::Grade9),
+        "Grade10" => Some(GradeLevel::Grade10),
+        "Grade11" => Some(GradeLevel::Grade11),
+        "Grade12" => Some(GradeLevel::Grade12),
+        "College" => Some(GradeLevel::College),
+        "Undergraduate" => Some(GradeLevel::Undergraduate),
+        "Graduate" => Some(GradeLevel::Graduate),
+        "Doctoral" => Some(GradeLevel::Doctoral),
+        "PostDoctoral" => Some(GradeLevel::PostDoctoral),
+        "Professional" => Some(GradeLevel::Professional),
+        "Adult" => Some(GradeLevel::Adult),
+        _ => None,
+    }
+}
+
+/// Parse a subject area string to the SubjectArea enum.
+fn parse_subject_area(s: &str) -> Option<SubjectArea> {
+    if s.is_empty() {
+        return None;
+    }
+    let lower = s.to_lowercase();
+    Some(if lower.contains("math") {
+        SubjectArea::Mathematics
+    } else if lower.contains("english") || lower == "englishlanguagearts" {
+        SubjectArea::EnglishLanguageArts
+    } else if lower.contains("science") && !lower.contains("computer") {
+        SubjectArea::Science
+    } else if lower.contains("social") {
+        SubjectArea::SocialStudies
+    } else if lower.contains("art") {
+        SubjectArea::Arts
+    } else if lower.contains("physical education") {
+        SubjectArea::PhysicalEducation
+    } else if lower.contains("technology") {
+        SubjectArea::Technology
+    } else if lower.contains("language") && !lower.contains("english") {
+        SubjectArea::ForeignLanguage
+    } else {
+        SubjectArea::Custom(s.to_string())
+    })
+}
+
 // ============================================================================
 // Tests -- pure business logic only (no HDK required)
 // ============================================================================

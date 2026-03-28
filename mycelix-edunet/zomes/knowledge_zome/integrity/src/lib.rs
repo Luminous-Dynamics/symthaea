@@ -575,6 +575,12 @@ pub enum LinkTypes {
     GradeToNodes,
     /// Subject -> Nodes in that subject
     SubjectToNodes,
+    /// Node -> Mentor profiles (for PhD milestones and advanced topics)
+    NodeToMentors,
+    /// ISCED-F field -> Nodes in that broad field
+    IscedFieldToNodes,
+    /// Career -> Nodes (links career pathway nodes to educational prerequisites)
+    CareerToNodes,
 }
 
 // ============== Validation Functions ==============
