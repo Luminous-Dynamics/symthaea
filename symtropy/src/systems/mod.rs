@@ -9,6 +9,7 @@ pub mod fep_behavior;
 pub mod governance;
 pub mod input;
 pub mod leviathan;
+pub mod menu;
 pub mod minimap;
 pub mod player;
 pub mod postprocess;

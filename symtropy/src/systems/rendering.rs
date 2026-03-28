@@ -23,13 +23,8 @@ pub struct HudText;
 #[derive(Component)]
 pub struct LeviathanSprite;
 
-/// Generate level layout. Uses procedural BSP dungeon generation
-/// with a random seed based on system time for unique layouts each run.
-fn level_map() -> Vec<Vec<u8>> {
-    let seed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(42);
+/// Generate level layout from a seed.
+fn level_map(seed: u64) -> Vec<Vec<u8>> {
     let dungeon = super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed);
     eprintln!("[symtropy] Generated dungeon with seed {seed}");
     return dungeon.tiles;
@@ -76,7 +71,7 @@ fn level_map() -> Vec<Vec<u8>> {
 }
 
 /// Spawn the camera, level, player, NPCs, fusion core, and Leviathan.
-pub fn setup_world(mut commands: Commands) {
+pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSeed>) {
     // Camera with consciousness-driven post-processing
     commands.spawn((
         Camera2d,
@@ -87,7 +82,7 @@ pub fn setup_world(mut commands: Commands) {
         },
     ));
 
-    let map = level_map();
+    let map = level_map(seed.0);
     let rows = map.len() as i32;
     let cols = if map.is_empty() { 0 } else { map[0].len() as i32 };
 

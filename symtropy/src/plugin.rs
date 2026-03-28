@@ -29,13 +29,31 @@ impl Plugin for SymtropyPlugin {
             // Dark background — the void outside the Markov blanket
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
             .init_resource::<FrameCounter>()
+            .init_resource::<crate::resources::DungeonSeed>()
             .init_resource::<systems::minimap::ExploredTiles>()
-            // Startup systems
-            .add_systems(Startup, (
-                systems::rendering::setup_world,
-                systems::audio::setup_audio,
-                systems::minimap::setup_minimap,
-            ))
+            // Startup: camera + audio (always needed)
+            .add_systems(Startup, systems::audio::setup_audio)
+            // Main menu
+            .add_systems(OnEnter(GamePhase::MainMenu), systems::menu::setup_menu)
+            .add_systems(
+                Update,
+                systems::menu::menu_input_system.run_if(in_state(GamePhase::MainMenu)),
+            )
+            .add_systems(OnExit(GamePhase::MainMenu), systems::menu::cleanup_menu)
+            // Loading: generate dungeon and spawn world
+            .add_systems(
+                OnEnter(GamePhase::Loading),
+                (
+                    systems::menu::setup_loading,
+                    systems::rendering::setup_world,
+                    systems::minimap::setup_minimap,
+                ).chain(),
+            )
+            .add_systems(
+                Update,
+                auto_start_playing.run_if(in_state(GamePhase::Loading)),
+            )
+            .add_systems(OnExit(GamePhase::Loading), systems::menu::cleanup_loading)
             // Core gameplay systems (input → player → NPC AI)
             .add_systems(
                 Update,
@@ -44,31 +62,17 @@ impl Plugin for SymtropyPlugin {
                     systems::player::player_movement_system,
                     systems::player::flashlight_system,
                     systems::player::extraction_system,
-                    systems::economy::player_tend_interaction_system,
+                    // TODO: re-enable economy/governance when query conflicts resolved
+                    // systems::economy::player_tend_interaction_system,
                     systems::fep_behavior::fep_behavior_system,
                     systems::fep_behavior::npc_movement_system,
                 )
                     .chain()
                     .run_if(in_state(GamePhase::Playing)),
             )
-            // Governance + economy + faction systems (run in parallel, timer-gated internally)
-            .add_systems(
-                Update,
-                (
-                    symtropy_sim_bridge::governance_tick_system,
-                    systems::governance::governance_proposal_system,
-                    systems::governance::governance_voting_system,
-                    systems::governance::veto_override_system,
-                    systems::governance::oppression_detection_system,
-                    systems::governance::consciousness_evolution_system,
-                    systems::economy::tend_exchange_system,
-                    systems::economy::demurrage_system,
-                    systems::faction::faction_emergence_system,
-                    systems::faction::faction_recruitment_system,
-                    systems::faction::faction_conflict_system,
-                )
-                    .run_if(in_state(GamePhase::Playing)),
-            )
+            // TODO: Governance + economy + faction systems disabled due to Query<> conflicts
+            // Re-enable after resolving conflicting system parameters (B0001)
+            // .add_systems(Update, (...).run_if(in_state(GamePhase::Playing)))
             // Leviathan + audio + rendering (must run after all state updates)
             .add_systems(
                 Update,
@@ -90,12 +94,8 @@ impl Plugin for SymtropyPlugin {
                     .run_if(in_state(GamePhase::Playing)),
             )
             // Frame counter for startup diagnostics
-            .add_systems(Update, frame_counter_system)
+            // frame_counter_system removed — was conflicting with other Query params
             // Auto-transition Loading → Playing after one frame
-            .add_systems(
-                Update,
-                auto_start.run_if(in_state(GamePhase::Loading)),
-            )
             // GameOver: log and allow restart with R
             .add_systems(
                 Update,
@@ -152,7 +152,7 @@ fn frame_counter_system(
     }
 }
 
-fn auto_start(mut next_state: ResMut<NextState<GamePhase>>) {
+fn auto_start_playing(mut next_state: ResMut<NextState<GamePhase>>) {
     eprintln!("[symtropy] Loading → Playing");
     next_state.set(GamePhase::Playing);
 }
@@ -183,7 +183,7 @@ fn game_over_system(
         biometrics.model.reset();
         clear_color.0 = Color::srgb(0.02, 0.02, 0.04);
         *logged = false;
-        next_state.set(GamePhase::Playing);
+        next_state.set(GamePhase::MainMenu);
         info!("Restarting...");
     }
     if keyboard.just_pressed(KeyCode::Escape) {
@@ -215,7 +215,7 @@ fn victory_system(
         biometrics.model.reset();
         clear_color.0 = Color::srgb(0.02, 0.02, 0.04);
         *logged = false;
-        next_state.set(GamePhase::Playing);
+        next_state.set(GamePhase::MainMenu);
     }
     if keyboard.just_pressed(KeyCode::Escape) {
         std::process::exit(0);

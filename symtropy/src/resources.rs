@@ -64,11 +64,28 @@ impl Default for LeviathanState {
     }
 }
 
+/// Dungeon seed for reproducible levels.
+#[derive(Resource)]
+pub struct DungeonSeed(pub u64);
+
+impl Default for DungeonSeed {
+    fn default() -> Self {
+        Self(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(42),
+        )
+    }
+}
+
 /// Game state for phase management.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GamePhase {
-    /// Setting up the level.
+    /// Title screen with menu.
     #[default]
+    MainMenu,
+    /// Generating the dungeon.
     Loading,
     /// Active gameplay.
     Playing,

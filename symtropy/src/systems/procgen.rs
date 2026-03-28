@@ -54,8 +54,8 @@ impl BspNode {
             // Leaf — carve a room
             let room_w = rng.gen_range(MIN_ROOM_SIZE..=self.w.saturating_sub(2).max(MIN_ROOM_SIZE));
             let room_h = rng.gen_range(MIN_ROOM_SIZE..=self.h.saturating_sub(2).max(MIN_ROOM_SIZE));
-            let room_x = self.x + rng.gen_range(1..=(self.w - room_w).max(1));
-            let room_y = self.y + rng.gen_range(1..=(self.h - room_h).max(1));
+            let room_x = self.x + rng.gen_range(1..=self.w.saturating_sub(room_w).max(1));
+            let room_y = self.y + rng.gen_range(1..=self.h.saturating_sub(room_h).max(1));
             self.room = Some(Room { x: room_x, y: room_y, w: room_w, h: room_h });
             return;
         }
@@ -71,7 +71,7 @@ impl BspNode {
         if split_horizontal {
             let split = rng.gen_range(MIN_ROOM_SIZE..=self.h.saturating_sub(MIN_ROOM_SIZE).max(MIN_ROOM_SIZE));
             let mut left = Box::new(BspNode::new(self.x, self.y, self.w, split));
-            let mut right = Box::new(BspNode::new(self.x, self.y + split, self.w, self.h - split));
+            let mut right = Box::new(BspNode::new(self.x, self.y + split, self.w, self.h.saturating_sub(split).max(1)));
             left.split(rng, depth - 1);
             right.split(rng, depth - 1);
             self.left = Some(left);
@@ -79,7 +79,7 @@ impl BspNode {
         } else {
             let split = rng.gen_range(MIN_ROOM_SIZE..=self.w.saturating_sub(MIN_ROOM_SIZE).max(MIN_ROOM_SIZE));
             let mut left = Box::new(BspNode::new(self.x, self.y, split, self.h));
-            let mut right = Box::new(BspNode::new(self.x + split, self.y, self.w - split, self.h));
+            let mut right = Box::new(BspNode::new(self.x + split, self.y, self.w.saturating_sub(split).max(1), self.h));
             left.split(rng, depth - 1);
             right.split(rng, depth - 1);
             self.left = Some(left);
