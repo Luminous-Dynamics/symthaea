@@ -1,0 +1,24 @@
+# NASA Biomass Production Chamber Crop Yield Data
+# Source: Wheeler et al. (1996), Adv Space Res 18(4-5):215-224
+# Source: Wheeler et al. (2008), Adv Space Res 41(5):706-713
+# BPC: 20 m² facility at Kennedy Space Center, 113 m³ volume
+#
+crop,growth_days,total_biomass_g_m2_day,edible_biomass_g_m2_day,edible_fraction,o2_production,co2_fixation,water_condensed_kg
+wheat,64-86,39.6,11.3,0.285,high,high,high
+potato,90-105,27.2,18.4,0.676,medium,medium,medium
+tomato,80-90,19.6,9.8,0.500,medium,medium,medium
+soybean,90-97,15.7,6.0,0.382,medium,medium,medium
+lettuce,28-30,7.7,7.1,0.922,low,low,low
+#
+# Overall BPC totals (1200 days operation):
+# 481 kg dry plant biomass produced
+# 196 kg edible biomass produced
+# 540 kg oxygen produced
+# 739 kg CO2 fixed
+# 94700 kg water condensed
+#
+# Space requirement: 40-50 m2 per person for full caloric needs
+# With insect protein supplementation: 35-40 m2 per person
+#
+# Key insight: Potato has highest edible productivity (18.4 g/m2/day)
+# but wheat has highest total biomass (39.6 g/m2/day) for O2 production
