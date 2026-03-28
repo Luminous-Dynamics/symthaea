@@ -22,6 +22,7 @@
 
 pub mod api_types;
 pub mod bridge;
+pub mod career_profile;
 pub mod client;
 pub mod converter;
 pub mod higher_ed_types;

@@ -169,6 +169,16 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Show career intelligence profiles (salary, growth, SDGs, automation risk)
+    Careers {
+        /// Filter by field name (substring match, or "all")
+        #[arg(default_value = "all")]
+        field: String,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// List ESCO career fields
     ListEsco,
 
@@ -543,6 +553,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("\nWrote bridge to {}", path.display());
             } else {
                 println!("{json}");
+            }
+        }
+
+        // ============================================================
+        // Career Intelligence
+        // ============================================================
+        Commands::Careers { field, json } => {
+            let profiles = edunet_standards_ingest::career_profile::embedded_career_profiles();
+            let filtered: Vec<_> = if field == "all" {
+                profiles.iter().collect()
+            } else {
+                profiles.iter().filter(|p| p.field.to_lowercase().contains(&field.to_lowercase())).collect()
+            };
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&filtered)?);
+            } else {
+                for p in &filtered {
+                    eprintln!("{}", edunet_standards_ingest::career_profile::format_career_summary(p));
+                }
+                eprintln!("--- {} career profiles ---", filtered.len());
             }
         }
 
