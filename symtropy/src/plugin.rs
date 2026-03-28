@@ -6,7 +6,8 @@ use bevy::prelude::*;
 
 use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState};
 use crate::systems;
-use symtropy_sim_bridge::SimBridgePlugin;
+// TODO: re-enable when multiworld-sim compiles
+// use symtropy_sim_bridge::SimBridgePlugin;
 
 /// Main game plugin. Add this to a Bevy `App` to get the full Symtropy experience.
 pub struct SymtropyPlugin;
@@ -16,8 +17,8 @@ impl Plugin for SymtropyPlugin {
         app
             // State
             .init_state::<GamePhase>()
-            // Sim-bridge plugin (GovernanceState, EconomyState, FactionState, ActiveProposal)
-            .add_plugins(SimBridgePlugin)
+            // TODO: re-enable sim-bridge when multiworld-sim compiles
+            // .add_plugins(SimBridgePlugin)
             // Resources
             .init_resource::<BiometricsCtx>()
             .init_resource::<LeviathanState>()
@@ -44,16 +45,17 @@ impl Plugin for SymtropyPlugin {
                     // NPC AI
                     systems::fep_behavior::fep_behavior_system,
                     systems::fep_behavior::npc_movement_system,
-                    // Governance sim tick (runs on its own timer)
-                    symtropy_sim_bridge::governance_tick_system,
+                    // TODO: governance sim tick (re-enable with sim-bridge)
+                    // symtropy_sim_bridge::governance_tick_system,
                     // Leviathan
                     systems::leviathan::leviathan_system,
                     systems::leviathan::victory_check_system,
                     // Audio (reads stress + leviathan)
                     systems::audio::audio_system,
-                    // Rendering
+                    // Rendering + visuals
                     systems::rendering::camera_follow_system,
                     systems::rendering::visual_stress_system,
+                    systems::rendering::leviathan_visual_system,
                     systems::rendering::hud_system,
                 )
                     .chain()

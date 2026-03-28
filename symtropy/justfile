@@ -1,0 +1,40 @@
+# Symtropy development commands
+# Usage: just <command>
+
+# NixOS pkg-config paths for build
+export PKG_CONFIG_PATH := `nix-build '<nixpkgs>' -A alsa-lib.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libX11.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libXcursor.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libXi.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libXrandr.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A libxkbcommon.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A wayland.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + env("PKG_CONFIG_PATH", "")
+
+# Default: build and run debug
+default: run
+
+# Build debug
+build:
+    cargo build
+
+# Build release
+release:
+    cargo build --release
+
+# Run debug build
+run: build
+    ./run.sh
+
+# Run release build
+run-release: release
+    ./run.sh --release
+
+# Run with X11 backend
+run-x11: build
+    ./run.sh --x11
+
+# Check compilation only (fast)
+check:
+    cargo check
+
+# Run biometrics tests
+test-biometrics:
+    cd ../symthaea && cargo test -p symthaea-biometrics --features muse-bridge
+
+# Clean build artifacts
+clean:
+    cargo clean
