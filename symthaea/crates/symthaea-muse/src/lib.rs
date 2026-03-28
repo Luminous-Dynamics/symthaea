@@ -29,11 +29,7 @@
 
 #![deny(unsafe_code)]
 
-pub mod ablation;
-pub mod audio_feedback;
-pub mod binaural;
 pub mod choreography;
-pub mod collaborative;
 pub mod critic;
 pub mod export;
 pub mod fingerprint;
@@ -42,27 +38,16 @@ pub mod form;
 pub mod live_output;
 pub mod melody;
 pub mod midi;
-pub mod musical_inference;
+pub mod midi_loader;
 pub mod neural_melody;
 pub mod notation;
-pub mod phi_optimizer;
 pub mod pitch;
 pub mod rhythm;
-pub mod spectral_vocoder;
 pub mod stream;
 pub mod streaming;
-pub mod sidechain;
 pub mod structure;
-pub mod substrate_timbre;
 pub mod synth;
-pub mod synesthesia;
-pub mod temporal_hierarchy;
-pub mod timbre_space;
 pub mod voice;
-pub mod wavetable;
-pub mod mixing;
-pub mod percussion;
-pub mod consciousness_reverb;
 
 use serde::{Deserialize, Serialize};
 
