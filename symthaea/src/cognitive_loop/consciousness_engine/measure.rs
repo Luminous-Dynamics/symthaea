@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core measurement method for the consciousness engine.
 
 use std::time::Instant;
@@ -280,6 +283,13 @@ impl ConsciousnessEngine {
                 let result = eq.compute(&state);
                 self.cache.last_equation_v2_consciousness = result.consciousness;
                 self.cache.last_limiting_component = Some(result.limiting_factor);
+                // Cache PAC modulation and binding for CTC wiring
+                #[cfg(feature = "ctc_wiring")]
+                {
+                    self.cache.last_pac_modulation = result.pac_modulation;
+                    self.cache.last_binding_coherence =
+                        *result.core_breakdown.get(&crate::consciousness::consciousness_equation_v2::CoreComponent::Binding).unwrap_or(&0.0);
+                }
                 result.consciousness
             } else {
                 self.cache.last_equation_v2_consciousness

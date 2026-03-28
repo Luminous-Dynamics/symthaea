@@ -45,6 +45,22 @@ impl CognitiveLoopService {
                             vec!["priming".to_string()],
                         );
                     }
+                    // CTC: Wire binding coherence and PAC modulation index into GWT
+                    // Science: Fries (2015) — phase-locked binding gates workspace entry
+                    #[cfg(feature = "ctc_wiring")]
+                    {
+                        // Use equation V2's cached PAC modulation and multimodal binding
+                        let binding_c = self
+                            .consciousness
+                            .consciousness_engine
+                            .last_multimodal_binding_coherence();
+                        let pac = self
+                            .consciousness
+                            .consciousness_engine
+                            .last_pac_modulation();
+                        gwt.set_ctc_signals(binding_c, pac);
+                    }
+
                     let result = gwt.process();
                     let coalition_size = result
                         .winning_coalition

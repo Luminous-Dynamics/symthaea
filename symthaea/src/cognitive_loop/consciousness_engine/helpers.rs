@@ -1,3 +1,9 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Helper methods — weight management, convergence detection, unified computation.
 
 use super::super::types::ConsciousnessCache;
@@ -202,5 +208,17 @@ impl ConsciousnessEngine {
     /// Borrow the unified consciousness pipeline (if present).
     pub fn unified_consciousness_pipeline(&self) -> Option<&UnifiedConsciousnessPipeline> {
         self.unified_consciousness_pipeline.as_ref()
+    }
+
+    /// Get last multimodal binding coherence (for CTC wiring).
+    #[cfg(feature = "ctc_wiring")]
+    pub fn last_multimodal_binding_coherence(&self) -> f64 {
+        self.cache.last_binding_coherence
+    }
+
+    /// Get last PAC modulation index (for CTC wiring).
+    #[cfg(feature = "ctc_wiring")]
+    pub fn last_pac_modulation(&self) -> f64 {
+        self.cache.last_pac_modulation
     }
 }

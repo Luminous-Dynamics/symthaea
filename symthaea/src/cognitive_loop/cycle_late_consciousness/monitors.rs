@@ -470,11 +470,25 @@ impl CognitiveLoopService {
                     // FEEDBACK: Phi→precision coupling — higher integrated information
                     // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
                     // This creates a causal mechanism: consciousness improves perceptual accuracy.
-                    let psi_boost = (ctx.unified_psi * 0.5).clamp(0.0, 0.5);
-                    let base_decay = hfe.config.precision_decay;
-                    for level in &mut hfe.levels {
-                        let base_precision = base_decay.powi(level.level as i32);
-                        level.precision = base_precision * (1.0 + psi_boost);
+                    #[cfg(feature = "unified_precision")]
+                    {
+                        // Unified precision: Phi × interoceptive × blanket modulation
+                        // Science: Parr & Friston (2019) — precision IS attention
+                        let phi_factor = ctx.unified_psi;
+                        // Interoceptive factor from affective state (positive valence → higher precision)
+                        let intero_factor = 1.0 + 0.2 * (affective_valence as f64).clamp(-1.0, 1.0);
+                        // Blanket factor: use prediction confidence as proxy for blanket openness
+                        let blanket_factor = (self.prediction_confidence as f64).clamp(0.0, 1.0);
+                        hfe.update_precisions(phi_factor, intero_factor, blanket_factor);
+                    }
+                    #[cfg(not(feature = "unified_precision"))]
+                    {
+                        let psi_boost = (ctx.unified_psi * 0.5).clamp(0.0, 0.5);
+                        let base_decay = hfe.config.precision_decay;
+                        for level in &mut hfe.levels {
+                            let base_precision = base_decay.powi(level.level as i32);
+                            level.precision = base_precision * (1.0 + psi_boost);
+                        }
                     }
 
                     // Build observation from compressed state (clamped to state_dim)
