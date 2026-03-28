@@ -93,7 +93,13 @@ impl PopulationEngine {
             .iter()
             .filter(|a| a.is_alive())
             .filter_map(|a| {
-                let mut rate = a.mortality_rate(current_tick);
+                // Use tech-gated Gompertz modifiers (lifespan evolution model)
+                let mut rate = a.mortality_rate_with_modifiers(
+                    current_tick,
+                    world.mortality_alpha_mult,
+                    world.mortality_beta_mult,
+                    world.mortality_lambda_mult,
+                );
 
                 // Allostatic load increases mortality risk.
                 // Ref: McEwen (1998) — sustained allostatic overload accelerates aging.
@@ -138,6 +144,13 @@ impl PopulationEngine {
         }
 
         // --- Births ---
+        // #10: Reproduction viability check. If gravity < 0.4g and no centrifuge
+        // tech, reproduction may not be viable. Unknown if mammals can develop
+        // at 0.14g (Titan) or 0.38g (Mars). NASA ICES-2021-142.
+        if !world.reproduction_viable {
+            // No births — return deaths + any events already collected
+            return events;
+        }
         // Collect fertile pairs
         let living: Vec<&CivAgent> = world
             .agents
@@ -527,6 +540,11 @@ mod tests {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         };
 
         let mut rng = StochasticEngine::new(42);

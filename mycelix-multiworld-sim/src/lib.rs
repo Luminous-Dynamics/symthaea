@@ -214,6 +214,11 @@ impl MultiWorldSimulator {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
             };
 
             // Spawn initial population as adults (age 25-45)
@@ -340,6 +345,11 @@ impl MultiWorldSimulator {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         };
 
         for _ in 0..population {
@@ -1260,6 +1270,97 @@ impl MultiWorldSimulator {
                 let decay = 0.0005 * (1.0 - distance_factor) * (1.0 - value_to_earth);
                 world.earth_funding = (world.earth_funding - decay).max(0.0);
                 // Low funding reduces trade volume from Earth
+            }
+
+            // === LIFESPAN EVOLUTION (Gompertz-Makeham parameter shifts) ===
+            // Research calibration: Pyrkov et al. (2021), Rejuvenate Bio (2024).
+            // Tech milestones progressively reduce alpha (initial mortality),
+            // beta (aging rate), and lambda (background mortality).
+            {
+                let med_skill = world.agents.iter()
+                    .filter(|a| a.is_alive())
+                    .map(|a| a.skills.as_slice()[2]) // medicine sector
+                    .sum::<f64>() / pop.max(1.0);
+                let sci_skill = world.agents.iter()
+                    .filter(|a| a.is_alive())
+                    .map(|a| a.skills.as_slice()[4]) // science sector
+                    .sum::<f64>() / pop.max(1.0);
+
+                // Era 1 (baseline): alpha=1.0, beta=1.0, lambda=1.0 → lifespan ~80
+                let mut alpha_m = 1.0_f64;
+                let mut beta_m = 1.0_f64;
+                let mut lambda_m = 1.0_f64;
+
+                // Era 2 (senolytics equivalent): med > 0.4 → lambda -50%, alpha -30%
+                if med_skill > 0.4 {
+                    lambda_m *= 0.5;
+                    alpha_m *= 0.7;
+                }
+                // Era 3 (reprogramming): med > 0.6 AND sci > 0.5 → beta starts dropping
+                if med_skill > 0.6 && sci_skill > 0.5 {
+                    beta_m *= 0.82; // Mortality doubling time: 8yr → ~10yr
+                }
+                // Era 4 (genetic engineering milestone): further beta reduction
+                if self.disaster_engine.tech_tree.is_achieved("Genetic Engineering") {
+                    beta_m *= 0.85;
+                    alpha_m *= 0.5;
+                }
+                // Era 5 (bioregenerative + closed ECLSS): lambda near zero
+                if self.disaster_engine.tech_tree.is_achieved("Bioregenerative Agriculture")
+                    && self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS")
+                {
+                    lambda_m *= 0.3;
+                }
+                // Space colony health penalty: radiation + low gravity + isolation
+                let space_penalty = match world.location.as_str() {
+                    "Earth" => 1.0,
+                    "Moon" => 1.15,   // -5 to -10 years
+                    "Mars" => 1.10,   // -5 years (borderline gravity)
+                    "Europa" => 1.25, // -10 to -15 years (radiation even shielded)
+                    "Titan" => 1.20,  // -10 years (low-g + isolation)
+                    _ => 1.1,
+                };
+                // Isolation penalty for small populations
+                let isolation_penalty = if pop < 500.0 { 1.1 } else { 1.0 };
+
+                world.mortality_alpha_mult = alpha_m * space_penalty * isolation_penalty;
+                world.mortality_beta_mult = beta_m;
+                world.mortality_lambda_mult = lambda_m * space_penalty;
+            }
+
+            // === #10: REPRODUCTION VIABILITY ===
+            // Unknown if mammals can reproduce at < 0.4g.
+            // NASA ICES-2021-142: partial gravity below 0.4g insufficient for health.
+            // Without centrifuge habitat tech, low-g colonies can't have children.
+            {
+                let gravity = match world.location.as_str() {
+                    "Earth" => 1.0,
+                    "Moon" => 0.166,
+                    "Mars" => 0.38,
+                    "Europa" => 0.134,
+                    "Titan" => 0.138,
+                    _ => 1.0,
+                };
+                let has_centrifuge = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
+                world.reproduction_viable = gravity >= 0.38 || has_centrifuge;
+                // Mars is borderline (0.38g) — viable but with health risks
+            }
+
+            // === #7: SEALED ECOSYSTEM BALANCE ===
+            // Atmospheric composition drifts in sealed habitats.
+            // Without active management, CO2 builds, O2 drops, trace contaminants accumulate.
+            // Biosphere 2: lost 7% O2 in 16 months from soil microbe respiration.
+            if world.location != "Earth" {
+                let has_eclss = self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS");
+                let decay_rate = if has_eclss { 0.00005 } else { 0.0002 }; // ECLSS slows decay 4×
+                world.ecosystem_balance = (world.ecosystem_balance - decay_rate).max(0.3);
+                // Low balance reduces food production and increases health stress
+                if world.ecosystem_balance < 0.7 {
+                    let penalty = (0.7 - world.ecosystem_balance) * 0.01;
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.needs.allostatic_load = (agent.needs.allostatic_load + penalty).min(1.0);
+                    }
+                }
             }
 
             // === #2: NARRATIVE IDENTITY ===
@@ -2690,6 +2791,11 @@ impl Default for World {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         }
     }
 }

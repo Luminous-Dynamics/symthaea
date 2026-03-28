@@ -508,10 +508,30 @@ pub struct World {
     /// #9: Earth funding commitment [0, 1] — political willingness to resupply.
     #[serde(default = "default_funding")]
     pub earth_funding: f64,
+
+    /// Lifespan evolution: Gompertz-Makeham modifiers from medical tech.
+    /// Pyrkov et al. (2021): resilience wall at 120-150yr without beta modification.
+    #[serde(default = "default_one")]
+    pub mortality_alpha_mult: f64,
+    #[serde(default = "default_one")]
+    pub mortality_beta_mult: f64,
+    #[serde(default = "default_one")]
+    pub mortality_lambda_mult: f64,
+
+    /// #10: Reproduction viability. False if gravity < 0.4g without countermeasures.
+    #[serde(default = "default_true")]
+    pub reproduction_viable: bool,
+
+    /// #7: Sealed ecosystem balance [0, 1]. Atmospheric stability.
+    /// Biosphere 2: O2 dropped from 20.9% to 14.2% in 16 months.
+    #[serde(default = "default_one")]
+    pub ecosystem_balance: f64,
 }
 
 fn default_trust() -> f64 { 0.7 }
 fn default_funding() -> f64 { 1.0 }
+fn default_one() -> f64 { 1.0 }
+fn default_true() -> bool { true }
 
 /// #2: Narrative Identity — the shared story of "who we are" and "why we're here."
 ///
@@ -733,6 +753,11 @@ mod tests {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         };
 
         for i in 0..n {

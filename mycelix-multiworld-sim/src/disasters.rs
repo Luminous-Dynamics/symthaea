@@ -2467,6 +2467,11 @@ mod tests {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         }
     }
 

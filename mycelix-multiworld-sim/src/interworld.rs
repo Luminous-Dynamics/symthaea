@@ -635,6 +635,11 @@ impl InterWorldEngine {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         };
 
         // Establish trade route with parent (assume Moon-Earth-class delay).
@@ -778,6 +783,11 @@ mod tests {
             civilizational_phi: 0.0,
             trust_level: 0.7,
             earth_funding: 1.0,
+            mortality_alpha_mult: 1.0,
+            mortality_beta_mult: 1.0,
+            mortality_lambda_mult: 1.0,
+            reproduction_viable: true,
+            ecosystem_balance: 1.0,
         };
         for i in 0..n {
             let birth_tick = 0; // born at tick 0, so at TEST_TICK they are 30 years old
