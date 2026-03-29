@@ -21,6 +21,7 @@
 //! - [`kalman`] — Extended Kalman Filter for continuous tracking
 
 pub mod bodies;
+pub mod dead_reckoning;
 pub mod ranging;
 pub mod trilateration;
 pub mod coverage;
@@ -31,3 +32,4 @@ pub use trilateration::{PositionEstimate, TrilaterationError, trilaterate_3d, tr
 pub use ranging::{RangeEstimate, RangingMethod};
 pub use coverage::{gdop, pdop, CoveragePoint};
 pub use kalman::{PositionFilter, FilterConfig, FilterState};
+pub use dead_reckoning::{PedestrianDeadReckoning, PdrConfig, barometric_altitude};

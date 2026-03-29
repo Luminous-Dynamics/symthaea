@@ -36,6 +36,8 @@ pub enum RangingMethod {
     ManualSurvey,
     /// Meshtastic hop-count estimate (σ ≈ 500-2000 m)
     MeshtasticHops,
+    /// BLE Channel Sounding (Bluetooth 6.0, σ ≈ 0.01-0.30 m)
+    BleChannelSounding,
 }
 
 // ============================================================================
@@ -135,6 +137,37 @@ pub fn manual_survey(distance_m: f64, instrument_accuracy_m: f64) -> RangeEstima
 }
 
 // ============================================================================
+// BLE CHANNEL SOUNDING (Bluetooth 6.0)
+// ============================================================================
+
+/// Estimate distance from BLE Channel Sounding phase measurement.
+///
+/// BLE Channel Sounding (Bluetooth 6.0, Android 16+) uses channel impulse
+/// response to measure distance with centimeter accuracy. The distance is
+/// derived from the round-trip phase shift across multiple BLE channels.
+///
+/// # Parameters
+/// - `round_trip_time_ns`: Round-trip time in nanoseconds (from Channel Sounding)
+///
+/// # Accuracy
+/// - Line-of-sight: 1-5 cm
+/// - Non-line-of-sight: 10-30 cm
+///
+/// # References
+/// - Bluetooth SIG Core Specification v6.0 (2024)
+/// - Nordic Semiconductor Channel Sounding documentation
+pub fn ble_channel_sounding_to_range(round_trip_time_ns: f64) -> RangeEstimate {
+    let distance = C_M_S * round_trip_time_ns * 1e-9 / 2.0;
+    // BLE CS achieves 1-5 cm in LOS, worse in NLOS
+    let sigma = 0.02 + distance * 0.001; // 2cm base + 0.1% of range
+    RangeEstimate {
+        distance_m: distance.max(0.0),
+        sigma_m: sigma.max(0.01),
+        method: RangingMethod::BleChannelSounding,
+    }
+}
+
+// ============================================================================
 // MESHTASTIC HOP COUNT
 // ============================================================================
 
@@ -212,6 +245,23 @@ mod tests {
         assert!((one.distance_m - 2000.0).abs() < 1.0);
         assert!((three.distance_m - 6000.0).abs() < 1.0);
         assert!(three.sigma_m > one.sigma_m);
+    }
+
+    #[test]
+    fn ble_channel_sounding_centimeter_accuracy() {
+        // 10m: round trip = 2 * 10 / c = 66.7 ns
+        let est = ble_channel_sounding_to_range(66.7);
+        assert!((est.distance_m - 10.0).abs() < 0.1);
+        assert!(est.sigma_m < 0.1, "BLE CS should be sub-10cm: {}", est.sigma_m);
+        assert_eq!(est.method, RangingMethod::BleChannelSounding);
+    }
+
+    #[test]
+    fn ble_channel_sounding_short_range() {
+        // 1m: round trip = 6.67 ns
+        let est = ble_channel_sounding_to_range(6.67);
+        assert!((est.distance_m - 1.0).abs() < 0.01);
+        assert!(est.sigma_m < 0.05, "Short range BLE CS: {}", est.sigma_m);
     }
 
     #[test]
