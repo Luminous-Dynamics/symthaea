@@ -2458,6 +2458,37 @@ impl MultiWorldSimulator {
             // Phase 5.5: Immigration pipeline for genetic rescue
             self.tick_immigration_pipeline();
 
+            // Phase 5.55: Fission Delivery — Earth can deliver reactors to colonies.
+            // NASA doesn't expect colonies to invent fission; they deliver Kilopower units.
+            // If Earth has engineering > 1.2 and an outer-system colony exists without
+            // fission, the reactor is delivered via transfer window.
+            if !self.disaster_engine.tech_tree.is_achieved("Fission Surface Power")
+                && self.current_tick > 36 // FISSION_EARLIEST: year 3
+            {
+                let earth_eng = self.worlds.iter()
+                    .find(|w| w.location == "Earth")
+                    .map(|w| w.knowledge.technology_levels[0])
+                    .unwrap_or(1.0);
+                let has_outer_colony = self.worlds.iter()
+                    .any(|w| w.location != "Earth" && w.location != "Moon" && w.population() > 0);
+
+                if earth_eng >= 1.2 && has_outer_colony {
+                    // Deliver fission reactor — achieve the milestone
+                    for m in &mut self.disaster_engine.tech_tree.milestones {
+                        if m.name == "Fission Surface Power" && !m.achieved {
+                            m.achieved = true;
+                            m.achieved_tick = Some(self.current_tick);
+                            self.events.push(CivEvent::new(
+                                self.current_tick, None, CivEventType::EmergencyDeclared,
+                                format!("FISSION DELIVERY: Earth delivered Kilopower reactors to outer colonies \
+                                    (Earth engineering {:.2}). Nuclear power online.",
+                                    earth_eng),
+                            ));
+                        }
+                    }
+                }
+            }
+
             // Phase 5.6: Structural realism (power, maintenance, bus factor, trust, narrative)
             self.tick_structural_realism();
 

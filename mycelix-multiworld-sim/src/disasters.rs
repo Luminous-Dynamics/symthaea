@@ -582,7 +582,10 @@ impl TechTree {
                     earliest_tick: FISSION_EARLIEST,
                     latest_tick: FISSION_LATEST,
                     base_probability: 0.025,
-                    prerequisites: vec![(0, 1.5)], // engineering (sector 0) > 1.5
+                    // Lowered from 1.5 to 1.2 — fission is mature tech (TRL 5-6),
+                    // the barrier is deployment logistics not fundamental science.
+                    // KRUSTY tested 2018, NASA FSP contracts awarded 2022.
+                    prerequisites: vec![(0, 1.2)], // engineering (sector 0) > 1.2
                     prerequisite_milestones: vec![],
                     effects: TechEffects {
                         tech_level_boost: vec![(0, 0.5), (4, 0.2)], // boost engineering + science
