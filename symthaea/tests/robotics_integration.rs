@@ -101,7 +101,7 @@ fn test_humanoid_cognitive_loop_closure() {
 fn test_helicopter_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Helicopter);
 
-    assert!(service.has_motor_bridge());
+    assert!(service.has_embodiment());
     assert_eq!(
         service.embodiment_platform(),
         EmbodimentPlatform::Helicopter
@@ -137,7 +137,7 @@ fn test_helicopter_cognitive_loop_closure() {
 fn test_flight_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Quadrotor);
 
-    assert!(service.has_motor_bridge());
+    assert!(service.has_embodiment());
     assert_eq!(
         service.embodiment_platform(),
         EmbodimentPlatform::Quadrotor
@@ -171,7 +171,7 @@ fn test_flight_cognitive_loop_closure() {
 fn test_vehicle_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Vehicle);
 
-    assert!(service.has_motor_bridge());
+    assert!(service.has_embodiment());
     assert_eq!(service.embodiment_platform(), EmbodimentPlatform::Vehicle);
 
     for i in 0..50 {
@@ -241,7 +241,7 @@ fn test_multi_embodiment_fusion() {
     );
 
     assert!(
-        service.has_motor_bridge(),
+        service.has_embodiment(),
         "should have embodiment bridge"
     );
 
@@ -375,7 +375,7 @@ fn test_proprioceptive_feedback_influences_perception() {
 fn test_auv_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Auv);
 
-    assert!(service.has_motor_bridge());
+    assert!(service.has_embodiment());
     assert_eq!(service.embodiment_platform(), EmbodimentPlatform::Auv);
 
     for i in 0..50 {
@@ -405,7 +405,7 @@ fn test_auv_cognitive_loop_closure() {
 fn test_manipulator_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Manipulator);
 
-    assert!(service.has_motor_bridge());
+    assert!(service.has_embodiment());
     assert_eq!(
         service.embodiment_platform(),
         EmbodimentPlatform::Manipulator
