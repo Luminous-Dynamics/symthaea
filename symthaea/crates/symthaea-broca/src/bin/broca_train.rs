@@ -391,9 +391,6 @@ struct TrainOpts {
     network_layers: usize,
     /// CfC neurons per layer (default: 8). Only used for fresh training (not --resume).
     neurons_per_layer: usize,
-    /// Projection head dimension (default: 0 = disabled).
-    /// Projects 16,384D output to this dimension before logit computation.
-    projection_dim: usize,
     /// Adaptive veto target threshold (default: 0.0 = disabled).
     /// When > 0, veto_threshold ramps from 0.0 to this value over the final
     /// veto_warmup_epochs, teaching the CfC to satisfy the veto coherence gate.
@@ -443,7 +440,6 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         hidden_dropout: 0.0,
         network_layers: 3,
         neurons_per_layer: 8,
-        projection_dim: 0,
         adaptive_veto_target: 0.0,
         veto_warmup_epochs: 10,
         enable_soft_veto_training: false,
@@ -676,14 +672,6 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--neurons-per-layer must be a positive integer")?;
             }
-            "--projection-dim" => {
-                i += 1;
-                opts.projection_dim = args
-                    .get(i)
-                    .ok_or("--projection-dim requires a number")?
-                    .parse()
-                    .map_err(|_| "--projection-dim must be a positive integer")?;
-            }
             "--adaptive-veto" => {
                 i += 1;
                 opts.adaptive_veto_target = args
@@ -772,9 +760,6 @@ fn print_usage() {
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
     eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");
     eprintln!("  --neurons-per-layer N  CfC neurons per layer (default: 8, fresh train only)");
-    eprintln!(
-        "  --projection-dim N   Project to N dimensions for logits (default: 0 = off, try 256)"
-    );
     eprintln!("  --adaptive-veto F    Ramp veto threshold to F over final --veto-warmup epochs (default: 0.0 = off)");
     eprintln!("  --veto-warmup N      Epochs over which to ramp veto threshold (default: 10)");
     eprintln!("  --soft-veto-training Enable soft veto (partial CfC restore) during training");
