@@ -16,6 +16,7 @@ use crate::holochain::{ConnectionBadge, HolochainProvider};
 use crate::learning_engine::LearningEngineProvider;
 use crate::pages::*;
 use crate::role::{provide_role_context, UserRole};
+use crate::student_profile::provide_profile_context;
 use crate::theme::{provide_theme_context, use_theme, use_set_theme};
 
 #[component]
@@ -37,6 +38,7 @@ pub fn App() -> impl IntoView {
 fn AppInner() -> impl IntoView {
     let (role, _set_role) = provide_role_context();
     let (_theme, _set_theme) = provide_theme_context();
+    let (_profile, _set_profile) = provide_profile_context();
     provide_curriculum_context();
 
     view! {
@@ -59,6 +61,7 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/dashboard") view=DashboardPage />
                     <Route path=path!("/skill-map") view=SkillMapPage />
                     <Route path=path!("/study/:id") view=StudyPageWrapper />
+                    <Route path=path!("/exam-prep") view=ExamPrepPage />
                     <Route path=path!("/teacher") view=TeacherDashboardPage />
                     <Route path=path!("/governance") view=GovernancePage />
                     <Route path=path!("/credentials") view=CredentialsPage />
@@ -98,9 +101,9 @@ fn RoleNav(role: ReadSignal<Option<UserRole>>) -> impl IntoView {
         }.into_any(),
         Some(UserRole::Student) => view! {
             <A href="/dashboard">"Dashboard"</A>
-            <A href="/review">"Review"</A>
             <A href="/skill-map">"Skill Map"</A>
-            <A href="/credentials">"Achievements"</A>
+            <A href="/review">"Review"</A>
+            <A href="/exam-prep">"Exam Prep"</A>
         }.into_any(),
         Some(UserRole::Parent) => view! {
             <A href="/dashboard">"Progress"</A>

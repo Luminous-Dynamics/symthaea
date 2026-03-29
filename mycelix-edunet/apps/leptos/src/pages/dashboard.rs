@@ -13,6 +13,7 @@ use leptos::prelude::*;
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
 use crate::components::suggestion_overlay::{SuggestionOverlay, CognitiveStateMirror};
+use crate::curriculum::{caps_graph, use_progress, ProgressStatus};
 use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
@@ -174,28 +175,38 @@ fn mock_activity() -> Vec<ActivityEvent> {
 pub fn DashboardPage() -> impl IntoView {
     view! {
         <div class="dashboard">
-            <h2>"My Learning"</h2>
-            <p class="dashboard-encouragement">
-                "You're doing great! 3 skills improving this week."
-            </p>
+            <h2>"Dashboard"</h2>
 
-            // Suggestion overlay -- available on dashboard too
+            // CAPS Progress Overview
+            <CapsProgressCard />
+
+            // Suggestion overlay
             <SuggestionOverlay />
 
             // Mirror mode cognitive state display
             <CognitiveStateMirror />
 
+            // Quick actions
+            <div style="display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap">
+                <a href="/skill-map" class="feature-card" style="flex: 1; min-width: 200px; text-align: center; padding: 1rem">
+                    <div style="font-size: 1.5rem">"\u{1f4d0}"</div>
+                    <div style="font-weight: 600">"Skill Map"</div>
+                </a>
+                <a href="/review" class="feature-card" style="flex: 1; min-width: 200px; text-align: center; padding: 1rem">
+                    <div style="font-size: 1.5rem">"\u{1f4dd}"</div>
+                    <div style="font-weight: 600">"Review Cards"</div>
+                </a>
+                <a href="/exam-prep" class="feature-card" style="flex: 1; min-width: 200px; text-align: center; padding: 1rem">
+                    <div style="font-size: 1.5rem">"\u{1f3af}"</div>
+                    <div style="font-weight: 600">"Exam Prep"</div>
+                </a>
+            </div>
+
             <div class="dashboard-grid">
                 <SovereigntyCard />
                 <LearningReadinessCard />
-                <XpLevelCard />
-                <StreakCard />
-                <DueReviewsCard />
-                <SkillsCard />
             </div>
-            <ActiveAdaptationSection />
-            <RecommendationsSection />
-            <RecentActivitySection />
+            <CapsRecommendationsSection />
         </div>
     }
 }
@@ -820,6 +831,198 @@ fn CardLoading() -> impl IntoView {
             <div class="skeleton-line wide"></div>
             <div class="skeleton-line medium"></div>
             <div class="skeleton-line narrow"></div>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CAPS Progress Card — real curriculum data
+// ---------------------------------------------------------------------------
+
+#[component]
+fn CapsProgressCard() -> impl IntoView {
+    let progress = use_progress();
+    let graph = caps_graph();
+
+    let math_mastery = Memo::new(move |_| {
+        let p = progress.get();
+        p.subject_mastery(graph, "Mathematics")
+    });
+
+    let physics_mastery = Memo::new(move |_| {
+        let p = progress.get();
+        p.subject_mastery(graph, "Physical Sciences")
+    });
+
+    let counts = Memo::new(move |_| {
+        let p = progress.get();
+        let total = graph.nodes.len();
+        let mastered = p.mastered_count();
+        let studying = p.studying_count();
+        (total, mastered, studying)
+    });
+
+    // Find highest-weight unmastered Gr12 topics
+    let priority_topics = Memo::new(move |_| {
+        let p = progress.get();
+        let mut topics: Vec<_> = graph.nodes.iter()
+            .filter(|n| {
+                n.grade_levels.first().map(|g| g == "Grade12").unwrap_or(false)
+                    && p.get(&n.id).status != ProgressStatus::Mastered
+                    && n.exam_weight.is_some()
+            })
+            .collect();
+        topics.sort_by(|a, b| {
+            let wa = a.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
+            let wb = b.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
+            wb.cmp(&wa)
+        });
+        topics.into_iter().take(3).map(|n| (n.id.clone(), n.title.clone(), n.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0))).collect::<Vec<_>>()
+    });
+
+    view! {
+        <div class="dash-card" style="grid-column: 1 / -1">
+            <h3>"CAPS Matric Progress"</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin: 1rem 0">
+                // Overall
+                <div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem">"Overall"</div>
+                    {move || {
+                        let (total, mastered, studying) = counts.get();
+                        let pct = if total > 0 { mastered * 100 / total } else { 0 };
+                        view! {
+                            <div style="font-size: 1.5rem; font-weight: 700">{mastered}"/" {total}</div>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill success" style=format!("width: {}%", pct)></div>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem">
+                                {studying}" studying, "{total - mastered - studying}" remaining"
+                            </div>
+                        }
+                    }}
+                </div>
+                // Mathematics
+                <div>
+                    <div style="font-size: 0.8rem; color: var(--subject-math); margin-bottom: 0.25rem">"Mathematics"</div>
+                    {move || {
+                        let m = math_mastery.get();
+                        view! {
+                            <div style="font-size: 1.5rem; font-weight: 700">{m / 10}"%"</div>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill primary" style=format!("width: {}%", m / 10)></div>
+                            </div>
+                        }
+                    }}
+                </div>
+                // Physical Sciences
+                <div>
+                    <div style="font-size: 0.8rem; color: var(--subject-physics); margin-bottom: 0.25rem">"Physical Sciences"</div>
+                    {move || {
+                        let m = physics_mastery.get();
+                        view! {
+                            <div style="font-size: 1.5rem; font-weight: 700">{m / 10}"%"</div>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill success" style=format!("width: {}%", m / 10)></div>
+                            </div>
+                        }
+                    }}
+                </div>
+            </div>
+
+            // Priority topics
+            {move || {
+                let topics = priority_topics.get();
+                if topics.is_empty() {
+                    view! { <p style="color: var(--success); font-weight: 600">"All Grade 12 topics mastered!"</p> }.into_any()
+                } else {
+                    view! {
+                        <div style="margin-top: 1rem">
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem">"Priority — highest exam weight, not yet mastered"</div>
+                            {topics.iter().map(|(id, title, marks)| {
+                                let href = format!("/study/{}", id);
+                                let title = title.clone();
+                                let marks = *marks;
+                                view! {
+                                    <a href=href style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--text)">
+                                        <span style="font-size: 0.9rem">{title}</span>
+                                        <span class="caps-badge caps-badge-exam">{marks}"m"</span>
+                                    </a>
+                                }
+                            }).collect::<Vec<_>>()}
+                        </div>
+                    }.into_any()
+                }
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CAPS Recommendations — real data from curriculum graph
+// ---------------------------------------------------------------------------
+
+#[component]
+fn CapsRecommendationsSection() -> impl IntoView {
+    let progress = use_progress();
+    let graph = caps_graph();
+
+    let recommendations = Memo::new(move |_| {
+        let p = progress.get();
+
+        // Find topics where all prerequisites are mastered but the topic itself isn't
+        let mut recs = Vec::new();
+        for node in &graph.nodes {
+            let status = p.get(&node.id).status;
+            if status == ProgressStatus::Mastered { continue; }
+
+            let prereqs = graph.prereqs_for(&node.id);
+            let all_prereqs_met = prereqs.is_empty() || prereqs.iter().all(|pid| {
+                p.get(pid).status == ProgressStatus::Mastered
+            });
+
+            if all_prereqs_met {
+                let weight = node.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
+                recs.push((node.id.clone(), node.title.clone(), node.subdomain.clone(), weight, status));
+            }
+        }
+
+        // Sort: studying first, then by exam weight
+        recs.sort_by(|a, b| {
+            let studying_a = a.4 == ProgressStatus::Studying;
+            let studying_b = b.4 == ProgressStatus::Studying;
+            studying_b.cmp(&studying_a).then(b.3.cmp(&a.3))
+        });
+        recs.into_iter().take(5).collect::<Vec<_>>()
+    });
+
+    view! {
+        <div class="dash-section">
+            <h3 class="dash-section-title">"Recommended Next Steps"</h3>
+            <div class="recommendations-list">
+                {move || {
+                    recommendations.get().iter().map(|(id, title, subdomain, marks, status)| {
+                        let href = format!("/study/{}", id);
+                        let title = title.clone();
+                        let subdomain = subdomain.clone();
+                        let marks = *marks;
+                        let label = if *status == ProgressStatus::Studying { "Continue" } else { "Start" };
+                        view! {
+                            <a href=href class="feature-card" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem">
+                                <div style="flex: 1">
+                                    <div style="font-weight: 600; font-size: 0.9rem">{title}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary)">{subdomain}</div>
+                                </div>
+                                {if marks > 0 {
+                                    view! { <span class="caps-badge caps-badge-exam">{marks}"m"</span> }.into_any()
+                                } else {
+                                    view! { <span></span> }.into_any()
+                                }}
+                                <span style="color: var(--primary); font-size: 0.8rem; font-weight: 600">{label}" \u{2192}"</span>
+                            </a>
+                        }
+                    }).collect::<Vec<_>>()
+                }}
+            </div>
         </div>
     }
 }

@@ -34,17 +34,6 @@ pub fn SkillMapPage() -> impl IntoView {
         graph.nodes_for(&s, &g).into_iter().cloned().collect::<Vec<_>>()
     });
 
-    // Derived: edges within the filtered set
-    let filtered_edges = Memo::new(move |_| {
-        let graph = caps_graph();
-        let nodes = filtered_nodes.get();
-        let node_ids: std::collections::HashSet<&str> = nodes.iter().map(|n| n.id.as_str()).collect();
-        graph.edges.iter()
-            .filter(|e| node_ids.contains(e.to.as_str()) || node_ids.contains(e.from.as_str()))
-            .cloned()
-            .collect::<Vec<_>>()
-    });
-
     // Progress summary
     let progress_summary = Memo::new(move |_| {
         let graph = caps_graph();
@@ -89,8 +78,16 @@ pub fn SkillMapPage() -> impl IntoView {
                         class=move || if subject.get() == Subject::PhysicalSciences { "caps-filter-btn active" } else { "caps-filter-btn" }
                         on:click=move |_| set_subject.set(Subject::PhysicalSciences)
                     >"Physical Sciences"</button>
+                    <button
+                        class=move || if subject.get() == Subject::NaturalSciences { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| { set_subject.set(Subject::NaturalSciences); set_grade.set(Grade::Gr9); }
+                    >"Natural Sciences"</button>
                 </div>
                 <div class="caps-filter-group">
+                    <button
+                        class=move || if grade.get() == Grade::Gr9 { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| set_grade.set(Grade::Gr9)
+                    >"Grade 9"</button>
                     <button
                         class=move || if grade.get() == Grade::Gr10 { "caps-filter-btn active" } else { "caps-filter-btn" }
                         on:click=move |_| set_grade.set(Grade::Gr10)
@@ -106,7 +103,48 @@ pub fn SkillMapPage() -> impl IntoView {
                 </div>
             </div>
 
-            // Node grid (simpler than SVG for initial version — cards in a responsive grid)
+            // Learning path — shows prerequisite order
+            <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 0.8rem; color: var(--text-secondary)">
+                <span style="font-weight: 600; color: var(--text)">"Learning path: "</span>
+                {move || {
+                    let graph = caps_graph();
+                    let nodes = filtered_nodes.get();
+                    let p = progress.get();
+                    // Simple topological display: show nodes in prerequisite order
+                    // Nodes with no within-view prereqs come first
+                    let node_ids: std::collections::HashSet<String> = nodes.iter().map(|n| n.id.clone()).collect();
+                    let mut ordered: Vec<(String, String, bool)> = Vec::new();
+                    // First: nodes with no prereqs in this view
+                    for n in &nodes {
+                        let prereqs = graph.prereqs_for(&n.id);
+                        let has_prereq_in_view = prereqs.iter().any(|pid| node_ids.contains(*pid));
+                        if !has_prereq_in_view {
+                            let mastered = p.get(&n.id).status == ProgressStatus::Mastered;
+                            ordered.push((n.id.clone(), n.title.clone(), mastered));
+                        }
+                    }
+                    // Then: nodes that depend on the first set
+                    for n in &nodes {
+                        if !ordered.iter().any(|(id, _, _)| id == &n.id) {
+                            let mastered = p.get(&n.id).status == ProgressStatus::Mastered;
+                            ordered.push((n.id.clone(), n.title.clone(), mastered));
+                        }
+                    }
+                    ordered.iter().enumerate().map(|(i, (_, title, mastered))| {
+                        let color = if *mastered { "var(--success)" } else { "var(--text-secondary)" };
+                        let decoration = if *mastered { "line-through" } else { "none" };
+                        let arrow = if i > 0 { " \u{2192} " } else { "" };
+                        let title = title.clone();
+                        view! {
+                            <span style=format!("color: {}; text-decoration: {}", color, decoration)>
+                                {arrow}{title}
+                            </span>
+                        }
+                    }).collect::<Vec<_>>()
+                }}
+            </div>
+
+            // Node grid
             <div class="feature-grid">
                 <For
                     each=move || filtered_nodes.get()

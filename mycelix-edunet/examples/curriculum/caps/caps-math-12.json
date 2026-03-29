@@ -1,0 +1,961 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 12 (Matric)",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade12",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 10,
+    "domains": [
+      "Paper 1 — Algebra",
+      "Paper 1 — Sequences",
+      "Paper 1 — Finance",
+      "Paper 1 — Functions",
+      "Paper 1 — Calculus",
+      "Paper 1 — Probability",
+      "Paper 2 — Geometry",
+      "Paper 2 — Analytical Geometry",
+      "Paper 2 — Trigonometry",
+      "Paper 2 — Statistics"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Mathematics FET Phase (DBE, 2011 amended 2022). NSC Matric examination syllabus — Paper 1 (150 marks, 3 hours) and Paper 2 (150 marks, 3 hours)."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr12.P1.ALG",
+      "title": "Algebra, Equations, and Inequalities",
+      "description": "Solve equations: quadratic (all methods), surd, exponential, simultaneous (two quadratics). Quadratic inequalities. Nature of roots (discriminant Δ = b²−4ac). Apply to real-world problems",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 1 — Algebra",
+      "tags": [
+        "algebra",
+        "quadratic",
+        "equations",
+        "discriminant",
+        "inequalities",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P1.ALG",
+          "description": "Solve equations: quadratic (all methods), surd, exponential, simultaneous (two quadratics). Quadratic inequalities. Nature of roots (discriminant Δ = b²−4ac). Apply to real-world problems",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.ALG"
+        },
+        {
+          "title": "Khan Academy: Algebra, Equations, and Inequalities",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebra,+Equations,+and+Inequalities",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.ALG"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebra, Equations, and Inequalities",
+          "url": "https://www.youtube.com/results?search_query=Algebra,+Equations,+and+Inequalities+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebra, Equations, and Inequalities",
+          "url": "https://en.wikipedia.org/wiki/Algebra",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 25,
+        "total_paper_marks": 150,
+        "percentage": 16.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P1.SEQ",
+      "title": "Patterns, Sequences, and Series",
+      "description": "Arithmetic sequences (Tn = a + (n−1)d, Sn = n/2[2a + (n−1)d]). Geometric sequences (Tn = ar^(n−1), Sn = a(r^n − 1)/(r − 1)). Sum to infinity S∞ = a/(1−r) for |r|<1. Sigma notation. Proof by induction (enrichment)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 1 — Sequences",
+      "tags": [
+        "sequences",
+        "series",
+        "arithmetic",
+        "geometric",
+        "sigma-notation",
+        "sum-to-infinity",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P1.SEQ",
+          "description": "Arithmetic sequences (Tn = a + (n−1)d, Sn = n/2[2a + (n−1)d]). Geometric sequences (Tn = ar^(n−1), Sn = a(r^n − 1)/(r − 1)). Sum to infinity S∞ = a/(1−r) for |r|<1. Sigma notation. Proof by induction (enrichment)",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.SEQ"
+        },
+        {
+          "title": "Khan Academy: Patterns, Sequences, and Series",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Patterns,+Sequences,+and+Series",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.SEQ"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Patterns, Sequences, and Series",
+          "url": "https://www.youtube.com/results?search_query=Patterns,+Sequences,+and+Series+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Patterns, Sequences, and Series",
+          "url": "https://en.wikipedia.org/wiki/Patterns",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 25,
+        "total_paper_marks": 150,
+        "percentage": 16.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P1.FIN",
+      "title": "Finance, Growth, and Decay",
+      "description": "Future value and present value annuities: F = x[(1+i)^n − 1]/i, P = x[1 − (1+i)^−n]/i. Sinking funds, loan repayments, outstanding balance. Effective vs nominal rates. Deferred payments. Pyramidal schemes",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 1 — Finance",
+      "tags": [
+        "finance",
+        "annuities",
+        "future-value",
+        "present-value",
+        "loans",
+        "sinking-fund",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P1.FIN",
+          "description": "Future value and present value annuities: F = x[(1+i)^n − 1]/i, P = x[1 − (1+i)^−n]/i. Sinking funds, loan repayments, outstanding balance. Effective vs nominal rates. Deferred payments. Pyramidal schemes",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.FIN"
+        },
+        {
+          "title": "Khan Academy: Finance, Growth, and Decay",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Finance,+Growth,+and+Decay",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.FIN"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Finance, Growth, and Decay",
+          "url": "https://www.youtube.com/results?search_query=Finance,+Growth,+and+Decay+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Finance, Growth, and Decay",
+          "url": "https://en.wikipedia.org/wiki/Finance",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 25,
+        "total_paper_marks": 150,
+        "percentage": 16.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P1.FN",
+      "title": "Functions and Graphs",
+      "description": "Revise linear, quadratic (y = a(x−p)²+q), hyperbolic (y = a/(x−p)+q), exponential (y = ab^(x−p)+q). Logarithmic function. Average gradient, increasing/decreasing intervals. Interpret real-world graphs. Transformations and reflections",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 1 — Functions",
+      "tags": [
+        "functions",
+        "parabola",
+        "hyperbola",
+        "exponential",
+        "logarithm",
+        "transformations",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P1.FN",
+          "description": "Revise linear, quadratic (y = a(x−p)²+q), hyperbolic (y = a/(x−p)+q), exponential (y = ab^(x−p)+q). Logarithmic function. Average gradient, increasing/decreasing intervals. Interpret real-world graphs. Transformations and reflections",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.FN"
+        },
+        {
+          "title": "Khan Academy: Functions and Graphs",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Functions+and+Graphs",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.FN"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Functions and Graphs",
+          "url": "https://www.youtube.com/results?search_query=Functions+and+Graphs+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Functions and Graphs",
+          "url": "https://en.wikipedia.org/wiki/Functions_and_Graphs",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 25,
+        "total_paper_marks": 150,
+        "percentage": 16.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P1.CALC",
+      "title": "Differential Calculus",
+      "description": "Limits (intuitive). First principles: f'(x) = lim[h→0] (f(x+h)−f(x))/h. Differentiation rules: power rule, constant rule, sum/difference. Equations of tangent lines. Sketch cubic functions using first derivative (turning points, concavity). Optimisation problems",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 1 — Calculus",
+      "tags": [
+        "calculus",
+        "differentiation",
+        "first-principles",
+        "tangent",
+        "cubic",
+        "optimisation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 18,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P1.CALC",
+          "description": "Limits (intuitive). First principles: f'(x) = lim[h→0] (f(x+h)−f(x))/h. Differentiation rules: power rule, constant rule, sum/difference. Equations of tangent lines. Sketch cubic functions using first derivative (turning points, concavity). Optimisation problems",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.CALC"
+        },
+        {
+          "title": "Khan Academy: Differential Calculus",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Differential+Calculus",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.CALC"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Differential Calculus",
+          "url": "https://www.youtube.com/results?search_query=Differential+Calculus+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Differential Calculus",
+          "url": "https://en.wikipedia.org/wiki/Differential_Calculus",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 35,
+        "total_paper_marks": 150,
+        "percentage": 23.333334
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P1.COUNT",
+      "title": "Counting Principles and Probability",
+      "description": "Fundamental counting principle. Factorial notation (n!). Permutations and combinations. Probability using counting principles. Mutually exclusive and complementary events revisited. Independent events. Tree diagrams",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 1 — Probability",
+      "tags": [
+        "probability",
+        "counting",
+        "permutations",
+        "combinations",
+        "factorial",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P1.COUNT",
+          "description": "Fundamental counting principle. Factorial notation (n!). Permutations and combinations. Probability using counting principles. Mutually exclusive and complementary events revisited. Independent events. Tree diagrams",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.COUNT"
+        },
+        {
+          "title": "Khan Academy: Counting Principles and Probability",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Counting+Principles+and+Probability",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P1.COUNT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Counting Principles and Probability",
+          "url": "https://www.youtube.com/results?search_query=Counting+Principles+and+Probability+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Counting Principles and Probability",
+          "url": "https://en.wikipedia.org/wiki/Counting_Principles_and_Probability",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 15,
+        "total_paper_marks": 150,
+        "percentage": 10.0
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P2.GEOM",
+      "title": "Euclidean Geometry",
+      "description": "Circle geometry theorems (prove examinable theorems, apply all). Proportionality theorem. Similar and congruent triangles applied to circle geometry. Riders combining multiple theorems",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 2 — Geometry",
+      "tags": [
+        "geometry",
+        "circle-theorems",
+        "similar-triangles",
+        "proportionality",
+        "riders",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 16,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P2.GEOM",
+          "description": "Circle geometry theorems (prove examinable theorems, apply all). Proportionality theorem. Similar and congruent triangles applied to circle geometry. Riders combining multiple theorems",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.GEOM"
+        },
+        {
+          "title": "Khan Academy: Euclidean Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Euclidean+Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.GEOM"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Euclidean Geometry",
+          "url": "https://www.youtube.com/results?search_query=Euclidean+Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Euclidean Geometry",
+          "url": "https://en.wikipedia.org/wiki/Euclidean_Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P2.ANAG",
+      "title": "Analytical Geometry",
+      "description": "Revise distance, midpoint, gradient, collinear points. Equation of a circle (centre origin and general). Tangent to circle. Properties of quadrilaterals proven analytically. Inclination and angle between two lines",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 2 — Analytical Geometry",
+      "tags": [
+        "analytical-geometry",
+        "circle",
+        "tangent",
+        "inclination",
+        "coordinate-geometry",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P2.ANAG",
+          "description": "Revise distance, midpoint, gradient, collinear points. Equation of a circle (centre origin and general). Tangent to circle. Properties of quadrilaterals proven analytically. Inclination and angle between two lines",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.ANAG"
+        },
+        {
+          "title": "Khan Academy: Analytical Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Analytical+Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.ANAG"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Analytical Geometry",
+          "url": "https://www.youtube.com/results?search_query=Analytical+Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Analytical Geometry",
+          "url": "https://en.wikipedia.org/wiki/Analytical_Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P2.TRIG",
+      "title": "Trigonometry",
+      "description": "Compound angles: sin(α±β), cos(α±β), sin2α, cos2α. Solve general equations. Trigonometric identities (prove). Sine rule, cosine rule, area rule. 2D and 3D problems. Trigonometric graphs with amplitude, period, and phase shift",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 2 — Trigonometry",
+      "tags": [
+        "trigonometry",
+        "compound-angles",
+        "identities",
+        "sine-rule",
+        "cosine-rule",
+        "3d-problems",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 16,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P2.TRIG",
+          "description": "Compound angles: sin(α±β), cos(α±β), sin2α, cos2α. Solve general equations. Trigonometric identities (prove). Sine rule, cosine rule, area rule. 2D and 3D problems. Trigonometric graphs with amplitude, period, and phase shift",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.TRIG"
+        },
+        {
+          "title": "Khan Academy: Trigonometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Trigonometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.TRIG"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Trigonometry",
+          "url": "https://www.youtube.com/results?search_query=Trigonometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Trigonometry",
+          "url": "https://en.wikipedia.org/wiki/Trigonometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.666668
+      }
+    },
+    {
+      "id": "CAPS.Mathematics.Gr12.P2.STAT",
+      "title": "Statistics",
+      "description": "Symmetric and skewed data. Variance and standard deviation (σ = √(Σ(x−x̄)²/n)). Identify outliers. Ogives, box-and-whisker plots, histograms, frequency polygons. Normal distribution (intuitive). Bivariate data: scatter plots, least-squares regression line ŷ = a + bx, correlation coefficient r",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Paper 2 — Statistics",
+      "tags": [
+        "statistics",
+        "standard-deviation",
+        "variance",
+        "regression",
+        "correlation",
+        "normal-distribution",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr12.P2.STAT",
+          "description": "Symmetric and skewed data. Variance and standard deviation (σ = √(Σ(x−x̄)²/n)). Identify outliers. Ogives, box-and-whisker plots, histograms, frequency polygons. Normal distribution (intuitive). Bivariate data: scatter plots, least-squares regression line ŷ = a + bx, correlation coefficient r",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.STAT"
+        },
+        {
+          "title": "Khan Academy: Statistics",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Statistics",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr12.P2.STAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Statistics",
+          "url": "https://www.youtube.com/results?search_query=Statistics+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Statistics",
+          "url": "https://en.wikipedia.org/wiki/Statistics",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 30,
+        "total_paper_marks": 150,
+        "percentage": 20.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr12.P1.ALG",
+      "to": "CAPS.Mathematics.Gr12.P1.SEQ",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Algebraic skills needed for series formulae"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr12.P1.ALG",
+      "to": "CAPS.Mathematics.Gr12.P1.FIN",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Equation solving needed for annuity calculations"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr12.P1.ALG",
+      "to": "CAPS.Mathematics.Gr12.P1.FN",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Algebraic manipulation for function analysis"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr12.P1.FN",
+      "to": "CAPS.Mathematics.Gr12.P1.CALC",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Function knowledge is prerequisite for calculus"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr12.P1.ALG",
+      "to": "CAPS.Mathematics.Gr12.P1.COUNT",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Algebraic reasoning for counting problems"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr12.P2.GEOM",
+      "to": "CAPS.Mathematics.Gr12.P2.ANAG",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Geometric properties applied analytically"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.ALG.2",
+      "to": "CAPS.Mathematics.Gr12.P1.ALG",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 quadratic equations foundation for Grade 12 algebra"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.PAT.1",
+      "to": "CAPS.Mathematics.Gr12.P1.SEQ",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 series foundation for Grade 12 sequences"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.FIN.1",
+      "to": "CAPS.Mathematics.Gr12.P1.FIN",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 growth/decay before Grade 12 annuities"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.FN.2",
+      "to": "CAPS.Mathematics.Gr12.P1.FN",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 inverse functions before Grade 12 function revision"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.TRIG.1",
+      "to": "CAPS.Mathematics.Gr12.P2.TRIG",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 compound angles before Grade 12 trig"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.GEOM.1",
+      "to": "CAPS.Mathematics.Gr12.P2.GEOM",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Grade 11 circle geometry before Grade 12 proofs"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.ANAG.1",
+      "to": "CAPS.Mathematics.Gr12.P2.ANAG",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 circle equations before Grade 12 analytical geometry"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.STAT.1",
+      "to": "CAPS.Mathematics.Gr12.P2.STAT",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 11 bivariate data before Grade 12 regression"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.PROB.1",
+      "to": "CAPS.Mathematics.Gr12.P1.COUNT",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 11 probability before Grade 12 counting principles"
+    }
+  ]
+}

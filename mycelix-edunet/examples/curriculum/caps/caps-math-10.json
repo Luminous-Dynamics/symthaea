@@ -1,0 +1,923 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 10",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade10",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 13,
+    "domains": [
+      "Algebra",
+      "Functions",
+      "Trigonometry",
+      "Euclidean Geometry",
+      "Analytical Geometry",
+      "Statistics",
+      "Probability",
+      "Measurement"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Mathematics FET Phase (DBE, 2011 amended 2022). Grade 10 foundations."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr10.ALG.1",
+      "title": "Algebraic Expressions",
+      "description": "Simplify, factorise, and manipulate algebraic expressions including products, factors (common factor, grouping, trinomials, difference of squares, sum/difference of cubes)",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "algebra",
+        "factorisation",
+        "expressions",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.ALG.1",
+          "description": "Simplify, factorise, and manipulate algebraic expressions including products, factors (common factor, grouping, trinomials, difference of squares, sum/difference of cubes)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Algebraic Expressions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebraic+Expressions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.ALG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebraic Expressions",
+          "url": "https://www.youtube.com/results?search_query=Algebraic+Expressions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebraic Expressions",
+          "url": "https://en.wikipedia.org/wiki/Algebraic_Expressions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.ALG.2",
+      "title": "Equations and Inequalities",
+      "description": "Solve linear, quadratic, literal, and simultaneous linear equations. Solve linear inequalities and represent on number line",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "equations",
+        "inequalities",
+        "linear",
+        "quadratic",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.ALG.2",
+          "description": "Solve linear, quadratic, literal, and simultaneous linear equations. Solve linear inequalities and represent on number line",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Equations and Inequalities",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Equations+and+Inequalities",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.ALG.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Equations and Inequalities",
+          "url": "https://www.youtube.com/results?search_query=Equations+and+Inequalities+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Equations and Inequalities",
+          "url": "https://en.wikipedia.org/wiki/Equations_and_Inequalities",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.PAT.1",
+      "title": "Number Patterns",
+      "description": "Investigate and extend numeric and geometric patterns. Determine the general term of linear sequences (Tn = an + b)",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Patterns & Sequences",
+      "tags": [
+        "patterns",
+        "sequences",
+        "linear-sequences",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.PAT.1",
+          "description": "Investigate and extend numeric and geometric patterns. Determine the general term of linear sequences (Tn = an + b)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Number Patterns",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Number+Patterns",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.PAT.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Number Patterns",
+          "url": "https://www.youtube.com/results?search_query=Number+Patterns+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Number Patterns",
+          "url": "https://en.wikipedia.org/wiki/Number_Patterns",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.FIN.1",
+      "title": "Finance and Growth",
+      "description": "Simple and compound interest. Use formulae A = P(1+in) and A = P(1+i)^n. Hire purchase and inflation",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Finance",
+      "tags": [
+        "finance",
+        "simple-interest",
+        "compound-interest",
+        "growth",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.FIN.1",
+          "description": "Simple and compound interest. Use formulae A = P(1+in) and A = P(1+i)^n. Hire purchase and inflation",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Finance and Growth",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Finance+and+Growth",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.FIN.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Finance and Growth",
+          "url": "https://www.youtube.com/results?search_query=Finance+and+Growth+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Finance and Growth",
+          "url": "https://en.wikipedia.org/wiki/Finance_and_Growth",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.FN.1",
+      "title": "Functions — Linear and Quadratic",
+      "description": "Define function, domain, range. Investigate and sketch y = ax + q, y = ax² + q. Effect of a and q on graphs. Points of intersection",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "functions",
+        "linear-function",
+        "quadratic-function",
+        "parabola",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.FN.1",
+          "description": "Define function, domain, range. Investigate and sketch y = ax + q, y = ax² + q. Effect of a and q on graphs. Points of intersection",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Functions — Linear and Quadratic",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Functions+—+Linear+and+Quadratic",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.FN.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Functions — Linear and Quadratic",
+          "url": "https://www.youtube.com/results?search_query=Functions+—+Linear+and+Quadratic+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Functions — Linear and Quadratic",
+          "url": "https://en.wikipedia.org/wiki/Functions_—_Linear_and_Quadratic",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.FN.2",
+      "title": "Functions — Hyperbola and Exponential",
+      "description": "Investigate and sketch y = a/x + q (hyperbola) and y = ab^x + q (exponential). Asymptotes, domain, range",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "functions",
+        "hyperbola",
+        "exponential-function",
+        "asymptote",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.FN.2",
+          "description": "Investigate and sketch y = a/x + q (hyperbola) and y = ab^x + q (exponential). Asymptotes, domain, range",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Functions — Hyperbola and Exponential",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Functions+—+Hyperbola+and+Exponential",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.FN.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Functions — Hyperbola and Exponential",
+          "url": "https://www.youtube.com/results?search_query=Functions+—+Hyperbola+and+Exponential+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Functions — Hyperbola and Exponential",
+          "url": "https://en.wikipedia.org/wiki/Functions_—_Hyperbola_and_Exponential",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.TRIG.1",
+      "title": "Trigonometry — Definitions and Identities",
+      "description": "Define sin, cos, tan using right-angled triangles and the unit circle. Derive and use identities: tan θ = sin θ/cos θ, sin²θ + cos²θ = 1. Solve 2D triangle problems",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometry",
+      "tags": [
+        "trigonometry",
+        "sine",
+        "cosine",
+        "tangent",
+        "identities",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.TRIG.1",
+          "description": "Define sin, cos, tan using right-angled triangles and the unit circle. Derive and use identities: tan θ = sin θ/cos θ, sin²θ + cos²θ = 1. Solve 2D triangle problems",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Trigonometry — Definitions and Identities",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Trigonometry+—+Definitions+and+Identities",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.TRIG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Trigonometry — Definitions and Identities",
+          "url": "https://www.youtube.com/results?search_query=Trigonometry+—+Definitions+and+Identities+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Trigonometry — Definitions and Identities",
+          "url": "https://en.wikipedia.org/wiki/Trigonometry_—_Definitions_and_Identities",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.TRIG.2",
+      "title": "Trigonometric Functions",
+      "description": "Sketch and interpret graphs of y = sin θ, y = cos θ, y = tan θ for θ ∈ [0°, 360°]. Period, amplitude, asymptotes",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometry",
+      "tags": [
+        "trigonometry",
+        "trig-graphs",
+        "sine-curve",
+        "cosine-curve",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.TRIG.2",
+          "description": "Sketch and interpret graphs of y = sin θ, y = cos θ, y = tan θ for θ ∈ [0°, 360°]. Period, amplitude, asymptotes",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Trigonometric Functions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Trigonometric+Functions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.TRIG.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Trigonometric Functions",
+          "url": "https://www.youtube.com/results?search_query=Trigonometric+Functions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Trigonometric Functions",
+          "url": "https://en.wikipedia.org/wiki/Trigonometric_Functions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.GEOM.1",
+      "title": "Euclidean Geometry — Properties",
+      "description": "Properties of special quadrilaterals (parallelogram, rectangle, rhombus, square, kite, trapezium). Midpoint theorem",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Euclidean Geometry",
+      "tags": [
+        "geometry",
+        "quadrilaterals",
+        "midpoint-theorem",
+        "euclidean",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.GEOM.1",
+          "description": "Properties of special quadrilaterals (parallelogram, rectangle, rhombus, square, kite, trapezium). Midpoint theorem",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Euclidean Geometry — Properties",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Euclidean+Geometry+—+Properties",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.GEOM.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Euclidean Geometry — Properties",
+          "url": "https://www.youtube.com/results?search_query=Euclidean+Geometry+—+Properties+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Euclidean Geometry — Properties",
+          "url": "https://en.wikipedia.org/wiki/Euclidean_Geometry_—_Properties",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.ANAG.1",
+      "title": "Analytical Geometry",
+      "description": "Distance formula, midpoint formula, gradient. Inclination of a line. Equation of a straight line. Parallel and perpendicular lines",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Analytical Geometry",
+      "tags": [
+        "analytical-geometry",
+        "coordinate-geometry",
+        "distance",
+        "gradient",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.ANAG.1",
+          "description": "Distance formula, midpoint formula, gradient. Inclination of a line. Equation of a straight line. Parallel and perpendicular lines",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Analytical Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Analytical+Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.ANAG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Analytical Geometry",
+          "url": "https://www.youtube.com/results?search_query=Analytical+Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Analytical Geometry",
+          "url": "https://en.wikipedia.org/wiki/Analytical_Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.STAT.1",
+      "title": "Statistics",
+      "description": "Collect, organise, and interpret univariate data. Measures of central tendency (mean, median, mode) and spread (range, percentiles, quartiles, IQR, five-number summary). Box-and-whisker plots",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Statistics",
+      "tags": [
+        "statistics",
+        "mean",
+        "median",
+        "box-plot",
+        "data-handling",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.STAT.1",
+          "description": "Collect, organise, and interpret univariate data. Measures of central tendency (mean, median, mode) and spread (range, percentiles, quartiles, IQR, five-number summary). Box-and-whisker plots",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Statistics",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Statistics",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.STAT.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Statistics",
+          "url": "https://www.youtube.com/results?search_query=Statistics+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Statistics",
+          "url": "https://en.wikipedia.org/wiki/Statistics",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.PROB.1",
+      "title": "Probability",
+      "description": "Theoretical and experimental probability. Venn diagrams. Mutually exclusive and complementary events. The addition rule for mutually exclusive events",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Probability",
+      "tags": [
+        "probability",
+        "venn-diagrams",
+        "events",
+        "addition-rule",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.PROB.1",
+          "description": "Theoretical and experimental probability. Venn diagrams. Mutually exclusive and complementary events. The addition rule for mutually exclusive events",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Probability",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Probability",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.PROB.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Probability",
+          "url": "https://www.youtube.com/results?search_query=Probability+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Probability",
+          "url": "https://en.wikipedia.org/wiki/Probability",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr10.MEAS.1",
+      "title": "Measurement",
+      "description": "Conversions, perimeter, area (2D shapes), surface area and volume of right prisms and cylinders",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "area",
+        "volume",
+        "prisms",
+        "cylinders",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr10.MEAS.1",
+          "description": "Conversions, perimeter, area (2D shapes), surface area and volume of right prisms and cylinders",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Measurement",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Measurement",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr10.MEAS.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Measurement",
+          "url": "https://www.youtube.com/results?search_query=Measurement+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Measurement",
+          "url": "https://en.wikipedia.org/wiki/Measurement",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr10.ALG.1",
+      "to": "CAPS.Mathematics.Gr10.ALG.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Algebraic manipulation is prerequisite for solving equations"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.ALG.2",
+      "to": "CAPS.Mathematics.Gr10.FN.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Equations skills needed for function analysis"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.FN.1",
+      "to": "CAPS.Mathematics.Gr10.FN.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Linear/quadratic foundation before hyperbola/exponential"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.TRIG.1",
+      "to": "CAPS.Mathematics.Gr10.TRIG.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Trig definitions before trig graphs"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.ALG.2",
+      "to": "CAPS.Mathematics.Gr10.ANAG.1",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Linear equations needed for analytical geometry"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.ALG.1",
+      "to": "CAPS.Mathematics.Gr10.FIN.1",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Algebraic substitution needed for finance formulae"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.ALG.1",
+      "to": "CAPS.Mathematics.Gr10.PAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Algebraic expressions needed for general term"
+    }
+  ]
+}

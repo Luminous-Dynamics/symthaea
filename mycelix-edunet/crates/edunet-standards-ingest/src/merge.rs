@@ -136,7 +136,7 @@ fn clone_node(n: &CurriculumNode) -> CurriculumNode {
         cip_code: n.cip_code.clone(),
         program_id: n.program_id.clone(),
         corequisites: n.corequisites.clone(), supplementary_resources: n.supplementary_resources.clone(),
-        exam_weight: None,
+        exam_weight: n.exam_weight.clone(),
     }
 }
 

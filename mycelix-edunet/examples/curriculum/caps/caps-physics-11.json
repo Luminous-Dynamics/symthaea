@@ -1,0 +1,860 @@
+{
+  "metadata": {
+    "title": "CAPS Physical Sciences Grade 11",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade11",
+    "subject_area": "Physical Sciences",
+    "domain": "Physical Sciences",
+    "version": "2011 (amended 2022)",
+    "total_standards": 11,
+    "domains": [
+      "Physics — Mechanics",
+      "Physics — Waves",
+      "Physics — Electricity",
+      "Chemistry — Organic",
+      "Chemistry — Kinetics",
+      "Chemistry — Equilibrium",
+      "Chemistry — Acids & Bases",
+      "Chemistry — Electrochemistry"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Physical Sciences FET Phase (DBE, 2011 amended 2022). Grade 11 intermediate — Physics and Chemistry."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.PHY.1",
+      "title": "Mechanics — Vectors in Two Dimensions",
+      "description": "Resolution of vectors into components. Addition by components. Newton's laws in 2D with resolved forces. Inclined planes. Friction (static and kinetic)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Mechanics",
+      "tags": [
+        "physics",
+        "vectors",
+        "components",
+        "inclined-planes",
+        "friction",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.PHY.1",
+          "description": "Resolution of vectors into components. Addition by components. Newton's laws in 2D with resolved forces. Inclined planes. Friction (static and kinetic)",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Mechanics — Vectors in Two Dimensions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Vectors+in+Two+Dimensions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.PHY.1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Vectors in Two Dimensions",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Vectors+in+Two+Dimensions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Vectors in Two Dimensions",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Vectors_in_Two_Dimensions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.PHY.2",
+      "title": "Mechanics — Newton's Laws and Application",
+      "description": "Newton's first, second (Fnet = ma), and third laws. Free-body diagrams. Applications: lifts, connected objects, inclined planes with friction. Normal force and weight",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Mechanics",
+      "tags": [
+        "physics",
+        "newtons-laws",
+        "force",
+        "free-body-diagram",
+        "acceleration",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.PHY.2",
+          "description": "Newton's first, second (Fnet = ma), and third laws. Free-body diagrams. Applications: lifts, connected objects, inclined planes with friction. Normal force and weight",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Mechanics — Newton's Laws and Application",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Newton's+Laws+and+Application",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.PHY.2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Newton's Laws and Application",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Newton's+Laws+and+Application+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Newton's Laws and Application",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Newton's_Laws_and_Application",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.PHY.3",
+      "title": "Mechanics — Momentum and Impulse",
+      "description": "Momentum (p = mv). Newton's second law in terms of momentum (FnetΔt = Δp). Impulse-momentum theorem. Conservation of momentum in isolated systems. Elastic and inelastic collisions",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Mechanics",
+      "tags": [
+        "physics",
+        "momentum",
+        "impulse",
+        "collisions",
+        "conservation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.PHY.3",
+          "description": "Momentum (p = mv). Newton's second law in terms of momentum (FnetΔt = Δp). Impulse-momentum theorem. Conservation of momentum in isolated systems. Elastic and inelastic collisions",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Mechanics — Momentum and Impulse",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Momentum+and+Impulse",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.PHY.3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Momentum and Impulse",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Momentum+and+Impulse+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Momentum and Impulse",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Momentum_and_Impulse",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.PHY.4",
+      "title": "Mechanics — Work, Energy, and Power",
+      "description": "Work (W = FΔx cos θ). Work-energy theorem. Conservation of energy with non-conservative forces. Power (P = W/Δt = Fv). Efficiency",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Mechanics",
+      "tags": [
+        "physics",
+        "work",
+        "energy",
+        "power",
+        "efficiency",
+        "conservation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.PHY.4",
+          "description": "Work (W = FΔx cos θ). Work-energy theorem. Conservation of energy with non-conservative forces. Power (P = W/Δt = Fv). Efficiency",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Mechanics — Work, Energy, and Power",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Work,+Energy,+and+Power",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.PHY.4"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Work, Energy, and Power",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Work,+Energy,+and+Power+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Work, Energy, and Power",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Work",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.PHY.5",
+      "title": "Waves — Geometrical Optics",
+      "description": "Refraction (Snell's law: n₁sin θ₁ = n₂sin θ₂). Total internal reflection. Critical angle. Lenses: converging and diverging. Thin lens equation (1/f = 1/do + 1/di). Magnification. Ray diagrams",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Waves",
+      "tags": [
+        "physics",
+        "optics",
+        "refraction",
+        "snells-law",
+        "lenses",
+        "total-internal-reflection",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.PHY.5",
+          "description": "Refraction (Snell's law: n₁sin θ₁ = n₂sin θ₂). Total internal reflection. Critical angle. Lenses: converging and diverging. Thin lens equation (1/f = 1/do + 1/di). Magnification. Ray diagrams",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Waves — Geometrical Optics",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Waves+—+Geometrical+Optics",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.PHY.5"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Waves — Geometrical Optics",
+          "url": "https://www.youtube.com/results?search_query=Waves+—+Geometrical+Optics+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Waves — Geometrical Optics",
+          "url": "https://en.wikipedia.org/wiki/Waves_—_Geometrical_Optics",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.PHY.6",
+      "title": "Electricity — Electrodynamics",
+      "description": "Electrical machines: generators (AC and DC) and motors. Faraday's law. Alternating current (peak, RMS values: Vrms = Vmax/√2). Transformers",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Electricity",
+      "tags": [
+        "physics",
+        "electrodynamics",
+        "generators",
+        "motors",
+        "faraday",
+        "alternating-current",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.PHY.6",
+          "description": "Electrical machines: generators (AC and DC) and motors. Faraday's law. Alternating current (peak, RMS values: Vrms = Vmax/√2). Transformers",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Electricity — Electrodynamics",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electricity+—+Electrodynamics",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.PHY.6"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electricity — Electrodynamics",
+          "url": "https://www.youtube.com/results?search_query=Electricity+—+Electrodynamics+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electricity — Electrodynamics",
+          "url": "https://en.wikipedia.org/wiki/Electricity_—_Electrodynamics",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.CHM.1",
+      "title": "Matter and Materials — Organic Molecules (Introduction)",
+      "description": "Molecular and structural formulae. Functional groups: alkanes, alkenes, alkynes, alcohols, carboxylic acids, esters, aldehydes, ketones. IUPAC nomenclature. Physical properties and intermolecular forces",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Organic",
+      "tags": [
+        "chemistry",
+        "organic",
+        "functional-groups",
+        "iupac",
+        "nomenclature",
+        "hydrocarbons",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.CHM.1",
+          "description": "Molecular and structural formulae. Functional groups: alkanes, alkenes, alkynes, alcohols, carboxylic acids, esters, aldehydes, ketones. IUPAC nomenclature. Physical properties and intermolecular forces",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Matter and Materials — Organic Molecules (Int...",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Matter+and+Materials+—+Organic+Molecules+(Introduction)",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.CHM.1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Matter and Materials — Organic Molecules (Int...",
+          "url": "https://www.youtube.com/results?search_query=Matter+and+Materials+—+Organic+Molecules+(Introduction)+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Matter and Materials — Organic Molecules (Int...",
+          "url": "https://en.wikipedia.org/wiki/Matter_and_Materials_—_Organic_Molecules",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.CHM.2",
+      "title": "Chemical Change — Reaction Rates",
+      "description": "Rate of reaction. Factors affecting rate: concentration, temperature, surface area, catalysts. Collision theory. Energy profiles (activation energy, exothermic, endothermic). Maxwell-Boltzmann distribution",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Kinetics",
+      "tags": [
+        "chemistry",
+        "reaction-rates",
+        "kinetics",
+        "activation-energy",
+        "catalysts",
+        "collision-theory",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.CHM.2",
+          "description": "Rate of reaction. Factors affecting rate: concentration, temperature, surface area, catalysts. Collision theory. Energy profiles (activation energy, exothermic, endothermic). Maxwell-Boltzmann distribution",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Chemical Change — Reaction Rates",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Change+—+Reaction+Rates",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.CHM.2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Change — Reaction Rates",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Change+—+Reaction+Rates+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Change — Reaction Rates",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Change_—_Reaction_Rates",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.CHM.3",
+      "title": "Chemical Change — Chemical Equilibrium",
+      "description": "Open and closed systems. Reversible reactions. Dynamic equilibrium. Le Chatelier's principle (concentration, temperature, pressure). Equilibrium constant Kc. Equilibrium calculations",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Equilibrium",
+      "tags": [
+        "chemistry",
+        "equilibrium",
+        "le-chatelier",
+        "reversible-reactions",
+        "kc",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.CHM.3",
+          "description": "Open and closed systems. Reversible reactions. Dynamic equilibrium. Le Chatelier's principle (concentration, temperature, pressure). Equilibrium constant Kc. Equilibrium calculations",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Chemical Change — Chemical Equilibrium",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Change+—+Chemical+Equilibrium",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.CHM.3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Change — Chemical Equilibrium",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Change+—+Chemical+Equilibrium+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Change — Chemical Equilibrium",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Change_—_Chemical_Equilibrium",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.CHM.4",
+      "title": "Acids and Bases",
+      "description": "Arrhenius, Brønsted-Lowry definitions. Strong/weak acids and bases. pH scale (pH = −log[H⁺]). Neutralisation. Titrations. Indicators. Acid-base reactions with oxides, carbonates, metals",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Acids & Bases",
+      "tags": [
+        "chemistry",
+        "acids",
+        "bases",
+        "ph",
+        "titration",
+        "neutralisation",
+        "bronsted-lowry",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.CHM.4",
+          "description": "Arrhenius, Brønsted-Lowry definitions. Strong/weak acids and bases. pH scale (pH = −log[H⁺]). Neutralisation. Titrations. Indicators. Acid-base reactions with oxides, carbonates, metals",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Acids and Bases",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Acids+and+Bases",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.CHM.4"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Acids and Bases",
+          "url": "https://www.youtube.com/results?search_query=Acids+and+Bases+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Acids and Bases",
+          "url": "https://en.wikipedia.org/wiki/Acids_and_Bases",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr11.CHM.5",
+      "title": "Electrochemistry — Galvanic and Electrolytic Cells",
+      "description": "Oxidation and reduction (electron transfer). Galvanic (voltaic) cells. Cell notation. Standard electrode potentials (E°). EMF calculation. Electrolytic cells. Faraday's laws of electrolysis. Applications (electroplating, extraction)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Electrochemistry",
+      "tags": [
+        "chemistry",
+        "electrochemistry",
+        "galvanic-cell",
+        "electrolysis",
+        "electrode-potential",
+        "redox",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr11.CHM.5",
+          "description": "Oxidation and reduction (electron transfer). Galvanic (voltaic) cells. Cell notation. Standard electrode potentials (E°). EMF calculation. Electrolytic cells. Faraday's laws of electrolysis. Applications (electroplating, extraction)",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Electrochemistry — Galvanic and Electrolytic ...",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electrochemistry+—+Galvanic+and+Electrolytic+Cells",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr11.CHM.5"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electrochemistry — Galvanic and Electrolytic ...",
+          "url": "https://www.youtube.com/results?search_query=Electrochemistry+—+Galvanic+and+Electrolytic+Cells+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electrochemistry — Galvanic and Electrolytic ...",
+          "url": "https://en.wikipedia.org/wiki/Electrochemistry_—_Galvanic_and_Electrolytic_Cells",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.1",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Vector resolution needed for 2D Newton's law problems"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.2",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.3",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Newton's second law foundation for momentum"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.2",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.4",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Force concepts needed for work-energy theorem"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.2",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.3",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Reaction rates before equilibrium"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.3",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Equilibrium concepts before acid-base equilibria"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.4",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Acid-base redox reactions before electrochemistry"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.1",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 10 kinematics before Grade 11 2D vectors"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.2",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.4",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 10 energy concepts before Grade 11 work-energy theorem"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.3",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.5",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 10 waves before Grade 11 optics"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.7",
+      "to": "CAPS.PhysicalSciences.Gr11.PHY.6",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 10 circuits before Grade 11 electrodynamics"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.2",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 10 bonding before Grade 11 organic chemistry"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.4",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.2",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 10 stoichiometry before Grade 11 reaction rates"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.5",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 10 acid-base basics before Grade 11 acids and bases"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.5",
+      "to": "CAPS.PhysicalSciences.Gr11.CHM.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 10 redox basics before Grade 11 electrochemistry"
+    }
+  ]
+}

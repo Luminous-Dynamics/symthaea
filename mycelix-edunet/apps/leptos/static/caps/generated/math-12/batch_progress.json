@@ -1,0 +1,18 @@
+{
+  "total": 10,
+  "completed": [
+    "CAPS.Mathematics.Gr12.P1.ALG",
+    "CAPS.Mathematics.Gr12.P1.SEQ",
+    "CAPS.Mathematics.Gr12.P1.FIN",
+    "CAPS.Mathematics.Gr12.P1.FN",
+    "CAPS.Mathematics.Gr12.P1.CALC",
+    "CAPS.Mathematics.Gr12.P1.COUNT",
+    "CAPS.Mathematics.Gr12.P2.GEOM",
+    "CAPS.Mathematics.Gr12.P2.ANAG",
+    "CAPS.Mathematics.Gr12.P2.TRIG",
+    "CAPS.Mathematics.Gr12.P2.STAT"
+  ],
+  "failed": [],
+  "started_at": "2026-03-29T16:18:24",
+  "last_updated": "2026-03-29T16:18:24"
+}

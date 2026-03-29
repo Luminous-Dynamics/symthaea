@@ -1,0 +1,408 @@
+{
+  "node_id": "CAPS.Mathematics.Gr11.FN.1",
+  "lesson": {
+    "standard_code": "CAPS.Mathematics.Gr11.FN.1",
+    "title": "CAPS.Mathematics.Gr11.FN.1: Investigate y = a(x−p)² + q, y = a/(x−p) + q, y = ab^(x−p...",
+    "grade_level": "Grade11",
+    "bloom_level": "Understand",
+    "explanation": "Grade 11 algebra introduces surds (√a), the quadratic formula, and the nature of roots. You simplify expressions with surds, solve quadratic equations by completing the square, and use the discriminant to determine how many roots an equation has. Simultaneous equations now include one linear and one quadratic equation.",
+    "examples": [
+      {
+        "problem": "Sketch f(x) = −(x−2)² + 9 showing intercepts, turning point, and axis of symmetry.",
+        "steps": [
+          {
+            "instruction": "Step 1: Shape: a = −1 < 0 so \"sad face\" (opens down)",
+            "result": "identify shape"
+          },
+          {
+            "instruction": "Step 2: Turning point at (2, 9)",
+            "result": "read from equation"
+          },
+          {
+            "instruction": "Step 3: y-intercept: f(0) = −(0−2)² + 9 = −4 + 9 = 5, so (0, 5)",
+            "result": "set x = 0"
+          },
+          {
+            "instruction": "Step 4: x-intercepts: 0 = −(x−2)² + 9, (x−2)² = 9, x − 2 = ±3, x = 5 or x = −1",
+            "result": "set y = 0"
+          },
+          {
+            "instruction": "Step 5: Axis of symmetry: x = 2",
+            "result": "vertical line through TP"
+          }
+        ],
+        "answer": "Answer: TP(2,9), y-int(0,5), x-ints(−1,0) and (5,0), axis x = 2",
+        "visual_description": null
+      },
+      {
+        "problem": "Sketch f(x) = −(x−2)² + 9 showing intercepts, turning point, and axis of symmetry.",
+        "steps": [
+          {
+            "instruction": "Step 1: Shape: a = −1 < 0 so \"sad face\" (opens down)",
+            "result": "identify shape"
+          },
+          {
+            "instruction": "Step 2: Turning point at (2, 9)",
+            "result": "read from equation"
+          },
+          {
+            "instruction": "Step 3: y-intercept: f(0) = −(0−2)² + 9 = −4 + 9 = 5, so (0, 5)",
+            "result": "set x = 0"
+          },
+          {
+            "instruction": "Step 4: x-intercepts: 0 = −(x−2)² + 9, (x−2)² = 9, x − 2 = ±3, x = 5 or x = −1",
+            "result": "set y = 0"
+          },
+          {
+            "instruction": "Step 5: Axis of symmetry: x = 2",
+            "result": "vertical line through TP"
+          }
+        ],
+        "answer": "Answer: TP(2,9), y-int(0,5), x-ints(−1,0) and (5,0), axis x = 2",
+        "visual_description": null
+      },
+      {
+        "problem": "Sketch f(x) = −(x−2)² + 9 showing intercepts, turning point, and axis of symmetry.",
+        "steps": [
+          {
+            "instruction": "Step 1: Shape: a = −1 < 0 so \"sad face\" (opens down)",
+            "result": "identify shape"
+          },
+          {
+            "instruction": "Step 2: Turning point at (2, 9)",
+            "result": "read from equation"
+          },
+          {
+            "instruction": "Step 3: y-intercept: f(0) = −(0−2)² + 9 = −4 + 9 = 5, so (0, 5)",
+            "result": "set x = 0"
+          },
+          {
+            "instruction": "Step 4: x-intercepts: 0 = −(x−2)² + 9, (x−2)² = 9, x − 2 = ±3, x = 5 or x = −1",
+            "result": "set y = 0"
+          },
+          {
+            "instruction": "Step 5: Axis of symmetry: x = 2",
+            "result": "vertical line through TP"
+          }
+        ],
+        "answer": "Answer: TP(2,9), y-int(0,5), x-ints(−1,0) and (5,0), axis x = 2",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      },
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      },
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      },
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      },
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      },
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      },
+      {
+        "question": "Determine the equation of the parabola with turning point (3, −4) passing through (5, 0).",
+        "answer": "y = (x − 3)² − 4",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with y = a(x−p)² + q where (p,q) is the turning point.,Substitute the given point to find a."
+        ],
+        "explanation": "y = a(x−3)² − 4. At (5,0): 0 = a(4) − 4, a = 1. So y = (x−3)² − 4.",
+        "distractors": [
+          "y = (x−3)² + 4",
+          "y = −(x−3)² − 4",
+          "y = 2(x−3)² − 4"
+        ]
+      }
+    ],
+    "hints": [
+      "What is the turning point form of a parabola?",
+      "y = a(x − p)² + q. Substitute the TP, then use another point to find a.",
+      "TP(3,−4) gives y = a(x−3)² − 4. Put in (5,0): 0 = a(4) − 4, so a = 1."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "turning point",
+        "definition": "The minimum or maximum point of a parabola",
+        "example_usage": "y = 2(x−1)² + 3 has turning point (1, 3)."
+      },
+      {
+        "term": "asymptote",
+        "definition": "A line that a graph approaches but never touches",
+        "example_usage": "y = 1/(x−2) + 3 has asymptotes at x = 2 and y = 3."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students read the turning point of y = −2(x−3)² + 5 as (−3, 5).",
+        "correction": "The turning point is (3, 5). The formula is y = a(x−p)² + q, so the sign in the bracket is opposite.",
+        "why_students_think_this": "(x − 3)² means p = +3, not −3. The negative is part of the formula structure."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Mathematics.Gr11.FN.1",
+    "title": "Assessment: Investigate y = a(x−p)² + q, y = a/(x−p) + q, y = ab^(x−p) + q. Transformations: shifts, reflections, stretches. Axes of symmetry, turning points, asymptotes",
+    "items": [
+      {
+        "question": "Given f(x) = 2/(x+1) − 3, state the equations of the asymptotes and sketch the graph.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Vertical: x = −1, Horizontal: y = −3",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Given f(x) = 2/(x+1) − 3, state the equations of the asymptotes and sketch the graph.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Vertical: x = −1, Horizontal: y = −3",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Given f(x) = 2/(x+1) − 3, state the equations of the asymptotes and sketch the graph.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Vertical: x = −1, Horizontal: y = −3",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Given f(x) = 2/(x+1) − 3, state the equations of the asymptotes and sketch the graph.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Vertical: x = −1, Horizontal: y = −3",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Given f(x) = 2/(x+1) − 3, state the equations of the asymptotes and sketch the graph.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Vertical: x = −1, Horizontal: y = −3",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Given f(x) = 2/(x+1) − 3, state the equations of the asymptotes and sketch the graph.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Vertical: x = −1, Horizontal: y = −3",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "4"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the turning point of y = a(x − p)² + q?",
+      "back": "The turning point is (p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.",
+      "tags": [
+        "CAPS.Mathematics.Gr11.FN.1",
+        "Grade11",
+        "Functions"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T14:41:33"
+}

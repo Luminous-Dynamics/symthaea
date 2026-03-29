@@ -16,6 +16,7 @@ use wasm_bindgen::JsCast;
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
 use crate::role::{use_set_role, UserRole};
+use crate::student_profile::use_profile;
 
 fn event_target_value(ev: &leptos::ev::Event) -> String {
     ev.target()
@@ -98,14 +99,22 @@ fn MentorGreeting(
 
     let adaptivity_sandbox = adaptivity.clone();
 
-    // What the mentor says based on time of day
+    let profile = use_profile();
+
+    // Personalized greeting based on time of day + student name
     let greeting = {
         let hour = (js_sys::Date::new_0().get_hours()) as u8;
-        match hour {
-            5..=11 => "Good morning!",
-            12..=16 => "Good afternoon!",
-            17..=20 => "Good evening!",
-            _ => "Hey there!",
+        let name = profile.get_untracked().name;
+        let time_greeting = match hour {
+            5..=11 => "Good morning",
+            12..=16 => "Good afternoon",
+            17..=20 => "Good evening",
+            _ => "Hey",
+        };
+        if name.is_empty() {
+            format!("{}!", time_greeting)
+        } else {
+            format!("{}, {}.", time_greeting, name)
         }
     };
 
@@ -145,33 +154,33 @@ fn MentorGreeting(
 
             <div class="intention-cards">
                 <button class="intention-card intention-practice" on:click=on_practice>
-                    <span class="intention-icon">"\u{1f4da}"</span>
-                    <span class="intention-label">"Practice something"</span>
-                    <span class="intention-hint">"Review what you've been learning"</span>
+                    <span class="intention-icon">"\u{1f4dd}"</span>
+                    <span class="intention-label">"Review flashcards"</span>
+                    <span class="intention-hint">"Spaced repetition for exam prep"</span>
                 </button>
 
                 <button class="intention-card intention-explore" on:click=on_explore>
-                    <span class="intention-icon">"\u{1f30d}"</span>
-                    <span class="intention-label">"Explore something new"</span>
-                    <span class="intention-hint">"See what's out there"</span>
+                    <span class="intention-icon">"\u{1f4d0}"</span>
+                    <span class="intention-label">"Study a topic"</span>
+                    <span class="intention-hint">"Browse the curriculum"</span>
                 </button>
 
                 <button class="intention-card intention-create" on:click=on_create>
-                    <span class="intention-icon">"\u{1f3a8}"</span>
-                    <span class="intention-label">"See how I'm doing"</span>
-                    <span class="intention-hint">"Check your progress and skills"</span>
+                    <span class="intention-icon">"\u{1f4ca}"</span>
+                    <span class="intention-label">"View my progress"</span>
+                    <span class="intention-hint">"Track mastery and find gaps"</span>
                 </button>
 
                 <button class="intention-card intention-help" on:click=on_help>
                     <span class="intention-icon">"\u{1f91d}"</span>
-                    <span class="intention-label">"I'd like some help"</span>
-                    <span class="intention-hint">"Get extra support today"</span>
+                    <span class="intention-label">"I need help"</span>
+                    <span class="intention-hint">"Get guided support"</span>
                 </button>
 
                 <button class="intention-card intention-play" on:click=on_play>
-                    <span class="intention-icon">"\u{1f3ae}"</span>
-                    <span class="intention-label">"Just explore freely"</span>
-                    <span class="intention-hint">"No tracking, no scores — just play"</span>
+                    <span class="intention-icon">"\u{1f50d}"</span>
+                    <span class="intention-label">"Explore freely"</span>
+                    <span class="intention-hint">"Browse without tracking"</span>
                 </button>
             </div>
 

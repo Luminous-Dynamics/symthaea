@@ -1,0 +1,415 @@
+{
+  "node_id": "CAPS.PhysicalSciences.Gr10.CHM.4",
+  "lesson": {
+    "standard_code": "CAPS.PhysicalSciences.Gr10.CHM.4",
+    "title": "CAPS.PhysicalSciences.Gr10.CHM.4: Mole concept (n = m/M, n = cV, n = N/Nₐ). Balanced equati...",
+    "grade_level": "Grade10",
+    "bloom_level": "Understand",
+    "explanation": "Grade 10 algebra covers factorisation (common factor, grouping, trinomials, difference of squares, sum/difference of cubes) and solving linear, quadratic, literal, and simultaneous equations. You also solve linear inequalities and represent solutions on a number line.",
+    "examples": [
+      {
+        "problem": "Solve: 2x² − 5x − 3 = 0",
+        "steps": [
+          {
+            "instruction": "Step 1: Try factorisation: find factors of 2 × (−3) = −6 that add to −5 → these are −6 and +1",
+            "result": "identify factors"
+          },
+          {
+            "instruction": "Step 2: Rewrite: 2x² − 6x + x − 3 = 0",
+            "result": "split middle term"
+          },
+          {
+            "instruction": "Step 3: Group: 2x(x − 3) + 1(x − 3) = 0",
+            "result": "factorise by grouping"
+          },
+          {
+            "instruction": "Step 4: (2x + 1)(x − 3) = 0",
+            "result": "common bracket"
+          },
+          {
+            "instruction": "Step 5: x = −½ or x = 3",
+            "result": "solve each factor"
+          }
+        ],
+        "answer": "Answer: x = −½ or x = 3",
+        "visual_description": null
+      },
+      {
+        "problem": "Solve simultaneously: y = x + 1 and x² + y² = 5",
+        "steps": [
+          {
+            "instruction": "Step 1: Substitute y = x + 1 into x² + y² = 5",
+            "result": "substitution method"
+          },
+          {
+            "instruction": "Step 2: x² + (x + 1)² = 5 → x² + x² + 2x + 1 = 5",
+            "result": "expand"
+          },
+          {
+            "instruction": "Step 3: 2x² + 2x − 4 = 0 → x² + x − 2 = 0",
+            "result": "simplify"
+          },
+          {
+            "instruction": "Step 4: (x + 2)(x − 1) = 0, so x = −2 or x = 1",
+            "result": "factorise"
+          },
+          {
+            "instruction": "Step 5: When x = −2, y = −1. When x = 1, y = 2",
+            "result": "find y-values"
+          }
+        ],
+        "answer": "Answer: (−2, −1) and (1, 2)",
+        "visual_description": null
+      },
+      {
+        "problem": "Determine the nature of the roots of 3x² + 2x + 1 = 0.",
+        "steps": [
+          {
+            "instruction": "Step 1: Identify a = 3, b = 2, c = 1",
+            "result": "read coefficients"
+          },
+          {
+            "instruction": "Step 2: Δ = b² − 4ac = (2)² − 4(3)(1) = 4 − 12 = −8",
+            "result": "calculate discriminant"
+          },
+          {
+            "instruction": "Step 3: Since Δ < 0, the equation has no real roots",
+            "result": "interpret"
+          }
+        ],
+        "answer": "Answer: Non-real roots (Δ = −8 < 0)",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Solve: x² − 7x + 12 = 0",
+        "answer": "x = 3 or x = 4",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find two numbers that multiply to 12 and add to −7.,Try (x − ?)(x − ?) = 0."
+        ],
+        "explanation": "Factorise: (x − 3)(x − 4) = 0. Each factor gives a root.",
+        "distractors": [
+          "x = 3 or x = −4",
+          "x = −3 or x = −4",
+          "x = 6 or x = 2"
+        ]
+      },
+      {
+        "question": "Solve: x² − 7x + 12 = 0",
+        "answer": "x = 3 or x = 4",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find two numbers that multiply to 12 and add to −7.,Try (x − ?)(x − ?) = 0."
+        ],
+        "explanation": "Factorise: (x − 3)(x − 4) = 0. Each factor gives a root.",
+        "distractors": [
+          "x = 3 or x = −4",
+          "x = −3 or x = −4",
+          "x = 6 or x = 2"
+        ]
+      },
+      {
+        "question": "Solve for x: 3x² − x = 4",
+        "answer": "x = 4/3 or x = −1",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "First move everything to one side.,Factor or use the quadratic formula."
+        ],
+        "explanation": "Rearrange: 3x² − x − 4 = 0. (3x − 4)(x + 1) = 0.",
+        "distractors": [
+          "x = 4/3 or x = 1",
+          "x = −4/3 or x = −1",
+          "x = 4 or x = −1"
+        ]
+      },
+      {
+        "question": "Solve for x: 3x² − x = 4",
+        "answer": "x = 4/3 or x = −1",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "First move everything to one side.,Factor or use the quadratic formula."
+        ],
+        "explanation": "Rearrange: 3x² − x − 4 = 0. (3x − 4)(x + 1) = 0.",
+        "distractors": [
+          "x = 4/3 or x = 1",
+          "x = −4/3 or x = −1",
+          "x = 4 or x = −1"
+        ]
+      },
+      {
+        "question": "For which values of k does x² + kx + 9 = 0 have equal roots?",
+        "answer": "k = 6 or k = −6",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Equal roots means the discriminant equals zero.,Set b² − 4ac = 0 and solve for k."
+        ],
+        "explanation": "Equal roots when Δ = 0: k² − 4(1)(9) = 0, k² = 36, k = ±6.",
+        "distractors": [
+          "k = 6 only",
+          "k = 3 or k = −3",
+          "k = 36"
+        ]
+      },
+      {
+        "question": "For which values of k does x² + kx + 9 = 0 have equal roots?",
+        "answer": "k = 6 or k = −6",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Equal roots means the discriminant equals zero.,Set b² − 4ac = 0 and solve for k."
+        ],
+        "explanation": "Equal roots when Δ = 0: k² − 4(1)(9) = 0, k² = 36, k = ±6.",
+        "distractors": [
+          "k = 6 only",
+          "k = 3 or k = −3",
+          "k = 36"
+        ]
+      },
+      {
+        "question": "Solve: 2/(x−1) + 3/(x+2) = 1 (x ≠ 1, x ≠ −2)",
+        "answer": "x = 2 + √7 ≈ 4.65 or x = 2 − √7 ≈ −0.65",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Multiply every term by the LCD.,Use the quadratic formula on x²−4x−3 = 0. Check restrictions."
+        ],
+        "explanation": "Multiply through by (x−1)(x+2): 2(x+2) + 3(x−1) = (x−1)(x+2). Expand: 2x+4+3x−3 = x²+x−2. Simplify: 5x+1 = x²+x−2 → x²−4x−3 = 0. Using the quadratic formula: x = (4±√(16+12))/2 = (4±√28)/2 = 2±√7. Both values satisfy the restrictions.",
+        "distractors": [
+          "x = 4 only",
+          "x = 1",
+          "no solution"
+        ]
+      }
+    ],
+    "hints": [
+      "What type of equation is this? Can you rearrange it to standard form ax² + bx + c = 0?",
+      "Try factorising first. If that doesn't work, use the quadratic formula: x = (−b ± √(b²−4ac))/(2a).",
+      "For x² − 7x + 12 = 0: find two numbers that multiply to +12 and add to −7. Those are −3 and −4."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "discriminant",
+        "definition": "The expression Δ = b² − 4ac that determines the nature of roots",
+        "example_usage": "If Δ > 0, the equation has two distinct real roots."
+      },
+      {
+        "term": "quadratic formula",
+        "definition": "x = (−b ± √(b²−4ac))/(2a) for solving ax² + bx + c = 0",
+        "example_usage": "Use the quadratic formula when you can't factorise."
+      },
+      {
+        "term": "nature of roots",
+        "definition": "Whether roots are real/non-real, equal/unequal, rational/irrational",
+        "example_usage": "The discriminant tells us the nature of roots."
+      },
+      {
+        "term": "surd",
+        "definition": "An irrational number expressed as a root, e.g., √2 or ∛5",
+        "example_usage": "√8 simplifies to 2√2."
+      },
+      {
+        "term": "simultaneous equations",
+        "definition": "Two or more equations solved together to find common solutions",
+        "example_usage": "Solve y = x + 1 and x² + y = 5 simultaneously."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often forget to set the equation equal to zero before factorising. They factorise x² − 5x = 6 as x(x−5) = 6 and then say x = 6 or x − 5 = 6.",
+        "correction": "First rearrange: x² − 5x − 6 = 0. Then factorise: (x − 6)(x + 1) = 0. So x = 6 or x = −1.",
+        "why_students_think_this": "Factorisation only works to find roots when the product equals zero (zero product property)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.PhysicalSciences.Gr10.CHM.4",
+    "title": "Assessment: Mole concept (n = m/M, n = cV, n = N/Nₐ). Balanced equations. Limiting reagents. Percentage yield. Concentration (mol/dm³). Volume relationships (molar gas volume at STP)",
+    "items": [
+      {
+        "question": "Write down the quadratic formula.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "x = (−b ± √(b²−4ac))/(2a)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "x = ½ or x = −2",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "x = ½ or x = −2",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "x = ½ or x = −2",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "x = ½ or x = −2",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "x = ½ or x = −2",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "4"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What does the discriminant Δ = b² − 4ac tell us?",
+      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr10.CHM.4",
+        "Grade10",
+        "Chemistry — Quantitative"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T14:41:35"
+}

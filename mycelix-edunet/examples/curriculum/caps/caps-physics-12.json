@@ -1,0 +1,1403 @@
+{
+  "metadata": {
+    "title": "CAPS Physical Sciences Grade 12 (Matric)",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade12",
+    "subject_area": "Physical Sciences",
+    "domain": "Physical Sciences",
+    "version": "2011 (amended 2022)",
+    "total_standards": 15,
+    "domains": [
+      "Paper 1 — Mechanics",
+      "Paper 1 — Waves",
+      "Paper 1 — Electricity",
+      "Paper 1 — Modern Physics",
+      "Paper 2 — Organic Chemistry",
+      "Paper 2 — Reaction Rates",
+      "Paper 2 — Equilibrium",
+      "Paper 2 — Acids & Bases",
+      "Paper 2 — Electrochemistry",
+      "Paper 2 — Chemical Industry"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Physical Sciences FET Phase (DBE, 2011 amended 2022). NSC Matric examination syllabus — Paper 1 Physics (150 marks, 3 hours) and Paper 2 Chemistry (150 marks, 3 hours)."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.MECH1",
+      "title": "Mechanics — Momentum and Impulse",
+      "description": "Conservation of linear momentum (Σpi = Σpf). Impulse (FnetΔt = mΔv = Δp). Elastic and inelastic collisions in one dimension. Newton's second law in terms of momentum. Application to safety: crumple zones, airbags, seatbelts",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Mechanics",
+      "tags": [
+        "physics",
+        "momentum",
+        "impulse",
+        "collisions",
+        "safety",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.MECH1",
+          "description": "Conservation of linear momentum (Σpi = Σpf). Impulse (FnetΔt = mΔv = Δp). Elastic and inelastic collisions in one dimension. Newton's second law in terms of momentum. Application to safety: crumple zones, airbags, seatbelts",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MECH1"
+        },
+        {
+          "title": "Khan Academy: Mechanics — Momentum and Impulse",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Momentum+and+Impulse",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MECH1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Momentum and Impulse",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Momentum+and+Impulse+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Momentum and Impulse",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Momentum_and_Impulse",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 12,
+        "total_paper_marks": 150,
+        "percentage": 8.0
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.MECH2",
+      "title": "Mechanics — Vertical Projectile Motion",
+      "description": "Motion in one dimension under gravity. Equations of motion with g = 9.8 m/s². Free-fall, bouncing ball, projectile launched vertically. Graphs of motion (x-t, v-t). Reaction time experiments",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Mechanics",
+      "tags": [
+        "physics",
+        "projectile",
+        "free-fall",
+        "gravity",
+        "kinematics",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.MECH2",
+          "description": "Motion in one dimension under gravity. Equations of motion with g = 9.8 m/s². Free-fall, bouncing ball, projectile launched vertically. Graphs of motion (x-t, v-t). Reaction time experiments",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MECH2"
+        },
+        {
+          "title": "Khan Academy: Mechanics — Vertical Projectile Motion",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Vertical+Projectile+Motion",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MECH2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Vertical Projectile Motion",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Vertical+Projectile+Motion+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Vertical Projectile Motion",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Vertical_Projectile_Motion",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 15,
+        "total_paper_marks": 150,
+        "percentage": 10.0
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.MECH3",
+      "title": "Mechanics — Work, Energy, and Power",
+      "description": "Work (W = FΔx cos θ, positive/negative/zero work). Work-energy theorem (Wnet = ΔEk). Conservation of energy including non-conservative forces (Wnc = ΔEk + ΔEp). Power (P = W/Δt = Fv). Efficiency",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Mechanics",
+      "tags": [
+        "physics",
+        "work",
+        "energy",
+        "power",
+        "efficiency",
+        "conservation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.MECH3",
+          "description": "Work (W = FΔx cos θ, positive/negative/zero work). Work-energy theorem (Wnet = ΔEk). Conservation of energy including non-conservative forces (Wnc = ΔEk + ΔEp). Power (P = W/Δt = Fv). Efficiency",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MECH3"
+        },
+        {
+          "title": "Khan Academy: Mechanics — Work, Energy, and Power",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Work,+Energy,+and+Power",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MECH3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Work, Energy, and Power",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Work,+Energy,+and+Power+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Work, Energy, and Power",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Work",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 30,
+        "total_paper_marks": 150,
+        "percentage": 20.0
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.DOP",
+      "title": "Waves — Doppler Effect",
+      "description": "The Doppler effect with sound. Observer frequency formula: fL = fs × (v ± vL)/(v ± vs). Applications: radar, medical ultrasound, astronomy (red shift). Supersonic motion and shock waves (Mach cone)",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Waves",
+      "tags": [
+        "physics",
+        "doppler-effect",
+        "waves",
+        "sound",
+        "red-shift",
+        "ultrasound",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.DOP",
+          "description": "The Doppler effect with sound. Observer frequency formula: fL = fs × (v ± vL)/(v ± vs). Applications: radar, medical ultrasound, astronomy (red shift). Supersonic motion and shock waves (Mach cone)",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.DOP"
+        },
+        {
+          "title": "Khan Academy: Waves — Doppler Effect",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Waves+—+Doppler+Effect",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.DOP"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Waves — Doppler Effect",
+          "url": "https://www.youtube.com/results?search_query=Waves+—+Doppler+Effect+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Waves — Doppler Effect",
+          "url": "https://en.wikipedia.org/wiki/Waves_—_Doppler_Effect",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 10,
+        "total_paper_marks": 150,
+        "percentage": 6.666667
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.ELEC1",
+      "title": "Electricity — Electric Circuits",
+      "description": "Internal resistance and EMF (ε = I(R + r)). Series-parallel networks. Power dissipation. Kirchhoff's voltage and current laws. Wheatstone bridge (enrichment). Motor effect",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Electricity",
+      "tags": [
+        "physics",
+        "circuits",
+        "internal-resistance",
+        "emf",
+        "kirchhoff",
+        "power",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.ELEC1",
+          "description": "Internal resistance and EMF (ε = I(R + r)). Series-parallel networks. Power dissipation. Kirchhoff's voltage and current laws. Wheatstone bridge (enrichment). Motor effect",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.ELEC1"
+        },
+        {
+          "title": "Khan Academy: Electricity — Electric Circuits",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electricity+—+Electric+Circuits",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.ELEC1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electricity — Electric Circuits",
+          "url": "https://www.youtube.com/results?search_query=Electricity+—+Electric+Circuits+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electricity — Electric Circuits",
+          "url": "https://en.wikipedia.org/wiki/Electricity_—_Electric_Circuits",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 35,
+        "total_paper_marks": 150,
+        "percentage": 23.333334
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.ELEC2",
+      "title": "Electricity — Electrodynamics",
+      "description": "Generators (AC and DC principles). Faraday's law of electromagnetic induction (ε = −NΔΦ/Δt). Motors (DC motor operation). Alternating current: Vrms, Irms, Pavg. Transformers (Vs/Vp = Ns/Np). National electricity grid",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Electricity",
+      "tags": [
+        "physics",
+        "electrodynamics",
+        "generators",
+        "faraday",
+        "transformers",
+        "alternating-current",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.ELEC2",
+          "description": "Generators (AC and DC principles). Faraday's law of electromagnetic induction (ε = −NΔΦ/Δt). Motors (DC motor operation). Alternating current: Vrms, Irms, Pavg. Transformers (Vs/Vp = Ns/Np). National electricity grid",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.ELEC2"
+        },
+        {
+          "title": "Khan Academy: Electricity — Electrodynamics",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electricity+—+Electrodynamics",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.ELEC2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electricity — Electrodynamics",
+          "url": "https://www.youtube.com/results?search_query=Electricity+—+Electrodynamics+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electricity — Electrodynamics",
+          "url": "https://en.wikipedia.org/wiki/Electricity_—_Electrodynamics",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 20,
+        "total_paper_marks": 150,
+        "percentage": 13.333334
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.MOD1",
+      "title": "Modern Physics — Photoelectric Effect",
+      "description": "Dual nature of light. Photoelectric effect: threshold frequency (f₀), work function (W₀ = hf₀), Einstein's equation (E = W₀ + Ekmax = hf). Particle nature of light. Photon energy (E = hf = hc/λ). Photocell applications",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Modern Physics",
+      "tags": [
+        "physics",
+        "photoelectric-effect",
+        "photons",
+        "work-function",
+        "planck",
+        "dual-nature",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.MOD1",
+          "description": "Dual nature of light. Photoelectric effect: threshold frequency (f₀), work function (W₀ = hf₀), Einstein's equation (E = W₀ + Ekmax = hf). Particle nature of light. Photon energy (E = hf = hc/λ). Photocell applications",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MOD1"
+        },
+        {
+          "title": "Khan Academy: Modern Physics — Photoelectric Effect",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Modern+Physics+—+Photoelectric+Effect",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MOD1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Modern Physics — Photoelectric Effect",
+          "url": "https://www.youtube.com/results?search_query=Modern+Physics+—+Photoelectric+Effect+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Modern Physics — Photoelectric Effect",
+          "url": "https://en.wikipedia.org/wiki/Modern_Physics_—_Photoelectric_Effect",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 18,
+        "total_paper_marks": 150,
+        "percentage": 12.0
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P1.MOD2",
+      "title": "Modern Physics — Emission and Absorption Spectra",
+      "description": "Atomic energy levels. Emission spectra (continuous, line/bright). Absorption spectra (dark lines). Bohr model. E = hf relationship for photon emission/absorption. Applications: stellar composition, flame tests",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 1 — Modern Physics",
+      "tags": [
+        "physics",
+        "spectra",
+        "emission",
+        "absorption",
+        "bohr-model",
+        "energy-levels",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P1.MOD2",
+          "description": "Atomic energy levels. Emission spectra (continuous, line/bright). Absorption spectra (dark lines). Bohr model. E = hf relationship for photon emission/absorption. Applications: stellar composition, flame tests",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MOD2"
+        },
+        {
+          "title": "Khan Academy: Modern Physics — Emission and Absorption Spectra",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Modern+Physics+—+Emission+and+Absorption+Spectra",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P1.MOD2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Modern Physics — Emission and Absorption Spectra",
+          "url": "https://www.youtube.com/results?search_query=Modern+Physics+—+Emission+and+Absorption+Spectra+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Modern Physics — Emission and Absorption Spectra",
+          "url": "https://en.wikipedia.org/wiki/Modern_Physics_—_Emission_and_Absorption_Spectra",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 1,
+        "marks": 10,
+        "total_paper_marks": 150,
+        "percentage": 6.666667
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.ORG1",
+      "title": "Organic Chemistry — Nomenclature and Reactions",
+      "description": "IUPAC naming: alkanes, alkenes, alkynes, alcohols (primary/secondary/tertiary), carboxylic acids, esters, aldehydes, ketones, amines, amides, alkyl halides. Structural, condensed, and molecular formulae. Functional group identification. Isomers (structural, functional group, positional, chain)",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Organic Chemistry",
+      "tags": [
+        "chemistry",
+        "organic",
+        "nomenclature",
+        "iupac",
+        "isomers",
+        "functional-groups",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.ORG1",
+          "description": "IUPAC naming: alkanes, alkenes, alkynes, alcohols (primary/secondary/tertiary), carboxylic acids, esters, aldehydes, ketones, amines, amides, alkyl halides. Structural, condensed, and molecular formulae. Functional group identification. Isomers (structural, functional group, positional, chain)",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ORG1"
+        },
+        {
+          "title": "Khan Academy: Organic Chemistry — Nomenclature and Reactions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Organic+Chemistry+—+Nomenclature+and+Reactions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ORG1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Organic Chemistry — Nomenclature and Reactions",
+          "url": "https://www.youtube.com/results?search_query=Organic+Chemistry+—+Nomenclature+and+Reactions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Organic Chemistry — Nomenclature and Reactions",
+          "url": "https://en.wikipedia.org/wiki/Organic_Chemistry_—_Nomenclature_and_Reactions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 15,
+        "total_paper_marks": 150,
+        "percentage": 10.0
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.ORG2",
+      "title": "Organic Chemistry — Reactions and Applications",
+      "description": "Substitution (haloalkanes + OH⁻). Elimination (dehydrohalogenation). Addition (alkenes: HX, X₂, H₂O, H₂). Esterification and hydrolysis. Combustion. Oxidation of alcohols. Polymerisation (addition and condensation). Plastics and polymers. Petrochemicals and the refining process (fractional distillation, cracking)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Organic Chemistry",
+      "tags": [
+        "chemistry",
+        "organic-reactions",
+        "substitution",
+        "elimination",
+        "addition",
+        "polymers",
+        "esterification",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.ORG2",
+          "description": "Substitution (haloalkanes + OH⁻). Elimination (dehydrohalogenation). Addition (alkenes: HX, X₂, H₂O, H₂). Esterification and hydrolysis. Combustion. Oxidation of alcohols. Polymerisation (addition and condensation). Plastics and polymers. Petrochemicals and the refining process (fractional distillation, cracking)",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ORG2"
+        },
+        {
+          "title": "Khan Academy: Organic Chemistry — Reactions and Applications",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Organic+Chemistry+—+Reactions+and+Applications",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ORG2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Organic Chemistry — Reactions and Applications",
+          "url": "https://www.youtube.com/results?search_query=Organic+Chemistry+—+Reactions+and+Applications+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Organic Chemistry — Reactions and Applications",
+          "url": "https://en.wikipedia.org/wiki/Organic_Chemistry_—_Reactions_and_Applications",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 25,
+        "total_paper_marks": 150,
+        "percentage": 16.666668
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.RATE",
+      "title": "Chemical Change — Reaction Rates",
+      "description": "Qualitative and quantitative rate. Rate = −Δ[reactant]/Δt = +Δ[product]/Δt. Factors: concentration, temperature, surface area, catalysts. Collision theory. Activation energy and energy profiles. Maxwell-Boltzmann distribution. Mechanism of catalysis",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Reaction Rates",
+      "tags": [
+        "chemistry",
+        "reaction-rates",
+        "kinetics",
+        "activation-energy",
+        "catalysts",
+        "maxwell-boltzmann",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.RATE",
+          "description": "Qualitative and quantitative rate. Rate = −Δ[reactant]/Δt = +Δ[product]/Δt. Factors: concentration, temperature, surface area, catalysts. Collision theory. Activation energy and energy profiles. Maxwell-Boltzmann distribution. Mechanism of catalysis",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.RATE"
+        },
+        {
+          "title": "Khan Academy: Chemical Change — Reaction Rates",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Change+—+Reaction+Rates",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.RATE"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Change — Reaction Rates",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Change+—+Reaction+Rates+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Change — Reaction Rates",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Change_—_Reaction_Rates",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 20,
+        "total_paper_marks": 150,
+        "percentage": 13.333334
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+      "title": "Chemical Equilibrium",
+      "description": "Reversible reactions and dynamic equilibrium. Le Chatelier's principle applied to concentration, temperature, pressure changes. Equilibrium constant Kc and its interpretation. Effect of catalyst on equilibrium (no shift, faster attainment). Industrial applications: Haber process, Contact process",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Equilibrium",
+      "tags": [
+        "chemistry",
+        "equilibrium",
+        "le-chatelier",
+        "haber-process",
+        "contact-process",
+        "kc",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+          "description": "Reversible reactions and dynamic equilibrium. Le Chatelier's principle applied to concentration, temperature, pressure changes. Equilibrium constant Kc and its interpretation. Effect of catalyst on equilibrium (no shift, faster attainment). Industrial applications: Haber process, Contact process",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.EQUIL"
+        },
+        {
+          "title": "Khan Academy: Chemical Equilibrium",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Equilibrium",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.EQUIL"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Equilibrium",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Equilibrium+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Equilibrium",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Equilibrium",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 25,
+        "total_paper_marks": 150,
+        "percentage": 16.666668
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+      "title": "Acids and Bases",
+      "description": "Brønsted-Lowry model. Conjugate acid-base pairs. Strong vs weak acids/bases (degree of ionisation). Ka, Kb, Kw. pH calculations: pH = −log[H₃O⁺]. Titration curves (strong/strong, strong/weak). Indicators and equivalence point. Hydrolysis of salts. Buffer solutions (conceptual)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Acids & Bases",
+      "tags": [
+        "chemistry",
+        "acids",
+        "bases",
+        "ph",
+        "titration-curves",
+        "ka",
+        "hydrolysis",
+        "buffers",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+          "description": "Brønsted-Lowry model. Conjugate acid-base pairs. Strong vs weak acids/bases (degree of ionisation). Ka, Kb, Kw. pH calculations: pH = −log[H₃O⁺]. Titration curves (strong/strong, strong/weak). Indicators and equivalence point. Hydrolysis of salts. Buffer solutions (conceptual)",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ACID"
+        },
+        {
+          "title": "Khan Academy: Acids and Bases",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Acids+and+Bases",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ACID"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Acids and Bases",
+          "url": "https://www.youtube.com/results?search_query=Acids+and+Bases+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Acids and Bases",
+          "url": "https://en.wikipedia.org/wiki/Acids_and_Bases",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 30,
+        "total_paper_marks": 150,
+        "percentage": 20.0
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.ECHEM",
+      "title": "Electrochemistry — Galvanic and Electrolytic Cells",
+      "description": "Galvanic cells: spontaneous redox reactions, cell notation, standard hydrogen electrode, EMF calculation (E°cell = E°cathode − E°anode). Electrolytic cells: non-spontaneous, external voltage, anode/cathode identification. Faraday's laws. Applications: electroplating, refining of copper, chlor-alkali process. Comparison of galvanic and electrolytic cells",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Electrochemistry",
+      "tags": [
+        "chemistry",
+        "electrochemistry",
+        "galvanic",
+        "electrolytic",
+        "emf",
+        "faraday",
+        "electrode-potential",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.ECHEM",
+          "description": "Galvanic cells: spontaneous redox reactions, cell notation, standard hydrogen electrode, EMF calculation (E°cell = E°cathode − E°anode). Electrolytic cells: non-spontaneous, external voltage, anode/cathode identification. Faraday's laws. Applications: electroplating, refining of copper, chlor-alkali process. Comparison of galvanic and electrolytic cells",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ECHEM"
+        },
+        {
+          "title": "Khan Academy: Electrochemistry — Galvanic and Electrolytic ...",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electrochemistry+—+Galvanic+and+Electrolytic+Cells",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.ECHEM"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electrochemistry — Galvanic and Electrolytic ...",
+          "url": "https://www.youtube.com/results?search_query=Electrochemistry+—+Galvanic+and+Electrolytic+Cells+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electrochemistry — Galvanic and Electrolytic ...",
+          "url": "https://en.wikipedia.org/wiki/Electrochemistry_—_Galvanic_and_Electrolytic_Cells",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 20,
+        "total_paper_marks": 150,
+        "percentage": 13.333334
+      }
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr12.P2.FERT",
+      "title": "Chemical Industry — Fertilisers",
+      "description": "N, P, K in fertilisers. Haber process (NH₃). Ostwald process (HNO₃). Contact process (H₂SO₄). Superphosphate production. NPK ratios. Environmental impact: eutrophication, soil acidification",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Physical Sciences",
+      "subdomain": "Paper 2 — Chemical Industry",
+      "tags": [
+        "chemistry",
+        "fertilisers",
+        "haber-process",
+        "ostwald-process",
+        "eutrophication",
+        "industry",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr12.P2.FERT",
+          "description": "N, P, K in fertilisers. Haber process (NH₃). Ostwald process (HNO₃). Contact process (H₂SO₄). Superphosphate production. NPK ratios. Environmental impact: eutrophication, soil acidification",
+          "grade_level": "Grade12"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "DBE Past NSC Exam Papers",
+          "url": "https://www.education.gov.za/Curriculum/NationalSeniorCertificate/NSCPastExaminationpapers.aspx",
+          "source": {
+            "Custom": "DBE"
+          },
+          "content_type": "Exercise",
+          "relevance_score": 90,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.FERT"
+        },
+        {
+          "title": "Khan Academy: Chemical Industry — Fertilisers",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Industry+—+Fertilisers",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr12.P2.FERT"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Industry — Fertilisers",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Industry+—+Fertilisers+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Industry — Fertilisers",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Industry_—_Fertilisers",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ],
+      "exam_weight": {
+        "paper": 2,
+        "marks": 15,
+        "total_paper_marks": 150,
+        "percentage": 10.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P1.MECH1",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.MECH2",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Momentum concepts before projectile motion applications"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P1.MECH2",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.MECH3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Kinematics before work-energy theorem"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P1.ELEC1",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.ELEC2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "DC circuits before electrodynamics"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P1.MOD1",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.MOD2",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Photoelectric effect before emission spectra"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P2.ORG1",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ORG2",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Nomenclature before organic reactions"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P2.RATE",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Reaction rates before equilibrium"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Equilibrium concepts before acid-base equilibria"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ECHEM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Acid-base redox concepts before electrochemistry"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.FERT",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Equilibrium needed for industrial processes (Haber, Contact)"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.3",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.MECH1",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Grade 11 momentum before Grade 12 momentum"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.4",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.MECH3",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 work-energy before Grade 12 work-energy-power"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.5",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.DOP",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 11 optics/waves before Grade 12 Doppler effect"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.PHY.6",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.ELEC2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 electrodynamics before Grade 12 generators/motors"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.1",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ORG1",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Grade 11 organic introduction before Grade 12 organic chemistry"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.2",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.RATE",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 reaction rates before Grade 12 rates"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.3",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 11 equilibrium before Grade 12 equilibrium"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.4",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Grade 11 acids and bases before Grade 12 acids and bases"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr11.CHM.5",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ECHEM",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Grade 11 electrochemistry before Grade 12 electrochemistry"
+    }
+  ]
+}

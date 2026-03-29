@@ -1,0 +1,389 @@
+{
+  "node_id": "CAPS.Mathematics.Gr12.P1.COUNT",
+  "lesson": {
+    "standard_code": "CAPS.Mathematics.Gr12.P1.COUNT",
+    "title": "CAPS.Mathematics.Gr12.P1.COUNT: Fundamental counting principle. Factorial notation (n!). ...",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "In Grade 12, you must solve quadratic equations using factorisation, completing the square, and the quadratic formula x = (−b ± √(b²−4ac)) / 2a. The discriminant Δ = b² − 4ac tells us about the nature of roots: Δ > 0 means two distinct real roots, Δ = 0 means two equal real roots, and Δ < 0 means no real roots. You also solve simultaneous equations where one is linear and one is quadratic, and quadratic inequalities using a sign diagram or parabola sketch.",
+    "examples": [
+      {
+        "problem": "How many 4-letter codes can be formed from the word SUNDAY if no letter is repeated?",
+        "steps": [
+          {
+            "instruction": "Step 1: SUNDAY has 6 distinct letters",
+            "result": "count available letters"
+          },
+          {
+            "instruction": "Step 2: First position: 6 choices. Second: 5. Third: 4. Fourth: 3",
+            "result": "apply counting principle"
+          },
+          {
+            "instruction": "Step 3: Total = 6 × 5 × 4 × 3 = 360",
+            "result": "multiply"
+          }
+        ],
+        "answer": "Answer: 360 codes",
+        "visual_description": null
+      },
+      {
+        "problem": "How many 4-letter codes can be formed from the word SUNDAY if no letter is repeated?",
+        "steps": [
+          {
+            "instruction": "Step 1: SUNDAY has 6 distinct letters",
+            "result": "count available letters"
+          },
+          {
+            "instruction": "Step 2: First position: 6 choices. Second: 5. Third: 4. Fourth: 3",
+            "result": "apply counting principle"
+          },
+          {
+            "instruction": "Step 3: Total = 6 × 5 × 4 × 3 = 360",
+            "result": "multiply"
+          }
+        ],
+        "answer": "Answer: 360 codes",
+        "visual_description": null
+      },
+      {
+        "problem": "How many 4-letter codes can be formed from the word SUNDAY if no letter is repeated?",
+        "steps": [
+          {
+            "instruction": "Step 1: SUNDAY has 6 distinct letters",
+            "result": "count available letters"
+          },
+          {
+            "instruction": "Step 2: First position: 6 choices. Second: 5. Third: 4. Fourth: 3",
+            "result": "apply counting principle"
+          },
+          {
+            "instruction": "Step 3: Total = 6 × 5 × 4 × 3 = 360",
+            "result": "multiply"
+          }
+        ],
+        "answer": "Answer: 360 codes",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      },
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      },
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      },
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      },
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      },
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      },
+      {
+        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
+        "answer": "74",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+        ],
+        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "distractors": [
+          "84",
+          "80",
+          "64"
+        ]
+      }
+    ],
+    "hints": [
+      "Does order matter here? That determines permutation vs combination.",
+      "\"At least 1\" problems are easier using the complement: total − none.",
+      "\"At least 1\" problems are easier using the complement: total − none."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "factorial",
+        "definition": "n! = n × (n−1) × ... × 1, with 0! = 1",
+        "example_usage": "5! = 120."
+      },
+      {
+        "term": "permutation",
+        "definition": "An ordered arrangement",
+        "example_usage": "The permutations of AB are AB and BA."
+      },
+      {
+        "term": "combination",
+        "definition": "An unordered selection",
+        "example_usage": "The combination {A,B} = {B,A} — just one selection."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students confuse permutations and combinations.",
+        "correction": "If order matters (arrangements), use permutations. If order doesn't matter (selections), use combinations.",
+        "why_students_think_this": "Choosing a committee of {A,B,C} is the same as {C,A,B} — combination. But the code ABC ≠ CAB — permutation."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Mathematics.Gr12.P1.COUNT",
+    "title": "Assessment: Fundamental counting principle. Factorial notation (n!). Permutations and combinations. Probability using counting principles. Mutually exclusive and complementary events revisited. Independent events. Tree diagrams",
+    "items": [
+      {
+        "question": "In how many ways can the letters of the word MATHEMATICS be arranged?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "11!/(2!2!2!) = 4 989 600",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "In how many ways can the letters of the word MATHEMATICS be arranged?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "11!/(2!2!2!) = 4 989 600",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "In how many ways can the letters of the word MATHEMATICS be arranged?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "11!/(2!2!2!) = 4 989 600",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "In how many ways can the letters of the word MATHEMATICS be arranged?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "11!/(2!2!2!) = 4 989 600",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "In how many ways can the letters of the word MATHEMATICS be arranged?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "11!/(2!2!2!) = 4 989 600",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "4"
+      },
+      {
+        "question": "In how many ways can the letters of the word MATHEMATICS be arranged?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "11!/(2!2!2!) = 4 989 600",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "4"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Create",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the formula for combinations (nCr)?",
+      "back": "nCr = n! / [r!(n−r)!]",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.COUNT",
+        "Grade12",
+        "Paper 1 — Probability"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T16:18:24"
+}

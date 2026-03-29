@@ -1,0 +1,389 @@
+{
+  "node_id": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+  "lesson": {
+    "standard_code": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+    "title": "CAPS.PhysicalSciences.Gr12.P2.ACID: Brønsted-Lowry model. Conjugate acid-base pairs. Strong v...",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "Dynamic equilibrium occurs in a closed system when the rate of the forward reaction equals the rate of the reverse reaction. Le Chatelier's principle: if a system at equilibrium is disturbed, it shifts to counteract the disturbance. Kc = [products]ᵖ/[reactants]ʳ at equilibrium. A large Kc means products are favoured. A catalyst speeds up both directions equally — it does NOT shift equilibrium.",
+    "examples": [
+      {
+        "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
+        "steps": [
+          {
+            "instruction": "Step 1: HCl is a strong acid → fully ionised → [H₃O⁺] = 0.01 mol/dm³",
+            "result": "identify acid type"
+          },
+          {
+            "instruction": "Step 2: pH = −log[H₃O⁺] = −log(0.01) = −log(10⁻²)",
+            "result": "apply formula"
+          },
+          {
+            "instruction": "Step 3: pH = 2",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: pH = 2",
+        "visual_description": null
+      },
+      {
+        "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
+        "steps": [
+          {
+            "instruction": "Step 1: HCl is a strong acid → fully ionised → [H₃O⁺] = 0.01 mol/dm³",
+            "result": "identify acid type"
+          },
+          {
+            "instruction": "Step 2: pH = −log[H₃O⁺] = −log(0.01) = −log(10⁻²)",
+            "result": "apply formula"
+          },
+          {
+            "instruction": "Step 3: pH = 2",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: pH = 2",
+        "visual_description": null
+      },
+      {
+        "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
+        "steps": [
+          {
+            "instruction": "Step 1: HCl is a strong acid → fully ionised → [H₃O⁺] = 0.01 mol/dm³",
+            "result": "identify acid type"
+          },
+          {
+            "instruction": "Step 2: pH = −log[H₃O⁺] = −log(0.01) = −log(10⁻²)",
+            "result": "apply formula"
+          },
+          {
+            "instruction": "Step 3: pH = 2",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: pH = 2",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      },
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      },
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      },
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      },
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      },
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      },
+      {
+        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
+        "answer": "pH = 11.3",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+        ],
+        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "distractors": [
+          "3.0",
+          "2.7",
+          "8.7"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember: pH + pOH = 14 at 25°C. If you know [OH⁻], find pOH = −log[OH⁻], then pH = 14 − pOH.",
+      "Remember: pH + pOH = 14 at 25°C. If you know [OH⁻], find pOH = −log[OH⁻], then pH = 14 − pOH.",
+      "Remember: pH + pOH = 14 at 25°C. If you know [OH⁻], find pOH = −log[OH⁻], then pH = 14 − pOH."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "conjugate acid-base pair",
+        "definition": "Two species that differ by one proton (H⁺)",
+        "example_usage": "NH₃ and NH₄⁺ are a conjugate pair."
+      },
+      {
+        "term": "equivalence point",
+        "definition": "The point in a titration where moles of acid = moles of base",
+        "example_usage": "At the equivalence point, the indicator changes colour."
+      },
+      {
+        "term": "hydrolysis",
+        "definition": "The reaction of a salt with water to produce acidic or basic solution",
+        "example_usage": "NaCH₃COO is basic by hydrolysis (weak acid salt)."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think a weak acid has a high pH.",
+        "correction": "A weak acid can still have a low pH if concentrated enough. 'Weak' refers to degree of ionisation, not pH.",
+        "why_students_think_this": "Concentrated CH₃COOH (weak) can have a lower pH than dilute HCl (strong)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.PhysicalSciences.Gr12.P2.ACID",
+    "title": "Assessment: Brønsted-Lowry model. Conjugate acid-base pairs. Strong vs weak acids/bases (degree of ionisation). Ka, Kb, Kw. pH calculations: pH = −log[H₃O⁺]. Titration curves (strong/strong, strong/weak). Indicators and equivalence point. Hydrolysis of salts. Buffer solutions (conceptual)",
+    "items": [
+      {
+        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "5"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Create",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the difference between a strong and weak acid?",
+      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P2.ACID",
+        "Grade12",
+        "Paper 2 — Acids & Bases"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T16:18:26"
+}

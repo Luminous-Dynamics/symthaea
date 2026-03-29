@@ -15,6 +15,7 @@ mod learning_engine;
 mod pages;
 mod persistence;
 mod role;
+mod student_profile;
 mod theme;
 
 fn main() {

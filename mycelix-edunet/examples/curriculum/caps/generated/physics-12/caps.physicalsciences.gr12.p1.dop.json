@@ -1,0 +1,384 @@
+{
+  "node_id": "CAPS.PhysicalSciences.Gr12.P1.DOP",
+  "lesson": {
+    "standard_code": "CAPS.PhysicalSciences.Gr12.P1.DOP",
+    "title": "CAPS.PhysicalSciences.Gr12.P1.DOP: The Doppler effect with sound. Observer frequency formula...",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "The Doppler effect is the change in observed frequency when a source and listener move relative to each other. Formula: fL = fs × (v ± vL)/(v ± vs), where v = speed of sound, vL = listener speed, vs = source speed. Convention: use + in numerator when listener moves toward source; + in denominator when source moves away.",
+    "examples": [
+      {
+        "problem": "An ambulance siren emits sound at 500 Hz and approaches at 30 m/s. Speed of sound = 340 m/s. Find the frequency heard.",
+        "steps": [
+          {
+            "instruction": "Step 1: Source approaches → use minus in denominator",
+            "result": "identify relative motion"
+          },
+          {
+            "instruction": "Step 2: fL = 500 × 340/(340 − 30) = 500 × 340/310",
+            "result": "substitute"
+          },
+          {
+            "instruction": "Step 3: fL = 548.4 Hz",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: The observer hears 548.4 Hz (higher pitch as ambulance approaches)",
+        "visual_description": null
+      },
+      {
+        "problem": "An ambulance siren emits sound at 500 Hz and approaches at 30 m/s. Speed of sound = 340 m/s. Find the frequency heard.",
+        "steps": [
+          {
+            "instruction": "Step 1: Source approaches → use minus in denominator",
+            "result": "identify relative motion"
+          },
+          {
+            "instruction": "Step 2: fL = 500 × 340/(340 − 30) = 500 × 340/310",
+            "result": "substitute"
+          },
+          {
+            "instruction": "Step 3: fL = 548.4 Hz",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: The observer hears 548.4 Hz (higher pitch as ambulance approaches)",
+        "visual_description": null
+      },
+      {
+        "problem": "An ambulance siren emits sound at 500 Hz and approaches at 30 m/s. Speed of sound = 340 m/s. Find the frequency heard.",
+        "steps": [
+          {
+            "instruction": "Step 1: Source approaches → use minus in denominator",
+            "result": "identify relative motion"
+          },
+          {
+            "instruction": "Step 2: fL = 500 × 340/(340 − 30) = 500 × 340/310",
+            "result": "substitute"
+          },
+          {
+            "instruction": "Step 3: fL = 548.4 Hz",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: The observer hears 548.4 Hz (higher pitch as ambulance approaches)",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      },
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      },
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      },
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      },
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      },
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      },
+      {
+        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "answer": "372.6 Hz",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+        ],
+        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "distractors": [
+          "400 Hz",
+          "430.8 Hz",
+          "350 Hz"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember: approaching → higher frequency. Receding → lower frequency. Use the sign convention carefully.",
+      "Remember: approaching → higher frequency. Receding → lower frequency. Use the sign convention carefully.",
+      "Remember: approaching → higher frequency. Receding → lower frequency. Use the sign convention carefully."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Doppler effect",
+        "definition": "The apparent change in frequency due to relative motion",
+        "example_usage": "An approaching siren sounds higher-pitched."
+      },
+      {
+        "term": "red shift",
+        "definition": "The decrease in frequency of light from objects moving away",
+        "example_usage": "Distant galaxies show red shift, indicating the universe is expanding."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think the Doppler effect changes the actual frequency emitted by the source.",
+        "correction": "Only the observed frequency changes. The source continues emitting at its original frequency.",
+        "why_students_think_this": "The wave crests are compressed or stretched in the medium, but the source vibrates at the same rate."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.PhysicalSciences.Gr12.P1.DOP",
+    "title": "Assessment: The Doppler effect with sound. Observer frequency formula: fL = fs × (v ± vL)/(v ± vs). Applications: radar, medical ultrasound, astronomy (red shift). Supersonic motion and shock waves (Mach cone)",
+    "items": [
+      {
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m/s toward a wall. Speed of sound = 340 m/s. Find the frequency of the echo.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "fecho ≈ 53.03 kHz (apply Doppler twice: bat→wall, then wall→bat)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m/s toward a wall. Speed of sound = 340 m/s. Find the frequency of the echo.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "fecho ≈ 53.03 kHz (apply Doppler twice: bat→wall, then wall→bat)",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m/s toward a wall. Speed of sound = 340 m/s. Find the frequency of the echo.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "fecho ≈ 53.03 kHz (apply Doppler twice: bat→wall, then wall→bat)",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m/s toward a wall. Speed of sound = 340 m/s. Find the frequency of the echo.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "fecho ≈ 53.03 kHz (apply Doppler twice: bat→wall, then wall→bat)",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m/s toward a wall. Speed of sound = 340 m/s. Find the frequency of the echo.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "fecho ≈ 53.03 kHz (apply Doppler twice: bat→wall, then wall→bat)",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m/s toward a wall. Speed of sound = 340 m/s. Find the frequency of the echo.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "fecho ≈ 53.03 kHz (apply Doppler twice: bat→wall, then wall→bat)",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "5"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Write the Doppler effect formula for sound.",
+      "back": "fL = fs(v ± vL)/(v ± vs). Top sign: listener toward source (+) or away (−). Bottom sign: source toward listener (−) or away (+).",
+      "tags": [
+        "CAPS.PhysicalSciences.Gr12.P1.DOP",
+        "Grade12",
+        "Paper 1 — Waves"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T16:18:25"
+}

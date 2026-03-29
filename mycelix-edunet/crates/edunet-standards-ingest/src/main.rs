@@ -746,10 +746,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 file.display()
             );
 
-            let pipeline = edunet_content_gen::pipeline::ContentPipeline::new(
-                edunet_content_gen::mock::MockGenerator,
-            )
-            .with_quality_threshold(quality_threshold);
+            // Use CAPS-aware generator for SA curriculum, mock for everything else
+            let is_caps = content.contains("CAPS (South Africa DBE)");
 
             let filter = if let Some(ref subj) = subject {
                 edunet_content_gen::batch::NodeFilter::BySubject(subj.clone())
@@ -774,7 +772,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..Default::default()
             };
 
-            let report = edunet_content_gen::batch::run_batch(&pipeline, &standards, &config);
+            let report = if is_caps {
+                let pipeline = edunet_content_gen::pipeline::ContentPipeline::new(
+                    edunet_content_gen::caps_content::CapsContentGenerator,
+                ).with_quality_threshold(quality_threshold);
+                edunet_content_gen::batch::run_batch(&pipeline, &standards, &config)
+            } else {
+                let pipeline = edunet_content_gen::pipeline::ContentPipeline::new(
+                    edunet_content_gen::mock::MockGenerator,
+                ).with_quality_threshold(quality_threshold);
+                edunet_content_gen::batch::run_batch(&pipeline, &standards, &config)
+            };
             edunet_content_gen::batch::print_report(&report);
         }
 

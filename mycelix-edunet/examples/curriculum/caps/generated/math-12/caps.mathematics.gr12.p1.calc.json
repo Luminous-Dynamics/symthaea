@@ -1,0 +1,419 @@
+{
+  "node_id": "CAPS.Mathematics.Gr12.P1.CALC",
+  "lesson": {
+    "standard_code": "CAPS.Mathematics.Gr12.P1.CALC",
+    "title": "CAPS.Mathematics.Gr12.P1.CALC: Limits (intuitive). First principles: f'(x) = lim[h→0] (f...",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "Differential calculus is about finding the rate of change of a function. The derivative f'(x) tells us the gradient of the tangent to the curve at any point x. We define the derivative from first principles as: f'(x) = lim[h→0] (f(x+h) − f(x))/h. For practical differentiation, we use the power rule: if f(x) = xⁿ, then f'(x) = nxⁿ⁻¹. The derivative helps us find turning points (where f'(x) = 0), determine whether a function is increasing or decreasing, and solve optimisation problems.",
+    "examples": [
+      {
+        "problem": "Find f'(x) from first principles if f(x) = 3x².",
+        "steps": [
+          {
+            "instruction": "Step 1: Write f(x+h) = 3(x+h)² = 3(x² + 2xh + h²) = 3x² + 6xh + 3h²",
+            "result": "f(x+h) expanded"
+          },
+          {
+            "instruction": "Step 2: f(x+h) − f(x) = 3x² + 6xh + 3h² − 3x² = 6xh + 3h²",
+            "result": "difference"
+          },
+          {
+            "instruction": "Step 3: [f(x+h) − f(x)]/h = (6xh + 3h²)/h = 6x + 3h",
+            "result": "divided by h"
+          },
+          {
+            "instruction": "Step 4: lim[h→0] (6x + 3h) = 6x",
+            "result": "take the limit"
+          }
+        ],
+        "answer": "Answer: f'(x) = 6x",
+        "visual_description": null
+      },
+      {
+        "problem": "Given f(x) = x³ − 6x² + 9x + 2, find the turning points and sketch.",
+        "steps": [
+          {
+            "instruction": "Step 1: f'(x) = 3x² − 12x + 9",
+            "result": "differentiate using power rule"
+          },
+          {
+            "instruction": "Step 2: Set f'(x) = 0: 3x² − 12x + 9 = 0, so x² − 4x + 3 = 0",
+            "result": "solve for x"
+          },
+          {
+            "instruction": "Step 3: (x − 1)(x − 3) = 0, so x = 1 or x = 3",
+            "result": "factorise"
+          },
+          {
+            "instruction": "Step 4: f(1) = 1 − 6 + 9 + 2 = 6 and f(3) = 27 − 54 + 27 + 2 = 2",
+            "result": "find y-values"
+          },
+          {
+            "instruction": "Step 5: f''(x) = 6x − 12. f''(1) = −6 < 0 (local max), f''(3) = 6 > 0 (local min)",
+            "result": "classify"
+          }
+        ],
+        "answer": "Answer: Local maximum at (1, 6) and local minimum at (3, 2)",
+        "visual_description": null
+      },
+      {
+        "problem": "A farmer wants to fence a rectangular camp against a river (no fence needed on river side). He has 120 m of fencing. Find the dimensions that maximise the area.",
+        "steps": [
+          {
+            "instruction": "Step 1: Let width = x, then length = 120 − 2x (two widths + one length = 120)",
+            "result": "set up variables"
+          },
+          {
+            "instruction": "Step 2: Area A = x(120 − 2x) = 120x − 2x²",
+            "result": "express area in terms of x"
+          },
+          {
+            "instruction": "Step 3: A'(x) = 120 − 4x",
+            "result": "differentiate"
+          },
+          {
+            "instruction": "Step 4: Set A'(x) = 0: 120 − 4x = 0, so x = 30",
+            "result": "find critical point"
+          },
+          {
+            "instruction": "Step 5: Length = 120 − 2(30) = 60. A''(x) = −4 < 0, confirming maximum",
+            "result": "verify"
+          }
+        ],
+        "answer": "Answer: Width = 30 m, Length = 60 m, Maximum area = 1800 m²",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Differentiate f(x) = 5x³ − 2x + 7.",
+        "answer": "15x² − 2",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "What rule do we use for each term?,What happens to constants when differentiated?"
+        ],
+        "explanation": "Apply the power rule to each term: d/dx(5x³) = 15x², d/dx(−2x) = −2, d/dx(7) = 0.",
+        "distractors": [
+          "15x³ − 2",
+          "15x² + 2",
+          "15x² − 2x"
+        ]
+      },
+      {
+        "question": "Differentiate f(x) = 5x³ − 2x + 7.",
+        "answer": "15x² − 2",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "What rule do we use for each term?,What happens to constants when differentiated?"
+        ],
+        "explanation": "Apply the power rule to each term: d/dx(5x³) = 15x², d/dx(−2x) = −2, d/dx(7) = 0.",
+        "distractors": [
+          "15x³ − 2",
+          "15x² + 2",
+          "15x² − 2x"
+        ]
+      },
+      {
+        "question": "Find the equation of the tangent to y = x² − 4x + 3 at the point where x = 1.",
+        "answer": "y = −2x + 2",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "First find the y-value at x = 1.,Find the gradient using the derivative. Then use y − y₁ = m(x − x₁)."
+        ],
+        "explanation": "At x = 1: y = 1 − 4 + 3 = 0. y' = 2x − 4, so m = 2(1) − 4 = −2. Tangent: y − 0 = −2(x − 1), y = −2x + 2.",
+        "distractors": [
+          "y = −2x + 1",
+          "y = 2x − 2",
+          "y = −2x"
+        ]
+      },
+      {
+        "question": "Find the equation of the tangent to y = x² − 4x + 3 at the point where x = 1.",
+        "answer": "y = −2x + 2",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "First find the y-value at x = 1.,Find the gradient using the derivative. Then use y − y₁ = m(x − x₁)."
+        ],
+        "explanation": "At x = 1: y = 1 − 4 + 3 = 0. y' = 2x − 4, so m = 2(1) − 4 = −2. Tangent: y − 0 = −2(x − 1), y = −2x + 2.",
+        "distractors": [
+          "y = −2x + 1",
+          "y = 2x − 2",
+          "y = −2x"
+        ]
+      },
+      {
+        "question": "For f(x) = 2x³ − 9x² + 12x − 4, determine the x-values where f is increasing.",
+        "answer": "x < 1 or x > 2",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find f'(x) first.,Set f'(x) = 0 to find critical points. Then test intervals."
+        ],
+        "explanation": "f'(x) = 6x² − 18x + 12 = 6(x² − 3x + 2) = 6(x−1)(x−2). f'(x) > 0 when x < 1 or x > 2.",
+        "distractors": [
+          "x > 2 only",
+          "1 < x < 2",
+          "x < 2"
+        ]
+      },
+      {
+        "question": "For f(x) = 2x³ − 9x² + 12x − 4, determine the x-values where f is increasing.",
+        "answer": "x < 1 or x > 2",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Find f'(x) first.,Set f'(x) = 0 to find critical points. Then test intervals."
+        ],
+        "explanation": "f'(x) = 6x² − 18x + 12 = 6(x² − 3x + 2) = 6(x−1)(x−2). f'(x) > 0 when x < 1 or x > 2.",
+        "distractors": [
+          "x > 2 only",
+          "1 < x < 2",
+          "x < 2"
+        ]
+      },
+      {
+        "question": "A closed cylindrical can must hold 500π cm³. Find the radius that minimises the total surface area.",
+        "answer": "r = 5∛2 ≈ 6.3 cm",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Express h in terms of r using the volume constraint.,Write SA in terms of r only, then differentiate and set equal to zero."
+        ],
+        "explanation": "V = πr²h = 500π, so h = 500/r². SA = 2πr² + 2πrh = 2πr² + 1000π/r. dSA/dr = 4πr − 1000π/r² = 0. 4r³ = 1000, r³ = 250, r = ∛250 ≈ 6.3 cm (or exactly 5∛2). d²SA/dr² = 4π + 2000π/r³ > 0 ✓",
+        "distractors": [
+          "r = 10 cm",
+          "r = 250 cm",
+          "r = √500 cm"
+        ]
+      }
+    ],
+    "hints": [
+      "What rule do you use when the exponent is a constant? Think about bringing the power down.",
+      "Use the power rule: multiply by the exponent, then reduce the exponent by 1. For f(x) = xⁿ, f'(x) = nxⁿ⁻¹.",
+      "For f(x) = 3x², apply the power rule: bring down the 2, multiply by the coefficient: f'(x) = 2 × 3x¹ = 6x."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "derivative",
+        "definition": "The rate of change of a function; the gradient of the tangent at any point",
+        "example_usage": "The derivative of f(x) = x² is f'(x) = 2x."
+      },
+      {
+        "term": "first principles",
+        "definition": "Calculating the derivative using the limit definition f'(x) = lim[h→0] (f(x+h)−f(x))/h",
+        "example_usage": "We proved f'(x) = 2x from first principles."
+      },
+      {
+        "term": "turning point",
+        "definition": "A point where the function changes from increasing to decreasing (or vice versa); where f'(x) = 0",
+        "example_usage": "The parabola y = x² − 4x has a turning point at x = 2."
+      },
+      {
+        "term": "tangent",
+        "definition": "A straight line that touches the curve at exactly one point and has the same gradient as the curve at that point",
+        "example_usage": "The tangent to y = x² at x = 3 has gradient 6."
+      },
+      {
+        "term": "optimisation",
+        "definition": "Using calculus to find the maximum or minimum value of a quantity",
+        "example_usage": "We used optimisation to find the dimensions that maximise area."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think the derivative of x² is 2x², keeping the original exponent.",
+        "correction": "The power rule says d/dx(xⁿ) = nxⁿ⁻¹. So d/dx(x²) = 2x¹ = 2x. The exponent decreases by 1.",
+        "why_students_think_this": "Students remember to \"bring down the power\" but forget to reduce the exponent. Practice: write xⁿ → nxⁿ⁻¹ as two separate actions."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Mathematics.Gr12.P1.CALC",
+    "title": "Assessment: Limits (intuitive). First principles: f'(x) = lim[h→0] (f(x+h)−f(x))/h. Differentiation rules: power rule, constant rule, sum/difference. Equations of tangent lines. Sketch cubic functions using first derivative (turning points, concavity). Optimisation problems",
+    "items": [
+      {
+        "question": "State the power rule for differentiation.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "f'(x) = nxⁿ⁻¹ for f(x) = xⁿ",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "A box with no lid is made from a 20 cm × 20 cm sheet by cutting squares of side x from each corner. Show that the volume is V = 4x³ − 80x² + 400x, and find x for maximum volume.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "V'(x) = 12x² − 160x + 400 = 0, x = 10/3 ≈ 3.33 cm",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A box with no lid is made from a 20 cm × 20 cm sheet by cutting squares of side x from each corner. Show that the volume is V = 4x³ − 80x² + 400x, and find x for maximum volume.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "V'(x) = 12x² − 160x + 400 = 0, x = 10/3 ≈ 3.33 cm",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A box with no lid is made from a 20 cm × 20 cm sheet by cutting squares of side x from each corner. Show that the volume is V = 4x³ − 80x² + 400x, and find x for maximum volume.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "V'(x) = 12x² − 160x + 400 = 0, x = 10/3 ≈ 3.33 cm",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A box with no lid is made from a 20 cm × 20 cm sheet by cutting squares of side x from each corner. Show that the volume is V = 4x³ − 80x² + 400x, and find x for maximum volume.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "V'(x) = 12x² − 160x + 400 = 0, x = 10/3 ≈ 3.33 cm",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "5"
+      },
+      {
+        "question": "A box with no lid is made from a 20 cm × 20 cm sheet by cutting squares of side x from each corner. Show that the volume is V = 4x³ − 80x² + 400x, and find x for maximum volume.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "V'(x) = 12x² − 160x + 400 = 0, x = 10/3 ≈ 3.33 cm",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "5"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Create",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the derivative of f(x) = axⁿ?",
+      "back": "f'(x) = naxⁿ⁻¹ (multiply by the exponent, reduce exponent by 1)",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P1.CALC",
+        "Grade12",
+        "Paper 1 — Calculus"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T16:18:24"
+}

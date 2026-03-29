@@ -1,0 +1,23 @@
+{
+  "total": 15,
+  "completed": [
+    "CAPS.PhysicalSciences.Gr12.P1.MECH1",
+    "CAPS.PhysicalSciences.Gr12.P1.MECH2",
+    "CAPS.PhysicalSciences.Gr12.P1.MECH3",
+    "CAPS.PhysicalSciences.Gr12.P1.DOP",
+    "CAPS.PhysicalSciences.Gr12.P1.ELEC1",
+    "CAPS.PhysicalSciences.Gr12.P1.ELEC2",
+    "CAPS.PhysicalSciences.Gr12.P1.MOD1",
+    "CAPS.PhysicalSciences.Gr12.P1.MOD2",
+    "CAPS.PhysicalSciences.Gr12.P2.ORG1",
+    "CAPS.PhysicalSciences.Gr12.P2.ORG2",
+    "CAPS.PhysicalSciences.Gr12.P2.RATE",
+    "CAPS.PhysicalSciences.Gr12.P2.EQUIL",
+    "CAPS.PhysicalSciences.Gr12.P2.ACID",
+    "CAPS.PhysicalSciences.Gr12.P2.ECHEM",
+    "CAPS.PhysicalSciences.Gr12.P2.FERT"
+  ],
+  "failed": [],
+  "started_at": "2026-03-29T16:18:25",
+  "last_updated": "2026-03-29T16:18:26"
+}

@@ -1,0 +1,401 @@
+{
+  "node_id": "CAPS.Mathematics.Gr12.P2.GEOM",
+  "lesson": {
+    "standard_code": "CAPS.Mathematics.Gr12.P2.GEOM",
+    "title": "CAPS.Mathematics.Gr12.P2.GEOM: Circle geometry theorems (prove examinable theorems, appl...",
+    "grade_level": "Grade12",
+    "bloom_level": "Apply",
+    "explanation": "Grade 12 Euclidean geometry focuses on circle theorems and proofs. You must prove and apply: angle at centre = 2 × angle at circumference, angles in the same segment are equal, opposite angles of a cyclic quad are supplementary, tangent ⊥ radius, tan-chord angle = angle in the alternate segment, and the proportionality theorem.",
+    "examples": [
+      {
+        "problem": "In the diagram, O is the centre. AB is a chord and OC ⊥ AB. If AB = 10 and OC = 12, find the radius.",
+        "steps": [
+          {
+            "instruction": "Step 1: OC ⊥ AB, so C is the midpoint of AB → AC = 5",
+            "result": "theorem: perpendicular from centre bisects chord"
+          },
+          {
+            "instruction": "Step 2: Triangle OCA is right-angled at C",
+            "result": "identify right triangle"
+          },
+          {
+            "instruction": "Step 3: OA² = OC² + AC² = 12² + 5² = 144 + 25 = 169",
+            "result": "Pythagoras"
+          },
+          {
+            "instruction": "Step 4: OA = √169 = 13",
+            "result": "take square root"
+          }
+        ],
+        "answer": "Answer: Radius = 13 units",
+        "visual_description": null
+      },
+      {
+        "problem": "In the diagram, O is the centre. AB is a chord and OC ⊥ AB. If AB = 10 and OC = 12, find the radius.",
+        "steps": [
+          {
+            "instruction": "Step 1: OC ⊥ AB, so C is the midpoint of AB → AC = 5",
+            "result": "theorem: perpendicular from centre bisects chord"
+          },
+          {
+            "instruction": "Step 2: Triangle OCA is right-angled at C",
+            "result": "identify right triangle"
+          },
+          {
+            "instruction": "Step 3: OA² = OC² + AC² = 12² + 5² = 144 + 25 = 169",
+            "result": "Pythagoras"
+          },
+          {
+            "instruction": "Step 4: OA = √169 = 13",
+            "result": "take square root"
+          }
+        ],
+        "answer": "Answer: Radius = 13 units",
+        "visual_description": null
+      },
+      {
+        "problem": "In the diagram, O is the centre. AB is a chord and OC ⊥ AB. If AB = 10 and OC = 12, find the radius.",
+        "steps": [
+          {
+            "instruction": "Step 1: OC ⊥ AB, so C is the midpoint of AB → AC = 5",
+            "result": "theorem: perpendicular from centre bisects chord"
+          },
+          {
+            "instruction": "Step 2: Triangle OCA is right-angled at C",
+            "result": "identify right triangle"
+          },
+          {
+            "instruction": "Step 3: OA² = OC² + AC² = 12² + 5² = 144 + 25 = 169",
+            "result": "Pythagoras"
+          },
+          {
+            "instruction": "Step 4: OA = √169 = 13",
+            "result": "take square root"
+          }
+        ],
+        "answer": "Answer: Radius = 13 units",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      },
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      },
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      },
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      },
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      },
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      },
+      {
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+        ],
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "distractors": [
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
+        ]
+      }
+    ],
+    "hints": [
+      "Which circle theorem applies here? Look at the relationship between the angles.",
+      "Opposite angles of a cyclic quad sum to 180°. Check: 75° + 105° = ?",
+      "Opposite angles of a cyclic quad sum to 180°. Check: 75° + 105° = ?"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "cyclic quadrilateral",
+        "definition": "A quadrilateral whose vertices all lie on a circle",
+        "example_usage": "ABCD is cyclic if a circle passes through A, B, C, and D."
+      },
+      {
+        "term": "tangent",
+        "definition": "A line that touches a circle at exactly one point",
+        "example_usage": "A tangent is perpendicular to the radius at the point of contact."
+      },
+      {
+        "term": "subtend",
+        "definition": "To form an angle by connecting endpoints of an arc to a point",
+        "example_usage": "Arc AB subtends angle AOB at the centre."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students confuse 'angle at centre' with 'angle in a semicircle'.",
+        "correction": "Angle at centre = 2× angle at circumference (for the same arc). Angle in a semicircle = 90° (special case where the arc is a diameter).",
+        "why_students_think_this": "The semicircle theorem IS the angle-at-centre theorem when the central angle is 180°: half of 180° = 90°."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Mathematics.Gr12.P2.GEOM",
+    "title": "Assessment: Circle geometry theorems (prove examinable theorems, apply all). Proportionality theorem. Similar and congruent triangles applied to circle geometry. Riders combining multiple theorems",
+    "items": [
+      {
+        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "6"
+      },
+      {
+        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "6"
+      },
+      {
+        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "6"
+      },
+      {
+        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "6"
+      },
+      {
+        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "6"
+      },
+      {
+        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "6"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Create",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
+      "back": "They are supplementary (add up to 180°).",
+      "tags": [
+        "CAPS.Mathematics.Gr12.P2.GEOM",
+        "Grade12",
+        "Paper 2 — Geometry"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-29T16:18:24"
+}

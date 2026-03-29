@@ -1,57 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mycelix EduNet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="CAPS Matric Math &amp; Science study companion — Grades 9-12" />
+    <title>EduNet</title>
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Fonts: Inter for body text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+
+    <!-- Styles -->
     <link data-trunk rel="css" href="style/main.css" />
+
+    <!-- Static assets -->
     <link data-trunk rel="copy-dir" href="static/caps" />
+    <link data-trunk rel="copy-file" href="static/manifest.json" />
+    <link data-trunk rel="copy-file" href="static/sw.js" />
+    <link data-trunk rel="copy-file" href="static/icon-192.png" />
+    <link data-trunk rel="copy-file" href="static/icon-512.png" />
 </head>
 <body>
+    <!-- Service Worker registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            console.log('[EduNet] Service Worker registered');
+        }).catch(function(err) {
+            console.log('[EduNet] SW registration failed:', err);
+        });
+    }
+    </script>
+
     <!-- Spore WASM integration (loaded when available) -->
     <script id="spore-loader">
         window.__SPORE_AVAILABLE = false;
-        // When Spore WASM is deployed to /spore/, this will detect and load it
         fetch('/spore/symthaea_spore_bg.wasm', { method: 'HEAD' })
             .then(r => { if (r.ok) window.__SPORE_AVAILABLE = true; })
             .catch(() => {});
     </script>
 
-    <!-- Holochain conductor bridge — probes local conductor via WebSocket -->
+    <!-- Holochain conductor bridge -->
     <script id="holochain-bridge">
-    // Attempts a WebSocket connection to the local Holochain conductor.
-    // Sets window.__HC_STATUS so the Leptos WASM app can read it via js-sys.
-    // If no conductor is running, the app seamlessly falls back to mock data.
     (function() {
         window.__HC_STATUS = 'connecting';
-
         var WS_URL = 'ws://localhost:8888';
         var TIMEOUT_MS = 3000;
-
         try {
             var ws = new WebSocket(WS_URL);
             var timer = setTimeout(function() {
                 ws.close();
                 window.__HC_STATUS = 'mock';
-                console.log('[EduNet] Conductor probe timed out — running in mock mode');
             }, TIMEOUT_MS);
-
             ws.onopen = function() {
                 clearTimeout(timer);
                 window.__HC_STATUS = 'connected';
-                console.log('[EduNet] Connected to Holochain conductor at ' + WS_URL);
-                // Close the probe — real zome calls will open their own connections
                 ws.close();
             };
-
             ws.onerror = function() {
                 clearTimeout(timer);
                 window.__HC_STATUS = 'mock';
-                console.log('[EduNet] No conductor found — running in mock mode');
             };
         } catch (e) {
             window.__HC_STATUS = 'mock';
-            console.log('[EduNet] WebSocket unavailable — running in mock mode');
         }
     })();
     </script>

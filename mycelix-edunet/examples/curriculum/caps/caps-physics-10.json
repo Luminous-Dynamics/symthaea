@@ -1,0 +1,945 @@
+{
+  "metadata": {
+    "title": "CAPS Physical Sciences Grade 10",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade10",
+    "subject_area": "Physical Sciences",
+    "domain": "Physical Sciences",
+    "version": "2011 (amended 2022)",
+    "total_standards": 13,
+    "domains": [
+      "Physics — Mechanics",
+      "Physics — Waves",
+      "Physics — Electricity",
+      "Chemistry — Atomic",
+      "Chemistry — Bonding",
+      "Chemistry — Quantitative",
+      "Chemistry — Reactions"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Physical Sciences FET Phase (DBE, 2011 amended 2022). Grade 10 foundations — Physics and Chemistry."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.1",
+      "title": "Mechanics — Motion in One Dimension",
+      "description": "Vectors and scalars. Reference frames. Position, displacement, speed, velocity, acceleration. Equations of motion: v = u + at, s = ut + ½at², v² = u² + 2as. Graphs of motion (x-t, v-t, a-t)",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Mechanics",
+      "tags": [
+        "physics",
+        "mechanics",
+        "kinematics",
+        "motion",
+        "equations-of-motion",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.1",
+          "description": "Vectors and scalars. Reference frames. Position, displacement, speed, velocity, acceleration. Equations of motion: v = u + at, s = ut + ½at², v² = u² + 2as. Graphs of motion (x-t, v-t, a-t)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Mechanics — Motion in One Dimension",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Motion+in+One+Dimension",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Motion in One Dimension",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Motion+in+One+Dimension+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Motion in One Dimension",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Motion_in_One_Dimension",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.2",
+      "title": "Mechanics — Energy",
+      "description": "Gravitational potential energy (Ep = mgh). Kinetic energy (Ek = ½mv²). Mechanical energy. Conservation of mechanical energy (non-conservative forces absent). Work done by a force (W = FΔx cos θ)",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Mechanics",
+      "tags": [
+        "physics",
+        "energy",
+        "kinetic-energy",
+        "potential-energy",
+        "conservation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.2",
+          "description": "Gravitational potential energy (Ep = mgh). Kinetic energy (Ek = ½mv²). Mechanical energy. Conservation of mechanical energy (non-conservative forces absent). Work done by a force (W = FΔx cos θ)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Mechanics — Energy",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Mechanics+—+Energy",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Mechanics — Energy",
+          "url": "https://www.youtube.com/results?search_query=Mechanics+—+Energy+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Mechanics — Energy",
+          "url": "https://en.wikipedia.org/wiki/Mechanics_—_Energy",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.3",
+      "title": "Waves, Sound, and Light — Transverse and Longitudinal",
+      "description": "Pulse, wavelength, frequency, period, amplitude. Transverse and longitudinal waves. Wave equation v = fλ. Superposition. Standing waves (strings)",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Waves",
+      "tags": [
+        "physics",
+        "waves",
+        "transverse",
+        "longitudinal",
+        "frequency",
+        "wavelength",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.3",
+          "description": "Pulse, wavelength, frequency, period, amplitude. Transverse and longitudinal waves. Wave equation v = fλ. Superposition. Standing waves (strings)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Waves, Sound, and Light — Transverse and Long...",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Waves,+Sound,+and+Light+—+Transverse+and+Longitudinal",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Waves, Sound, and Light — Transverse and Long...",
+          "url": "https://www.youtube.com/results?search_query=Waves,+Sound,+and+Light+—+Transverse+and+Longitudinal+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Waves, Sound, and Light — Transverse and Long...",
+          "url": "https://en.wikipedia.org/wiki/Waves",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.4",
+      "title": "Waves — Sound",
+      "description": "Speed of sound. Pitch and loudness. Ultrasound applications. Resonance and standing waves in pipes",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Waves",
+      "tags": [
+        "physics",
+        "sound",
+        "pitch",
+        "loudness",
+        "resonance",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.4",
+          "description": "Speed of sound. Pitch and loudness. Ultrasound applications. Resonance and standing waves in pipes",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Waves — Sound",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Waves+—+Sound",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.4"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Waves — Sound",
+          "url": "https://www.youtube.com/results?search_query=Waves+—+Sound+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Waves — Sound",
+          "url": "https://en.wikipedia.org/wiki/Waves_—_Sound",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.5",
+      "title": "Waves — Electromagnetic Radiation",
+      "description": "Electromagnetic spectrum. Nature of EM waves. Properties: wavelength, frequency, speed (c = 3×10⁸ m/s). Applications of different EM bands",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Waves",
+      "tags": [
+        "physics",
+        "electromagnetic",
+        "spectrum",
+        "light",
+        "radiation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.5",
+          "description": "Electromagnetic spectrum. Nature of EM waves. Properties: wavelength, frequency, speed (c = 3×10⁸ m/s). Applications of different EM bands",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Waves — Electromagnetic Radiation",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Waves+—+Electromagnetic+Radiation",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.5"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Waves — Electromagnetic Radiation",
+          "url": "https://www.youtube.com/results?search_query=Waves+—+Electromagnetic+Radiation+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Waves — Electromagnetic Radiation",
+          "url": "https://en.wikipedia.org/wiki/Waves_—_Electromagnetic_Radiation",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.6",
+      "title": "Electricity and Magnetism — Electrostatics",
+      "description": "Two kinds of charge. Coulomb's law: F = kQ₁Q₂/r². Electric field. Electric field between parallel plates. Charge conservation and quantisation",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Electricity",
+      "tags": [
+        "physics",
+        "electrostatics",
+        "coulombs-law",
+        "electric-field",
+        "charge",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.6",
+          "description": "Two kinds of charge. Coulomb's law: F = kQ₁Q₂/r². Electric field. Electric field between parallel plates. Charge conservation and quantisation",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Electricity and Magnetism — Electrostatics",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electricity+and+Magnetism+—+Electrostatics",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.6"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electricity and Magnetism — Electrostatics",
+          "url": "https://www.youtube.com/results?search_query=Electricity+and+Magnetism+—+Electrostatics+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electricity and Magnetism — Electrostatics",
+          "url": "https://en.wikipedia.org/wiki/Electricity_and_Magnetism_—_Electrostatics",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.PHY.7",
+      "title": "Electricity — Electric Circuits",
+      "description": "EMF and internal resistance. Ohm's law (V = IR). Series and parallel circuits. Power (P = VI = I²R = V²/R). Energy (E = VIt). Kirchhoff's rules (simple circuits)",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Physics — Electricity",
+      "tags": [
+        "physics",
+        "circuits",
+        "ohms-law",
+        "resistance",
+        "power",
+        "kirchhoff",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.PHY.7",
+          "description": "EMF and internal resistance. Ohm's law (V = IR). Series and parallel circuits. Power (P = VI = I²R = V²/R). Energy (E = VIt). Kirchhoff's rules (simple circuits)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Electricity — Electric Circuits",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electricity+—+Electric+Circuits",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.PHY.7"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=physics",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electricity — Electric Circuits",
+          "url": "https://www.youtube.com/results?search_query=Electricity+—+Electric+Circuits+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electricity — Electric Circuits",
+          "url": "https://en.wikipedia.org/wiki/Electricity_—_Electric_Circuits",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.CHM.1",
+      "title": "Matter and Materials — Atomic Structure",
+      "description": "Models of the atom (Bohr). Electron configuration. Periodic table structure. Periodic trends: atomic radius, ionisation energy, electronegativity, electron affinity",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Atomic",
+      "tags": [
+        "chemistry",
+        "atoms",
+        "electron-configuration",
+        "periodic-table",
+        "trends",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.CHM.1",
+          "description": "Models of the atom (Bohr). Electron configuration. Periodic table structure. Periodic trends: atomic radius, ionisation energy, electronegativity, electron affinity",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Matter and Materials — Atomic Structure",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Matter+and+Materials+—+Atomic+Structure",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.CHM.1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Matter and Materials — Atomic Structure",
+          "url": "https://www.youtube.com/results?search_query=Matter+and+Materials+—+Atomic+Structure+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Matter and Materials — Atomic Structure",
+          "url": "https://en.wikipedia.org/wiki/Matter_and_Materials_—_Atomic_Structure",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.CHM.2",
+      "title": "Chemical Bonding",
+      "description": "Ionic bonding (electron transfer, lattice structures). Covalent bonding (Lewis dot structures, molecular shapes — VSEPR). Metallic bonding. Bond polarity and molecular polarity",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Bonding",
+      "tags": [
+        "chemistry",
+        "bonding",
+        "ionic",
+        "covalent",
+        "metallic",
+        "vsepr",
+        "lewis-structures",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.CHM.2",
+          "description": "Ionic bonding (electron transfer, lattice structures). Covalent bonding (Lewis dot structures, molecular shapes — VSEPR). Metallic bonding. Bond polarity and molecular polarity",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Chemical Bonding",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Bonding",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.CHM.2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Bonding",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Bonding+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Bonding",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Bonding",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.CHM.3",
+      "title": "Intermolecular Forces",
+      "description": "Van der Waals forces (London, dipole-dipole). Hydrogen bonding. Relationship between IMFs and physical properties (boiling point, viscosity, surface tension). States of matter",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Bonding",
+      "tags": [
+        "chemistry",
+        "intermolecular-forces",
+        "hydrogen-bonding",
+        "van-der-waals",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.CHM.3",
+          "description": "Van der Waals forces (London, dipole-dipole). Hydrogen bonding. Relationship between IMFs and physical properties (boiling point, viscosity, surface tension). States of matter",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Intermolecular Forces",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Intermolecular+Forces",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.CHM.3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Intermolecular Forces",
+          "url": "https://www.youtube.com/results?search_query=Intermolecular+Forces+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Intermolecular Forces",
+          "url": "https://en.wikipedia.org/wiki/Intermolecular_Forces",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.CHM.4",
+      "title": "Chemical Change — Stoichiometry",
+      "description": "Mole concept (n = m/M, n = cV, n = N/Nₐ). Balanced equations. Limiting reagents. Percentage yield. Concentration (mol/dm³). Volume relationships (molar gas volume at STP)",
+      "node_type": "Skill",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Quantitative",
+      "tags": [
+        "chemistry",
+        "stoichiometry",
+        "moles",
+        "concentration",
+        "balanced-equations",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.CHM.4",
+          "description": "Mole concept (n = m/M, n = cV, n = N/Nₐ). Balanced equations. Limiting reagents. Percentage yield. Concentration (mol/dm³). Volume relationships (molar gas volume at STP)",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Chemical Change — Stoichiometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Change+—+Stoichiometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.CHM.4"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Change — Stoichiometry",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Change+—+Stoichiometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Change — Stoichiometry",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Change_—_Stoichiometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.CHM.5",
+      "title": "Chemical Change — Types of Reactions",
+      "description": "Acid-base reactions. Redox reactions (oxidation numbers). Combustion reactions. Synthesis and decomposition. Neutralisation. Net ionic equations",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Reactions",
+      "tags": [
+        "chemistry",
+        "reactions",
+        "acid-base",
+        "redox",
+        "oxidation",
+        "combustion",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.CHM.5",
+          "description": "Acid-base reactions. Redox reactions (oxidation numbers). Combustion reactions. Synthesis and decomposition. Neutralisation. Net ionic equations",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Chemical Change — Types of Reactions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Change+—+Types+of+Reactions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.CHM.5"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Change — Types of Reactions",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Change+—+Types+of+Reactions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Change — Types of Reactions",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Change_—_Types_of_Reactions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.PhysicalSciences.Gr10.CHM.6",
+      "title": "Hydrosphere — Water Chemistry",
+      "description": "Water as a resource. The water cycle. Water quality (pH, dissolved oxygen, turbidity). Water purification and treatment. Pollution",
+      "node_type": "Concept",
+      "difficulty": "Intermediate",
+      "domain": "Physical Sciences",
+      "subdomain": "Chemistry — Environmental",
+      "tags": [
+        "chemistry",
+        "water",
+        "purification",
+        "pollution",
+        "environment",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Physical Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.PhysicalSciences.Gr10.CHM.6",
+          "description": "Water as a resource. The water cycle. Water quality (pH, dissolved oxygen, turbidity). Water purification and treatment. Pollution",
+          "grade_level": "Grade10"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Hydrosphere — Water Chemistry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Hydrosphere+—+Water+Chemistry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.PhysicalSciences.Gr10.CHM.6"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemistry",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Hydrosphere — Water Chemistry",
+          "url": "https://www.youtube.com/results?search_query=Hydrosphere+—+Water+Chemistry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Hydrosphere — Water Chemistry",
+          "url": "https://en.wikipedia.org/wiki/Hydrosphere_—_Water_Chemistry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.1",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.2",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Kinematics concepts needed for energy calculations"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.3",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "General wave properties before sound"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.3",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "General wave properties before EM radiation"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.PHY.6",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.7",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Electrostatics concepts before circuits"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.1",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Atomic structure needed for bonding"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.2",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.3",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Chemical bonding before intermolecular forces"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.2",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.4",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Bonding and formulae needed for stoichiometry"
+    },
+    {
+      "from": "CAPS.PhysicalSciences.Gr10.CHM.4",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.5",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Mole calculations needed for reaction types"
+    }
+  ]
+}

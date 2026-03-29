@@ -1,0 +1,984 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 11",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade11",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 13,
+    "domains": [
+      "Algebra",
+      "Functions",
+      "Trigonometry",
+      "Euclidean Geometry",
+      "Analytical Geometry",
+      "Statistics",
+      "Probability",
+      "Measurement"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Mathematics FET Phase (DBE, 2011 amended 2022). Grade 11 intermediate."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr11.ALG.1",
+      "title": "Algebraic Expressions — Surds and Simplification",
+      "description": "Simplify expressions involving surds. Apply laws of exponents to real-number exponents. Add, subtract, multiply, divide surds",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "algebra",
+        "surds",
+        "exponents",
+        "simplification",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.ALG.1",
+          "description": "Simplify expressions involving surds. Apply laws of exponents to real-number exponents. Add, subtract, multiply, divide surds",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Algebraic Expressions — Surds and Simplification",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebraic+Expressions+—+Surds+and+Simplification",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.ALG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebraic Expressions — Surds and Simplification",
+          "url": "https://www.youtube.com/results?search_query=Algebraic+Expressions+—+Surds+and+Simplification+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebraic Expressions — Surds and Simplification",
+          "url": "https://en.wikipedia.org/wiki/Algebraic_Expressions_—_Surds_and_Simplification",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.ALG.2",
+      "title": "Equations and Inequalities — Quadratic and Simultaneous",
+      "description": "Solve quadratic equations (factorisation, completing the square, quadratic formula). Nature of roots (discriminant). Simultaneous equations (one linear, one quadratic). Quadratic inequalities",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "equations",
+        "quadratic-formula",
+        "discriminant",
+        "simultaneous",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.ALG.2",
+          "description": "Solve quadratic equations (factorisation, completing the square, quadratic formula). Nature of roots (discriminant). Simultaneous equations (one linear, one quadratic). Quadratic inequalities",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Equations and Inequalities — Quadratic and Si...",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Equations+and+Inequalities+—+Quadratic+and+Simultaneous",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.ALG.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Equations and Inequalities — Quadratic and Si...",
+          "url": "https://www.youtube.com/results?search_query=Equations+and+Inequalities+—+Quadratic+and+Simultaneous+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Equations and Inequalities — Quadratic and Si...",
+          "url": "https://en.wikipedia.org/wiki/Equations_and_Inequalities_—_Quadratic_and_Simultaneous",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.PAT.1",
+      "title": "Patterns, Sequences, and Series",
+      "description": "Arithmetic and geometric sequences. General term Tn. Sigma notation. Finite arithmetic and geometric series. Convergent geometric series (|r| < 1)",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Patterns & Sequences",
+      "tags": [
+        "sequences",
+        "series",
+        "arithmetic",
+        "geometric",
+        "sigma-notation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.PAT.1",
+          "description": "Arithmetic and geometric sequences. General term Tn. Sigma notation. Finite arithmetic and geometric series. Convergent geometric series (|r| < 1)",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Patterns, Sequences, and Series",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Patterns,+Sequences,+and+Series",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.PAT.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Patterns, Sequences, and Series",
+          "url": "https://www.youtube.com/results?search_query=Patterns,+Sequences,+and+Series+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Patterns, Sequences, and Series",
+          "url": "https://en.wikipedia.org/wiki/Patterns",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.FIN.1",
+      "title": "Finance, Growth, and Decay",
+      "description": "Compound growth and decay: A = P(1+i)^n, A = P(1−i)^n. Effective and nominal interest rates. Simple and compound depreciation",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Finance",
+      "tags": [
+        "finance",
+        "compound-growth",
+        "decay",
+        "depreciation",
+        "nominal-rate",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.FIN.1",
+          "description": "Compound growth and decay: A = P(1+i)^n, A = P(1−i)^n. Effective and nominal interest rates. Simple and compound depreciation",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Finance, Growth, and Decay",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Finance,+Growth,+and+Decay",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.FIN.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Finance, Growth, and Decay",
+          "url": "https://www.youtube.com/results?search_query=Finance,+Growth,+and+Decay+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Finance, Growth, and Decay",
+          "url": "https://en.wikipedia.org/wiki/Finance",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.FN.1",
+      "title": "Functions — Parabola, Hyperbola, Exponential",
+      "description": "Investigate y = a(x−p)² + q, y = a/(x−p) + q, y = ab^(x−p) + q. Transformations: shifts, reflections, stretches. Axes of symmetry, turning points, asymptotes",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "functions",
+        "transformations",
+        "parabola",
+        "hyperbola",
+        "exponential",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.FN.1",
+          "description": "Investigate y = a(x−p)² + q, y = a/(x−p) + q, y = ab^(x−p) + q. Transformations: shifts, reflections, stretches. Axes of symmetry, turning points, asymptotes",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Functions — Parabola, Hyperbola, Exponential",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Functions+—+Parabola,+Hyperbola,+Exponential",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.FN.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Functions — Parabola, Hyperbola, Exponential",
+          "url": "https://www.youtube.com/results?search_query=Functions+—+Parabola,+Hyperbola,+Exponential+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Functions — Parabola, Hyperbola, Exponential",
+          "url": "https://en.wikipedia.org/wiki/Functions_—_Parabola",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.FN.2",
+      "title": "Inverse Functions",
+      "description": "Concept of inverse function (reflection in y = x). Determine and sketch inverses of y = ax + q, y = ax², y = b^x. Logarithmic function as inverse of exponential",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Functions",
+      "tags": [
+        "functions",
+        "inverse",
+        "logarithm",
+        "reflection",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.FN.2",
+          "description": "Concept of inverse function (reflection in y = x). Determine and sketch inverses of y = ax + q, y = ax², y = b^x. Logarithmic function as inverse of exponential",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Inverse Functions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Inverse+Functions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.FN.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Inverse Functions",
+          "url": "https://www.youtube.com/results?search_query=Inverse+Functions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Inverse Functions",
+          "url": "https://en.wikipedia.org/wiki/Inverse_Functions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.TRIG.1",
+      "title": "Trigonometry — Compound and Double Angles",
+      "description": "Derive and apply compound angle identities: sin(α±β), cos(α±β). Double angle formulae. Solve general trigonometric equations. Reduction formulae for (90°±θ), (180°±θ), (360°±θ)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometry",
+      "tags": [
+        "trigonometry",
+        "compound-angles",
+        "double-angles",
+        "reduction-formulae",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.TRIG.1",
+          "description": "Derive and apply compound angle identities: sin(α±β), cos(α±β). Double angle formulae. Solve general trigonometric equations. Reduction formulae for (90°±θ), (180°±θ), (360°±θ)",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Trigonometry — Compound and Double Angles",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Trigonometry+—+Compound+and+Double+Angles",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.TRIG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Trigonometry — Compound and Double Angles",
+          "url": "https://www.youtube.com/results?search_query=Trigonometry+—+Compound+and+Double+Angles+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Trigonometry — Compound and Double Angles",
+          "url": "https://en.wikipedia.org/wiki/Trigonometry_—_Compound_and_Double_Angles",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.TRIG.2",
+      "title": "Trigonometry — Sine, Cosine, and Area Rules",
+      "description": "Prove and apply sine rule, cosine rule, and area rule. Solve 2D and 3D problems involving these rules",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Trigonometry",
+      "tags": [
+        "trigonometry",
+        "sine-rule",
+        "cosine-rule",
+        "area-rule",
+        "3d-problems",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.TRIG.2",
+          "description": "Prove and apply sine rule, cosine rule, and area rule. Solve 2D and 3D problems involving these rules",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Trigonometry — Sine, Cosine, and Area Rules",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Trigonometry+—+Sine,+Cosine,+and+Area+Rules",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.TRIG.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Trigonometry — Sine, Cosine, and Area Rules",
+          "url": "https://www.youtube.com/results?search_query=Trigonometry+—+Sine,+Cosine,+and+Area+Rules+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Trigonometry — Sine, Cosine, and Area Rules",
+          "url": "https://en.wikipedia.org/wiki/Trigonometry_—_Sine",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.GEOM.1",
+      "title": "Euclidean Geometry — Circle Geometry",
+      "description": "Theorems of the circle: line from centre perpendicular to chord, angle at centre, angles in same segment, cyclic quadrilaterals, tangent properties. Prove and apply",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Euclidean Geometry",
+      "tags": [
+        "geometry",
+        "circle-theorems",
+        "cyclic-quadrilateral",
+        "tangent",
+        "euclidean",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.GEOM.1",
+          "description": "Theorems of the circle: line from centre perpendicular to chord, angle at centre, angles in same segment, cyclic quadrilaterals, tangent properties. Prove and apply",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Euclidean Geometry — Circle Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Euclidean+Geometry+—+Circle+Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.GEOM.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Euclidean Geometry — Circle Geometry",
+          "url": "https://www.youtube.com/results?search_query=Euclidean+Geometry+—+Circle+Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Euclidean Geometry — Circle Geometry",
+          "url": "https://en.wikipedia.org/wiki/Euclidean_Geometry_—_Circle_Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.ANAG.1",
+      "title": "Analytical Geometry — Circles",
+      "description": "Equation of a circle with centre at origin and centre (a, b). Determine equation from given information. Tangent to circle at a point",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Analytical Geometry",
+      "tags": [
+        "analytical-geometry",
+        "circle-equation",
+        "tangent-line",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.ANAG.1",
+          "description": "Equation of a circle with centre at origin and centre (a, b). Determine equation from given information. Tangent to circle at a point",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Analytical Geometry — Circles",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Analytical+Geometry+—+Circles",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.ANAG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Analytical Geometry — Circles",
+          "url": "https://www.youtube.com/results?search_query=Analytical+Geometry+—+Circles+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Analytical Geometry — Circles",
+          "url": "https://en.wikipedia.org/wiki/Analytical_Geometry_—_Circles",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.STAT.1",
+      "title": "Statistics — Bivariate Data",
+      "description": "Scatter plots. Intuitive line of best fit. Correlation (strong/weak, positive/negative). Regression line (interpretation, not calculation). Ogives and cumulative frequency",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Statistics",
+      "tags": [
+        "statistics",
+        "scatter-plots",
+        "correlation",
+        "regression",
+        "ogives",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.STAT.1",
+          "description": "Scatter plots. Intuitive line of best fit. Correlation (strong/weak, positive/negative). Regression line (interpretation, not calculation). Ogives and cumulative frequency",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Statistics — Bivariate Data",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Statistics+—+Bivariate+Data",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.STAT.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Statistics — Bivariate Data",
+          "url": "https://www.youtube.com/results?search_query=Statistics+—+Bivariate+Data+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Statistics — Bivariate Data",
+          "url": "https://en.wikipedia.org/wiki/Statistics_—_Bivariate_Data",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.PROB.1",
+      "title": "Probability — Dependent and Independent Events",
+      "description": "Dependent and independent events. Product rule. Tree diagrams and Venn diagrams. Contingency tables. Mutually exclusive vs independent",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Probability",
+      "tags": [
+        "probability",
+        "independent-events",
+        "tree-diagrams",
+        "contingency-tables",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.PROB.1",
+          "description": "Dependent and independent events. Product rule. Tree diagrams and Venn diagrams. Contingency tables. Mutually exclusive vs independent",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Probability — Dependent and Independent Events",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Probability+—+Dependent+and+Independent+Events",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.PROB.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Probability — Dependent and Independent Events",
+          "url": "https://www.youtube.com/results?search_query=Probability+—+Dependent+and+Independent+Events+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Probability — Dependent and Independent Events",
+          "url": "https://en.wikipedia.org/wiki/Probability_—_Dependent_and_Independent_Events",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr11.MEAS.1",
+      "title": "Measurement — Pyramids, Cones, and Spheres",
+      "description": "Surface area and volume of pyramids (right), right cones, and spheres. Combinations of these solids",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "pyramids",
+        "cones",
+        "spheres",
+        "volume",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr11.MEAS.1",
+          "description": "Surface area and volume of pyramids (right), right cones, and spheres. Combinations of these solids",
+          "grade_level": "Grade11"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Measurement — Pyramids, Cones, and Spheres",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Measurement+—+Pyramids,+Cones,+and+Spheres",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr11.MEAS.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Measurement — Pyramids, Cones, and Spheres",
+          "url": "https://www.youtube.com/results?search_query=Measurement+—+Pyramids,+Cones,+and+Spheres+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Measurement — Pyramids, Cones, and Spheres",
+          "url": "https://en.wikipedia.org/wiki/Measurement_—_Pyramids",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr11.ALG.1",
+      "to": "CAPS.Mathematics.Gr11.ALG.2",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Surd manipulation needed for quadratic equations"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.ALG.2",
+      "to": "CAPS.Mathematics.Gr11.FN.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Quadratic equations needed for function analysis"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.FN.1",
+      "to": "CAPS.Mathematics.Gr11.FN.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Function concepts needed for inverses"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.TRIG.1",
+      "to": "CAPS.Mathematics.Gr11.TRIG.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Compound angle identities needed for sine/cosine rules"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.ALG.1",
+      "to": "CAPS.Mathematics.Gr11.FIN.1",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Exponent laws needed for growth/decay formulae"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr11.ALG.1",
+      "to": "CAPS.Mathematics.Gr11.PAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Algebraic manipulation for series formulae"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.ALG.2",
+      "to": "CAPS.Mathematics.Gr11.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 10 equations are prerequisite for Grade 11 algebra"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.FN.2",
+      "to": "CAPS.Mathematics.Gr11.FN.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 10 function types foundation for Grade 11 transformations"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.TRIG.2",
+      "to": "CAPS.Mathematics.Gr11.TRIG.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 10 trig graphs before compound angles"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.GEOM.1",
+      "to": "CAPS.Mathematics.Gr11.GEOM.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Quadrilateral properties before circle geometry"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.ANAG.1",
+      "to": "CAPS.Mathematics.Gr11.ANAG.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Straight-line analytical geometry before circle equations"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.STAT.1",
+      "to": "CAPS.Mathematics.Gr11.STAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Univariate statistics before bivariate data"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.PROB.1",
+      "to": "CAPS.Mathematics.Gr11.PROB.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Basic probability before dependent/independent events"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.FIN.1",
+      "to": "CAPS.Mathematics.Gr11.FIN.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Simple/compound interest before nominal rates and depreciation"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr10.PAT.1",
+      "to": "CAPS.Mathematics.Gr11.PAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Linear sequences before arithmetic/geometric series"
+    }
+  ]
+}

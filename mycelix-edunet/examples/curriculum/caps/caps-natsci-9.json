@@ -1,0 +1,561 @@
+{
+  "metadata": {
+    "title": "CAPS Natural Sciences Grade 9",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade9",
+    "subject_area": "Natural Sciences",
+    "domain": "Natural Sciences",
+    "version": "2011 (amended 2022)",
+    "total_standards": 7,
+    "domains": [
+      "Matter & Materials",
+      "Energy & Change"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Natural Sciences Senior Phase (DBE, 2011 amended 2022). Grade 9 — physics and chemistry foundations for FET Physical Sciences."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.NaturalSciences.Gr9.MM.1",
+      "title": "Properties of Materials",
+      "description": "Classify materials by properties (density, hardness, flexibility). Acids and bases in everyday life. pH indicators. Metals and non-metals. Physical and chemical changes",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Matter & Materials",
+      "tags": [
+        "matter",
+        "materials",
+        "properties",
+        "acids-bases",
+        "metals",
+        "physical-change",
+        "chemical-change",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.MM.1",
+          "description": "Classify materials by properties (density, hardness, flexibility). Acids and bases in everyday life. pH indicators. Metals and non-metals. Physical and chemical changes",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Properties of Materials",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Properties+of+Materials",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.MM.1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=matter",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Properties of Materials",
+          "url": "https://www.youtube.com/results?search_query=Properties+of+Materials+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Properties of Materials",
+          "url": "https://en.wikipedia.org/wiki/Properties_of_Materials",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.NaturalSciences.Gr9.MM.2",
+      "title": "Particle Model of Matter",
+      "description": "The particle model to explain states of matter, changes of state, density, and gas pressure. Atoms as building blocks. Elements, compounds, and mixtures",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Matter & Materials",
+      "tags": [
+        "particles",
+        "atoms",
+        "elements",
+        "compounds",
+        "mixtures",
+        "states-of-matter",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.MM.2",
+          "description": "The particle model to explain states of matter, changes of state, density, and gas pressure. Atoms as building blocks. Elements, compounds, and mixtures",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Particle Model of Matter",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Particle+Model+of+Matter",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.MM.2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=particles",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Particle Model of Matter",
+          "url": "https://www.youtube.com/results?search_query=Particle+Model+of+Matter+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Particle Model of Matter",
+          "url": "https://en.wikipedia.org/wiki/Particle_Model_of_Matter",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.NaturalSciences.Gr9.MM.3",
+      "title": "Chemical Reactions",
+      "description": "Reactions of metals with oxygen, water, and acids. Reaction of non-metals with oxygen. Conservation of mass. Word equations for simple reactions",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Matter & Materials",
+      "tags": [
+        "chemical-reactions",
+        "metals",
+        "oxides",
+        "conservation-of-mass",
+        "word-equations",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.MM.3",
+          "description": "Reactions of metals with oxygen, water, and acids. Reaction of non-metals with oxygen. Conservation of mass. Word equations for simple reactions",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Chemical Reactions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Chemical+Reactions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.MM.3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=chemical-reactions",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Chemical Reactions",
+          "url": "https://www.youtube.com/results?search_query=Chemical+Reactions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Chemical Reactions",
+          "url": "https://en.wikipedia.org/wiki/Chemical_Reactions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.NaturalSciences.Gr9.EC.1",
+      "title": "Energy and Electricity",
+      "description": "Energy transfer and transformation. Series and parallel circuits (basic). Potential difference and current. Resistance. Cost of electricity (kWh)",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Energy & Change",
+      "tags": [
+        "energy",
+        "electricity",
+        "circuits",
+        "current",
+        "voltage",
+        "resistance",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.EC.1",
+          "description": "Energy transfer and transformation. Series and parallel circuits (basic). Potential difference and current. Resistance. Cost of electricity (kWh)",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Energy and Electricity",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Energy+and+Electricity",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.EC.1"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=energy",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Energy and Electricity",
+          "url": "https://www.youtube.com/results?search_query=Energy+and+Electricity+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Energy and Electricity",
+          "url": "https://en.wikipedia.org/wiki/Energy_and_Electricity",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.NaturalSciences.Gr9.EC.2",
+      "title": "Forces and Motion",
+      "description": "Contact and non-contact forces. Gravitational force and weight (w = mg). Balanced and unbalanced forces. Speed, distance, time calculations. Speed-time graphs",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Energy & Change",
+      "tags": [
+        "forces",
+        "motion",
+        "gravity",
+        "weight",
+        "speed",
+        "distance-time",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.EC.2",
+          "description": "Contact and non-contact forces. Gravitational force and weight (w = mg). Balanced and unbalanced forces. Speed, distance, time calculations. Speed-time graphs",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Forces and Motion",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Forces+and+Motion",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.EC.2"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=forces",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Forces and Motion",
+          "url": "https://www.youtube.com/results?search_query=Forces+and+Motion+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Forces and Motion",
+          "url": "https://en.wikipedia.org/wiki/Forces_and_Motion",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.NaturalSciences.Gr9.EC.3",
+      "title": "Electric Cells and Circuits",
+      "description": "How batteries work. Series and parallel circuits. Measuring voltage and current. Resistors in circuits. Safety with electricity",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Energy & Change",
+      "tags": [
+        "circuits",
+        "batteries",
+        "series-parallel",
+        "voltage",
+        "current",
+        "safety",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.EC.3",
+          "description": "How batteries work. Series and parallel circuits. Measuring voltage and current. Resistors in circuits. Safety with electricity",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Electric Cells and Circuits",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Electric+Cells+and+Circuits",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.EC.3"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=circuits",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Electric Cells and Circuits",
+          "url": "https://www.youtube.com/results?search_query=Electric+Cells+and+Circuits+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Electric Cells and Circuits",
+          "url": "https://en.wikipedia.org/wiki/Electric_Cells_and_Circuits",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.NaturalSciences.Gr9.EC.4",
+      "title": "Waves, Sound, and Light",
+      "description": "Transverse and longitudinal waves. Properties: wavelength, frequency, amplitude. Sound: pitch, loudness, echoes. Light: reflection, refraction, colours",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Natural Sciences",
+      "subdomain": "Energy & Change",
+      "tags": [
+        "waves",
+        "sound",
+        "light",
+        "reflection",
+        "refraction",
+        "frequency",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Natural Sciences",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.NaturalSciences.Gr9.EC.4",
+          "description": "Transverse and longitudinal waves. Properties: wavelength, frequency, amplitude. Sound: pitch, loudness, echoes. Light: reflection, refraction, colours",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Waves, Sound, and Light",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Waves,+Sound,+and+Light",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.NaturalSciences.Gr9.EC.4"
+        },
+        {
+          "title": "PhET Interactive Simulations",
+          "url": "https://phet.colorado.edu/en/simulations/filter?q=waves",
+          "source": {
+            "Custom": "PhET"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 80
+        },
+        {
+          "title": "YouTube: Waves, Sound, and Light",
+          "url": "https://www.youtube.com/results?search_query=Waves,+Sound,+and+Light+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Waves, Sound, and Light",
+          "url": "https://en.wikipedia.org/wiki/Waves",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.NaturalSciences.Gr9.MM.1",
+      "to": "CAPS.NaturalSciences.Gr9.MM.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Material properties before particle model"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.MM.2",
+      "to": "CAPS.NaturalSciences.Gr9.MM.3",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Particle model before chemical reactions"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.EC.1",
+      "to": "CAPS.NaturalSciences.Gr9.EC.3",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Energy concepts before circuit details"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.MM.2",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 9 atoms/elements before Grade 10 atomic structure"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.MM.3",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.5",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 9 chemical reactions before Grade 10 reaction types"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.MM.1",
+      "to": "CAPS.PhysicalSciences.Gr10.CHM.3",
+      "edge_type": "Requires",
+      "strength_permille": 750,
+      "rationale": "Grade 9 acids-bases before Grade 10 intermolecular forces"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.EC.2",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 9 forces/motion before Grade 10 kinematics"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.EC.3",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.7",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 9 basic circuits before Grade 10 Ohm's law circuits"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.EC.4",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.3",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 9 waves basics before Grade 10 wave properties"
+    },
+    {
+      "from": "CAPS.NaturalSciences.Gr9.EC.1",
+      "to": "CAPS.PhysicalSciences.Gr10.PHY.6",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 9 energy/electricity before Grade 10 electrostatics"
+    }
+  ]
+}

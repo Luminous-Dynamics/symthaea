@@ -22,9 +22,10 @@ use crate::components::suggestion_overlay::SuggestionOverlay;
 
 #[derive(Clone, Debug, PartialEq)]
 enum CardSource {
-    Grade3Math,
-    Grade3Science,
-    SpaceExplorer,
+    MatricMath,
+    MatricPhysics,
+    MatricChemistry,
+    Grade9Foundations,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,122 +66,85 @@ struct MockFlashcard {
     mastery_permille: u16,
 }
 
-/// Generate real flashcards from Common Core Grade 3 Math standards.
-/// Covers all 5 domains: OA, NBT, NF, MD, G.
+/// Generate flashcards for CAPS Matric Mathematics.
 fn generate_curriculum_cards() -> Vec<MockFlashcard> {
     vec![
-        // === Operations & Algebraic Thinking (3.OA) ===
-        // 3.OA.A.1: Interpret products
-        MockFlashcard { front: "3 \u{00d7} 6 means 3 groups of 6. How many total?", back: "18", tags: "Multiplication", mastery_permille: 700 },
-        MockFlashcard { front: "Draw an array for 4 \u{00d7} 5", back: "4 rows of 5 = 20", tags: "Multiplication", mastery_permille: 650 },
-        // 3.OA.A.2: Interpret quotients
-        MockFlashcard { front: "24 \u{00f7} 6 = ? (How many groups of 6 make 24?)", back: "4", tags: "Division", mastery_permille: 400 },
-        MockFlashcard { front: "Share 15 stickers equally among 3 friends. How many each?", back: "5 stickers each (15 \u{00f7} 3 = 5)", tags: "Division", mastery_permille: 450 },
-        // 3.OA.A.3: Multiply and divide word problems
-        MockFlashcard { front: "A garden has 5 rows with 7 flowers in each row. How many flowers?", back: "35 flowers (5 \u{00d7} 7 = 35)", tags: "Word Problems", mastery_permille: 350 },
-        MockFlashcard { front: "Mom bought 32 cookies for 8 children. How many each?", back: "4 cookies each (32 \u{00f7} 8 = 4)", tags: "Word Problems", mastery_permille: 300 },
-        // 3.OA.A.4: Unknown in multiplication
-        MockFlashcard { front: "? \u{00d7} 8 = 48", back: "6 (because 6 \u{00d7} 8 = 48)", tags: "Multiplication", mastery_permille: 500 },
-        MockFlashcard { front: "7 \u{00d7} ? = 56", back: "8 (because 7 \u{00d7} 8 = 56)", tags: "Multiplication", mastery_permille: 480 },
-        // 3.OA.B.5: Properties of multiplication
-        MockFlashcard { front: "If 3 \u{00d7} 5 \u{00d7} 2 is hard, can you rearrange? Try (3 \u{00d7} 2) \u{00d7} 5", back: "6 \u{00d7} 5 = 30. Same answer! (Associative property)", tags: "Multiplication", mastery_permille: 400 },
-        // 3.OA.B.6: Division as unknown factor
-        MockFlashcard { front: "56 \u{00f7} 8 = ? Think: 8 \u{00d7} ? = 56", back: "7", tags: "Division", mastery_permille: 420 },
-        // 3.OA.C.7: Fluently multiply/divide within 100
-        MockFlashcard { front: "9 \u{00d7} 7 = ?", back: "63", tags: "Multiplication", mastery_permille: 600 },
-        MockFlashcard { front: "8 \u{00d7} 6 = ?", back: "48", tags: "Multiplication", mastery_permille: 620 },
-        MockFlashcard { front: "72 \u{00f7} 9 = ?", back: "8", tags: "Division", mastery_permille: 380 },
-        MockFlashcard { front: "7 \u{00d7} 4 = ?", back: "28", tags: "Multiplication", mastery_permille: 700 },
-        // 3.OA.D.8: Two-step word problems
-        MockFlashcard { front: "You have $20. You buy 3 books at $4 each. How much left?", back: "$8 (3 \u{00d7} $4 = $12, $20 - $12 = $8)", tags: "Word Problems", mastery_permille: 250 },
-        MockFlashcard { front: "A baker makes 6 trays of 8 muffins, then eats 3. How many left?", back: "45 (6 \u{00d7} 8 = 48, 48 - 3 = 45)", tags: "Word Problems", mastery_permille: 200 },
-        // 3.OA.D.9: Patterns in addition/multiplication tables
-        MockFlashcard { front: "Look at the pattern: 4, 8, 12, 16, 20. What comes next?", back: "24 (adding 4 each time \u{2014} the 4\u{00d7} table!)", tags: "Patterns", mastery_permille: 550 },
-
-        // === Number & Operations in Base Ten (3.NBT) ===
-        // 3.NBT.A.1: Round to nearest 10/100
-        MockFlashcard { front: "Round 67 to the nearest ten", back: "70", tags: "Rounding", mastery_permille: 600 },
-        MockFlashcard { front: "Round 345 to the nearest hundred", back: "300", tags: "Rounding", mastery_permille: 500 },
-        MockFlashcard { front: "Round 851 to the nearest hundred", back: "900", tags: "Rounding", mastery_permille: 480 },
-        // 3.NBT.A.2: Fluently add/subtract within 1000
-        MockFlashcard { front: "456 + 237 = ?", back: "693", tags: "Addition", mastery_permille: 750 },
-        MockFlashcard { front: "803 - 256 = ?", back: "547", tags: "Subtraction", mastery_permille: 680 },
-        // 3.NBT.A.3: Multiply one-digit x multiples of 10
-        MockFlashcard { front: "6 \u{00d7} 70 = ?", back: "420 (6 \u{00d7} 7 = 42, then add a zero)", tags: "Multiplication", mastery_permille: 350 },
-
-        // === Number & Operations -- Fractions (3.NF) ===
-        // 3.NF.A.1: Understand fractions
-        MockFlashcard { front: "A pizza is cut into 8 equal slices. You eat 3. What fraction did you eat?", back: "3/8", tags: "Fractions", mastery_permille: 400 },
-        MockFlashcard { front: "What does the 4 mean in 3/4?", back: "The whole is divided into 4 equal parts", tags: "Fractions", mastery_permille: 350 },
-        // 3.NF.A.2: Fractions on number line
-        MockFlashcard { front: "Where does 1/2 go on a number line from 0 to 1?", back: "Exactly in the middle, halfway between 0 and 1", tags: "Fractions", mastery_permille: 450 },
-        // 3.NF.A.3: Equivalent fractions, comparing
-        MockFlashcard { front: "Which is bigger: 1/3 or 1/4?", back: "1/3 is bigger (fewer parts = bigger pieces)", tags: "Fractions", mastery_permille: 300 },
-        MockFlashcard { front: "Are 2/4 and 1/2 the same?", back: "Yes! 2/4 = 1/2 (equivalent fractions)", tags: "Fractions", mastery_permille: 320 },
-
-        // === Measurement & Data (3.MD) ===
-        // 3.MD.C.5-7: Area
-        MockFlashcard { front: "A rectangle is 4 units wide and 3 units tall. What's the area?", back: "12 square units (4 \u{00d7} 3 = 12)", tags: "Geometry", mastery_permille: 250 },
-        MockFlashcard { front: "A square has sides of 5. What's its area?", back: "25 square units (5 \u{00d7} 5 = 25)", tags: "Geometry", mastery_permille: 280 },
-        // 3.MD.A.1: Tell time
-        MockFlashcard { front: "What time is 15 minutes after 2:45?", back: "3:00", tags: "Time", mastery_permille: 550 },
-        // 3.MD.B.3: Picture graphs/bar graphs
-        MockFlashcard { front: "A bar graph shows: Red=5, Blue=8, Green=3. How many more blue than green?", back: "5 more (8 - 3 = 5)", tags: "Data", mastery_permille: 500 },
-        // 3.MD.D.8: Perimeter
-        MockFlashcard { front: "A rectangle is 6 long and 4 wide. What's the perimeter?", back: "20 units (6 + 4 + 6 + 4 = 20)", tags: "Geometry", mastery_permille: 300 },
-
-        // === Geometry (3.G) ===
-        // 3.G.A.1: Shapes and attributes
-        MockFlashcard { front: "How many sides does a hexagon have?", back: "6 sides", tags: "Geometry", mastery_permille: 600 },
-        MockFlashcard { front: "A rhombus has 4 equal sides. Is it always a square?", back: "No \u{2014} a square has 4 equal sides AND 4 right angles. A rhombus might not.", tags: "Geometry", mastery_permille: 220 },
-        // 3.G.A.2: Partition shapes into equal parts
-        MockFlashcard { front: "Split a rectangle into 4 equal parts. What fraction is each part?", back: "1/4 (each part is one-fourth of the whole)", tags: "Fractions", mastery_permille: 380 },
+        // Algebra
+        MockFlashcard { front: "State the quadratic formula.", back: "x = (\u{2212}b \u{00b1} \u{221a}(b\u{00b2}\u{2212}4ac)) / 2a", tags: "Algebra", mastery_permille: 400 },
+        MockFlashcard { front: "What does the discriminant \u{0394} = b\u{00b2}\u{2212}4ac tell us?", back: "\u{0394} > 0: two distinct real roots. \u{0394} = 0: two equal roots. \u{0394} < 0: no real roots.", tags: "Algebra", mastery_permille: 350 },
+        // Sequences & Series
+        MockFlashcard { front: "When does a geometric series converge?", back: "|r| < 1. Sum to infinity: a/(1\u{2212}r)", tags: "Sequences", mastery_permille: 300 },
+        MockFlashcard { front: "What is Tn for an arithmetic sequence?", back: "Tn = a + (n\u{2212}1)d, where a = first term, d = common difference", tags: "Sequences", mastery_permille: 350 },
+        // Finance
+        MockFlashcard { front: "What is the present value annuity formula?", back: "P = x[1 \u{2212} (1+i)\u{207b}\u{207f}]/i", tags: "Finance", mastery_permille: 250 },
+        MockFlashcard { front: "Sinking fund or loan? Regular payments to accumulate a target amount.", back: "Sinking fund (future value annuity). Loans use present value.", tags: "Finance", mastery_permille: 300 },
+        // Functions
+        MockFlashcard { front: "What is the turning point of y = a(x\u{2212}p)\u{00b2} + q?", back: "(p, q). If a > 0 it's a minimum; if a < 0 it's a maximum.", tags: "Functions", mastery_permille: 400 },
+        // Calculus
+        MockFlashcard { front: "What is the derivative of f(x) = ax\u{207f}?", back: "f'(x) = nax\u{207f}\u{207b}\u{00b9} (power rule)", tags: "Calculus", mastery_permille: 350 },
+        MockFlashcard { front: "How do you find turning points of a cubic?", back: "Set f'(x) = 0. Solve for x. Substitute back into f(x) for y-values.", tags: "Calculus", mastery_permille: 250 },
+        MockFlashcard { front: "What is the first principles definition of the derivative?", back: "f'(x) = lim[h\u{2192}0] (f(x+h) \u{2212} f(x))/h", tags: "Calculus", mastery_permille: 200 },
+        // Counting & Probability
+        MockFlashcard { front: "What is the formula for combinations (nCr)?", back: "nCr = n! / [r!(n\u{2212}r)!]", tags: "Counting", mastery_permille: 300 },
+        MockFlashcard { front: "Permutations vs Combinations: when does order matter?", back: "Permutations: order matters (arrangements). Combinations: order doesn't (selections).", tags: "Counting", mastery_permille: 350 },
+        // Trigonometry
+        MockFlashcard { front: "Write cos2\u{03b1} in three forms.", back: "cos\u{00b2}\u{03b1} \u{2212} sin\u{00b2}\u{03b1} = 1 \u{2212} 2sin\u{00b2}\u{03b1} = 2cos\u{00b2}\u{03b1} \u{2212} 1", tags: "Trigonometry", mastery_permille: 250 },
+        MockFlashcard { front: "sin(A+B) = ?", back: "sinA\u{00b7}cosB + cosA\u{00b7}sinB. NOT sinA + sinB!", tags: "Trigonometry", mastery_permille: 300 },
+        // Geometry
+        MockFlashcard { front: "Opposite angles of a cyclic quadrilateral sum to?", back: "180\u{00b0} (supplementary)", tags: "Geometry", mastery_permille: 350 },
+        // Analytical Geometry
+        MockFlashcard { front: "Equation of a circle with centre (a,b) and radius r?", back: "(x\u{2212}a)\u{00b2} + (y\u{2212}b)\u{00b2} = r\u{00b2}", tags: "Analytical Geometry", mastery_permille: 400 },
+        // Statistics
+        MockFlashcard { front: "What is the formula for standard deviation?", back: "\u{03c3} = \u{221a}[\u{03a3}(xi \u{2212} x\u{0304})\u{00b2}/n]", tags: "Statistics", mastery_permille: 300 },
     ]
 }
 
-/// Generate Grade 3 Science flashcards based on NGSS standards.
-/// Covers Life Science (LS1-LS4), Physical Science (PS2), Earth & Space Science (ESS2-ESS3).
+/// Generate flashcards for CAPS Matric Physics (Paper 1).
 fn generate_science_cards() -> Vec<MockFlashcard> {
     vec![
-        // Life Science: 3-LS1 (Inheritance & Variation of Traits)
-        MockFlashcard { front: "Do baby animals always look exactly like their parents?", back: "No! They look similar but not identical. A puppy might have a different fur color than its mom.", tags: "Life Science", mastery_permille: 500 },
-        MockFlashcard { front: "Why do some flowers in a garden look different from each other even though they\u{2019}re the same kind?", back: "Plants (and animals) of the same kind can have different traits. This is called variation.", tags: "Life Science", mastery_permille: 450 },
-
-        // Life Science: 3-LS2 (Ecosystems)
-        MockFlashcard { front: "What would happen to a pond ecosystem if all the frogs disappeared?", back: "The insects frogs eat would increase a lot, and the animals that eat frogs (like herons) would have less food.", tags: "Ecosystems", mastery_permille: 350 },
-        MockFlashcard { front: "Can an animal survive if its environment changes?", back: "Some can adapt or move to a new place. Others might not survive. That\u{2019}s why protecting habitats matters!", tags: "Ecosystems", mastery_permille: 400 },
-
-        // Life Science: 3-LS3 (Heredity)
-        MockFlashcard { front: "Why do you look a bit like your parents?", back: "You inherit traits from both parents! Eye color, hair type, and even how tall you\u{2019}ll grow.", tags: "Heredity", mastery_permille: 500 },
-
-        // Life Science: 3-LS4 (Evolution: Fossils)
-        MockFlashcard { front: "What can fossils tell us about animals that lived long ago?", back: "Fossils show us what ancient animals looked like, what they ate, and how they\u{2019}ve changed over time.", tags: "Fossils", mastery_permille: 300 },
-        MockFlashcard { front: "If you found a fossil of a seashell on top of a mountain, what might that tell you?", back: "That area was probably underwater millions of years ago! The land changed over a very long time.", tags: "Fossils", mastery_permille: 250 },
-
-        // Physical Science: 3-PS2 (Motion and Stability: Forces)
-        MockFlashcard { front: "If you push a ball harder, what happens?", back: "It goes faster and farther! A bigger push (force) means more motion.", tags: "Forces", mastery_permille: 600 },
-        MockFlashcard { front: "Two magnets are near each other. One flips around. What happened?", back: "The magnets\u{2019} poles switched! Like poles (N-N or S-S) push apart, opposite poles (N-S) pull together.", tags: "Forces", mastery_permille: 400 },
-        MockFlashcard { front: "Can something move without being touched?", back: "Yes! Magnets can push or pull without touching. Gravity pulls things down without touching them too.", tags: "Forces", mastery_permille: 350 },
-
-        // Earth & Space Science: 3-ESS2 (Earth's Systems: Weather)
-        MockFlashcard { front: "Is weather the same as climate?", back: "No! Weather is what\u{2019}s happening outside right now. Climate is the typical weather pattern over many years.", tags: "Weather", mastery_permille: 450 },
-        MockFlashcard { front: "What causes wind?", back: "The sun heats the ground unevenly. Warm air rises and cool air rushes in to fill the space. That moving air is wind!", tags: "Weather", mastery_permille: 300 },
-
-        // Earth & Space Science: 3-ESS2 (Earth's Systems: Water)
-        MockFlashcard { front: "Where does rain come from?", back: "Water evaporates from oceans and lakes, forms clouds, and falls back down as rain. This is the water cycle!", tags: "Water Cycle", mastery_permille: 500 },
-
-        // Earth & Space Science: 3-ESS3 (Earth and Human Activity)
-        MockFlashcard { front: "Can people change the land? Give an example.", back: "Yes! Building cities, farming, cutting forests, and mining all change the land. Some changes help, some hurt.", tags: "Human Impact", mastery_permille: 400 },
-        MockFlashcard { front: "What\u{2019}s one way we can reduce the impact of a natural hazard like flooding?", back: "Build levees, plant trees to absorb water, move buildings away from flood zones, or create wetlands.", tags: "Natural Hazards", mastery_permille: 350 },
+        // Momentum
+        MockFlashcard { front: "State the impulse-momentum theorem.", back: "Fnet\u{0394}t = \u{0394}p = m(vf \u{2212} vi). Net impulse equals change in momentum.", tags: "Momentum", mastery_permille: 350 },
+        MockFlashcard { front: "Is momentum conserved in all collisions?", back: "Only in isolated systems (no external net force). Kinetic energy is only conserved in elastic collisions.", tags: "Momentum", mastery_permille: 300 },
+        // Work, Energy, Power
+        MockFlashcard { front: "State the work-energy theorem.", back: "Wnet = \u{0394}Ek. The net work done equals the change in kinetic energy.", tags: "Energy", mastery_permille: 350 },
+        MockFlashcard { front: "What is the formula for power?", back: "P = W/\u{0394}t = Fv (work per unit time, or force times velocity)", tags: "Energy", mastery_permille: 400 },
+        // Doppler Effect
+        MockFlashcard { front: "Write the Doppler effect formula for sound.", back: "fL = fs(v \u{00b1} vL)/(v \u{00b1} vs). Approaching = higher frequency.", tags: "Doppler", mastery_permille: 250 },
+        // Electricity
+        MockFlashcard { front: "What is the relationship between EMF, terminal voltage, and internal resistance?", back: "\u{03b5} = Vterminal + Ir, or \u{03b5} = I(R + r)", tags: "Electricity", mastery_permille: 350 },
+        MockFlashcard { front: "State Faraday's law of electromagnetic induction.", back: "\u{03b5} = \u{2212}N\u{0394}\u{03a6}/\u{0394}t. An EMF is induced when magnetic flux through a coil changes.", tags: "Electrodynamics", mastery_permille: 250 },
+        // Photoelectric Effect
+        MockFlashcard { front: "State Einstein's photoelectric equation.", back: "E = W0 + Ek(max), or hf = hf0 + \u{00bd}mv\u{00b2}(max)", tags: "Modern Physics", mastery_permille: 250 },
+        MockFlashcard { front: "Why can't wave theory explain the photoelectric effect?", back: "Wave theory predicts any frequency should cause emission given enough intensity, and there should be a delay. Both are wrong.", tags: "Modern Physics", mastery_permille: 200 },
     ]
 }
 
-/// Generate Space Explorer pathway cards spanning PreK through university.
-/// Interest-driven pathway crossing Math and Science boundaries.
-fn generate_space_pathway_cards() -> Vec<MockFlashcard> {
+/// Generate flashcards for CAPS Matric Chemistry (Paper 2).
+fn generate_chemistry_cards() -> Vec<MockFlashcard> {
     vec![
-        // Foundational: PreK-Grade 2
-        MockFlashcard { front: "Look up at the sky at night. What do you see?", back: "Stars! They look tiny but they\u{2019}re actually HUGE \u{2014} they\u{2019}re just very, very far away.", tags: "Space \u{00b7} Foundational", mastery_permille: 800 },
+        // Organic Chemistry
+        MockFlashcard { front: "What is the product of an esterification reaction?", back: "An ester + water. Alcohol + carboxylic acid \u{2192} ester + H2O.", tags: "Organic Chemistry", mastery_permille: 300 },
+        MockFlashcard { front: "What are the three types of organic reactions for alkenes?", back: "Addition reactions: HX, X2, H2O, H2 add across the C=C double bond.", tags: "Organic Chemistry", mastery_permille: 250 },
+        // Reaction Rates
+        MockFlashcard { front: "How does a catalyst increase reaction rate?", back: "Provides an alternative pathway with lower activation energy. NOT consumed in the reaction.", tags: "Reaction Rates", mastery_permille: 350 },
+        // Equilibrium
+        MockFlashcard { front: "Does a catalyst shift equilibrium?", back: "No. It speeds up both forward and reverse equally. Kc is unchanged.", tags: "Equilibrium", mastery_permille: 350 },
+        MockFlashcard { front: "State Le Chatelier's principle.", back: "A system at equilibrium shifts to counteract any imposed change (concentration, temperature, pressure).", tags: "Equilibrium", mastery_permille: 300 },
+        MockFlashcard { front: "What are the conditions for the Haber process?", back: "N2 + 3H2 \u{21cc} 2NH3. 450\u{00b0}C, 200 atm, iron catalyst.", tags: "Equilibrium", mastery_permille: 250 },
+        // Acids & Bases
+        MockFlashcard { front: "Strong acid vs weak acid?", back: "Strong: fully ionised (HCl). Weak: partially ionised (CH3COOH). Strength \u{2260} concentration.", tags: "Acids & Bases", mastery_permille: 350 },
+        MockFlashcard { front: "What is pH?", back: "pH = \u{2212}log[H3O+]. pH 7 = neutral, < 7 = acidic, > 7 = basic.", tags: "Acids & Bases", mastery_permille: 400 },
+        // Electrochemistry
+        MockFlashcard { front: "How do you calculate E\u{00b0}cell?", back: "E\u{00b0}cell = E\u{00b0}cathode \u{2212} E\u{00b0}anode. Positive = spontaneous.", tags: "Electrochemistry", mastery_permille: 300 },
+        MockFlashcard { front: "AN OX, RED CAT \u{2014} what does it mean?", back: "Anode = Oxidation, Reduction = Cathode. In galvanic cells, anode is negative.", tags: "Electrochemistry", mastery_permille: 350 },
+    ]
+}
+
+/// Generate flashcards for Grade 9 foundations (cumulative prerequisites).
+fn generate_foundations_cards() -> Vec<MockFlashcard> {
+    vec![
+        // Integers & Operations
+        MockFlashcard { front: "What is BODMAS?", back: "Brackets, Orders (exponents), Division, Multiplication, Addition, Subtraction \u{2014} the order of operations.", tags: "Numbers", mastery_permille: 600 },
         MockFlashcard { front: "Why is it dark at night and bright during the day?", back: "Earth spins! When our side faces the Sun, it\u{2019}s day. When it faces away, it\u{2019}s night.", tags: "Space \u{00b7} Foundational", mastery_permille: 700 },
         MockFlashcard { front: "Is the Sun a star?", back: "Yes! The Sun is a star \u{2014} the closest star to Earth. It looks bigger and brighter because it\u{2019}s much closer than other stars.", tags: "Space \u{00b7} Foundational", mastery_permille: 650 },
         MockFlashcard { front: "How many planets are in our solar system?", back: "8 planets! Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune. (Pluto is a dwarf planet.)", tags: "Space \u{00b7} Foundational", mastery_permille: 600 },
@@ -204,10 +168,23 @@ fn generate_space_pathway_cards() -> Vec<MockFlashcard> {
         MockFlashcard { front: "What is the escape velocity from Earth\u{2019}s surface?", back: "About 11.2 km/s. This is the minimum speed needed to escape Earth\u{2019}s gravity without further propulsion. v = \u{221a}(2GM/r)", tags: "Space \u{00b7} Advanced", mastery_permille: 100 },
 
         // Expert: University
-        MockFlashcard { front: "In the Hertzsprung-Russell diagram, where are main sequence stars located?", back: "Along a diagonal band from hot/bright (upper left) to cool/dim (lower right). Our Sun is a G2V star in the middle.", tags: "Space \u{00b7} Expert", mastery_permille: 50 },
-        MockFlashcard { front: "What is the Schwarzschild radius of a black hole with 10 solar masses?", back: "r\u{209b} = 2GM/c\u{00b2} = 2(6.674\u{00d7}10\u{207b}\u{00b9}\u{00b9})(10\u{00d7}1.989\u{00d7}10\u{00b3}\u{2070})/(3\u{00d7}10\u{2078})\u{00b2} \u{2248} 29.5 km", tags: "Space \u{00b7} Expert", mastery_permille: 30 },
-        MockFlashcard { front: "Why does time pass slower near a massive object?", back: "General Relativity: mass curves spacetime. Clocks in stronger gravitational fields tick slower. GPS satellites correct for this daily!", tags: "Space \u{00b7} Expert", mastery_permille: 50 },
-        MockFlashcard { front: "Explain the twin paradox in special relativity.", back: "A twin traveling near light speed ages less than the twin on Earth. This isn\u{2019}t a paradox \u{2014} the traveling twin accelerated (broke inertial symmetry), making the situation asymmetric.", tags: "Space \u{00b7} Expert", mastery_permille: 30 },
+        // Exponents
+        MockFlashcard { front: "Simplify: a\u{00b3} \u{00d7} a\u{2074}", back: "a\u{2077} (add the exponents when bases are the same)", tags: "Exponents", mastery_permille: 600 },
+        MockFlashcard { front: "What is a\u{2070}?", back: "1 (any non-zero number to the power 0 equals 1)", tags: "Exponents", mastery_permille: 550 },
+        // Algebra fundamentals
+        MockFlashcard { front: "Factorise: x\u{00b2} \u{2212} 9", back: "(x + 3)(x \u{2212} 3) \u{2014} difference of two squares", tags: "Algebra", mastery_permille: 500 },
+        MockFlashcard { front: "Solve: 3x + 7 = 22", back: "3x = 15, so x = 5", tags: "Algebra", mastery_permille: 600 },
+        MockFlashcard { front: "Expand: (x + 3)(x \u{2212} 2)", back: "x\u{00b2} + x \u{2212} 6", tags: "Algebra", mastery_permille: 500 },
+        // Geometry
+        MockFlashcard { front: "State the theorem of Pythagoras.", back: "a\u{00b2} + b\u{00b2} = c\u{00b2}, where c is the hypotenuse of a right-angled triangle.", tags: "Geometry", mastery_permille: 550 },
+        MockFlashcard { front: "Angles on a straight line sum to?", back: "180\u{00b0}", tags: "Geometry", mastery_permille: 700 },
+        MockFlashcard { front: "Vertically opposite angles are?", back: "Equal", tags: "Geometry", mastery_permille: 650 },
+        // Forces & Motion
+        MockFlashcard { front: "What is the formula for speed?", back: "speed = distance / time", tags: "Forces", mastery_permille: 600 },
+        MockFlashcard { front: "What is the formula for weight?", back: "w = mg (mass \u{00d7} gravitational acceleration, g \u{2248} 9.8 m/s\u{00b2})", tags: "Forces", mastery_permille: 500 },
+        // Matter
+        MockFlashcard { front: "What is the difference between an element and a compound?", back: "Element: one type of atom. Compound: two or more elements chemically bonded.", tags: "Matter", mastery_permille: 550 },
+        MockFlashcard { front: "Name the three states of matter.", back: "Solid, liquid, gas. Particles are closest together in solids and furthest apart in gases.", tags: "Matter", mastery_permille: 650 },
     ]
 }
 
@@ -220,10 +197,10 @@ struct KidRating {
 }
 
 const KID_RATINGS: &[KidRating] = &[
-    KidRating { emoji: "\u{1f61f}", label: "I don't know this yet", quality: 1, css_class: "kid-rate-red" },
-    KidRating { emoji: "\u{1f914}", label: "I'm still learning", quality: 2, css_class: "kid-rate-orange" },
-    KidRating { emoji: "\u{1f60a}", label: "I got it!", quality: 4, css_class: "kid-rate-green" },
-    KidRating { emoji: "\u{1f31f}", label: "Too easy!", quality: 5, css_class: "kid-rate-gold" },
+    KidRating { emoji: "\u{2716}", label: "Blackout", quality: 1, css_class: "kid-rate-red" },
+    KidRating { emoji: "\u{2753}", label: "Hard", quality: 2, css_class: "kid-rate-orange" },
+    KidRating { emoji: "\u{2714}", label: "Good", quality: 4, css_class: "kid-rate-green" },
+    KidRating { emoji: "\u{26a1}", label: "Easy", quality: 5, css_class: "kid-rate-gold" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -286,9 +263,10 @@ pub fn ReviewPage() -> impl IntoView {
         let adaptivity = adaptivity.clone();
         move |source: CardSource| {
             let deck = match &source {
-                CardSource::Grade3Math => generate_curriculum_cards(),
-                CardSource::Grade3Science => generate_science_cards(),
-                CardSource::SpaceExplorer => generate_space_pathway_cards(),
+                CardSource::MatricMath => generate_curriculum_cards(),
+                CardSource::MatricPhysics => generate_science_cards(),
+                CardSource::MatricChemistry => generate_chemistry_cards(),
+                CardSource::Grade9Foundations => generate_foundations_cards(),
             };
             cards.set_value(deck);
             set_card_source.set(Some(source));
@@ -394,35 +372,44 @@ pub fn ReviewPage() -> impl IntoView {
                 if card_source.get().is_none() {
                     let select_math = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::Grade3Math)
+                        move |_| select_source(CardSource::MatricMath)
                     };
-                    let select_science = {
+                    let select_physics = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::Grade3Science)
+                        move |_| select_source(CardSource::MatricPhysics)
                     };
-                    let select_space = {
+                    let select_chem = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::SpaceExplorer)
+                        move |_| select_source(CardSource::MatricChemistry)
+                    };
+                    let select_foundations = {
+                        let select_source = select_source.clone();
+                        move |_| select_source(CardSource::Grade9Foundations)
                     };
                     return view! {
                         <div class="topic-selector">
-                            <h2>"What do you want to study?"</h2>
-                            <p class="topic-selector-subtitle">"Pick a topic and let\u{2019}s go!"</p>
+                            <h2>"What do you want to review?"</h2>
+                            <p class="topic-selector-subtitle">"Choose a subject to start your flashcard session."</p>
                             <div class="source-cards">
                                 <button class="source-card source-math" on:click=select_math>
-                                    <span class="source-icon">"\u{1f522}"</span>
-                                    <span class="source-label">"Grade 3 Math"</span>
-                                    <span class="source-meta">"35 cards"</span>
+                                    <span class="source-icon">"\u{1f4d0}"</span>
+                                    <span class="source-label">"Matric Maths"</span>
+                                    <span class="source-meta">"17 cards"</span>
                                 </button>
-                                <button class="source-card source-science" on:click=select_science>
-                                    <span class="source-icon">"\u{1f52c}"</span>
-                                    <span class="source-label">"Grade 3 Science"</span>
-                                    <span class="source-meta">"15 cards"</span>
+                                <button class="source-card source-science" on:click=select_physics>
+                                    <span class="source-icon">"\u{269b}\u{fe0f}"</span>
+                                    <span class="source-label">"Matric Physics"</span>
+                                    <span class="source-meta">"9 cards"</span>
                                 </button>
-                                <button class="source-card source-space" on:click=select_space>
-                                    <span class="source-icon">"\u{1f680}"</span>
-                                    <span class="source-label">"Space Explorer"</span>
-                                    <span class="source-meta">"PreK \u{2192} University"</span>
+                                <button class="source-card source-science" on:click=select_chem>
+                                    <span class="source-icon">"\u{2697}\u{fe0f}"</span>
+                                    <span class="source-label">"Matric Chemistry"</span>
+                                    <span class="source-meta">"10 cards"</span>
+                                </button>
+                                <button class="source-card" on:click=select_foundations style="border-color: var(--grade-9)">
+                                    <span class="source-icon">"\u{1f9f1}"</span>
+                                    <span class="source-label">"Gr9 Foundations"</span>
+                                    <span class="source-meta">"12 cards"</span>
                                 </button>
                             </div>
                         </div>

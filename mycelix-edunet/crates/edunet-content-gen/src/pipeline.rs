@@ -548,10 +548,11 @@ fn infer_bloom_level(code: &str, description: &str) -> String {
 
 /// Truncate a string to at most `max_len` characters, appending "..." if truncated.
 fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
+    if s.chars().count() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len.saturating_sub(3)])
+        let truncated: String = s.chars().take(max_len.saturating_sub(3)).collect();
+        format!("{truncated}...")
     }
 }
 

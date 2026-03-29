@@ -1,0 +1,932 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 9",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade9",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 12,
+    "domains": [
+      "Numbers & Operations",
+      "Algebra",
+      "Patterns & Functions",
+      "Geometry",
+      "Measurement",
+      "Statistics",
+      "Probability"
+    ],
+    "created_at": "2026-03-29",
+    "notes": "Curated from CAPS Mathematics Senior Phase (DBE, 2011 amended 2022). Grade 9 — foundational skills for FET Phase."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr9.NUM.1",
+      "title": "Whole Numbers and Integers",
+      "description": "Properties of integers. Order of operations (BODMAS). Calculations with integers including multiplication and division of negative numbers. Prime factorisation, HCF, LCM",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Numbers & Operations",
+      "tags": [
+        "integers",
+        "operations",
+        "bodmas",
+        "prime-factorisation",
+        "hcf",
+        "lcm",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.NUM.1",
+          "description": "Properties of integers. Order of operations (BODMAS). Calculations with integers including multiplication and division of negative numbers. Prime factorisation, HCF, LCM",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Whole Numbers and Integers",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Whole+Numbers+and+Integers",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.NUM.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Whole Numbers and Integers",
+          "url": "https://www.youtube.com/results?search_query=Whole+Numbers+and+Integers+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Whole Numbers and Integers",
+          "url": "https://en.wikipedia.org/wiki/Whole_Numbers_and_Integers",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.NUM.2",
+      "title": "Common Fractions, Decimal Fractions, and Percentages",
+      "description": "Operations with fractions and decimals. Converting between fractions, decimals, and percentages. Percentage increase/decrease. Ratio and proportion",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Numbers & Operations",
+      "tags": [
+        "fractions",
+        "decimals",
+        "percentages",
+        "ratio",
+        "proportion",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.NUM.2",
+          "description": "Operations with fractions and decimals. Converting between fractions, decimals, and percentages. Percentage increase/decrease. Ratio and proportion",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Common Fractions, Decimal Fractions, and Percen...",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Common+Fractions,+Decimal+Fractions,+and+Percentages",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.NUM.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Common Fractions, Decimal Fractions, and Percen...",
+          "url": "https://www.youtube.com/results?search_query=Common+Fractions,+Decimal+Fractions,+and+Percentages+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Common Fractions, Decimal Fractions, and Percen...",
+          "url": "https://en.wikipedia.org/wiki/Common_Fractions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.EXP.1",
+      "title": "Exponents",
+      "description": "Laws of exponents with integer exponents: aᵐ × aⁿ = aᵐ⁺ⁿ, aᵐ ÷ aⁿ = aᵐ⁻ⁿ, (aᵐ)ⁿ = aᵐⁿ, (ab)ⁿ = aⁿbⁿ, a⁰ = 1. Scientific notation",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "exponents",
+        "laws-of-exponents",
+        "scientific-notation",
+        "indices",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.EXP.1",
+          "description": "Laws of exponents with integer exponents: aᵐ × aⁿ = aᵐ⁺ⁿ, aᵐ ÷ aⁿ = aᵐ⁻ⁿ, (aᵐ)ⁿ = aᵐⁿ, (ab)ⁿ = aⁿbⁿ, a⁰ = 1. Scientific notation",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Exponents",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Exponents",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.EXP.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Exponents",
+          "url": "https://www.youtube.com/results?search_query=Exponents+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Exponents",
+          "url": "https://en.wikipedia.org/wiki/Exponents",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.ALG.1",
+      "title": "Algebraic Expressions",
+      "description": "Identify and classify like terms, coefficients, constants. Expand and simplify expressions. Multiply binomials. Factorise: common factor, difference of squares, trinomials",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "algebra",
+        "expressions",
+        "expand",
+        "simplify",
+        "factorise",
+        "binomials",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.ALG.1",
+          "description": "Identify and classify like terms, coefficients, constants. Expand and simplify expressions. Multiply binomials. Factorise: common factor, difference of squares, trinomials",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Algebraic Expressions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebraic+Expressions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.ALG.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebraic Expressions",
+          "url": "https://www.youtube.com/results?search_query=Algebraic+Expressions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebraic Expressions",
+          "url": "https://en.wikipedia.org/wiki/Algebraic_Expressions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.ALG.2",
+      "title": "Algebraic Equations",
+      "description": "Solve linear equations including equations with fractions. Solve simple quadratic equations by factorisation (x² = c, ax² + bx = 0). Word problems leading to equations",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "equations",
+        "linear-equations",
+        "word-problems",
+        "solving",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.ALG.2",
+          "description": "Solve linear equations including equations with fractions. Solve simple quadratic equations by factorisation (x² = c, ax² + bx = 0). Word problems leading to equations",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Algebraic Equations",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebraic+Equations",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.ALG.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebraic Equations",
+          "url": "https://www.youtube.com/results?search_query=Algebraic+Equations+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebraic Equations",
+          "url": "https://en.wikipedia.org/wiki/Algebraic_Equations",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.PAT.1",
+      "title": "Numeric and Geometric Patterns",
+      "description": "Investigate and describe numeric patterns (including geometric). Determine input and output values for given rules. Describe the general rule for a pattern in words and algebraically",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Patterns & Functions",
+      "tags": [
+        "patterns",
+        "sequences",
+        "general-rule",
+        "input-output",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.PAT.1",
+          "description": "Investigate and describe numeric patterns (including geometric). Determine input and output values for given rules. Describe the general rule for a pattern in words and algebraically",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Numeric and Geometric Patterns",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Numeric+and+Geometric+Patterns",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.PAT.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Numeric and Geometric Patterns",
+          "url": "https://www.youtube.com/results?search_query=Numeric+and+Geometric+Patterns+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Numeric and Geometric Patterns",
+          "url": "https://en.wikipedia.org/wiki/Numeric_and_Geometric_Patterns",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.FN.1",
+      "title": "Functions and Relationships",
+      "description": "Input-output tables. Represent functions as equations (y = mx + c), tables, and graphs. Interpret and plot points on the Cartesian plane. Linear functions",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Patterns & Functions",
+      "tags": [
+        "functions",
+        "cartesian-plane",
+        "linear",
+        "input-output",
+        "graphs",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.FN.1",
+          "description": "Input-output tables. Represent functions as equations (y = mx + c), tables, and graphs. Interpret and plot points on the Cartesian plane. Linear functions",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Functions and Relationships",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Functions+and+Relationships",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.FN.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Functions and Relationships",
+          "url": "https://www.youtube.com/results?search_query=Functions+and+Relationships+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Functions and Relationships",
+          "url": "https://en.wikipedia.org/wiki/Functions_and_Relationships",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.GEOM.1",
+      "title": "Geometry of Straight Lines",
+      "description": "Angles on a straight line (180°), vertically opposite angles, angles formed by parallel lines cut by a transversal (corresponding, alternate, co-interior)",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "geometry",
+        "angles",
+        "parallel-lines",
+        "transversal",
+        "corresponding-angles",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.GEOM.1",
+          "description": "Angles on a straight line (180°), vertically opposite angles, angles formed by parallel lines cut by a transversal (corresponding, alternate, co-interior)",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Geometry of Straight Lines",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Geometry+of+Straight+Lines",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.GEOM.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Geometry of Straight Lines",
+          "url": "https://www.youtube.com/results?search_query=Geometry+of+Straight+Lines+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Geometry of Straight Lines",
+          "url": "https://en.wikipedia.org/wiki/Geometry_of_Straight_Lines",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.GEOM.2",
+      "title": "Geometry of 2D Shapes",
+      "description": "Properties of triangles and quadrilaterals. Congruency (SSS, SAS, AAS, RHS). Similarity. The theorem of Pythagoras and its converse",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "geometry",
+        "triangles",
+        "quadrilaterals",
+        "congruency",
+        "pythagoras",
+        "similarity",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.GEOM.2",
+          "description": "Properties of triangles and quadrilaterals. Congruency (SSS, SAS, AAS, RHS). Similarity. The theorem of Pythagoras and its converse",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Geometry of 2D Shapes",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Geometry+of+2D+Shapes",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.GEOM.2"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Geometry of 2D Shapes",
+          "url": "https://www.youtube.com/results?search_query=Geometry+of+2D+Shapes+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Geometry of 2D Shapes",
+          "url": "https://en.wikipedia.org/wiki/Geometry_of_2D_Shapes",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.MEAS.1",
+      "title": "Area, Perimeter, and Volume",
+      "description": "Area and perimeter of polygons. Surface area and volume of cubes, rectangular prisms, triangular prisms, and cylinders. Conversions between units",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "area",
+        "perimeter",
+        "volume",
+        "surface-area",
+        "prisms",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.MEAS.1",
+          "description": "Area and perimeter of polygons. Surface area and volume of cubes, rectangular prisms, triangular prisms, and cylinders. Conversions between units",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Area, Perimeter, and Volume",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Area,+Perimeter,+and+Volume",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.MEAS.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Area, Perimeter, and Volume",
+          "url": "https://www.youtube.com/results?search_query=Area,+Perimeter,+and+Volume+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Area, Perimeter, and Volume",
+          "url": "https://en.wikipedia.org/wiki/Area",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.STAT.1",
+      "title": "Data Handling",
+      "description": "Collect, organise, summarise, and represent data. Mean, median, mode, range. Bar graphs, histograms, pie charts, line graphs. Interpret data and draw conclusions",
+      "node_type": "Skill",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Statistics",
+      "tags": [
+        "statistics",
+        "data-handling",
+        "mean",
+        "median",
+        "mode",
+        "graphs",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.STAT.1",
+          "description": "Collect, organise, summarise, and represent data. Mean, median, mode, range. Bar graphs, histograms, pie charts, line graphs. Interpret data and draw conclusions",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Data Handling",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Data+Handling",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.STAT.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Data Handling",
+          "url": "https://www.youtube.com/results?search_query=Data+Handling+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Data Handling",
+          "url": "https://en.wikipedia.org/wiki/Data_Handling",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr9.PROB.1",
+      "title": "Probability",
+      "description": "Probability of single events. Probability scale (0 to 1). Relative frequency. Comparing experimental and theoretical probability. Tree diagrams for compound events",
+      "node_type": "Concept",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Probability",
+      "tags": [
+        "probability",
+        "events",
+        "relative-frequency",
+        "tree-diagrams",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade9"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr9.PROB.1",
+          "description": "Probability of single events. Probability scale (0 to 1). Relative frequency. Comparing experimental and theoretical probability. Tree diagrams for compound events",
+          "grade_level": "Grade9"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Probability",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Probability",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr9.PROB.1"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Probability",
+          "url": "https://www.youtube.com/results?search_query=Probability+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Probability",
+          "url": "https://en.wikipedia.org/wiki/Probability",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr9.NUM.1",
+      "to": "CAPS.Mathematics.Gr9.NUM.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Integer operations before fractions and percentages"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.NUM.1",
+      "to": "CAPS.Mathematics.Gr9.EXP.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Integer operations before exponent laws"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.EXP.1",
+      "to": "CAPS.Mathematics.Gr9.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Exponent laws needed for algebraic expressions"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.ALG.1",
+      "to": "CAPS.Mathematics.Gr9.ALG.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Expression manipulation before equation solving"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.ALG.2",
+      "to": "CAPS.Mathematics.Gr9.PAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 700,
+      "rationale": "Equations needed for pattern generalisation"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.PAT.1",
+      "to": "CAPS.Mathematics.Gr9.FN.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Patterns lead to function concepts"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.GEOM.1",
+      "to": "CAPS.Mathematics.Gr9.GEOM.2",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Angle properties before shape properties"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.ALG.1",
+      "to": "CAPS.Mathematics.Gr10.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Grade 9 factorisation is prerequisite for Grade 10 algebra"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.ALG.2",
+      "to": "CAPS.Mathematics.Gr10.ALG.2",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 9 equations before Grade 10 equations"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.EXP.1",
+      "to": "CAPS.Mathematics.Gr10.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 9 exponents needed for Grade 10 expressions"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.FN.1",
+      "to": "CAPS.Mathematics.Gr10.FN.1",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Grade 9 function concepts before Grade 10 functions"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.GEOM.2",
+      "to": "CAPS.Mathematics.Gr10.GEOM.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 9 shape properties before Grade 10 quadrilateral properties"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.STAT.1",
+      "to": "CAPS.Mathematics.Gr10.STAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 9 data handling before Grade 10 statistics"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.PROB.1",
+      "to": "CAPS.Mathematics.Gr10.PROB.1",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Grade 9 basic probability before Grade 10 Venn diagrams"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.NUM.2",
+      "to": "CAPS.Mathematics.Gr10.FIN.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Fractions and percentages needed for Grade 10 finance"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr9.MEAS.1",
+      "to": "CAPS.Mathematics.Gr10.MEAS.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 9 volume/area before Grade 10 prisms and cylinders"
+    }
+  ]
+}
