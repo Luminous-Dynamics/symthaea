@@ -53,7 +53,7 @@ fn make_multi_embodied_service(
 fn test_humanoid_cognitive_loop_closure() {
     let mut service = make_embodied_service(EmbodimentPlatform::Humanoid);
 
-    assert!(service.has_motor_bridge());
+    assert!(service.has_embodiment());
     assert_eq!(service.embodiment_platform(), EmbodimentPlatform::Humanoid);
 
     // Run 50 cycles — the full loop should close each time
