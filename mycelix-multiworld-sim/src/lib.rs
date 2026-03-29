@@ -46,6 +46,7 @@ pub mod narrative;
 pub mod needs;
 pub mod observables;
 pub mod population;
+pub mod cohort;
 pub mod engine_v2;
 pub mod projects;
 pub mod supply_chain;
@@ -1287,6 +1288,8 @@ impl MultiWorldSimulator {
     /// pathogen pressure, trust dynamics, narrative identity, Earth funding.
     fn tick_structural_realism(&mut self) {
         let tick = self.current_tick;
+        let earth_id_cached = self.worlds.iter()
+            .find(|w| w.location == "Earth").map(|w| w.id);
 
         for world in &mut self.worlds {
             let pop = world.population().max(1) as f64;
@@ -1582,6 +1585,12 @@ impl MultiWorldSimulator {
                     world.narrative_identity.identification =
                         (world.narrative_identity.identification + 0.1).min(1.0);
                     world.trust_level = (world.trust_level - 0.05).max(0.0);
+                    // P2: Independence degrades diplomatic relations with Earth
+                    // (earth_id cached before the structural realism loop)
+                    if let Some(eid) = earth_id_cached {
+                        let rel = world.diplomatic_relations.entry(eid).or_insert(0.5);
+                        *rel = (*rel - 0.15).max(-1.0);
+                    }
                 }
             }
 
@@ -1600,10 +1609,21 @@ impl MultiWorldSimulator {
                         mat.capacity *= 1.1; // Discovered new deposits
                         mat.current += mat.capacity * 0.1;
                     }
+                    // P2: Location-specific exploration narratives
+                    let discovery = match world.location.as_str() {
+                        "Mars" => "subsurface ice deposit mapped by ground-penetrating radar",
+                        "Europa" => "hydrothermal vent system detected beneath the ice shell",
+                        "Titan" => "methane lake shoreline rich in organic tholins catalogued",
+                        "Moon" => "permanently shadowed crater with water ice confirmed",
+                        _ => "new mineral deposits surveyed and mapped",
+                    };
+                    let explorer = narrative::generate_character_name(
+                        &world.name, "scientist", (tick / 360) as u16);
                     self.events.push(CivEvent::new(
                         tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: EXPLORATION SUCCESS #{} — new resource deposits discovered, \
-                            science advanced.", world.name, world.explorations_completed),
+                        format!("{}: EXPLORATION SUCCESS #{} — {}. \
+                            Lead scientist: {}.",
+                            world.name, world.explorations_completed, discovery, explorer),
                     ));
                 }
             }
@@ -1808,6 +1828,7 @@ impl MultiWorldSimulator {
         // Direct trust networks break down at ~150; hierarchical management required at ~1500.
         {
             let mut dunbar_events = Vec::new();
+            let mut dunbar_worlds = Vec::new(); // Track which worlds need governance hit
             for world in &self.worlds {
                 let pop = world.population();
                 for (threshold, desc) in [(150, "direct trust to formal roles"), (1500, "community to bureaucracy")] {
@@ -1820,10 +1841,19 @@ impl MultiWorldSimulator {
                             format!("{}: DUNBAR TRANSITION at pop {} — {} required. [{}]",
                                 world.name, pop, desc, key),
                         ));
+                        dunbar_worlds.push(world.id);
                     }
                 }
             }
             self.events.extend(dunbar_events);
+            // P2: Dunbar transitions temporarily destabilize governance
+            for world in &mut self.worlds {
+                if dunbar_worlds.contains(&world.id) {
+                    world.governance.stability_score =
+                        (world.governance.stability_score - 0.15).max(0.0);
+                    world.trust_level = (world.trust_level - 0.1).max(0.0);
+                }
+            }
         }
 
         // Phase 6b: Per-world consciousness-gated governance with anti-tyranny invariants

@@ -102,14 +102,17 @@ impl SkillVector {
 
     /// Name of the strongest skill sector.
     pub fn strongest(&self) -> &str {
+        SKILL_SECTORS[self.strongest_index()]
+    }
+
+    /// Index of the strongest skill sector (0-7).
+    pub fn strongest_index(&self) -> usize {
         let slice = self.as_slice();
-        let idx = slice
-            .iter()
+        slice.iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
-            .unwrap_or(0);
-        SKILL_SECTORS[idx]
+            .unwrap_or(0)
     }
 
     /// Learn: increase skill at `sector` index by `amount`, capped at 1.0.
