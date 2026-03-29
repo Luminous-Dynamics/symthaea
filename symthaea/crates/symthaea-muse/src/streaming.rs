@@ -16,7 +16,9 @@ use crate::ambient_drone::AmbientDrone;
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::composer_mind::ComposerMind;
 use crate::creative_agency::{CreativeIntent, CreativeJournal};
+use crate::dramatic::DramaticState;
 use crate::emotional_gestures;
+use crate::learned_melody::MelodyPredictor;
 use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
@@ -115,6 +117,10 @@ pub struct StreamingSynth {
     journal: CreativeJournal,
     /// Composer mind: goal-directed planning and long-range form.
     composer: ComposerMind,
+    /// Dramatic state: silence, modulation, sub-bass, texture.
+    dramatic: DramaticState,
+    /// Learned melody predictor (trained on 65M real music pairs).
+    melody_predictor: MelodyPredictor,
     /// Voice states for independent voice leading.
     lead_voice: VoiceState,
     /// Bar counter for form progression.
@@ -183,6 +189,8 @@ impl StreamingSynth {
             prev_note_freq: None,
             journal: CreativeJournal::new(),
             composer: ComposerMind::new(),
+            dramatic: DramaticState::new(),
+            melody_predictor: MelodyPredictor::new(),
             lead_voice: VoiceState::new(VoiceRole::Lead),
             bars_elapsed_frac: 0.0,
             smoother: StateSmoother::default_smooth(),
@@ -237,6 +245,13 @@ impl StreamingSynth {
             );
         }
         self.composer.shape_state(&mut self.state);
+
+        // Dramatic state: update silence, modulation, texture, sub-bass
+        self.dramatic.update(
+            self.composer.section(),
+            &self.state,
+            self.composer.memory.bars_elapsed() % 16.0,
+        );
 
         // Arousal-driven note generation cadence:
         // High arousal (0.9) → generate every 1 chunk (dense onsets)
@@ -373,9 +388,21 @@ impl StreamingSynth {
                     }).collect();
                     let partial_sum: f32 = blended.iter().sum();
                     let norm = if partial_sum > 0.01 { 1.0 / partial_sum } else { 1.0 };
+                    // Valence-driven micro-detuning: negative valence → partial beating → roughness
+                    // Plomp & Levelt (1965): dissonance peaks at ~25% critical bandwidth
+                    // Apply ±5-15 cents detune to partials 2-5 when valence < 0
+                    let neg_valence = (-self.state.valence).max(0.0); // 0 when happy, 1 when sad
+                    let detune_cents = neg_valence * 15.0; // 0-15 cents
+
                     let mut s = 0.0f32;
                     for h in 0..num_p {
-                        let cf = freq * (h + 1) as f32;
+                        let mut cf = freq * (h + 1) as f32;
+                        // Detune partials 2-5 for roughness (skip fundamental)
+                        if h >= 1 && h <= 4 && detune_cents > 0.5 {
+                            // Alternate + and - detune for beating between adjacent partials
+                            let sign = if h % 2 == 0 { 1.0 } else { -1.0 };
+                            cf *= 2.0f32.powf(sign * detune_cents / 1200.0);
+                        }
                         if cf >= nyquist { break; }
                         while active.partial_phases.len() <= h { active.partial_phases.push(0.0); }
                         active.partial_phases[h] += (cf / sr) * std::f32::consts::TAU;
@@ -462,6 +489,16 @@ impl StreamingSynth {
             }
         }
         self.bar_sample_pos += self.chunk_samples;
+
+        // ── Phase 3.6: Sub-bass (physical weight) ──
+        let kick_active = !self.drum_hits.is_empty(); // rough proxy
+        let sub_bass = self.dramatic.render_sub_bass(self.chunk_samples, self.sample_rate as f32, kick_active);
+        for (i, pair) in buffer.iter_mut().enumerate() {
+            if i < sub_bass.len() {
+                pair[0] += sub_bass[i];
+                pair[1] += sub_bass[i];
+            }
+        }
 
         // ── Phase 3.7: Ambient drone (fills silence, continuous low pad) ──
         let drone_chunk = self.drone.render(self.chunk_samples);
@@ -563,7 +600,14 @@ impl StreamingSynth {
         // Creative intent: what does Symthaea WANT to do?
         let intent = self.journal.creative_intent(&self.state);
 
+        // Dramatic silence gate: don't generate notes during dramatic pauses
+        if !self.dramatic.allow_notes() { return; }
+
+        // Texture density limits polyphony
+        let texture_voices = self.dramatic.max_voices();
         let max_new = if psi > 0.7 { 4 } else if psi > 0.5 { 3 } else if psi > 0.3 { 2 } else { 1 };
+        let max_new = max_new.min(texture_voices);
+
         for _ in 0..max_new {
             if self.active_notes.len() >= MAX_ACTIVE_NOTES { break; }
 
@@ -624,15 +668,42 @@ impl StreamingSynth {
                     if let Some(theme_note) = theme.get(self.note_counter as usize % theme.len()) {
                         note.frequency = theme_note.frequency;
                     }
+                } else if self.melody_predictor.has_context() {
+                    // Use learned melody predictor (trained on 65M real music pairs)
+                    let (pred_interval, pred_duration) = self.melody_predictor.predict(
+                        self.chord_beat_counter,
+                        phrase_pos,
+                        self.state.valence,
+                        self.state.arousal,
+                    );
+                    if let Some(prev) = self.lead_voice.prev_freq {
+                        note.frequency = self.melody_predictor.interval_to_freq(
+                            prev, pred_interval, &scale_tones,
+                        );
+                        note.duration = (pred_duration * 60.0 / self.muse_stream.tempo()).max(0.05);
+                    }
                 } else {
-                    // Apply melodic grammar (stepwise motion, leap resolution, etc.)
+                    // Fallback: rule-based grammar until predictor has enough context
                     note.frequency = melodic_grammar::apply_grammar(
                         note.frequency, &chord_freqs, &scale_tones, &ctx, self.note_counter,
                     );
                 }
 
+                // Apply key modulation from dramatic state
+                note.frequency = self.dramatic.apply_key_shift(note.frequency);
+
+                // Apply dynamic range exaggeration
+                note.velocity = self.dramatic.apply_dynamics(note.velocity, 0.5);
+
                 // Track voice state for grammar context
                 self.lead_voice.record(note);
+
+                // Feed learned predictor
+                if let Some(prev) = self.prev_note_freq {
+                    let interval = (note.frequency / prev).log2() * 12.0;
+                    let dur_beats = note.duration * self.muse_stream.tempo() / 60.0;
+                    self.melody_predictor.record(interval, dur_beats);
+                }
             }
 
             // Apply full emotional gesture: direction + duration + staccato + velocity + tension
@@ -785,6 +856,8 @@ impl StreamingSynth {
         self.motif.reset();
         self.journal.reset();
         self.composer.reset();
+        self.dramatic.reset();
+        self.melody_predictor.reset();
         self.lead_voice.reset();
         self.bars_elapsed_frac = 0.0;
         self.chord_idx = 0;
