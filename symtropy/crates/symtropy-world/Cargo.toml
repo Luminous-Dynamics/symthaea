@@ -1,0 +1,10 @@
+[package]
+name = "symtropy-world"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Macro/micro world bridge: civilization sim ↔ real-time gameplay"
+
+[dependencies]
+mycelix-multiworld-sim = { path = "../../../mycelix-multiworld-sim" }
+crossbeam-channel = "0.5"

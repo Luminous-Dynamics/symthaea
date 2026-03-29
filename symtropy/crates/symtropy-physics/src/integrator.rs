@@ -1,0 +1,245 @@
+//! Semi-implicit Euler integrator for ND rigid body dynamics.
+//!
+//! Angular velocity is a bivector (element of so(n)), integrated via the
+//! rotation matrix exponential. For small timesteps, the Rodrigues formula
+//! approximation is sufficient and avoids matrix exponential computation.
+
+use crate::body::RigidBody;
+use nalgebra::SVector;
+use symtropy_math::{Bivector, Point, Rotor};
+
+/// Integrate a single rigid body forward by dt seconds.
+///
+/// Semi-implicit Euler: update velocity first, then position.
+/// This is unconditionally stable for Hamiltonian systems (symplectic).
+pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64, D>, dt: f64) {
+    if !body.is_dynamic() {
+        body.clear_accumulators();
+        return;
+    }
+
+    // --- Linear dynamics ---
+
+    // Acceleration = F/m + gravity
+    let accel = body.force_accumulator * body.inv_mass + gravity;
+
+    // Semi-implicit: velocity first
+    body.linear_velocity += accel * dt;
+
+    // Apply linear damping
+    body.linear_velocity *= 1.0 - body.linear_damping;
+
+    // Clamp velocity to prevent explosion
+    let speed = body.linear_velocity.norm();
+    if speed > 1000.0 {
+        body.linear_velocity *= 1000.0 / speed;
+    }
+
+    // Update position
+    let displacement = body.linear_velocity * dt;
+    body.transform.translation = Point(body.transform.translation.0 + displacement);
+
+    // --- Angular dynamics ---
+
+    // Angular acceleration = torque / inertia (scalar approximation)
+    let ang_accel = body.torque_accumulator.scale(body.inv_inertia);
+
+    // Update angular velocity
+    body.angular_velocity = body.angular_velocity.add(&ang_accel.scale(dt));
+
+    // Apply angular damping
+    body.angular_velocity = body.angular_velocity.scale(1.0 - body.angular_damping);
+
+    // Clamp angular velocity
+    let ang_speed = body.angular_velocity.norm();
+    if ang_speed > 100.0 {
+        body.angular_velocity = body.angular_velocity.scale(100.0 / ang_speed);
+    }
+
+    // Integrate rotation: small angle approximation via Rodrigues
+    if ang_speed > 1e-12 {
+        let delta_angle = ang_speed * dt;
+        let delta_rotation = Rotor::from_plane_angle(&body.angular_velocity, delta_angle);
+        body.transform.rotation = delta_rotation.compose(&body.transform.rotation);
+    }
+
+    // Clear accumulators for next frame
+    body.clear_accumulators();
+}
+
+/// Apply a position correction to separate overlapping bodies.
+pub fn separate<const D: usize>(
+    body: &mut RigidBody<D>,
+    correction: &SVector<f64, D>,
+) {
+    if body.is_dynamic() {
+        body.transform.translation = Point(body.transform.translation.0 + correction);
+    }
+}
+
+/// Apply an impulse to a body at its center of mass.
+pub fn apply_impulse<const D: usize>(
+    body: &mut RigidBody<D>,
+    impulse: &SVector<f64, D>,
+) {
+    if body.is_dynamic() {
+        body.linear_velocity += impulse * body.inv_mass;
+    }
+}
+
+/// Apply an angular impulse (as a bivector) to a body.
+pub fn apply_angular_impulse<const D: usize>(
+    body: &mut RigidBody<D>,
+    impulse: &Bivector<D>,
+) {
+    if body.is_dynamic() {
+        body.angular_velocity = body.angular_velocity.add(&impulse.scale(body.inv_inertia));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::body::BodyHandle;
+
+    #[test]
+    fn free_fall_3d() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::origin(),
+            1.0,
+            1.0,
+        );
+        let gravity = SVector::from([0.0, -9.81, 0.0]);
+        let dt = 0.01;
+
+        // Simulate 1 second of free fall (100 steps)
+        for _ in 0..100 {
+            integrate(&mut body, &gravity, dt);
+        }
+
+        // After 1s: y ≈ -0.5 * 9.81 * 1² ≈ -4.905 (with damping, less)
+        let y = body.transform.translation.coord(1);
+        assert!(y < -3.0, "y = {y}, expected < -3.0");
+        assert!(y > -6.0, "y = {y}, expected > -6.0 (damping bounds)");
+    }
+
+    #[test]
+    fn stationary_without_forces() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::new([5.0, 5.0, 5.0]),
+            1.0,
+            1.0,
+        );
+        let zero_gravity = SVector::zeros();
+        let dt = 0.01;
+
+        for _ in 0..100 {
+            integrate(&mut body, &zero_gravity, dt);
+        }
+
+        // Should barely move (damping causes slight drift toward zero vel)
+        assert!((body.transform.translation.coord(0) - 5.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn applied_force_accelerates() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::origin(),
+            1.0,
+            2.0, // 2 kg
+        );
+        let zero_gravity = SVector::zeros();
+        let dt = 0.01;
+
+        // Apply 10N in x direction for 1 second
+        for _ in 0..100 {
+            body.apply_force(SVector::from([10.0, 0.0, 0.0]));
+            integrate(&mut body, &zero_gravity, dt);
+        }
+
+        // v ≈ F/m * t = 10/2 * 1 = 5 m/s (minus damping)
+        let vx = body.linear_velocity[0];
+        assert!(vx > 3.0, "vx = {vx}, expected > 3.0");
+        assert!(vx < 6.0, "vx = {vx}, expected < 6.0");
+    }
+
+    #[test]
+    fn angular_velocity_rotates_body() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::origin(),
+            1.0,
+            1.0,
+        );
+        // Set angular velocity in xy plane
+        body.angular_velocity = Bivector::<3>::unit_plane(0, 1).scale(1.0);
+
+        let zero_gravity = SVector::zeros();
+        let dt = 0.01;
+
+        for _ in 0..100 {
+            integrate(&mut body, &zero_gravity, dt);
+        }
+
+        // Body should have rotated — rotation matrix should not be identity
+        let mat = body.transform.rotation.to_matrix();
+        let trace = mat.trace();
+        // Identity has trace = 3, rotated will have trace < 3
+        assert!(trace < 2.99, "trace = {trace}, body didn't rotate");
+    }
+
+    #[test]
+    fn impulse_changes_velocity() {
+        let mut body = RigidBody::<4>::dynamic_sphere(
+            BodyHandle(0),
+            Point::origin(),
+            1.0,
+            5.0, // 5 kg
+        );
+        apply_impulse(&mut body, &SVector::from([50.0, 0.0, 0.0, 0.0]));
+        // Δv = impulse / mass = 50/5 = 10
+        assert!((body.linear_velocity[0] - 10.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn energy_conservation_no_damping() {
+        let mut body = RigidBody::<3>::dynamic_sphere(
+            BodyHandle(0),
+            Point::new([0.0, 100.0, 0.0]),
+            1.0,
+            1.0,
+        );
+        body.linear_damping = 0.0;
+        body.angular_damping = 0.0;
+
+        let gravity = SVector::from([0.0, -9.81, 0.0]);
+        let dt = 0.001; // Small timestep for accuracy
+
+        let initial_energy = body.kinetic_energy() + body.mass * 9.81 * body.transform.translation.coord(1);
+
+        for _ in 0..1000 {
+            integrate(&mut body, &gravity, dt);
+        }
+
+        let final_energy = body.kinetic_energy() + body.mass * 9.81 * body.transform.translation.coord(1);
+        let drift = ((final_energy - initial_energy) / initial_energy).abs();
+        assert!(drift < 0.01, "energy drift {drift} > 1%");
+    }
+
+    #[test]
+    fn static_body_not_affected() {
+        use symtropy_math::Sphere;
+        let mut body = RigidBody::<3>::static_body(
+            BodyHandle(0),
+            Point::new([5.0, 5.0, 5.0]),
+            Box::new(Sphere::unit()),
+        );
+        body.apply_force(SVector::from([1000.0, 0.0, 0.0]));
+        let gravity = SVector::from([0.0, -100.0, 0.0]);
+        integrate(&mut body, &gravity, 1.0);
+        assert!((body.transform.translation.coord(0) - 5.0).abs() < 1e-12);
+    }
+}

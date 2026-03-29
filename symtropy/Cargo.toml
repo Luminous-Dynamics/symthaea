@@ -31,8 +31,20 @@ mycelix-core-types = { path = "../mycelix-core/libs/mycelix-core-types", default
 # Symthaea consciousness — the Master Equation (7-theory synthesis)
 symthaea-consciousness-equation = { path = "../symthaea/crates/symthaea-consciousness-equation" }
 
+# Symtropy engine crates — consciousness-physics runtime
+symtropy-math = { path = "crates/symtropy-math" }
+symtropy-physics = { path = "crates/symtropy-physics" }
+symtropy-consciousness-physics = { path = "crates/symtropy-consciousness-physics" }
+symtropy-render-bridge = { path = "crates/symtropy-render-bridge" }
+symtropy-robotics-bridge = { path = "crates/symtropy-robotics-bridge" }
+
+# Optional advanced features
+symtropy-world = { path = "crates/symtropy-world", optional = true }
+symtropy-net = { path = "crates/symtropy-net", optional = true }
+
 # Utilities
 rand = "0.8"
+nalgebra = "0.34"
 
 [features]
 default = []
@@ -41,6 +53,8 @@ default = []
 # All Mycelix modules (governance, economy, factions, FL, DKG, epistemics) activate.
 # Run headless tests: cargo run -p symtropy-sim-bridge --bin headless_test -- --ticks 300
 mycelix = ["dep:symtropy-sim-bridge", "dep:mycelix-bridge-common", "dep:mycelix-core-types"]
+world = ["dep:symtropy-world"]
+net = ["world", "dep:symtropy-net"]
 
 [lints.clippy]
 all = "warn"

@@ -1,0 +1,119 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use nalgebra::SVector;
+use symtropy_math::{ConvexHull, Point, Sphere};
+use symtropy_physics::{PhysicsWorld, RigidBody, BodyHandle};
+use symtropy_physics::gjk;
+
+fn bench_gjk_sphere_sphere(c: &mut Criterion) {
+    let a = Sphere::<3>::unit();
+    let b = Sphere::<3>::unit();
+    let pa = SVector::from([0.0, 0.0, 0.0]);
+    let pb = SVector::from([1.5, 0.0, 0.0]);
+
+    c.bench_function("gjk_sphere_sphere_3d", |bench| {
+        bench.iter(|| {
+            black_box(gjk::intersects(&a, &pa, &b, &pb));
+        });
+    });
+}
+
+fn bench_gjk_box_box(c: &mut Criterion) {
+    let a = ConvexHull::<3>::unit_cube();
+    let b = ConvexHull::<3>::unit_cube();
+    let pa = SVector::from([0.0, 0.0, 0.0]);
+    let pb = SVector::from([1.5, 0.0, 0.0]);
+
+    c.bench_function("gjk_box_box_3d", |bench| {
+        bench.iter(|| {
+            black_box(gjk::intersects(&a, &pa, &b, &pb));
+        });
+    });
+}
+
+fn bench_gjk_4d_tesseract(c: &mut Criterion) {
+    let a = ConvexHull::<4>::unit_cube();
+    let b = ConvexHull::<4>::unit_cube();
+    let pa = SVector::from([0.0, 0.0, 0.0, 0.0]);
+    let pb = SVector::from([1.5, 0.0, 0.0, 0.0]);
+
+    c.bench_function("gjk_tesseract_4d", |bench| {
+        bench.iter(|| {
+            black_box(gjk::intersects(&a, &pa, &b, &pb));
+        });
+    });
+}
+
+fn bench_physics_step_10_bodies(c: &mut Criterion) {
+    c.bench_function("physics_step_10_bodies_3d", |bench| {
+        bench.iter_batched(
+            || {
+                let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
+                for i in 0..10 {
+                    let h = world.add_sphere(
+                        Point::new([i as f64 * 3.0, 10.0, 0.0]),
+                        0.5,
+                        1.0,
+                    );
+                    world.body_mut(h).unwrap().linear_velocity =
+                        SVector::from([0.0, -5.0, 0.0]);
+                }
+                world
+            },
+            |mut world| {
+                black_box(world.step(0.016));
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn bench_physics_step_100_bodies(c: &mut Criterion) {
+    c.bench_function("physics_step_100_bodies_3d", |bench| {
+        bench.iter_batched(
+            || {
+                let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
+                for i in 0..100 {
+                    let x = (i % 10) as f64 * 2.5;
+                    let y = (i / 10) as f64 * 2.5 + 5.0;
+                    world.add_sphere(Point::new([x, y, 0.0]), 0.5, 1.0);
+                }
+                world
+            },
+            |mut world| {
+                black_box(world.step(0.016));
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+fn bench_physics_step_2d(c: &mut Criterion) {
+    c.bench_function("physics_step_50_bodies_2d", |bench| {
+        bench.iter_batched(
+            || {
+                let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, -9.81]));
+                for i in 0..50 {
+                    let x = (i % 10) as f64 * 2.5;
+                    let y = (i / 10) as f64 * 2.5 + 5.0;
+                    world.add_sphere(Point::new([x, y]), 0.5, 1.0);
+                }
+                world
+            },
+            |mut world| {
+                black_box(world.step(0.016));
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
+criterion_group!(
+    benches,
+    bench_gjk_sphere_sphere,
+    bench_gjk_box_box,
+    bench_gjk_4d_tesseract,
+    bench_physics_step_10_bodies,
+    bench_physics_step_100_bodies,
+    bench_physics_step_2d,
+);
+criterion_main!(benches);

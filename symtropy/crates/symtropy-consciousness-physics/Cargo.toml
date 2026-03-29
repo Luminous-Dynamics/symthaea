@@ -1,0 +1,15 @@
+[package]
+name = "symtropy-consciousness-physics"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Consciousness-physics coupling: Φ as a first-class physics parameter"
+
+[dependencies]
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+nalgebra = "0.34"
+
+[dev-dependencies]
+proptest = "1.4"

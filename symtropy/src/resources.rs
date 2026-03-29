@@ -164,16 +164,21 @@ impl TileGrid {
 // Physics Engine (Symtropy consciousness-physics runtime)
 // ============================================================================
 
-/// 2D physics world resource — wraps the ND physics engine for the game.
+/// 2D physics world resource — wraps the ND physics engine AND consciousness field.
+///
+/// The consciousness field is wired INTO the physics step via `step_with_callback`,
+/// making Φ a real physical force that modulates impulses, friction, and energy.
 #[derive(Resource)]
 pub struct PhysicsWorldRes {
     pub world: symtropy_physics::PhysicsWorld<2>,
+    pub consciousness: symtropy_consciousness_physics::ConsciousnessField<2>,
 }
 
 impl Default for PhysicsWorldRes {
     fn default() -> Self {
         Self {
             world: symtropy_physics::PhysicsWorld::new(nalgebra::SVector::from([0.0, 0.0])),
+            consciousness: symtropy_consciousness_physics::ConsciousnessField::new(),
         }
     }
 }

@@ -5,6 +5,7 @@
 pub mod audio;
 pub mod consciousness;
 pub mod engine_physics;
+pub mod phi_pcg;
 pub mod dialogue;
 pub mod room_memory;
 pub mod fep_behavior;

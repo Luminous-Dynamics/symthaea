@@ -1,0 +1,12 @@
+[package]
+name = "symtropy-math"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "N-dimensional geometric algebra for the Symtropy consciousness-physics engine"
+
+[dependencies]
+nalgebra = "0.34"
+
+[dev-dependencies]
+proptest = "1.4"

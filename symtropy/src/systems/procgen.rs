@@ -41,8 +41,9 @@ impl Room {
     }
 }
 
-const MIN_ROOM_SIZE: usize = 5;
-const MIN_SPLIT_SIZE: usize = 12;
+const DEFAULT_MIN_ROOM_SIZE: usize = 5;
+const DEFAULT_MIN_SPLIT_SIZE: usize = 12;
+const DEFAULT_BSP_DEPTH: usize = 5;
 
 impl BspNode {
     fn new(x: usize, y: usize, w: usize, h: usize) -> Self {
@@ -50,10 +51,20 @@ impl BspNode {
     }
 
     fn split(&mut self, rng: &mut impl Rng, depth: usize) {
-        if depth == 0 || (self.w < MIN_SPLIT_SIZE && self.h < MIN_SPLIT_SIZE) {
+        self.split_with_params(rng, depth, DEFAULT_MIN_ROOM_SIZE, DEFAULT_MIN_SPLIT_SIZE);
+    }
+
+    fn split_with_params(
+        &mut self,
+        rng: &mut impl Rng,
+        depth: usize,
+        min_room: usize,
+        min_split: usize,
+    ) {
+        if depth == 0 || (self.w < min_split && self.h < min_split) {
             // Leaf — carve a room
-            let room_w = rng.gen_range(MIN_ROOM_SIZE..=self.w.saturating_sub(2).max(MIN_ROOM_SIZE));
-            let room_h = rng.gen_range(MIN_ROOM_SIZE..=self.h.saturating_sub(2).max(MIN_ROOM_SIZE));
+            let room_w = rng.gen_range(min_room..=self.w.saturating_sub(2).max(min_room));
+            let room_h = rng.gen_range(min_room..=self.h.saturating_sub(2).max(min_room));
             let room_x = self.x + rng.gen_range(1..=self.w.saturating_sub(room_w).max(1));
             let room_y = self.y + rng.gen_range(1..=self.h.saturating_sub(room_h).max(1));
             self.room = Some(Room { x: room_x, y: room_y, w: room_w, h: room_h });
@@ -69,19 +80,19 @@ impl BspNode {
         };
 
         if split_horizontal {
-            let split = rng.gen_range(MIN_ROOM_SIZE..=self.h.saturating_sub(MIN_ROOM_SIZE).max(MIN_ROOM_SIZE));
+            let split = rng.gen_range(min_room..=self.h.saturating_sub(min_room).max(min_room));
             let mut left = Box::new(BspNode::new(self.x, self.y, self.w, split));
             let mut right = Box::new(BspNode::new(self.x, self.y + split, self.w, self.h.saturating_sub(split).max(1)));
-            left.split(rng, depth - 1);
-            right.split(rng, depth - 1);
+            left.split_with_params(rng, depth - 1, min_room, min_split);
+            right.split_with_params(rng, depth - 1, min_room, min_split);
             self.left = Some(left);
             self.right = Some(right);
         } else {
-            let split = rng.gen_range(MIN_ROOM_SIZE..=self.w.saturating_sub(MIN_ROOM_SIZE).max(MIN_ROOM_SIZE));
+            let split = rng.gen_range(min_room..=self.w.saturating_sub(min_room).max(min_room));
             let mut left = Box::new(BspNode::new(self.x, self.y, split, self.h));
             let mut right = Box::new(BspNode::new(self.x + split, self.y, self.w.saturating_sub(split).max(1), self.h));
-            left.split(rng, depth - 1);
-            right.split(rng, depth - 1);
+            left.split_with_params(rng, depth - 1, min_room, min_split);
+            right.split_with_params(rng, depth - 1, min_room, min_split);
             self.left = Some(left);
             self.right = Some(right);
         }
@@ -133,22 +144,28 @@ impl BspNode {
 }
 
 fn carve_corridor(tiles: &mut Vec<Vec<u8>>, from: (usize, usize), to: (usize, usize)) {
+    carve_corridor_width(tiles, from, to, 2);
+}
+
+fn carve_corridor_width(tiles: &mut Vec<Vec<u8>>, from: (usize, usize), to: (usize, usize), width: usize) {
     let (mut x, mut y) = from;
     let (tx, ty) = to;
 
-    // L-shaped corridor: horizontal then vertical
     while x != tx {
         if x < tiles[0].len() && y < tiles.len() {
             tiles[y][x] = 1;
-            // Make corridor 2 wide for easier navigation
-            if y + 1 < tiles.len() { tiles[y + 1][x] = 1; }
+            for w in 1..width {
+                if y + w < tiles.len() { tiles[y + w][x] = 1; }
+            }
         }
         if x < tx { x += 1; } else { x -= 1; }
     }
     while y != ty {
         if x < tiles[0].len() && y < tiles.len() {
             tiles[y][x] = 1;
-            if x + 1 < tiles[0].len() { tiles[y][x + 1] = 1; }
+            for w in 1..width {
+                if x + w < tiles[0].len() { tiles[y][x + w] = 1; }
+            }
         }
         if y < ty { y += 1; } else { y -= 1; }
     }
@@ -156,12 +173,65 @@ fn carve_corridor(tiles: &mut Vec<Vec<u8>>, from: (usize, usize), to: (usize, us
 
 /// Generate a random dungeon.
 pub fn generate_dungeon(width: usize, height: usize, seed: u64) -> Dungeon {
+    generate_dungeon_with_config(width, height, seed, DEFAULT_BSP_DEPTH, DEFAULT_MIN_ROOM_SIZE, DEFAULT_MIN_SPLIT_SIZE, 2)
+}
+
+/// Generate a consciousness-modulated dungeon.
+///
+/// Uses PhiDungeonConfig to vary BSP depth, room sizes, corridor width,
+/// and extra connections based on the player's consciousness level.
+pub fn generate_dungeon_phi(
+    width: usize,
+    height: usize,
+    seed: u64,
+    config: &super::phi_pcg::PhiDungeonConfig,
+) -> Dungeon {
+    let mut dungeon = generate_dungeon_with_config(
+        width,
+        height,
+        seed,
+        config.bsp_depth,
+        config.min_room_size,
+        config.min_split_size,
+        config.corridor_width,
+    );
+
+    // Add extra corridor connections for high-Phi (integration loops)
+    if config.extra_connections > 0 {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed.wrapping_add(1000));
+        let mut root = BspNode::new(0, 0, width, height);
+        root.split_with_params(&mut rng, config.bsp_depth, config.min_room_size, config.min_split_size);
+        let mut rooms = Vec::new();
+        root.collect_rooms(&mut rooms);
+
+        // Connect non-adjacent rooms to create loops (integration)
+        for i in 0..config.extra_connections.min(rooms.len().saturating_sub(2)) {
+            let from_idx = i;
+            let to_idx = (i + 2).min(rooms.len() - 1);
+            if from_idx < rooms.len() && to_idx < rooms.len() {
+                carve_corridor_width(&mut dungeon.tiles, rooms[from_idx], rooms[to_idx], config.corridor_width);
+            }
+        }
+    }
+
+    dungeon
+}
+
+fn generate_dungeon_with_config(
+    width: usize,
+    height: usize,
+    seed: u64,
+    bsp_depth: usize,
+    min_room: usize,
+    min_split: usize,
+    corridor_width: usize,
+) -> Dungeon {
     let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
     let mut tiles = vec![vec![0u8; width]; height]; // all walls
 
     // BSP split
     let mut root = BspNode::new(0, 0, width, height);
-    root.split(&mut rng, 5); // depth 5 → ~32 rooms
+    root.split_with_params(&mut rng, bsp_depth, min_room, min_split);
     root.carve(&mut tiles);
 
     // Ensure border is all walls
@@ -255,6 +325,36 @@ mod tests {
         let tiles1: Vec<u8> = d1.tiles.iter().flat_map(|r| r.iter().copied()).collect();
         let tiles2: Vec<u8> = d2.tiles.iter().flat_map(|r| r.iter().copied()).collect();
         assert_ne!(tiles1, tiles2);
+    }
+
+    #[test]
+    fn phi_driven_generation_varies_with_phi() {
+        use super::super::phi_pcg::{PhiDungeonConfig, PhiPcgParams};
+
+        let low_phi_config = PhiDungeonConfig::from_phi(&PhiPcgParams {
+            phi: 0.1,
+            ..Default::default()
+        });
+        let high_phi_config = PhiDungeonConfig::from_phi(&PhiPcgParams {
+            phi: 0.9,
+            ..Default::default()
+        });
+
+        let low = generate_dungeon_phi(30, 22, 42, &low_phi_config);
+        let high = generate_dungeon_phi(30, 22, 42, &high_phi_config);
+
+        let low_tiles: Vec<u8> = low.tiles.iter().flat_map(|r| r.iter().copied()).collect();
+        let high_tiles: Vec<u8> = high.tiles.iter().flat_map(|r| r.iter().copied()).collect();
+
+        // High Phi and low Phi should produce DIFFERENT layouts (different params)
+        assert_ne!(
+            low_tiles, high_tiles,
+            "different phi levels should produce different layouts"
+        );
+
+        // Verify BSP depth difference is reflected in the config
+        assert!(high_phi_config.bsp_depth > low_phi_config.bsp_depth);
+        assert!(high_phi_config.extra_connections > low_phi_config.extra_connections);
     }
 
     #[test]

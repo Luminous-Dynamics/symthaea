@@ -1,0 +1,14 @@
+[package]
+name = "symtropy-robotics-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Bridge Symthaea robotics platforms into the Symtropy game engine"
+
+[dependencies]
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
+symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
+symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+nalgebra = "0.34"

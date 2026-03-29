@@ -1,0 +1,265 @@
+//! Harmony field physics: spatially-varying consciousness fields that modulate
+//! local physics constants.
+//!
+//! Inspired by McFadden's CEMI field theory (2020): the brain's EM field *is*
+//! consciousness and causally influences neural activity. By analogy, harmony
+//! activations create fields that modulate local friction, collision response,
+//! and other physics parameters.
+//!
+//! # Field Properties
+//! - Each of the 8 harmonies creates a radial field around the entity
+//! - Field strength falls off as 1/r² (like electromagnetic fields)
+//! - Overlapping fields interact: resonance (aligned) vs interference (opposed)
+//! - Physical effects: resonant fields reduce friction, dissonant increase impulse
+
+use nalgebra::SVector;
+use symtropy_math::Point;
+
+/// Number of harmonies in the Eight Harmonies system.
+pub const NUM_HARMONIES: usize = 8;
+
+/// A harmony field source: an entity emitting harmony activations.
+#[derive(Debug, Clone)]
+pub struct HarmonySource<const D: usize> {
+    /// Position of the source entity.
+    pub position: Point<D>,
+    /// Harmony activations [0.0, 1.0] for each of the 8 harmonies.
+    pub activations: [f64; NUM_HARMONIES],
+    /// Field strength multiplier (scales with consciousness level).
+    pub strength: f64,
+    /// Field radius (beyond this, field is negligible).
+    pub radius: f64,
+}
+
+/// The harmony field: aggregates all sources and computes field effects.
+pub struct HarmonyField<const D: usize> {
+    pub sources: Vec<HarmonySource<D>>,
+}
+
+impl<const D: usize> HarmonyField<D> {
+    pub fn new() -> Self {
+        Self {
+            sources: Vec::new(),
+        }
+    }
+
+    /// Sample the total harmony field at a point.
+    ///
+    /// Returns the summed harmony activations at that location,
+    /// with each source's contribution falling off as 1/r².
+    pub fn sample(&self, point: &Point<D>) -> [f64; NUM_HARMONIES] {
+        let mut total = [0.0f64; NUM_HARMONIES];
+        for source in &self.sources {
+            let dist = source.position.distance(point);
+            if dist >= source.radius {
+                continue;
+            }
+            // 1/r² falloff (clamped at r=1 to avoid singularity)
+            let r = dist.max(1.0);
+            let falloff = source.strength / (r * r);
+
+            for i in 0..NUM_HARMONIES {
+                total[i] += source.activations[i] * falloff;
+            }
+        }
+        total
+    }
+
+    /// Compute the resonance between two harmony activation vectors.
+    ///
+    /// Resonance = dot product of normalized activation vectors.
+    /// Range: [-1, 1] where 1 = perfectly aligned, -1 = perfectly opposed.
+    pub fn resonance(a: &[f64; NUM_HARMONIES], b: &[f64; NUM_HARMONIES]) -> f64 {
+        let dot: f64 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+        let norm_a: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let norm_b: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if norm_a < 1e-10 || norm_b < 1e-10 {
+            return 0.0;
+        }
+        dot / (norm_a * norm_b)
+    }
+
+    /// Friction multiplier at a point, based on local harmony field.
+    ///
+    /// Resonant fields (aligned harmonies) reduce friction (cooperation flows).
+    /// Dissonant fields (opposed harmonies) increase friction (conflict resistance).
+    ///
+    /// Returns multiplier [0.5, 2.0]:
+    /// - 0.5 = half friction (strong resonance)
+    /// - 1.0 = normal friction (no field or neutral)
+    /// - 2.0 = double friction (strong dissonance)
+    pub fn friction_multiplier(
+        &self,
+        point: &Point<D>,
+        entity_harmonies: &[f64; NUM_HARMONIES],
+    ) -> f64 {
+        let field = self.sample(point);
+        let res = Self::resonance(&field, entity_harmonies);
+        // Map resonance [-1, 1] → friction [2.0, 0.5]
+        // res = 1.0 → 0.5 (half friction, harmony flows)
+        // res = 0.0 → 1.0 (normal)
+        // res = -1.0 → 2.0 (double friction, conflict resists)
+        1.0 - res * 0.5
+    }
+
+    /// Collision impulse multiplier at a point.
+    ///
+    /// Resonant fields dampen collisions (peaceful interactions).
+    /// Dissonant fields amplify collisions (conflict escalates).
+    ///
+    /// Returns multiplier [0.5, 1.5].
+    pub fn impulse_multiplier(
+        &self,
+        point: &Point<D>,
+        entity_harmonies: &[f64; NUM_HARMONIES],
+    ) -> f64 {
+        let field = self.sample(point);
+        let res = Self::resonance(&field, entity_harmonies);
+        // res = 1.0 → 0.5 (dampened)
+        // res = 0.0 → 1.0 (normal)
+        // res = -1.0 → 1.5 (amplified)
+        1.0 - res * 0.5
+    }
+
+    /// Total field energy at a point (sum of all harmony strengths).
+    pub fn field_energy(&self, point: &Point<D>) -> f64 {
+        let field = self.sample(point);
+        field.iter().sum()
+    }
+}
+
+impl<const D: usize> Default for HarmonyField<D> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stillness_source<const D: usize>(pos: Point<D>) -> HarmonySource<D> {
+        let mut activations = [0.0; NUM_HARMONIES];
+        activations[7] = 1.0; // Sacred Stillness
+        HarmonySource {
+            position: pos,
+            activations,
+            strength: 10.0,
+            radius: 100.0,
+        }
+    }
+
+    #[test]
+    fn sample_at_source() {
+        let mut field = HarmonyField::<3>::new();
+        field.sources.push(stillness_source(Point::origin()));
+
+        let sample = field.sample(&Point::origin());
+        // At distance ~1 (clamped), strength 10, stillness 1.0 → 10.0
+        assert!(sample[7] > 1.0, "stillness = {}", sample[7]);
+    }
+
+    #[test]
+    fn sample_falls_off_with_distance() {
+        let mut field = HarmonyField::<3>::new();
+        field.sources.push(stillness_source(Point::origin()));
+
+        let near = field.sample(&Point::new([2.0, 0.0, 0.0]));
+        let far = field.sample(&Point::new([10.0, 0.0, 0.0]));
+        assert!(near[7] > far[7], "near {} should be > far {}", near[7], far[7]);
+    }
+
+    #[test]
+    fn sample_zero_outside_radius() {
+        let mut source = stillness_source::<3>(Point::origin());
+        source.radius = 5.0;
+        let mut field = HarmonyField::new();
+        field.sources.push(source);
+
+        let outside = field.sample(&Point::new([10.0, 0.0, 0.0]));
+        assert!(outside[7] < 1e-10);
+    }
+
+    #[test]
+    fn resonance_aligned() {
+        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let b = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let res = HarmonyField::<3>::resonance(&a, &b);
+        assert!((res - 1.0).abs() < 1e-10, "identical harmonies should resonate");
+    }
+
+    #[test]
+    fn resonance_opposed() {
+        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let b = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let res = HarmonyField::<3>::resonance(&a, &b);
+        assert!((res - 0.0).abs() < 1e-10, "orthogonal harmonies = zero resonance");
+    }
+
+    #[test]
+    fn friction_reduced_by_resonance() {
+        let mut field = HarmonyField::<3>::new();
+        field.sources.push(stillness_source(Point::origin()));
+
+        let mut entity_harmonies = [0.0; NUM_HARMONIES];
+        entity_harmonies[7] = 1.0; // Same harmony → resonance
+
+        let mult = field.friction_multiplier(&Point::new([2.0, 0.0, 0.0]), &entity_harmonies);
+        assert!(mult < 1.0, "resonant friction mult {} should be < 1.0", mult);
+    }
+
+    #[test]
+    fn friction_increased_by_dissonance() {
+        let mut field = HarmonyField::<3>::new();
+        field.sources.push(stillness_source(Point::origin()));
+
+        let mut entity_harmonies = [0.0; NUM_HARMONIES];
+        entity_harmonies[0] = 1.0; // Different harmony → less resonance
+
+        // Since orthogonal harmonies give resonance=0, friction should be ~1.0
+        let mult = field.friction_multiplier(&Point::new([2.0, 0.0, 0.0]), &entity_harmonies);
+        assert!(
+            (mult - 1.0).abs() < 0.5,
+            "orthogonal friction mult {} should be near 1.0",
+            mult
+        );
+    }
+
+    #[test]
+    fn multiple_sources_superpose() {
+        let mut field = HarmonyField::<3>::new();
+        field.sources.push(stillness_source(Point::new([5.0, 0.0, 0.0])));
+        field.sources.push(stillness_source(Point::new([-5.0, 0.0, 0.0])));
+
+        let single_source = {
+            let mut f = HarmonyField::<3>::new();
+            f.sources.push(stillness_source(Point::new([5.0, 0.0, 0.0])));
+            f.sample(&Point::origin())
+        };
+
+        let both = field.sample(&Point::origin());
+        assert!(both[7] > single_source[7], "superposition should be stronger");
+    }
+
+    #[test]
+    fn field_energy_sums() {
+        let mut field = HarmonyField::<3>::new();
+        field.sources.push(stillness_source(Point::origin()));
+        let energy = field.field_energy(&Point::new([2.0, 0.0, 0.0]));
+        assert!(energy > 0.0);
+    }
+
+    #[test]
+    fn harmony_field_4d() {
+        let mut field = HarmonyField::<4>::new();
+        let mut source = HarmonySource {
+            position: Point::origin(),
+            activations: [0.5; 8],
+            strength: 5.0,
+            radius: 50.0,
+        };
+        field.sources.push(source);
+        let sample = field.sample(&Point::new([3.0, 0.0, 0.0, 0.0]));
+        assert!(sample[0] > 0.0);
+    }
+}

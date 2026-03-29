@@ -1,0 +1,12 @@
+[package]
+name = "symtropy-net"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Decentralized P2P state sync via Holochain DHT for Symtropy"
+
+[dependencies]
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+symtropy-holochain-relay = { path = "../symtropy-holochain-relay" }
+nalgebra = "0.34"
