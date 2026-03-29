@@ -794,6 +794,10 @@ name = "robotics_scenarios"
 required-features = ["humanoid"]
 
 [[test]]
+name = "substrate_embodiment_integration"
+required-features = ["humanoid"]
+
+[[test]]
 name = "humanoid_integration"
 required-features = ["humanoid"]
 
