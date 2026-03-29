@@ -507,14 +507,14 @@ muse = ["dep:symthaea-muse"]                             # Consciousness-driven 
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
-embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # UNTESTED: not in CI matrix; GPU passthrough only (0 cfg gates in src/)
+# REMOVED: embeddings-gpu (0 cfg gates; pure dependency passthrough, never tested in CI)
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
-vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # UNTESTED: not in CI (requires V4L2 hardware); passthrough only (0 cfg gates in src/)
+# REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
-foveation-perception = ["foveation", "symthaea-foveation/perception"]  # UNTESTED: not in CI (requires GPU models); passthrough only (0 cfg gates in src/)
+# REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
 glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
@@ -542,7 +542,7 @@ lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh ra
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
-secure-mesh = ["identity", "mesh-key-exchange", "swarm"]  # UNTESTED: not in CI matrix; pure bundle (0 cfg gates in src/)
+# REMOVED: secure-mesh (0 cfg gates; pure convenience bundle — enable identity + mesh-key-exchange + swarm directly)
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
@@ -655,7 +655,7 @@ proliferation-safeguards = ["nuclear-forensics"]
 
 # ── Convenience bundles ───────────────────────────────────────────
 # Group related features that users commonly enable together.
-consciousness_full = ["reasoning_engine", "identity"]   # UNTESTED: not in CI matrix (pure bundle, 0 cfg gates in src/)
+# REMOVED: consciousness_full (0 cfg gates; pure bundle — enable reasoning_engine + identity directly)
 # REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
 # REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
