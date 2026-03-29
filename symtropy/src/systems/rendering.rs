@@ -215,6 +215,7 @@ pub fn setup_world(
             MoveTarget { target: None, speed: 60.0 },
             NoiseEmitter::default(),
             cp,
+            super::consciousness::NpcConsciousness::default(),
             TendBalance::new(40),
             FactionAffiliation {
                 faction_id: None,
