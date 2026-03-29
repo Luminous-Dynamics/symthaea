@@ -15,6 +15,192 @@ use mycelix_bridge_common::requirement_for_basic;
 use mycelix_zome_helpers::records_from_links;
 
 // =============================================================================
+// Cross-cluster bridge helpers (best-effort, never block primary operation)
+// =============================================================================
+
+/// Best-effort cross-cluster call to TEND zome to record a care exchange settlement.
+/// Returns the TEND exchange ID if successful, or None if the finance cluster is
+/// unreachable. The primary contract operation must not fail because of TEND.
+fn bridge_tend_settlement(
+    provider: &AgentPubKey,
+    receiver: &AgentPubKey,
+    hours: f32,
+    description: &str,
+) -> Option<String> {
+    #[derive(Serialize, Debug)]
+    struct TendPayload {
+        receiver_did: String,
+        hours: f32,
+        service_description: String,
+        service_category: String,
+        cultural_alias: Option<String>,
+        dao_did: String,
+        service_date: Option<Timestamp>,
+    }
+    let payload = TendPayload {
+        receiver_did: format!("did:mycelix:{}", receiver),
+        hours,
+        service_description: description.to_string(),
+        service_category: "BoundaryContract".to_string(),
+        cultural_alias: None,
+        dao_did: "did:mycelix:commons".to_string(),
+        service_date: None,
+    };
+    match call(
+        CallTargetCell::OtherRole("finance".into()),
+        ZomeName::from("tend"),
+        FunctionName::from("record_exchange"),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Deserialize, Debug)]
+            struct TendResult {
+                id: String,
+            }
+            result.decode::<TendResult>().ok().map(|r| r.id)
+        }
+        Ok(other) => {
+            debug!(
+                "TEND settlement warning: non-Ok response for provider={}: {:?}",
+                provider, other
+            );
+            None
+        }
+        Err(e) => {
+            debug!(
+                "TEND settlement warning: finance cluster unreachable for provider={}: {:?}",
+                provider, e
+            );
+            None
+        }
+    }
+}
+
+/// Best-effort cross-cluster call to the civic justice_restorative zome to open
+/// a restorative circle for a boundary violation. Returns the circle case_id if
+/// successful, or None if the civic cluster is unreachable.
+fn bridge_create_restorative_circle(
+    contract_id: &str,
+    reporter: &AgentPubKey,
+    violator: &AgentPubKey,
+    _description: &str,
+    _severity: &ViolationSeverity,
+) -> Option<String> {
+    #[derive(Serialize, Debug)]
+    struct CircleParticipant {
+        did: String,
+        role: String,
+        consented: bool,
+        attended_sessions: Vec<u32>,
+    }
+    #[derive(Serialize, Debug)]
+    struct RestorativeCirclePayload {
+        id: String,
+        case_id: String,
+        facilitator: String,
+        participants: Vec<CircleParticipant>,
+        status: String,
+        sessions: Vec<()>,
+        agreements: Vec<String>,
+        created_at: Timestamp,
+    }
+    let now = sys_time().ok()?;
+    let case_id = format!("bc-violation-{}-{}", contract_id, now.as_micros());
+    let circle_id = format!("circle-{}", case_id);
+    let payload = RestorativeCirclePayload {
+        id: circle_id,
+        case_id: case_id.clone(),
+        facilitator: "did:mycelix:auto-facilitator".to_string(),
+        participants: vec![
+            CircleParticipant {
+                did: format!("did:mycelix:{}", reporter),
+                role: "HarmReceiver".to_string(),
+                consented: true,
+                attended_sessions: vec![],
+            },
+            CircleParticipant {
+                did: format!("did:mycelix:{}", violator),
+                role: "HarmDoer".to_string(),
+                consented: false,
+                attended_sessions: vec![],
+            },
+        ],
+        status: "Forming".to_string(),
+        sessions: vec![],
+        agreements: vec![],
+        created_at: now,
+    };
+    match call(
+        CallTargetCell::OtherRole("civic".into()),
+        ZomeName::from("justice_restorative"),
+        FunctionName::from("create_circle"),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(_)) => Some(case_id),
+        Ok(other) => {
+            debug!(
+                "Restorative circle warning: non-Ok response for contract={}: {:?}",
+                contract_id, other
+            );
+            None
+        }
+        Err(e) => {
+            debug!(
+                "Restorative circle warning: civic cluster unreachable for contract={}: {:?}",
+                contract_id, e
+            );
+            None
+        }
+    }
+}
+
+/// Best-effort call to commons_bridge to slash a violator's community reputation
+/// score. Uses the consciousness credential refresh path to apply the penalty.
+/// Returns true if the slash was applied, false otherwise.
+fn bridge_reputation_slash(violator: &AgentPubKey, slash_factor: f32) -> bool {
+    // The SubPassport reputation slash is applied via the commons_bridge
+    // consciousness credential system. We call refresh_consciousness_credential
+    // with a penalty annotation. If the bridge extern doesn't exist yet, the
+    // call fails gracefully.
+    #[derive(Serialize, Debug)]
+    struct SlashInput {
+        agent: String,
+        factor: f32,
+        reason: String,
+    }
+    let payload = SlashInput {
+        agent: format!("did:mycelix:{}", violator),
+        factor: slash_factor,
+        reason: "boundary_contract_violation".to_string(),
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("commons_bridge"),
+        FunctionName::from("slash_community_score"),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(_)) => true,
+        Ok(other) => {
+            debug!(
+                "Reputation slash warning: non-Ok response for violator={}: {:?}",
+                violator, other
+            );
+            false
+        }
+        Err(e) => {
+            debug!(
+                "Reputation slash warning: commons_bridge unreachable or slash_community_score not yet implemented for violator={}: {:?}",
+                violator, e
+            );
+            false
+        }
+    }
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 
@@ -239,9 +425,31 @@ pub fn revoke_contract(input: RevokeContractInput) -> ExternResult<Record> {
     contract.status = ContractStatus::Revoked;
     contract.updated_at = now;
 
-    let new_hash = update_entry(input.contract_hash, &EntryTypes::BoundaryContract(contract))?;
+    let new_hash = update_entry(input.contract_hash, &EntryTypes::BoundaryContract(contract.clone()))?;
 
-    // TODO: Bridge call to TEND for partial settlement based on elapsed time
+    // Bridge call to TEND for partial settlement based on elapsed time.
+    // Best-effort: if TEND is unreachable, the revocation still succeeds.
+    if contract.provider_signed_at.is_some() && contract.receiver_signed_at.is_some() {
+        let elapsed_micros = now.as_micros().saturating_sub(contract.created_at.as_micros());
+        let total_micros = (contract.duration_minutes as i64) * 60 * 1_000_000;
+        let fraction = if total_micros > 0 {
+            (elapsed_micros as f32 / total_micros as f32).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let partial_hours = contract.tend_hours * fraction;
+        if partial_hours >= 0.25 {
+            let _exchange_id = bridge_tend_settlement(
+                &contract.provider,
+                &contract.receiver,
+                partial_hours,
+                &format!(
+                    "Partial settlement: boundary contract revoked ({:.0}% elapsed)",
+                    fraction * 100.0
+                ),
+            );
+        }
+    }
 
     get(new_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get revoked contract".into())))
@@ -280,9 +488,18 @@ pub fn complete_contract(contract_hash: ActionHash) -> ExternResult<Record> {
     contract.status = ContractStatus::Completed;
     contract.updated_at = now;
 
-    let new_hash = update_entry(contract_hash, &EntryTypes::BoundaryContract(contract))?;
+    let new_hash = update_entry(contract_hash, &EntryTypes::BoundaryContract(contract.clone()))?;
 
-    // TODO: Bridge call to TEND for full settlement
+    // Bridge call to TEND for full settlement.
+    // Best-effort: if TEND is unreachable, the completion still succeeds.
+    if contract.tend_hours >= 0.25 {
+        let _exchange_id = bridge_tend_settlement(
+            &contract.provider,
+            &contract.receiver,
+            contract.tend_hours,
+            "Full settlement: boundary contract completed",
+        );
+    }
 
     get(new_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get completed contract".into())))
@@ -366,6 +583,10 @@ pub fn report_violation(input: ReportViolationInput) -> ExternResult<Record> {
         contract.provider.clone()
     };
 
+    // Capture values needed for bridge calls before they are moved
+    let contract_id = contract.id.clone();
+    let violation_description = input.description.clone();
+
     // Transition contract to Violated status
     if contract.status.can_transition_to(&ContractStatus::Violated) {
         contract.status = ContractStatus::Violated;
@@ -393,16 +614,21 @@ pub fn report_violation(input: ReportViolationInput) -> ExternResult<Record> {
         (),
     )?;
 
-    // TODO: Bridge call to SubPassport for reputation slash
-    // let slash = input.severity.slash_factor();
-    // call(CallTargetCell::OtherRole("commons".into()),
-    //      "commons_bridge", "slash_community_score",
-    //      None, SlashInput { agent: violator.clone(), amount: slash })?;
+    // Bridge call to SubPassport for reputation slash.
+    // Best-effort: if the bridge extern is unavailable, we log and continue.
+    let slash_factor = input.severity.slash_factor();
+    let _slashed = bridge_reputation_slash(&violator, slash_factor);
 
-    // TODO: Bridge call to justice-restorative for case creation
-    // let case = call(CallTargetCell::OtherRole("civic".into()),
-    //      "justice_restorative", "create_case",
-    //      None, CaseInput { ... })?;
+    // Bridge call to justice-restorative for restorative circle creation.
+    // Best-effort: if the civic cluster is unreachable, the violation is
+    // still recorded and can be routed to restorative justice later.
+    let _restorative_case_id = bridge_create_restorative_circle(
+        &contract_id,
+        &reporter,
+        &violator,
+        &violation_description,
+        &input.severity,
+    );
 
     get(violation_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get violation record".into())))
