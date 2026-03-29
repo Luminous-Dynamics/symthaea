@@ -89,22 +89,8 @@ fn main() {
         let mut config = BrocaConfig::default();
         config.controller.network_layers = opts.network_layers;
         config.controller.neurons_per_layer = opts.neurons_per_layer;
-        if opts.projection_dim > 0 {
-            config.controller.projection_dim = Some(opts.projection_dim);
-        }
         (BrocaGenerator::new_4k(&genesis, config), None)
     };
-
-    // Enable projection head if --projection-dim specified (works for both fresh and resume)
-    if opts.projection_dim > 0 && generator.controller().projection_dim().is_none() {
-        tracing::info!(
-            dim = opts.projection_dim,
-            "Enabling learned projection head"
-        );
-        generator
-            .controller_mut()
-            .enable_projection(&genesis, opts.projection_dim);
-    }
 
     // Re-tokenize all pairs with the generator's BPE tokenizer.
     // The JSONL may have target_ids from a different tokenizer (e.g., GPT-NeoX

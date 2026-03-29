@@ -113,3 +113,22 @@ pub use projection::{
 };
 #[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn broca_config_default() {
+        let config = BrocaConfig::default();
+        // Verify default config is constructible
+        assert!(matches!(config.sampling, SamplingStrategy::Greedy));
+    }
+
+    #[test]
+    fn thought_channels_default() {
+        let channels = ThoughtChannels::default();
+        // ThoughtChannels should have a valid channel array (43 or 47 channels)
+        assert!(channels.channels.len() >= 43);
+    }
+}

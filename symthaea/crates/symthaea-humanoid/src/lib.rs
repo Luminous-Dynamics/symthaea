@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-humanoid
 //!
 //! HDC-LTC + FEP Active Inference bipedal humanoid control on the DMC Humanoid benchmark.
@@ -67,3 +70,20 @@ pub use simulator::MuJoCoHumanoidSimulator;
 pub use simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 pub use training::HumanoidTrainer;
 pub use types::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn humanoid_command_zero() {
+        let cmd = HumanoidCommand::zero();
+        assert_eq!(cmd.torques.len(), NUM_ACTUATORS);
+        assert!(cmd.torques.iter().all(|&t| t == 0.0));
+    }
+
+    #[test]
+    fn joint_names_count() {
+        assert_eq!(JOINT_NAMES.len(), NUM_ACTUATORS);
+    }
+}
