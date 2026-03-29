@@ -37,7 +37,7 @@ fn main() {
     // Print civilization results
     println!("=== CIVILIZATION RESULTS ===");
     println!("Duration: {:.0} years ({} ticks)", report.total_ticks as f64 / 12.0, report.total_ticks);
-    println!("RESULT: {} (CVS: {:.3})", if report.survived { "SURVIVED" } else { "COLLAPSED" }, report.cvs);
+    println!("RESULT: {} (CVS: {:.3})", if report.survived { "SURVIVED" } else { "COLLAPSED" }, report.final_cvs);
     println!("Population: {}", report.final_population);
     println!("Breakthroughs: {}", report.breakthroughs);
     println!();
