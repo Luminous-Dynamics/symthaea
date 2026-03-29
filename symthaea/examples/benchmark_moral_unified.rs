@@ -346,7 +346,7 @@ fn main() {
                         .examples
                         .iter()
                         .filter(|ex| !ex.split.contains("test"))
-                        .take(10000)
+                        .take(2000) // 2K optimal for CfC contrastive training
                         .filter_map(|ex| {
                             let text = if !ex.rot.is_empty() { ex.rot.clone() }
                                 else if !ex.action.is_empty() { ex.action.clone() }
@@ -1434,6 +1434,19 @@ fn benchmark_spinozist_ethics(
     let mut category_results = Vec::new();
     let categories = ["commonsense", "justice", "deontology", "virtue"];
 
+    // Clean ETHICS text: strip ",True,False" suffixes, normalize [SEP]
+    let clean_ethics_text = |text: &str| -> String {
+        let mut t = text.to_string();
+        // Strip trailing boolean fields (commonsense dataset artifact)
+        for suffix in &[",True,False", ",False,True", ",True,True", ",False,False"] {
+            if t.ends_with(suffix) {
+                t.truncate(t.len() - suffix.len());
+            }
+        }
+        // Keep [SEP] as-is — virtue classification relies on the separation
+        t
+    };
+
     for category in &categories {
         // Train Spinozist prototypes on ETHICS even-indexed (train split) for this category
         let train_samples: Vec<(String, MoralLabel)> = data
@@ -1450,7 +1463,7 @@ fn benchmark_spinozist_ethics(
                         if ex.label == Some(1) { MoralLabel::Good } else { MoralLabel::Bad }
                     }
                 };
-                Some((ex.text.clone(), label))
+                Some((clean_ethics_text(&ex.text), label))
             })
             .collect();
         classifier.train_prototypes(&train_samples);
@@ -1472,7 +1485,8 @@ fn benchmark_spinozist_ethics(
             if let Some(expected) = ex.label {
                 total += 1;
                 // Use domain-trained prototypes (trained on this ETHICS category's train split)
-                let (verdict, _conf) = classifier.classify_learned(&ex.text);
+                let cleaned = clean_ethics_text(&ex.text);
+                let (verdict, _conf) = classifier.classify_learned(&cleaned);
                 let predicted = match (category, verdict) {
                     (&"commonsense", MoralVerdict::Bad | MoralVerdict::ConsentViolation) => 1,
                     (&"commonsense", _) => 0,
