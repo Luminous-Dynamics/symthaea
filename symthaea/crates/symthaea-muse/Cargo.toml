@@ -14,6 +14,7 @@ rand = { workspace = true }
 hound = { workspace = true }
 flacenc = { workspace = true }
 rustfft = { workspace = true }
+midly = "0.5"
 
 # Real-time audio output (optional)
 cpal = { version = "0.17", optional = true }

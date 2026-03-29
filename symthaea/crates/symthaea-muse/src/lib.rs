@@ -610,6 +610,7 @@ pub mod composer_mind;
 pub mod creative_agency;
 pub mod emotional_gestures;
 pub mod melodic_grammar;
+pub mod midi_trainer;
 pub mod motif_memory;
 pub mod voice_leader;
 pub mod performance;
