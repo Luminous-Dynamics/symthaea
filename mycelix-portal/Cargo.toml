@@ -1,0 +1,14 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+[workspace]
+members = [
+    "crates/portal-shell",
+    "crates/portal-domain-trait",
+    "crates/domain-health",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
