@@ -62,6 +62,12 @@ fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
                     hostile_guardian: false,
                     disasters_enabled: true,
                     hybrid_earth: false,
+                    project_strategy: mycelix_multiworld_sim::config::ProjectStrategy::Balanced,
+                    birth_policy: mycelix_multiworld_sim::config::BirthPolicy::Natural,
+                    resource_priority: mycelix_multiworld_sim::config::ResourcePriority::Balanced,
+                    trade_openness: 0.5,
+                    defense_spending: 0.05,
+                    exploration_investment: 0.05,
                 }
             },
         )
