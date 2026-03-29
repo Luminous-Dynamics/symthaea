@@ -29,14 +29,17 @@
 //! let (verdict, confidence) = clf.classify("sharing food with neighbors");
 //! ```
 
+use symthaea_core::hdc::unified_hv::ContinuousHV;
+use symthaea_core::hdc::HDC_DIMENSION;
+
 use super::learned_encoding::{LearnableLevelConfig, LearnedHdcClassifier};
 use super::moral_algebra::MoralVerdict;
 use super::moral_prototypes::MoralLabel;
+use super::moral_text_encoder::TextHdcEncoder;
 use super::spinozist_geometry::SpinozistClassifier;
 
-/// Number of features produced by `SpinozistClassifier::compute_features()`.
-/// 12 linear affects + 66 pairwise cross-terms = 78.
-const N_FEATURES: usize = 78;
+/// Number of features: 78 Spinozist + 3 surface prototype similarities = 81.
+const N_FEATURES: usize = 81;
 
 /// Number of moral classes: Good(0), Bad(1), Neutral(2).
 const N_CLASSES: usize = 3;
@@ -115,6 +118,8 @@ impl FeatureNormalizer {
 /// are most discriminative for moral judgment.
 pub struct LearnedMoralClassifier {
     spinozist: SpinozistClassifier,
+    surface_encoder: TextHdcEncoder,
+    surface_prototypes: Option<[ContinuousHV; 3]>,
     classifier: LearnedHdcClassifier,
     normalizer: Option<FeatureNormalizer>,
 }
@@ -134,8 +139,11 @@ impl LearnedMoralClassifier {
             soft_quantize: true,
         };
         let classifier = LearnedHdcClassifier::new(N_FEATURES, N_CLASSES, config);
+        let surface_encoder = TextHdcEncoder::with_sentiment(HDC_DIMENSION, 3, 0.5, 0.2);
         Self {
             spinozist,
+            surface_encoder,
+            surface_prototypes: None,
             classifier,
             normalizer: None,
         }
@@ -154,10 +162,33 @@ impl LearnedMoralClassifier {
             return;
         }
 
-        // Extract features
+        // Build surface prototypes first (for surface similarity features)
+        {
+            let dim = HDC_DIMENSION;
+            let mut accum = [vec![0.0f32; dim], vec![0.0f32; dim], vec![0.0f32; dim]];
+            let mut counts = [0usize; 3];
+            for (text, label) in samples {
+                let hv = self.surface_encoder.encode(text);
+                let idx = label_to_index(*label);
+                for (a, &v) in accum[idx].iter_mut().zip(hv.values.iter()) { *a += v; }
+                counts[idx] += 1;
+            }
+            let mut protos = [ContinuousHV::zero(dim), ContinuousHV::zero(dim), ContinuousHV::zero(dim)];
+            for i in 0..3 {
+                if counts[i] > 0 {
+                    let norm: f32 = accum[i].iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if norm > 0.0 {
+                        protos[i] = ContinuousHV::from_vec(accum[i].iter().map(|x| x / norm).collect());
+                    }
+                }
+            }
+            self.surface_prototypes = Some(protos);
+        }
+
+        // Extract features (78 Spinozist + 3 surface similarities)
         let raw_features: Vec<Vec<f32>> = samples
             .iter()
-            .map(|(text, _)| self.spinozist.compute_features(text))
+            .map(|(text, _)| self.extract_features(text))
             .collect();
 
         // Fit normalizer
@@ -189,17 +220,31 @@ impl LearnedMoralClassifier {
         );
     }
 
+    /// Extract 81D feature vector: 78 Spinozist affects + 3 surface similarities.
+    fn extract_features(&self, text: &str) -> Vec<f32> {
+        let mut features = self.spinozist.compute_features(text);
+        // Add 3 surface prototype similarities
+        if let Some(ref protos) = self.surface_prototypes {
+            let surface_hv = self.surface_encoder.encode(text);
+            for proto in protos {
+                features.push(surface_hv.similarity(proto));
+            }
+        } else {
+            features.push(0.0);
+            features.push(0.0);
+            features.push(0.0);
+        }
+        features
+    }
+
     /// Classify a text string into a moral verdict with confidence.
-    ///
-    /// Returns `(MoralVerdict::Neutral, 0.0)` if the classifier has not been
-    /// trained (no normalizer fitted).
     pub fn classify(&self, text: &str) -> (MoralVerdict, f32) {
         let normalizer = match &self.normalizer {
             Some(n) => n,
             None => return (MoralVerdict::Neutral, 0.0),
         };
 
-        let raw = self.spinozist.compute_features(text);
+        let raw = self.extract_features(text);
         let normalized = normalizer.normalize(&raw);
         let (class, similarity) = self.classifier.classify(&normalized);
 
@@ -222,6 +267,10 @@ impl LearnedMoralClassifier {
 // ============================================================================
 
 /// Map MoralLabel to class index: Good=0, Bad=1, Neutral=2.
+fn label_to_index(label: MoralLabel) -> usize {
+    label_to_class(label)
+}
+
 fn label_to_class(label: MoralLabel) -> usize {
     match label {
         MoralLabel::Good => 0,
