@@ -487,9 +487,6 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 rdp = []                                   # Core RDP protocol + codec + session
 rdp-server = ["rdp"]                       # RDP server with screen capture
 rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (x11rb TODO)
-rdp-client = ["rdp"]                       # RDP client with frame reconstruction
-rdp-support = ["rdp"]                      # Mycelix support integration
-rdp-full = ["rdp-server", "rdp-client", "rdp-support"]  # Everything
 
 # ── Voice & Audio ───────────────────────────────────────────────────
 # Voice Pipeline (hierarchy):
@@ -639,12 +636,10 @@ genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  
 # ── Genesis Mission Challenges (DOE 2026) ─────────────────────────
 fusion-twin = ["physics"]
 safety-agents = []
-lab-controller = ["cell-foundry"]
 materials = ["dep:symthaea-materials"]
 nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
 water-prediction = ["cell-foundry"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
-physics-unification = ["physics"]
 grid-scaling = ["physics"]
 fission-reactor = ["physics"]
 accelerator = ["physics"]
@@ -654,17 +649,7 @@ experiment-planner = ["cell-foundry"]
 strategic-materials = ["materials"]
 critical-minerals = ["materials"]
 advanced-manufacturing = ["dep:symthaea-fabrication-kernel"]
-building-systems = ["dep:symthaea-fabrication-kernel"]
-design-production = ["dep:symthaea-fabrication-kernel"]
 proliferation-safeguards = ["nuclear-forensics"]
-genesis-missions = [
-    "fusion-twin", "safety-agents", "lab-controller", "materials",
-    "nuclear-forensics", "water-prediction", "physics-unification",
-    "grid-scaling", "fission-reactor", "accelerator", "threat-assessment",
-    "datacenter", "experiment-planner", "strategic-materials",
-    "critical-minerals", "advanced-manufacturing", "building-systems",
-    "design-production", "proliferation-safeguards"
-]
 
 
 # ── Convenience bundles ───────────────────────────────────────────
@@ -684,22 +669,6 @@ default-mind = [
     "cpg",
     "spectral_state",
     "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
-]
-networked-mind = [  # UNTESTED: not in CI matrix (pure bundle)
-    "default-mind",
-    "mycelix",
-    "mesh",
-    "multi_agent",
-]
-embodied-mind = [  # UNTESTED: not in CI matrix (pure bundle)
-    "default-mind",
-    "flight",
-    "humanoid",
-]
-sovereign-mind = [  # UNTESTED: not in CI matrix (pure bundle)
-    "networked-mind",
-    "secure-mesh",
-    "ssm_language",
 ]
 
 
@@ -1276,7 +1245,7 @@ required-features = ["safety-agents"]
 
 [[example]]
 name = "benchmark_genesis_lab"
-required-features = ["lab-controller"]
+required-features = ["cell-foundry"]
 
 [[example]]
 name = "benchmark_genesis_materials"
@@ -1292,11 +1261,11 @@ required-features = ["water-prediction"]
 
 [[example]]
 name = "benchmark_genesis_multiscale"
-required-features = ["physics-unification"]
+required-features = ["physics"]
 
 [[example]]
 name = "benchmark_genesis_temporal_unified"
-required-features = ["genesis-missions"]
+required-features = ["safety-agents"]
 
 [[example]]
 name = "benchmark_genesis_grid"
@@ -1332,15 +1301,15 @@ required-features = ["critical-minerals"]
 
 [[example]]
 name = "benchmark_genesis_manufacturing"
-required-features = ["genesis-missions"]
+required-features = ["advanced-manufacturing"]
 
 [[example]]
 name = "benchmark_genesis_building"
-required-features = ["genesis-missions"]
+required-features = ["advanced-manufacturing"]
 
 [[example]]
 name = "benchmark_genesis_design_loop"
-required-features = ["genesis-missions"]
+required-features = ["advanced-manufacturing"]
 
 [[example]]
 name = "benchmark_genesis_safeguards"
@@ -1348,11 +1317,11 @@ required-features = ["proliferation-safeguards"]
 
 [[example]]
 name = "benchmark_genesis_suite"
-required-features = ["genesis-missions"]
+required-features = ["safety-agents"]
 
 [[example]]
 name = "benchmark_genesis_safety_dashboard"
-required-features = ["genesis-missions"]
+required-features = ["safety-agents"]
 
 [[example]]
 name = "six_watt_benchmark"

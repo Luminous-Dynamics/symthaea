@@ -15404,6 +15404,7 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea-core",
+ "symthaea-stt",
  "tokenizers",
  "tracing",
  "tracing-subscriber",
@@ -15639,6 +15640,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-hal",
 ]
 
 [[package]]
@@ -15730,6 +15732,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-hal",
 ]
 
 [[package]]
@@ -15760,6 +15763,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-hal",
 ]
 
 [[package]]
@@ -16183,6 +16187,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-hal",
 ]
 
 [[package]]
