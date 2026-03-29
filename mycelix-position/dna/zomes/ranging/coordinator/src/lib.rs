@@ -69,7 +69,8 @@ pub fn submit_range(input: SubmitRangeInput) -> ExternResult<ActionHash> {
 pub fn get_ranges_for_node(node_id: String) -> ExternResult<Vec<RangeMeasurement>> {
     let node_anchor = anchor_for_node(&node_id)?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor, LinkTypes::RangesByNode)?.build(),
+        LinkQuery::try_new(node_anchor, LinkTypes::RangesByNode)?,
+            GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();

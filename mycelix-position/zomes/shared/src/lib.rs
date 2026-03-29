@@ -84,7 +84,8 @@ pub enum SurveyMethod {
 // ============================================================================
 
 /// An anchor node with a known position.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[hdk_entry_helper]
+#[derive(Clone)]
 pub struct AnchorNode {
     pub node_id: String,
     pub latitude_deg: f64,
@@ -98,7 +99,8 @@ pub struct AnchorNode {
 }
 
 /// Certification of an anchor's accuracy by a Steward.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[hdk_entry_helper]
+#[derive(Clone)]
 pub struct AnchorCertification {
     pub anchor_node_id: String,
     pub certifier: AgentPubKey,
@@ -108,7 +110,8 @@ pub struct AnchorCertification {
 }
 
 /// A range measurement between two nodes.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[hdk_entry_helper]
+#[derive(Clone)]
 pub struct RangeMeasurement {
     pub from_node: String,
     pub to_node: String,
@@ -121,7 +124,8 @@ pub struct RangeMeasurement {
 }
 
 /// A fused position estimate for a node.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[hdk_entry_helper]
+#[derive(Clone)]
 pub struct PositionEstimateEntry {
     pub node_id: String,
     pub latitude_deg: f64,

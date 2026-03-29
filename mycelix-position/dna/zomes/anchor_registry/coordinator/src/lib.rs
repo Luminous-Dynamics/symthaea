@@ -144,7 +144,8 @@ pub fn get_anchors_in_region(input: RegionQueryInput) -> ExternResult<Vec<Anchor
     let region_anchor = anchor_by_region(&geohash)?;
 
     let links = get_links(
-        GetLinksInputBuilder::try_new(region_anchor, LinkTypes::AnchorsByRegion)?.build(),
+        LinkQuery::try_new(region_anchor, LinkTypes::AnchorsByRegion)?,
+            GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();
@@ -163,7 +164,8 @@ pub fn get_anchors_in_region(input: RegionQueryInput) -> ExternResult<Vec<Anchor
 pub fn get_all_anchors(_: ()) -> ExternResult<Vec<AnchorNode>> {
     let all_anchor = anchor_all()?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(all_anchor, LinkTypes::AllAnchors)?.build(),
+        LinkQuery::try_new(all_anchor, LinkTypes::AllAnchors)?,
+            GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();

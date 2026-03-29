@@ -39,7 +39,8 @@ pub fn store_position_estimate(input: PositionEstimateEntry) -> ExternResult<Act
 pub fn get_latest_position(node_id: String) -> ExternResult<Option<PositionEstimateEntry>> {
     let node_anchor = anchor_for_node(&node_id)?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor, LinkTypes::EstimatesByNode)?.build(),
+        LinkQuery::try_new(node_anchor, LinkTypes::EstimatesByNode)?,
+            GetStrategy::Network,
     )?;
 
     let mut latest: Option<(PositionEstimateEntry, Timestamp)> = None;
@@ -65,7 +66,8 @@ pub fn get_latest_position(node_id: String) -> ExternResult<Option<PositionEstim
 pub fn get_position_history(node_id: String) -> ExternResult<Vec<PositionEstimateEntry>> {
     let node_anchor = anchor_for_node(&node_id)?;
     let links = get_links(
-        GetLinksInputBuilder::try_new(node_anchor, LinkTypes::EstimatesByNode)?.build(),
+        LinkQuery::try_new(node_anchor, LinkTypes::EstimatesByNode)?,
+            GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();
