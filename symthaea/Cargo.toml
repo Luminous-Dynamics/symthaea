@@ -790,6 +790,10 @@ name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
 
 [[test]]
+name = "robotics_scenarios"
+required-features = ["humanoid"]
+
+[[test]]
 name = "humanoid_integration"
 required-features = ["humanoid"]
 
