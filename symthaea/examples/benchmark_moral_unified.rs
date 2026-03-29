@@ -448,9 +448,10 @@ fn main() {
     }
 
     // Learned Moral Classifier (Spinozist features + adaptive HDC)
-    if let Some(r) = benchmark_learned_moral_classifier() {
-        results.push(r);
-    }
+    // Temporarily disabled — OOMs under memory pressure from concurrent train_melody
+    // if let Some(r) = benchmark_learned_moral_classifier() {
+    //     results.push(r);
+    // }
 
     let total_duration = start.elapsed().as_millis();
 
@@ -1634,7 +1635,7 @@ fn benchmark_learned_moral_classifier() -> Option<BenchmarkResult> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     // Collect train and test splits
-    let max_train = 10_000; // 2x more data (20K+ OOMs under load)
+    let max_train = 5_000; // Keep small under memory pressure
     let mut train_samples: Vec<(String, MoralLabel)> = Vec::new();
     let mut test_samples: Vec<(String, i32)> = Vec::new();
 
@@ -1799,8 +1800,8 @@ fn train_prototypes_from_292k(
         return None;
     }
 
-    // Use all samples for retraining — no artificial cap.
-    let max_retrain = samples.len();
+    // Cap retrain at 50K to avoid OOM from pre-encoding cache (~3.2GB at 50K).
+    let max_retrain = 50_000;
     let sentiment_weight = 0.15;
     println!(
         "  Training on {} samples (retrain cap: {}, dim={}, sentiment={})...",

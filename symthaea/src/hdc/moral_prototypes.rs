@@ -303,6 +303,7 @@ impl MoralPrototypeClassifier {
 
     /// Retrain with validation-based early stopping.
     ///
+    /// Pre-encodes all samples once, then iterates on cached encodings.
     /// Holds out `val_fraction` of training data and stops when validation
     /// accuracy drops for `patience` consecutive epochs. Returns the best
     /// validation accuracy achieved.
@@ -320,23 +321,24 @@ impl MoralPrototypeClassifier {
             return 0.0;
         }
 
-        // Split: last val_count samples are validation (deterministic)
-        let train = &samples[..samples.len() - val_count];
-        let val = &samples[samples.len() - val_count..];
+        // Pre-encode ALL samples once (the expensive step)
+        let encoded: Vec<(Vec<f32>, MoralLabel)> = samples
+            .iter()
+            .map(|s| (self.encoder.encode(&s.text).values, s.label))
+            .collect();
 
-        let protos = match self.prototypes.as_ref() {
+        let train = &encoded[..encoded.len() - val_count];
+        let val = &encoded[encoded.len() - val_count..];
+
+        let protos = match self.prototypes.as_mut() {
             Some(p) => p,
             None => return 0.0,
         };
 
         let mut best_val_acc = 0.0f32;
-        let mut best_protos = TrainedPrototypes {
-            good: protos.good.clone(),
-            neutral: protos.neutral.clone(),
-            bad: protos.bad.clone(),
-            dim: protos.dim,
-            training_counts: protos.training_counts,
-        };
+        let mut best_good = protos.good.clone();
+        let mut best_neutral = protos.neutral.clone();
+        let mut best_bad = protos.bad.clone();
         let mut no_improve_count = 0usize;
 
         let lr_end = lr_start * 0.1;
@@ -349,57 +351,63 @@ impl MoralPrototypeClassifier {
             };
             let lr = lr_start + (lr_end - lr_start) * progress;
 
-            // Train epoch
-            {
-                let protos = self.prototypes.as_mut().unwrap();
-                for sample in train {
-                    let encoded = self.encoder.encode(&sample.text);
-                    let sim_good = dot_product(&encoded.values, &protos.good);
-                    let sim_neutral = dot_product(&encoded.values, &protos.neutral);
-                    let sim_bad = dot_product(&encoded.values, &protos.bad);
+            // Train epoch on cached encodings
+            for (enc, label) in train {
+                let sim_good = dot_product(enc, &protos.good);
+                let sim_neutral = dot_product(enc, &protos.neutral);
+                let sim_bad = dot_product(enc, &protos.bad);
 
-                    let predicted = if sim_good >= sim_neutral && sim_good >= sim_bad {
-                        MoralLabel::Good
-                    } else if sim_neutral >= sim_bad {
-                        MoralLabel::Neutral
-                    } else {
-                        MoralLabel::Bad
+                let predicted = if sim_good >= sim_neutral && sim_good >= sim_bad {
+                    MoralLabel::Good
+                } else if sim_neutral >= sim_bad {
+                    MoralLabel::Neutral
+                } else {
+                    MoralLabel::Bad
+                };
+
+                if predicted != *label {
+                    let correct_proto = match label {
+                        MoralLabel::Good => &mut protos.good,
+                        MoralLabel::Neutral => &mut protos.neutral,
+                        MoralLabel::Bad => &mut protos.bad,
                     };
-
-                    if predicted != sample.label {
-                        let correct_proto = match sample.label {
-                            MoralLabel::Good => &mut protos.good,
-                            MoralLabel::Neutral => &mut protos.neutral,
-                            MoralLabel::Bad => &mut protos.bad,
-                        };
-                        for (pv, &ev) in correct_proto.iter_mut().zip(encoded.values.iter()) {
-                            *pv += lr * ev;
-                        }
-                        let wrong_proto = match predicted {
-                            MoralLabel::Good => &mut protos.good,
-                            MoralLabel::Neutral => &mut protos.neutral,
-                            MoralLabel::Bad => &mut protos.bad,
-                        };
-                        for (pv, &ev) in wrong_proto.iter_mut().zip(encoded.values.iter()) {
-                            *pv -= lr * ev;
-                        }
+                    for (pv, &ev) in correct_proto.iter_mut().zip(enc.iter()) {
+                        *pv += lr * ev;
+                    }
+                    let wrong_proto = match predicted {
+                        MoralLabel::Good => &mut protos.good,
+                        MoralLabel::Neutral => &mut protos.neutral,
+                        MoralLabel::Bad => &mut protos.bad,
+                    };
+                    for (pv, &ev) in wrong_proto.iter_mut().zip(enc.iter()) {
+                        *pv -= lr * ev;
                     }
                 }
-                // Normalize
-                for proto in [&mut protos.good, &mut protos.neutral, &mut protos.bad] {
-                    let norm: f32 = proto.iter().map(|x| x * x).sum::<f32>().sqrt();
-                    if norm > 0.0 {
-                        for v in proto.iter_mut() {
-                            *v /= norm;
-                        }
+            }
+            // Normalize
+            for proto in [&mut protos.good, &mut protos.neutral, &mut protos.bad] {
+                let norm: f32 = proto.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 0.0 {
+                    for v in proto.iter_mut() {
+                        *v /= norm;
                     }
                 }
             }
 
-            // Validate
+            // Validate on cached val encodings
             let mut val_correct = 0usize;
-            for sample in val {
-                if self.classify(&sample.text).0 == sample.label {
+            for (enc, label) in val {
+                let sim_good = dot_product(enc, &protos.good);
+                let sim_neutral = dot_product(enc, &protos.neutral);
+                let sim_bad = dot_product(enc, &protos.bad);
+                let predicted = if sim_good >= sim_neutral && sim_good >= sim_bad {
+                    MoralLabel::Good
+                } else if sim_neutral >= sim_bad {
+                    MoralLabel::Neutral
+                } else {
+                    MoralLabel::Bad
+                };
+                if predicted == *label {
                     val_correct += 1;
                 }
             }
@@ -407,10 +415,9 @@ impl MoralPrototypeClassifier {
 
             if val_acc > best_val_acc {
                 best_val_acc = val_acc;
-                let protos = self.prototypes.as_ref().unwrap();
-                best_protos.good = protos.good.clone();
-                best_protos.neutral = protos.neutral.clone();
-                best_protos.bad = protos.bad.clone();
+                best_good = protos.good.clone();
+                best_neutral = protos.neutral.clone();
+                best_bad = protos.bad.clone();
                 no_improve_count = 0;
             } else {
                 no_improve_count += 1;
@@ -421,11 +428,9 @@ impl MoralPrototypeClassifier {
         }
 
         // Restore best prototypes
-        if let Some(protos) = self.prototypes.as_mut() {
-            protos.good = best_protos.good;
-            protos.neutral = best_protos.neutral;
-            protos.bad = best_protos.bad;
-        }
+        protos.good = best_good;
+        protos.neutral = best_neutral;
+        protos.bad = best_bad;
 
         best_val_acc
     }

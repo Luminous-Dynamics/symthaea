@@ -12,10 +12,14 @@ Full details: @.claude/rules/CREDENTIALS.md
 ### Ports
 | Port | Service |
 |------|---------|
-| 5491 | Luminous Nix (EXCLUSIVE) |
 | 3001/3333/3338 | Weave/Core/Visualizer |
+| 5491 | Luminous Nix (EXCLUSIVE) |
 | 7777 | Sacred Bridge |
 | 7778 | Holon (Soma mobile bridge) |
+| 8090 | Symthaea Web (consciousness portal) |
+| 8091 | Terra Atlas (Leptos WebGL globe) |
+| 8092 | EduNet UI |
+| 8093 | Music UI |
 
 Full allocation: @.claude/rules/PORTS.md
 

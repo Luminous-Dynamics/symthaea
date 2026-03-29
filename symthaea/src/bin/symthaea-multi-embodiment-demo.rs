@@ -47,20 +47,8 @@ fn main() {
     #[cfg(feature = "humanoid")]
     {
         use symthaea::cognitive_loop::motor_bridge::EmbodimentPlatform;
-        config.embodiment_platforms = vec![
-            EmbodimentPlatform::Humanoid,
-            #[cfg(feature = "helicopter")]
-            EmbodimentPlatform::Helicopter,
-            #[cfg(feature = "flight")]
-            EmbodimentPlatform::Quadrotor,
-            #[cfg(feature = "vehicle")]
-            EmbodimentPlatform::Vehicle,
-            #[cfg(feature = "auv")]
-            EmbodimentPlatform::Auv,
-            #[cfg(feature = "manipulator")]
-            EmbodimentPlatform::Manipulator,
-        ];
-        config.embodiment_blend_weight = 0.15; // Lighter blend with 6 bodies
+        config.embodiment_platform = EmbodimentPlatform::Humanoid;
+        config.embodiment_blend_weight = 0.15;
         config.embodiment_step_interval = 1;
     }
 

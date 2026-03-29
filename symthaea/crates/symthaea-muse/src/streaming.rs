@@ -145,6 +145,10 @@ pub struct StreamingSynth {
     pub enable_phi_optimizer: bool,
     /// Enable FEP active inference (generative model of own audio).
     pub enable_fep: bool,
+    /// Emotional timbre manifold: V-A → interpolated partial amplitudes.
+    timbre_manifold: crate::timbre_space::TimbreManifold,
+    /// Cached manifold partials for current emotional state.
+    manifold_partials: Vec<f32>,
 }
 
 impl StreamingSynth {
@@ -194,6 +198,10 @@ impl StreamingSynth {
             enable_sidechain: true,
             enable_phi_optimizer: false,
             enable_fep: true,
+            timbre_manifold: crate::timbre_space::TimbreManifold::default_manifold(
+                &symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-muse-timbre"),
+            ),
+            manifold_partials: vec![1.0, 0.5, 0.25, 0.12, 0.06, 0.03, 0.015, 0.0],
         }
     }
 
@@ -205,6 +213,10 @@ impl StreamingSynth {
         self.reverb.update_state(&smoothed);
         self.binaural.update_state(&smoothed);
         self.drone.update_state(&smoothed, self.active_notes.len());
+
+        // Update timbre manifold: V-A → interpolated partial amplitudes
+        self.manifold_partials = self.timbre_manifold.lookup(smoothed.valence, smoothed.arousal);
+
         if self.enable_phi_optimizer {
             self.phi_optimizer.update_phi(state.consciousness_level);
         }
@@ -345,10 +357,17 @@ impl StreamingSynth {
                     // Pre-rendered FM (e-piano, bell): read from buffer
                     if active.sample_pos < fm_buf.len() { fm_buf[active.sample_pos] } else { 0.0 }
                 } else {
-                    // Additive synthesis with instrument-specific partials (normalized)
-                    let partials = active.instrument.partials();
-                    let num_p = partials.len().min(16);
-                    let partial_sum: f32 = partials.iter().take(num_p).sum();
+                    // Additive synthesis: blend instrument partials with manifold partials
+                    // Manifold provides V-A emotional timbre; instrument provides acoustic character
+                    let inst_partials = active.instrument.partials();
+                    let mp = &self.manifold_partials;
+                    let num_p = inst_partials.len().min(16);
+                    let blended: Vec<f32> = (0..num_p).map(|h| {
+                        let inst = inst_partials.get(h).copied().unwrap_or(0.0);
+                        let mani = mp.get(h).copied().unwrap_or(0.0);
+                        inst * 0.6 + mani * 0.4 // 60% instrument, 40% emotional manifold
+                    }).collect();
+                    let partial_sum: f32 = blended.iter().sum();
                     let norm = if partial_sum > 0.01 { 1.0 / partial_sum } else { 1.0 };
                     let mut s = 0.0f32;
                     for h in 0..num_p {
@@ -361,7 +380,7 @@ impl StreamingSynth {
                         }
                         // NE boosts upper partials → harsher timbre under stress
                         let ne_boost = if h > 2 { ne_brightness_boost } else { 0.0 };
-                        s += (partials[h] + ne_boost) * active.partial_phases[h].sin();
+                        s += (blended[h] + ne_boost) * active.partial_phases[h].sin();
                     }
                     s * norm * env
                 };
@@ -369,7 +388,13 @@ impl StreamingSynth {
                 // Arousal-modulated gain with wide dynamic range for V-A measurability.
                 // 0.06 (calm) → 0.30 (excited). Required for Arousal↔RMS R² > 0.3.
                 let arousal = self.state.arousal.clamp(0.0, 1.0);
-                let master_gain = 0.06 + arousal * 0.24;
+                // Wider dynamic range: 0.03 (calm) → 0.35 (excited)
+                // Arousal² for steeper response at high arousal (Weber-Fechner)
+                let base_gain = 0.03 + arousal * arousal * 0.32;
+                // Compensate for gesture duration changes: shorter notes → louder per-sample
+                // so total energy stays proportional to arousal, not note length
+                let dur_comp = (1.0 / active.note.duration.max(0.1)).sqrt().clamp(0.7, 1.5);
+                let master_gain = base_gain * dur_comp;
                 voice_buffers[voice][i] += sample * active.note.velocity * active.volume * master_gain;
                 active.sample_pos += 1;
             }
