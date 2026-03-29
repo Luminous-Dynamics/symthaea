@@ -247,6 +247,9 @@ impl MultiWorldSimulator {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
             };
 
             // Hybrid Earth: skip individual agent creation for Earth;
@@ -383,6 +386,9 @@ impl MultiWorldSimulator {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
         };
 
         for _ in 0..population {
@@ -1305,14 +1311,30 @@ impl MultiWorldSimulator {
             };
             world.power_generation_kw = solar_kw + nuclear_kw;
 
+            // === B: AUTOMATION LEVEL ===
+            // Grows with engineering + manufacturing tech. Reduces labor requirements.
+            // At automation 0.8, a colony of 200 can do work of 2000.
+            let eng_level = world.knowledge.technology_levels[0];
+            let has_manufacturing = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
+            let auto_target = if has_manufacturing {
+                ((eng_level - 1.0) / 5.0).clamp(0.0, 0.9) // Up to 90% automation
+            } else {
+                ((eng_level - 1.0) / 10.0).clamp(0.0, 0.5) // Up to 50% without manufacturing
+            };
+            // EMA toward target (slow adoption)
+            world.automation_level = world.automation_level * 0.99 + auto_target * 0.01;
+
             // === #3: MAINTENANCE LABOR BUDGET ===
             // Infrastructure demands maintenance proportional to complexity.
             // Tainter (1988): diminishing returns on complexity.
+            // Automation reduces human labor needed for maintenance.
             let tech_complexity = world.knowledge.mean_tech_level().max(1.0);
+            let automation_reduction = 1.0 - world.automation_level * 0.8; // Up to 80% reduction
             world.maintenance_hours_required =
-                world.infrastructure_level * tech_complexity * 80.0 * (pop / 100.0).max(1.0);
+                world.infrastructure_level * tech_complexity * 80.0 * (pop / 100.0).max(1.0)
+                * automation_reduction;
             // Available: workers × 160 hrs/month × fraction allocated to maintenance
-            let maintenance_fraction = 0.3; // 30% of labor goes to maintenance
+            let maintenance_fraction = 0.3;
             world.maintenance_hours_available = living_workers * 160.0 * maintenance_fraction;
 
             // Maintenance trap: when demand > supply, infrastructure decays faster
@@ -1507,6 +1529,33 @@ impl MultiWorldSimulator {
                 }
             }
 
+            // === D: EXPLORATION MISSIONS ===
+            // Colonies with sufficient population and tech can launch exploration missions.
+            // Each mission costs resources but discovers new deposits + generates knowledge.
+            if pop > 100.0 && world.infrastructure_level > 0.5
+                && tick % 120 == 0 // Check every 10 years
+            {
+                let exploration_prob = (world.knowledge.technology_levels[4] - 1.0) * 0.05; // science-driven
+                if exploration_prob > 0.0 && self.rng.bernoulli(exploration_prob.min(0.2)) {
+                    world.explorations_completed += 1;
+                    // Discovery boosts knowledge and resources
+                    world.knowledge.technology_levels[4] += 0.1; // science boost
+                    if let Some(mat) = world.resources.get_mut("materials") {
+                        mat.capacity *= 1.1; // Discovered new deposits
+                        mat.current += mat.capacity * 0.1;
+                    }
+                    self.events.push(CivEvent::new(
+                        tick, Some(world.id), CivEventType::EmergencyDeclared,
+                        format!("{}: EXPLORATION SUCCESS #{} — new resource deposits discovered, \
+                            science advanced.", world.name, world.explorations_completed),
+                    ));
+                }
+            }
+
+            // === A: INTER-WORLD DIPLOMATIC RELATIONS ===
+            // Deferred to after the world loop to avoid borrow conflicts.
+            // (Needs access to multiple worlds simultaneously.)
+
             // === #2: NARRATIVE IDENTITY ===
             // Generation counting
             let mean_generation = {
@@ -1538,6 +1587,34 @@ impl MultiWorldSimulator {
                 // Crisis can be productive: boost adaptability
                 world.narrative_identity.adaptability =
                     (world.narrative_identity.adaptability + 0.1).min(1.0);
+            }
+        }
+    }
+
+    /// Inter-world diplomatic relations (deferred from structural realism to avoid borrow).
+    fn tick_diplomacy(&mut self) {
+        if self.worlds.len() < 2 || self.current_tick % 12 != 0 { return; }
+        let n = self.worlds.len();
+        // Collect culture weights and self-sufficiency for all worlds
+        let world_data: Vec<(u32, [f64; 8], f64)> = self.worlds.iter()
+            .map(|w| (w.id, w.culture.harmony_weights, w.resources.self_sufficiency()))
+            .collect();
+
+        for i in 0..n {
+            for j in 0..n {
+                if i == j { continue; }
+                let (_, cw_i, ss_i) = &world_data[i];
+                let (id_j, cw_j, ss_j) = &world_data[j];
+                // Cultural similarity (cosine-ish)
+                let culture_sim: f64 = cw_i.iter().zip(cw_j.iter())
+                    .map(|(a, b)| a * b).sum();
+                // Trade mutual benefit
+                let trade_benefit = (1.0 - ss_i) * (1.0 - ss_j);
+                let target = culture_sim * 0.5 + trade_benefit * 0.5;
+                let relation = self.worlds[i].diplomatic_relations
+                    .entry(*id_j).or_insert(0.5);
+                *relation = *relation * 0.99 + target * 0.01;
+                *relation = relation.clamp(-1.0, 1.0);
             }
         }
     }
@@ -2662,6 +2739,9 @@ impl MultiWorldSimulator {
             // Phase 5.6: Structural realism (power, maintenance, bus factor, trust, narrative)
             self.tick_structural_realism();
 
+            // Phase 5.7: Inter-world diplomacy
+            self.tick_diplomacy();
+
             // Phase 6: Knowledge
             self.tick_knowledge();
 
@@ -3042,6 +3122,9 @@ impl Default for World {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
         }
     }
 }

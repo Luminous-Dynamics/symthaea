@@ -204,7 +204,7 @@ impl EducationEngine {
                     let strongest = skills
                         .iter()
                         .enumerate()
-                        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                         .map(|(i, _)| i)
                         .unwrap_or(0);
                     agent.skills.learn(strongest, REVIEW_SKILL_GAIN);
@@ -495,6 +495,9 @@ mod tests {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
         }
     }
 

@@ -103,6 +103,7 @@ fn main() {
             speciation_friction_enabled: true,
             hostile_guardian: false,
             disasters_enabled: true,
+            hybrid_earth: false,
         }),
     ];
 

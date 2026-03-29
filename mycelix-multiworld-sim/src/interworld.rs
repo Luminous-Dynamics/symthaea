@@ -555,7 +555,7 @@ impl InterWorldEngine {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Ensure sex balance: pick alternating from sorted list
         let mut selected_indices: Vec<usize> = Vec::with_capacity(count);
@@ -640,6 +640,9 @@ impl InterWorldEngine {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
         };
 
         // Establish trade route with parent (assume Moon-Earth-class delay).
@@ -788,6 +791,9 @@ mod tests {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
         };
         for i in 0..n {
             let birth_tick = 0; // born at tick 0, so at TEST_TICK they are 30 years old

@@ -60,6 +60,11 @@ pub struct PolicyConfig {
     /// Enable the probabilistic disaster engine (7 categories, 40 event types).
     /// Default true. Set false for A/B comparison (disasters OFF).
     pub disasters_enabled: bool,
+    /// Enable hybrid Earth model: 12 aggregate regions + Spaceport Funnel.
+    /// When true, Earth is modeled as aggregate demographics (no individual agents)
+    /// and off-world colonists are instantiated via the Spaceport Funnel.
+    /// Default false for backward compatibility.
+    pub hybrid_earth: bool,
 }
 
 impl Default for PolicyConfig {
@@ -79,6 +84,7 @@ impl Default for PolicyConfig {
             speciation_friction_enabled: true,
             hostile_guardian: false,
             disasters_enabled: true,
+            hybrid_earth: false,
         }
     }
 }
@@ -265,6 +271,18 @@ impl SimulationConfig {
     pub fn default_resontia_777_year() -> Self {
         // Base 777-year config — Resontia config is separate (ResontiaConfig struct)
         Self::default_777_year()
+    }
+
+    /// 777-year configuration with hybrid Earth model (12 aggregate regions
+    /// + Spaceport Funnel for macro-to-micro agent instantiation).
+    ///
+    /// Earth is modeled as 12 regional populations using aggregate demographics
+    /// (no individual Earth agents). Off-world colonists are instantiated from
+    /// regional statistics via the Spaceport Funnel when launched.
+    pub fn default_hybrid_777_year() -> Self {
+        let mut cfg = Self::default_777_year();
+        cfg.policy.hybrid_earth = true;
+        cfg
     }
 
     /// 1000-year configuration (12000 ticks).

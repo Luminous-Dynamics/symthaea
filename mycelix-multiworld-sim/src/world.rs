@@ -526,6 +526,19 @@ pub struct World {
     /// Biosphere 2: O2 dropped from 20.9% to 14.2% in 16 months.
     #[serde(default = "default_one")]
     pub ecosystem_balance: f64,
+
+    /// B: Automation level [0, 1]. Reduces human labor requirements.
+    /// At 0.8, a colony of 200 can maintain infrastructure requiring 2000 workers.
+    #[serde(default)]
+    pub automation_level: f64,
+
+    /// D: Exploration missions completed (cumulative). Each adds knowledge + resources.
+    #[serde(default)]
+    pub explorations_completed: u32,
+
+    /// E: Inter-world relationship scores [-1, 1]. -1 = hostile, 0 = neutral, +1 = allied.
+    #[serde(default)]
+    pub diplomatic_relations: HashMap<u32, f64>,
 }
 
 fn default_trust() -> f64 { 0.7 }
@@ -758,6 +771,9 @@ mod tests {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: HashMap::new(),
         };
 
         for i in 0..n {

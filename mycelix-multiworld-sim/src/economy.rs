@@ -107,7 +107,7 @@ impl WorldEconomy {
             let best_sector = skills
                 .iter()
                 .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             self.sector_workers[best_sector] += 1;
@@ -195,7 +195,7 @@ impl WorldEconomy {
             return;
         }
 
-        totals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        totals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let sum: f64 = totals.iter().sum();
         if sum == 0.0 {

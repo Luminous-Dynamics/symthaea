@@ -2475,6 +2475,9 @@ mod tests {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            automation_level: 0.0,
+            explorations_completed: 0,
+            diplomatic_relations: std::collections::HashMap::new(),
         }
     }
 
