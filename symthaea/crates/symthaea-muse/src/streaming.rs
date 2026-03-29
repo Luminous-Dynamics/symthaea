@@ -41,6 +41,49 @@ pub const DEFAULT_CHUNK_MS: u32 = 32;
 const MAX_ACTIVE_NOTES: usize = 32;
 const MIN_CHUNK_SAMPLES: usize = 64;
 
+// ── Synthesis Parameter Constants ────────────────────────────────────────
+// Each constant documents its acoustic/psychoacoustic rationale.
+
+/// Minimum gain at zero arousal. Prevents complete silence.
+const GAIN_MIN: f32 = 0.03;
+/// Arousal² gain coefficient. Weber-Fechner: perceived loudness ~ log(intensity).
+/// 0.03 + 1.0² × 0.32 = 0.35 at max arousal → ~21dB dynamic range.
+const GAIN_AROUSAL_COEFF: f32 = 0.32;
+/// Valence gain modulation ±15%. Huron (2006): happy music performed louder.
+const VALENCE_GAIN_SCALE: f32 = 0.15;
+
+/// Dopamine→brightness floor. Minimum spectral brightness even at DA=0.
+const BRIGHTNESS_FLOOR: f32 = 0.3;
+/// Dopamine→brightness scale. Full DA adds 0.7 to brightness.
+const BRIGHTNESS_DA_SCALE: f32 = 0.7;
+
+/// Base attack time (seconds) at full arousal. Fast transients = excited.
+const ATTACK_BASE: f32 = 0.01;
+/// Attack lengthening at zero arousal. Slow onsets = calm.
+const ATTACK_AROUSAL_SCALE: f32 = 0.05;
+
+/// Phi-vibrato rate (Hz). Co-prime with typical musical vibrato (5-6Hz).
+/// Creates spectral flux measurable via FFT without beating with instrument vibrato.
+const PHI_VIBRATO_BASE_HZ: f32 = 5.3;
+/// Phi-vibrato max depth (cents). 8 cents = sub-semitone, measurable but not dissonant.
+const PHI_VIBRATO_MAX_CENTS: f32 = 8.0;
+
+/// NE→vibrato rate multiplier. Zentner et al. (2008): urgency → faster modulation.
+/// At max NE, vibrato rate increases 50% (5.3 → 8.0Hz).
+const NE_VIBRATO_RATE_SCALE: f32 = 0.5;
+/// NE→upper partial boost. Adds harshness under stress.
+const NE_BRIGHTNESS_BOOST: f32 = 0.15;
+
+/// Max partial detuning (cents) at valence=-1.0.
+/// Plomp & Levelt (1965): roughness peaks at ~25% critical bandwidth.
+/// 15 cents at 440Hz ≈ 3.8Hz beating, within the roughness range.
+const VALENCE_DETUNE_MAX_CENTS: f32 = 15.0;
+
+/// Timbre manifold minimum blend (at neutral V-A). Instrument partials dominate.
+const MANIFOLD_BLEND_MIN: f32 = 0.15;
+/// Timbre manifold additional blend per unit emotional distance from neutral.
+const MANIFOLD_BLEND_SCALE: f32 = 0.15;
+
 // ─── ADSR + clip ────────────────────────────────────────────────────────────
 
 fn envelope(atk: f32, dec: f32, sus: f32, rel: f32, t: f32, dur: f32) -> f32 {
@@ -257,9 +300,10 @@ impl StreamingSynth {
         // High arousal (0.9) → generate every 1 chunk (dense onsets)
         // Low arousal (0.1) → generate every 8 chunks (sparse, calm)
         // Formula: cadence = 8 - 7 * arousal, clamped to [1, 8]
-        self.note_gen_cadence = (8.0 - 7.0 * state.arousal.clamp(0.0, 1.0))
-            .round()
-            .clamp(1.0, 8.0) as u32;
+        let base_cadence = 8.0 - 7.0 * state.arousal.clamp(0.0, 1.0);
+        // Apply tempo rubato from dramatic state
+        let rubato_cadence = base_cadence / self.dramatic.tempo_factor.max(0.5);
+        self.note_gen_cadence = rubato_cadence.round().clamp(1.0, 12.0) as u32;
     }
 
     /// Set substrate type for timbre coloring.
@@ -302,20 +346,20 @@ impl StreamingSynth {
         let fm_depth = self.state.dopamine * self.config.max_fm_depth;
         let fm_ratio = 2.0 + self.state.noradrenaline;
         let rolloff = 1.0 + self.state.serotonin * 0.8;
-        let brightness = 0.3 + self.state.dopamine * 0.7;
+        let brightness = BRIGHTNESS_FLOOR + self.state.dopamine * BRIGHTNESS_DA_SCALE;
 
         // NE → vibrato rate scaling: high stress = faster, more agitated vibrato
         // Base: 5.3Hz, scales up to 8Hz at max NE (Zentner et al. 2008: urgency → faster modulation)
-        let vibrato_rate_scale = 1.0 + self.state.noradrenaline * 0.5;
+        let vibrato_rate_scale = 1.0 + self.state.noradrenaline * NE_VIBRATO_RATE_SCALE;
 
         // NE → harmonic tension bias: high NE shifts brightness toward harshness
-        let ne_brightness_boost = self.state.noradrenaline * 0.15;
+        let ne_brightness_boost = self.state.noradrenaline * NE_BRIGHTNESS_BOOST;
 
         // Prediction error → onset jitter (±samples): surprise makes timing unpredictable
         // Max jitter: ±5ms at PE=1.0 (Vuust & Witek 2014: rhythmic surprise)
         let pe_jitter_samples = (self.state.prediction_error * 0.005 * sr) as i32;
 
-        let atk = 0.01 + (1.0 - self.state.arousal) * 0.05;
+        let atk = ATTACK_BASE + (1.0 - self.state.arousal) * ATTACK_AROUSAL_SCALE;
         let dec = 0.05 + self.state.serotonin * 0.1;
         let sus = 0.4 + self.state.consciousness_level * 0.4;
         let rel = 0.1 + self.state.harmony_activations[7] * 0.3;
@@ -359,8 +403,8 @@ impl StreamingSynth {
                 // Phi-scaled micro-vibrato: higher consciousness = richer spectral flux
                 // 0-8 cents at 5.3Hz — subtle but measurable via spectral analysis
                 let psi = self.state.consciousness_level.clamp(0.0, 1.0);
-                let phi_vibrato_cents = psi * 8.0;
-                let phi_vibrato_rate = 5.3 * vibrato_rate_scale; // NE scales rate (stress → faster)
+                let phi_vibrato_cents = psi * PHI_VIBRATO_MAX_CENTS;
+                let phi_vibrato_rate = PHI_VIBRATO_BASE_HZ * vibrato_rate_scale;
                 let phi_vib = (t * phi_vibrato_rate * std::f32::consts::TAU).sin();
                 let phi_factor = 2.0f32.powf(phi_vibrato_cents * phi_vib / 1200.0);
                 let freq = active.note.frequency * vibrato_factor * phi_factor;
@@ -383,7 +427,7 @@ impl StreamingSynth {
                         // Manifold influence scales with emotional distance from neutral.
                         // Near-neutral states → mostly instrument; extreme V-A → more manifold.
                         let emotional_dist = (self.state.valence.abs() + (self.state.arousal - 0.5).abs()).clamp(0.0, 1.0);
-                        let blend = 0.15 + emotional_dist * 0.15; // 15-30% manifold
+                        let blend = MANIFOLD_BLEND_MIN + emotional_dist * MANIFOLD_BLEND_SCALE;
                         inst * (1.0 - blend) + mani * blend
                     }).collect();
                     let partial_sum: f32 = blended.iter().sum();
@@ -392,7 +436,7 @@ impl StreamingSynth {
                     // Plomp & Levelt (1965): dissonance peaks at ~25% critical bandwidth
                     // Apply ±5-15 cents detune to partials 2-5 when valence < 0
                     let neg_valence = (-self.state.valence).max(0.0); // 0 when happy, 1 when sad
-                    let detune_cents = neg_valence * 15.0; // 0-15 cents
+                    let detune_cents = neg_valence * VALENCE_DETUNE_MAX_CENTS;
 
                     let mut s = 0.0f32;
                     for h in 0..num_p {
@@ -416,15 +460,22 @@ impl StreamingSynth {
                     s * norm * env
                 };
 
+                // Attack noise transient: adds realism to note onsets
+                let attack_samples = (0.015 * sr) as usize; // 15ms attack
+                let noise = crate::dramatic::attack_noise(
+                    active.sample_pos, attack_samples, brightness,
+                );
+                let sample = sample + noise;
+
                 // Arousal-modulated gain with wide dynamic range for V-A measurability.
                 // 0.06 (calm) → 0.30 (excited). Required for Arousal↔RMS R² > 0.3.
                 let arousal = self.state.arousal.clamp(0.0, 1.0);
                 // Wider dynamic range: 0.03 (calm) → 0.35 (excited)
                 // Arousal² for steeper response at high arousal (Weber-Fechner)
-                let base_gain = 0.03 + arousal * arousal * 0.32;
+                let base_gain = GAIN_MIN + arousal * arousal * GAIN_AROUSAL_COEFF;
                 // Valence modulates gain ±15%: positive = brighter/louder, negative = darker/softer
                 // (Huron 2006: happy music is performed louder than sad music)
-                let valence_gain = 1.0 + self.state.valence * 0.15;
+                let valence_gain = 1.0 + self.state.valence * VALENCE_GAIN_SCALE;
                 // Compensate for gesture duration changes: shorter notes → louder per-sample
                 let dur_comp = (1.0 / active.note.duration.max(0.1)).sqrt().clamp(0.7, 1.5);
                 let master_gain = base_gain * valence_gain * dur_comp;
@@ -602,6 +653,50 @@ impl StreamingSynth {
 
         // Dramatic silence gate: don't generate notes during dramatic pauses
         if !self.dramatic.allow_notes() { return; }
+
+        // Strong ending: final cadence — one last tonic chord, full stop
+        if self.dramatic.final_cadence && self.active_notes.is_empty() {
+            // Generate a root note at low velocity as the final statement
+            if !self.chord_progression.is_empty() {
+                let chord = &self.chord_progression[0]; // return to tonic
+                let root_freq = 130.81 * 2.0f32.powf(chord.root_semitones as f32 / 12.0);
+                let final_note = crate::Note {
+                    frequency: root_freq,
+                    start_time: 0.0,
+                    duration: 3.0, // long final note with reverb tail
+                    velocity: 0.6,
+                };
+                // Don't generate more after this
+                self.dramatic.final_cadence = false; // one-shot
+                let note = final_note;
+                let instrument = instruments::select_instrument(&self.state);
+                let ks = if instrument.uses_karplus_strong() {
+                    let (damp, bright, _) = instrument.ks_params();
+                    let mut k = KarplusStrong::new(note.frequency, self.sample_rate, damp, bright);
+                    k.excite(note.velocity);
+                    Some(k)
+                } else { None };
+                let fm_buffer = if instrument.uses_fm() {
+                    Some(instruments::render_fm_instrument(instrument, note.frequency, note.velocity, note.duration, self.sample_rate))
+                } else { None };
+                self.active_notes.push(ActiveNote {
+                    total_samples: (note.duration * sr) as usize + release_samples,
+                    note,
+                    sample_pos: 0,
+                    partial_phases: vec![0.0; 16],
+                    fm_phase: 0.0,
+                    pan: 0.0,
+                    volume: 0.8,
+                    voice_idx: 0,
+                    wavetable_osc: WavetableOscillator::new(),
+                    vibrato_phase: 0.0,
+                    instrument,
+                    ks,
+                    fm_buffer,
+                });
+                return; // no more notes after final cadence
+            }
+        }
 
         // Texture density limits polyphony
         let texture_voices = self.dramatic.max_voices();
