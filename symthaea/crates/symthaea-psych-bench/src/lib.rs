@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Psychological Benchmark Suite
 //!
 //! Standardized evaluation of Symthaea's neuroscience-inspired subsystems
@@ -51,6 +54,7 @@
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
+pub mod substrate_transfer;
 pub mod wm;
 
 #[cfg(feature = "neuroevolution")]

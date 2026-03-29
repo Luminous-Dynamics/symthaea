@@ -47,6 +47,7 @@ pub mod mars_isru;
 pub mod planetary_governance;
 pub mod cross_planetary_fl;
 pub mod consciousness_sync;
+pub mod federated_genomics;
 
 #[cfg(feature = "hdk")]
 pub mod validation;

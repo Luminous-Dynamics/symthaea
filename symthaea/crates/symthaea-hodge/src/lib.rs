@@ -887,6 +887,8 @@ fn symmetric_eigenvectors(mat: &[Vec<f64>]) -> Vec<Vec<f64>> {
     eigen_pairs.into_iter().map(|(_, vec)| vec).collect()
 }
 
+pub mod consciousness_topology;
+
 // ============================================================================
 // TESTS
 // ============================================================================

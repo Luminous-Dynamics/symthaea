@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Orbital Mechanics Library for Mycelix-Space
 //!
 //! This library provides:
@@ -41,6 +44,7 @@
 pub mod cdm;
 pub mod cdm_parser;
 pub mod conjunction;
+pub mod conjunction_network;
 pub mod coordinates;
 pub mod covariance;
 pub mod fusion;

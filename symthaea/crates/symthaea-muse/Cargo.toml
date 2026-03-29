@@ -13,6 +13,7 @@ serde = { workspace = true }
 rand = { workspace = true }
 hound = { workspace = true }
 flacenc = { workspace = true }
+rustfft = { workspace = true }
 
 # Real-time audio output (optional)
 cpal = { version = "0.17", optional = true }
