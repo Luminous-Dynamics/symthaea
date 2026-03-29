@@ -117,6 +117,20 @@ pub struct TrendSnapshot {
     pub neuromod_balance: f32,
 }
 
+/// Quality-of-life snapshot with richer fields (used by engine.rs).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct QolSnapshot {
+    pub cycle: u64,
+    pub timestamp_secs: u64,
+    pub consciousness_level: f32,
+    pub harmony_alignment: f32,
+    pub metacog_accuracy: f32,
+    pub allostatic_load: f32,
+    pub dream_wisdom_count: usize,
+    pub coherence_score: f32,
+    pub safety_level: u8,
+}
+
 /// Summary statistics over trend history.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TrendSummary {
@@ -144,6 +158,21 @@ impl TrendHistory {
             self.snapshots.remove(0);
         }
         self.snapshots.push(snapshot);
+    }
+
+    /// Record a QolSnapshot by converting to TrendSnapshot. Called every cycle.
+    pub fn maybe_record(&mut self, qol: QolSnapshot) {
+        // Only record every 100 cycles to avoid bloat
+        if qol.cycle % 100 != 0 && self.snapshots.len() > 10 {
+            return;
+        }
+        self.record(TrendSnapshot {
+            cycle: qol.cycle,
+            consciousness_level: qol.consciousness_level,
+            phi: qol.coherence_score,
+            harmony_alignment: qol.harmony_alignment,
+            neuromod_balance: 0.0, // Not tracked in QolSnapshot
+        });
     }
 
     pub fn snapshots(&self) -> &[TrendSnapshot] {
@@ -354,6 +383,7 @@ impl SporeCheckpoint {
             neuromodulators,
             semantic_entries,
             episodic_entries,
+            trend_snapshots: vec![], // Trend snapshots not yet serialized in binary format
             format_version,
         })
     }
