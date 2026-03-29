@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! INA219 current/voltage sensor decoder.
 //!
 //! Implements [`SensorDecoder`] for the Texas Instruments INA219 high-side

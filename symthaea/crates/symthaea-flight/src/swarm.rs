@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Parallel swarm training via rayon (behind `swarm` feature).
 //!
 //! 128 parallel MuJoCo instances via rayon, each with randomized wind/mass/geometry.

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Quick Benchmark Suite for CI/CD
 //!
 //! Fast benchmark suite (~5 minutes) providing essential metrics for every commit.

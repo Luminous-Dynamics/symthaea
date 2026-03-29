@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! FL Pipeline Plugin: Consciousness-guided quality assessment for federated learning.
 //!
 //! This module bridges `SymthaeaBackend` quality assessments into the

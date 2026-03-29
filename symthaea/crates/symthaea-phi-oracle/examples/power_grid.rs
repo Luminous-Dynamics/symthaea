@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Demo: Measure structural coherence of a synthetic power grid.
 //!
 //! Simulates a 6-node power grid where nodes are coupled through shared

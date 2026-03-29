@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Vehicle controller: wraps HdcLtcUnifiedNetwork + output projection (16,384D → 3D).
 //!
 //! Uses the full 16,384D HDC-LTC temporal dynamics engine with a 3-layer × 8-neuron

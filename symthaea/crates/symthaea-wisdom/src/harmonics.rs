@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Harmonics - The Eight Harmonies as Operational Reasoning Modes
 //!
 //! Each harmony is not just a value but a *mode of reasoning* that biases

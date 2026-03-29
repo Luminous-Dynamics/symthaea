@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Composite Consciousness Score — Qualia Confidence Matrix Synthesis
 //!
 //! Aggregates results from all 7 qualia confidence benchmarks into a single

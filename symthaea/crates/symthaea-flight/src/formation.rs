@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-agent formation flight: pure geometry + coordination types.
 //!
 //! Defines formation shapes, setpoint computation, and neighbor state tracking.

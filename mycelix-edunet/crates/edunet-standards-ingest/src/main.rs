@@ -145,6 +145,22 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Fetch South African CAPS curriculum (Matric Math & Physical Sciences)
+    IngestCaps {
+        /// Source ID: caps-math-10, caps-math-11, caps-math-12, caps-physics-10, caps-physics-11, caps-physics-12
+        source_id: String,
+        /// Output file path (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
+    /// Fetch all CAPS curricula (Grade 10-12 Math + Physical Sciences)
+    IngestCapsAll {
+        /// Output directory
+        #[arg(long, short = 'o', default_value = ".")]
+        output_dir: PathBuf,
+    },
+
     /// Fetch Luminous Dynamics curriculum (symthaea, mycelix, programming)
     IngestLuminous {
         /// Source ID: symthaea, mycelix, programming

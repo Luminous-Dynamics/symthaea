@@ -548,33 +548,71 @@ impl StreamingSynth {
                 }
             };
 
-            // Snap to current chord tones
+            // Apply melodic grammar: stepwise motion, leap resolution, tension arcs
             if !self.chord_progression.is_empty() {
                 let chord = &self.chord_progression[self.chord_idx % self.chord_progression.len()];
-                let root_freq = 130.81 * 2.0f32.powf(chord.root_semitones as f32 / 12.0); // C3 base
+                let root_freq = 130.81 * 2.0f32.powf(chord.root_semitones as f32 / 12.0);
                 let chord_ratios = chord.chord_type.ratios();
                 let chord_freqs: Vec<f32> = chord_ratios.iter()
-                    .flat_map(|&r| {
-                        // Generate chord tones across 2 octaves
-                        vec![root_freq * r, root_freq * r * 2.0]
+                    .flat_map(|&r| vec![root_freq * r, root_freq * r * 2.0])
+                    .collect();
+
+                // Build scale tones (major or minor based on emotional gesture)
+                let scale_intervals = if gesture.prefer_major {
+                    &[0, 2, 4, 5, 7, 9, 11, 12] // major
+                } else {
+                    &[0, 2, 3, 5, 7, 8, 10, 12] // natural minor
+                };
+                let scale_tones: Vec<f32> = scale_intervals.iter()
+                    .flat_map(|&s| {
+                        let f = root_freq * 2.0f32.powf(s as f32 / 12.0);
+                        vec![f, f * 2.0] // two octaves
                     })
                     .collect();
 
-                // Snap note to nearest chord tone (70% chance) or keep scale tone (30%)
                 self.note_counter = self.note_counter.wrapping_add(1);
-                let use_chord = (self.note_counter % 10) < 7; // 70% chord tones
-                if use_chord && !chord_freqs.is_empty() {
-                    let nearest = chord_freqs.iter()
-                        .min_by(|a, b| ((**a - note.frequency).abs()).partial_cmp(&((**b - note.frequency).abs())).unwrap())
-                        .copied()
-                        .unwrap_or(note.frequency);
-                    note.frequency = nearest;
+                let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
+                let ctx = self.lead_voice.melodic_context(phrase_pos, self.chord_beat_counter);
+
+                // Recapitulation: if composer says bring back opening theme, use it
+                if let Some(theme) = self.composer.recapitulation_theme() {
+                    if let Some(theme_note) = theme.get(self.note_counter as usize % theme.len()) {
+                        note.frequency = theme_note.frequency;
+                    }
+                } else {
+                    // Apply melodic grammar (stepwise motion, leap resolution, etc.)
+                    note.frequency = melodic_grammar::apply_grammar(
+                        note.frequency, &chord_freqs, &scale_tones, &ctx, self.note_counter,
+                    );
                 }
+
+                // Track voice state for grammar context
+                self.lead_voice.record(note);
             }
 
-            // Apply emotional gesture (direction bias, duration scaling)
-            note.duration *= gesture.duration_scale;
-            note.velocity = (note.velocity * gesture.velocity_scale).clamp(0.05, 1.0);
+            // Apply full emotional gesture: direction + duration + staccato + velocity + tension
+            {
+                let scale = crate::pitch::build_scale(&self.state);
+                note.frequency = emotional_gestures::apply_gesture_to_pitch(
+                    note.frequency, self.prev_note_freq, &scale, &gesture,
+                );
+                note.duration *= gesture.duration_scale;
+                if gesture.staccato > 0.1 {
+                    note.duration *= 1.0 - gesture.staccato * 0.6;
+                }
+                note.velocity = (note.velocity * gesture.velocity_scale).clamp(0.05, 1.0);
+                // High harmonic tension → inject passing tones for dissonance
+                if gesture.harmonic_tension > 0.5 && scale.len() > 2 && self.note_counter % 3 == 0 {
+                    let shift = if gesture.direction_bias > 0.0 { 1i32 } else { -1 };
+                    if let Some(idx) = scale.iter().enumerate()
+                        .min_by(|(_, a), (_, b)| ((**a - note.frequency).abs()).partial_cmp(&((**b - note.frequency).abs())).unwrap())
+                        .map(|(i, _)| i)
+                    {
+                        let t = (idx as i32 + shift).clamp(0, scale.len() as i32 - 1) as usize;
+                        note.frequency = scale[t];
+                    }
+                }
+            }
 
             // Apply humanization
             let beat_pos = self.chord_beat_counter;
@@ -585,8 +623,7 @@ impl StreamingSynth {
             self.motif.record_note(note);
             self.prev_note_freq = Some(note.frequency);
 
-            // When a phrase completes in motif memory, evaluate it
-            // (evaluate every 4-8 notes based on phrase length)
+            // When a phrase completes, evaluate it for creative journal + form memory
             if self.note_counter % (self.motif.replay_queue_len().max(4) as u32) == 0 {
                 let recent: Vec<crate::Note> = self.active_notes.iter()
                     .rev()
@@ -594,7 +631,14 @@ impl StreamingSynth {
                     .map(|a| a.note)
                     .collect();
                 if recent.len() >= 2 {
-                    let _beauty = self.journal.evaluate_phrase(&recent, &self.state);
+                    let beauty = self.journal.evaluate_phrase(&recent, &self.state);
+                    self.composer.memory.record_phrase(&recent, beauty);
+
+                    // Call-and-response: if lead completed a good phrase, queue echo
+                    if beauty > 0.5 && self.lead_voice.phrase_notes.len() >= 3 {
+                        // The next harmony voice will echo this phrase
+                        // (stored in lead_voice.phrase_notes for the voice_leader to use)
+                    }
                 }
             }
 
@@ -686,6 +730,9 @@ impl StreamingSynth {
         self.drone.reset();
         self.motif.reset();
         self.journal.reset();
+        self.composer.reset();
+        self.lead_voice.reset();
+        self.bars_elapsed_frac = 0.0;
         self.chord_idx = 0;
         self.chord_beat_counter = 0.0;
         self.note_counter = 0;

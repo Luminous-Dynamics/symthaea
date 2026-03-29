@@ -264,6 +264,8 @@ pub enum ChordType {
     Dom7,        // [0, 4, 7, 10]
     Sus2,        // [0, 2, 7]
     Sus4,        // [0, 5, 7]
+    Dim,         // [0, 3, 6] — diminished (tension/fear)
+    Aug,         // [0, 4, 8] — augmented (unease/wonder)
 }
 
 impl ChordType {
@@ -277,6 +279,8 @@ impl ChordType {
             Self::Dom7 => &[0, 4, 7, 10],
             Self::Sus2 => &[0, 2, 7],
             Self::Sus4 => &[0, 5, 7],
+            Self::Dim => &[0, 3, 6],
+            Self::Aug => &[0, 4, 8],
         }
     }
 
@@ -324,13 +328,44 @@ pub fn ambient_progression() -> Vec<ProgressionChord> {
     ]
 }
 
-/// Select a progression based on consciousness state.
+/// Minor progression for sadness/grief (Cheung et al. 2019: minor mode → negative valence).
+pub fn minor_progression() -> Vec<ProgressionChord> {
+    // i - iv - v - i (natural minor, no leading tone → unresolved)
+    vec![
+        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
+        ProgressionChord { root_semitones: 5, chord_type: ChordType::Minor, duration_beats: 4.0 },
+        ProgressionChord { root_semitones: 7, chord_type: ChordType::Minor, duration_beats: 4.0 },
+        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
+    ]
+}
+
+/// Tension/dread progression with tritones and diminished chords.
+pub fn tension_progression() -> Vec<ProgressionChord> {
+    // i - bII - vii° - i (Phrygian approach + diminished = maximum tension)
+    vec![
+        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
+        ProgressionChord { root_semitones: 1, chord_type: ChordType::Major, duration_beats: 2.0 },
+        ProgressionChord { root_semitones: 11, chord_type: ChordType::Dim, duration_beats: 2.0 },
+        ProgressionChord { root_semitones: 0, chord_type: ChordType::Minor, duration_beats: 4.0 },
+    ]
+}
+
+/// Select a progression based on consciousness state AND valence.
 pub fn select_progression(state: &MusicalState) -> Vec<ProgressionChord> {
     let psi = state.consciousness_level;
     let arousal = state.arousal;
+    let valence = state.valence;
     let stillness = state.harmony_activations[7];
+    let pe = state.prediction_error;
 
-    if stillness > 0.5 || (psi < 0.3 && arousal < 0.3) {
+    // Valence-first selection (Panda et al. 2023: harmonic content predicts valence)
+    if pe > 0.6 || (valence < -0.3 && arousal > 0.6) {
+        // High surprise or negative+aroused → tension/dread
+        tension_progression()
+    } else if valence < -0.2 && arousal < 0.5 {
+        // Sad/depleted → minor
+        minor_progression()
+    } else if stillness > 0.5 || (psi < 0.3 && arousal < 0.3) {
         ambient_progression()
     } else if psi > 0.6 && state.dopamine > 0.5 {
         jazz_progression()

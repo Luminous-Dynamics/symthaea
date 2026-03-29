@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Dynamic Time Warping Alignment for Phoneme Training
 //!
 //! Provides precise frame-to-phoneme alignment using DTW between
