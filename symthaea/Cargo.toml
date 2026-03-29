@@ -524,6 +524,7 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Motor / Embodiment ─────────────────────────────────────────────
 cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
+creative = []                               # Creative agency: motor rendering bridge, artistic expression
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
