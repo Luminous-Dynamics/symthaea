@@ -30,15 +30,36 @@ pub fn physics_apply_inputs(
     players: Query<(&PhysicsBody, &Transform), With<Player>>,
 ) {
     for (body_comp, transform) in &players {
-        if let Some(body) = physics.world.body_mut(body_comp.handle) {
-            let speed = if input.sprinting { SPRINT_SPEED } else { WALK_SPEED };
-            let dir = input.direction;
+        let speed = if input.sprinting { SPRINT_SPEED } else { WALK_SPEED };
+        let dir = input.direction;
 
-            if dir.length_squared() < 1e-6 {
+        if dir.length_squared() < 1e-6 {
+            if let Some(body) = physics.world.body_mut(body_comp.handle) {
                 body.linear_velocity = nalgebra::SVector::from([0.0, 0.0]);
-                continue;
             }
+            continue;
+        }
 
+        // Rule 1: Movement costs energy
+        let dt = 1.0 / 64.0;
+        let displacement = speed * dt;
+        let sprint_mult = if input.sprinting {
+            physics.consciousness.constants.sprint_cost_multiplier
+        } else {
+            1.0
+        };
+        let move_cost = displacement * physics.consciousness.constants.movement_cost_per_unit * sprint_mult;
+        let energy_consumed = physics.consciousness.consume_energy(body_comp.handle, move_cost);
+
+        // No energy = no movement
+        if energy_consumed < move_cost * 0.5 {
+            if let Some(body) = physics.world.body_mut(body_comp.handle) {
+                body.linear_velocity = nalgebra::SVector::from([0.0, 0.0]);
+            }
+            continue;
+        }
+
+        if let Some(body) = physics.world.body_mut(body_comp.handle) {
             let norm_dir = dir.normalize();
             let mut vx = norm_dir.x as f64 * speed;
             let mut vy = norm_dir.y as f64 * speed;

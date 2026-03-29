@@ -26,6 +26,56 @@ pub const LANDAUER_BOUND_310K: f64 = 2.87e-21; // Joules per bit
 /// Ref: Laughlin & Sejnowski (2003)
 pub const ENERGY_PER_COGNITIVE_OP: f64 = LANDAUER_BOUND_310K * 16.6;
 
+/// Tunable thermodynamic constants for the enforcement layer.
+///
+/// These values determine how quickly energy depletes and regenerates.
+/// Calibrated so that solo play survives ~4 minutes, cooperation sustains indefinitely.
+#[derive(Debug, Clone)]
+pub struct ThermodynamicConstants {
+    /// Starting Joules for a new entity.
+    pub initial_energy: f64,
+    /// Maximum energy an entity can hold.
+    pub max_energy: f64,
+    /// Joules per physics-unit of displacement (walking).
+    /// At WALK_SPEED=100 u/s, 64Hz: ~0.0078 J/tick for movement.
+    pub movement_cost_per_unit: f64,
+    /// Sprint cost multiplier (applied on top of movement_cost_per_unit).
+    pub sprint_cost_multiplier: f64,
+    /// Joules per tick to maintain consciousness (Φ > 0).
+    /// Higher Φ costs more: actual = base * (1.0 + phi * 0.5).
+    pub consciousness_maintenance_per_tick: f64,
+    /// Fraction of collision impulse magnitude drained as energy.
+    pub collision_energy_drain: f64,
+    /// Joules per tick gained when harmony resonance > 0.5 with a nearby agent.
+    pub harmony_resonance_regen_rate: f64,
+    /// Joules per tick gained when standing in an energy well.
+    pub energy_well_regen_rate: f64,
+    /// Slow background regeneration (too slow alone).
+    pub ambient_regen_rate: f64,
+    /// Harmony resonance threshold to rescue a collapsed entity.
+    pub collapse_recovery_harmony_threshold: f64,
+    /// Range within which harmony resonance transfers energy.
+    pub harmony_range: f64,
+}
+
+impl Default for ThermodynamicConstants {
+    fn default() -> Self {
+        Self {
+            initial_energy: 1000.0,
+            max_energy: 1000.0,
+            movement_cost_per_unit: 0.005,
+            sprint_cost_multiplier: 2.5,
+            consciousness_maintenance_per_tick: 0.08,
+            collision_energy_drain: 0.05,
+            harmony_resonance_regen_rate: 0.15,
+            energy_well_regen_rate: 0.25,
+            ambient_regen_rate: 0.02,
+            collapse_recovery_harmony_threshold: 0.5,
+            harmony_range: 50.0,
+        }
+    }
+}
+
 /// Thermodynamic ledger: tracks energy flow through the consciousness-physics system.
 #[derive(Debug, Clone)]
 pub struct ThermodynamicLedger {

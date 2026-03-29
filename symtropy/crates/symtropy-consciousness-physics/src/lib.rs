@@ -27,4 +27,4 @@ pub use energy::EnergyBudget;
 pub use harmony_field::HarmonyField;
 pub use safety::SafetyTier;
 pub use sanctuary::SanctuaryZone;
-pub use thermodynamics::ThermodynamicLedger;
+pub use thermodynamics::{ThermodynamicConstants, ThermodynamicLedger};

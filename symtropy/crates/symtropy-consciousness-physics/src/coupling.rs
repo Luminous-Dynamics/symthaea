@@ -17,7 +17,7 @@ use symthaea_consciousness_equation::{
 use crate::energy::EnergyBudget;
 use crate::safety::SafetyTier;
 use crate::sanctuary::{SanctuaryConditions, SanctuaryZone};
-use crate::thermodynamics::ThermodynamicLedger;
+use crate::thermodynamics::{ThermodynamicConstants, ThermodynamicLedger};
 use symtropy_physics::body::BodyHandle;
 use symtropy_physics::world::PhysicsCallback;
 
@@ -62,11 +62,17 @@ impl EntityConsciousness {
     }
 
     /// Compute consciousness from inputs and update derived state.
+    ///
+    /// Note: energy is NOT reset here — it's a persistent reservoir.
+    /// Energy depletes through actions and regenerates through harmony/wells.
     pub fn compute(&mut self, inputs: &ConsciousnessInputs) {
         let result = self.equation.compute(inputs);
         let phi = result.consciousness_level;
-        self.safety_tier = SafetyTier::from_phi(phi);
-        self.energy.refresh(phi);
+        self.safety_tier = if self.energy.is_collapsed() {
+            SafetyTier::Red // Collapsed = no motor authority
+        } else {
+            SafetyTier::from_phi(phi)
+        };
         self.result = Some(result);
     }
 
@@ -145,6 +151,8 @@ pub struct ConsciousnessField<const D: usize> {
     pub collective_phi: f64,
     /// Thermodynamic ledger: tracks energy conservation across the system.
     pub ledger: ThermodynamicLedger,
+    /// Tunable thermodynamic constants.
+    pub constants: ThermodynamicConstants,
 }
 
 impl<const D: usize> ConsciousnessField<D> {
@@ -155,6 +163,7 @@ impl<const D: usize> ConsciousnessField<D> {
             sanctuaries: HashMap::new(),
             collective_phi: 0.0,
             ledger: ThermodynamicLedger::new(),
+            constants: ThermodynamicConstants::default(),
         }
     }
 
@@ -357,13 +366,18 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     }
 
     fn on_collision(&mut self, event: &symtropy_physics::CollisionEvent<D>) {
-        // Feed collision into prediction error system
+        let drain_rate = self.constants.collision_energy_drain;
+        // Rule 3+6: collision spikes prediction error AND drains energy
         if let Some(entity) = self.entities.get_mut(&event.body_a) {
             entity.on_collision(event.impulse);
+            let drain = event.impulse * drain_rate;
+            entity.energy.consume(drain);
             self.ledger.record_phi_change(event.impulse * 0.001);
         }
         if let Some(entity) = self.entities.get_mut(&event.body_b) {
             entity.on_collision(event.impulse);
+            let drain = event.impulse * drain_rate;
+            entity.energy.consume(drain);
             self.ledger.record_phi_change(event.impulse * 0.001);
         }
     }

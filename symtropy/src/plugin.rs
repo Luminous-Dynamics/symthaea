@@ -30,9 +30,11 @@ impl Plugin for SymtropyPlugin {
             // Physics engine
             .init_resource::<PhysicsWorldRes>()
             .init_resource::<PlayerInput>()
-            // FixedUpdate: physics step at consistent 64Hz
+            .init_resource::<systems::thermodynamic::ThermodynamicHudState>()
+            // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
             .add_systems(FixedUpdate, (
                 systems::engine_physics::physics_apply_inputs,
+                systems::thermodynamic::thermodynamic_enforcement_system,
                 systems::engine_physics::physics_step,
                 systems::engine_physics::physics_sync_transforms,
             ).chain().run_if(in_state(GamePhase::Playing)))
@@ -60,9 +62,12 @@ impl Plugin for SymtropyPlugin {
                 systems::rendering::leviathan_visual_system,
                 systems::harmonies::harmony_update_system, systems::harmonies::harmony_visual_system,
                 systems::harmonies::sanctuary_system, systems::scavenge::scavenge_pickup_system,
+            ).chain().run_if(in_state(GamePhase::Playing)))
+            .add_systems(Update, (
                 systems::consciousness::player_consciousness_system,
                 systems::consciousness::npc_consciousness_system,
                 systems::engine_physics::consciousness_sync_system,
+                systems::thermodynamic::collapse_visual_system,
                 systems::rendering::hud_system, systems::minimap::update_minimap,
                 systems::room_memory::room_memory_update_system,
                 systems::dialogue::dialogue_system,
