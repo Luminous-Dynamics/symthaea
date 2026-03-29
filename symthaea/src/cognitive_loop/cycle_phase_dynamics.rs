@@ -2176,7 +2176,12 @@ impl CognitiveLoopService {
                 noradrenaline: self.neuromod.bath.noradrenaline.effective() as f64,
                 serotonin: self.neuromod.bath.serotonin.effective() as f64,
                 oxytocin: self.neuromod.bath.oxytocin.effective() as f64,
-                threat_level: self.sentinel_manager.threat_level() as f64,
+                threat_level: {
+                    #[cfg(feature = "sentinel")]
+                    { self.sentinel_manager.threat_level() as f64 }
+                    #[cfg(not(feature = "sentinel"))]
+                    { 0.0 }
+                },
                 peer_trust: self.swarm_manager.telemetry().connectivity_ema,
                 flow_state: self.behavior.flow_state.intensity as f64,
             };
