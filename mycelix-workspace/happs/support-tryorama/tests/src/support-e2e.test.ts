@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 import { describe, it, expect, afterAll } from 'vitest';
 import { Scenario, dhtSync } from '@holochain/tryorama';
 import { HAPP_PATH, setupScenario } from './setup.js';

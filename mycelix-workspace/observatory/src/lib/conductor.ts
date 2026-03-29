@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 import { AppWebsocket } from '@holochain/client';
 import { browser } from '$app/environment';
 import { writable, type Readable } from 'svelte/store';
