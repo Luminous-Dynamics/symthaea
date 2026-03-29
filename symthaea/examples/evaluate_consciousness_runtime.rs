@@ -24,7 +24,9 @@
 use std::time::Instant;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
-const NUM_CYCLES: usize = 50;
+/// Number of cognitive cycles to run. 200 cycles shows the full consciousness
+/// trajectory (cold start → plateau). 50 cycles shows early warm-up only.
+const NUM_CYCLES: usize = 200;
 
 /// Stimuli that exercise different cognitive faculties
 const STIMULI: &[&str] = &[
