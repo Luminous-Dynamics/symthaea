@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-hal — Hardware Abstraction Layer
 //!
 //! Bridges Symthaea's cognitive loop to physical servos and sensors on a
@@ -64,6 +67,7 @@ pub mod imu;
 pub mod ina219;
 pub mod interlock;
 pub mod mock;
+pub mod motor_safety;
 pub mod pca9685;
 pub mod recording;
 pub mod runtime;
@@ -73,6 +77,7 @@ pub mod servo;
 // ── Public re-exports ────────────────────────────────────────────────
 
 pub use calibration::{CalibrationProfile, JointCalibration};
+pub use motor_safety::MotorSafetyLevel;
 pub use error::{HalError, HalResult};
 pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};

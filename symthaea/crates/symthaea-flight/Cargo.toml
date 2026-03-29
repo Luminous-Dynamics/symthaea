@@ -14,6 +14,7 @@ categories = ["science", "algorithms", "simulation"]
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
+symthaea-hal = { path = "../symthaea-hal", default-features = false }
 serde = { workspace = true }
 rand = { workspace = true }
 anyhow = { workspace = true }
