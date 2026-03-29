@@ -1065,3 +1065,25 @@ impl CognitiveLoopService {
         self.thermodynamic_mgr.memory_consolidation_suppressed()
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MUSE ACCESSORS (consciousness-driven music synthesis)
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "muse")]
+impl CognitiveLoopService {
+    /// Get the last rendered stereo PCM audio chunk from the muse manager.
+    pub fn muse_audio_chunk(&self) -> &[[f32; 2]] {
+        self.muse_manager.last_chunk()
+    }
+
+    /// Get muse telemetry (tempo, active notes, chunks rendered, etc.).
+    pub fn muse_telemetry(&self) -> super::super::managers::muse_manager::MuseTelemetry {
+        self.muse_manager.telemetry()
+    }
+
+    /// Get the current MusicalState driving synthesis.
+    pub fn muse_musical_state(&self) -> &symthaea_muse::MusicalState {
+        self.muse_manager.musical_state()
+    }
+}

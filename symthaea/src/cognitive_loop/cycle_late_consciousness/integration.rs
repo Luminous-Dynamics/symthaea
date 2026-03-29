@@ -28,7 +28,17 @@ impl CognitiveLoopService {
         let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
-                    let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    let mut activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    // Warm-start: boost activation during early cycles when prediction
+                    // error is necessarily high (untrained system). Decays linearly over
+                    // 50 cycles. Science: spontaneous neural activity provides baseline
+                    // workspace activation before learned predictions emerge (Raichle 2001).
+                    // 0.55 ensures GWT entry (threshold 0.5) even with PE ≈ 1.0.
+                    if self.stats.total_cycles < 50 {
+                        let warmup_boost =
+                            0.55 * (1.0 - self.stats.total_cycles as f64 / 50.0);
+                        activation = (activation + warmup_boost).min(1.0);
+                    }
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
                         "cognitive_loop",

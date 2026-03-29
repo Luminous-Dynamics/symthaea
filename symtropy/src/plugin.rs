@@ -3,7 +3,7 @@
 //! Symtropy game plugin: wires all systems together.
 
 use bevy::prelude::*;
-use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState};
+use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes, PlayerInput};
 use crate::systems;
 
 pub struct SymtropyPlugin;
@@ -27,6 +27,15 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<systems::audio::AudioState>()
             .init_resource::<systems::room_memory::RoomMemory>()
             .init_resource::<systems::dialogue::DialogueTimer>()
+            // Physics engine
+            .init_resource::<PhysicsWorldRes>()
+            .init_resource::<PlayerInput>()
+            // FixedUpdate: physics step at consistent 64Hz
+            .add_systems(FixedUpdate, (
+                systems::engine_physics::physics_apply_inputs,
+                systems::engine_physics::physics_step,
+                systems::engine_physics::physics_sync_transforms,
+            ).chain().run_if(in_state(GamePhase::Playing)))
             .add_systems(Startup, systems::audio::setup_audio)
             .add_systems(OnEnter(GamePhase::MainMenu), systems::menu::setup_menu)
             .add_systems(Update, systems::menu::menu_input_system.run_if(in_state(GamePhase::MainMenu)))

@@ -72,7 +72,11 @@ fn level_map(seed: u64) -> Vec<Vec<u8>> {
 }
 
 /// Spawn the camera, level, player, NPCs, fusion core, and Leviathan.
-pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSeed>) {
+pub fn setup_world(
+    mut commands: Commands,
+    seed: Res<crate::resources::DungeonSeed>,
+    mut physics_world: ResMut<crate::resources::PhysicsWorldRes>,
+) {
     // Camera with consciousness-driven post-processing
     commands.spawn((
         Camera2d,
@@ -137,7 +141,16 @@ pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSe
     // Insert tile grid as resource for collision checks
     commands.insert_resource(tile_grid);
 
-    // Player — bright cyan
+    // Player — bright cyan, with physics body
+    let player_physics_handle = physics_world.world.add_sphere(
+        symtropy_math::Point::new([player_pos.x as f64, player_pos.y as f64]),
+        10.0, // collision radius (half the sprite size)
+        1.0,  // mass
+    );
+    // Disable gravity for the player (top-down game)
+    if let Some(body) = physics_world.world.body_mut(player_physics_handle) {
+        body.linear_damping = 0.5; // high damping for responsive controls
+    }
     commands.spawn((
         Sprite::from_color(Color::srgb(0.2, 0.9, 1.0), Vec2::splat(20.0)),
         Transform::from_xyz(player_pos.x, player_pos.y, 2.0),
@@ -147,6 +160,7 @@ pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSe
         ConsciousnessComp::default(),
         TendBalance::new(40), // ±40 TEND credit limit
         FactionAffiliation::default(),
+        symtropy_render_bridge::PhysicsBody::new(player_physics_handle, 10.0),
     ));
 
     // Crew NPCs — each a different green shade, spread near player
@@ -167,6 +181,16 @@ pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSe
             ..Default::default()
         };
 
+        // Register NPC physics body
+        let npc_physics_handle = physics_world.world.add_sphere(
+            symtropy_math::Point::new([*x as f64, *y as f64]),
+            8.0, // collision radius
+            1.0, // mass
+        );
+        if let Some(body) = physics_world.world.body_mut(npc_physics_handle) {
+            body.linear_damping = 0.5;
+        }
+
         commands.spawn((
             Sprite::from_color(*color, Vec2::splat(16.0)),
             Transform::from_xyz(*x, *y, 2.0),
@@ -185,6 +209,7 @@ pub fn setup_world(mut commands: Commands, seed: Res<crate::resources::DungeonSe
                 ],
             },
             NpcTrust::default(),
+            symtropy_render_bridge::PhysicsBody::new(npc_physics_handle, 8.0),
         ));
     }
 

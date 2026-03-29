@@ -325,6 +325,13 @@ impl Default for PhaseCoherenceTracker {
 /// 2.27 ceiling outperformed 1.0 by +6.36% composite fitness.
 pub const DEFAULT_AMPLIFIER_CAP: f64 = 1.27;
 
+/// Weight of pure necessary conditions vs amplified necessary conditions.
+/// C = w × necessary + (1-w) × necessary × amplifier.
+/// 0.0 = pure amplification (current behavior: necessary × amp).
+/// 0.42 = evolved optimal (reduces sensitivity but improves stability).
+/// Default: 0.0 preserves existing behavior; tune via config for research.
+pub const DEFAULT_NECESSARY_WEIGHT: f64 = 0.0;
+
 /// Default amplifier weight for Attention
 pub const DEFAULT_AMPLIFIER_W_ATTENTION: f64 = 0.30;
 
@@ -365,6 +372,11 @@ pub struct EquationConfig {
     /// Maximum amplifier boost above 1.0 (caps at 1.0 + cap).
     /// Only used when `structured_bottleneck` feature is enabled.
     pub amplifier_cap: f64,
+
+    /// Weight of pure necessary term vs amplified term [0, 1].
+    /// C = w × necessary + (1-w) × necessary × amplifier.
+    /// Only used when `structured_bottleneck` feature is enabled.
+    pub necessary_weight: f64,
 }
 
 impl Default for EquationConfig {
@@ -383,6 +395,7 @@ impl Default for EquationConfig {
                 DEFAULT_AMPLIFIER_W_KNOWLEDGE,
             ],
             amplifier_cap: DEFAULT_AMPLIFIER_CAP,
+            necessary_weight: DEFAULT_NECESSARY_WEIGHT,
         }
     }
 }
@@ -560,7 +573,12 @@ impl ConsciousnessEquationV2 {
                 (CoreComponent::Workspace, workspace),
             ]);
 
-            (necessary_min, necessary_term * amp, amp, lf)
+            // Blend: w × necessary + (1-w) × necessary × amplifier
+            // Evolution found w=0.42 outperforms pure amplification (w=0)
+            let w = self.config.necessary_weight;
+            let blended = necessary_term * (w + (1.0 - w) * amp);
+
+            (necessary_min, blended, amp, lf)
         };
 
         #[cfg(not(feature = "structured_bottleneck"))]

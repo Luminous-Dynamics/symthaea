@@ -820,24 +820,57 @@
       this.textContent = 'Deploying...';
 
       window.addNarration('Beginning Sovereign Birth on ' + diskName + '...');
-      if (window.speechSynthesis) {
-        var utt = new SpeechSynthesisUtterance('Beginning Sovereign Birth.');
+      if (window.speechSynthesis && window.narrateTTS) {
+        var utt = new SpeechSynthesisUtterance('Beginning Sovereign Birth on ' + diskName);
         utt.rate = 0.85;
         window.speechSynthesis.speak(utt);
       }
 
       var hostname = document.getElementById('install-hostname')?.textContent || 'guardian';
-      var installCmd = [
-        'mkdir -p /tmp/symthaea-install',
-        'cd /tmp/symthaea-install',
-        'nixos-anywhere --flake /tmp/symthaea-install#' + hostname,
-        '--target-host root@localhost'
-      ].join(' && ');
 
+      // Detect layout from disk count and type
+      var nvmeDisks = disks.filter(function(d) { return d.transport === 'nvme' && !d.removable; });
+      var layout = 'single';
+      var fastDisk = '';
+      var standardDisk = '';
+
+      if (nvmeDisks.length >= 2) {
+        layout = 'dual';
+        // Assume selected is the fast drive, other is standard
+        fastDisk = diskName;
+        standardDisk = nvmeDisks.find(function(d) { return d.name !== diskName; })?.name || '';
+        if (!confirm('Dual-NVMe layout detected.\n\nFast drive (data): ' + fastDisk + '\nStandard drive (OS): ' + standardDisk + '\n\nBOTH drives will be wiped.\n\nContinue?')) {
+          this.disabled = false;
+          this.textContent = 'Deploy to ' + diskName;
+          return;
+        }
+      }
+
+      // Generate configs via WASM
+      var hwJson = buildHardwareJson(state.hardwareProfile || {});
+      var flakeContent = '', diskoContent = '', hwContent = '';
+      try {
+        flakeContent = await window.send('generateFlake', { hardwareJson: hwJson, path: '/', hostname: hostname });
+        diskoContent = await window.send('generateDiskoConfig', { hardwareJson: hwJson });
+        hwContent = await window.send('generateHardwareNix', { hardwareJson: hwJson });
+      } catch(e) {
+        window.addNarration('Failed to generate configuration: ' + e.message);
+        this.disabled = false;
+        this.textContent = 'Deploy to ' + diskName;
+        return;
+      }
+
+      // Send fully automated install command
       ws.send(JSON.stringify({
-        action: 'exec',
-        command: installCmd,
-        stream: true
+        action: 'install',
+        disk: diskName,
+        layout: layout,
+        fast_disk: fastDisk,
+        standard_disk: standardDisk,
+        hostname: hostname,
+        flake_nix: flakeContent,
+        disko_nix: diskoContent,
+        hardware_nix: hwContent
       }));
     });
   }

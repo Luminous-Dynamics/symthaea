@@ -225,6 +225,11 @@ impl MuseManager {
         &self.last_chunk
     }
 
+    /// Get the current MusicalState driving synthesis.
+    pub fn musical_state(&self) -> &MusicalState {
+        &self.last_musical_state
+    }
+
     /// Get current telemetry.
     pub fn telemetry(&self) -> MuseTelemetry {
         MuseTelemetry {

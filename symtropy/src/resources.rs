@@ -161,6 +161,36 @@ impl TileGrid {
 }
 
 // ============================================================================
+// Physics Engine (Symtropy consciousness-physics runtime)
+// ============================================================================
+
+/// 2D physics world resource — wraps the ND physics engine for the game.
+#[derive(Resource)]
+pub struct PhysicsWorldRes {
+    pub world: symtropy_physics::PhysicsWorld<2>,
+}
+
+impl Default for PhysicsWorldRes {
+    fn default() -> Self {
+        Self {
+            world: symtropy_physics::PhysicsWorld::new(nalgebra::SVector::from([0.0, 0.0])),
+        }
+    }
+}
+
+/// Buffered player input — written in Update, consumed in FixedUpdate.
+///
+/// This bridges the gap between Bevy's Update (where `just_pressed` works)
+/// and FixedUpdate (where physics must run at a consistent timestep).
+#[derive(Resource, Default)]
+pub struct PlayerInput {
+    /// Desired movement direction (not normalized — magnitude encodes intent).
+    pub direction: Vec2,
+    /// Whether the player is sprinting.
+    pub sprinting: bool,
+}
+
+// ============================================================================
 // Live Audio Output (H1.2)
 // ============================================================================
 

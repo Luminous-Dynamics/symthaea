@@ -101,28 +101,41 @@ pub fn fep_behavior_system(
     }
 }
 
-/// Move NPCs toward their targets with wall collision.
+/// Apply NPC movement intent to physics bodies.
+///
+/// Reads MoveTarget (set by FEP behavior) and sets velocity on the NPC's
+/// physics body. Wall collision handled by the physics system via TileGrid.
 pub fn npc_movement_system(
-    mut query: Query<(&mut Transform, &MoveTarget), With<CrewNpc>>,
+    mut query: Query<(&Transform, &MoveTarget, &symtropy_render_bridge::PhysicsBody), With<CrewNpc>>,
+    mut physics: ResMut<crate::resources::PhysicsWorldRes>,
     tile_grid: Option<Res<crate::resources::TileGrid>>,
-    time: Res<Time>,
 ) {
-    for (mut tf, target) in &mut query {
-        if let Some(dest) = target.target {
-            let pos = tf.translation.truncate();
-            let dir = dest - pos;
-            let dist = dir.length();
-            if dist > 2.0 && target.speed > 0.0 {
-                let move_vec = dir.normalize() * target.speed * time.delta_secs();
-                let new_x = tf.translation.x + move_vec.x;
-                let new_y = tf.translation.y + move_vec.y;
-                if let Some(ref grid) = tile_grid {
-                    if grid.is_walkable(new_x, tf.translation.y) { tf.translation.x = new_x; }
-                    if grid.is_walkable(tf.translation.x, new_y) { tf.translation.y = new_y; }
+    for (tf, target, body_comp) in &query {
+        if let Some(body) = physics.world.body_mut(body_comp.handle) {
+            if let Some(dest) = target.target {
+                let pos = tf.translation.truncate();
+                let dir = dest - pos;
+                let dist = dir.length();
+                if dist > 2.0 && target.speed > 0.0 {
+                    let norm = dir.normalize();
+                    let mut vx = norm.x as f64 * target.speed as f64;
+                    let mut vy = norm.y as f64 * target.speed as f64;
+
+                    // TileGrid wall collision filter
+                    if let Some(ref grid) = tile_grid {
+                        let dt = 1.0 / 64.0_f32;
+                        let new_x = tf.translation.x + vx as f32 * dt;
+                        let new_y = tf.translation.y + vy as f32 * dt;
+                        if !grid.is_walkable(new_x, tf.translation.y) { vx = 0.0; }
+                        if !grid.is_walkable(tf.translation.x, new_y) { vy = 0.0; }
+                    }
+
+                    body.linear_velocity = nalgebra::SVector::from([vx, vy]);
                 } else {
-                    tf.translation.x = new_x;
-                    tf.translation.y = new_y;
+                    body.linear_velocity = nalgebra::SVector::from([0.0, 0.0]);
                 }
+            } else {
+                body.linear_velocity = nalgebra::SVector::from([0.0, 0.0]);
             }
         }
     }

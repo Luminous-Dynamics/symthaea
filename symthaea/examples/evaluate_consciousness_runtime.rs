@@ -24,7 +24,7 @@
 use std::time::Instant;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
-const NUM_CYCLES: usize = 20;
+const NUM_CYCLES: usize = 50;
 
 /// Stimuli that exercise different cognitive faculties
 const STIMULI: &[&str] = &[

@@ -5,12 +5,8 @@
 use bevy::prelude::*;
 
 use crate::components::{Flashlight, FusionCore, NoiseEmitter, Player};
-use crate::resources::{BiometricsCtx, TileGrid};
+use crate::resources::{BiometricsCtx, PlayerInput};
 
-/// Normal movement speed (pixels/second).
-const WALK_SPEED: f32 = 100.0;
-/// Sprint speed (pixels/second) — much noisier.
-const SPRINT_SPEED: f32 = 200.0;
 /// Walk noise level.
 const WALK_NOISE: f32 = 0.15;
 /// Sprint noise level.
@@ -18,17 +14,15 @@ const SPRINT_NOISE: f32 = 0.6;
 /// Standing noise decay factor.
 const NOISE_DECAY: f32 = 0.85;
 
-/// Move player with WASD, sprint with Shift. Wall collision via TileGrid.
+/// Capture player input and write to the PlayerInput resource.
+///
+/// Runs in Update (where `pressed()` works reliably). The physics system
+/// in FixedUpdate reads PlayerInput to set velocity on the physics body.
 pub fn player_movement_system(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut Transform, &mut NoiseEmitter), With<Player>>,
-    tile_grid: Option<Res<TileGrid>>,
-    time: Res<Time>,
+    mut input: ResMut<PlayerInput>,
+    mut noise_query: Query<&mut NoiseEmitter, With<Player>>,
 ) {
-    let Ok((mut transform, mut noise)) = query.single_mut() else {
-        return;
-    };
-
     let mut direction = Vec2::ZERO;
     if keyboard.pressed(KeyCode::KeyW) || keyboard.pressed(KeyCode::ArrowUp) {
         direction.y += 1.0;
@@ -43,32 +37,19 @@ pub fn player_movement_system(
         direction.x += 1.0;
     }
 
-    if direction != Vec2::ZERO {
-        direction = direction.normalize();
-        let sprinting =
-            keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
-        let speed = if sprinting { SPRINT_SPEED } else { WALK_SPEED };
+    let sprinting =
+        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-        let new_x = transform.translation.x + direction.x * speed * time.delta_secs();
-        let new_y = transform.translation.y + direction.y * speed * time.delta_secs();
+    input.direction = direction;
+    input.sprinting = sprinting;
 
-        // Wall collision: check each axis independently (allows wall sliding)
-        if let Some(ref grid) = tile_grid {
-            if grid.is_walkable(new_x, transform.translation.y) {
-                transform.translation.x = new_x;
-            }
-            if grid.is_walkable(transform.translation.x, new_y) {
-                transform.translation.y = new_y;
-            }
+    // Update noise based on movement
+    if let Ok(mut noise) = noise_query.single_mut() {
+        if direction != Vec2::ZERO {
+            noise.level = if sprinting { SPRINT_NOISE } else { WALK_NOISE };
         } else {
-            // No grid yet (first frame) — allow movement
-            transform.translation.x = new_x;
-            transform.translation.y = new_y;
+            noise.level *= NOISE_DECAY;
         }
-
-        noise.level = if sprinting { SPRINT_NOISE } else { WALK_NOISE };
-    } else {
-        noise.level *= NOISE_DECAY;
     }
 }
 
