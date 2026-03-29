@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    # Holochain zomes (8 pairs: integrity + coordinator)
+    "holochain/zomes/procurement/integrity",
+    "holochain/zomes/procurement/coordinator",
+    "holochain/zomes/inventory/integrity",
+    "holochain/zomes/inventory/coordinator",
+    "holochain/zomes/logistics/integrity",
+    "holochain/zomes/logistics/coordinator",
+    "holochain/zomes/payments/integrity",
+    "holochain/zomes/payments/coordinator",
+    "holochain/zomes/trust/integrity",
+    "holochain/zomes/trust/coordinator",
+    "holochain/zomes/claims/integrity",
+    "holochain/zomes/claims/coordinator",
+    "holochain/zomes/verification/integrity",
+    "holochain/zomes/verification/coordinator",
+    "holochain/zomes/bridge/integrity",
+    "holochain/zomes/bridge/coordinator",
+    # Rust ERP backend
+    "rust/service",
+    "rust/claim-model",
+    "rust/crypto",
+    "rust/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
