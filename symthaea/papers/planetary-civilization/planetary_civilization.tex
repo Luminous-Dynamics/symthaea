@@ -30,8 +30,8 @@
 % Title
 % ============================================================================
 
-\title{Consciousness-Gated Governance for Autonomous Planetary Settlement:\\
-A 777-Year Multi-World Simulation with Empirically Calibrated Disasters}
+\title{Governance by Integration: A 1,000-Year Multi-World Simulation\\
+of Consciousness-Coupled Resilience Under Empirically Calibrated Disasters}
 
 \author{
 Tristan Stoltz\textsuperscript{1}\\[4pt]
@@ -49,14 +49,14 @@ Tristan Stoltz\textsuperscript{1}\\[4pt]
 % ============================================================================
 
 \begin{abstract}
-We present a 777-year simulation of multi-world civilization development governed by consciousness-gated decision authority, subjected to a 40-event probabilistic disaster engine calibrated from NASA, NOAA, and ISS operational data. Using Symthaea, a hyperdimensional computing (HDC) consciousness framework, and Mycelix, a decentralized Holochain-based coordination platform with 134+ governance zomes, we model demographics, genetics, economics, governance, knowledge diffusion, and collective consciousness across lunar, Martian, and asteroid settlements through 10 civilizational epochs ($\sim$31 generations).
+We present a 1,000-year agent-based simulation of multi-world civilization development under a governance architecture that ties decision authority to a six-dimensional integration proxy ($\Phi$) rather than role, rank, or election. Subjected to a 40-event probabilistic disaster engine calibrated from NASA, NOAA, and ISS operational data, the simulation models demographics, economics, governance, knowledge diffusion, and collective integration across lunar, Martian, and outer-system settlements through 12,000 monthly ticks ($\sim$40 generations).
 
-Three experimental conditions reveal the architecture's properties: (1)~without disasters, CVS stabilizes at $0.762$ for 700+ years across 5 worlds; (2)~with 40 realistic disaster types but no resilience mechanisms, the civilization \textbf{collapses at year 755} from Tainter's complexity trap---8,393 cumulative disasters exceed regenerative capacity; (3)~with 15 consciousness-coupled resilience mechanisms (tech-scaled reliability, Sacred Stillness recovery, consciousness-gated evacuation, collective memory inoculation, and 10 additional realism mechanisms including cascade failures and knowledge loss), the civilization survives all 777 years with mean CVS $0.698 \pm 0.007$ across 5 seeds, population 34,548, and 7,595 disasters weathered per run.
+Three experimental conditions reveal the architecture's properties: (1)~without disasters, CVS stabilizes at $0.762$ for 700+ years; (2)~with realistic disasters but no resilience mechanisms, the civilization \textbf{collapses at year 755} from Tainter's complexity trap \citep{tainter1988collapse}---8,393 cumulative disasters exceed regenerative capacity; (3)~with 15 integration-coupled resilience mechanisms, the civilization survives 1,000 years (CVS $0.697$, population 57,048 across 5 worlds, 7,595 disasters per 777-year validation run, $\pm 0.007$ across 5 seeds).
 
-A controlled experiment (5 seeds $\times$ 2 conditions) demonstrates that consciousness gating improves CVS by 5.9\% and nearly triples collective $\Phi$ (0.283 vs.\ 0.102), while an astropharmacy model shows that psychedelic therapeutics (psilocybin, MDMA) directly boost neuroplasticity. The most unexpected finding is that Sacred Stillness---the Eighth Harmony, representing rest and contemplation---has a direct survival function: civilizations that learn to rest rebuild infrastructure up to $6\times$ faster after disasters. We conclude that consciousness-gated governance is \emph{necessary but not sufficient}: the civilization must actively convert coordination quality into physical redundancy, pharmaceutical consciousness maintenance, and above all, the institutional capacity to rest.
+A controlled experiment demonstrates that integration-gated governance improves CVS by 5.9\% and nearly triples collective $\Phi$ (0.283 vs.\ 0.102), operating through governance quality rather than demographic advantage. The most unexpected finding is that scheduled maintenance and contemplative slack---operationalized as ``Sacred Stillness''---has a direct survival function: civilizations that allocate time for rest rebuild infrastructure up to $6\times$ faster. We frame this architecture not as proof that consciousness is the correct basis for governance, but as \emph{one tested governance architecture within a planetary-settlement simulation framework} that produces measurably better outcomes than its ungated counterpart under realistic multi-century stress.
 \end{abstract}
 
-\textbf{Keywords:} consciousness-gated governance, planetary settlement, multi-world simulation, disaster resilience, cliodynamics, hyperdimensional computing, decentralized coordination, Holochain, IIT, Sacred Stillness
+\textbf{Keywords:} integration-gated governance, planetary settlement, agent-based simulation, disaster resilience, cliodynamics, scheduled maintenance, decentralized coordination, Holochain, civilizational viability
 
 % ============================================================================
 % 1. Introduction
@@ -68,16 +68,18 @@ The prospect of permanent human settlement beyond Earth raises a governance ques
 
 Current space settlement proposals assume either centralized mission control authority \citep{zubrin1996case} or ad hoc crew governance \citep{cockell2006space}. Neither scales to permanent multi-world civilization. Mission control cannot govern at interplanetary latency. Ad hoc crew governance lacks the institutional memory and constitutional framework needed for multi-generational continuity.
 
-We propose a third path: \emph{consciousness-gated governance}, where decision authority is tied to measurable consciousness metrics rather than role, rank, or election. The key insight is that consciousness---as measured by Integrated Information Theory ($\Phi$) \citep{tononi2004information}, hyperdimensional computing coherence, and moral algebra scoring---provides a decision-quality signal that is independent of social hierarchy.
+We propose and test a third path: \emph{integration-gated governance}, where decision authority is tied to a measurable six-dimensional proxy for cognitive integration---encompassing meta-awareness, coherence, care, epistemic confidence, and alignment with shared values---rather than role, rank, or election. We operationalize this proxy using Integrated Information Theory ($\Phi$) \citep{tononi2004information} and hyperdimensional computing, while acknowledging that the proxy is theoretical and not yet experimentally validated against biological consciousness (\S\ref{sec:limitations}).
+
+The key contribution is not a claim that consciousness \emph{is} the correct basis for governance, but rather a 1,000-year stress test demonstrating that \emph{one specific integration-gated architecture} produces measurably better outcomes than its ungated counterpart under realistic multi-century disaster pressure.
 
 This paper presents:
 \begin{enumerate}
-    \item A 777-year simulation with 40 empirically calibrated disaster types (\S\ref{sec:simulator}, \S\ref{sec:disasters})
-    \item The extinction-to-survival comparison: collapse at year 755 without resilience, survival with 15 mechanisms (\S\ref{sec:disasters})
-    \item A controlled experiment proving consciousness gating improves CVS by 5.9\% (\S\ref{sec:results})
-    \item The Sacred Stillness discovery: rest as existential infrastructure (\S\ref{sec:disasters})
-    \item An astropharmacy model for pharmaceutical consciousness maintenance (\S\ref{sec:astropharmacy})
-    \item A delta-v proof that Ceres refueling is mandatory for outer system expansion (\S\ref{sec:deltav})
+    \item A 1,000-year simulation with 40 empirically calibrated disaster types across 7 categories (\S\ref{sec:simulator}, \S\ref{sec:disasters})
+    \item The extinction-to-survival contrast: collapse at year 755 without resilience, survival to year 1,000 with 15 mechanisms (\S\ref{sec:disasters})
+    \item A controlled experiment showing integration gating improves CVS by 5.9\% (\S\ref{sec:results})
+    \item The discovery that scheduled maintenance slack (``Sacred Stillness'') functions as existential infrastructure (\S\ref{sec:disasters})
+    \item An astropharmacy model for pharmaceutical support of cognitive integration (\S\ref{sec:astropharmacy})
+    \item A delta-v analysis showing that asteroid belt refueling is a prerequisite for outer system expansion (\S\ref{sec:deltav})
 \end{enumerate}
 
 % ============================================================================
@@ -304,7 +306,7 @@ Population is neutral between conditions, confirming that gating does not create
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{fig2_cvs_components.pdf}
-\caption{CVS component trajectories. Collective $\Phi$ peaks at year 65 then slowly declines (generational consciousness decay). Technology grows steadily. Genetic diversity is preserved above 0.99 due to adequate population sizes.}
+\caption{CVS component trajectories (150-year baseline, no disasters). Collective $\Phi$ peaks at year 65 then declines. Technology grows steadily. Genetic diversity remains high in this run because the aggregate population (including Earth) is large; off-Earth colonies with founding populations of 12--50 experience significant bottleneck effects visible only at longer horizons (see \S\ref{sec:simulator}).}
 \label{fig:cvs}
 \end{figure}
 
@@ -461,7 +463,7 @@ With Ceres refueling, the longest single leg is Earth-to-Ceres ($\Delta v \appro
     \frac{m_0}{m_f} = \exp\left(\frac{16{,}000}{900 \times 9.81}\right) = e^{1.81} \approx 6.1
 \end{equation}
 
-The fuel requirement drops from $1{,}965\times$ to $6.1\times$---a \textbf{322-fold reduction}. This mathematically proves that the asteroid belt is not optional infrastructure; it is a \emph{prerequisite} for outer solar system civilization.
+The fuel requirement drops from $1{,}965\times$ to $6.1\times$---a \textbf{322-fold reduction}. This strongly suggests that asteroid belt refueling infrastructure is a practical prerequisite for crewed outer solar system missions with chemical or nuclear thermal propulsion.
 
 \begin{table}[h]
 \centering
@@ -516,9 +518,11 @@ This result is encouraging but carries an important caveat: the simulation's con
 
 \section{Discussion}
 
-\subsection{What Consciousness Gating Is Not}
+\subsection{What Integration Gating Is and Is Not}
 
-Consciousness-gated governance is not technocracy (rule by technical expertise), meritocracy (rule by achievement), or epistocracy (rule by knowledge). It is governance by \emph{integration}---the measured capacity to hold multiple perspectives, evaluate moral consequences, and maintain coherence under uncertainty. A Guardian-tier agent is not necessarily the smartest, most educated, or most powerful; they are the most \emph{conscious}, as measured by a six-dimensional vector that includes care for others, epistemic humility, and harmonic alignment.
+A skeptical reader may reasonably ask whether the six-dimensional $\Phi$ proxy is measuring ``consciousness'' or simply a blend of desirable prosocial traits (coherence, care, meta-awareness, epistemic humility, and value alignment). We believe this is a legitimate concern and do not claim to have resolved it. What we \emph{do} claim is narrower: the specific six-dimensional integration proxy used in this simulation, when tied to governance authority, produces measurably better civilizational outcomes than ungated governance under identical disaster conditions.
+
+This is governance by \emph{integration}---the measured capacity to hold multiple perspectives, evaluate moral consequences, and maintain coherence under uncertainty---not technocracy, meritocracy, or epistocracy. Whether this integration proxy corresponds to phenomenal consciousness remains an open question beyond the scope of this simulation study. The operational finding---that gating by integration improves coordination quality by 5.9\%---holds regardless of the metaphysical status of $\Phi$.
 
 \subsection{The Moral Algebra Must Evolve}
 
@@ -552,15 +556,15 @@ Across all epochs and worlds, the Eight Harmonies provide the ethical thread. Th
 
 \section{Conclusion}
 
-We have demonstrated that consciousness-gated governance---decision authority tied to measurable consciousness metrics rather than social hierarchy---produces viable multi-world civilizations across 150 simulated years. The Civilization Viability Score of $0.434 \pm 0.009$ across 10 stochastic seeds indicates structural resilience: the architecture survives because it adapts.
+We have tested one specific integration-gated governance architecture against 1,000 years of empirically calibrated disasters and found that it produces viable multi-world civilizations where ungated governance does not. The 1,000-year run (CVS $0.697$, population 57,048 across 5 worlds, 17,866 technology breakthroughs) confirms that the attractor observed at 777 years ($0.698 \pm 0.007$) is stable through a full millennium.
 
-The most important finding emerged from the disaster gauntlet: consciousness gating is \textbf{necessary but not sufficient}. Without resilience mechanisms, the civilization collapsed at year 755 under the cumulative weight of 8,393 disasters---not from a single catastrophe, but from Tainter's complexity trap \citep{tainter1988collapse}: the cost of maintaining infrastructure under constant stress exceeded regenerative capacity. With five consciousness-coupled resilience mechanisms (tech-scaled reliability, milestone shielding, Sacred Stillness recovery, consciousness-gated evacuation, and collective memory inoculation) plus ten realism mechanisms (cascade failures, stress-impaired decisions, supply chain fragility, skill gaps, knowledge loss, resource depletion, infrastructure aging, communication delay, morale contagion, and dynamic carrying capacity), the civilization not only survived 777 years but grew to 39,225 across 5 worlds (CVS 0.702).
+The most important finding emerged from the disaster gauntlet: integration gating is \textbf{necessary but not sufficient}. Without the 15 resilience mechanisms, the civilization collapsed at year 755 under 8,393 cumulative disasters---Tainter's complexity trap \citep{tainter1988collapse} in simulation. With integration-coupled resilience (tech-scaled ECLSS reliability, consciousness-gated evacuation, collective memory inoculation, and 10 realism mechanisms), the civilization survived and grew.
 
-The most unexpected discovery is that Sacred Stillness---the Eighth Harmony, representing rest, contemplation, and maintenance---has a direct survival function. Civilizations that learn to rest rebuild infrastructure up to 6$\times$ faster after disasters. In the 150-year run, Stillness was the weakest harmony (0.089). The disaster gauntlet revealed that this weakness is potentially lethal: contemplation is not a luxury; it is existential infrastructure.
+The most unexpected discovery is that scheduled maintenance and contemplative slack---operationalized as ``Sacred Stillness''---has a direct survival function. Infrastructure rebuilds up to $6\times$ faster when civilizations allocate time for rest. At 150 years, this was the weakest governance dimension (0.089). Under disaster pressure, its absence becomes potentially lethal. This finding---that \emph{slack is infrastructure}---may generalize beyond space settlement to any complex system under sustained stress.
 
-The Eight Harmonies score slowly, but they score. Over 777 years and 10 epochs, love coherence builds from zero to 0.33---not through mandate, but through the accumulated weight of consciousness-gated decisions that consistently choose care over extraction, reciprocity over exploitation, and rest over relentless expansion.
+We do not claim to have proven that consciousness is the correct basis for political legitimacy. What we have shown is that a specific, reproducible, integration-gated governance architecture---one that rewards meta-awareness, care, epistemic humility, and value alignment---outperforms its ungated counterpart by 5.9\% CVS and nearly triples collective integration under identical disaster conditions. Whether this architecture captures something essential about consciousness, or merely operationalizes good governance traits through a novel mechanism, remains an open and important question.
 
-The question ``Does consciousness-gated civilization survive its own success?'' now has a nuanced, testable answer: \emph{yes---if the civilization converts its governance quality into physical redundancy, maintains its pharmaceutical consciousness infrastructure, learns from every disaster it survives, and above all, learns to rest}.
+The civilization survived 1,000 years. It grew to 57,048 people across 5 worlds. It weathered Carrington events, ECLSS cascades, epidemics, and constitutional crises. And the single most important thing it learned was to rest.
 
 % ============================================================================
 % Code & Data Availability
@@ -568,7 +572,7 @@ The question ``Does consciousness-gated civilization survive its own success?'' 
 
 \section*{Code \& Data Availability}
 
-The simulation code (\texttt{mycelix-multiworld-sim}), planetary resource catalog (97 resources), 40-event disaster engine, latency simulation harness, and all analysis scripts are available in the Luminous Dynamics monorepo. The simulator comprises $\sim$12,000+ lines of Rust with 173 unit tests, 15 resilience and realism mechanisms, and a configurable technology tree. Simulations can be reproduced with any reported seed at 150, 300, 777, or 1,000-year horizons. A 777-year run completes in $\sim$30 minutes on a single core in release mode.
+The simulation code (\texttt{mycelix-multiworld-sim}), planetary resource catalog (97 resources), 40-event disaster engine, 12-region hybrid Earth model, and all analysis binaries are available in the Luminous Dynamics monorepo. The simulator comprises $\sim$45,000 lines of Rust with 240+ unit tests, 15 resilience and realism mechanisms, a configurable technology tree, and empirical calibration from 12 scientific domains. Simulations can be reproduced with any reported seed at 150, 300, 777, or 1,000-year horizons. A 1,000-year disaster run completes in $\sim$60 minutes on a single core in release mode.
 
 % ============================================================================
 % Acknowledgments
