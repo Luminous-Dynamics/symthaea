@@ -30,4 +30,4 @@ pub use bodies::{CelestialBody, Earth, Moon, Mars};
 pub use trilateration::{PositionEstimate, TrilaterationError, trilaterate_3d, trilaterate_2d};
 pub use ranging::{RangeEstimate, RangingMethod};
 pub use coverage::{gdop, pdop, CoveragePoint};
-pub use kalman::{PositionFilter, FilterState};
+pub use kalman::{PositionFilter, FilterConfig, FilterState};
