@@ -7,6 +7,7 @@
 //! output compatible with the knowledge_zome data model.
 
 pub mod acm;
+pub mod caps;
 pub mod cip;
 pub mod csp;
 pub mod esco;

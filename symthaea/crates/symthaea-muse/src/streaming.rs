@@ -276,6 +276,18 @@ impl StreamingSynth {
         let fm_ratio = 2.0 + self.state.noradrenaline;
         let rolloff = 1.0 + self.state.serotonin * 0.8;
         let brightness = 0.3 + self.state.dopamine * 0.7;
+
+        // NE → vibrato rate scaling: high stress = faster, more agitated vibrato
+        // Base: 5.3Hz, scales up to 8Hz at max NE (Zentner et al. 2008: urgency → faster modulation)
+        let vibrato_rate_scale = 1.0 + self.state.noradrenaline * 0.5;
+
+        // NE → harmonic tension bias: high NE shifts brightness toward harshness
+        let ne_brightness_boost = self.state.noradrenaline * 0.15;
+
+        // Prediction error → onset jitter (±samples): surprise makes timing unpredictable
+        // Max jitter: ±5ms at PE=1.0 (Vuust & Witek 2014: rhythmic surprise)
+        let pe_jitter_samples = (self.state.prediction_error * 0.005 * sr) as i32;
+
         let atk = 0.01 + (1.0 - self.state.arousal) * 0.05;
         let dec = 0.05 + self.state.serotonin * 0.1;
         let sus = 0.4 + self.state.consciousness_level * 0.4;
@@ -321,7 +333,7 @@ impl StreamingSynth {
                 // 0-8 cents at 5.3Hz — subtle but measurable via spectral analysis
                 let psi = self.state.consciousness_level.clamp(0.0, 1.0);
                 let phi_vibrato_cents = psi * 8.0;
-                let phi_vibrato_rate = 5.3; // Hz, co-prime with typical musical vibrato rates
+                let phi_vibrato_rate = 5.3 * vibrato_rate_scale; // NE scales rate (stress → faster)
                 let phi_vib = (t * phi_vibrato_rate * std::f32::consts::TAU).sin();
                 let phi_factor = 2.0f32.powf(phi_vibrato_cents * phi_vib / 1200.0);
                 let freq = active.note.frequency * vibrato_factor * phi_factor;
@@ -347,7 +359,9 @@ impl StreamingSynth {
                         if active.partial_phases[h] > std::f32::consts::TAU * 2.0 {
                             active.partial_phases[h] -= std::f32::consts::TAU * 2.0;
                         }
-                        s += partials[h] * active.partial_phases[h].sin();
+                        // NE boosts upper partials → harsher timbre under stress
+                        let ne_boost = if h > 2 { ne_brightness_boost } else { 0.0 };
+                        s += (partials[h] + ne_boost) * active.partial_phases[h].sin();
                     }
                     s * norm * env
                 };
@@ -671,10 +685,19 @@ impl StreamingSynth {
                     None
                 };
 
+                // Prediction error → onset jitter: surprise makes timing unpredictable
+                let pe = self.state.prediction_error;
+                let jitter_max = (pe * 0.005 * sr) as i32; // ±5ms at PE=1.0
+                let jitter = if jitter_max > 0 {
+                    let hash = self.note_counter.wrapping_mul(2654435761);
+                    (hash as i32 % (jitter_max * 2 + 1)) - jitter_max
+                } else { 0 };
+                let onset_offset = jitter.max(0) as usize;
+
                 self.active_notes.push(ActiveNote {
                     total_samples: (note.duration * sr) as usize + release_samples,
                     note,
-                    sample_pos: 0,
+                    sample_pos: onset_offset, // jittered onset
                     partial_phases: vec![0.0; 16],
                     fm_phase: 0.0,
                     pan: [0.0, -0.2, 0.4, -0.3][voice_idx],

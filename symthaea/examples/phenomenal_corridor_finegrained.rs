@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Fine-Grained Phenomenal Corridor Analysis
 //!
 //! Maps the phenomenal effect at each layer from 17-24 to identify

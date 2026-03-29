@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! OpenBCI Adapter
 //!
 //! Supports OpenBCI Cyton (8-channel), Cyton-Daisy (16-channel), and Ganglion (4-channel).

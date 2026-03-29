@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Neuromodulator Bath — thin re-export from `symthaea-neuromodulators` crate.
 //!
 //! All core types, structs, and logic live in the extracted sub-crate.

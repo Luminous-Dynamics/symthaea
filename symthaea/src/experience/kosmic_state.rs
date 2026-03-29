@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! KosmicSong State Management
 //!
 //! Implements the unified identity structure from GIS v4.0 "Kosmic Song Synthesis":

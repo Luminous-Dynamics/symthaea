@@ -23,6 +23,7 @@ blake3 = { workspace = true }
 ed25519-dalek = { version = "2", optional = true, default-features = false, features = ["rand_core"] }
 hex = { version = "0.4", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
+positioning = { path = "../../../mycelix-position/lib/positioning", optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
@@ -36,6 +37,8 @@ pairing = ["dep:ed25519-dalek", "dep:hex"]
 screen-vision = []
 # Full 20-channel Broca language center with epistemic gating and semantic veto.
 broca-full = ["dep:symthaea-broca"]
+# Decentralized cooperative positioning (GPS-independent).
+positioning = ["dep:positioning"]
 
 [[bin]]
 name = "soma_bench"

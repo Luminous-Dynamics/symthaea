@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Tier 7: Compositionality Primitives - Revolutionary Primitive Algebra
 //!
 //! **PARADIGM SHIFT**: This module implements a complete algebra for combining primitives,

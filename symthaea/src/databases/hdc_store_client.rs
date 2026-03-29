@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! HdcStore-backed ConsciousnessDatabase implementation.
 //!
 //! Vectors are stored in the zero-copy mmap'd HdcStore for O(1) access.

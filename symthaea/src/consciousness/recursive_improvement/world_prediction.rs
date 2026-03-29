@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # World-Grounded Prediction System (MAGI Loop Step 1 + 1.5)
 //!
 //! This module implements the first two steps of the Minimum AGI Loop (MAGI Loop):

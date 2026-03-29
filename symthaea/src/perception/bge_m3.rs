@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! BGE-M3 Embedding Model via Candle
 //!
 //! Pure Rust implementation of BAAI/bge-m3 using HuggingFace Candle.

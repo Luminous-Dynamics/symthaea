@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! CfC-based Lookahead Engine for O(1) Learning Value Prediction
 //!
 //! This is the core innovation of the School system: using CfC's closed-form

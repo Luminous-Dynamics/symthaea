@@ -61,6 +61,10 @@ pub mod screen_vision;
 #[cfg(feature = "screen-vision")]
 pub mod touch_body;
 
+// Decentralized positioning (GPS-independent)
+#[cfg(feature = "positioning")]
+pub mod positioning_bridge;
+
 // Full Broca language center (replaces BrocaLite)
 #[cfg(feature = "broca-full")]
 pub mod broca_soma;

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Consciousness Bridge - Connecting Heart (World Model) to Brain (Global Workspace)
 //!
 //! This module bridges the ConsciousnessWorldModel (the "heart" that crystallizes concepts)

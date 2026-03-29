@@ -547,6 +547,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // ============================================================
         // Luminous Dynamics Curriculum
         // ============================================================
+        // ============================================================
+        // South African CAPS Curriculum
+        // ============================================================
+        Commands::IngestCaps { source_id, output } => {
+            let source = edunet_standards_ingest::sources::caps::CapsSource::new();
+            eprintln!("Generating CAPS curriculum: {}...", source_id);
+            let doc = source.fetch(&source_id)?;
+            eprintln!("Generated {} nodes for {}", doc.nodes.len(), doc.metadata.title);
+            write_document(&doc, output.as_deref(), true)?;
+        }
+
+        Commands::IngestCapsAll { output_dir } => {
+            std::fs::create_dir_all(&output_dir)?;
+            let source = edunet_standards_ingest::sources::caps::CapsSource::new();
+            let entries = source.list_available()?;
+            eprintln!("Generating {} CAPS curricula...", entries.len());
+
+            for (i, entry) in entries.iter().enumerate() {
+                eprint!("[{}/{}] {}... ", i + 1, entries.len(), entry.title);
+                let doc = source.fetch(&entry.id)?;
+                let path = output_dir.join(format!("{}.json", entry.id));
+                let json = serde_json::to_string_pretty(&doc)?;
+                std::fs::write(&path, &json)?;
+                eprintln!("{} nodes", doc.nodes.len());
+            }
+            eprintln!("Done.");
+        }
+
+        // ============================================================
+        // Luminous Dynamics Curriculum
+        // ============================================================
         Commands::IngestLuminous { source_id, output } => {
             let source = edunet_standards_ingest::sources::luminous::LuminousSource::new();
             eprintln!("Generating Luminous Dynamics curriculum: {}...", source_id);

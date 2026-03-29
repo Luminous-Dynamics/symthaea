@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use symthaea::language::llm_backend::create_backend_from_env;
 use symthaea::language::llm_organ::LLMOrgan;
 use symthaea::mind::structured_thought::StructuredThought;
