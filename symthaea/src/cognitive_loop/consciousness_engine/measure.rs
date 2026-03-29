@@ -367,6 +367,27 @@ impl ConsciousnessEngine {
         }
 
         // ═══════════════════════════════════════════════════════════════════
+        // LAYER 5: IIT 4.0 Concept Structure Analysis (Albantakis 2023)
+        // Co-prime interval 101 (~3x/sec at 31Hz). O(2^n) per mechanism,
+        // but n = active modal channels (typically 3-6), so fast enough.
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "iit4")]
+        if input.cycle % 101 == 0 {
+            if let Some(ref mmi) = self.multi_modal_integrator {
+                let components = mmi.component_hvs_for_iit4();
+                if components.len() >= 2 {
+                    let calc = symthaea_core::consciousness_metrics::IIT4Calculator::new();
+                    let result = calc.analyze(&components);
+                    // Feed IIT4 Big Phi into learning modulation
+                    // More integrated concept structure → sharper learning
+                    if result.big_phi > 0.0 {
+                        lr_factor *= 1.0 + (result.big_phi * 0.05) as f32;
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
         // UNIFIED CONSCIOUSNESS: Weighted consensus across all systems
         // ═══════════════════════════════════════════════════════════════════
         let mut unified_consciousness = self.compute_unified(
