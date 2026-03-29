@@ -47,6 +47,18 @@ impl CognitiveLoopService {
                         vec![ctx.hv16_cached],
                         vec!["encoder".to_string()],
                     );
+                    // Submit memory retrieval as competing strategy (default mode network).
+                    // GWT requires coalition competition for ignition (Dehaene 2011).
+                    // Memory activation = prediction confidence (familiar → stronger retrieval).
+                    let memory_activation =
+                        (self.prediction_confidence * 0.8 + 0.1).clamp(0.0, 1.0);
+                    gwt.submit_strategy(
+                        "memory_retrieval",
+                        memory_activation,
+                        vec![ctx.hv16_cached],
+                        vec!["memory".to_string()],
+                    );
+
                     // If previous cycle's subsystems requested broadcast, boost salience
                     if self.carryover.gwt_broadcast_occurred {
                         gwt.submit_strategy(
@@ -1046,6 +1058,18 @@ impl CognitiveLoopService {
                     }
                 }
             }
+
+            // Blend MCE level with ConsciousnessEquationV2 output.
+            // V2 has structured bottleneck (necessary/amplifier split, evolved parameters).
+            // MCE provides the base; V2 provides a scientifically grounded correction.
+            // Blend: max(MCE, V2 * 0.8) — V2 can lift the floor but MCE remains primary.
+            let v2_cached = self
+                .consciousness
+                .consciousness_engine
+                .consciousness_equation_v2()
+                .map(|eq| eq.last_consciousness())
+                .unwrap_or(0.0);
+            let level = level.max(v2_cached * 0.8);
 
             // Track consciousness level for learning gating (Task C)
             self.carryover.history.consciousness_level = level;

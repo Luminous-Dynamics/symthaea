@@ -883,6 +883,15 @@ impl ConsciousnessEquationV2 {
     pub fn weights(&self) -> &HashMap<String, f64> {
         &self.weights
     }
+
+    /// Get the consciousness level from the most recent computation.
+    /// Returns 0.0 if no computation has been performed yet.
+    pub fn last_consciousness(&self) -> f64 {
+        self.history
+            .back()
+            .map(|r| r.consciousness)
+            .unwrap_or(0.0)
+    }
 }
 
 impl Default for ConsciousnessEquationV2 {
