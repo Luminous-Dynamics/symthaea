@@ -125,6 +125,12 @@ pub struct MultiWorldSimulator {
     /// Spaceport for launching colonists from Earth aggregate regions.
     /// None when `hybrid_earth` is false.
     pub spaceport: Option<spaceport::Spaceport>,
+    /// Generation ship for interstellar transit (if enabled).
+    pub generation_ship: Option<generation_ship::GenerationShip>,
+    /// Tick at which to launch the generation ship (0 = disabled).
+    pub generation_ship_launch_tick: u32,
+    /// Whether the generation ship has been launched.
+    generation_ship_launched: bool,
 }
 
 impl MultiWorldSimulator {
@@ -157,7 +163,17 @@ impl MultiWorldSimulator {
             resontia_config: resontia::ResontiaConfig::default(),
             earth_regions: Vec::new(),
             spaceport: None,
+            generation_ship: None,
+            generation_ship_launch_tick: 0,
+            generation_ship_launched: false,
         }
+    }
+
+    /// Enable interstellar mode: launch a generation ship at the specified tick.
+    pub fn enable_interstellar(&mut self, launch_tick: u32, passengers: usize, velocity_c: f64) {
+        self.generation_ship_launch_tick = launch_tick;
+        // Ship will be created at launch tick, not now
+        let _ = (passengers, velocity_c); // stored in config
     }
 
     /// Enable Resontia Earth-hardening for this simulation.
@@ -2657,6 +2673,57 @@ impl MultiWorldSimulator {
                             "Kessler syndrome blocks spaceport — colonist launches suspended".to_string(),
                         ));
                     }
+                }
+            }
+
+            // Phase 0.7: Generation ship launch + tick
+            if self.generation_ship_launch_tick > 0
+                && self.current_tick >= self.generation_ship_launch_tick
+                && !self.generation_ship_launched
+            {
+                // Launch the generation ship with 500 colonists to Proxima
+                let ship = generation_ship::GenerationShip::new(
+                    99,
+                    generation_ship::InterstellarDestination::ProximaCentauri,
+                    0.05,
+                    self.current_tick,
+                    500,
+                );
+                self.events.push(CivEvent::new(
+                    self.current_tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
+                    format!("GENERATION SHIP LAUNCHED → {} ({:.2} ly at {:.1}%c, {} passengers)",
+                        ship.destination.name(), ship.distance_ly, ship.cruise_velocity_c * 100.0, 500),
+                ));
+                self.generation_ship = Some(ship);
+                self.generation_ship_launched = true;
+            }
+            if let Some(ref mut ship) = self.generation_ship {
+                let disasters = ship.tick(&mut self.rng);
+                for d in &disasters {
+                    let desc = match d {
+                        generation_ship::InterstellarDisaster::CosmicRayBurst { severity } =>
+                            format!("Cosmic ray burst (severity {:.2}) on generation ship", severity),
+                        generation_ship::InterstellarDisaster::MicrometeoiteImpact { hull_damage } =>
+                            format!("Micrometeorite impact (hull damage {:.3}) on generation ship", hull_damage),
+                        generation_ship::InterstellarDisaster::NavigationDrift { correction_fuel_fraction } =>
+                            format!("Navigation drift (fuel cost {:.3}) on generation ship", correction_fuel_fraction),
+                        generation_ship::InterstellarDisaster::KnowledgeAttrition { skill_loss_fraction } =>
+                            format!("Knowledge attrition ({:.1}% skill loss) on generation ship", skill_loss_fraction * 100.0),
+                        generation_ship::InterstellarDisaster::SocialFracture { cohesion_loss } =>
+                            format!("Social fracture ({:.1}% cohesion loss) on generation ship", cohesion_loss * 100.0),
+                    };
+                    self.events.push(CivEvent::new(
+                        self.current_tick, None, CivEventType::EmergencyDeclared, desc,
+                    ));
+                }
+                if ship.phase == generation_ship::ShipPhase::Arrived {
+                    self.events.push(CivEvent::new(
+                        self.current_tick, None, CivEventType::TradeEstablished,
+                        format!("GENERATION SHIP ARRIVED at {} — new human culture founded",
+                            ship.destination.name()),
+                    ));
                 }
             }
 
