@@ -196,6 +196,48 @@ pub struct PlayerInput {
 }
 
 // ============================================================================
+// Energy Wells (thermodynamic life sources)
+// ============================================================================
+
+/// Spatial energy source in the dungeon. Entities within radius regenerate energy.
+/// Wells have finite capacity — they deplete over time (forcing migration).
+#[derive(Component)]
+pub struct EnergyWell {
+    /// Joules per tick for entities in range.
+    pub regen_rate: f64,
+    /// Effect radius in world units.
+    pub radius: f32,
+    /// Remaining Joules in this well.
+    pub remaining: f64,
+    /// Maximum capacity (for display).
+    pub max_capacity: f64,
+}
+
+impl EnergyWell {
+    pub fn new(regen_rate: f64, radius: f32, capacity: f64) -> Self {
+        Self {
+            regen_rate,
+            radius,
+            remaining: capacity,
+            max_capacity: capacity,
+        }
+    }
+
+    /// Fraction of energy remaining [0, 1].
+    pub fn fraction_remaining(&self) -> f64 {
+        if self.max_capacity < 1e-10 {
+            return 0.0;
+        }
+        self.remaining / self.max_capacity
+    }
+
+    /// Whether this well still has energy.
+    pub fn is_active(&self) -> bool {
+        self.remaining > 1e-10
+    }
+}
+
+// ============================================================================
 // Live Audio Output (H1.2)
 // ============================================================================
 

@@ -16,6 +16,8 @@ pub struct Dungeon {
     pub height: usize,
     /// 0=wall, 1=floor, 2=core_room, 3=player_start
     pub tiles: Vec<Vec<u8>>,
+    /// Room centers for energy well placement.
+    pub room_centers: Vec<(usize, usize)>,
 }
 
 struct BspNode {
@@ -277,7 +279,7 @@ fn generate_dungeon_with_config(
         }
     }
 
-    Dungeon { width, height, tiles }
+    Dungeon { width, height, tiles, room_centers: rooms }
 }
 
 use rand::SeedableRng;

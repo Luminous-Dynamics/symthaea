@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 
 use crate::components::{CrewNpc, Player};
-use crate::resources::PhysicsWorldRes;
+use crate::resources::{EnergyWell, PhysicsWorldRes};
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_render_bridge::PhysicsBody;
 
@@ -41,12 +41,17 @@ pub struct ThermodynamicHudState {
 pub fn thermodynamic_enforcement_system(
     mut physics: ResMut<PhysicsWorldRes>,
     mut hud_state: ResMut<ThermodynamicHudState>,
-    entities_query: Query<&PhysicsBody, Or<(With<Player>, With<CrewNpc>)>>,
+    entities_query: Query<(&PhysicsBody, &Transform), Or<(With<Player>, With<CrewNpc>)>>,
+    mut wells: Query<(&Transform, &mut EnergyWell, &mut Sprite), Without<Player>>,
 ) {
     let constants = physics.consciousness.constants.clone();
 
-    // Collect handles for iteration
-    let handles: Vec<_> = entities_query.iter().map(|pb| pb.handle).collect();
+    // Collect handles and positions for iteration
+    let agent_data: Vec<_> = entities_query
+        .iter()
+        .map(|(pb, tf)| (pb.handle, tf.translation))
+        .collect();
+    let handles: Vec<_> = agent_data.iter().map(|(h, _)| *h).collect();
 
     // Pre-compute values that don't need mutable access
     let regen_mult = physics.consciousness.resource_regeneration_multiplier();
@@ -72,6 +77,29 @@ pub fn thermodynamic_enforcement_system(
                 entity.safety_tier = symtropy_consciousness_physics::SafetyTier::Red;
             }
         }
+    }
+
+    // --- Energy Wells: spatial regeneration sources ---
+    for (well_tf, mut well, mut well_sprite) in &mut wells {
+        if !well.is_active() {
+            well_sprite.color = Color::srgba(0.2, 0.2, 0.2, 0.15); // dim depleted wells
+            continue;
+        }
+
+        for &(handle, agent_pos) in &agent_data {
+            let dist = agent_pos.truncate().distance(well_tf.translation.truncate());
+            if dist < well.radius {
+                let regen = well.regen_rate.min(well.remaining);
+                well.remaining -= regen;
+                if let Some(entity) = physics.consciousness.entities.get_mut(&handle) {
+                    entity.energy.regenerate(regen);
+                }
+            }
+        }
+
+        // Visual: pulse alpha based on remaining capacity
+        let frac = well.fraction_remaining() as f32;
+        well_sprite.color = Color::srgba(0.1, 0.8 * frac, 0.6 * frac, 0.2 + 0.3 * frac);
     }
 
     // Record total maintenance as dissipation

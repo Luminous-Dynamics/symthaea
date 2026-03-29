@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 
 use crate::components::*;
-use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, SleepPhase, TileGrid};
+use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes, SleepPhase, TileGrid};
 // TODO: re-enable when Mycelix integration stabilizes
 // use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
 
@@ -24,8 +24,8 @@ pub struct HudText;
 #[derive(Component)]
 pub struct LeviathanSprite;
 
-/// Generate level layout from a seed, optionally modulated by consciousness.
-fn level_map(seed: u64, phi: Option<f64>) -> Vec<Vec<u8>> {
+/// Generate full dungeon from seed, optionally modulated by consciousness.
+fn level_dungeon(seed: u64, phi: Option<f64>) -> super::procgen::Dungeon {
     let dungeon = if let Some(phi) = phi {
         let config = super::phi_pcg::PhiDungeonConfig::from_phi(
             &super::phi_pcg::PhiPcgParams {
@@ -39,48 +39,8 @@ fn level_map(seed: u64, phi: Option<f64>) -> Vec<Vec<u8>> {
     } else {
         super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed)
     };
-    eprintln!("[symtropy] Generated dungeon with seed {seed}");
-    return dungeon.tiles;
-
-    // Legacy hand-designed level kept as reference:
-    #[allow(unreachable_code)]
-    let raw = [
-        "##############################",
-        "#....##########...###########",
-        "#....##........#..#.........#",
-        "#....##.######.#..#.##.####.#",
-        "#....##.#....#.#..#.##.#..#.#",
-        "##.####.#....#.#..#....#..#.#",
-        "#......##....#.#..######..#.#",
-        "#.####.##.####....#.......#.#",
-        "#.#..#.......#.####.#######.#",
-        "#.#..#.####..#.#......#.....#",
-        "#.#....#..#..#.#.####.#.###.#",
-        "#.######..#..#.#.#..#.#.#...#",
-        "#.........#....#.#..#...#.#.#",
-        "#.####.####.####.#..#####.#.#",
-        "#.#..#.#.........#........#.#",
-        "#.#..#.#.#########.######.#.#",
-        "#.#....#.#...CC...........#.#",
-        "#.######.#...CC...#########.#",
-        "#........#........#.........#",
-        "#.################.########.#",
-        "#..............P............#",
-        "##############################",
-    ];
-
-    raw.iter()
-        .map(|row| {
-            row.chars()
-                .map(|c| match c {
-                    '#' => 1,
-                    'C' => 2, // core room
-                    'P' => 3, // player start (treated as floor)
-                    _ => 0,
-                })
-                .collect()
-        })
-        .collect()
+    eprintln!("[symtropy] Generated dungeon with seed {seed} ({} rooms)", dungeon.room_centers.len());
+    dungeon
 }
 
 /// Spawn the camera, level, player, NPCs, fusion core, and Leviathan.
@@ -100,7 +60,8 @@ pub fn setup_world(
     ));
 
     // First run uses default generation; subsequent runs could use player's Φ
-    let map = level_map(seed.0, None);
+    let dungeon = level_dungeon(seed.0, None);
+    let map = &dungeon.tiles;
     let rows = map.len() as i32;
     let cols = if map.is_empty() { 0 } else { map[0].len() as i32 };
 
@@ -251,6 +212,40 @@ pub fn setup_world(
         LeviathanSprite,
     ));
 
+    // Energy Wells — spatial life sources at room centers
+    let well_constants = &physics_world.consciousness.constants;
+    for (i, &(cx, cy)) in dungeon.room_centers.iter().enumerate() {
+        // Place wells at every other room, skip player/core rooms
+        if i % 2 != 0 {
+            continue;
+        }
+        let wx = (cx as f32 - cols as f32 / 2.0) * TILE_SIZE;
+        let wy = (rows as f32 / 2.0 - cy as f32) * TILE_SIZE;
+
+        // Skip if too close to player or core
+        let near_player = (wx - player_pos.x).abs() < TILE_SIZE * 2.0
+            && (wy - player_pos.y).abs() < TILE_SIZE * 2.0;
+        let near_core = (wx - core_pos.x).abs() < TILE_SIZE * 2.0
+            && (wy - core_pos.y).abs() < TILE_SIZE * 2.0;
+        if near_player || near_core {
+            continue;
+        }
+
+        commands.spawn((
+            Sprite::from_color(
+                Color::srgba(0.1, 0.8, 0.6, 0.35),
+                Vec2::splat(40.0),
+            ),
+            Transform::from_xyz(wx, wy, 1.0),
+            crate::resources::EnergyWell::new(
+                well_constants.energy_well_regen_rate,
+                64.0,
+                5000.0,
+            ),
+        ));
+    }
+    eprintln!("[symtropy] Energy wells placed");
+
     // HUD
     commands.spawn((
         Text::new("WASD: move | E: extract core | Esc: quit"),
@@ -289,7 +284,7 @@ pub fn hud_system(
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
     cores: Query<&FusionCore>,
-    player: Query<&Transform, With<Player>>,
+    player: Query<(&Transform, &symtropy_render_bridge::PhysicsBody), With<Player>>,
     mut hud: Query<(&mut Text, &mut TextColor), With<HudText>>,
     time: Res<Time>,
     mut timer: ResMut<TelemetryTimer>,
@@ -298,6 +293,8 @@ pub fn hud_system(
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
     collected: Res<crate::systems::scavenge::CollectedPrimitives>,
     player_consciousness: Res<crate::systems::consciousness::PlayerConsciousness>,
+    physics: Res<PhysicsWorldRes>,
+    thermo_hud: Res<crate::systems::thermodynamic::ThermodynamicHudState>,
 ) {
     timer.0 += time.delta_secs();
     if timer.0 < 0.25 {
@@ -307,7 +304,11 @@ pub fn hud_system(
 
     let stress = biometrics.encoder.compute_stress_vector();
     let extraction = cores.iter().next().map(|c| c.extraction_progress).unwrap_or(0.0);
-    let player_pos = player.iter().next().map(|t| t.translation.truncate()).unwrap_or_default();
+    let (player_pos, player_handle) = player
+        .iter()
+        .next()
+        .map(|(t, pb)| (t.translation.truncate(), Some(pb.handle)))
+        .unwrap_or_default();
 
     let phase_str = match leviathan.phase {
         SleepPhase::Dormant => "DORMANT",
@@ -329,10 +330,39 @@ pub fn hud_system(
         player_consciousness.stability * 100.0,
     );
 
+    // Thermodynamic display
+    let (energy_str, energy_bar) = if let Some(handle) = player_handle {
+        if let Some(entity) = physics.consciousness.entities.get(&handle) {
+            let e = &entity.energy;
+            let frac = e.fraction_remaining();
+            let bar_filled = (frac * 15.0) as usize;
+            let bar = format!("[{}{}]", "=".repeat(bar_filled), "-".repeat(15 - bar_filled));
+            let net = thermo_hud.regenerated_per_sec - thermo_hud.consumed_per_sec;
+            let net_str = if net >= 0.0 { format!("+{:.1}", net) } else { format!("{:.1}", net) };
+            let collapse_str = if e.is_collapsed() {
+                " !! COLLAPSED !!".to_string()
+            } else if net < 0.0 && e.available > 0.0 {
+                format!("  collapse in: {:.0}s", e.available / (-net / 64.0).max(0.001))
+            } else {
+                String::new()
+            };
+            (
+                format!("Energy: {:.0}/{:.0} J {} {net_str} J/s{collapse_str}",
+                    e.available, e.max_energy, bar),
+                frac,
+            )
+        } else {
+            ("Energy: --".to_string(), 1.0)
+        }
+    } else {
+        ("Energy: --".to_string(), 1.0)
+    };
+
     let hud_text = format!(
         "WASD: move | Shift: sprint | E: extract | Esc: quit\n\
          Stress: {:.0}%  Load: {:.0}%  Leviathan: {phase}{sanctuary}\n\
          {consciousness}  Harmony: {harm}  Fragments: {frags}/48\n\
+         {energy}\n\
          Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%",
         stress.arousal * 100.0,
         biometrics.model.allostatic_load * 100.0,
@@ -341,6 +371,7 @@ pub fn hud_system(
         consciousness = consciousness_str,
         harm = harmony_str,
         frags = collected.total(),
+        energy = energy_str,
         noise = leviathan.noise_accumulator,
         thresh = leviathan.threshold,
         ext = extraction * 100.0,
