@@ -583,14 +583,16 @@ fn test_cascading_phi_collapse_quadrotor() {
 
     for &phi in &phi_sequence {
         let result = bridge.step(&hv, 0.002, phi);
-        match result.safety_level {
-            MotorSafetyLevel::Green => levels_seen[0] = true,
-            MotorSafetyLevel::Yellow => levels_seen[1] = true,
-            MotorSafetyLevel::Orange => levels_seen[2] = true,
-            MotorSafetyLevel::Red => {
+        let level = format!("{:?}", result.safety_level);
+        match level.as_str() {
+            "Green" => levels_seen[0] = true,
+            "Yellow" => levels_seen[1] = true,
+            "Orange" => levels_seen[2] = true,
+            "Red" => {
                 levels_seen[3] = true;
                 assert_eq!(result.control_effort, 0.0, "quadrotor Red: effort must be 0");
             }
+            other => panic!("unexpected safety level: {other}"),
         }
     }
     assert!(levels_seen.iter().all(|&s| s), "quadrotor cascade must visit all 4 levels");
@@ -610,14 +612,16 @@ fn test_cascading_phi_collapse_helicopter() {
 
     for &phi in &phi_sequence {
         let result = bridge.step(&hv, 1.0 / 300.0, phi);
-        match result.safety_level {
-            MotorSafetyLevel::Green => levels_seen[0] = true,
-            MotorSafetyLevel::Yellow => levels_seen[1] = true,
-            MotorSafetyLevel::Orange => levels_seen[2] = true,
-            MotorSafetyLevel::Red => {
+        let level = format!("{:?}", result.safety_level);
+        match level.as_str() {
+            "Green" => levels_seen[0] = true,
+            "Yellow" => levels_seen[1] = true,
+            "Orange" => levels_seen[2] = true,
+            "Red" => {
                 levels_seen[3] = true;
                 assert_eq!(result.control_effort, 0.0, "helicopter Red: effort must be 0");
             }
+            other => panic!("unexpected safety level: {other}"),
         }
     }
     assert!(levels_seen.iter().all(|&s| s), "helicopter cascade must visit all 4 levels");
@@ -637,11 +641,13 @@ fn test_cascading_phi_collapse_vehicle() {
 
     for &phi in &phi_sequence {
         let result = bridge.step(&hv, 0.005, phi);
-        match result.safety_level {
-            MotorSafetyLevel::Green => levels_seen[0] = true,
-            MotorSafetyLevel::Yellow => levels_seen[1] = true,
-            MotorSafetyLevel::Orange => levels_seen[2] = true,
-            MotorSafetyLevel::Red => levels_seen[3] = true,
+        let level = format!("{:?}", result.safety_level);
+        match level.as_str() {
+            "Green" => levels_seen[0] = true,
+            "Yellow" => levels_seen[1] = true,
+            "Orange" => levels_seen[2] = true,
+            "Red" => levels_seen[3] = true,
+            other => panic!("unexpected safety level: {other}"),
         }
     }
     assert!(levels_seen.iter().all(|&s| s), "vehicle cascade must visit all 4 levels");
@@ -661,11 +667,13 @@ fn test_cascading_phi_collapse_manipulator() {
 
     for &phi in &phi_sequence {
         let result = bridge.step(&hv, 0.002, phi);
-        match result.safety_level {
-            MotorSafetyLevel::Green => levels_seen[0] = true,
-            MotorSafetyLevel::Yellow => levels_seen[1] = true,
-            MotorSafetyLevel::Orange => levels_seen[2] = true,
-            MotorSafetyLevel::Red => levels_seen[3] = true,
+        let level = format!("{:?}", result.safety_level);
+        match level.as_str() {
+            "Green" => levels_seen[0] = true,
+            "Yellow" => levels_seen[1] = true,
+            "Orange" => levels_seen[2] = true,
+            "Red" => levels_seen[3] = true,
+            other => panic!("unexpected safety level: {other}"),
         }
     }
     assert!(levels_seen.iter().all(|&s| s), "manipulator cascade must visit all 4 levels");
@@ -731,7 +739,7 @@ fn test_asymmetric_degradation_cross_platform() {
         let q_result = quadrotor.step(&hv, 0.002, 0.01);
 
         assert_eq!(h_result.safety_level, MotorSafetyLevel::Green);
-        assert_eq!(q_result.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(format!("{:?}", q_result.safety_level), "Red");
     }
 
     // Now swap: humanoid fails, quadrotor recovers
@@ -740,7 +748,7 @@ fn test_asymmetric_degradation_cross_platform() {
         let q_result = quadrotor.step(&hv, 0.002, 0.8);
 
         assert_eq!(h_result.safety_level, MotorSafetyLevel::Red);
-        assert_eq!(q_result.safety_level, MotorSafetyLevel::Green);
+        assert_eq!(format!("{:?}", q_result.safety_level), "Green");
     }
 }
 
@@ -867,7 +875,7 @@ fn test_nan_phi_quadrotor_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.002, f64::NAN);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Red);
+    assert_eq!(format!("{:?}", result.safety_level), "Red");
     assert_eq!(result.control_effort, 0.0);
 }
 
@@ -881,7 +889,7 @@ fn test_nan_phi_helicopter_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 1.0 / 300.0, f64::NAN);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Red);
+    assert_eq!(format!("{:?}", result.safety_level), "Red");
     assert_eq!(result.control_effort, 0.0);
 }
 
@@ -895,7 +903,7 @@ fn test_nan_phi_vehicle_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.005, f64::NAN);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Red);
+    assert_eq!(format!("{:?}", result.safety_level), "Red");
 }
 
 #[cfg(feature = "manipulator")]
@@ -908,7 +916,7 @@ fn test_nan_phi_manipulator_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let result = bridge.step(&hv, 0.002, f64::NAN);
-    assert_eq!(result.safety_level, MotorSafetyLevel::Red);
+    assert_eq!(format!("{:?}", result.safety_level), "Red");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1062,15 +1070,15 @@ fn test_recovery_from_red_quadrotor() {
     // Red phase
     for _ in 0..10 {
         let r = bridge.step(&hv, 0.002, 0.0);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(format!("{:?}", r.safety_level), "Red");
     }
 
     // Recovery phase
     for i in 0..10 {
         let r = bridge.step(&hv, 0.002, 0.8);
         assert_eq!(
-            r.safety_level,
-            MotorSafetyLevel::Green,
+            format!("{:?}", r.safety_level),
+            "Green",
             "quadrotor recovery cycle {i}: must be Green"
         );
     }
@@ -1087,11 +1095,11 @@ fn test_recovery_from_red_helicopter() {
 
     for _ in 0..10 {
         let r = bridge.step(&hv, 1.0 / 300.0, 0.0);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(format!("{:?}", r.safety_level), "Red");
     }
     for _ in 0..10 {
         let r = bridge.step(&hv, 1.0 / 300.0, 0.8);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+        assert_eq!(format!("{:?}", r.safety_level), "Green");
     }
 }
 
@@ -1106,11 +1114,11 @@ fn test_recovery_from_red_vehicle() {
 
     for _ in 0..10 {
         let r = bridge.step(&hv, 0.005, 0.0);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(format!("{:?}", r.safety_level), "Red");
     }
     for _ in 0..10 {
         let r = bridge.step(&hv, 0.005, 0.8);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+        assert_eq!(format!("{:?}", r.safety_level), "Green");
     }
 }
 
@@ -1125,11 +1133,11 @@ fn test_recovery_from_red_manipulator() {
 
     for _ in 0..10 {
         let r = bridge.step(&hv, 0.002, 0.0);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(format!("{:?}", r.safety_level), "Red");
     }
     for _ in 0..10 {
         let r = bridge.step(&hv, 0.002, 0.8);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+        assert_eq!(format!("{:?}", r.safety_level), "Green");
     }
 }
 
@@ -1181,12 +1189,12 @@ fn test_infinity_phi_quadrotor_no_panic() {
     let hv = ContinuousHV::random(16384, 42);
 
     let r = bridge.step(&hv, 0.002, f64::INFINITY);
-    assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+    assert_eq!(format!("{:?}", r.safety_level), "Green");
     assert!(r.success);
 
     bridge.reset();
     let r = bridge.step(&hv, 0.002, f64::NEG_INFINITY);
-    assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+    assert_eq!(format!("{:?}", r.safety_level), "Red");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1258,6 +1266,7 @@ fn test_six_platforms_same_safety_at_same_phi() {
         let mut manip = ManipulatorEmbodiment::new(&genesis);
 
         let expected = MotorSafetyLevel::from_phi(phi);
+        let expected_name = format!("{:?}", expected);
 
         let h = humanoid.step(&hv, 0.025, phi);
         let f = flight.step(&hv, 0.002, phi);
@@ -1265,11 +1274,11 @@ fn test_six_platforms_same_safety_at_same_phi() {
         let v = vehicle.step(&hv, 0.005, phi);
         let m = manip.step(&hv, 0.002, phi);
 
-        assert_eq!(h.safety_level, expected, "humanoid phi={phi}");
-        assert_eq!(f.safety_level, expected, "flight phi={phi}");
-        assert_eq!(he.safety_level, expected, "helicopter phi={phi}");
-        assert_eq!(v.safety_level, expected, "vehicle phi={phi}");
-        assert_eq!(m.safety_level, expected, "manipulator phi={phi}");
+        assert_eq!(format!("{:?}", h.safety_level), expected_name, "humanoid phi={phi}");
+        assert_eq!(format!("{:?}", f.safety_level), expected_name, "flight phi={phi}");
+        assert_eq!(format!("{:?}", he.safety_level), expected_name, "helicopter phi={phi}");
+        assert_eq!(format!("{:?}", v.safety_level), expected_name, "vehicle phi={phi}");
+        assert_eq!(format!("{:?}", m.safety_level), expected_name, "manipulator phi={phi}");
 
         // All motor gains must match
         let gain = expected.motor_gain();
@@ -1476,7 +1485,7 @@ fn test_sustained_red_quadrotor_1000_cycles() {
 
     for i in 0..1000 {
         let result = bridge.step(&hv, 0.002, 0.0);
-        assert_eq!(result.safety_level, MotorSafetyLevel::Red, "cycle {i}");
+        assert_eq!(format!("{:?}", result.safety_level), "Red", "cycle {i}");
         assert_eq!(result.control_effort, 0.0, "cycle {i}: effort=0");
     }
     assert_eq!(bridge.total_steps(), 1000);
@@ -1493,7 +1502,7 @@ fn test_sustained_red_helicopter_1000_cycles() {
 
     for i in 0..1000 {
         let result = bridge.step(&hv, 1.0 / 300.0, 0.0);
-        assert_eq!(result.safety_level, MotorSafetyLevel::Red, "cycle {i}");
+        assert_eq!(format!("{:?}", result.safety_level), "Red", "cycle {i}");
         assert_eq!(result.control_effort, 0.0, "cycle {i}: effort=0");
     }
     assert_eq!(bridge.total_steps(), 1000);
@@ -1558,7 +1567,7 @@ fn test_safety_override_does_not_downgrade() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_safety_override_quadrotor() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_flight::embodiment::{FlightEmbodiment, MotorSafetyLevel as FlightSafety};
 
     let genesis = GenesisSeed::from_phrase("override-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1566,17 +1575,17 @@ fn test_safety_override_quadrotor() {
 
     // Without override
     let r = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+    assert_eq!(format!("{:?}", r.safety_level), "Green");
 
     // Override to Orange
-    bridge.set_safety_override(MotorSafetyLevel::Orange);
+    bridge.set_safety_override(FlightSafety::Orange);
     let r = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(r.safety_level, MotorSafetyLevel::Orange);
+    assert_eq!(format!("{:?}", r.safety_level), "Orange");
 
     // Clear
     bridge.clear_safety_override();
     let r = bridge.step(&hv, 0.002, 0.8);
-    assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+    assert_eq!(format!("{:?}", r.safety_level), "Green");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
