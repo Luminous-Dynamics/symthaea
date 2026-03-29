@@ -618,6 +618,7 @@ pub mod midi_trainer;
 pub mod motif_memory;
 pub mod voice_leader;
 pub mod performance;
+pub mod similarity_monitor;
 pub mod state_smoother;
 pub mod binaural;
 pub mod collaborative;

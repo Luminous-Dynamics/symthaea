@@ -23,6 +23,7 @@ use crate::learned_melody::MelodyPredictor;
 use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
+use crate::similarity_monitor::{SimilarityAction, SimilarityMonitor};
 use crate::voice_leader::{self, VoiceRole, VoiceState};
 use crate::state_smoother::StateSmoother;
 use crate::binaural::BinauralConsciousnessRenderer;
@@ -167,6 +168,8 @@ pub struct StreamingSynth {
     melody_predictor: MelodyPredictor,
     /// Density regulator: section-aware note spacing.
     density: DensityRegulator,
+    /// Self-similarity monitor: ensures right amount of repetition.
+    similarity: SimilarityMonitor,
     /// Voice states for independent voice leading.
     lead_voice: VoiceState,
     /// Bar counter for form progression.
@@ -238,6 +241,7 @@ impl StreamingSynth {
             dramatic: DramaticState::new(),
             melody_predictor: MelodyPredictor::new(),
             density: DensityRegulator::new(),
+            similarity: SimilarityMonitor::new(),
             lead_voice: VoiceState::new(VoiceRole::Lead),
             bars_elapsed_frac: 0.0,
             smoother: StateSmoother::default_smooth(),
@@ -654,8 +658,15 @@ impl StreamingSynth {
         let emotion = emotional_gestures::detect_emotion(&self.state);
         let gesture = emotional_gestures::gesture_for_emotion(emotion);
 
+        // Self-similarity monitor: override creative intent when repetition is wrong
+        let similarity_action = self.similarity.recommend();
+
         // Creative intent: what does Symthaea WANT to do?
-        let intent = self.journal.creative_intent(&self.state);
+        let intent = match similarity_action {
+            SimilarityAction::ForceRepeat => CreativeIntent::Perform, // force familiarity
+            SimilarityAction::ForceNew => CreativeIntent::Explore,    // force novelty
+            SimilarityAction::NoAction => self.journal.creative_intent(&self.state),
+        };
 
         // Dramatic silence gate: don't generate notes during dramatic pauses
         if !self.dramatic.allow_notes() { return; }
@@ -851,6 +862,7 @@ impl StreamingSynth {
                 if recent.len() >= 2 {
                     let beauty = self.journal.evaluate_phrase(&recent, &self.state);
                     self.composer.memory.record_phrase(&recent, beauty);
+                    self.similarity.record_phrase(&recent);
 
                     // Call-and-response: if lead completed a good phrase, queue echo
                     if beauty > 0.5 && self.lead_voice.phrase_notes.len() >= 3 {
@@ -961,6 +973,7 @@ impl StreamingSynth {
         self.dramatic.reset();
         self.melody_predictor.reset();
         self.density.reset();
+        self.similarity.reset();
         self.lead_voice.reset();
         self.bars_elapsed_frac = 0.0;
         self.chord_idx = 0;
