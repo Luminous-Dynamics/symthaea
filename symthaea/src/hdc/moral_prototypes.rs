@@ -527,15 +527,15 @@ impl StructuralRoles {
 }
 
 impl MultiPrototypeClassifier {
-    /// Create a new multi-prototype classifier with structural encoding.
+    /// Create a new multi-prototype classifier with framing channel.
     pub fn new(dim: usize, ngram_size: usize, k: usize) -> Self {
         Self {
-            encoder: TextHdcEncoder::with_sentiment(dim, ngram_size, 0.5, 0.15),
+            encoder: TextHdcEncoder::with_framing(dim, ngram_size, 0.5, 0.15, 0.1),
             parser: MoralParser::new(),
             role_hvs: StructuralRoles::new(dim),
             prototypes: None,
             k,
-            structural_weight: 0.3,
+            structural_weight: 0.0, // disabled by default
         }
     }
 
