@@ -82,6 +82,8 @@ exclude = [
     # kept out of the workspace so normal `cargo build` isn't affected.
     "crates/symthaea-zkproof/methods",
     "crates/symthaea-zkproof/host",
+    # WASM crate targets wasm32-unknown-unknown; excluded so `cargo build` works normally.
+    "crates/symthaea-muse-wasm",
 ]
 # Only build core crates by default; platform-specific crates (quicken-fb) require explicit -p flag.
 default-members = [
@@ -672,6 +674,7 @@ default-mind = [
     "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
     "ctc_wiring",             # GWT entry gated by binding coherence (Fries 2015)
     "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
+    "unified_precision",      # Dynamic HFE precision: Phi × interoceptive × blanket (Parr 2019)
 ]
 
 
