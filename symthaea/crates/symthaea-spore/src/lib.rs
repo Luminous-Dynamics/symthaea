@@ -58,6 +58,8 @@ pub mod persistence;
 pub mod secure_boot;
 pub mod sovereign;
 pub mod topology;
+pub mod wellbeing_profiles;
+pub mod daily_ritual;
 
 pub mod hardware_probe;
 pub mod neuroevolution;
