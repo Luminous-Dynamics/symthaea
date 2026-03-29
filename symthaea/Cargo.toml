@@ -670,6 +670,8 @@ default-mind = [
     "cpg",
     "spectral_state",
     "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
+    "ctc_wiring",             # GWT entry gated by binding coherence (Fries 2015)
+    "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
 ]
 
 
