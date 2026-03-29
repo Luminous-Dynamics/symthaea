@@ -123,3 +123,4 @@ benchmarks/external/**/helm-repo/
 benchmarks/external/**/.git/
 symthaea/
 data/midi/
+data/samples/

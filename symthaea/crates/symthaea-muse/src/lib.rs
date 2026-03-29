@@ -619,6 +619,7 @@ pub mod motif_memory;
 pub mod voice_leader;
 pub mod param_tuner;
 pub mod performance;
+pub mod sample_player;
 pub mod similarity_monitor;
 pub mod state_smoother;
 pub mod binaural;
