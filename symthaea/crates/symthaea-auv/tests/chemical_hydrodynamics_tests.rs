@@ -240,7 +240,6 @@ fn test_auv_simulator_long_horizon() {
 #[test]
 fn test_auv_simulator_moderate_thrust_stability() {
     let mut sim = SimpleAuvSimulator::new();
-    // Moderate thrust (50%) — realistic operational level
     let cmd = AuvCommand {
         thrusters: [0.5; 8],
     };
@@ -253,6 +252,29 @@ fn test_auv_simulator_moderate_thrust_stability() {
             "AUV should survive moderate thrust at step {i}"
         );
     }
+}
+
+#[test]
+fn test_auv_simulator_full_thrust_stability() {
+    // Previously caused NaN at step 35 due to explicit Euler divergence
+    // with stiff quadratic drag. Fixed by velocity clamping.
+    let mut sim = SimpleAuvSimulator::new();
+    let cmd = AuvCommand {
+        thrusters: [1.0; 8], // Full thrust all thrusters
+    };
+
+    for i in 0..200 {
+        sim.step(&cmd, 0.01);
+        let state = sim.state();
+        assert!(
+            state.is_finite(),
+            "AUV should survive full thrust at step {i}"
+        );
+    }
+
+    // Velocity should be capped at physical limits, not divergent
+    let state = sim.state();
+    assert!(state.speed() <= 6.0, "Speed should be bounded: {}", state.speed());
 }
 
 #[test]
