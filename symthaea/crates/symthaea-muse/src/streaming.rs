@@ -365,7 +365,11 @@ impl StreamingSynth {
                     let blended: Vec<f32> = (0..num_p).map(|h| {
                         let inst = inst_partials.get(h).copied().unwrap_or(0.0);
                         let mani = mp.get(h).copied().unwrap_or(0.0);
-                        inst * 0.6 + mani * 0.4 // 60% instrument, 40% emotional manifold
+                        // Manifold influence scales with emotional distance from neutral.
+                        // Near-neutral states → mostly instrument; extreme V-A → more manifold.
+                        let emotional_dist = (self.state.valence.abs() + (self.state.arousal - 0.5).abs()).clamp(0.0, 1.0);
+                        let blend = 0.15 + emotional_dist * 0.15; // 15-30% manifold
+                        inst * (1.0 - blend) + mani * blend
                     }).collect();
                     let partial_sum: f32 = blended.iter().sum();
                     let norm = if partial_sum > 0.01 { 1.0 / partial_sum } else { 1.0 };
@@ -391,10 +395,12 @@ impl StreamingSynth {
                 // Wider dynamic range: 0.03 (calm) → 0.35 (excited)
                 // Arousal² for steeper response at high arousal (Weber-Fechner)
                 let base_gain = 0.03 + arousal * arousal * 0.32;
+                // Valence modulates gain ±15%: positive = brighter/louder, negative = darker/softer
+                // (Huron 2006: happy music is performed louder than sad music)
+                let valence_gain = 1.0 + self.state.valence * 0.15;
                 // Compensate for gesture duration changes: shorter notes → louder per-sample
-                // so total energy stays proportional to arousal, not note length
                 let dur_comp = (1.0 / active.note.duration.max(0.1)).sqrt().clamp(0.7, 1.5);
-                let master_gain = base_gain * dur_comp;
+                let master_gain = base_gain * valence_gain * dur_comp;
                 voice_buffers[voice][i] += sample * active.note.velocity * active.volume * master_gain;
                 active.sample_pos += 1;
             }

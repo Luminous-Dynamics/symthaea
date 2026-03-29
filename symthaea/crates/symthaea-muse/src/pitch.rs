@@ -38,14 +38,19 @@ pub fn build_scale(state: &MusicalState) -> Vec<f32> {
         if activation > 0.2 {
             let mut interval = HARMONY_INTERVALS[i];
 
-            // Minor mode: flat the 3rd (4→3) and 6th (9→8)
-            if state.valence < -0.3 {
-                if interval == 4 {
-                    interval = 3; // minor 3rd
-                }
-                if interval == 9 {
-                    interval = 8; // minor 6th
-                }
+            // Continuous minor mode: valence controls how "minor" the scale sounds.
+            // v=+1.0 → always major, v=0.0 → 50% minor, v=-1.0 → always minor.
+            // This eliminates the -0.3 dead zone (Eerola et al. 2013).
+            let minor_weight = (0.5 - state.valence * 0.5).clamp(0.0, 1.0);
+            if interval == 4 && minor_weight > 0.5 {
+                interval = 3; // minor 3rd
+            }
+            if interval == 9 && minor_weight > 0.4 {
+                interval = 8; // minor 6th
+            }
+            // At very negative valence, also flatten the 7th (11→10) for dorian feel
+            if interval == 11 && minor_weight > 0.7 {
+                interval = 10; // minor 7th
             }
 
             if !intervals.contains(&interval) {
