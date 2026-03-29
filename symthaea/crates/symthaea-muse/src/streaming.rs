@@ -23,6 +23,7 @@ use crate::learned_melody::MelodyPredictor;
 use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
+use crate::rhythm_engine::{self, TimeSignature, GroovePocket, ExtendedChordType};
 use crate::sample_player::SampleLibrary;
 use crate::similarity_monitor::{SimilarityAction, SimilarityMonitor};
 use crate::voice_leader::{self, VoiceRole, VoiceState};
@@ -173,6 +174,10 @@ pub struct StreamingSynth {
     similarity: SimilarityMonitor,
     /// Sample library for richer instrument sounds.
     sample_lib: SampleLibrary,
+    /// Current time signature (dynamic — changes with consciousness).
+    time_sig: TimeSignature,
+    /// Groove pocket (micro-timing for feel).
+    groove: GroovePocket,
     /// Voice states for independent voice leading.
     lead_voice: VoiceState,
     /// Bar counter for form progression.
@@ -250,6 +255,8 @@ impl StreamingSynth {
                 lib.generate_synthetic(sample_rate);
                 lib
             },
+            time_sig: TimeSignature::FOUR_FOUR,
+            groove: GroovePocket { swing: 0.0, laid_back: 0.0, ghost_notes: 0.0 },
             lead_voice: VoiceState::new(VoiceRole::Lead),
             bars_elapsed_frac: 0.0,
             smoother: StateSmoother::default_smooth(),
@@ -322,6 +329,10 @@ impl StreamingSynth {
         self.note_gen_cadence = rubato_cadence.round().clamp(1.0, 12.0) as u32;
         // Density regulator adjusts cadence to match section targets
         self.note_gen_cadence = self.density.adjust_cadence(self.note_gen_cadence);
+
+        // Dynamic time signature and groove (consciousness-driven)
+        self.time_sig = rhythm_engine::select_time_signature(&self.state);
+        self.groove = GroovePocket::from_state(&self.state);
     }
 
     /// Set substrate type for timbre coloring.
@@ -790,11 +801,23 @@ impl StreamingSynth {
                 }
             };
 
+            // Apply groove pocket to note timing
+            let is_offbeat = self.chord_beat_counter % 1.0 > 0.4;
+            let grooved_beat = self.groove.apply(self.chord_beat_counter, is_offbeat);
+
+            // Ghost notes: quiet rhythmic fill between main beats
+            if self.groove.insert_ghost(self.note_counter) {
+                note.velocity = self.groove.ghost_velocity();
+            }
+
             // Apply melodic grammar: stepwise motion, leap resolution, tension arcs
             if !self.chord_progression.is_empty() {
                 let chord = &self.chord_progression[self.chord_idx % self.chord_progression.len()];
                 let root_freq = 130.81 * 2.0f32.powf(chord.root_semitones as f32 / 12.0);
-                let chord_ratios = chord.chord_type.ratios();
+
+                // Extended chord type from consciousness state (7ths, 9ths, sus, dim)
+                let ext_chord = ExtendedChordType::from_state(&self.state, grooved_beat);
+                let chord_ratios = ext_chord.ratios();
                 let chord_freqs: Vec<f32> = chord_ratios.iter()
                     .flat_map(|&r| vec![root_freq * r, root_freq * r * 2.0])
                     .collect();
@@ -1015,6 +1038,8 @@ impl StreamingSynth {
         self.melody_predictor.reset();
         self.density.reset();
         self.similarity.reset();
+        self.time_sig = TimeSignature::FOUR_FOUR;
+        self.groove = GroovePocket { swing: 0.0, laid_back: 0.0, ghost_notes: 0.0 };
         self.lead_voice.reset();
         self.bars_elapsed_frac = 0.0;
         self.chord_idx = 0;
