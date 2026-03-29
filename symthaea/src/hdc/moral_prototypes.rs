@@ -470,6 +470,298 @@ impl MoralPrototypeClassifier {
 }
 
 // ============================================================================
+// MultiPrototypeClassifier — K prototypes per class for heterogeneous data
+// ============================================================================
+
+/// Multi-prototype moral classifier using K centroids per class.
+///
+/// A single centroid can't capture that "white lie" and "murder" are both Bad.
+/// K-means initialization + per-prototype retraining handles class heterogeneity.
+pub struct MultiPrototypeClassifier {
+    encoder: TextHdcEncoder,
+    /// K prototypes per class: [Good_protos, Neutral_protos, Bad_protos]
+    prototypes: Option<[Vec<Vec<f32>>; 3]>,
+    k: usize,
+}
+
+impl MultiPrototypeClassifier {
+    /// Create a new multi-prototype classifier.
+    pub fn new(dim: usize, ngram_size: usize, k: usize) -> Self {
+        Self {
+            encoder: TextHdcEncoder::with_sentiment(dim, ngram_size, 0.5, 0.15),
+            prototypes: None,
+            k,
+        }
+    }
+
+    /// Train: encode all samples, then K-means cluster each class.
+    pub fn train(&mut self, samples: &[MoralSample]) {
+        let dim = self.encoder.encode("test").values.len();
+
+        // Pre-encode
+        let encoded: Vec<(Vec<f32>, MoralLabel)> = samples
+            .iter()
+            .map(|s| (self.encoder.encode(&s.text).values, s.label))
+            .collect();
+
+        // Split by class
+        let mut per_class: [Vec<&Vec<f32>>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+        for (enc, label) in &encoded {
+            let idx = match label {
+                MoralLabel::Good => 0,
+                MoralLabel::Neutral => 1,
+                MoralLabel::Bad => 2,
+            };
+            per_class[idx].push(enc);
+        }
+
+        // K-means for each class
+        let mut protos = [Vec::new(), Vec::new(), Vec::new()];
+        for c in 0..3 {
+            protos[c] = self.kmeans_init(&per_class[c], self.k, dim);
+        }
+
+        self.prototypes = Some(protos);
+    }
+
+    /// Simple K-means clustering to find K sub-centroids.
+    fn kmeans_init(&self, class_vecs: &[&Vec<f32>], k: usize, dim: usize) -> Vec<Vec<f32>> {
+        if class_vecs.is_empty() {
+            return vec![vec![0.0; dim]; k];
+        }
+        let actual_k = k.min(class_vecs.len());
+
+        // Initialize: evenly-spaced samples
+        let mut centroids: Vec<Vec<f32>> = (0..actual_k)
+            .map(|i| {
+                let idx = i * class_vecs.len() / actual_k;
+                class_vecs[idx].clone()
+            })
+            .collect();
+
+        // 10 iterations of K-means
+        for _ in 0..10 {
+            // Assign each vector to nearest centroid
+            let mut accum = vec![vec![0.0f32; dim]; actual_k];
+            let mut counts = vec![0usize; actual_k];
+
+            for vec in class_vecs {
+                let mut best_c = 0;
+                let mut best_sim = f32::NEG_INFINITY;
+                for (ci, centroid) in centroids.iter().enumerate() {
+                    let sim = dot_product(vec, centroid);
+                    if sim > best_sim {
+                        best_sim = sim;
+                        best_c = ci;
+                    }
+                }
+                for (a, &v) in accum[best_c].iter_mut().zip(vec.iter()) {
+                    *a += v;
+                }
+                counts[best_c] += 1;
+            }
+
+            // Update centroids
+            for ci in 0..actual_k {
+                if counts[ci] > 0 {
+                    let norm: f32 = accum[ci].iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if norm > 0.0 {
+                        centroids[ci] = accum[ci].iter().map(|x| x / norm).collect();
+                    }
+                }
+            }
+        }
+
+        centroids
+    }
+
+    /// Retrain with validation-based early stopping on cached encodings.
+    pub fn retrain_with_validation(
+        &mut self,
+        samples: &[MoralSample],
+        lr_start: f32,
+        max_iterations: usize,
+        val_fraction: f32,
+        patience: usize,
+    ) -> f32 {
+        let protos = match self.prototypes.as_mut() {
+            Some(p) => p,
+            None => return 0.0,
+        };
+
+        // Pre-encode all samples
+        let encoded: Vec<(Vec<f32>, usize)> = samples
+            .iter()
+            .map(|s| {
+                let idx = match s.label {
+                    MoralLabel::Good => 0,
+                    MoralLabel::Neutral => 1,
+                    MoralLabel::Bad => 2,
+                };
+                (self.encoder.encode(&s.text).values, idx)
+            })
+            .collect();
+
+        let val_count = (encoded.len() as f32 * val_fraction) as usize;
+        if val_count == 0 {
+            return 0.0;
+        }
+        let train = &encoded[..encoded.len() - val_count];
+        let val = &encoded[encoded.len() - val_count..];
+
+        let mut best_val_acc = 0.0f32;
+        let mut best_protos = protos.clone();
+        let mut no_improve = 0usize;
+        let lr_end = lr_start * 0.1;
+
+        for iter in 0..max_iterations {
+            let progress = if max_iterations > 1 {
+                iter as f32 / (max_iterations - 1) as f32
+            } else {
+                0.0
+            };
+            let lr = lr_start + (lr_end - lr_start) * progress;
+
+            // Train: push/pull closest prototype
+            for (enc, correct_class) in train {
+                // Inline classify_encoded to avoid borrow conflict
+                let mut pred_class = 0;
+                let mut pred_idx = 0;
+                let mut best_sim = f32::NEG_INFINITY;
+                for (ci, class_protos) in protos.iter().enumerate() {
+                    for (pi, proto) in class_protos.iter().enumerate() {
+                        let sim = dot_product(enc, proto);
+                        if sim > best_sim {
+                            best_sim = sim;
+                            pred_class = ci;
+                            pred_idx = pi;
+                        }
+                    }
+                }
+
+                if pred_class != *correct_class {
+                    // Find closest correct-class prototype
+                    let correct_idx = protos[*correct_class]
+                        .iter()
+                        .enumerate()
+                        .map(|(i, p)| (i, dot_product(enc, p)))
+                        .max_by(|a, b| a.1.total_cmp(&b.1))
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+
+                    // Push correct toward sample
+                    for (pv, &ev) in protos[*correct_class][correct_idx].iter_mut().zip(enc.iter()) {
+                        *pv += lr * ev;
+                    }
+                    // Pull wrong away
+                    for (pv, &ev) in protos[pred_class][pred_idx].iter_mut().zip(enc.iter()) {
+                        *pv -= lr * ev;
+                    }
+                }
+            }
+
+            // Normalize all prototypes
+            for class_protos in protos.iter_mut() {
+                for proto in class_protos.iter_mut() {
+                    let norm: f32 = proto.iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if norm > 0.0 {
+                        for v in proto.iter_mut() {
+                            *v /= norm;
+                        }
+                    }
+                }
+            }
+
+            // Validate (inline to avoid borrow conflict)
+            let mut val_correct = 0usize;
+            for (enc, label) in val {
+                let mut pred = 0usize;
+                let mut vs = f32::NEG_INFINITY;
+                for (ci, cp) in protos.iter().enumerate() {
+                    for p in cp {
+                        let s = dot_product(enc, p);
+                        if s > vs { vs = s; pred = ci; }
+                    }
+                }
+                if pred == *label {
+                    val_correct += 1;
+                }
+            }
+            let val_acc = val_correct as f32 / val.len() as f32;
+
+            if val_acc > best_val_acc {
+                best_val_acc = val_acc;
+                best_protos = protos.clone();
+                no_improve = 0;
+            } else {
+                no_improve += 1;
+                if no_improve >= patience {
+                    break;
+                }
+            }
+        }
+
+        *protos = best_protos;
+        best_val_acc
+    }
+
+    /// Classify by max similarity across all K×3 prototypes.
+    fn classify_encoded(&self, enc: &[f32], protos: &[Vec<Vec<f32>>; 3]) -> (usize, usize, f32) {
+        let mut best_class = 0;
+        let mut best_proto_idx = 0;
+        let mut best_sim = f32::NEG_INFINITY;
+
+        for (ci, class_protos) in protos.iter().enumerate() {
+            for (pi, proto) in class_protos.iter().enumerate() {
+                let sim = dot_product(enc, proto);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_class = ci;
+                    best_proto_idx = pi;
+                }
+            }
+        }
+
+        (best_class, best_proto_idx, best_sim)
+    }
+
+    /// Find closest prototype within a class.
+    fn closest_proto(&self, enc: &[f32], class_protos: &[Vec<f32>]) -> usize {
+        class_protos
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (i, dot_product(enc, p)))
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    }
+
+    /// Classify a text string.
+    pub fn classify(&self, text: &str) -> (MoralLabel, f32) {
+        let protos = match &self.prototypes {
+            Some(p) => p,
+            None => return (MoralLabel::Neutral, 0.0),
+        };
+
+        let encoded = self.encoder.encode(text);
+        let (class, _, sim) = self.classify_encoded(&encoded.values, protos);
+
+        let label = match class {
+            0 => MoralLabel::Good,
+            1 => MoralLabel::Neutral,
+            _ => MoralLabel::Bad,
+        };
+
+        (label, sim)
+    }
+
+    /// Number of prototypes per class.
+    pub fn k(&self) -> usize {
+        self.k
+    }
+}
+
+// ============================================================================
 // VirtueMatchClassifier — 2-class pair-encoding classifier for ETHICS Virtue
 // ============================================================================
 

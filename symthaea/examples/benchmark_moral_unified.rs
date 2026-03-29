@@ -453,6 +453,11 @@ fn main() {
     //     results.push(r);
     // }
 
+    // Multi-Prototype Classifier (Phase 2: K=7 prototypes per class)
+    if let Some(r) = benchmark_multi_prototype_classifier() {
+        results.push(r);
+    }
+
     let total_duration = start.elapsed().as_millis();
 
     // Print summary
@@ -1619,6 +1624,99 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
 // ============================================================================
 // Learned Moral Classifier Benchmark (Spinozist + Adaptive HDC)
 // ============================================================================
+
+fn benchmark_multi_prototype_classifier() -> Option<BenchmarkResult> {
+    use symthaea::hdc::moral_prototypes::{
+        MoralSample, MultiPrototypeClassifier, MORAL_PROTO_DIM,
+    };
+
+    let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: Social Chemistry (MultiPrototype K=7)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let max_train = 50_000;
+    let mut train_samples: Vec<MoralSample> = Vec::new();
+    let mut test_samples: Vec<(&str, i32)> = Vec::new();
+
+    for ex in &data.examples {
+        let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+        let label = MoralLabel::from_rot_judgment(judgment);
+
+        if ex.split.contains("test") {
+            if test_samples.len() < MAX_SAMPLES {
+                test_samples.push((&ex.rot, judgment));
+            }
+        } else if train_samples.len() < max_train && !ex.rot.is_empty() {
+            train_samples.push(MoralSample {
+                text: ex.rot.clone(),
+                label,
+            });
+        }
+    }
+
+    if train_samples.is_empty() || test_samples.is_empty() {
+        return None;
+    }
+
+    let train_start = Instant::now();
+    let mut clf = MultiPrototypeClassifier::new(MORAL_PROTO_DIM, 3, 7);
+    clf.train(&train_samples);
+
+    println!(
+        "  Training {} samples (K={})...",
+        train_samples.len(),
+        clf.k()
+    );
+
+    let val_acc = clf.retrain_with_validation(&train_samples, 0.1, 30, 0.1, 3);
+    let train_time = train_start.elapsed();
+
+    println!(
+        "  MultiProto: trained in {:.1}s, val accuracy {:.1}%",
+        train_time.as_secs_f32(),
+        val_acc * 100.0
+    );
+
+    // Evaluate on test split
+    let mut correct = 0;
+    let total = test_samples.len();
+
+    for (text, expected) in &test_samples {
+        let (label, _) = clf.classify(text);
+        let predicted = match label {
+            MoralLabel::Good => 1,
+            MoralLabel::Bad => -1,
+            MoralLabel::Neutral => 0,
+        };
+        if predicted == *expected {
+            correct += 1;
+        }
+    }
+
+    let accuracy = correct as f32 / total as f32;
+    println!(
+        "  MultiProto accuracy: {}/{} ({:.1}%)",
+        correct, total, accuracy * 100.0
+    );
+
+    Some(BenchmarkResult {
+        dataset: "Social Chemistry (MultiProto K=7)".to_string(),
+        category: None,
+        total,
+        correct,
+        accuracy,
+        errors: Vec::new(),
+        duration_ms: train_time.as_millis(),
+    })
+}
 
 fn benchmark_learned_moral_classifier() -> Option<BenchmarkResult> {
     let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
