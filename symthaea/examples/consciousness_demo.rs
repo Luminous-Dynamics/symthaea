@@ -150,6 +150,18 @@ fn main() {
         }
     }
 
+    // Auto-master: LUFS normalization, corrective EQ, limiting
+    println!("\nAuto-mastering...");
+    let master_config = symthaea_muse::auto_master::MasteringConfig::default();
+    let master_result = symthaea_muse::auto_master::auto_master(
+        &mut all_samples, sample_rate, &master_config,
+    );
+    println!("  Input LUFS:  {:.1}", master_result.input_lufs);
+    println!("  Output LUFS: {:.1}", master_result.output_lufs);
+    println!("  Gain: {:.1} dB", master_result.gain_applied_db);
+    println!("  EQ corrections: low={:.1}dB mid={:.1}dB high={:.1}dB",
+        master_result.eq_corrections[0], master_result.eq_corrections[1], master_result.eq_corrections[2]);
+
     // Write WAV
     let path = dir.join("consciousness_demo_3min.wav");
     let audio = AudioData::StereoF32(all_samples.clone());

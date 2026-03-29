@@ -16,6 +16,7 @@ use crate::ambient_drone::AmbientDrone;
 use crate::audio_feedback::AudioFeedbackEncoder;
 use crate::composer_mind::ComposerMind;
 use crate::creative_agency::{CreativeIntent, CreativeJournal};
+use crate::density_regulator::DensityRegulator;
 use crate::dramatic::DramaticState;
 use crate::emotional_gestures;
 use crate::learned_melody::MelodyPredictor;
@@ -164,6 +165,8 @@ pub struct StreamingSynth {
     dramatic: DramaticState,
     /// Learned melody predictor (trained on 65M real music pairs).
     melody_predictor: MelodyPredictor,
+    /// Density regulator: section-aware note spacing.
+    density: DensityRegulator,
     /// Voice states for independent voice leading.
     lead_voice: VoiceState,
     /// Bar counter for form progression.
@@ -234,6 +237,7 @@ impl StreamingSynth {
             composer: ComposerMind::new(),
             dramatic: DramaticState::new(),
             melody_predictor: MelodyPredictor::new(),
+            density: DensityRegulator::new(),
             lead_voice: VoiceState::new(VoiceRole::Lead),
             bars_elapsed_frac: 0.0,
             smoother: StateSmoother::default_smooth(),
@@ -304,6 +308,8 @@ impl StreamingSynth {
         // Apply tempo rubato from dramatic state
         let rubato_cadence = base_cadence / self.dramatic.tempo_factor.max(0.5);
         self.note_gen_cadence = rubato_cadence.round().clamp(1.0, 12.0) as u32;
+        // Density regulator adjusts cadence to match section targets
+        self.note_gen_cadence = self.density.adjust_cadence(self.note_gen_cadence);
     }
 
     /// Set substrate type for timbre coloring.
@@ -830,8 +836,9 @@ impl StreamingSynth {
             let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
             performance::humanize(&mut note, beat_pos, phrase_pos, self.note_counter);
 
-            // Record note for motif memory + creative journal evaluation
+            // Record note for motif memory + creative journal + density regulator
             self.motif.record_note(note);
+            self.density.record_onset(self.total_samples_rendered as f32 / self.sample_rate as f32);
             self.prev_note_freq = Some(note.frequency);
 
             // When a phrase completes, evaluate it for creative journal + form memory
@@ -953,6 +960,7 @@ impl StreamingSynth {
         self.composer.reset();
         self.dramatic.reset();
         self.melody_predictor.reset();
+        self.density.reset();
         self.lead_voice.reset();
         self.bars_elapsed_frac = 0.0;
         self.chord_idx = 0;
