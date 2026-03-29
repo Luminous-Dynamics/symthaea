@@ -30,6 +30,7 @@ pub mod config;
 pub mod consciousness;
 pub mod consciousness_epidemiology;
 pub mod disasters;
+pub mod earth_regions;
 pub mod interplanetary_consciousness;
 pub mod economy;
 pub mod education;
@@ -45,8 +46,10 @@ pub mod narrative;
 pub mod needs;
 pub mod observables;
 pub mod population;
+pub mod supply_chain;
 pub mod report;
 pub mod resontia;
+pub mod spaceport;
 pub mod stochastic;
 pub mod world;
 
@@ -108,10 +111,18 @@ pub struct MultiWorldSimulator {
     carrying_capacity_base: std::collections::HashMap<u32, usize>,
     /// Narrative engine: generates memorable event descriptions from affect + disaster data.
     pub narrative_engine: narrative::NarrativeEngine,
+    /// Global supply chain graph (12 Earth regions + 4 colonies).
+    pub supply_chain: supply_chain::SupplyChainGraph,
     /// Resontia Earth-hardening infrastructure.
     pub resontia_infra: resontia::ResontiaInfrastructure,
     /// Resontia configuration.
     pub resontia_config: resontia::ResontiaConfig,
+    /// Hybrid Earth model: aggregate regional demographics (12 regions).
+    /// Empty when `hybrid_earth` is false (backward compat).
+    pub earth_regions: Vec<earth_regions::EarthRegion>,
+    /// Spaceport for launching colonists from Earth aggregate regions.
+    /// None when `hybrid_earth` is false.
+    pub spaceport: Option<spaceport::Spaceport>,
 }
 
 impl MultiWorldSimulator {
@@ -139,8 +150,11 @@ impl MultiWorldSimulator {
             morale_contagion: std::collections::HashMap::new(),
             carrying_capacity_base: std::collections::HashMap::new(),
             narrative_engine: narrative::NarrativeEngine::new(),
+            supply_chain: supply_chain::SupplyChainGraph::new(),
             resontia_infra: resontia::ResontiaInfrastructure::new(),
             resontia_config: resontia::ResontiaConfig::default(),
+            earth_regions: Vec::new(),
+            spaceport: None,
         }
     }
 
@@ -149,8 +163,20 @@ impl MultiWorldSimulator {
         self.resontia_config = resontia::default_resontia_config();
     }
 
+    /// Enable hybrid Earth model with 12 aggregate regions and spaceport.
+    pub fn enable_hybrid_earth(&mut self) {
+        self.earth_regions = earth_regions::build_earth_regions();
+        self.spaceport = Some(spaceport::Spaceport::new_equatorial(0));
+    }
+
     /// Initialize worlds that should exist at tick 0.
     fn initialize_worlds(&mut self) {
+        // If hybrid_earth is enabled, populate aggregate regions and spaceport
+        // instead of creating individual Earth agents.
+        if self.config.policy.hybrid_earth {
+            self.enable_hybrid_earth();
+        }
+
         let seeds: Vec<_> = self
             .config
             .initial_worlds
@@ -223,8 +249,13 @@ impl MultiWorldSimulator {
             ecosystem_balance: 1.0,
             };
 
+            // Hybrid Earth: skip individual agent creation for Earth;
+            // aggregate demographics are handled by earth_regions.
+            let skip_agents = self.config.policy.hybrid_earth && seed.location == "Earth";
+
             // Spawn initial population as adults (age 25-45)
-            for _ in 0..seed.initial_population {
+            let spawn_count = if skip_agents { 0 } else { seed.initial_population };
+            for _ in 0..spawn_count {
                 let sex = if self.rng.bernoulli(0.5) {
                     BiologicalSex::Male
                 } else {
@@ -580,10 +611,21 @@ impl MultiWorldSimulator {
             let has_nuclear = self.disaster_engine.tech_tree.is_achieved("Fission Surface Power")
                 || self.disaster_engine.tech_tree.is_achieved("Fusion Demo");
 
+            // Spaceport supply line cut: if Kessler active and hybrid model,
+            // reduce off-world production by 30%.
+            let supply_line_cut = self.config.policy.hybrid_earth
+                && self.spaceport.as_ref().map_or(false, |sp| sp.leo_blocked)
+                && world.location != "Earth";
+
             // Raw resource arithmetic (life support)
             for name in &["food", "water", "energy", "materials", "oxygen"] {
                 if let Some(stock) = world.resources.get_mut(name) {
                     let mut production = stock.production_rate * world.infrastructure_level;
+
+                    // Supply line cut: off-world production reduced 30% during Kessler.
+                    if supply_line_cut {
+                        production *= 1.0 - spaceport::apply_supply_line_cut_penalty();
+                    }
 
                     // Outer system energy gate: no solar, must have nuclear
                     if is_outer_system && *name == "energy" && !has_nuclear {
@@ -877,80 +919,160 @@ impl MultiWorldSimulator {
         // Inter-world migration: every 6 ticks (biannual), move a few adults from
         // Earth to off-world colonies. This maintains genetic diversity and carries
         // fresh social bonds into isolated populations.
+        //
+        // When hybrid_earth is enabled, colonists are instantiated from aggregate
+        // regional data via the Spaceport Funnel instead of cloning Earth agents.
         if self.config.policy.migration_enabled
             && self.current_tick % 6 == 0
             && self.worlds.len() >= 2
         {
-            let earth_idx = self.worlds.iter().position(|w| w.location == "Earth");
-            if let Some(ei) = earth_idx {
-                let earth_pop = self.worlds[ei].population();
-                if earth_pop > 100 {
-                    // Find off-world colonies below capacity
-                    let destinations: Vec<usize> = (0..self.worlds.len())
-                        .filter(|&i| {
-                            i != ei
-                                && self.worlds[i].population() < self.worlds[i].max_population
-                                && self.worlds[i].population() > 0
-                        })
-                        .collect();
+            let use_spaceport = self.config.policy.hybrid_earth
+                && !self.earth_regions.is_empty()
+                && self.spaceport.as_ref().map_or(false, |sp| sp.can_launch());
 
-                    // Collect migration plans first, then execute
-                    let mut migration_plans: Vec<(Vec<u64>, usize, u32, String)> = Vec::new();
+            if use_spaceport {
+                // Spaceport Funnel: instantiate colonists from aggregate regions.
+                let destinations: Vec<(usize, u32, String)> = self
+                    .worlds
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, w)| {
+                        w.location != "Earth"
+                            && w.population() < w.max_population
+                            && w.population() > 0
+                    })
+                    .map(|(i, w)| (i, w.id, w.name.clone()))
+                    .collect();
 
-                    for &dest_idx in &destinations {
-                        let max_mig = self.config.policy.migration_max_per_cycle.max(1) as u64;
-                        let n_migrants = (self.rng.next_u64() % max_mig + 1) as usize;
-                        let dest_id = self.worlds[dest_idx].id;
-                        let dest_name = self.worlds[dest_idx].name.clone();
+                let monthly_cap = self.spaceport.as_ref().map_or(0, |sp| sp.monthly_capacity());
 
-                        let migrant_ids: Vec<u64> = self.worlds[ei]
-                            .agents
-                            .iter()
-                            .filter(|a| {
-                                a.is_alive()
-                                    && a.life_stage(self.current_tick) == agent::LifeStage::Adult
-                            })
-                            .take(n_migrants)
-                            .map(|a| a.id)
-                            .collect();
-
-                        if !migrant_ids.is_empty() {
-                            migration_plans.push((migrant_ids, dest_idx, dest_id, dest_name));
-                        }
+                for (dest_idx, dest_id, dest_name) in destinations {
+                    let max_mig = self.config.policy.migration_max_per_cycle.max(1) as usize;
+                    let n_migrants = ((self.rng.next_u64() % max_mig as u64 + 1) as usize)
+                        .min(monthly_cap);
+                    if n_migrants == 0 {
+                        continue;
                     }
 
-                    for (migrant_ids, dest_idx, dest_id, dest_name) in migration_plans {
-                        let mut migrants: Vec<CivAgent> = Vec::new();
-                        for mid in &migrant_ids {
-                            if let Some(agent) = self.worlds[ei]
-                                .agents
-                                .iter_mut()
-                                .find(|a| a.id == *mid)
-                            {
-                                let mut migrant = agent.clone();
-                                migrant.world_id = dest_id;
-                                migrant.is_immigrant = true;
-                                migrant.partner_id = None;
-                                migrant.death_tick = None;
-                                migrants.push(migrant);
+                    // Pick the best source region (highest space contribution with access).
+                    let best_region_idx = self
+                        .earth_regions
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, r)| r.spaceport_access && r.population > 1.0)
+                        .max_by(|(_, a), (_, b)| {
+                            earth_regions::region_contribution_to_space(a)
+                                .partial_cmp(&earth_regions::region_contribution_to_space(b))
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                        .map(|(i, _)| i);
 
-                                agent.death_tick = Some(self.current_tick);
+                    if let Some(ri) = best_region_idx {
+                        let selection = spaceport::prepare_selection(&self.earth_regions[ri], n_migrants);
+                        if let Some(sel) = selection {
+                            let mut next_id = self.worlds[dest_idx].next_agent_id as u64;
+                            let new_agents = spaceport::instantiate_colonists(
+                                &sel,
+                                &mut self.earth_regions[ri],
+                                dest_id,
+                                self.current_tick,
+                                &mut next_id,
+                                &mut self.rng,
+                            );
+                            let moved = new_agents.len();
+                            self.worlds[dest_idx].next_agent_id = next_id;
+                            self.worlds[dest_idx].agents.extend(new_agents);
+                            if let Some(ref mut sp) = self.spaceport {
+                                sp.total_launched += moved as u64;
+                            }
+
+                            if moved > 0 {
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(dest_id),
+                                    CivEventType::Migration,
+                                    format!(
+                                        "{} colonists launched from {} to {} via Spaceport Funnel",
+                                        moved, self.earth_regions[ri].name, dest_name
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Classic migration path: clone Earth agents to off-world colonies.
+                let earth_idx = self.worlds.iter().position(|w| w.location == "Earth");
+                if let Some(ei) = earth_idx {
+                    let earth_pop = self.worlds[ei].population();
+                    if earth_pop > 100 {
+                        // Find off-world colonies below capacity
+                        let destinations: Vec<usize> = (0..self.worlds.len())
+                            .filter(|&i| {
+                                i != ei
+                                    && self.worlds[i].population() < self.worlds[i].max_population
+                                    && self.worlds[i].population() > 0
+                            })
+                            .collect();
+
+                        // Collect migration plans first, then execute
+                        let mut migration_plans: Vec<(Vec<u64>, usize, u32, String)> = Vec::new();
+
+                        for &dest_idx in &destinations {
+                            let max_mig = self.config.policy.migration_max_per_cycle.max(1) as u64;
+                            let n_migrants = (self.rng.next_u64() % max_mig + 1) as usize;
+                            let dest_id = self.worlds[dest_idx].id;
+                            let dest_name = self.worlds[dest_idx].name.clone();
+
+                            let migrant_ids: Vec<u64> = self.worlds[ei]
+                                .agents
+                                .iter()
+                                .filter(|a| {
+                                    a.is_alive()
+                                        && a.life_stage(self.current_tick) == agent::LifeStage::Adult
+                                })
+                                .take(n_migrants)
+                                .map(|a| a.id)
+                                .collect();
+
+                            if !migrant_ids.is_empty() {
+                                migration_plans.push((migrant_ids, dest_idx, dest_id, dest_name));
                             }
                         }
 
-                        let moved = migrants.len();
-                        self.worlds[dest_idx].agents.extend(migrants);
+                        for (migrant_ids, dest_idx, dest_id, dest_name) in migration_plans {
+                            let mut migrants: Vec<CivAgent> = Vec::new();
+                            for mid in &migrant_ids {
+                                if let Some(agent) = self.worlds[ei]
+                                    .agents
+                                    .iter_mut()
+                                    .find(|a| a.id == *mid)
+                                {
+                                    let mut migrant = agent.clone();
+                                    migrant.world_id = dest_id;
+                                    migrant.is_immigrant = true;
+                                    migrant.partner_id = None;
+                                    migrant.death_tick = None;
+                                    migrants.push(migrant);
 
-                        if moved > 0 {
-                            self.events.push(CivEvent::new(
-                                self.current_tick,
-                                Some(dest_id),
-                                CivEventType::Migration,
-                                format!(
-                                    "{} migrants arrived at {} from Earth",
-                                    moved, dest_name
-                                ),
-                            ));
+                                    agent.death_tick = Some(self.current_tick);
+                                }
+                            }
+
+                            let moved = migrants.len();
+                            self.worlds[dest_idx].agents.extend(migrants);
+
+                            if moved > 0 {
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(dest_id),
+                                    CivEventType::Migration,
+                                    format!(
+                                        "{} migrants arrived at {} from Earth",
+                                        moved, dest_name
+                                    ),
+                                ));
+                            }
                         }
                     }
                 }
@@ -2397,6 +2519,30 @@ impl MultiWorldSimulator {
                 }
             }
 
+            // Phase 0.5: Earth aggregate demographics (hybrid model)
+            if !self.earth_regions.is_empty() {
+                for region in &mut self.earth_regions {
+                    earth_regions::tick_region(region, self.current_tick, &mut self.rng);
+                }
+                // Tick the spaceport (construction + Kessler countdown)
+                if let Some(ref mut sp) = self.spaceport {
+                    sp.tick(self.current_tick);
+                    // Sync Kessler state from disaster engine → spaceport.
+                    // If the disaster engine has an active Kessler cascade and the
+                    // spaceport isn't already blocked, activate the blockade.
+                    if self.disaster_engine.orbital_debris.cascade_active && !sp.leo_blocked {
+                        let duration = spaceport::kessler_duration(&mut self.rng);
+                        sp.activate_kessler(duration);
+                        self.events.push(CivEvent::new(
+                            self.current_tick,
+                            None,
+                            CivEventType::EmergencyDeclared,
+                            "Kessler syndrome blocks spaceport — colonist launches suspended".to_string(),
+                        ));
+                    }
+                }
+            }
+
             // Phase 1: Demographics (pair-bonding, births, deaths)
             let mut phase1_events = Vec::new();
             let world_count = self.worlds.len();
@@ -2457,6 +2603,30 @@ impl MultiWorldSimulator {
 
             // Phase 5.5: Immigration pipeline for genetic rescue
             self.tick_immigration_pipeline();
+
+            // Phase 5.4: Supply chain propagation
+            // Disasters that hit Earth regions propagate through the supply DAG.
+            let colony_supply = self.supply_chain.propagate();
+            // Apply supply multipliers to colony resource production
+            for world in &mut self.worlds {
+                let supply_mult = match world.location.as_str() {
+                    "Moon" => colony_supply.get(&supply_chain::SupplyNode::LunarColony)
+                        .copied().unwrap_or(1.0),
+                    "Mars" => colony_supply.get(&supply_chain::SupplyNode::MarsColony)
+                        .copied().unwrap_or(1.0),
+                    "Europa" => colony_supply.get(&supply_chain::SupplyNode::EuropaStation)
+                        .copied().unwrap_or(1.0),
+                    "Titan" => colony_supply.get(&supply_chain::SupplyNode::TitanOutpost)
+                        .copied().unwrap_or(1.0),
+                    _ => 1.0,
+                };
+                // Low supply chain health degrades colony resource production
+                if supply_mult < 0.8 {
+                    let penalty = 1.0 - supply_mult;
+                    world.infrastructure_level =
+                        (world.infrastructure_level - penalty * 0.001).max(0.0);
+                }
+            }
 
             // Phase 5.55: Fission Delivery — Earth can deliver reactors to colonies.
             // NASA doesn't expect colonies to invent fission; they deliver Kilopower units.
