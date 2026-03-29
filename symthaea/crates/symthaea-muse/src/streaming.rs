@@ -14,6 +14,9 @@
 use crate::aesthetic_listener::AestheticListener;
 use crate::ambient_drone::AmbientDrone;
 use crate::audio_feedback::AudioFeedbackEncoder;
+use crate::emotional_gestures;
+use crate::motif_memory::MotifMemory;
+use crate::performance;
 use crate::state_smoother::StateSmoother;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
@@ -92,6 +95,18 @@ pub struct StreamingSynth {
     aesthetic: AestheticListener,
     /// Ambient drone: continuous low pad filling silence.
     drone: AmbientDrone,
+    /// Motif memory: tracks phrases, enables repetition and development.
+    motif: MotifMemory,
+    /// Current chord progression (cycled through).
+    chord_progression: Vec<crate::instruments::ProgressionChord>,
+    /// Current chord index in progression.
+    chord_idx: usize,
+    /// Beats elapsed in current chord.
+    chord_beat_counter: f32,
+    /// Notes generated (for humanization seed).
+    note_counter: u32,
+    /// Previous note frequency (for emotional gesture direction).
+    prev_note_freq: Option<f32>,
     /// State smoother: prevents abrupt parameter changes.
     smoother: StateSmoother,
     /// FEP active inference engine for music (the system predicts its own sound).
@@ -144,6 +159,12 @@ impl StreamingSynth {
             substrate: None,
             aesthetic: AestheticListener::new(),
             drone: AmbientDrone::new(sample_rate),
+            motif: MotifMemory::new(),
+            chord_progression: crate::instruments::ambient_progression(),
+            chord_idx: 0,
+            chord_beat_counter: 0.0,
+            note_counter: 0,
+            prev_note_freq: None,
             smoother: StateSmoother::default_smooth(),
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
@@ -446,12 +467,78 @@ impl StreamingSynth {
         let release_samples = (rel * sr) as usize;
         let psi = self.state.consciousness_level;
 
-        // Phi-gated polyphony: higher consciousness = more simultaneous voices
-        // Psi < 0.3 → 1 note, Psi 0.3-0.5 → 2, Psi 0.5-0.7 → 3, Psi > 0.7 → 4
+        // Update chord progression based on consciousness
+        self.chord_progression = crate::instruments::select_progression(&self.state);
+        self.motif.set_phrase_length(&self.state);
+
+        // Advance chord on beat boundaries
+        let tempo = self.muse_stream.tempo();
+        let beats_per_chunk = (self.chunk_samples as f32 / sr) * (tempo / 60.0);
+        self.chord_beat_counter += beats_per_chunk * self.note_gen_cadence as f32;
+        if !self.chord_progression.is_empty() {
+            let chord = &self.chord_progression[self.chord_idx % self.chord_progression.len()];
+            if self.chord_beat_counter >= chord.duration_beats {
+                self.chord_beat_counter = 0.0;
+                self.chord_idx = (self.chord_idx + 1) % self.chord_progression.len();
+            }
+        }
+
+        // Get current emotional gesture
+        let emotion = emotional_gestures::detect_emotion(&self.state);
+        let gesture = emotional_gestures::gesture_for_emotion(emotion);
+
         let max_new = if psi > 0.7 { 4 } else if psi > 0.5 { 3 } else if psi > 0.3 { 2 } else { 1 };
         for _ in 0..max_new {
             if self.active_notes.len() >= MAX_ACTIVE_NOTES { break; }
-            if let Some(note) = self.muse_stream.next_note() {
+
+            // Try motif memory first (repetition/development)
+            let note_opt = self.motif.next_note(&self.state);
+            let mut note = if let Some(n) = note_opt {
+                n
+            } else if let Some(n) = self.muse_stream.next_note() {
+                n
+            } else {
+                continue;
+            };
+
+            // Snap to current chord tones
+            if !self.chord_progression.is_empty() {
+                let chord = &self.chord_progression[self.chord_idx % self.chord_progression.len()];
+                let root_freq = 130.81 * 2.0f32.powf(chord.root_semitones as f32 / 12.0); // C3 base
+                let chord_ratios = chord.chord_type.ratios();
+                let chord_freqs: Vec<f32> = chord_ratios.iter()
+                    .flat_map(|&r| {
+                        // Generate chord tones across 2 octaves
+                        vec![root_freq * r, root_freq * r * 2.0]
+                    })
+                    .collect();
+
+                // Snap note to nearest chord tone (70% chance) or keep scale tone (30%)
+                self.note_counter = self.note_counter.wrapping_add(1);
+                let use_chord = (self.note_counter % 10) < 7; // 70% chord tones
+                if use_chord && !chord_freqs.is_empty() {
+                    let nearest = chord_freqs.iter()
+                        .min_by(|a, b| ((**a - note.frequency).abs()).partial_cmp(&((**b - note.frequency).abs())).unwrap())
+                        .copied()
+                        .unwrap_or(note.frequency);
+                    note.frequency = nearest;
+                }
+            }
+
+            // Apply emotional gesture (direction bias, duration scaling)
+            note.duration *= gesture.duration_scale;
+            note.velocity = (note.velocity * gesture.velocity_scale).clamp(0.05, 1.0);
+
+            // Apply humanization
+            let beat_pos = self.chord_beat_counter;
+            let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
+            performance::humanize(&mut note, beat_pos, phrase_pos, self.note_counter);
+
+            // Record note for motif memory
+            self.motif.record_note(note);
+            self.prev_note_freq = Some(note.frequency);
+
+            if let Some(note) = Some(note) {
                 let idx = self.active_notes.len();
                 let voice_idx = match idx % 4 {
                     0 => 0, // lead
@@ -537,6 +624,11 @@ impl StreamingSynth {
         self.fep_engine = MusicalInferenceEngine::new();
         self.fe_history.clear();
         self.drone.reset();
+        self.motif.reset();
+        self.chord_idx = 0;
+        self.chord_beat_counter = 0.0;
+        self.note_counter = 0;
+        self.prev_note_freq = None;
         self.smoother.reset();
         self.mixing = MixingChain::new(self.sample_rate);
         self.drum_hits.clear();

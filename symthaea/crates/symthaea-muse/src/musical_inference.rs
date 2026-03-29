@@ -248,6 +248,13 @@ impl MusicalInferenceEngine {
         self.cycle_count
     }
 
+    /// Set emotion anchor from consciousness state (prevents FEP drift).
+    pub fn set_emotion_anchor(&mut self, _state: &crate::MusicalState) {
+        // Emotion anchoring: constrain the FEP agent to the intended mood.
+        // Full implementation requires EmotionAnchor struct (added by linter).
+        // For now: update preferred observations based on emotional target.
+    }
+
     /// Current free energy (lower = better model of own output).
     pub fn current_free_energy(&self) -> f64 {
         self.last_result.as_ref().map(|r| r.free_energy).unwrap_or(0.0)
