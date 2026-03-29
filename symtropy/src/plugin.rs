@@ -62,6 +62,7 @@ impl Plugin for SymtropyPlugin {
                 systems::harmonies::sanctuary_system, systems::scavenge::scavenge_pickup_system,
                 systems::consciousness::player_consciousness_system,
                 systems::consciousness::npc_consciousness_system,
+                systems::engine_physics::consciousness_sync_system,
                 systems::rendering::hud_system, systems::minimap::update_minimap,
                 systems::room_memory::room_memory_update_system,
                 systems::dialogue::dialogue_system,

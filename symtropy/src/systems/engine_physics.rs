@@ -9,8 +9,9 @@
 
 use bevy::prelude::*;
 
-use crate::components::Player;
+use crate::components::{CrewNpc, Player};
 use crate::resources::{PhysicsWorldRes, PlayerInput, TileGrid};
+use crate::systems::consciousness::{NpcConsciousness, PlayerConsciousness};
 use symtropy_render_bridge::PhysicsBody;
 
 /// Walk speed in physics units/second.
@@ -79,6 +80,70 @@ pub fn physics_step(mut physics: ResMut<PhysicsWorldRes>, time: Res<Time<Fixed>>
     consciousness.tick_prediction_errors();
     // Step physics with consciousness callback
     world.step_with_callback(dt, consciousness);
+}
+
+/// Sync consciousness state from the game's consciousness systems into the
+/// physics consciousness field. This is what makes consciousness AFFECT physics.
+///
+/// Runs after the consciousness systems compute Φ and before the physics step.
+pub fn consciousness_sync_system(
+    mut physics: ResMut<PhysicsWorldRes>,
+    player_c: Res<PlayerConsciousness>,
+    harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
+    players: Query<(&PhysicsBody, &Transform), With<Player>>,
+    npcs: Query<(&PhysicsBody, &Transform, &NpcConsciousness), With<CrewNpc>>,
+) {
+    // Sync player consciousness into the physics field
+    for (body_comp, transform) in &players {
+        let inputs = symthaea_consciousness_equation::ConsciousnessInputs {
+            phi: player_c.level,
+            broadcast: 0.7,
+            working_memory: 0.6,
+            attention: 0.6,
+            recurrence: 0.5,
+            embodiment: 0.7,
+            knowledge: 0.5,
+            synchrony: 0.6,
+        };
+        let pos = symtropy_math::Point::new([
+            transform.translation.x as f64,
+            transform.translation.y as f64,
+        ]);
+        physics.consciousness.update_entity(body_comp.handle, &inputs, pos);
+
+        // Sync harmony activations
+        if let Some(entity) = physics.consciousness.entities.get_mut(&body_comp.handle) {
+            entity.harmony_activations = [
+                harmony.activations[0] as f64,
+                harmony.activations[1] as f64,
+                harmony.activations[2] as f64,
+                harmony.activations[3] as f64,
+                harmony.activations[4] as f64,
+                harmony.activations[5] as f64,
+                harmony.activations[6] as f64,
+                harmony.activations[7] as f64,
+            ];
+        }
+    }
+
+    // Sync NPC consciousness
+    for (body_comp, transform, npc_c) in &npcs {
+        let inputs = symthaea_consciousness_equation::ConsciousnessInputs {
+            phi: npc_c.level,
+            broadcast: 0.6,
+            working_memory: 0.5,
+            attention: 0.5,
+            recurrence: 0.4,
+            embodiment: 0.6,
+            knowledge: 0.4,
+            synchrony: 0.5,
+        };
+        let pos = symtropy_math::Point::new([
+            transform.translation.x as f64,
+            transform.translation.y as f64,
+        ]);
+        physics.consciousness.update_entity(body_comp.handle, &inputs, pos);
+    }
 }
 
 /// Sync physics body positions back to Bevy Transforms.

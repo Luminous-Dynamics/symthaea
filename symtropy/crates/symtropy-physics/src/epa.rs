@@ -10,7 +10,6 @@
 //! Implemented for 2D (edge-based) and 3D (face-based). 4D falls back to
 //! bounding-sphere approximation (ND EPA is combinatorially infeasible).
 
-use arrayvec::ArrayVec;
 use nalgebra::SVector;
 use symtropy_math::Shape;
 

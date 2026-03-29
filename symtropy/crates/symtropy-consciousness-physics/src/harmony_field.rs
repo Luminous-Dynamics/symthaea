@@ -15,7 +15,6 @@
 //! - Overlapping fields interact: resonance (aligned) vs interference (opposed)
 //! - Physical effects: resonant fields reduce friction, dissonant increase impulse
 
-use nalgebra::SVector;
 use symtropy_math::Point;
 
 /// Number of harmonies in the Eight Harmonies system.

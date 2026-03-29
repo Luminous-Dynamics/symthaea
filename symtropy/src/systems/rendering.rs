@@ -24,9 +24,21 @@ pub struct HudText;
 #[derive(Component)]
 pub struct LeviathanSprite;
 
-/// Generate level layout from a seed.
-fn level_map(seed: u64) -> Vec<Vec<u8>> {
-    let dungeon = super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed);
+/// Generate level layout from a seed, optionally modulated by consciousness.
+fn level_map(seed: u64, phi: Option<f64>) -> Vec<Vec<u8>> {
+    let dungeon = if let Some(phi) = phi {
+        let config = super::phi_pcg::PhiDungeonConfig::from_phi(
+            &super::phi_pcg::PhiPcgParams {
+                phi,
+                ..Default::default()
+            },
+        );
+        eprintln!("[symtropy] Phi-PCG: phi={phi:.2}, depth={}, rooms_min={}, connections={}",
+            config.bsp_depth, config.min_room_size, config.extra_connections);
+        super::procgen::generate_dungeon_phi(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed, &config)
+    } else {
+        super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed)
+    };
     eprintln!("[symtropy] Generated dungeon with seed {seed}");
     return dungeon.tiles;
 
@@ -87,7 +99,8 @@ pub fn setup_world(
         },
     ));
 
-    let map = level_map(seed.0);
+    // First run uses default generation; subsequent runs could use player's Φ
+    let map = level_map(seed.0, None);
     let rows = map.len() as i32;
     let cols = if map.is_empty() { 0 } else { map[0].len() as i32 };
 
