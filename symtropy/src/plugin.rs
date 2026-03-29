@@ -31,6 +31,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<PhysicsWorldRes>()
             .init_resource::<PlayerInput>()
             .init_resource::<systems::thermodynamic::ThermodynamicHudState>()
+            .init_resource::<systems::living_dungeon::DungeonBreathTimer>()
             // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
             .add_systems(FixedUpdate, (
                 systems::engine_physics::physics_apply_inputs,
@@ -71,6 +72,7 @@ impl Plugin for SymtropyPlugin {
                 systems::rendering::hud_system, systems::minimap::update_minimap,
                 systems::room_memory::room_memory_update_system,
                 systems::dialogue::dialogue_system,
+                systems::living_dungeon::living_dungeon_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
             // Mycelix physicalized cryptography (only when --features mycelix)
             ;
