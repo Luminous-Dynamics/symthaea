@@ -140,6 +140,11 @@ pub struct MuseManager {
     /// Current fade level [0.0 = silence, 1.0 = full volume].
     fade_level: f32,
 
+    // ── Live audio output ─────────────────────────────────────────────
+    /// When enabled, streams audio to system speakers via cpal.
+    #[cfg(feature = "muse-live")]
+    live_output: Option<symthaea_muse::live_output::LiveMuseOutput>,
+
     // ── Telemetry ─────────────────────────────────────────────────────
     underruns: u64,
 }
@@ -158,7 +163,7 @@ impl MuseManager {
             ..Default::default()
         };
 
-        let mut synth = StreamingSynth::new(config, MUSE_SAMPLE_RATE);
+        let mut synth = StreamingSynth::new(config.clone(), MUSE_SAMPLE_RATE);
         synth.set_chunk_duration_ms(MUSE_CHUNK_MS);
 
         Self {
@@ -173,6 +178,8 @@ impl MuseManager {
             injected_energy_ratio: 0.0,
             injected_safety_level: SAFETY_GREEN,
             peer_distress: None,
+            #[cfg(feature = "muse-live")]
+            live_output: symthaea_muse::live_output::LiveMuseOutput::new(config).ok(),
             fade_level: 1.0,
             underruns: 0,
         }
@@ -386,7 +393,13 @@ impl CognitiveSubsystem for MuseManager {
 
         // 6. Store for external access (RDP, direct output)
         self.last_chunk = chunk;
-        self.last_musical_state = musical_state;
+        self.last_musical_state = musical_state.clone();
+
+        // 6b. Push to live speakers if enabled
+        #[cfg(feature = "muse-live")]
+        if let Some(ref live) = self.live_output {
+            live.update_state(&musical_state);
+        }
 
         // 7. Build subsystem output
         // Music slightly modulates affect: consonant music → positive valence

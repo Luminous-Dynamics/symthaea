@@ -1634,7 +1634,7 @@ fn benchmark_learned_moral_classifier() -> Option<BenchmarkResult> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     // Collect train and test splits
-    let max_train = 5_000; // Cap training samples for speed
+    let max_train = 50_000; // Use more training data for better generalization
     let mut train_samples: Vec<(String, MoralLabel)> = Vec::new();
     let mut test_samples: Vec<(String, i32)> = Vec::new();
 
@@ -1799,8 +1799,8 @@ fn train_prototypes_from_292k(
         return None;
     }
 
-    // Use all samples for retraining (v4: full 50K at dim 16384).
-    let max_retrain = 50_000;
+    // Use all samples for retraining — no artificial cap.
+    let max_retrain = samples.len();
     let sentiment_weight = 0.15;
     println!(
         "  Training on {} samples (retrain cap: {}, dim={}, sentiment={})...",
@@ -1836,10 +1836,11 @@ fn train_prototypes_from_292k(
         .collect();
 
     println!(
-        "  Retraining adaptive (lr=0.1, 10 iterations, {} samples)...",
+        "  Retraining with validation (lr=0.1, 30 iter, patience=3, {} samples)...",
         retrain_samples.len()
     );
-    classifier.retrain_adaptive(&retrain_samples, 0.1, 10);
+    let val_acc = classifier.retrain_with_validation(&retrain_samples, 0.1, 30, 0.1, 3);
+    println!("  Best validation accuracy: {:.1}%", val_acc * 100.0);
 
     // Report training accuracy
     let mut correct = 0;

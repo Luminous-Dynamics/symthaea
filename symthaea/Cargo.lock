@@ -15376,6 +15376,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-hal",
 ]
 
 [[package]]
@@ -15801,6 +15802,7 @@ dependencies = [
  "hound",
  "rand 0.8.5",
  "ringbuf",
+ "rustfft",
  "serde",
  "serde_json",
  "symthaea-aesthetic",

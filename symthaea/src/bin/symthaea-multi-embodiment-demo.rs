@@ -79,7 +79,7 @@ fn main() {
     #[cfg(feature = "humanoid")]
     println!(
         "✓ {} embodiment bridge(s) active",
-        service.sensorimotor_bridge_count()
+        if service.has_motor_bridge() { "1+" } else { "0" }
     );
     println!();
 
@@ -133,24 +133,19 @@ fn main() {
 }
 
 fn print_telemetry(cycle: usize, metadata: &symthaea::cognitive_loop::CycleMetadata) {
+    let platform = if metadata.embodiment_platform.is_empty() {
+        "none"
+    } else {
+        &metadata.embodiment_platform
+    };
     println!(
-        "  Cycle {:4} | Phi={:.4} | Bodies={} | Platform={}",
+        "  Cycle {:4} | Phi={:.4} | Platform={} | actuators={} | effort={:.4} | pred_err={:.4} | steps={}",
         cycle,
         metadata.consciousness.consciousness_level,
-        metadata.embodiment_count,
-        if metadata.embodiment_platform.is_empty() {
-            "none"
-        } else {
-            &metadata.embodiment_platform
-        },
+        platform,
+        metadata.embodiment_num_actuators,
+        metadata.embodiment_control_effort,
+        metadata.embodiment_prediction_error,
+        metadata.embodiment_total_steps,
     );
-
-    // Per-body breakdown
-    for body in &metadata.embodiment_per_body {
-        println!(
-            "    {:>12} | safety={:<6} | effort={:.4} | pred_err={:.4} | steps={}",
-            body.platform, body.safety_level, body.control_effort, body.prediction_error,
-            body.total_steps,
-        );
-    }
 }

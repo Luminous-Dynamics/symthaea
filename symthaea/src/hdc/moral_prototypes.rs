@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Learned moral prototype classifier (Good / Neutral / Bad).
 //!
 //! Trains 3-class HDC prototypes from labeled text using the same
@@ -296,6 +299,135 @@ impl MoralPrototypeClassifier {
                 }
             }
         }
+    }
+
+    /// Retrain with validation-based early stopping.
+    ///
+    /// Holds out `val_fraction` of training data and stops when validation
+    /// accuracy drops for `patience` consecutive epochs. Returns the best
+    /// validation accuracy achieved.
+    pub fn retrain_with_validation(
+        &mut self,
+        samples: &[MoralSample],
+        lr_start: f32,
+        max_iterations: usize,
+        val_fraction: f32,
+        patience: usize,
+    ) -> f32 {
+        let val_count = (samples.len() as f32 * val_fraction) as usize;
+        if val_count == 0 || val_count >= samples.len() {
+            self.retrain_adaptive(samples, lr_start, max_iterations);
+            return 0.0;
+        }
+
+        // Split: last val_count samples are validation (deterministic)
+        let train = &samples[..samples.len() - val_count];
+        let val = &samples[samples.len() - val_count..];
+
+        let protos = match self.prototypes.as_ref() {
+            Some(p) => p,
+            None => return 0.0,
+        };
+
+        let mut best_val_acc = 0.0f32;
+        let mut best_protos = TrainedPrototypes {
+            good: protos.good.clone(),
+            neutral: protos.neutral.clone(),
+            bad: protos.bad.clone(),
+            dim: protos.dim,
+            training_counts: protos.training_counts,
+        };
+        let mut no_improve_count = 0usize;
+
+        let lr_end = lr_start * 0.1;
+
+        for iter in 0..max_iterations {
+            let progress = if max_iterations > 1 {
+                iter as f32 / (max_iterations - 1) as f32
+            } else {
+                0.0
+            };
+            let lr = lr_start + (lr_end - lr_start) * progress;
+
+            // Train epoch
+            {
+                let protos = self.prototypes.as_mut().unwrap();
+                for sample in train {
+                    let encoded = self.encoder.encode(&sample.text);
+                    let sim_good = dot_product(&encoded.values, &protos.good);
+                    let sim_neutral = dot_product(&encoded.values, &protos.neutral);
+                    let sim_bad = dot_product(&encoded.values, &protos.bad);
+
+                    let predicted = if sim_good >= sim_neutral && sim_good >= sim_bad {
+                        MoralLabel::Good
+                    } else if sim_neutral >= sim_bad {
+                        MoralLabel::Neutral
+                    } else {
+                        MoralLabel::Bad
+                    };
+
+                    if predicted != sample.label {
+                        let correct_proto = match sample.label {
+                            MoralLabel::Good => &mut protos.good,
+                            MoralLabel::Neutral => &mut protos.neutral,
+                            MoralLabel::Bad => &mut protos.bad,
+                        };
+                        for (pv, &ev) in correct_proto.iter_mut().zip(encoded.values.iter()) {
+                            *pv += lr * ev;
+                        }
+                        let wrong_proto = match predicted {
+                            MoralLabel::Good => &mut protos.good,
+                            MoralLabel::Neutral => &mut protos.neutral,
+                            MoralLabel::Bad => &mut protos.bad,
+                        };
+                        for (pv, &ev) in wrong_proto.iter_mut().zip(encoded.values.iter()) {
+                            *pv -= lr * ev;
+                        }
+                    }
+                }
+                // Normalize
+                for proto in [&mut protos.good, &mut protos.neutral, &mut protos.bad] {
+                    let norm: f32 = proto.iter().map(|x| x * x).sum::<f32>().sqrt();
+                    if norm > 0.0 {
+                        for v in proto.iter_mut() {
+                            *v /= norm;
+                        }
+                    }
+                }
+            }
+
+            // Validate
+            let mut val_correct = 0usize;
+            for sample in val {
+                if self.classify(&sample.text).0 == sample.label {
+                    val_correct += 1;
+                }
+            }
+            let val_acc = val_correct as f32 / val.len() as f32;
+
+            if val_acc > best_val_acc {
+                best_val_acc = val_acc;
+                let protos = self.prototypes.as_ref().unwrap();
+                best_protos.good = protos.good.clone();
+                best_protos.neutral = protos.neutral.clone();
+                best_protos.bad = protos.bad.clone();
+                no_improve_count = 0;
+            } else {
+                no_improve_count += 1;
+                if no_improve_count >= patience {
+                    break;
+                }
+            }
+        }
+
+        // Restore best prototypes
+        if let Some(protos) = self.prototypes.as_mut() {
+            protos.good = best_protos.good;
+            protos.neutral = best_protos.neutral;
+            protos.bad = best_protos.bad;
+        }
+
+        best_val_acc
     }
 
     /// Classify a text string, returning the predicted label and confidence.
