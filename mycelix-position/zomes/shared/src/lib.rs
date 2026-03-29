@@ -171,7 +171,7 @@ impl PositionError {
 
     pub fn into_wasm_error(self) -> WasmError {
         let json = serde_json::to_string(&self).unwrap_or_else(|_| self.message.clone());
-        WasmError::Guest(json)
+        wasm_error!(json)
     }
 }
 
