@@ -1055,13 +1055,13 @@ impl MultiWorldSimulator {
                         }
 
                         for (migrant_ids, dest_idx, dest_id, dest_name) in migration_plans {
+                            // O(1) lookup for migration
+                            let mig_map: std::collections::HashMap<u64, usize> = self.worlds[ei].agents.iter()
+                                .enumerate().map(|(i, a)| (a.id, i)).collect();
                             let mut migrants: Vec<CivAgent> = Vec::new();
                             for mid in &migrant_ids {
-                                if let Some(agent) = self.worlds[ei]
-                                    .agents
-                                    .iter_mut()
-                                    .find(|a| a.id == *mid)
-                                {
+                                if let Some(&idx) = mig_map.get(mid) {
+                                    let agent = &mut self.worlds[ei].agents[idx];
                                     let mut migrant = agent.clone();
                                     migrant.world_id = dest_id;
                                     migrant.is_immigrant = true;
@@ -1141,22 +1141,17 @@ impl MultiWorldSimulator {
                     .take(count)
                     .map(|a| a.id)
                     .collect();
+                // O(1) refugee lookup
+                let ref_map: std::collections::HashMap<u64, usize> = self.worlds[fi].agents.iter()
+                    .enumerate().map(|(i, a)| (a.id, i)).collect();
                 for id in ids {
-                    // Clone refugee from source world first (avoids double &mut borrow)
-                    let refugee_opt = self.worlds[fi].agents.iter()
-                        .find(|a| a.id == id)
-                        .cloned();
-                    if let Some(mut refugee) = refugee_opt {
+                    if let Some(&idx) = ref_map.get(&id) {
+                        let mut refugee = self.worlds[fi].agents[idx].clone();
                         refugee.world_id = dest_id;
                         refugee.is_immigrant = true;
                         refugee.partner_id = None;
                         self.worlds[ti].agents.push(refugee);
-                        // Now mark original as dead in source world
-                        if let Some(agent) = self.worlds[fi].agents.iter_mut()
-                            .find(|a| a.id == id)
-                        {
-                            agent.death_tick = Some(self.current_tick);
-                        }
+                        self.worlds[fi].agents[idx].death_tick = Some(self.current_tick);
                         moved += 1;
                     }
                 }
@@ -1238,23 +1233,24 @@ impl MultiWorldSimulator {
                     .collect();
 
                 // Collect settlers first, then modify both worlds to avoid double borrow.
+                // O(1) lookup for immigration pipeline
+                let settler_map: std::collections::HashMap<u64, usize> = self.worlds[donor_idx].agents.iter()
+                    .enumerate().map(|(i, a)| (a.id, i)).collect();
                 let mut settlers_to_move: Vec<agent::CivAgent> = Vec::new();
-                let mut death_ids: Vec<u64> = Vec::new();
                 for id in &settler_ids {
-                    if let Some(agent) = self.worlds[donor_idx].agents.iter().find(|a| a.id == *id) {
-                        let mut settler = agent.clone();
+                    if let Some(&idx) = settler_map.get(id) {
+                        let mut settler = self.worlds[donor_idx].agents[idx].clone();
                         settler.world_id = dest_id;
                         settler.is_immigrant = true;
                         settler.partner_id = None;
                         settlers_to_move.push(settler);
-                        death_ids.push(*id);
                     }
                 }
                 let moved = settlers_to_move.len();
-                // Mark donors as dead
-                for id in &death_ids {
-                    if let Some(agent) = self.worlds[donor_idx].agents.iter_mut().find(|a| a.id == *id) {
-                        agent.death_tick = Some(self.current_tick);
+                // Mark donors as dead (reuse map)
+                for id in &settler_ids {
+                    if let Some(&idx) = settler_map.get(id) {
+                        self.worlds[donor_idx].agents[idx].death_tick = Some(self.current_tick);
                     }
                 }
                 // Add settlers to recipient
