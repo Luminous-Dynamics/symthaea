@@ -207,6 +207,27 @@ impl AffectState {
         Self { joy, sadness, desire, care, harm, consent }
     }
 
+    /// Blend new computed state with previous state (emotional momentum).
+    /// Alpha = 0.3 means 30% new state, 70% previous state.
+    /// Grief doesn't vanish when the cause is removed. Joy persists.
+    /// Resentment builds over years. This is the key to realistic psychology.
+    pub fn blend_with_previous(&self, previous: &AffectState, alpha: f64) -> Self {
+        Self {
+            joy: previous.joy * (1.0 - alpha) + self.joy * alpha,
+            sadness: previous.sadness * (1.0 - alpha) + self.sadness * alpha,
+            desire: previous.desire * (1.0 - alpha) + self.desire * alpha,
+            care: previous.care * (1.0 - alpha) + self.care * alpha,
+            // Harm accumulates faster than it decays (moral injury persists)
+            harm: previous.harm * (1.0 - alpha * 0.5) + self.harm * (alpha * 0.5),
+            // Consent rebuilds slowly but collapses fast (hysteresis)
+            consent: if self.consent < previous.consent {
+                previous.consent * (1.0 - alpha * 1.5).max(0.0) + self.consent * (alpha * 1.5).min(1.0)
+            } else {
+                previous.consent * (1.0 - alpha * 0.5) + self.consent * (alpha * 0.5)
+            },
+        }
+    }
+
     /// Net conatus: joy - sadness. Positive = flourishing, negative = suffering.
     pub fn net_conatus(&self) -> f64 {
         self.joy - self.sadness

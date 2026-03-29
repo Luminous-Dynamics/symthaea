@@ -1789,6 +1789,22 @@ impl DisasterEngine {
                 continue; // Earth doesn't depend on ECLSS
             }
 
+            // #4: Disaster interaction — existing damage makes MORE failures likely.
+            // Low infrastructure = degraded systems = higher failure probability.
+            // This creates compound cascades: quake → damage → ECLSS failure → crisis.
+            let active_count = self.active_per_world.get(&world.id).copied().unwrap_or(0);
+            let interaction_amplifier = if active_count >= 2 {
+                1.0 + (active_count as f64 - 1.0) * 0.3 // Each active disaster +30% failure risk
+            } else {
+                1.0
+            };
+            // Low infrastructure = degraded systems
+            let damage_amplifier = if world.infrastructure_level < 0.5 {
+                1.0 + (0.5 - world.infrastructure_level) * 2.0 // Up to 2x at infra=0
+            } else {
+                1.0
+            };
+
             // Mechanism 1 — Tech-to-MTBF (Infrastructure Shield): higher technology
             // extends mean time between failures, and mature colonies (infra > 0.7)
             // get an additional 50% MTBF bonus from built-in redundancy.
@@ -1798,8 +1814,9 @@ impl DisasterEngine {
             // Scale failure probability by inverse of infrastructure level
             // Better infrastructure = more redundancy (original factor)
             let infra_factor = 1.0 / (0.5 + world.infrastructure_level);
-            // Combined: divide base probability by MTBF scale
-            let mtbf_factor = infra_factor / effective_mtbf_scale;
+            // Combined: divide base probability by MTBF scale, amplified by disaster interactions
+            let mtbf_factor = (infra_factor / effective_mtbf_scale)
+                * interaction_amplifier * damage_amplifier;
 
             let eclss_failures: &[(f64, InfrastructureFailureKind, &str, DisasterEffects)] = &[
                 (

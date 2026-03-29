@@ -32,6 +32,25 @@ pub struct NarrativeEvent {
     pub sadness: f64,
     pub desire: f64,
     pub care: f64,
+    /// Named character involved (generated for pivotal events).
+    pub character: Option<String>,
+}
+
+/// Generate a plausible name for a colony character.
+/// Uses deterministic selection from agent pool characteristics.
+pub fn generate_character_name(world_name: &str, role: &str, generation: u16) -> String {
+    // Deterministic name generation from world + role + generation
+    let first_names = ["Kenji", "Amara", "Chen", "Fatima", "Dmitri", "Yuki",
+        "Kofi", "Leila", "Ravi", "Ingrid", "Marcus", "Zara", "Tomás", "Aisha",
+        "Sven", "Priya", "Oleg", "Mei", "Hassan", "Luna"];
+    let last_names = ["Watanabe", "Okafor", "Zhang", "Al-Rashid", "Petrov", "Tanaka",
+        "Mensah", "Nazari", "Patel", "Lindqvist", "Santos", "Kim", "Reyes", "Mwangi",
+        "Johansson", "Sharma", "Volkov", "Liu", "Ibrahim", "Estrada"];
+
+    let seed = world_name.len() + role.len() + generation as usize;
+    let first = first_names[seed % first_names.len()];
+    let last = last_names[(seed * 7 + 3) % last_names.len()];
+    format!("{} {} (Gen {})", first, last, generation)
 }
 
 /// The narrative engine accumulates memorable events across the simulation.
@@ -90,15 +109,27 @@ impl NarrativeEngine {
                         } else {
                             "Social fabric frayed — faction tensions rose"
                         };
+                        // Generate a named character for pivotal events
+                        let character = if severity >= 3 {
+                            let role = if *care > 0.5 { "medic" } else if *desire > 0.6 { "engineer" } else { "leader" };
+                            Some(generate_character_name(name, role, (year / 30.0) as u16))
+                        } else { None };
+                        let crisis_text = if let Some(ref ch) = character {
+                            format!("{} lost {:.0}% of its population ({} → {}). {} was among the casualties.",
+                                name, drop_frac * 100.0, prev_pop, pop, ch)
+                        } else {
+                            format!("{} lost {:.0}% of its population ({} → {})",
+                                name, drop_frac * 100.0, prev_pop, pop)
+                        };
                         self.events.push(NarrativeEvent {
                             tick, year,
                             world: Some(name.clone()),
-                            crisis: format!("{} lost {:.0}% of its population ({} → {})",
-                                name, drop_frac * 100.0, prev_pop, pop),
+                            crisis: crisis_text,
                             response,
                             outcome: outcome.into(),
                             severity,
                             joy: 0.0, sadness: *sadness, desire: *desire, care: *care,
+                            character,
                         });
                     }
                 }
@@ -119,6 +150,7 @@ impl NarrativeEngine {
                 },
                 severity: if cvs < 0.4 { 4 } else { 2 },
                 joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                character: None,
             });
         }
 
@@ -179,6 +211,7 @@ impl NarrativeEngine {
                     outcome: format!("MILESTONE: {}", milestone),
                     severity: 3,
                     joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                character: None,
                 });
                 self.narrated_milestones.push(milestone.clone());
             }
@@ -194,6 +227,7 @@ impl NarrativeEngine {
                 outcome: "Outer colonies faced sudden isolation — the question of self-sufficiency became existential".into(),
                 severity: 4,
                 joy: 0.0, sadness: 0.8, desire: 0.9, care: 0.0,
+                character: None,
             });
             self.narrated_milestones.push("Kessler".into());
         }
@@ -208,6 +242,7 @@ impl NarrativeEngine {
                 outcome: "Earth was no longer the safe harbor. For the first time, all worlds faced equal danger.".into(),
                 severity: 4,
                 joy: 0.0, sadness: 0.6, desire: 0.7, care: 0.0,
+                character: None,
             });
             self.narrated_milestones.push("Laschamp".into());
         }
@@ -233,6 +268,7 @@ impl NarrativeEngine {
                         },
                         severity: if threshold >= 5000 { 3 } else { 1 },
                         joy: *joy, sadness: 0.0, desire: 0.0, care: *care,
+                            character: None,
                     });
                     self.narrated_milestones.push(key);
                 }
@@ -251,6 +287,7 @@ impl NarrativeEngine {
                     outcome: "Resource allocation became zero-sum — saving one colony meant neglecting another".into(),
                     severity: 3,
                     joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                character: None,
                 });
                 self.narrated_milestones.push(key);
             }

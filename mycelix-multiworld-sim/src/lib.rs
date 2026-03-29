@@ -560,7 +560,7 @@ impl MultiWorldSimulator {
             let gov_stability = governance_stability;
             let resource_frac = world.resources.self_sufficiency();
             for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                agent.needs.affect = needs::AffectState::compute(
+                let new_affect = needs::AffectState::compute(
                     &agent.needs,
                     agent.consciousness.care_activation,
                     agent.trauma_level,
@@ -568,6 +568,10 @@ impl MultiWorldSimulator {
                     agent.faction_id.is_some(),
                     resource_frac,
                 );
+                // Affect momentum: blend new state with previous (α=0.3).
+                // Emotions persist — grief doesn't vanish, joy lingers.
+                agent.needs.affect = new_affect.blend_with_previous(
+                    &agent.needs.affect, 0.3);
             }
 
             self.needs_summaries.push(summary);
@@ -1526,6 +1530,42 @@ impl MultiWorldSimulator {
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                         agent.needs.allostatic_load = (agent.needs.allostatic_load + penalty).min(1.0);
                     }
+                }
+            }
+
+            // === #3: INDEPENDENCE MOVEMENTS ===
+            // When a colony's population > 5000 AND self-sufficiency > 0.8 AND
+            // cultural distance from Earth > 0.3, independence pressure rises.
+            // Mars surpassing Earth (11,644 vs 10,859 in v8) is THE political event.
+            if world.location != "Earth" && pop > 5000.0
+                && world.resources.self_sufficiency() > 0.7
+                && tick % 120 == 0 // Check every 10 years
+            {
+                // Cultural distance from Earth (use individualism as proxy)
+                let cultural_dist = (world.culture.individualism - 0.5).abs()
+                    + (world.culture.risk_tolerance - 0.4).abs();
+                let independence_pressure = (pop / 10000.0).min(1.0) * 0.3
+                    + world.resources.self_sufficiency() * 0.3
+                    + cultural_dist * 0.2
+                    + (1.0 - world.trust_level) * 0.2;
+
+                if independence_pressure > 0.6 {
+                    // Independence movement forms
+                    let world_name = world.name.clone();
+                    let world_id = world.id;
+                    self.events.push(CivEvent::new(
+                        tick, Some(world_id), CivEventType::ConstitutionalAmendment,
+                        format!("{}: INDEPENDENCE MOVEMENT — pressure {:.0}%. Pop {}, \
+                            self-sufficiency {:.0}%, cultural divergence {:.2}. \
+                            \"We can govern ourselves.\"",
+                            world_name, independence_pressure * 100.0,
+                            pop as usize, world.resources.self_sufficiency() * 100.0,
+                            cultural_dist),
+                    ));
+                    // Independence reduces trust with Earth but boosts local identity
+                    world.narrative_identity.identification =
+                        (world.narrative_identity.identification + 0.1).min(1.0);
+                    world.trust_level = (world.trust_level - 0.05).max(0.0);
                 }
             }
 
