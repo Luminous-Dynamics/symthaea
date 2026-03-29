@@ -11,23 +11,7 @@ use crate::encoder::AuvHdcEncoder;
 use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 use crate::types::AuvConfig;
 
-/// Safety level for consciousness-gated motor authority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MotorSafetyLevel {
-    Green, Yellow, Orange, Red,
-}
-
-impl MotorSafetyLevel {
-    pub fn from_phi(phi: f64) -> Self {
-        if phi > 0.6 { Self::Green }
-        else if phi > 0.3 { Self::Yellow }
-        else if phi > 0.1 { Self::Orange }
-        else { Self::Red }
-    }
-    pub fn motor_gain(&self) -> f32 {
-        match self { Self::Green => 1.0, Self::Yellow => 0.6, Self::Orange => 0.3, Self::Red => 0.0 }
-    }
-}
+pub use symthaea_hal::MotorSafetyLevel;
 
 /// AUV embodiment bridge.
 pub struct AuvEmbodiment {

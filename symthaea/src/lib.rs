@@ -477,6 +477,18 @@ pub use symthaea_humanoid as humanoid;
 #[cfg(feature = "helicopter")]
 pub use symthaea_helicopter as helicopter;
 
+// Vehicle: HDC-LTC + FEP Active Inference autonomous vehicle control
+#[cfg(feature = "vehicle")]
+pub use symthaea_vehicle as vehicle;
+
+// Manipulator: HDC-LTC + FEP Active Inference consciousness-coupled industrial arm
+#[cfg(feature = "manipulator")]
+pub use symthaea_manipulator as manipulator;
+
+// AUV: HDC-LTC + FEP Active Inference autonomous underwater vehicle for commons stewardship
+#[cfg(feature = "auv")]
+pub use symthaea_auv as auv;
+
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]
 pub mod meta;

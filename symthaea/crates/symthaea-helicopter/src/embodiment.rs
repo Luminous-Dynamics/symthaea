@@ -9,7 +9,7 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
-use symthaea_hal::MotorSafetyLevel;
+pub use symthaea_hal::MotorSafetyLevel;
 
 use crate::controller::HelicopterController;
 use crate::encoder::HelicopterHdcEncoder;

@@ -23,6 +23,7 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod controller;
+pub mod embodiment;
 pub mod encoder;
 pub mod kinematics;
 pub mod simulator;
