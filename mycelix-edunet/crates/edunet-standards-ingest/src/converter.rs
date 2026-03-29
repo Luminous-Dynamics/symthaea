@@ -84,7 +84,6 @@ pub struct CurriculumNode {
     /// Supplementary external resources (for when generated content is insufficient).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supplementary_resources: Vec<SupplementaryResource>,
-    exam_weight: None,
     /// Exam weight (marks allocated in formal assessments).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exam_weight: Option<ExamWeight>,
