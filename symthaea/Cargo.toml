@@ -1424,6 +1424,11 @@ name = "cognitive_cycle"
 harness = false
 
 [[bench]]
+name = "embodied_cycle"
+harness = false
+required-features = ["humanoid"]
+
+[[bench]]
 name = "dynamics_ode"
 harness = false
 
