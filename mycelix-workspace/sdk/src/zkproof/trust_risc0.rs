@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! RISC-0 ZK Trust Proof Integration
 //!
 //! Bridges the SDK's trust types with the zk-trust-risc0 spike for generating

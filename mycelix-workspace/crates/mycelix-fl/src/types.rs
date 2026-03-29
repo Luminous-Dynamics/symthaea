@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core FL types — re-exported from mycelix-fl-core with HV16 extensions
 //!
 //! Canonical data structures for federated learning using f32 precision.

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Quick S192 spot benchmark - measure 192-bit security overhead
 //!
 //! Runs a single scenario with S192 profile to measure actual performance vs S128

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! PoGQ Zome - Byzantine Detection with RISC Zero Proofs
 //!
 //! This zome integrates RISC Zero zkVM proofs for Proof-of-Gradient-Quality (PoGQ)

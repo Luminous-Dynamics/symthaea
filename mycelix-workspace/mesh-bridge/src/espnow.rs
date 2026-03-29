@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ESP-NOW transport — peer-to-peer WiFi without an access point.
 //!
 //! ESP-NOW is a connectionless protocol by Espressif that allows direct

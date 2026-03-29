@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Verifiable Credential zome sweettest integration tests.
 //!
 //! Tests W3C verifiable credential issuance, verification, presentations,

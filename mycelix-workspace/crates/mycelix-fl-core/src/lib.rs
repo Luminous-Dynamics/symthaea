@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! mycelix-fl-core: Universal Federated Learning Core
 //!
 //! A lightweight, dependency-minimal crate containing the canonical FL types,

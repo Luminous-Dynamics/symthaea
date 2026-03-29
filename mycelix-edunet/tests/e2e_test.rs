@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # End-to-End Integration Tests for Mycelix EduNet
 //!
 //! This module contains comprehensive E2E tests covering all 5 test scenarios from Phase 7.

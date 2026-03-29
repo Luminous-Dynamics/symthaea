@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! WebAuthn/FIDO2 Integration for Mycelix Identity System
 //!
 //! This module provides WebAuthn (Web Authentication) support for hardware key

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! mycelix-attribution-scan — Scans lockfiles and generates attribution data.
 //!
 //! Reads Cargo.lock, package-lock.json, or flake.lock and outputs

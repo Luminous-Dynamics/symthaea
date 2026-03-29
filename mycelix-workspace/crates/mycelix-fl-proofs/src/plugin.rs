@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Ported from fl-aggregator concept — bridges proofs to fl-core's VerificationPlugin
 //! VerificationPlugin bridge for mycelix-fl-core pipeline integration.
 //!

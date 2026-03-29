@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Claim and VC data models for Mycelix supply chain provenance.
 //!
 //! This crate defines the core types and validation logic for supply chain events,

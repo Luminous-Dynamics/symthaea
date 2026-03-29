@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! CCSDS Conjunction Data Message (CDM) KVN Parser
 //!
 //! Parses Conjunction Data Messages in CCSDS 508.0-B-1 Keyword-Value Notation

@@ -1,4 +1,8 @@
 #![no_main]
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Gen-7 HYPERION-FL: Gradient Validity Proof Circuit
 //!
 //! This zkVM guest program proves that a gradient update is valid and was computed

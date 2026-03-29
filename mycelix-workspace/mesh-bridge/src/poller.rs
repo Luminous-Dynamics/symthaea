@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Conductor Poller — polls for new entries and relays to mesh.
 //!
 //! Watches for new TEND exchanges, food harvests, emergency messages,

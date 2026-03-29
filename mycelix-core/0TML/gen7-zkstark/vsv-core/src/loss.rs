@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Loss utilities for CanaryCNN (MSE-on-logits canonical path).
 //!
 //! Provides fixed-point implementations of mean squared error (MSE) over

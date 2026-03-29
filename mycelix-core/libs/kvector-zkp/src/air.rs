@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! AIR (Algebraic Intermediate Representation) for K-Vector range proofs
 //!
 //! This defines the constraint system for proving K-Vector components

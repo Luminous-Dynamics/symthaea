@@ -1,4 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #![cfg_attr(not(feature = "prover"), allow(unused_imports))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 

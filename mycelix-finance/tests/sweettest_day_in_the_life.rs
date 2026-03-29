@@ -1,4 +1,8 @@
 #![cfg(test)]
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # "Day in the Life" — Narrative Integration Test
 //!
 //! Simulates a realistic day in the Mycelix community of Roodepoort, South

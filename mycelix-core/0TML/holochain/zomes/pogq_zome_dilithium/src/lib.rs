@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! PoGQ Zome - Phase 2.5: Byzantine Detection with RISC Zero + Dilithium Authentication
 //!
 //! This zome extends the original PoGQ Byzantine detection with post-quantum client authentication.

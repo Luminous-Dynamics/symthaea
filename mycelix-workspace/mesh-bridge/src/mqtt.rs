@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! MQTT gateway transport — bridges LoRa mesh ↔ internet via Meshtastic MQTT.
 //!
 //! Meshtastic devices can natively bridge their LoRa mesh to MQTT.

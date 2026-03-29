@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Uncertainty Handling for Agents (GIS Integration)
 //!
 //! Integrates the Graceful Ignorance System (GIS) v4.0 from the TypeScript SDK

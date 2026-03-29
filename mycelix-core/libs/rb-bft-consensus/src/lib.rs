@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! RB-BFT: Reputation-Based Byzantine Fault Tolerant Consensus
 //!
 //! This crate implements a Byzantine fault tolerant consensus protocol that uses

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Pure-Rust stress and property tests for Mycelix Finance economic formulas.
 //!
 //! These tests exercise the math functions directly WITHOUT requiring a Holochain

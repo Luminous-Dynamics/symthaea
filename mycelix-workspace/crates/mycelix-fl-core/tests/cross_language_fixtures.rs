@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cross-Language Fixture Verification (Rust side)
 //!
 //! Loads the fixtures from `fixtures/fl_test_vectors.json` and verifies

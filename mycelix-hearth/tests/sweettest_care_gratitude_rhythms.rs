@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Mycelix Hearth — Care, Gratitude & Rhythms Sweettest Integration Tests
 //!
 //! Tests the H2 weekly digest pipeline end-to-end: care schedule creation and

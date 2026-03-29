@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use anyhow::{bail, Context, Result};
 use blake2::{Blake2b512, Digest};
 use ed25519_dalek::{SigningKey, VerifyingKey};

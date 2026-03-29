@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Feldman's Verifiable Secret Sharing for Distributed Key Generation
 //!
 //! This library implements Feldman's VSS scheme for threshold cryptography.

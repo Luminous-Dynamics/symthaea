@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // TODO: HDK 0.4→0.6 upgrade complete. Old `entry_defs` callback replaced with
 // `#[hdk_entry_helper]` + `#[hdk_entry_types]` macros. Entry types are not yet
 // used by zome functions (submit_gradient stores nothing in DHT), so this is

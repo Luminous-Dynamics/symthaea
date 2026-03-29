@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ML-DSA-65 post-quantum digital signatures for DKG attestation.
 //!
 //! Provides sign/verify operations using FIPS 204 ML-DSA-65 (Dilithium3),

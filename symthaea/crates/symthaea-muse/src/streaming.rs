@@ -14,10 +14,13 @@
 use crate::aesthetic_listener::AestheticListener;
 use crate::ambient_drone::AmbientDrone;
 use crate::audio_feedback::AudioFeedbackEncoder;
+use crate::composer_mind::ComposerMind;
 use crate::creative_agency::{CreativeIntent, CreativeJournal};
 use crate::emotional_gestures;
+use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
+use crate::voice_leader::{self, VoiceRole, VoiceState};
 use crate::state_smoother::StateSmoother;
 use crate::binaural::BinauralConsciousnessRenderer;
 use crate::consciousness_reverb::ConsciousnessReverb;
@@ -110,6 +113,12 @@ pub struct StreamingSynth {
     prev_note_freq: Option<f32>,
     /// Creative journal: Symthaea's autonomous aesthetic memory.
     journal: CreativeJournal,
+    /// Composer mind: goal-directed planning and long-range form.
+    composer: ComposerMind,
+    /// Voice states for independent voice leading.
+    lead_voice: VoiceState,
+    /// Bar counter for form progression.
+    bars_elapsed_frac: f32,
     /// State smoother: prevents abrupt parameter changes.
     smoother: StateSmoother,
     /// FEP active inference engine for music (the system predicts its own sound).
@@ -169,6 +178,9 @@ impl StreamingSynth {
             note_counter: 0,
             prev_note_freq: None,
             journal: CreativeJournal::new(),
+            composer: ComposerMind::new(),
+            lead_voice: VoiceState::new(VoiceRole::Lead),
+            bars_elapsed_frac: 0.0,
             smoother: StateSmoother::default_smooth(),
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
@@ -201,6 +213,18 @@ impl StreamingSynth {
         if self.enable_fep {
             self.fep_engine.set_emotion_anchor(state);
         }
+
+        // Composer mind: advance form and apply goal-directed state shaping
+        let tempo = self.muse_stream.tempo();
+        let bars_per_chunk = (self.chunk_samples as f32 / self.sample_rate as f32) * (tempo / 60.0) / 4.0;
+        self.bars_elapsed_frac += bars_per_chunk;
+        if self.bars_elapsed_frac >= 1.0 {
+            self.bars_elapsed_frac -= 1.0;
+            crate::composer_mind::free_compose_step(
+                &mut self.state, &mut self.composer, self.journal.beauty_ema(),
+            );
+        }
+        self.composer.shape_state(&mut self.state);
 
         // Arousal-driven note generation cadence:
         // High arousal (0.9) → generate every 1 chunk (dense onsets)

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Q16.16 Fixed-Point Arithmetic
 //!
 //! Provides deterministic fixed-point arithmetic for zkVM compatibility.

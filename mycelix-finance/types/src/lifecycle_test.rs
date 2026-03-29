@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! End-to-end lifecycle simulation: deposit -> covenant -> health -> margin call -> liquidation
 //!
 //! Tests the complete lifecycle of a collateral position through all states.

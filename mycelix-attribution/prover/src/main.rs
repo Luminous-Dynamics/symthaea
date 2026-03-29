@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! mycelix-attribution-prover — Generates ZK-STARK proofs for usage attestations.
 //!
 //! Builds a 9-column × 16-row trace and generates a Winterfell STARK proof

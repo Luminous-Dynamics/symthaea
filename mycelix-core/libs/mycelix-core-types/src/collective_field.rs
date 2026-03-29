@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Collective Mirror: Reflecting Group State Without Claiming Wisdom
 //!
 //! This module implements a **mirror**, not an **oracle**. It shows the group

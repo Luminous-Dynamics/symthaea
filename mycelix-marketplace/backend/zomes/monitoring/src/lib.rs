@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 /// Monitoring and Metrics System for Mycelix-Marketplace
 ///
 /// This module provides real-time monitoring, Byzantine attack detection,

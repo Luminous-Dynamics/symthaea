@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Byzantine Tolerance Phase Diagram Benchmark
 //!
 //! Sweeps Byzantine fraction from 0% to 40% across three aggregation strategies:
