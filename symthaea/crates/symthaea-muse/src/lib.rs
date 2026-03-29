@@ -606,6 +606,7 @@ pub mod ablation;
 pub mod aesthetic_listener;
 pub mod ambient_drone;
 pub mod audio_feedback;
+pub mod creative_agency;
 pub mod emotional_gestures;
 pub mod motif_memory;
 pub mod performance;

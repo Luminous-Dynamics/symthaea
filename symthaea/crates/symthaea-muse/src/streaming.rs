@@ -14,6 +14,7 @@
 use crate::aesthetic_listener::AestheticListener;
 use crate::ambient_drone::AmbientDrone;
 use crate::audio_feedback::AudioFeedbackEncoder;
+use crate::creative_agency::{CreativeIntent, CreativeJournal};
 use crate::emotional_gestures;
 use crate::motif_memory::MotifMemory;
 use crate::performance;
@@ -107,6 +108,8 @@ pub struct StreamingSynth {
     note_counter: u32,
     /// Previous note frequency (for emotional gesture direction).
     prev_note_freq: Option<f32>,
+    /// Creative journal: Symthaea's autonomous aesthetic memory.
+    journal: CreativeJournal,
     /// State smoother: prevents abrupt parameter changes.
     smoother: StateSmoother,
     /// FEP active inference engine for music (the system predicts its own sound).
@@ -165,6 +168,7 @@ impl StreamingSynth {
             chord_beat_counter: 0.0,
             note_counter: 0,
             prev_note_freq: None,
+            journal: CreativeJournal::new(),
             smoother: StateSmoother::default_smooth(),
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
@@ -487,18 +491,37 @@ impl StreamingSynth {
         let emotion = emotional_gestures::detect_emotion(&self.state);
         let gesture = emotional_gestures::gesture_for_emotion(emotion);
 
+        // Creative intent: what does Symthaea WANT to do?
+        let intent = self.journal.creative_intent(&self.state);
+
         let max_new = if psi > 0.7 { 4 } else if psi > 0.5 { 3 } else if psi > 0.3 { 2 } else { 1 };
         for _ in 0..max_new {
             if self.active_notes.len() >= MAX_ACTIVE_NOTES { break; }
 
-            // Try motif memory first (repetition/development)
-            let note_opt = self.motif.next_note(&self.state);
-            let mut note = if let Some(n) = note_opt {
-                n
-            } else if let Some(n) = self.muse_stream.next_note() {
-                n
-            } else {
-                continue;
+            // Creative agency: intent drives note source
+            let mut note = match intent {
+                CreativeIntent::Perform => {
+                    // Replay the best gem for the current emotion
+                    if let Some(gem) = self.journal.gem_for_emotion(emotion) {
+                        if let Some(n) = gem.notes.first().copied() {
+                            n
+                        } else if let Some(n) = self.muse_stream.next_note() { n }
+                        else { continue; }
+                    } else if let Some(n) = self.motif.next_note(&self.state) { n }
+                    else if let Some(n) = self.muse_stream.next_note() { n }
+                    else { continue; }
+                }
+                CreativeIntent::Reflect => {
+                    // Minimal activity: only generate if motif has something
+                    if let Some(n) = self.motif.next_note(&self.state) { n }
+                    else { continue; } // skip generation in reflective mode
+                }
+                CreativeIntent::Develop | CreativeIntent::Explore => {
+                    // Try motif memory first, then generate new
+                    if let Some(n) = self.motif.next_note(&self.state) { n }
+                    else if let Some(n) = self.muse_stream.next_note() { n }
+                    else { continue; }
+                }
             };
 
             // Snap to current chord tones
@@ -534,9 +557,22 @@ impl StreamingSynth {
             let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
             performance::humanize(&mut note, beat_pos, phrase_pos, self.note_counter);
 
-            // Record note for motif memory
+            // Record note for motif memory + creative journal evaluation
             self.motif.record_note(note);
             self.prev_note_freq = Some(note.frequency);
+
+            // When a phrase completes in motif memory, evaluate it
+            // (evaluate every 4-8 notes based on phrase length)
+            if self.note_counter % (self.motif.replay_queue_len().max(4) as u32) == 0 {
+                let recent: Vec<crate::Note> = self.active_notes.iter()
+                    .rev()
+                    .take(4)
+                    .map(|a| a.note)
+                    .collect();
+                if recent.len() >= 2 {
+                    let _beauty = self.journal.evaluate_phrase(&recent, &self.state);
+                }
+            }
 
             if let Some(note) = Some(note) {
                 let idx = self.active_notes.len();
@@ -625,6 +661,7 @@ impl StreamingSynth {
         self.fe_history.clear();
         self.drone.reset();
         self.motif.reset();
+        self.journal.reset();
         self.chord_idx = 0;
         self.chord_beat_counter = 0.0;
         self.note_counter = 0;
