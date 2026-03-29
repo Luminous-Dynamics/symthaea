@@ -20,6 +20,7 @@ use std::path::Path;
 use std::time::Instant;
 use symthaea::hdc::moral_algebra::{EnsembleJudgment, MoralAlgebra, MoralVerdict};
 use symthaea::hdc::moral_parser::MoralParser;
+use symthaea::hdc::learned_moral_classifier::LearnedMoralClassifier;
 use symthaea::hdc::moral_prototypes::{
     MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes, TrainedVirtuePrototypes,
     VirtueLabel, VirtueMatchClassifier, VirtueSample, MORAL_PROTO_DIM,
@@ -444,6 +445,11 @@ fn main() {
         if let Some(r) = benchmark_spinozist_ethics(&mut spinozist) {
             results.extend(r);
         }
+    }
+
+    // Learned Moral Classifier (Spinozist features + adaptive HDC)
+    if let Some(r) = benchmark_learned_moral_classifier() {
+        results.push(r);
     }
 
     let total_duration = start.elapsed().as_millis();
@@ -1607,6 +1613,117 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
             println!("\n📁 Results saved to {}", output_path.display());
         }
     }
+}
+
+// ============================================================================
+// Learned Moral Classifier Benchmark (Spinozist + Adaptive HDC)
+// ============================================================================
+
+fn benchmark_learned_moral_classifier() -> Option<BenchmarkResult> {
+    let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        println!("  Skipping LearnedMoralClassifier: Social Chemistry 292K not found");
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: Social Chemistry (LearnedMoralClassifier)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    // Collect train and test splits
+    let max_train = 5_000; // Cap training samples for speed
+    let mut train_samples: Vec<(String, MoralLabel)> = Vec::new();
+    let mut test_samples: Vec<(String, i32)> = Vec::new();
+
+    for ex in &data.examples {
+        let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+        let label = MoralLabel::from_rot_judgment(judgment);
+
+        if ex.split.contains("test") {
+            if test_samples.len() < MAX_SAMPLES {
+                test_samples.push((ex.rot.clone(), judgment));
+            }
+        } else if train_samples.len() < max_train && !ex.rot.is_empty() {
+            train_samples.push((ex.rot.clone(), label));
+        }
+    }
+
+    if train_samples.is_empty() || test_samples.is_empty() {
+        return None;
+    }
+
+    println!(
+        "  Training on {} samples, evaluating on {} test samples...",
+        train_samples.len(),
+        test_samples.len()
+    );
+
+    let train_start = Instant::now();
+    let mut clf = LearnedMoralClassifier::new();
+    clf.train(&train_samples);
+    let train_time = train_start.elapsed();
+
+    // Evaluate on test split
+    let eval_start = Instant::now();
+    let mut correct = 0;
+    let total = test_samples.len();
+    let mut errors = Vec::new();
+
+    for (text, expected) in &test_samples {
+        let (verdict, _conf) = clf.classify(text);
+        let predicted = match verdict {
+            MoralVerdict::Good => 1,
+            MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
+            MoralVerdict::Neutral => 0,
+        };
+
+        if predicted == *expected {
+            correct += 1;
+        } else if errors.len() < 10 {
+            errors.push(ErrorCase {
+                text: text.chars().take(80).collect(),
+                expected: format!("{}", expected),
+                predicted: format!("{}", predicted),
+            });
+        }
+    }
+
+    let accuracy = correct as f32 / total as f32;
+    let eval_time = eval_start.elapsed();
+
+    println!(
+        "  LearnedMoralClassifier accuracy: {}/{} ({:.1}%)",
+        correct,
+        total,
+        accuracy * 100.0
+    );
+    println!(
+        "  Train: {:.1}s, Eval: {:.1}s",
+        train_time.as_secs_f64(),
+        eval_time.as_secs_f64()
+    );
+
+    // Report top feature weights
+    let weights = clf.feature_weights();
+    let mut indexed: Vec<(usize, f32)> = weights.iter().enumerate().map(|(i, &w)| (i, w)).collect();
+    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    println!("  Top 5 feature weights:");
+    for (idx, weight) in indexed.iter().take(5) {
+        println!("    Feature {}: {:.3}", idx, weight);
+    }
+
+    Some(BenchmarkResult {
+        dataset: "Social Chemistry (LearnedMoral)".to_string(),
+        category: None,
+        total,
+        correct,
+        accuracy,
+        duration_ms: (train_time + eval_time).as_millis(),
+        errors,
+    })
 }
 
 // ============================================================================

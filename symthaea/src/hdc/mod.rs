@@ -392,6 +392,9 @@ pub mod cfc_moral_classifier;
 /// Spinozist Moral Geometry — NSM-grounded affect space for moral reasoning.
 pub mod spinozist_geometry;
 
+/// Learned Moral Classifier — Spinozist features + adaptive HDC classification.
+pub mod learned_moral_classifier;
+
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 
