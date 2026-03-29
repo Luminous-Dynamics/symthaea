@@ -547,6 +547,7 @@ mod tests {
             ecosystem_balance: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
+            project_manager: crate::projects::ProjectManager::new(),
             diplomatic_relations: std::collections::HashMap::new(),
         };
 

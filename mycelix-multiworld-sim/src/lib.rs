@@ -3484,4 +3484,27 @@ mod tests {
             "Education guild should produce teaching interactions"
         );
     }
+
+    #[test]
+    fn test_hybrid_earth_backward_compat_default() {
+        // With hybrid_earth=false (default), earth_regions and spaceport remain empty/None.
+        let config = small_config(60);
+        assert!(!config.policy.hybrid_earth);
+        let mut sim = MultiWorldSimulator::new(config);
+        let report = sim.run();
+        assert!(sim.earth_regions.is_empty(), "hybrid_earth=false should not populate regions");
+        assert!(sim.spaceport.is_none(), "hybrid_earth=false should not create spaceport");
+        assert!(report.final_population > 0, "Classic model should work");
+    }
+
+    #[test]
+    fn test_hybrid_earth_creates_12_regions_and_spaceport() {
+        let mut config = small_config(120);
+        config.policy.hybrid_earth = true;
+        let mut sim = MultiWorldSimulator::new(config);
+        let _report = sim.run();
+        assert_eq!(sim.earth_regions.len(), 12, "Should have 12 Earth regions");
+        assert!(sim.spaceport.is_some(), "Should have a spaceport");
+    }
 }
+pub mod maglev_network;
