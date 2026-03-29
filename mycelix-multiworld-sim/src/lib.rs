@@ -3517,3 +3517,4 @@ mod tests {
     }
 }
 pub mod maglev_network;
+pub mod generation_ship;
