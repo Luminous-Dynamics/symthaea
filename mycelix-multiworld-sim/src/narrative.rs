@@ -95,19 +95,33 @@ impl NarrativeEngine {
                     let threshold = if *prev_pop < 100 { 0.05 } else { 0.10 };
                     if drop_frac > threshold {
                         let severity = if drop_frac > 0.30 { 4 } else if drop_frac > 0.20 { 3 } else { 2 };
+                        // P3: Response diversity — crisis count matters
+                        let prior_crises = self.events.iter()
+                            .filter(|e| e.world.as_deref() == Some(name) && e.severity >= 2)
+                            .count();
                         let response = if *care > 0.5 {
                             format!("The survivors rallied with extraordinary mutual aid (care: {:.2})", care)
-                        } else if *desire > 0.6 {
+                        } else if *desire > 0.6 && prior_crises < 5 {
                             format!("Desperate striving gripped the colony (desire: {:.2})", desire)
-                        } else if *sadness > 0.5 {
+                        } else if *sadness > 0.5 && prior_crises < 3 {
                             format!("A pall of grief settled over the colony (sadness: {:.2})", sadness)
+                        } else if prior_crises > 10 {
+                            "A grim, practiced efficiency took over — they had done this before".into()
+                        } else if prior_crises > 5 {
+                            "The colony absorbed the blow with the numbness of experience".into()
                         } else {
-                            "The colony struggled to process the loss".into()
+                            "Emergency protocols activated — the colony braced for aftermath".into()
                         };
                         let outcome = if *care > *sadness {
                             "Community bonds held — reconstruction began within days"
+                        } else if prior_crises > 8 {
+                            "The colony endured — scarred but unbroken"
+                        } else if *desire > 0.7 {
+                            "Determination hardened — the colony would not let this define them"
+                        } else if *pop < 50 {
+                            "Every remaining colonist felt the absence — the community was intimate enough to grieve each loss by name"
                         } else {
-                            "Social fabric frayed — faction tensions rose"
+                            "Social fabric strained — trust eroded between factions"
                         };
                         // Generate a named character for pivotal events
                         let character = if severity >= 3 {
@@ -306,6 +320,69 @@ impl NarrativeEngine {
             self.events.sort_by(|a, b| b.severity.cmp(&a.severity)
                 .then_with(|| b.tick.cmp(&a.tick)));
             self.events.truncate(100);
+        }
+    }
+
+    /// P0: Ingest CivEvents into the narrative.
+    /// Bridges the two event systems so projects, independence movements,
+    /// explorations, Dunbar transitions, and supply chain disruptions
+    /// appear in the chronicle.
+    pub fn ingest_civ_events(&mut self, events: &[crate::events::CivEvent]) {
+        for event in events {
+            let desc = &event.description;
+            let tick = event.tick;
+            let year = tick as f64 / 12.0;
+
+            // Determine severity and narrative content from CivEvent markers
+            let (severity, crisis, response, outcome) = if desc.contains("PROJECT COMPLETE") {
+                (2,
+                 desc.clone(),
+                 "Construction crews celebrated as the structure came online".into(),
+                 "Colony capability expanded — new possibilities opened".to_string())
+            } else if desc.contains("INDEPENDENCE MOVEMENT") {
+                (3,
+                 desc.clone(),
+                 "Political assemblies debated sovereignty with unprecedented fervor".into(),
+                 "The relationship between colony and homeworld would never be the same".to_string())
+            } else if desc.contains("EXPLORATION SUCCESS") {
+                (2,
+                 desc.clone(),
+                 "Survey teams returned with samples and data".into(),
+                 "New resources mapped — the colony's future brightened".to_string())
+            } else if desc.contains("DUNBAR TRANSITION") {
+                (2,
+                 desc.clone(),
+                 "The old ways of knowing everyone by name gave way to formal institutions".into(),
+                 "Governance adapted to scale — or tried to".to_string())
+            } else if desc.contains("FISSION DELIVERY") {
+                (3,
+                 desc.clone(),
+                 "Nuclear reactors powered up for the first time on alien soil".into(),
+                 "The energy equation changed forever".to_string())
+            } else if desc.contains("KESSLER CASCADE") {
+                (4,
+                 desc.clone(),
+                 "Debris clouds sealed orbit — every launch window became a gamble".into(),
+                 "Earth's connection to its colonies hung by a thread".to_string())
+            } else {
+                continue; // Skip events we don't narrate
+            };
+
+            // Deduplicate: don't narrate the same event description twice
+            if self.events.iter().any(|e| e.crisis == crisis) { continue; }
+
+            let world = event.world_id.map(|_| {
+                // Extract world name from description if present
+                desc.split(':').next().unwrap_or("Unknown").to_string()
+            });
+
+            self.events.push(NarrativeEvent {
+                tick, year, world,
+                crisis, response, outcome,
+                severity,
+                joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                character: None,
+            });
         }
     }
 

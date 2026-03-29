@@ -3128,6 +3128,8 @@ impl MultiWorldSimulator {
                     self.disaster_engine.orbital_debris.cascade_active,
                     self.disaster_engine.magnetosphere.excursion_active,
                 );
+                // P0: Bridge CivEvents into narrative engine
+                self.narrative_engine.ingest_civ_events(&self.events);
             }
 
             // Dead agent compaction: every 600 ticks, remove agents dead for 1200+ ticks
