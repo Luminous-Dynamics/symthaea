@@ -46,6 +46,7 @@ pub mod narrative;
 pub mod needs;
 pub mod observables;
 pub mod population;
+pub mod projects;
 pub mod supply_chain;
 pub mod report;
 pub mod resontia;
@@ -249,6 +250,7 @@ impl MultiWorldSimulator {
             ecosystem_balance: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
+            project_manager: crate::projects::ProjectManager::new(),
             diplomatic_relations: std::collections::HashMap::new(),
             };
 
@@ -388,6 +390,7 @@ impl MultiWorldSimulator {
             ecosystem_balance: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
+            project_manager: crate::projects::ProjectManager::new(),
             diplomatic_relations: std::collections::HashMap::new(),
         };
 
@@ -2721,6 +2724,87 @@ impl MultiWorldSimulator {
             // Phase 5.5: Immigration pipeline for genetic rescue
             self.tick_immigration_pipeline();
 
+            // Phase 5.3: Colony projects (multi-tick construction)
+            for world in &mut self.worlds {
+                if world.population() == 0 { continue; }
+
+                // Auto-prioritize annually
+                if world.project_manager.active.is_empty()
+                    && world.project_manager.queue.is_empty()
+                    && self.current_tick % 12 == 0
+                {
+                    let priorities = projects::prioritize_projects(
+                        world.population(),
+                        world.power_demand_kw - world.power_generation_kw,
+                        world.resources.fraction_of_capacity("food"),
+                        world.max_population,
+                        world.population() > (world.max_population as f64 * 0.8) as usize,
+                        world.project_manager.has_completed(projects::ProjectBlueprint::MedicalFacility),
+                        world.project_manager.has_completed(projects::ProjectBlueprint::FabricationWorkshop),
+                        &world.location,
+                        &world.project_manager.completed,
+                    );
+                    for bp in priorities.into_iter().take(2) {
+                        world.project_manager.queue.push(bp);
+                    }
+                }
+
+                // Tick projects
+                let workers = world.agents.iter()
+                    .filter(|a| a.is_alive() && a.life_stage(self.current_tick).can_work())
+                    .count() as f64;
+                let available_labor = workers * 160.0 * 0.2;
+                let available_materials = world.resources.get("materials")
+                    .map(|s| s.current * 0.1).unwrap_or(0.0);
+
+                let (completed, _labor, mat_used) =
+                    world.project_manager.tick(available_labor, available_materials);
+
+                if mat_used > 0.0 {
+                    if let Some(mat) = world.resources.get_mut("materials") {
+                        mat.current = (mat.current - mat_used).max(0.0);
+                    }
+                }
+
+                for bp in &completed {
+                    match bp {
+                        projects::ProjectBlueprint::GreenhouseModule => {
+                            if let Some(food) = world.resources.get_mut("food") {
+                                food.production_rate += 25.0;
+                                food.capacity += 500.0;
+                            }
+                        }
+                        projects::ProjectBlueprint::HabitatExpansion => {
+                            world.max_population += 500;
+                            world.habitable_area_m2 += 15000.0;
+                        }
+                        projects::ProjectBlueprint::FissionReactor => {
+                            world.power_generation_kw += 100.0;
+                        }
+                        projects::ProjectBlueprint::CentrifugeHabitat => {
+                            world.reproduction_viable = true;
+                        }
+                        projects::ProjectBlueprint::FabricationWorkshop => {
+                            if let Some(mat) = world.resources.get_mut("materials") {
+                                mat.production_rate *= 1.5;
+                            }
+                        }
+                        projects::ProjectBlueprint::WaterExtractionPlant => {
+                            if let Some(w) = world.resources.get_mut("water") {
+                                w.production_rate *= 2.0;
+                                w.capacity *= 2.0;
+                            }
+                        }
+                        _ => {}
+                    }
+                    self.events.push(CivEvent::new(
+                        self.current_tick, Some(world.id), CivEventType::EmergencyDeclared,
+                        format!("{}: PROJECT COMPLETE — {} after {} months",
+                            world.name, bp.name(), bp.duration()),
+                    ));
+                }
+            }
+
             // Phase 5.4: Supply chain propagation
             // Disasters that hit Earth regions propagate through the supply DAG.
             let colony_supply = self.supply_chain.propagate();
@@ -3164,6 +3248,7 @@ impl Default for World {
             ecosystem_balance: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
+            project_manager: crate::projects::ProjectManager::new(),
             diplomatic_relations: std::collections::HashMap::new(),
         }
     }

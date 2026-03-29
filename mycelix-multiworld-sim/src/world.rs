@@ -536,6 +536,10 @@ pub struct World {
     #[serde(default)]
     pub explorations_completed: u32,
 
+    /// Colony project manager — multi-tick construction and development.
+    #[serde(default)]
+    pub project_manager: crate::projects::ProjectManager,
+
     /// E: Inter-world relationship scores [-1, 1]. -1 = hostile, 0 = neutral, +1 = allied.
     #[serde(default)]
     pub diplomatic_relations: HashMap<u32, f64>,
@@ -773,6 +777,7 @@ mod tests {
             ecosystem_balance: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
+            project_manager: crate::projects::ProjectManager::default(),
             diplomatic_relations: HashMap::new(),
         };
 
