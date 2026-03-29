@@ -1,0 +1,59 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Ranging integrity zome: validates range measurements between nodes.
+
+use hdi::prelude::*;
+use mycelix_position_shared::{RangeMeasurement, validate_range, validate_node_id};
+
+#[hdk_entry_types]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    RangeMeasurement(RangeMeasurement),
+}
+
+#[hdk_link_types]
+pub enum LinkTypes {
+    RangesByNode,
+    RangesByPair,
+}
+
+#[hdk_extern]
+pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
+    Ok(ValidateCallbackResult::Valid)
+}
+
+#[hdk_extern]
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { app_entry, action } => validate_create(app_entry, action),
+            OpEntry::UpdateEntry { app_entry, action, .. } => validate_create(app_entry, action),
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+fn validate_create(entry: EntryTypes, _action: Create) -> ExternResult<ValidateCallbackResult> {
+    match entry {
+        EntryTypes::RangeMeasurement(m) => validate_measurement(&m),
+    }
+}
+
+fn validate_measurement(m: &RangeMeasurement) -> ExternResult<ValidateCallbackResult> {
+    if let Err(e) = validate_node_id(&m.from_node) {
+        return Ok(ValidateCallbackResult::Invalid(format!("from_node: {}", e)));
+    }
+    if let Err(e) = validate_node_id(&m.to_node) {
+        return Ok(ValidateCallbackResult::Invalid(format!("to_node: {}", e)));
+    }
+    if m.from_node == m.to_node {
+        return Ok(ValidateCallbackResult::Invalid(
+            "from_node and to_node must be different".to_string(),
+        ));
+    }
+    if let Err(e) = validate_range(m.range_m, m.sigma_m) {
+        return Ok(ValidateCallbackResult::Invalid(e));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}

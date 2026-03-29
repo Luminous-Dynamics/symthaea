@@ -1,0 +1,15 @@
+[package]
+name = "mycelix-position-shared"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared types for Mycelix Position zomes"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
