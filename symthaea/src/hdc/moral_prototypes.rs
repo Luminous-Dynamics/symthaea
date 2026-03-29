@@ -20,14 +20,26 @@
 //! let (label, confidence) = classifier.classify("stealing is wrong");
 //! ```
 
+use super::moral_algebra::{ConsentState, MoralIntent};
+use super::moral_parser::MoralParser;
 use super::moral_text_encoder::TextHdcEncoder;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Fast dot product on float slices (avoids ContinuousHV clone allocations).
 #[inline]
 fn dot_product(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+}
+
+/// Simple string hash to deterministic seed.
+fn hash_str(s: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in s.bytes() {
+        h = h.wrapping_mul(33).wrapping_add(b as u64);
+    }
+    h
 }
 
 /// Recommended dimension for moral prototypes (higher = better separation).
@@ -479,26 +491,123 @@ impl MoralPrototypeClassifier {
 /// K-means initialization + per-prototype retraining handles class heterogeneity.
 pub struct MultiPrototypeClassifier {
     encoder: TextHdcEncoder,
+    parser: MoralParser,
+    /// Structural role HVs for binding (AGENT, ACTION, PATIENT, NEGATION, CONSENT_ABSENT)
+    role_hvs: StructuralRoles,
     /// K prototypes per class: [Good_protos, Neutral_protos, Bad_protos]
     prototypes: Option<[Vec<Vec<f32>>; 3]>,
     k: usize,
+    /// Weight for structural channel (0.0 = surface only, 1.0 = structural only)
+    structural_weight: f32,
+}
+
+/// Deterministic role HVs for structural encoding.
+struct StructuralRoles {
+    agent: ContinuousHV,
+    action: ContinuousHV,
+    patient: ContinuousHV,
+    negation: ContinuousHV,
+    consent_absent: ContinuousHV,
+    intent_good: ContinuousHV,
+    intent_bad: ContinuousHV,
+}
+
+impl StructuralRoles {
+    fn new(dim: usize) -> Self {
+        Self {
+            agent: ContinuousHV::random(dim, 2_000_003),
+            action: ContinuousHV::random(dim, 2_000_033),
+            patient: ContinuousHV::random(dim, 2_000_037),
+            negation: ContinuousHV::random(dim, 2_000_039),
+            consent_absent: ContinuousHV::random(dim, 2_000_081),
+            intent_good: ContinuousHV::random(dim, 2_000_099),
+            intent_bad: ContinuousHV::random(dim, 2_000_117),
+        }
+    }
 }
 
 impl MultiPrototypeClassifier {
-    /// Create a new multi-prototype classifier.
+    /// Create a new multi-prototype classifier with structural encoding.
     pub fn new(dim: usize, ngram_size: usize, k: usize) -> Self {
         Self {
             encoder: TextHdcEncoder::with_sentiment(dim, ngram_size, 0.5, 0.15),
+            parser: MoralParser::new(),
+            role_hvs: StructuralRoles::new(dim),
             prototypes: None,
             k,
+            structural_weight: 0.3,
         }
+    }
+
+    /// Encode text with structural blending.
+    ///
+    /// Surface channel (70%): TextHdcEncoder (trigrams + words + sentiment)
+    /// Structural channel (30%): role bindings from MoralParser output
+    fn encode_structured(&self, text: &str) -> ContinuousHV {
+        let surface = self.encoder.encode(text);
+        let parsed = self.parser.parse(text);
+
+        let dim = surface.values.len();
+        let mut structural_parts: Vec<&ContinuousHV> = Vec::new();
+
+        // Create temp bound HVs for structural roles
+        let mut bound_hvs: Vec<ContinuousHV> = Vec::new();
+
+        if let Some(ref agent) = parsed.agent {
+            let agent_hv = ContinuousHV::random(dim, hash_str(agent));
+            bound_hvs.push(self.role_hvs.agent.bind(&agent_hv));
+        }
+        if let Some(ref action) = parsed.action {
+            let mut action_hv = ContinuousHV::random(dim, hash_str(action));
+            if parsed.has_negation {
+                action_hv = action_hv.permute(1);
+            }
+            bound_hvs.push(self.role_hvs.action.bind(&action_hv));
+        }
+        if let Some(ref patient) = parsed.patient {
+            let patient_hv = ContinuousHV::random(dim, hash_str(patient));
+            bound_hvs.push(self.role_hvs.patient.bind(&patient_hv));
+        }
+        if parsed.consent == ConsentState::Denied || parsed.consent == ConsentState::Absent {
+            bound_hvs.push(self.role_hvs.consent_absent.clone());
+        }
+        match parsed.intent {
+            MoralIntent::Good => bound_hvs.push(self.role_hvs.intent_good.clone()),
+            MoralIntent::Bad => bound_hvs.push(self.role_hvs.intent_bad.clone()),
+            _ => {}
+        }
+
+        if bound_hvs.is_empty() {
+            return surface; // No structure detected, use surface only
+        }
+
+        for hv in &bound_hvs {
+            structural_parts.push(hv);
+        }
+        let structural = ContinuousHV::bundle(&structural_parts);
+
+        // Blend: (1-w)*surface + w*structural
+        let sw = self.structural_weight;
+        let tw = 1.0 - sw;
+        let mut blended = vec![0.0f32; dim];
+        for i in 0..dim {
+            blended[i] = tw * surface.values[i] + sw * structural.values[i];
+        }
+        // L2 normalize
+        let norm: f32 = blended.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut blended {
+                *v /= norm;
+            }
+        }
+        ContinuousHV::from_vec(blended)
     }
 
     /// Train: encode all samples, then K-means cluster each class.
     pub fn train(&mut self, samples: &[MoralSample]) {
         let dim = self.encoder.encode("test").values.len();
 
-        // Pre-encode
+        // Pre-encode (surface only — structural encoding hurts on norm descriptions)
         let encoded: Vec<(Vec<f32>, MoralLabel)> = samples
             .iter()
             .map(|s| (self.encoder.encode(&s.text).values, s.label))
@@ -584,12 +693,11 @@ impl MultiPrototypeClassifier {
         val_fraction: f32,
         patience: usize,
     ) -> f32 {
-        let protos = match self.prototypes.as_mut() {
-            Some(p) => p,
-            None => return 0.0,
-        };
+        if self.prototypes.is_none() {
+            return 0.0;
+        }
 
-        // Pre-encode all samples
+        // Pre-encode all samples (before taking mutable ref to prototypes)
         let encoded: Vec<(Vec<f32>, usize)> = samples
             .iter()
             .map(|s| {
@@ -608,6 +716,8 @@ impl MultiPrototypeClassifier {
         }
         let train = &encoded[..encoded.len() - val_count];
         let val = &encoded[encoded.len() - val_count..];
+
+        let protos = self.prototypes.as_mut().unwrap();
 
         let mut best_val_acc = 0.0f32;
         let mut best_protos = protos.clone();
