@@ -620,7 +620,7 @@ The mean indicator score across all 14 indicators is $\bar{s} = 0.85$, with no t
 \subsection{Psychological Benchmark Suite}
 \label{sec:psych-bench}
 
-We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, 18,734~LOC, 213~tests) that evaluates Symthaea's subsystems against five established paradigms: WorM~(working memory), CogBench~(FEP active inference), Butlin indicators~(\S\ref{sec:butlin}), ToMBench~(Theory of Mind), and MemoryAgentBench~(memory pipeline).  Table~\ref{tab:psych-bench} reports key metrics from the full benchmark suite (512D, 10~trials/condition).
+We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, 143+ benchmarks across 27 cognitive domains, 21{,}516~workspace tests) that evaluates Symthaea's subsystems against published human baselines.  The full benchmark suite achieves a grand mean $z = +1.32$ across 27 domains with all domains above the human mean.  Table~\ref{tab:psych-bench} reports key metrics (512D, 10~trials/condition).
 
 \begin{table}[ht]
 \centering
@@ -935,6 +935,36 @@ The LTC controller with full LS output refinement achieves \textbf{$37{\times}$ 
 
 To validate that the HDC-CfC architecture operates beyond simulation, we implement a hardware abstraction layer (HAL) bridging the cognitive loop to physical servos and I2C sensors on a Raspberry Pi SBC. The HAL targets a 21-DOF humanoid driven by PCA9685 PWM controllers and an MPU-6050 IMU at 50\,Hz. A strict safety chain---watchdog, torque clamping ($|\tau| \leq 0.9$), prediction-error gain reduction ($\text{gain} = \max(0.3,\; 1 - \text{error} \times 0.5)$), and GPIO e-stop---implements embodied precision weighting consistent with the FEP framework. The HAL crate (5,156 LOC, 173 tests) uses generic \texttt{embedded\_hal} traits for portability across Linux SBCs.
 
+\subsection{Multi-Platform Embodied Cognition}
+\label{sec:multi-platform}
+
+Beyond the humanoid (\S\ref{sec:humanoid}) and quadrotor (\S\ref{sec:flight-efe}), we instantiate the HAI architecture on four additional robotics platforms via a unified \texttt{EmbodimentBridge} trait. All platforms close the proprioceptive loop: thought HV $\rightarrow$ motor commands $\rightarrow$ physics simulation $\rightarrow$ proprioceptive encoding $\rightarrow$ next cognitive cycle. Table~\ref{tab:platforms} summarizes the six platforms.
+
+\begin{table}[ht]
+\centering
+\caption{Consciousness-coupled robotics platforms. All share the same HDC-CfC cognitive loop with platform-specific motor bridges and physics simulators.}
+\label{tab:platforms}
+\small
+\begin{tabular}{@{}lcccl@{}}
+\toprule
+Platform & State & Cmd & Tests & Key Physics \\
+\midrule
+Humanoid & 67D & 21D & 310 & Contact dynamics, gait analysis \\
+Quadrotor & 13D & 4D & 382 & Ballistic + formation control \\
+Helicopter & 18D & 6D & 160 & Rotor dynamics, autorotation \\
+Vehicle & 20D & 3D & 340 & Bicycle model, Pacejka tires \\
+AUV & 32D & 8D & 71 & 6DOF hydrodynamics, 8 chemical sensors \\
+Manipulator & 21D & 8D & 61 & DH kinematics, DLS inverse \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{AUV physics stability.} The autonomous underwater vehicle presented a numerical stability challenge: explicit Euler integration with stiff quadratic drag caused divergence (NaN) at step~35 under full thrust. The root cause---angular inertia ($0.5\;\mathrm{kg \cdot m^2}$) insufficient relative to angular drag ($623\;\mathrm{Nm}$ at $1\;\mathrm{rad/s}$)---was resolved via velocity-limited integration with physical caps ($5\;\mathrm{m/s}$ linear, $3\;\mathrm{rad/s}$ angular). Post-fix, seven extreme scenarios pass including 5{,}000-step missions, thermal downdrafts (200\,N external force), asymmetric thruster failure, and emergency full-reverse.
+
+\textbf{Multi-system integration: The Abyssal Rescue.} To validate that all subsystems compose correctly under extreme stress, we designed a scenario that forces hydrodynamics, moral algebra, defense cascade, and consciousness dynamics to interact simultaneously. An AUV must dive to retrieve a degrading biological sample, encounter a thermal downdraft mid-ascent, and triage (complete mission vs.\ preserve self) as energy depletes. Over 85~cognitive cycles: (1)~no state variable produces NaN; (2)~the moral algebra produces non-trivial deontological verdicts for the dilemma; (3)~the defense cascade escalates from Yellow to Red with moral filter approval; (4)~consciousness level remains bounded in $[0, 1]$ throughout.
+
+\textbf{HDC robustness under degradation.} Motivated by scenarios involving radiation or sensor noise, we tested moral reasoning under progressive HDC vector corruption (simulating bit-flips in the 16{,}384-D space). At 15\% dimension perturbation, the moral algebra still correctly distinguishes ``protect the innocent'' from ``torture for information''---the gap between their good-action-prototype similarities remains positive. Magnitude ordering (Tiny $<$ Small $<$ Medium $<$ Large $<$ Huge) is preserved at 10\% noise.
+
 \subsection{Ethical Considerations}
 
 The Byzantine detection capabilities in the FL pipeline could be misused for participant exclusion. We recommend transparent disclosure of detection criteria and appeals processes. The ethical reasoning system is trained on existing moral norms and may encode societal biases present in the ETHICS and Social Chemistry datasets.
@@ -956,7 +986,8 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.
   \item \textbf{Consciousness advantage:} Full consciousness pipeline recovers $3.5\times$ faster from distributional shifts and achieves $2\times$ better multi-pattern generalization vs.\ ablated configurations. Two-agent social cognition emerges from the pipeline without explicit programming.
-  \item \textbf{Psychological validation:} All 14 of 14 Butlin et al.\ consciousness indicators present (mean score 0.85), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
+  \item \textbf{Psychological validation:} All 14 of 14 Butlin et al.\ consciousness indicators present (mean score 0.81), grand mean $z = +1.32$ across 27 cognitive domains (143+ benchmarks, 21{,}516 tests), with human-like capacity limits.
+  \item \textbf{Multi-platform embodied cognition:} Six consciousness-coupled robotics platforms (humanoid, quadrotor, helicopter, vehicle, AUV, manipulator) validated across 1{,}324+ physics tests, including extreme scenarios (thermal downdraft, thruster failure, moral triage under energy depletion).
 \end{enumerate}
 
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.
