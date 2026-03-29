@@ -23,6 +23,7 @@ use crate::learned_melody::MelodyPredictor;
 use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
+use crate::sample_player::SampleLibrary;
 use crate::similarity_monitor::{SimilarityAction, SimilarityMonitor};
 use crate::voice_leader::{self, VoiceRole, VoiceState};
 use crate::state_smoother::StateSmoother;
@@ -170,6 +171,8 @@ pub struct StreamingSynth {
     density: DensityRegulator,
     /// Self-similarity monitor: ensures right amount of repetition.
     similarity: SimilarityMonitor,
+    /// Sample library for richer instrument sounds.
+    sample_lib: SampleLibrary,
     /// Voice states for independent voice leading.
     lead_voice: VoiceState,
     /// Bar counter for form progression.
@@ -242,6 +245,11 @@ impl StreamingSynth {
             melody_predictor: MelodyPredictor::new(),
             density: DensityRegulator::new(),
             similarity: SimilarityMonitor::new(),
+            sample_lib: {
+                let mut lib = SampleLibrary::new();
+                lib.generate_synthetic(sample_rate);
+                lib
+            },
             lead_voice: VoiceState::new(VoiceRole::Lead),
             bars_elapsed_frac: 0.0,
             smoother: StateSmoother::default_smooth(),
@@ -419,13 +427,25 @@ impl StreamingSynth {
                 let phi_factor = 2.0f32.powf(phi_vibrato_cents * phi_vib / 1200.0);
                 let freq = active.note.frequency * vibrato_factor * phi_factor;
 
+                // Sample-based synthesis: blend recorded sample with additive
+                let sample_contribution = if let Some((samp, rate)) = self.sample_lib.get_sample(active.instrument, active.note.frequency) {
+                    let idx = (active.sample_pos as f64 * rate) as usize;
+                    if idx + 1 < samp.data.len() {
+                        let frac = (active.sample_pos as f64 * rate - idx as f64) as f32;
+                        let s = samp.data[idx] * (1.0 - frac) + samp.data[idx + 1] * frac;
+                        Some(s * env)
+                    } else { None }
+                } else { None };
+
                 let sample = if let Some(ref mut ks) = active.ks {
                     // Karplus-Strong (guitar, harp): self-sustaining, no external envelope
                     ks.tick()
                 } else if let Some(ref fm_buf) = active.fm_buffer {
                     // Pre-rendered FM (e-piano, bell): read from buffer
                     if active.sample_pos < fm_buf.len() { fm_buf[active.sample_pos] } else { 0.0 }
-                } else {
+                } else if let Some(sc) = sample_contribution {
+                    // Sample available: blend 60% sample + 40% additive for richness
+                    let additive = {
                     // Additive synthesis: blend instrument partials with manifold partials
                     // Manifold provides V-A emotional timbre; instrument provides acoustic character
                     let inst_partials = active.instrument.partials();
@@ -468,6 +488,27 @@ impl StreamingSynth {
                         s += (blended[h] + ne_boost) * active.partial_phases[h].sin();
                     }
                     s * norm * env
+                    };
+                    sc * 0.6 + additive * 0.4
+                } else {
+                    // No sample: pure additive synthesis
+                    let inst_partials = active.instrument.partials();
+                    let mp = &self.manifold_partials;
+                    let num_p_fallback = inst_partials.len().min(16);
+                    let mut s = 0.0f32;
+                    for h in 0..num_p_fallback {
+                        let amp = inst_partials.get(h).copied().unwrap_or(0.0);
+                        let cf = freq * (h + 1) as f32;
+                        if cf >= nyquist { break; }
+                        while active.partial_phases.len() <= h { active.partial_phases.push(0.0); }
+                        active.partial_phases[h] += (cf / sr) * std::f32::consts::TAU;
+                        if active.partial_phases[h] > std::f32::consts::TAU * 2.0 {
+                            active.partial_phases[h] -= std::f32::consts::TAU * 2.0;
+                        }
+                        s += amp * active.partial_phases[h].sin();
+                    }
+                    let psum: f32 = inst_partials.iter().sum();
+                    s * (if psum > 0.01 { 1.0 / psum } else { 1.0 }) * env
                 };
 
                 // Attack noise transient: adds realism to note onsets
