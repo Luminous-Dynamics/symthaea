@@ -104,6 +104,7 @@ fn main() {
             hostile_guardian: false,
             disasters_enabled: true,
             hybrid_earth: false,
+            ..PolicyConfig::default()
         }),
     ];
 

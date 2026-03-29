@@ -331,4 +331,92 @@ impl NarrativeEngine {
         }
         out
     }
+
+    /// Generate a connected prose chronicle from the event history.
+    /// Groups events into eras, weaves named characters, and produces
+    /// paragraphs that read like a history book rather than a log.
+    pub fn format_chronicle(&self) -> String {
+        let mut sorted = self.events.clone();
+        sorted.sort_by_key(|e| e.tick);
+        if sorted.is_empty() { return String::from("No events recorded.\n"); }
+
+        let mut out = String::new();
+        out.push_str("╔══════════════════════════════════════════════════════════╗\n");
+        out.push_str("║   A CHRONICLE OF THE EXPANSION: 1000 YEARS IN SPACE    ║\n");
+        out.push_str("╚══════════════════════════════════════════════════════════╝\n\n");
+
+        // Group events into eras (50-year periods)
+        let eras = [
+            (0.0, 50.0, "THE FOUNDING (Years 1-50)", "The first generation. Everything was fragile."),
+            (50.0, 150.0, "THE ESTABLISHMENT (Years 50-150)", "Technology unlocked survival. Populations grew."),
+            (150.0, 300.0, "THE EXPANSION (Years 150-300)", "Outer system colonies found their footing."),
+            (300.0, 500.0, "THE TRIALS (Years 300-500)", "Distance bred divergence. Crises tested the bonds."),
+            (500.0, 750.0, "THE MATURATION (Years 500-750)", "Civilizations within the civilization."),
+            (750.0, 1001.0, "THE MILLENNIUM (Years 750-1000)", "A species spanning worlds."),
+        ];
+
+        for (start, end, title, intro) in &eras {
+            let era_events: Vec<&NarrativeEvent> = sorted.iter()
+                .filter(|e| e.year >= *start && e.year < *end)
+                .collect();
+            if era_events.is_empty() { continue; }
+
+            out.push_str(&format!("── {} ──\n\n", title));
+            out.push_str(&format!("{}\n\n", intro));
+
+            for event in &era_events {
+                let world_str = event.world.as_deref().unwrap_or("across all worlds");
+
+                // Affect-informed tone
+                let tone = if event.sadness > 0.6 {
+                    "The grief was palpable."
+                } else if event.joy > 0.5 {
+                    "Hope surged through the colony."
+                } else if event.desire > 0.7 {
+                    "Desperate determination drove the response."
+                } else if event.care > 0.5 {
+                    "The community closed ranks."
+                } else {
+                    "The response was measured."
+                };
+
+                // Character integration
+                let char_clause = if let Some(ref ch) = event.character {
+                    format!(" {} became the face of this moment.", ch)
+                } else {
+                    String::new()
+                };
+
+                // Severity determines paragraph weight
+                match event.severity {
+                    4 => {
+                        out.push_str(&format!(
+                            "  In Year {:.0}, {}: {}. {} {}{}\n\n",
+                            event.year, world_str, event.crisis,
+                            event.response, tone, char_clause));
+                        out.push_str(&format!("  The consequences: {}\n\n", event.outcome));
+                    }
+                    3 => {
+                        out.push_str(&format!(
+                            "  Year {:.0} — {}: {}. {}{}\n  Result: {}\n\n",
+                            event.year, world_str, event.crisis,
+                            event.response, char_clause, event.outcome));
+                    }
+                    2 => {
+                        out.push_str(&format!(
+                            "  Year {:.0}: {}. {}\n\n",
+                            event.year, event.crisis, event.outcome));
+                    }
+                    _ => {
+                        out.push_str(&format!(
+                            "  Year {:.0}: {}\n",
+                            event.year, event.crisis));
+                    }
+                }
+            }
+            out.push('\n');
+        }
+
+        out
+    }
 }

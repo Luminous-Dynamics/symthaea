@@ -48,9 +48,9 @@ fn main() {
         }
     }
 
-    // Print narrative history (the emergent story of this civilization)
+    // Print narrative chronicle (connected prose, not just events)
     if !sim.narrative_engine.events.is_empty() {
-        println!("\n{}", sim.narrative_engine.format_history());
+        println!("\n{}", sim.narrative_engine.format_chronicle());
     }
 
     let years = report.total_ticks / 12;

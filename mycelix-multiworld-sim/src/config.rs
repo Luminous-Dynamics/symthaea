@@ -65,6 +65,62 @@ pub struct PolicyConfig {
     /// and off-world colonists are instantiated via the Spaceport Funnel.
     /// Default false for backward compatibility.
     pub hybrid_earth: bool,
+
+    // === C: SCENARIO MODE — player/researcher policy choices ===
+
+    /// Colony project priority strategy.
+    pub project_strategy: ProjectStrategy,
+    /// Birth policy (affects birth rate modifier).
+    pub birth_policy: BirthPolicy,
+    /// Resource allocation priority (affects what fraction goes to which sector).
+    pub resource_priority: ResourcePriority,
+    /// Trade openness (0.0 = autarky, 1.0 = free trade).
+    pub trade_openness: f64,
+    /// Defense spending fraction (0.0 - 0.3). Diverts labor from production.
+    pub defense_spending: f64,
+    /// Exploration investment fraction (0.0 - 0.2). Accelerates discovery.
+    pub exploration_investment: f64,
+}
+
+/// How the colony prioritizes construction projects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProjectStrategy {
+    /// AI governor makes optimal decisions (default).
+    Balanced,
+    /// Prioritize survival infrastructure (ECLSS, food, medical).
+    SurvivalFirst,
+    /// Prioritize growth (habitats, greenhouses, water).
+    GrowthFirst,
+    /// Prioritize science and exploration (vehicles, comms).
+    ScienceFirst,
+    /// Prioritize self-sufficiency (fabrication, power, water).
+    IndependenceFirst,
+}
+
+/// Birth rate policy for colony governance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BirthPolicy {
+    /// Natural birth rate, no intervention.
+    Natural,
+    /// Pro-natal: +50% birth rate. Baby boom → future labor, but childcare burden now.
+    ProNatal,
+    /// Population control: -50% birth rate. Reduces resource pressure, but aging colony.
+    PopulationControl,
+    /// Replacement only: birth rate ≈ death rate.
+    ReplacementOnly,
+}
+
+/// Resource allocation priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResourcePriority {
+    /// Equal allocation across all sectors.
+    Balanced,
+    /// Heavy investment in engineering + manufacturing.
+    Industrial,
+    /// Heavy investment in agriculture + medicine.
+    Biological,
+    /// Heavy investment in science + education.
+    Knowledge,
 }
 
 impl Default for PolicyConfig {
@@ -85,6 +141,66 @@ impl Default for PolicyConfig {
             hostile_guardian: false,
             disasters_enabled: true,
             hybrid_earth: false,
+            project_strategy: ProjectStrategy::Balanced,
+            birth_policy: BirthPolicy::Natural,
+            resource_priority: ResourcePriority::Balanced,
+            trade_openness: 0.8,
+            defense_spending: 0.05,
+            exploration_investment: 0.05,
+        }
+    }
+}
+
+impl PolicyConfig {
+    /// Create a "Survival First" preset (conservative, risk-averse).
+    pub fn survival_first() -> Self {
+        Self {
+            project_strategy: ProjectStrategy::SurvivalFirst,
+            birth_policy: BirthPolicy::ReplacementOnly,
+            resource_priority: ResourcePriority::Biological,
+            defense_spending: 0.1,
+            exploration_investment: 0.02,
+            trade_openness: 0.5,
+            ..Self::default()
+        }
+    }
+
+    /// Create a "Growth First" preset (aggressive expansion).
+    pub fn growth_first() -> Self {
+        Self {
+            project_strategy: ProjectStrategy::GrowthFirst,
+            birth_policy: BirthPolicy::ProNatal,
+            resource_priority: ResourcePriority::Balanced,
+            defense_spending: 0.02,
+            exploration_investment: 0.05,
+            trade_openness: 0.9,
+            ..Self::default()
+        }
+    }
+
+    /// Create a "Science First" preset (knowledge economy).
+    pub fn science_first() -> Self {
+        Self {
+            project_strategy: ProjectStrategy::ScienceFirst,
+            birth_policy: BirthPolicy::Natural,
+            resource_priority: ResourcePriority::Knowledge,
+            defense_spending: 0.02,
+            exploration_investment: 0.15,
+            trade_openness: 1.0,
+            ..Self::default()
+        }
+    }
+
+    /// Create an "Independence First" preset (autarky-oriented).
+    pub fn independence_first() -> Self {
+        Self {
+            project_strategy: ProjectStrategy::IndependenceFirst,
+            birth_policy: BirthPolicy::ProNatal,
+            resource_priority: ResourcePriority::Industrial,
+            defense_spending: 0.15,
+            exploration_investment: 0.05,
+            trade_openness: 0.3,
+            ..Self::default()
         }
     }
 }

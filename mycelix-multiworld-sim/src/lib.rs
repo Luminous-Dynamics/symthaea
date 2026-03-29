@@ -2668,11 +2668,23 @@ impl MultiWorldSimulator {
             let world_count = self.worlds.len();
             for i in 0..world_count {
                 let mut world = std::mem::take(&mut self.worlds[i]);
+                // Birth policy modifies pair bond rate (C: Scenario Mode)
+                let birth_mult = match self.config.policy.birth_policy {
+                    config::BirthPolicy::ProNatal => 1.5,
+                    config::BirthPolicy::PopulationControl => 0.5,
+                    config::BirthPolicy::ReplacementOnly => {
+                        let pop = world.population();
+                        let deaths_per_tick = (pop as f64 * 0.001).max(1.0); // ~1.2% annual
+                        let target_rate = deaths_per_tick / pop.max(1) as f64;
+                        target_rate / self.config.policy.pair_bond_rate.max(0.001)
+                    }
+                    config::BirthPolicy::Natural => 1.0,
+                };
                 PopulationEngine::tick_pair_bonding(
                     &mut world,
                     &mut self.rng,
                     self.current_tick,
-                    self.config.policy.pair_bond_rate,
+                    self.config.policy.pair_bond_rate * birth_mult,
                 );
                 // Accumulate radiation dose per agent based on location.
                 // ISS: ~12 mSv/month. Mars: ~6 mSv/month. Europa (shielded): ~4 mSv/month.
