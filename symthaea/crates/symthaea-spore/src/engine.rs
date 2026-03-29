@@ -830,7 +830,7 @@ impl SporeEngine {
             timestamp_secs: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
             consciousness_level, harmony_alignment,
             metacog_accuracy: 0.0, allostatic_load: 0.0,
-            dream_wisdom_count: self.dream_journal.count(),
+            dream_wisdom_count: self.dream_journal.count() as usize,
             coherence_score: consciousness_level,
             safety_level: self.immune.safety_level() as u8,
         });

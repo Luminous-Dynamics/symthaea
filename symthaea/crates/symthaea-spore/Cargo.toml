@@ -30,6 +30,14 @@ wasm-bindgen = { version = "=0.2.108", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 
+# Server-side deps (eval-api, ssh-relay) — optional, never in WASM
+axum = { version = "0.7", optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+tokio-tungstenite = { version = "0.24", optional = true }
+tower-http = { version = "0.5", features = ["cors"], optional = true }
+async-ssh2-tokio = { version = "0.8", optional = true }
+futures-util = { version = "0.3", optional = true }
+
 # WASM support — getrandom needs "js"/"wasm_js" and uuid needs "rng-getrandom" on wasm32
 # getrandom 0.2 (used by rand 0.8/symthaea-core) uses feature "js"
 # getrandom 0.4 (used by uuid via rand 0.10) uses feature "wasm_js"
@@ -50,6 +58,8 @@ broca-full = []
 # Replaces broca-full's self-contained vocab with real trained weights.
 broca-pipeline = ["dep:symthaea-broca"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
+# Server-side features (eval-api, ssh-relay) — NOT for WASM builds
+server = ["dep:axum", "dep:tokio", "dep:tokio-tungstenite", "dep:tower-http", "dep:async-ssh2-tokio", "dep:futures-util"]
 
 [[bin]]
 name = "train-broca-lite"
@@ -62,12 +72,12 @@ path = "src/bin/gen_spore_training_data.rs"
 [[bin]]
 name = "eval-api"
 path = "src/bin/eval_api.rs"
-required-features = []
+required-features = ["server"]
 
 [[bin]]
 name = "ssh-relay"
 path = "src/bin/ssh_relay.rs"
-required-features = []
+required-features = ["server"]
 
 [[bin]]
 name = "spore-mesh-daemon"
