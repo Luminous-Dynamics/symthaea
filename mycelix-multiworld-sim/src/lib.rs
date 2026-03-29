@@ -46,6 +46,7 @@ pub mod narrative;
 pub mod needs;
 pub mod observables;
 pub mod population;
+pub mod engine_v2;
 pub mod projects;
 pub mod supply_chain;
 pub mod report;

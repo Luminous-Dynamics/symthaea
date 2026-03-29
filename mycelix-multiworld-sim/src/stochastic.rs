@@ -56,6 +56,11 @@ impl StochasticEngine {
         mean + std * z
     }
 
+    /// Uniform float in [0, 1). Alias for next_f64().
+    pub fn uniform_f64(&mut self) -> f64 {
+        self.next_f64()
+    }
+
     /// Bernoulli trial: returns true with probability `p`.
     pub fn bernoulli(&mut self, p: f64) -> bool {
         self.next_f64() < p
