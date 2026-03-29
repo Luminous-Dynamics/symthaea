@@ -1,13 +1,113 @@
 /* Mycelix EduNet — Leptos CSR Styles */
+/* Theme system: data-theme attribute on <html> switches variables */
 
-:root {
+:root, [data-theme="dark"] {
     --bg: #0a0a0a;
+    --bg-raised: #141420;
     --surface: #1a1a2e;
+    --surface-hover: #222240;
     --primary: #7c3aed;
+    --primary-hover: #6d28d9;
+    --primary-subtle: rgba(124, 58, 237, 0.15);
     --text: #e2e8f0;
     --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+    --text-on-primary: #ffffff;
     --border: #334155;
+    --border-focus: #7c3aed;
     --radius: 8px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+    /* Semantic */
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
+    /* Mastery scale */
+    --mastery-gold: #eab308;
+    --mastery-green: #22c55e;
+    --mastery-yellow: #f59e0b;
+    --mastery-red: #ef4444;
+    --mastery-locked: #334155;
+    /* Subject colors */
+    --subject-math: #3b82f6;
+    --subject-physics: #22c55e;
+    --subject-chemistry: #f59e0b;
+    /* Grade colors */
+    --grade-10: #4ade80;
+    --grade-11: #facc15;
+    --grade-12: #f87171;
+}
+
+[data-theme="light"] {
+    --bg: #f8fafc;
+    --bg-raised: #ffffff;
+    --surface: #ffffff;
+    --surface-hover: #f1f5f9;
+    --primary: #7c3aed;
+    --primary-hover: #6d28d9;
+    --primary-subtle: rgba(124, 58, 237, 0.08);
+    --text: #1e293b;
+    --text-secondary: #475569;
+    --text-tertiary: #94a3b8;
+    --text-on-primary: #ffffff;
+    --border: #e2e8f0;
+    --border-focus: #7c3aed;
+    --radius: 8px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+    --success: #16a34a;
+    --warning: #d97706;
+    --error: #dc2626;
+    --info: #2563eb;
+    --mastery-gold: #ca8a04;
+    --mastery-green: #16a34a;
+    --mastery-yellow: #d97706;
+    --mastery-red: #dc2626;
+    --mastery-locked: #cbd5e1;
+    --subject-math: #2563eb;
+    --subject-physics: #16a34a;
+    --subject-chemistry: #d97706;
+    --grade-10: #16a34a;
+    --grade-11: #ca8a04;
+    --grade-12: #dc2626;
+}
+
+[data-theme="high-contrast"] {
+    --bg: #000000;
+    --bg-raised: #111111;
+    --surface: #1a1a1a;
+    --surface-hover: #2a2a2a;
+    --primary: #a78bfa;
+    --primary-hover: #8b5cf6;
+    --primary-subtle: rgba(167, 139, 250, 0.2);
+    --text: #ffffff;
+    --text-secondary: #d1d5db;
+    --text-tertiary: #9ca3af;
+    --text-on-primary: #000000;
+    --border: #ffffff;
+    --border-focus: #a78bfa;
+    --radius: 8px;
+    --shadow-sm: 0 0 0 1px #ffffff;
+    --shadow-md: 0 0 0 2px #ffffff;
+    --shadow-lg: 0 0 0 3px #ffffff;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --error: #f87171;
+    --info: #60a5fa;
+    --mastery-gold: #fbbf24;
+    --mastery-green: #4ade80;
+    --mastery-yellow: #fbbf24;
+    --mastery-red: #f87171;
+    --mastery-locked: #6b7280;
+    --subject-math: #60a5fa;
+    --subject-physics: #4ade80;
+    --subject-chemistry: #fbbf24;
+    --grade-10: #4ade80;
+    --grade-11: #fbbf24;
+    --grade-12: #f87171;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -121,7 +221,8 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
    --------------------------------------------------------------------------- */
 
 .navbar { justify-content: flex-start; }
-.navbar .connection-badge { margin-left: auto; }
+.nav-links { flex: 1; }
+.navbar .connection-badge { margin-left: 0; }
 
 .connection-badge {
     display: flex;
@@ -3576,3 +3677,381 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 .source-icon { font-size: 2.5rem; }
 .source-label { font-size: 1rem; font-weight: 600; }
 .source-meta { font-size: 0.8rem; color: var(--text-secondary); }
+
+/* ===========================================================================
+   Theme Toggle
+   =========================================================================== */
+
+.nav-actions { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
+
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    transition: border-color var(--transition-fast, 0.15s), color var(--transition-fast, 0.15s);
+}
+
+.theme-toggle:hover {
+    border-color: var(--primary);
+    color: var(--text);
+}
+
+/* ===========================================================================
+   CAPS Skill Map — SVG Graph + Enhanced Layout
+   =========================================================================== */
+
+.caps-skill-map {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.caps-filters {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.caps-filter-group {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid var(--border);
+}
+
+.caps-filter-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.caps-filter-btn:hover { color: var(--text); }
+.caps-filter-btn.active { background: var(--primary); color: var(--text-on-primary); }
+
+.caps-graph-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 400px;
+    position: relative;
+}
+
+.caps-graph-container svg {
+    width: 100%;
+    height: 100%;
+}
+
+.caps-graph-container svg text {
+    fill: var(--text);
+    font-family: inherit;
+}
+
+.caps-node-group { cursor: pointer; }
+.caps-node-group:hover .caps-node-rect { stroke: var(--primary); stroke-width: 2; }
+
+.caps-node-rect {
+    rx: 8;
+    ry: 8;
+    fill: var(--surface);
+    stroke: var(--border);
+    stroke-width: 1;
+    transition: stroke 0.15s;
+}
+
+.caps-node-rect.mastery-gold { stroke: var(--mastery-gold); stroke-width: 2; }
+.caps-node-rect.mastery-green { stroke: var(--mastery-green); stroke-width: 2; }
+.caps-node-rect.mastery-yellow { stroke: var(--mastery-yellow); stroke-width: 1.5; }
+.caps-node-rect.mastery-red { stroke: var(--mastery-red); stroke-width: 1.5; }
+.caps-node-rect.mastery-locked { stroke: var(--mastery-locked); opacity: 0.5; }
+.caps-node-rect.selected { stroke: var(--primary); stroke-width: 3; fill: var(--bg-raised); }
+
+.caps-edge {
+    stroke: var(--border);
+    stroke-width: 1.5;
+    fill: none;
+    opacity: 0.4;
+}
+
+.caps-edge.completed {
+    stroke: var(--success);
+    opacity: 0.6;
+}
+
+/* Node detail panel */
+.caps-detail {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.caps-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.caps-detail-title { font-size: 1.25rem; font-weight: 700; }
+.caps-detail-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.caps-detail-meta {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.caps-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.caps-badge-grade { background: var(--primary-subtle); color: var(--primary); }
+.caps-badge-exam { background: rgba(192, 132, 252, 0.15); color: #c084fc; }
+.caps-badge-bloom { background: rgba(59, 130, 246, 0.15); color: var(--info); }
+.caps-badge-hours { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+
+.caps-status-btns {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1rem;
+}
+
+.caps-status-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.caps-status-btn.active-not-started { border-color: var(--text-tertiary); color: var(--text); }
+.caps-status-btn.active-studying { border-color: var(--warning); color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+.caps-status-btn.active-mastered { border-color: var(--success); color: var(--success); background: rgba(34, 197, 94, 0.1); }
+
+.caps-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 1rem;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+}
+
+.caps-tab {
+    flex: 1;
+    padding: 7px 12px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    transition: all 0.15s;
+    background: none;
+    border: none;
+    font-family: inherit;
+}
+
+.caps-tab:hover { color: var(--text-secondary); }
+.caps-tab.active { background: var(--primary); color: var(--text-on-primary); }
+
+.caps-tab-content { display: none; }
+.caps-tab-content.active { display: block; }
+
+/* Progress bar */
+.progress-bar {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.progress-bar-fill.mastery-gold { background: var(--mastery-gold); }
+.progress-bar-fill.mastery-green { background: var(--mastery-green); }
+.progress-bar-fill.mastery-yellow { background: var(--mastery-yellow); }
+.progress-bar-fill.mastery-red { background: var(--mastery-red); }
+.progress-bar-fill.primary { background: var(--primary); }
+.progress-bar-fill.success { background: var(--success); }
+
+/* Resource links */
+.caps-resources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.caps-resource-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-decoration: none;
+    color: var(--info);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    transition: all 0.15s;
+}
+
+.caps-resource-link:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--info);
+}
+
+/* Worked examples */
+.caps-example {
+    background: var(--bg-raised);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.caps-example-problem { font-weight: 600; margin-bottom: 0.5rem; }
+
+.caps-example-step {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    padding: 3px 0 3px 12px;
+    border-left: 2px solid var(--border);
+    margin: 3px 0;
+}
+
+.caps-example-answer { font-weight: 600; color: var(--success); margin-top: 0.5rem; }
+
+/* Practice problems */
+.caps-problem {
+    background: var(--bg-raised);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.caps-problem-q { font-weight: 500; margin-bottom: 0.25rem; }
+.caps-problem-a { color: var(--success); font-size: 0.85rem; }
+.caps-problem-meta { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.25rem; }
+
+/* Flashcards */
+.caps-flashcard {
+    display: flex;
+    gap: 12px;
+    background: var(--bg-raised);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+
+.caps-flashcard-front { flex: 1; font-size: 0.85rem; }
+.caps-flashcard-back {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--success);
+    filter: blur(4px);
+    transition: filter 0.3s;
+}
+
+.caps-flashcard:hover .caps-flashcard-back { filter: none; }
+
+/* Misconception alerts */
+.caps-misconception {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.caps-misconception-wrong { color: var(--error); font-weight: 600; font-size: 0.85rem; }
+.caps-misconception-right { color: var(--success); font-weight: 600; font-size: 0.85rem; margin-top: 0.25rem; }
+.caps-misconception-why { color: var(--text-secondary); font-style: italic; font-size: 0.85rem; margin-top: 0.25rem; }
+
+/* Prerequisite list */
+.caps-prereq-link {
+    color: var(--info);
+    text-decoration: none;
+    cursor: pointer;
+}
+.caps-prereq-link:hover { text-decoration: underline; }
+
+/* ===========================================================================
+   Focus & Accessibility
+   =========================================================================== */
+
+:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===========================================================================
+   Mobile Responsive
+   =========================================================================== */
+
+@media (max-width: 768px) {
+    .navbar { padding: 0.75rem 1rem; gap: 1rem; }
+    .nav-links { gap: 0.75rem; }
+    .nav-links a { font-size: 0.8rem; }
+    main { padding: 1rem; }
+    .caps-filters { gap: 0.5rem; }
+    .caps-filter-btn { padding: 5px 10px; font-size: 0.75rem; }
+    .landing-title { font-size: 2rem; }
+    .role-cards { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+    .navbar { flex-wrap: wrap; }
+    .nav-actions { width: 100%; justify-content: flex-end; }
+    .caps-detail { padding: 1rem; }
+    .caps-tabs { overflow-x: auto; }
+}

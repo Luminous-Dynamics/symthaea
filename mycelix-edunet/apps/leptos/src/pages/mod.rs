@@ -9,6 +9,7 @@ mod dashboard;
 mod governance;
 mod credentials;
 mod skill_map;
+mod study;
 mod teacher;
 
 pub use home::HomePage;
@@ -18,4 +19,5 @@ pub use dashboard::DashboardPage;
 pub use governance::GovernancePage;
 pub use credentials::CredentialsPage;
 pub use skill_map::SkillMapPage;
+pub use study::StudyPage;
 pub use teacher::TeacherDashboardPage;

@@ -1,528 +1,343 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-
-//! Skill Map page — interactive knowledge graph visualization.
+//! Skill Map page — CAPS curriculum graph visualization.
 //!
-//! Displays the student's progress through a curriculum as a tiered
-//! CSS-grid tree with color-coded mastery, locked nodes, and a detail
-//! panel for the selected node.
+//! Displays the student's progress through the South African CAPS
+//! Mathematics and Physical Sciences curriculum as an interactive
+//! SVG DAG with mastery tracking and a detail panel.
 
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
 
-fn event_target_value(ev: &leptos::ev::Event) -> String {
-    ev.target()
-        .and_then(|t| t.dyn_into::<web_sys::HtmlSelectElement>().ok())
-        .map(|el| el.value())
-        .unwrap_or_default()
-}
+use crate::curriculum::{
+    caps_graph, use_grade, use_progress, use_set_grade, use_set_progress, use_set_subject,
+    use_subject, CapsNode, Grade, ProgressStatus, Subject,
+};
 
-// ---------------------------------------------------------------------------
-// Data types
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct SkillNodeData {
-    pub id: &'static str,
-    pub name: &'static str,
-    pub mastery_permille: u16,
-    pub is_locked: bool,
-    pub bloom_level: &'static str,
-    pub standard_code: &'static str,
-    pub prerequisites: Vec<&'static str>,
-    pub description: &'static str,
-}
-
-impl SkillNodeData {
-    fn mastery_pct(&self) -> u16 {
-        self.mastery_permille / 10
-    }
-
-    fn mastery_class(&self) -> &'static str {
-        if self.is_locked {
-            "mastery-locked"
-        } else if self.mastery_permille >= 900 {
-            "mastery-gold"
-        } else if self.mastery_permille >= 700 {
-            "mastery-green"
-        } else if self.mastery_permille >= 300 {
-            "mastery-yellow"
-        } else {
-            "mastery-red"
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct SkillTierData {
-    name: &'static str,
-    nodes: Vec<SkillNodeData>,
-}
-
-// ---------------------------------------------------------------------------
-// Mock data — Grade 3 Math skill tree
-// ---------------------------------------------------------------------------
-
-fn mock_grade3_math() -> Vec<SkillTierData> {
-    vec![
-        SkillTierData {
-            name: "Foundations",
-            nodes: vec![
-                SkillNodeData {
-                    id: "place-value",
-                    name: "Place Value",
-                    mastery_permille: 950,
-                    is_locked: false,
-                    bloom_level: "Remember",
-                    standard_code: "CCSS.MATH.3.NBT.A.1",
-                    prerequisites: vec![],
-                    description: "Understand the value of digits in multi-digit numbers up to 1000.",
-                },
-                SkillNodeData {
-                    id: "number-sense",
-                    name: "Number Sense",
-                    mastery_permille: 880,
-                    is_locked: false,
-                    bloom_level: "Understand",
-                    standard_code: "CCSS.MATH.3.NBT.A.2",
-                    prerequisites: vec![],
-                    description: "Compare and order whole numbers. Develop fluency with number relationships.",
-                },
-            ],
-        },
-        SkillTierData {
-            name: "Operations I",
-            nodes: vec![
-                SkillNodeData {
-                    id: "addition",
-                    name: "Addition",
-                    mastery_permille: 920,
-                    is_locked: false,
-                    bloom_level: "Apply",
-                    standard_code: "CCSS.MATH.3.NBT.A.2",
-                    prerequisites: vec!["Place Value", "Number Sense"],
-                    description: "Fluently add within 1000 using strategies and algorithms.",
-                },
-                SkillNodeData {
-                    id: "subtraction",
-                    name: "Subtraction",
-                    mastery_permille: 850,
-                    is_locked: false,
-                    bloom_level: "Apply",
-                    standard_code: "CCSS.MATH.3.NBT.A.2",
-                    prerequisites: vec!["Place Value", "Number Sense"],
-                    description: "Fluently subtract within 1000 using strategies and algorithms.",
-                },
-                SkillNodeData {
-                    id: "rounding",
-                    name: "Rounding",
-                    mastery_permille: 780,
-                    is_locked: false,
-                    bloom_level: "Apply",
-                    standard_code: "CCSS.MATH.3.NBT.A.1",
-                    prerequisites: vec!["Place Value"],
-                    description: "Round whole numbers to the nearest 10 or 100.",
-                },
-            ],
-        },
-        SkillTierData {
-            name: "Operations II",
-            nodes: vec![
-                SkillNodeData {
-                    id: "multiplication",
-                    name: "Multiplication",
-                    mastery_permille: 650,
-                    is_locked: false,
-                    bloom_level: "Apply",
-                    standard_code: "CCSS.MATH.3.OA.A.1",
-                    prerequisites: vec!["Addition"],
-                    description: "Interpret products of whole numbers. Multiply within 100 using strategies.",
-                },
-                SkillNodeData {
-                    id: "division",
-                    name: "Division",
-                    mastery_permille: 480,
-                    is_locked: false,
-                    bloom_level: "Apply",
-                    standard_code: "CCSS.MATH.3.OA.A.2",
-                    prerequisites: vec!["Subtraction", "Multiplication"],
-                    description: "Interpret quotients of whole numbers. Divide within 100.",
-                },
-                SkillNodeData {
-                    id: "patterns",
-                    name: "Patterns",
-                    mastery_permille: 560,
-                    is_locked: false,
-                    bloom_level: "Analyze",
-                    standard_code: "CCSS.MATH.3.OA.D.9",
-                    prerequisites: vec!["Addition", "Multiplication"],
-                    description: "Identify arithmetic patterns and explain them using properties of operations.",
-                },
-            ],
-        },
-        SkillTierData {
-            name: "Applications",
-            nodes: vec![
-                SkillNodeData {
-                    id: "fractions",
-                    name: "Fractions",
-                    mastery_permille: 320,
-                    is_locked: false,
-                    bloom_level: "Understand",
-                    standard_code: "CCSS.MATH.3.NF.A.1",
-                    prerequisites: vec!["Division"],
-                    description: "Understand fractions as parts of a whole. Represent on a number line.",
-                },
-                SkillNodeData {
-                    id: "word-problems",
-                    name: "Word Problems",
-                    mastery_permille: 410,
-                    is_locked: false,
-                    bloom_level: "Analyze",
-                    standard_code: "CCSS.MATH.3.OA.A.3",
-                    prerequisites: vec!["Multiplication", "Division"],
-                    description: "Solve two-step word problems using the four operations.",
-                },
-            ],
-        },
-        SkillTierData {
-            name: "Advanced",
-            nodes: vec![
-                SkillNodeData {
-                    id: "measurement",
-                    name: "Measurement",
-                    mastery_permille: 180,
-                    is_locked: false,
-                    bloom_level: "Apply",
-                    standard_code: "CCSS.MATH.3.MD.A.1",
-                    prerequisites: vec!["Multiplication", "Fractions"],
-                    description: "Tell time, measure liquid volumes and masses, solve measurement problems.",
-                },
-                SkillNodeData {
-                    id: "geometry",
-                    name: "Geometry Basics",
-                    mastery_permille: 0,
-                    is_locked: true,
-                    bloom_level: "Understand",
-                    standard_code: "CCSS.MATH.3.G.A.1",
-                    prerequisites: vec!["Fractions", "Measurement"],
-                    description: "Understand shapes, partition shapes into parts with equal areas.",
-                },
-                SkillNodeData {
-                    id: "data-graphs",
-                    name: "Data & Graphs",
-                    mastery_permille: 0,
-                    is_locked: true,
-                    bloom_level: "Analyze",
-                    standard_code: "CCSS.MATH.3.MD.B.3",
-                    prerequisites: vec!["Word Problems"],
-                    description: "Draw and interpret scaled picture and bar graphs.",
-                },
-            ],
-        },
-    ]
-}
-
-// ---------------------------------------------------------------------------
-// Components
-// ---------------------------------------------------------------------------
-
-#[component]
-fn FilterBar(
-    grade: ReadSignal<&'static str>,
-    set_grade: WriteSignal<&'static str>,
-    subject: ReadSignal<&'static str>,
-    set_subject: WriteSignal<&'static str>,
-    view_mode: ReadSignal<&'static str>,
-    set_view_mode: WriteSignal<&'static str>,
-) -> impl IntoView {
-    view! {
-        <div class="skillmap-filters">
-            <div class="filter-group">
-                <label>"Grade"</label>
-                <select
-                    on:change=move |ev| {
-                        let val = event_target_value(&ev);
-                        set_grade.set(match val.as_str() {
-                            "K" => "K",
-                            "1" => "1",
-                            "2" => "2",
-                            "3" => "3",
-                            "4" => "4",
-                            "5" => "5",
-                            _ => "3",
-                        });
-                    }
-                    prop:value=move || grade.get()
-                >
-                    <option value="K">"K"</option>
-                    <option value="1">"1"</option>
-                    <option value="2">"2"</option>
-                    <option value="3" selected>"3"</option>
-                    <option value="4">"4"</option>
-                    <option value="5">"5"</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>"Subject"</label>
-                <select
-                    on:change=move |ev| {
-                        let val = event_target_value(&ev);
-                        set_subject.set(match val.as_str() {
-                            "Math" => "Math",
-                            "ELA" => "ELA",
-                            "Science" => "Science",
-                            _ => "Math",
-                        });
-                    }
-                    prop:value=move || subject.get()
-                >
-                    <option value="Math" selected>"Math"</option>
-                    <option value="ELA">"ELA"</option>
-                    <option value="Science">"Science"</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>"View"</label>
-                <select
-                    on:change=move |ev| {
-                        let val = event_target_value(&ev);
-                        set_view_mode.set(match val.as_str() {
-                            "tree" => "tree",
-                            "list" => "list",
-                            _ => "tree",
-                        });
-                    }
-                    prop:value=move || view_mode.get()
-                >
-                    <option value="tree" selected>"Tree"</option>
-                    <option value="list">"List"</option>
-                </select>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn SkillNodeCard(
-    node: SkillNodeData,
-    selected_id: ReadSignal<Option<&'static str>>,
-    set_selected: WriteSignal<Option<&'static str>>,
-) -> impl IntoView {
-    let node_id = node.id;
-    let mastery_pct = node.mastery_pct();
-    let mastery_cls = node.mastery_class();
-    let is_locked = node.is_locked;
-    let name = node.name;
-
-    view! {
-        <button
-            class=move || {
-                let base = format!("skill-node {}", mastery_cls);
-                if selected_id.get() == Some(node_id) {
-                    format!("{} skill-node-selected", base)
-                } else {
-                    base
-                }
-            }
-            on:click=move |_| {
-                if !is_locked {
-                    set_selected.set(Some(node_id));
-                }
-            }
-            disabled=is_locked
-        >
-            <span class="skill-node-name">
-                {if is_locked { "[locked] " } else { "" }}
-                {name}
-            </span>
-            <div class="skill-node-bar-container">
-                <div
-                    class="skill-node-bar"
-                    style=format!("width: {}%", mastery_pct)
-                ></div>
-            </div>
-            <span class="skill-node-pct">{mastery_pct}"%"</span>
-        </button>
-    }
-}
-
-#[component]
-fn SkillTierRow(
-    tier: SkillTierData,
-    selected_id: ReadSignal<Option<&'static str>>,
-    set_selected: WriteSignal<Option<&'static str>>,
-) -> impl IntoView {
-    let tier_name = tier.name;
-    view! {
-        <div class="skill-tier">
-            <div class="skill-tier-label">{tier_name}</div>
-            <div class="skill-tier-nodes">
-                {tier.nodes.into_iter().map(|node| {
-                    view! {
-                        <SkillNodeCard
-                            node=node
-                            selected_id=selected_id
-                            set_selected=set_selected
-                        />
-                    }
-                }).collect_view()}
-            </div>
-            <div class="skill-tier-arrow">"-->"</div>
-        </div>
-    }
-}
-
-#[component]
-fn NodeDetail(
-    node: SkillNodeData,
-) -> impl IntoView {
-    let mastery_pct = node.mastery_pct();
-    view! {
-        <div class="node-detail">
-            <div class="node-detail-header">
-                <h3>{node.name}</h3>
-                <span class="node-detail-meta">
-                    "Grade 3"
-                    " | Bloom: " {node.bloom_level}
-                </span>
-            </div>
-            <p class="node-detail-desc">{node.description}</p>
-            <div class="node-detail-mastery">
-                <span class="node-detail-mastery-label">"Mastery"</span>
-                <div class="progress-bar-container">
-                    <div
-                        class="progress-bar"
-                        style=format!("width: {}%", mastery_pct)
-                    ></div>
-                </div>
-                <span class="node-detail-mastery-pct">{mastery_pct}"%"</span>
-            </div>
-            <div class="node-detail-row">
-                <span class="node-detail-label">"Standards"</span>
-                <span class="node-detail-value">{node.standard_code}</span>
-            </div>
-            <div class="node-detail-row">
-                <span class="node-detail-label">"Prerequisites"</span>
-                <span class="node-detail-value">
-                    {if node.prerequisites.is_empty() {
-                        "None".to_string()
-                    } else {
-                        node.prerequisites.iter().map(|p| format!("{} (done)", p)).collect::<Vec<_>>().join(", ")
-                    }}
-                </span>
-            </div>
-            <div class="node-detail-actions">
-                <a href="#" class="btn-primary">"Start Learning"</a>
-                <a href="#" class="btn-secondary">"Review"</a>
-                <a href="#" class="btn-secondary">"Take Assessment"</a>
-            </div>
-        </div>
-    }
-}
-
-#[component]
-fn SkillListView(
-    tiers: Vec<SkillTierData>,
-) -> impl IntoView {
-    view! {
-        <div class="skill-list-view">
-            {tiers.into_iter().map(|tier| {
-                let tier_name = tier.name;
-                view! {
-                    <div class="skill-list-section">
-                        <h4 class="skill-list-tier-label">{tier_name}</h4>
-                        {tier.nodes.into_iter().map(|node| {
-                            let mastery_pct = node.mastery_pct();
-                            let cls = node.mastery_class();
-                            view! {
-                                <div class=format!("skill-list-item {}", cls)>
-                                    <span class="skill-list-name">
-                                        {if node.is_locked { "[locked] " } else { "" }}
-                                        {node.name}
-                                    </span>
-                                    <span class="skill-list-bloom">{node.bloom_level}</span>
-                                    <span class="skill-list-standard">{node.standard_code}</span>
-                                    <div class="skill-node-bar-container">
-                                        <div
-                                            class="skill-node-bar"
-                                            style=format!("width: {}%", mastery_pct)
-                                        ></div>
-                                    </div>
-                                    <span class="skill-list-pct">{mastery_pct}"%"</span>
-                                </div>
-                            }
-                        }).collect_view()}
-                    </div>
-                }
-            }).collect_view()}
-        </div>
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+// ============================================================
+// Page component
+// ============================================================
 
 #[component]
 pub fn SkillMapPage() -> impl IntoView {
-    let (grade, set_grade) = signal("3");
-    let (subject, set_subject) = signal("Math");
-    let (view_mode, set_view_mode) = signal("tree");
-    let (selected, set_selected) = signal::<Option<&'static str>>(None);
+    let subject = use_subject();
+    let set_subject = use_set_subject();
+    let grade = use_grade();
+    let set_grade = use_set_grade();
+    let progress = use_progress();
+    let (selected_id, set_selected_id) = signal::<Option<String>>(None);
 
-    let tiers = mock_grade3_math();
+    // Derived: filtered nodes for current subject + grade
+    let filtered_nodes = Memo::new(move |_| {
+        let graph = caps_graph();
+        let s = subject.get().as_str().to_string();
+        let g = grade.get().as_str().to_string();
+        graph.nodes_for(&s, &g).into_iter().cloned().collect::<Vec<_>>()
+    });
 
-    // Build a flat lookup for the detail panel
-    let all_nodes: Vec<SkillNodeData> = tiers
-        .iter()
-        .flat_map(|t| t.nodes.iter().cloned())
-        .collect();
+    // Derived: edges within the filtered set
+    let filtered_edges = Memo::new(move |_| {
+        let graph = caps_graph();
+        let nodes = filtered_nodes.get();
+        let node_ids: std::collections::HashSet<&str> = nodes.iter().map(|n| n.id.as_str()).collect();
+        graph.edges.iter()
+            .filter(|e| node_ids.contains(e.to.as_str()) || node_ids.contains(e.from.as_str()))
+            .cloned()
+            .collect::<Vec<_>>()
+    });
+
+    // Progress summary
+    let progress_summary = Memo::new(move |_| {
+        let graph = caps_graph();
+        let p = progress.get();
+        let total = graph.nodes.len();
+        let mastered = p.mastered_count();
+        let studying = p.studying_count();
+        (total, mastered, studying)
+    });
 
     view! {
-        <div class="skill-map-page">
-            <h2>"Skill Map"</h2>
-            <p class="subtitle">"Grade 3 Mathematics — Track your progress through the curriculum"</p>
-
-            <FilterBar
-                grade=grade set_grade=set_grade
-                subject=subject set_subject=set_subject
-                view_mode=view_mode set_view_mode=set_view_mode
-            />
-
-            {move || {
-                if view_mode.get() == "tree" {
-                    let tiers_clone = mock_grade3_math();
+        <div class="caps-skill-map">
+            // Progress summary
+            <div class="caps-progress-summary">
+                {move || {
+                    let (total, mastered, studying) = progress_summary.get();
+                    let pct = if total > 0 { mastered * 100 / total } else { 0 };
                     view! {
-                        <div class="skill-map-tree">
-                            {tiers_clone.into_iter().map(|tier| {
-                                view! {
-                                    <SkillTierRow
-                                        tier=tier
-                                        selected_id=selected
-                                        set_selected=set_selected
-                                    />
-                                }
-                            }).collect_view()}
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem">
+                            <span style="font-weight: 700; font-size: 1.1rem">"CAPS Curriculum"</span>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary)">
+                                {mastered}"/" {total}" mastered ("{pct}"%)"
+                            </span>
                         </div>
-                    }.into_any()
-                } else {
-                    let tiers_clone = mock_grade3_math();
-                    view! {
-                        <SkillListView tiers=tiers_clone />
-                    }.into_any()
-                }
-            }}
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill success"
+                                 style=format!("width: {}%", pct)>
+                            </div>
+                        </div>
+                    }
+                }}
+            </div>
 
+            // Filters
+            <div class="caps-filters">
+                <div class="caps-filter-group">
+                    <button
+                        class=move || if subject.get() == Subject::Mathematics { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| set_subject.set(Subject::Mathematics)
+                    >"Mathematics"</button>
+                    <button
+                        class=move || if subject.get() == Subject::PhysicalSciences { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| set_subject.set(Subject::PhysicalSciences)
+                    >"Physical Sciences"</button>
+                </div>
+                <div class="caps-filter-group">
+                    <button
+                        class=move || if grade.get() == Grade::Gr10 { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| set_grade.set(Grade::Gr10)
+                    >"Grade 10"</button>
+                    <button
+                        class=move || if grade.get() == Grade::Gr11 { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| set_grade.set(Grade::Gr11)
+                    >"Grade 11"</button>
+                    <button
+                        class=move || if grade.get() == Grade::Gr12 { "caps-filter-btn active" } else { "caps-filter-btn" }
+                        on:click=move |_| set_grade.set(Grade::Gr12)
+                    >"Grade 12"</button>
+                </div>
+            </div>
+
+            // Node grid (simpler than SVG for initial version — cards in a responsive grid)
+            <div class="feature-grid">
+                <For
+                    each=move || filtered_nodes.get()
+                    key=|n| n.id.clone()
+                    children=move |node: CapsNode| {
+                        let id = node.id.clone();
+                        let id_for_click = id.clone();
+                        let title = node.title.clone();
+                        let subdomain = node.subdomain.clone();
+                        let bloom = node.bloom_level.clone();
+                        let hours = node.estimated_hours;
+                        let exam_weight = node.exam_weight.clone();
+
+                        let mastery_class = {
+                            let id = id.clone();
+                            move || {
+                                let p = progress.get();
+                                let np = p.get(&id);
+                                match np.status {
+                                    ProgressStatus::Mastered => "mastery-gold",
+                                    ProgressStatus::Studying => "mastery-yellow",
+                                    ProgressStatus::NotStarted => if np.mastery_permille >= 700 { "mastery-green" } else { "" },
+                                }
+                            }
+                        };
+
+                        let is_selected = {
+                            let id = id.clone();
+                            move || selected_id.get().as_deref() == Some(&id)
+                        };
+
+                        view! {
+                            <button
+                                class=move || {
+                                    let mut cls = format!("feature-card caps-node-card {}", mastery_class());
+                                    if is_selected() { cls.push_str(" selected"); }
+                                    cls
+                                }
+                                on:click=move |_| set_selected_id.set(Some(id_for_click.clone()))
+                                style="text-align: left; cursor: pointer; font-family: inherit; width: 100%"
+                            >
+                                <h3 style="font-size: 0.9rem; margin-bottom: 0.25rem">{title.clone()}</h3>
+                                <p style="font-size: 0.75rem; margin-bottom: 0.5rem">{subdomain.clone()}</p>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap">
+                                    <span class="caps-badge caps-badge-bloom">{bloom.clone()}</span>
+                                    <span class="caps-badge caps-badge-hours">{hours}"h"</span>
+                                    {exam_weight.map(|ew| view! {
+                                        <span class="caps-badge caps-badge-exam">
+                                            "P"{ew.paper}": "{ew.marks}"m"
+                                        </span>
+                                    })}
+                                </div>
+                            </button>
+                        }
+                    }
+                />
+            </div>
+
+            // Detail panel
             {move || {
-                let sel_id = selected.get();
+                let sel_id = selected_id.get();
                 sel_id.and_then(|id| {
-                    all_nodes.iter().find(|n| n.id == id).cloned()
+                    let graph = caps_graph();
+                    graph.node(&id).cloned()
                 }).map(|node| {
-                    view! { <NodeDetail node=node /> }
+                    view! {
+                        <NodeDetail
+                            node=node
+                            on_close=move || set_selected_id.set(None)
+                        />
+                    }
                 })
             }}
+        </div>
+    }
+}
+
+// ============================================================
+// Node detail panel
+// ============================================================
+
+#[component]
+fn NodeDetail(
+    node: CapsNode,
+    on_close: impl Fn() + 'static,
+) -> impl IntoView {
+    let progress = use_progress();
+    let set_progress = use_set_progress();
+    let node_id = node.id.clone();
+    let (active_tab, set_active_tab) = signal("learn");
+
+    // Current status
+    let status = {
+        let id = node_id.clone();
+        Memo::new(move |_| {
+            progress.get().get(&id).status
+        })
+    };
+
+    // Prerequisites
+    let prereqs = {
+        let graph = caps_graph();
+        graph.prereqs_for(&node_id).iter().filter_map(|pid| {
+            graph.node(pid).map(|n| (n.id.clone(), n.title.clone()))
+        }).collect::<Vec<_>>()
+    };
+
+    let grade_label = node.grade_levels.first().cloned().unwrap_or_default().replace("Grade", "Grade ");
+    let exam_html = node.exam_weight.as_ref().map(|ew| {
+        format!("Paper {}: {}/{} marks ({:.1}%)", ew.paper, ew.marks, ew.total_paper_marks, ew.percentage)
+    });
+
+    let resources = node.supplementary_resources.clone();
+    let description = node.description.clone();
+    let title = node.title.clone();
+    let subdomain = node.subdomain.clone();
+    let bloom = node.bloom_level.clone();
+    let hours = node.estimated_hours;
+
+    view! {
+        <div class="caps-detail">
+            <div class="caps-detail-header">
+                <div class="caps-detail-title">{title.clone()}</div>
+                <button class="caps-detail-close" aria-label="Close detail panel" on:click=move |_| on_close()>"\u{00D7}"</button>
+            </div>
+
+            // Status buttons
+            <div class="caps-status-btns">
+                {
+                    let id = node_id.clone();
+                    let id2 = node_id.clone();
+                    let id3 = node_id.clone();
+                    view! {
+                        <button
+                            class=move || if status.get() == ProgressStatus::NotStarted { "caps-status-btn active-not-started" } else { "caps-status-btn" }
+                            on:click={
+                                let id = id.clone();
+                                move |_| set_progress.update(|p| p.set_status(&id, ProgressStatus::NotStarted))
+                            }
+                        >"Not Started"</button>
+                        <button
+                            class=move || if status.get() == ProgressStatus::Studying { "caps-status-btn active-studying" } else { "caps-status-btn" }
+                            on:click={
+                                let id = id2.clone();
+                                move |_| set_progress.update(|p| p.set_status(&id, ProgressStatus::Studying))
+                            }
+                        >"Studying"</button>
+                        <button
+                            class=move || if status.get() == ProgressStatus::Mastered { "caps-status-btn active-mastered" } else { "caps-status-btn" }
+                            on:click={
+                                let id = id3.clone();
+                                move |_| set_progress.update(|p| p.set_status(&id, ProgressStatus::Mastered))
+                            }
+                        >"Mastered"</button>
+                    }
+                }
+            </div>
+
+            // Meta badges
+            <div class="caps-detail-meta">
+                <span class="caps-badge caps-badge-grade">{grade_label.clone()}</span>
+                {exam_html.map(|eh| view! { <span class="caps-badge caps-badge-exam">{eh}</span> })}
+                <span class="caps-badge caps-badge-bloom">{bloom.clone()}</span>
+                <span class="caps-badge caps-badge-hours">{hours}"h estimated"</span>
+            </div>
+
+            // Action buttons
+            <div style="margin-bottom: 1rem">
+                <a
+                    href=format!("/study/{}", node_id)
+                    style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.25rem; background: var(--primary); color: var(--text-on-primary); border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem"
+                >"Start Learning \u{2192}"</a>
+            </div>
+
+            // Tabs
+            <div class="caps-tabs">
+                <button
+                    class=move || if active_tab.get() == "learn" { "caps-tab active" } else { "caps-tab" }
+                    on:click=move |_| set_active_tab.set("learn")
+                >"Learn"</button>
+                <button
+                    class=move || if active_tab.get() == "prereqs" { "caps-tab active" } else { "caps-tab" }
+                    on:click=move |_| set_active_tab.set("prereqs")
+                >"Prerequisites"</button>
+                <button
+                    class=move || if active_tab.get() == "resources" { "caps-tab active" } else { "caps-tab" }
+                    on:click=move |_| set_active_tab.set("resources")
+                >"Resources"</button>
+            </div>
+
+            // Tab content
+            <div style=move || if active_tab.get() == "learn" { "display: block" } else { "display: none" }>
+                <div class="section">
+                    <h4 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem">"Description"</h4>
+                    <p style="font-size: 0.9rem; line-height: 1.7">{description.clone()}</p>
+                </div>
+            </div>
+
+            <div style=move || if active_tab.get() == "prereqs" { "display: block" } else { "display: none" }>
+                {if prereqs.is_empty() {
+                    view! { <p style="color: var(--text-secondary); font-size: 0.9rem">"No prerequisites (entry point)"</p> }.into_any()
+                } else {
+                    view! {
+                        <ul style="list-style: none; padding: 0">
+                            {prereqs.iter().map(|(id, ptitle)| {
+                                let ptitle = ptitle.clone();
+                                let pid = id.clone();
+                                view! {
+                                    <li style="padding: 0.3rem 0; font-size: 0.9rem">
+                                        <span style="color: var(--primary); margin-right: 0.5rem">"\u{2192}"</span>
+                                        {ptitle}
+                                        <span style="color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.5rem">"("{pid}")"</span>
+                                    </li>
+                                }
+                            }).collect::<Vec<_>>()}
+                        </ul>
+                    }.into_any()
+                }}
+            </div>
+
+            <div style=move || if active_tab.get() == "resources" { "display: block" } else { "display: none" }>
+                <div class="caps-resources">
+                    {resources.iter().map(|r| {
+                        let url = r.url.clone();
+                        let title = r.title.clone();
+                        view! {
+                            <a class="caps-resource-link" href={url} target="_blank" rel="noopener">{title}</a>
+                        }
+                    }).collect::<Vec<_>>()}
+                </div>
+            </div>
         </div>
     }
 }

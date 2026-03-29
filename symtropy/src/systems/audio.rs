@@ -2,14 +2,76 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Audio system: computes consciousness-driven musical state.
 //!
-//! When symthaea-muse compiles with muse-live, this wires to cpal speakers.
-//! Currently runs in "composition mode" — state computed but not output.
+//! Each biome (faction territory) gets a distinct MuseConfig preset:
+//! - Sanctuary: warm Eight Harmonies (default)
+//! - Leviathan zones: `horror()` — deep FM, sub-bass, noise texture
+//! - Lunar Elite zones: `elite_sterile()` — cold sine tones, tight reverb
+//! - Deep space: sparse, SacredStillness dominant
+//! - Contested: blended FM with mild noise
 
 use bevy::prelude::*;
 use symthaea_biometrics::muse_bridge::stress_to_musical_state;
-use symthaea_muse::MusicalState;
+use symthaea_muse::{MuseConfig, MusicalState, ReverbConfig};
 
 use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase};
+
+/// Audio biome types matching game factions.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BiomeAudioType {
+    /// Safe haven: warm, consciousness-rich, Eight Harmonies
+    Sanctuary,
+    /// Leviathan-controlled: horror, deep FM, sub-bass, noise
+    LeviathanZone,
+    /// Lunar Elite territory: sterile, cold, quantized perfection
+    EliteZone,
+    /// Contested: blends nearest faction's audio character
+    Contested,
+    /// Deep space: sparse, SacredStillness dominant
+    DeepSpace,
+}
+
+/// Biome-specific audio configuration.
+#[derive(Resource, Clone)]
+pub struct AudioConfig {
+    pub config: MuseConfig,
+    pub biome: BiomeAudioType,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        Self {
+            config: MuseConfig::default(),
+            biome: BiomeAudioType::Sanctuary,
+        }
+    }
+}
+
+impl AudioConfig {
+    /// Select MuseConfig based on biome type.
+    pub fn for_biome(biome: BiomeAudioType) -> Self {
+        let config = match biome {
+            BiomeAudioType::Sanctuary => MuseConfig::default(),
+            BiomeAudioType::LeviathanZone => MuseConfig::horror(),
+            BiomeAudioType::EliteZone => MuseConfig::elite_sterile(),
+            BiomeAudioType::DeepSpace => MuseConfig {
+                num_partials: 3,
+                max_fm_depth: 1.0,
+                reverb: ReverbConfig {
+                    room_size: 0.95,
+                    damping: 0.2,
+                    width: 1.0,
+                },
+                ..Default::default()
+            },
+            BiomeAudioType::Contested => MuseConfig {
+                max_fm_depth: 4.0,
+                noise_mix: 0.05,
+                ..Default::default()
+            },
+        };
+        Self { config, biome }
+    }
+}
 
 /// Cached audio state for the current frame.
 #[derive(Resource, Default)]
@@ -20,7 +82,15 @@ pub struct AudioState {
 /// Initialize audio (composition mode).
 pub fn setup_audio(mut commands: Commands) {
     commands.insert_resource(AudioState::default());
-    info!("Audio system initialized (composition mode)");
+    commands.insert_resource(AudioConfig::default());
+    info!("Audio system initialized (composition mode, Sanctuary biome)");
+}
+
+/// Switch biome audio when player enters a new zone.
+pub fn switch_biome_audio(config: &mut AudioConfig, biome: BiomeAudioType) {
+    if config.biome != biome {
+        *config = AudioConfig::for_biome(biome);
+    }
 }
 
 /// Update audio synthesis state from stress and Leviathan phase.

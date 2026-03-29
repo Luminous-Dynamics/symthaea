@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Temporal Consensus Tracking
 //!
 //! Tracks how scientific consensus on claims evolves over time, detecting
@@ -261,24 +264,33 @@ impl ConsensusTracker {
         timestamp: i64,
         weight: f64,
     ) {
-        let history = self
-            .histories
+        self.histories
             .entry(claim_id)
             .or_insert_with(|| ConsensusHistory::new(claim_id));
 
-        if history.first_verification == 0 {
-            history.first_verification = timestamp;
-        }
+        let should_snapshot = {
+            let history = self.histories.get(&claim_id).unwrap();
+            if history.first_verification == 0 {
+                true // will set below
+            } else {
+                history.snapshots.is_empty()
+                    || (timestamp - history.snapshots.last().unwrap().timestamp)
+                        >= self.config.snapshot_interval
+            }
+        };
 
-        // Check if we should create a new snapshot
-        let should_snapshot = history.snapshots.is_empty()
-            || (timestamp - history.snapshots.last().unwrap().timestamp)
-                >= self.config.snapshot_interval;
+        {
+            let history = self.histories.get_mut(&claim_id).unwrap();
+            if history.first_verification == 0 {
+                history.first_verification = timestamp;
+            }
+        }
 
         if should_snapshot {
             self.create_snapshot(claim_id, timestamp);
         }
 
+        let history = self.histories.get_mut(&claim_id).unwrap();
         history.last_update = timestamp;
     }
 
@@ -318,51 +330,60 @@ impl ConsensusTracker {
         weighted_support: f64,
         timestamp: i64,
     ) {
-        let history = self
-            .histories
+        // Ensure the history entry exists
+        self.histories
             .entry(claim_id)
             .or_insert_with(|| ConsensusHistory::new(claim_id));
 
-        if history.first_verification == 0 {
-            history.first_verification = timestamp;
-        }
-
-        let prev_ratio = history
-            .snapshots
-            .last()
-            .map(|s| s.support_ratio)
-            .unwrap_or(0.5);
+        // First pass: read-only computations (immutable borrow of self)
+        let (prev_ratio, opinion_variance, trend) = {
+            let history = self.histories.get(&claim_id).unwrap();
+            let prev_ratio = history
+                .snapshots
+                .last()
+                .map(|s| s.support_ratio)
+                .unwrap_or(0.5);
+            let opinion_variance = self.calculate_variance(history, support_ratio);
+            let trend = self.detect_trend(history);
+            (prev_ratio, opinion_variance, trend)
+        };
 
         let change = (support_ratio - prev_ratio).abs();
         let is_significant = change >= self.config.significant_change_threshold;
 
-        // Calculate variance from previous snapshots
-        let opinion_variance = self.calculate_variance(history, support_ratio);
+        // Second pass: mutations (mutable borrow of history)
+        {
+            let history = self.histories.get_mut(&claim_id).unwrap();
 
-        let snapshot = ConsensusSnapshot {
-            timestamp,
-            support_ratio,
-            verification_count,
-            weighted_support,
-            opinion_variance,
-            is_significant,
-        };
+            if history.first_verification == 0 {
+                history.first_verification = timestamp;
+            }
 
-        history.snapshots.push(snapshot);
+            let snapshot = ConsensusSnapshot {
+                timestamp,
+                support_ratio,
+                verification_count,
+                weighted_support,
+                opinion_variance,
+                is_significant,
+            };
 
-        // Update current state
-        history.current_state =
-            ConsensusState::from_ratio(support_ratio, self.config.min_verifications, verification_count);
+            history.snapshots.push(snapshot);
 
-        // Detect trend
-        history.current_trend = self.detect_trend(history);
+            // Update current state
+            history.current_state =
+                ConsensusState::from_ratio(support_ratio, self.config.min_verifications, verification_count);
 
-        // Check for paradigm shift
+            // Apply trend
+            history.current_trend = trend;
+
+            history.last_update = timestamp;
+        }
+
+        // Check for paradigm shift (needs &mut self)
         if change >= self.config.paradigm_shift_threshold {
             self.detect_paradigm_shift(claim_id, prev_ratio, support_ratio, timestamp);
         }
-
-        history.last_update = timestamp;
     }
 
     /// Calculate opinion variance

@@ -9,11 +9,13 @@ mod app;
 mod cognitive_adaptivity;
 mod components;
 mod consciousness;
+mod curriculum;
 mod holochain;
 mod learning_engine;
 mod pages;
 mod persistence;
 mod role;
+mod theme;
 
 fn main() {
     console_error_panic_hook::set_once();

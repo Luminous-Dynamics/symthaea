@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Mycelix-DeSci Core
 //!
 //! Core functionality for Mycelix-DeSci including:
@@ -41,6 +44,9 @@ pub mod reproducibility;
 pub mod prediction;
 pub mod semantic;
 pub mod decay;
+
+// Reproducibility engine
+pub mod reproducibility_engine;
 
 // Advanced epistemic modules (Phase 2 - v0.4.0)
 pub mod inference;
@@ -111,7 +117,7 @@ pub use decay::{
 
 // Cross-Claim Inference Engine
 pub use inference::{
-    ClaimGraph, ClaimNode, ClaimEdge, InferenceEngine, InferenceConfig,
+    ClaimGraph, ClaimNode, ClaimEdge, InferenceEngine,
     InferredRelation, InferenceRule, ContradictionReport, ContradictionType,
     SuggestedRelation,
 };

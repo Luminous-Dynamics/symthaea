@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Expertise Domains & Weighted Verification
 //!
 //! Tracks domain-specific expertise for verifiers and applies weighted
@@ -382,7 +385,7 @@ impl ExpertiseVerifier {
         let ancestors = taxonomy.get_ancestors(claim_domain);
         let descendants = taxonomy.get_descendants(claim_domain);
 
-        let mut best_related_score = 0.0;
+        let mut best_related_score: f64 = 0.0;
         let mut decay_factor = 1.0;
 
         // Check ancestors (parent domains)
