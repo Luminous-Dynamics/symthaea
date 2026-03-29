@@ -33,74 +33,22 @@ pub struct ChannelMapping {
 pub fn default_flight_to_helicopter_mapping() -> Vec<ChannelMapping> {
     vec![
         // Position (weight 1.5 — spatial awareness transfers directly)
-        ChannelMapping {
-            source_ch: 0,
-            target_ch: 0,
-            weight: 1.5,
-        },
-        ChannelMapping {
-            source_ch: 1,
-            target_ch: 1,
-            weight: 1.5,
-        },
-        ChannelMapping {
-            source_ch: 2,
-            target_ch: 2,
-            weight: 1.5,
-        },
+        ChannelMapping { source_ch: 0, target_ch: 0, weight: 1.5 },
+        ChannelMapping { source_ch: 1, target_ch: 1, weight: 1.5 },
+        ChannelMapping { source_ch: 2, target_ch: 2, weight: 1.5 },
         // Quaternion (weight 2.0 — orientation is the most transferable concept)
-        ChannelMapping {
-            source_ch: 3,
-            target_ch: 3,
-            weight: 2.0,
-        },
-        ChannelMapping {
-            source_ch: 4,
-            target_ch: 4,
-            weight: 2.0,
-        },
-        ChannelMapping {
-            source_ch: 5,
-            target_ch: 5,
-            weight: 2.0,
-        },
-        ChannelMapping {
-            source_ch: 6,
-            target_ch: 6,
-            weight: 2.0,
-        },
+        ChannelMapping { source_ch: 3, target_ch: 3, weight: 2.0 },
+        ChannelMapping { source_ch: 4, target_ch: 4, weight: 2.0 },
+        ChannelMapping { source_ch: 5, target_ch: 5, weight: 2.0 },
+        ChannelMapping { source_ch: 6, target_ch: 6, weight: 2.0 },
         // Linear velocity (weight 1.0 — dynamics differ due to mass/drag)
-        ChannelMapping {
-            source_ch: 7,
-            target_ch: 7,
-            weight: 1.0,
-        },
-        ChannelMapping {
-            source_ch: 8,
-            target_ch: 8,
-            weight: 1.0,
-        },
-        ChannelMapping {
-            source_ch: 9,
-            target_ch: 9,
-            weight: 1.0,
-        },
+        ChannelMapping { source_ch: 7, target_ch: 7, weight: 1.0 },
+        ChannelMapping { source_ch: 8, target_ch: 8, weight: 1.0 },
+        ChannelMapping { source_ch: 9, target_ch: 9, weight: 1.0 },
         // Angular velocity (weight 1.5 — rotational dynamics partially shared)
-        ChannelMapping {
-            source_ch: 10,
-            target_ch: 10,
-            weight: 1.5,
-        },
-        ChannelMapping {
-            source_ch: 11,
-            target_ch: 11,
-            weight: 1.5,
-        },
-        ChannelMapping {
-            source_ch: 12,
-            target_ch: 12,
-            weight: 1.5,
-        },
+        ChannelMapping { source_ch: 10, target_ch: 10, weight: 1.5 },
+        ChannelMapping { source_ch: 11, target_ch: 11, weight: 1.5 },
+        ChannelMapping { source_ch: 12, target_ch: 12, weight: 1.5 },
     ]
 }
 
@@ -125,14 +73,8 @@ mod tests {
     fn test_mapping_indices_valid() {
         let mapping = default_flight_to_helicopter_mapping();
         for m in &mapping {
-            assert!(
-                m.source_ch < 13,
-                "Source channel must be < 13 (flight channels)"
-            );
-            assert!(
-                m.target_ch < 18,
-                "Target channel must be < 18 (helicopter channels)"
-            );
+            assert!(m.source_ch < 13, "Source channel must be < 13 (flight channels)");
+            assert!(m.target_ch < 18, "Target channel must be < 18 (helicopter channels)");
             assert!(m.weight > 0.0);
         }
     }
@@ -142,10 +84,7 @@ mod tests {
         let mapping = default_flight_to_helicopter_mapping();
         // First 13 channels share the same indices
         for m in &mapping {
-            assert_eq!(
-                m.source_ch, m.target_ch,
-                "Shared channels should have same index"
-            );
+            assert_eq!(m.source_ch, m.target_ch, "Shared channels should have same index");
         }
     }
 }

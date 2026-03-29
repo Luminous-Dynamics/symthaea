@@ -38,17 +38,15 @@ fn main() {
 
     for (name, snapshot) in &states {
         println!("  State: {name}");
-        println!(
-            "    Ψ = {:.2}, valence = {:.2}, arousal = {:.2}",
-            snapshot.consciousness_level, snapshot.valence, snapshot.arousal
-        );
+        println!("    Ψ = {:.2}, valence = {:.2}, arousal = {:.2}",
+            snapshot.consciousness_level, snapshot.valence, snapshot.arousal);
 
         let styles = [
-            ("lsystem", AtelierStyle::LSystem),
-            ("curves", AtelierStyle::ParametricCurve),
+            ("lsystem",     AtelierStyle::LSystem),
+            ("curves",      AtelierStyle::ParametricCurve),
             ("persistence", AtelierStyle::PersistenceTexture),
-            ("colorfield", AtelierStyle::ColorField),
-            ("composite", AtelierStyle::Composite),
+            ("colorfield",  AtelierStyle::ColorField),
+            ("composite",   AtelierStyle::Composite),
         ];
 
         for (style_name, style) in &styles {
@@ -106,27 +104,13 @@ fn main() {
         let tempo = symthaea_muse::rhythm::compute_tempo(&config, &musical_state);
         let section = symthaea_muse::structure::determine_section(&musical_state);
 
-        println!(
-            "  {name}: {:.1}s, {} notes, {:.0} BPM, {:?}, {} scale tones",
-            composition.duration_secs,
-            composition.notes.len(),
-            tempo,
-            section,
-            scale.len()
-        );
+        println!("  {name}: {:.1}s, {} notes, {:.0} BPM, {:?}, {} scale tones",
+            composition.duration_secs, composition.notes.len(), tempo, section, scale.len());
 
         // Note range
         if !composition.notes.is_empty() {
-            let min_hz = composition
-                .notes
-                .iter()
-                .map(|n| n.frequency)
-                .fold(f32::INFINITY, f32::min);
-            let max_hz = composition
-                .notes
-                .iter()
-                .map(|n| n.frequency)
-                .fold(0.0f32, f32::max);
+            let min_hz = composition.notes.iter().map(|n| n.frequency).fold(f32::INFINITY, f32::min);
+            let max_hz = composition.notes.iter().map(|n| n.frequency).fold(0.0f32, f32::max);
             println!("    pitch range: {:.0}–{:.0} Hz", min_hz, max_hz);
         }
     }
@@ -139,11 +123,7 @@ fn main() {
     let mut gallery = symthaea_gallery::GalleryIndex::new(100);
 
     for (name, snapshot) in &states {
-        for style in [
-            AtelierStyle::Composite,
-            AtelierStyle::LSystem,
-            AtelierStyle::ParametricCurve,
-        ] {
+        for style in [AtelierStyle::Composite, AtelierStyle::LSystem, AtelierStyle::ParametricCurve] {
             let config = AtelierConfig {
                 style,
                 iteration_budget: 3,
@@ -169,26 +149,19 @@ fn main() {
     let top = gallery.top_n(3);
     println!("  top 3:");
     for entry in &top {
-        println!(
-            "    {:.3} — {:?} [{}]",
+        println!("    {:.3} — {:?} [{}]",
             entry.aesthetic_score.composite,
             entry.modality,
-            entry.tags.join(", ")
-        );
+            entry.tags.join(", "));
     }
 
     // Evolution analysis
     let evo = symthaea_gallery::evolution::analyze_evolution(&gallery, 5);
     println!("  style periods: {}", evo.periods.len());
     for period in &evo.periods {
-        println!(
-            "    {} (cycles {}-{}): {:.3} avg, {} artworks",
-            period.harmony_name,
-            period.start_cycle,
-            period.end_cycle,
-            period.average_score,
-            period.artwork_count
-        );
+        println!("    {} (cycles {}-{}): {:.3} avg, {} artworks",
+            period.harmony_name, period.start_cycle, period.end_cycle,
+            period.average_score, period.artwork_count);
     }
     println!("  score trend: {:.4}", evo.score_trend);
 
@@ -209,29 +182,21 @@ fn main() {
         let artwork = symthaea_atelier::create_artwork_iterative(&config, snapshot, 42);
         let feedback = tracker.process(&artwork.aesthetic_score, &harmonies);
 
-        println!(
-            "  {name}: score={:.3}, EMA={:.3}, DA={:+.4}, 5-HT={:+.4}, surprise={:.4}",
+        println!("  {name}: score={:.3}, EMA={:.3}, DA={:+.4}, 5-HT={:+.4}, surprise={:.4}",
             artwork.aesthetic_score.composite,
             tracker.expectation(),
             feedback.dopamine_delta,
             feedback.serotonin_delta,
-            feedback.surprise_signal
-        );
+            feedback.surprise_signal);
     }
 
     println!();
     println!("═══════════════════════════════════════════════════════════");
     println!("  Output: {}", output_dir.display());
-    println!(
-        "  Visual: {}/visual/ ({} SVG files)",
-        output_dir.display(),
-        states.len() * 5
-    );
-    println!(
-        "  Music:  {}/music/ ({} WAV files)",
-        output_dir.display(),
-        states.len()
-    );
+    println!("  Visual: {}/visual/ ({} SVG files)",
+        output_dir.display(), states.len() * 5);
+    println!("  Music:  {}/music/ ({} WAV files)",
+        output_dir.display(), states.len());
     println!("═══════════════════════════════════════════════════════════");
 }
 
@@ -250,14 +215,11 @@ fn make_serene_state() -> CognitiveSnapshot {
         valence: 0.6,
         arousal: 0.3,
         harmony_activations: [0.7, 0.8, 0.6, 0.3, 0.7, 0.6, 0.5, 0.8],
-        betti_0: 4,
-        betti_1: 2,
-        betti_2: 1,
+        betti_0: 4, betti_1: 2, betti_2: 1,
         persistence_components: vec![[0.0, 0.7], [0.1, 0.9], [0.2, 0.5]],
         persistence_cycles: vec![[0.1, 0.6], [0.3, 0.8]],
-        thought_vector: vec![
-            0.3, -0.1, 0.5, 0.2, -0.3, 0.1, 0.4, -0.2, 0.1, 0.0, -0.1, 0.3, 0.2, -0.4, 0.1, 0.0,
-        ],
+        thought_vector: vec![0.3, -0.1, 0.5, 0.2, -0.3, 0.1, 0.4, -0.2,
+                            0.1, 0.0, -0.1, 0.3, 0.2, -0.4, 0.1, 0.0],
         cantor_metacognitive_depth: 0.7,
         cantor_last_depth: 3,
         cycle_count: 100,
@@ -278,14 +240,11 @@ fn make_turbulent_state() -> CognitiveSnapshot {
         valence: -0.6,
         arousal: 0.9,
         harmony_activations: [0.3, 0.2, 0.4, 0.9, 0.5, 0.2, 0.8, 0.1],
-        betti_0: 7,
-        betti_1: 3,
-        betti_2: 2,
+        betti_0: 7, betti_1: 3, betti_2: 2,
         persistence_components: vec![[0.0, 0.3], [0.05, 0.4], [0.1, 0.6], [0.2, 0.9]],
         persistence_cycles: vec![[0.1, 0.5], [0.2, 0.7], [0.4, 0.8]],
-        thought_vector: vec![
-            0.8, -0.7, 0.9, -0.5, 0.6, -0.8, 0.3, 0.7, -0.4, 0.6, -0.9, 0.2, 0.7, -0.3, 0.8, -0.6,
-        ],
+        thought_vector: vec![0.8, -0.7, 0.9, -0.5, 0.6, -0.8, 0.3, 0.7,
+                            -0.4, 0.6, -0.9, 0.2, 0.7, -0.3, 0.8, -0.6],
         cantor_metacognitive_depth: 0.5,
         cantor_last_depth: 4,
         cycle_count: 200,
@@ -306,14 +265,11 @@ fn make_playful_state() -> CognitiveSnapshot {
         valence: 0.4,
         arousal: 0.7,
         harmony_activations: [0.4, 0.5, 0.3, 0.95, 0.6, 0.4, 0.7, 0.1],
-        betti_0: 5,
-        betti_1: 2,
-        betti_2: 1,
+        betti_0: 5, betti_1: 2, betti_2: 1,
         persistence_components: vec![[0.0, 0.6], [0.15, 0.8]],
         persistence_cycles: vec![[0.2, 0.7]],
-        thought_vector: vec![
-            0.5, 0.3, -0.2, 0.6, 0.1, -0.5, 0.4, 0.2, -0.1, 0.3, 0.6, -0.2, 0.1, 0.4, -0.3, 0.5,
-        ],
+        thought_vector: vec![0.5, 0.3, -0.2, 0.6, 0.1, -0.5, 0.4, 0.2,
+                            -0.1, 0.3, 0.6, -0.2, 0.1, 0.4, -0.3, 0.5],
         cantor_metacognitive_depth: 0.6,
         cantor_last_depth: 3,
         cycle_count: 300,
@@ -334,14 +290,11 @@ fn make_contemplative_state() -> CognitiveSnapshot {
         valence: 0.2,
         arousal: 0.15,
         harmony_activations: [0.8, 0.6, 0.9, 0.2, 0.5, 0.7, 0.4, 0.95],
-        betti_0: 2,
-        betti_1: 1,
-        betti_2: 0,
+        betti_0: 2, betti_1: 1, betti_2: 0,
         persistence_components: vec![[0.0, 0.9]],
         persistence_cycles: vec![[0.1, 0.8]],
-        thought_vector: vec![
-            0.1, 0.0, 0.1, -0.1, 0.0, 0.1, -0.1, 0.0, 0.1, 0.0, -0.1, 0.1, 0.0, 0.1, 0.0, -0.1,
-        ],
+        thought_vector: vec![0.1, 0.0, 0.1, -0.1, 0.0, 0.1, -0.1, 0.0,
+                            0.1, 0.0, -0.1, 0.1, 0.0, 0.1, 0.0, -0.1],
         cantor_metacognitive_depth: 0.9,
         cantor_last_depth: 5,
         cycle_count: 400,

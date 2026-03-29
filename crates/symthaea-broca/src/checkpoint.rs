@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! BrocaCheckpoint: save/load trained Broca models with integrity verification.
 //!
 //! Uses rmp-serde (MessagePack) for self-describing serialization and blake3

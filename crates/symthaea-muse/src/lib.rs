@@ -29,11 +29,7 @@
 
 #![deny(unsafe_code)]
 
-pub mod audio_feedback;
-pub mod binaural;
 pub mod choreography;
-pub mod collaborative;
-pub mod consciousness_reverb;
 pub mod critic;
 pub mod export;
 pub mod fingerprint;
@@ -42,22 +38,17 @@ pub mod form;
 pub mod live_output;
 pub mod melody;
 pub mod midi;
-pub mod musical_inference;
+pub mod midi_loader;
 pub mod neural_melody;
 pub mod notation;
-pub mod phi_optimizer;
 pub mod pitch;
 pub mod rhythm;
-pub mod sidechain;
-pub mod spectral_vocoder;
 pub mod stream;
 pub mod streaming;
+pub mod training;
 pub mod structure;
-pub mod substrate_timbre;
 pub mod synth;
-pub mod timbre_space;
 pub mod voice;
-pub mod wavetable;
 
 use serde::{Deserialize, Serialize};
 
@@ -349,8 +340,7 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
     let base_scale = pitch::build_scale(state);
 
     // 3. Generate melody per section with key shifts and density modulation
-    let notes_per_section = config
-        .max_notes
+    let notes_per_section = config.max_notes
         .max(2)
         .checked_div(song_form.sections.len().max(1))
         .unwrap_or(config.max_notes)
@@ -360,8 +350,8 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
 
     for (sec_idx, section) in song_form.sections.iter().enumerate() {
         let density = structure::density_multiplier(section.section_type);
-        let sec_max =
-            ((notes_per_section as f32) * density * section.energy_level.max(0.3)).round() as usize;
+        let sec_max = ((notes_per_section as f32) * density * section.energy_level.max(0.3))
+            .round() as usize;
 
         let sec_config = MuseConfig {
             max_notes: sec_max.max(1),
@@ -382,6 +372,9 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
                 use symthaea_core::genesis::GenesisSeed;
                 let genesis = GenesisSeed::from_phrase(&format!("muse-neural-{sec_seed}"));
                 let mut neural = neural_melody::NeuralMelody::new(&genesis, config);
+                // Load trained projections if available
+                let proj_path = std::path::Path::new("data/midi-training/melody_projections.json");
+                neural.load_trained_projections(proj_path);
                 neural.generate(&sec_config, state, &sec_scale, beat_duration)
             }
         };
@@ -608,3 +601,37 @@ mod tests {
         assert!(matches!(comp.audio, AudioData::I16(_)));
     }
 }
+
+pub mod ablation;
+pub mod aesthetic_listener;
+pub mod ambient_drone;
+pub mod audio_feedback;
+pub mod auto_master;
+pub mod density_regulator;
+pub mod composer_mind;
+pub mod creative_agency;
+pub mod dramatic;
+pub mod emotional_gestures;
+pub mod learned_melody;
+pub mod melodic_grammar;
+pub mod midi_trainer;
+pub mod motif_memory;
+pub mod voice_leader;
+pub mod performance;
+pub mod similarity_monitor;
+pub mod state_smoother;
+pub mod binaural;
+pub mod collaborative;
+pub mod consciousness_reverb;
+pub mod mixing;
+pub mod musical_inference;
+pub mod percussion;
+pub mod phi_optimizer;
+pub mod sidechain;
+pub mod spectral_vocoder;
+pub mod substrate_timbre;
+pub mod synesthesia;
+pub mod temporal_hierarchy;
+pub mod instruments;
+pub mod timbre_space;
+pub mod wavetable;

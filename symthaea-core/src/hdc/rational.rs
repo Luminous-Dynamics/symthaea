@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
 use std::cmp::Ordering;

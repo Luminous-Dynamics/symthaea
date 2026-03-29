@@ -285,9 +285,9 @@ impl NetworkService {
                             "Signing key file too short (need 32 bytes)".into(),
                         ));
                     }
-                    let key_bytes: [u8; 32] = bytes[..32]
-                        .try_into()
-                        .map_err(|_| SwarmError::Internal("Invalid signing key bytes".into()))?;
+                    let key_bytes: [u8; 32] = bytes[..32].try_into().map_err(|_| {
+                        SwarmError::Internal("Invalid signing key bytes".into())
+                    })?;
                     let key = ed25519_dalek::SigningKey::from_bytes(&key_bytes);
                     tracing::info!(
                         path = %key_path.display(),
@@ -325,9 +325,7 @@ impl NetworkService {
         let pubkey_hex = hex::encode(signing_key.verifying_key().as_bytes());
         tracing::info!(pubkey = %&pubkey_hex[..16], "Attestation manager initialized");
 
-        let mgr = Arc::new(parking_lot::RwLock::new(AttestationManager::new(
-            signing_key,
-        )));
+        let mgr = Arc::new(parking_lot::RwLock::new(AttestationManager::new(signing_key)));
 
         // Wire into IrohNode if available
         #[cfg(feature = "swarm")]

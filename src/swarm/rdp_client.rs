@@ -244,7 +244,8 @@ impl RdpClientHandle {
                 } => {
                     let width = patch_cols as u32 * TILE_SIZE as u32;
                     let height = patch_rows as u32 * TILE_SIZE as u32;
-                    self.frame_buffer = FrameBuffer::new(width, height, patch_cols, patch_rows);
+                    self.frame_buffer =
+                        FrameBuffer::new(width, height, patch_cols, patch_rows);
                     self.server_consciousness = consciousness_level;
                     self.session.on_connected();
                 }
@@ -269,7 +270,8 @@ impl RdpClientHandle {
                         state_hash,
                         ref signature,
                     }) => {
-                        self.session.on_attestation(phi, &state_hash, signature);
+                        self.session
+                            .on_attestation(phi, &state_hash, signature);
                     }
                     _ => {}
                 },
@@ -335,8 +337,8 @@ impl RdpClientHandle {
 
 #[cfg(test)]
 mod tests {
-    use super::super::rdp_protocol::QuantizedPatch;
     use super::*;
+    use super::super::rdp_protocol::QuantizedPatch;
 
     fn make_test_full_frame(cols: u16, rows: u16) -> FullFrame {
         let n = cols as usize * rows as usize;

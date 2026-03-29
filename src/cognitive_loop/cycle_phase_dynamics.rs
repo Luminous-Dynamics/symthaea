@@ -568,8 +568,10 @@ impl CognitiveLoopService {
                     } else {
                         1.0
                     };
-                    self.muse_manager
-                        .inject_substrate(self.substrate_manager.feasibility, energy_ratio);
+                    self.muse_manager.inject_substrate(
+                        self.substrate_manager.feasibility,
+                        energy_ratio,
+                    );
                     let safety_u8 = if snapshot.unified_psi > 0.6 {
                         0
                     } else if snapshot.unified_psi > 0.3 {
@@ -583,7 +585,8 @@ impl CognitiveLoopService {
 
                     if self.muse_manager.should_run(cycle_num, urgency_u8) {
                         let muse_output = self.muse_manager.process(snapshot);
-                        self.subsystem_collector.record("muse_manager", muse_output);
+                        self.subsystem_collector
+                            .record("muse_manager", muse_output);
                     }
                 }
 
@@ -2173,7 +2176,12 @@ impl CognitiveLoopService {
                 noradrenaline: self.neuromod.bath.noradrenaline.effective() as f64,
                 serotonin: self.neuromod.bath.serotonin.effective() as f64,
                 oxytocin: self.neuromod.bath.oxytocin.effective() as f64,
-                threat_level: self.sentinel_manager.threat_level() as f64,
+                threat_level: {
+                    #[cfg(feature = "sentinel")]
+                    { self.sentinel_manager.threat_level() as f64 }
+                    #[cfg(not(feature = "sentinel"))]
+                    { 0.0 }
+                },
                 peer_trust: self.swarm_manager.telemetry().connectivity_ema,
                 flow_state: self.behavior.flow_state.intensity as f64,
             };
@@ -2374,14 +2382,12 @@ impl CognitiveLoopService {
                             .parameters
                             .first()
                             .and_then(|&v| super::motor_output_bridge::ActionType::from_param(v))
-                            .map_or(false, |at| {
-                                matches!(
-                                    at,
-                                    super::motor_output_bridge::ActionType::Read
-                                        | super::motor_output_bridge::ActionType::List
-                                        | super::motor_output_bridge::ActionType::Parse
-                                )
-                            });
+                            .map_or(false, |at| matches!(
+                                at,
+                                super::motor_output_bridge::ActionType::Read
+                                | super::motor_output_bridge::ActionType::List
+                                | super::motor_output_bridge::ActionType::Parse
+                            ));
                         if is_readonly {
                             // Read-only action: permitted at Orange level
                             if let Some(ref mut bridge) =
@@ -2393,12 +2399,12 @@ impl CognitiveLoopService {
                                     .pending_request
                                     .take()
                                     .unwrap_or_default();
-                                let motor_phi = if self.carryover.history.consciousness_level > 0.0
-                                {
-                                    self.carryover.history.consciousness_level
-                                } else {
-                                    coherence as f64
-                                };
+                                let motor_phi =
+                                    if self.carryover.history.consciousness_level > 0.0 {
+                                        self.carryover.history.consciousness_level
+                                    } else {
+                                        coherence as f64
+                                    };
                                 let result = bridge.execute(
                                     &enhanced_result.motor_command.parameters,
                                     enhanced_result.motor_command.confidence,

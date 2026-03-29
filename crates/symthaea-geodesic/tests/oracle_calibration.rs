@@ -41,10 +41,7 @@ fn calibrate_constant() {
 
     println!(
         "[calibrate_constant] converged={}, steps={}, complexity={:?}, sim={}",
-        result.converged,
-        result.convergence_steps,
-        result.complexity_estimate,
-        result.output_similarity
+        result.converged, result.convergence_steps, result.complexity_estimate, result.output_similarity
     );
 
     // With tau=0.1, convergence_steps = ceil(-0.1 * ln(0.05)) ≈ 1
@@ -74,10 +71,7 @@ fn calibrate_linear_loop() {
 
     println!(
         "[calibrate_linear_loop] converged={}, steps={}, complexity={:?}, sim={}",
-        result.converged,
-        result.convergence_steps,
-        result.complexity_estimate,
-        result.output_similarity
+        result.converged, result.convergence_steps, result.complexity_estimate, result.output_similarity
     );
 
     // avg tau = 0.15 → Constant complexity class (tau < 0.2)
@@ -105,10 +99,7 @@ fn calibrate_nested_loops() {
 
     println!(
         "[calibrate_nested_loops] converged={}, steps={}, complexity={:?}, sim={}",
-        result.converged,
-        result.convergence_steps,
-        result.complexity_estimate,
-        result.output_similarity
+        result.converged, result.convergence_steps, result.complexity_estimate, result.output_similarity
     );
 
     // avg tau = 1.0 → Linear complexity class
@@ -134,10 +125,7 @@ fn calibrate_divergent() {
 
     println!(
         "[calibrate_divergent] converged={}, steps={}, complexity={:?}, sim={}",
-        result.converged,
-        result.convergence_steps,
-        result.complexity_estimate,
-        result.output_similarity
+        result.converged, result.convergence_steps, result.complexity_estimate, result.output_similarity
     );
 
     // avg tau = 10.0 → Unknown complexity class
@@ -299,16 +287,8 @@ fn calibrate_prediction_accuracy() {
     // which is the initial state in this case, so it stays close — but that's
     // correct behavior for predict_forward with the original attractor)
     // The key check: both produce valid BinaryHVs (not zero, not degenerate)
-    assert_ne!(
-        predicted_state,
-        BinaryHV::zero(),
-        "prediction should not be zero"
-    );
-    assert_ne!(
-        iterative_state,
-        BinaryHV::zero(),
-        "iterative should not be zero"
-    );
+    assert_ne!(predicted_state, BinaryHV::zero(), "prediction should not be zero");
+    assert_ne!(iterative_state, BinaryHV::zero(), "iterative should not be zero");
 }
 
 // ---------------------------------------------------------------------------

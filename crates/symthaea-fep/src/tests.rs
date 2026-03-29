@@ -1619,86 +1619,41 @@ fn test_e2e_blanket_simulation_1000_cycles() {
     for i in 0..250 {
         bridge.update_blanket_permeability(&safe);
         let result = bridge.cycle(0.6, 0.5, 0.7, 0.4);
-        assert!(
-            result.fep_result.free_energy.is_finite(),
-            "Phase 1 cycle {}",
-            i
-        );
+        assert!(result.fep_result.free_energy.is_finite(), "Phase 1 cycle {}", i);
     }
     let p1_perm = bridge.blanket.permeability().effective;
     let p1_lr = bridge.blanket.modulate_learning_rate(1.0);
     phase_permeabilities.push(p1_perm);
     phase_learning_rates.push(p1_lr);
-    assert!(
-        p1_perm > 0.5,
-        "Phase 1: safe environment should open blanket: {}",
-        p1_perm
-    );
-    assert!(
-        p1_lr > 0.6,
-        "Phase 1: learning rate should be high: {}",
-        p1_lr
-    );
+    assert!(p1_perm > 0.5, "Phase 1: safe environment should open blanket: {}", p1_perm);
+    assert!(p1_lr > 0.6, "Phase 1: learning rate should be high: {}", p1_lr);
 
     // ── Phase 2: Threat (250 cycles) ────────────────────────────────────
     for i in 0..250 {
         bridge.update_blanket_permeability(&threat);
         let result = bridge.cycle(0.3, 0.2, 0.4, 0.3);
-        assert!(
-            result.fep_result.free_energy.is_finite(),
-            "Phase 2 cycle {}",
-            i
-        );
+        assert!(result.fep_result.free_energy.is_finite(), "Phase 2 cycle {}", i);
     }
     let p2_perm = bridge.blanket.permeability().effective;
     let p2_lr = bridge.blanket.modulate_learning_rate(1.0);
     phase_permeabilities.push(p2_perm);
     phase_learning_rates.push(p2_lr);
-    assert!(
-        p2_perm < p1_perm,
-        "Phase 2: threat should close blanket: {} < {}",
-        p2_perm,
-        p1_perm
-    );
-    assert!(
-        p2_lr < p1_lr,
-        "Phase 2: learning rate should drop: {} < {}",
-        p2_lr,
-        p1_lr
-    );
-    assert!(
-        p2_perm < 0.2,
-        "Phase 2: sustained threat → very low permeability: {}",
-        p2_perm
-    );
+    assert!(p2_perm < p1_perm, "Phase 2: threat should close blanket: {} < {}", p2_perm, p1_perm);
+    assert!(p2_lr < p1_lr, "Phase 2: learning rate should drop: {} < {}", p2_lr, p1_lr);
+    assert!(p2_perm < 0.2, "Phase 2: sustained threat → very low permeability: {}", p2_perm);
 
     // ── Phase 3: Recovery (250 cycles, back to safe) ────────────────────
     for i in 0..250 {
         bridge.update_blanket_permeability(&safe);
         let result = bridge.cycle(0.5, 0.5, 0.5, 0.5);
-        assert!(
-            result.fep_result.free_energy.is_finite(),
-            "Phase 3 cycle {}",
-            i
-        );
+        assert!(result.fep_result.free_energy.is_finite(), "Phase 3 cycle {}", i);
     }
     let p3_perm = bridge.blanket.permeability().effective;
     phase_permeabilities.push(p3_perm);
-    assert!(
-        p3_perm > p2_perm,
-        "Phase 3: recovery should reopen blanket: {} > {}",
-        p3_perm,
-        p2_perm
-    );
-    assert!(
-        p3_perm > 0.5,
-        "Phase 3: should recover to open state: {}",
-        p3_perm
-    );
-    assert!(
-        bridge.blanket.trend() > 0.0 || p3_perm > 0.6,
-        "Phase 3: trend should be opening or already open"
-    );
+    assert!(p3_perm > p2_perm, "Phase 3: recovery should reopen blanket: {} > {}", p3_perm, p2_perm);
+    assert!(p3_perm > 0.5, "Phase 3: should recover to open state: {}", p3_perm);
+    assert!(bridge.blanket.trend() > 0.0 || p3_perm > 0.6,
+        "Phase 3: trend should be opening or already open");
 
     // ── Phase 4: Coalescence (250 cycles, stable safe) ──────────────────
     for i in 0..250 {
@@ -1709,27 +1664,18 @@ fn test_e2e_blanket_simulation_1000_cycles() {
     }
     let p4_perm = bridge.blanket.permeability().effective;
     phase_permeabilities.push(p4_perm);
-    assert!(
-        bridge.blanket.coalescence_ready(0.6),
-        "Phase 4: 500 stable safe cycles → coalescence ready (perm={})",
-        p4_perm
-    );
+    assert!(bridge.blanket.coalescence_ready(0.6),
+        "Phase 4: 500 stable safe cycles → coalescence ready (perm={})", p4_perm);
 
     // ── Verify phase progression ────────────────────────────────────────
     // Safe → Threat → Recovery → Coalescence
     // Permeability should go: high → low → high → high(stable)
-    assert!(
-        phase_permeabilities[0] > phase_permeabilities[1],
-        "Safe→Threat should decrease permeability"
-    );
-    assert!(
-        phase_permeabilities[2] > phase_permeabilities[1],
-        "Recovery should increase from threat"
-    );
-    assert!(
-        phase_permeabilities[3] > 0.6,
-        "Coalescence phase should be stably high"
-    );
+    assert!(phase_permeabilities[0] > phase_permeabilities[1],
+        "Safe→Threat should decrease permeability");
+    assert!(phase_permeabilities[2] > phase_permeabilities[1],
+        "Recovery should increase from threat");
+    assert!(phase_permeabilities[3] > 0.6,
+        "Coalescence phase should be stably high");
 }
 
 /// Verify that the blanket correctly simulates the Ubuntu principle:
@@ -1747,55 +1693,32 @@ fn test_e2e_ubuntu_coalescence_lifecycle() {
 
     // High mutual permeability among a,b,c,d; low with e
     let edges = vec![
-        (0, 1, 0.90),
-        (0, 2, 0.88),
-        (0, 3, 0.85),
-        (1, 2, 0.87),
-        (1, 3, 0.83),
-        (2, 3, 0.86),
-        (0, 4, 0.30),
-        (1, 4, 0.25),
-        (2, 4, 0.28),
-        (3, 4, 0.22),
+        (0, 1, 0.90), (0, 2, 0.88), (0, 3, 0.85),
+        (1, 2, 0.87), (1, 3, 0.83), (2, 3, 0.86),
+        (0, 4, 0.30), (1, 4, 0.25), (2, 4, 0.28), (3, 4, 0.22),
     ];
 
     // Phase 1: Identify coalitions
     let coalitions = super::markov_blanket::identify_coalitions(&peers, &edges, 0.7);
     assert_eq!(coalitions.len(), 1, "Should form one coalition (a,b,c,d)");
     assert_eq!(coalitions[0].members.len(), 4);
-    assert!(
-        !coalitions[0].members.contains(&"ubuntu_e".to_string()),
-        "Outsider should be excluded"
-    );
+    assert!(!coalitions[0].members.contains(&"ubuntu_e".to_string()),
+        "Outsider should be excluded");
 
     // Phase 2: Test consciousness of the collective
     let coalition = &coalitions[0];
-    assert!(
-        coalition.internal_phi > 0.6,
-        "High internal phi: {}",
-        coalition.internal_phi
-    );
+    assert!(coalition.internal_phi > 0.6, "High internal phi: {}", coalition.internal_phi);
 
     // Phase 3: Verify that removing a high-permeability link fragments the coalition
     let degraded_edges = vec![
-        (0, 1, 0.90),
-        (0, 2, 0.30),
-        (0, 3, 0.25), // a-c and a-d links degraded
-        (1, 2, 0.87),
-        (1, 3, 0.83),
-        (2, 3, 0.86),
-        (0, 4, 0.30),
-        (1, 4, 0.25),
-        (2, 4, 0.28),
-        (3, 4, 0.22),
+        (0, 1, 0.90), (0, 2, 0.30), (0, 3, 0.25), // a-c and a-d links degraded
+        (1, 2, 0.87), (1, 3, 0.83), (2, 3, 0.86),
+        (0, 4, 0.30), (1, 4, 0.25), (2, 4, 0.28), (3, 4, 0.22),
     ];
-    let degraded_coalitions =
-        super::markov_blanket::identify_coalitions(&peers, &degraded_edges, 0.7);
+    let degraded_coalitions = super::markov_blanket::identify_coalitions(&peers, &degraded_edges, 0.7);
     // Should still form a coalition (b,c,d connected) but a might split off
-    assert!(
-        degraded_coalitions.iter().any(|c| c.members.len() >= 2),
-        "At least some coalition should survive degradation"
-    );
+    assert!(degraded_coalitions.iter().any(|c| c.members.len() >= 2),
+        "At least some coalition should survive degradation");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1806,11 +1729,7 @@ fn test_e2e_ubuntu_coalescence_lifecycle() {
 #[test]
 fn test_blanket_nan_inputs_safe() {
     let mut op = super::markov_blanket::MarkovBoundaryOperator::new(
-        super::markov_blanket::MarkovPartition {
-            internal_dim: 100,
-            sensory_dim: 4,
-            active_dim: 8,
-        },
+        super::markov_blanket::MarkovPartition { internal_dim: 100, sensory_dim: 4, active_dim: 8 }
     );
 
     // Normal cycle first
@@ -1822,7 +1741,7 @@ fn test_blanket_nan_inputs_safe() {
         acetylcholine: f64::NAN,
         noradrenaline: f64::INFINITY,
         serotonin: f64::NEG_INFINITY,
-        oxytocin: -1.0,    // Out of range
+        oxytocin: -1.0, // Out of range
         threat_level: 2.0, // Out of range
         peer_trust: f64::NAN,
         flow_state: f64::NAN,
@@ -1842,15 +1761,11 @@ fn test_blanket_rapid_oscillation_stress() {
     let mut bridge = EnhancedFEPBridge::new(config, 4);
 
     let safe = PermeabilityInputs {
-        serotonin: 1.0,
-        oxytocin: 1.0,
-        flow_state: 1.0,
+        serotonin: 1.0, oxytocin: 1.0, flow_state: 1.0,
         ..Default::default()
     };
     let threat = PermeabilityInputs {
-        threat_level: 1.0,
-        noradrenaline: 1.0,
-        acetylcholine: 1.0,
+        threat_level: 1.0, noradrenaline: 1.0, acetylcholine: 1.0,
         ..Default::default()
     };
 
@@ -1859,25 +1774,14 @@ fn test_blanket_rapid_oscillation_stress() {
         let inputs = if i % 2 == 0 { &safe } else { &threat };
         bridge.update_blanket_permeability(inputs);
         let result = bridge.cycle(0.5, 0.5, 0.5, 0.5);
-        assert!(
-            result.fep_result.free_energy.is_finite(),
-            "Cycle {} diverged",
-            i
-        );
-        assert!(
-            result.learning_signal.is_finite(),
-            "Learning signal diverged at cycle {}",
-            i
-        );
+        assert!(result.fep_result.free_energy.is_finite(), "Cycle {} diverged", i);
+        assert!(result.learning_signal.is_finite(), "Learning signal diverged at cycle {}", i);
     }
 
     // EMA should have dampened to somewhere in the middle
     let perm = bridge.blanket.permeability();
-    assert!(
-        perm.effective > 0.1 && perm.effective < 0.9,
-        "EMA should dampen extreme oscillation: {}",
-        perm.effective
-    );
+    assert!(perm.effective > 0.1 && perm.effective < 0.9,
+        "EMA should dampen extreme oscillation: {}", perm.effective);
 }
 
 /// 256-peer coalition identification should not panic or take excessive time.
@@ -1891,8 +1795,7 @@ fn test_blanket_coalition_scaling_256_peers() {
     // Create edges: nearby peers have high permeability, distant ones low
     let mut edges = Vec::new();
     for i in 0..n {
-        for j in (i + 1)..n.min(i + 10) {
-            // Only connect nearby peers (sparse graph)
+        for j in (i + 1)..n.min(i + 10) { // Only connect nearby peers (sparse graph)
             let distance = (j - i) as f64 / 10.0;
             let perm = (1.0 - distance).max(0.0);
             edges.push((i, j, perm));
@@ -1903,11 +1806,7 @@ fn test_blanket_coalition_scaling_256_peers() {
     let coalitions = super::markov_blanket::identify_coalitions(&peers, &edges, 0.5);
     let elapsed = start.elapsed();
 
-    assert!(
-        elapsed.as_millis() < 100,
-        "256-peer coalition should complete in <100ms: {:?}",
-        elapsed
-    );
+    assert!(elapsed.as_millis() < 100, "256-peer coalition should complete in <100ms: {:?}", elapsed);
     // Should form some coalitions from the sparse graph
     for c in &coalitions {
         assert!(c.members.len() >= 2);
@@ -1919,11 +1818,7 @@ fn test_blanket_coalition_scaling_256_peers() {
 #[test]
 fn test_blanket_topology_extreme_constraints() {
     let mut op = super::markov_blanket::MarkovBoundaryOperator::new(
-        super::markov_blanket::MarkovPartition {
-            internal_dim: 100,
-            sensory_dim: 4,
-            active_dim: 8,
-        },
+        super::markov_blanket::MarkovPartition { internal_dim: 100, sensory_dim: 4, active_dim: 8 }
     );
 
     // Stabilize at mid permeability
@@ -1934,8 +1829,8 @@ fn test_blanket_topology_extreme_constraints() {
 
     // Apply maximally hostile topology
     let extreme_topo = super::markov_blanket::TopologyBoundaryInputs {
-        boundary_thickness: 1.0,  // Maximally thick
-        fiedler_value: 0.0,       // Completely disconnected
+        boundary_thickness: 1.0, // Maximally thick
+        fiedler_value: 0.0,      // Completely disconnected
         boundary_components: 100, // Extremely fragmented
     };
     op.apply_topology_constraints(&extreme_topo);
@@ -1943,11 +1838,7 @@ fn test_blanket_topology_extreme_constraints() {
     let perm = op.permeability();
     assert!(perm.sensory >= 0.05, "Floor must hold: {}", perm.sensory);
     assert!(perm.active >= 0.05, "Floor must hold: {}", perm.active);
-    assert!(
-        perm.effective >= 0.0,
-        "Effective must be non-negative: {}",
-        perm.effective
-    );
+    assert!(perm.effective >= 0.0, "Effective must be non-negative: {}", perm.effective);
 }
 
 /// Verify that after reset, blanket returns to default state.
@@ -1958,9 +1849,7 @@ fn test_blanket_reset_returns_to_default() {
 
     // Drive to extreme state
     let threat = PermeabilityInputs {
-        threat_level: 0.9,
-        noradrenaline: 0.8,
-        ..Default::default()
+        threat_level: 0.9, noradrenaline: 0.8, ..Default::default()
     };
     for _ in 0..100 {
         bridge.update_blanket_permeability(&threat);
@@ -1973,11 +1862,8 @@ fn test_blanket_reset_returns_to_default() {
 
     // Should be back at default
     let perm = bridge.blanket.permeability();
-    assert!(
-        (perm.effective - 0.5).abs() < 0.01,
-        "After reset, permeability should be default 0.5: {}",
-        perm.effective
-    );
+    assert!((perm.effective - 0.5).abs() < 0.01,
+        "After reset, permeability should be default 0.5: {}", perm.effective);
     assert!(!bridge.blanket.coalescence_ready(0.6));
 }
 
@@ -1988,9 +1874,7 @@ fn test_blanket_telemetry_snapshot_complete() {
     let mut bridge = EnhancedFEPBridge::new(config, 4);
 
     let inputs = PermeabilityInputs {
-        serotonin: 0.7,
-        oxytocin: 0.6,
-        flow_state: 0.5,
+        serotonin: 0.7, oxytocin: 0.6, flow_state: 0.5,
         ..Default::default()
     };
     for _ in 0..30 {

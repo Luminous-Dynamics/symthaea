@@ -32,51 +32,17 @@ pub fn generate(
     let mut root = SceneNode::group(Some("color-field"));
 
     let neuro_colors = [
-        NeuroColor {
-            name: "dopamine",
-            level: snapshot.dopamine,
-            hue: 45.0,
-            saturation: 0.80,
-        },
-        NeuroColor {
-            name: "serotonin",
-            level: snapshot.serotonin,
-            hue: 30.0,
-            saturation: 0.70,
-        },
-        NeuroColor {
-            name: "noradrenaline",
-            level: snapshot.noradrenaline,
-            hue: 210.0,
-            saturation: 0.65,
-        },
-        NeuroColor {
-            name: "acetylcholine",
-            level: snapshot.acetylcholine,
-            hue: 150.0,
-            saturation: 0.60,
-        },
-        NeuroColor {
-            name: "oxytocin",
-            level: snapshot.oxytocin,
-            hue: 330.0,
-            saturation: 0.55,
-        },
-        NeuroColor {
-            name: "gaba",
-            level: snapshot.gaba,
-            hue: 270.0,
-            saturation: 0.40,
-        },
+        NeuroColor { name: "dopamine",      level: snapshot.dopamine,       hue: 45.0,  saturation: 0.80 },
+        NeuroColor { name: "serotonin",     level: snapshot.serotonin,      hue: 30.0,  saturation: 0.70 },
+        NeuroColor { name: "noradrenaline", level: snapshot.noradrenaline,  hue: 210.0, saturation: 0.65 },
+        NeuroColor { name: "acetylcholine", level: snapshot.acetylcholine,  hue: 150.0, saturation: 0.60 },
+        NeuroColor { name: "oxytocin",      level: snapshot.oxytocin,       hue: 330.0, saturation: 0.55 },
+        NeuroColor { name: "gaba",          level: snapshot.gaba,           hue: 270.0, saturation: 0.40 },
     ];
 
     // Sort by level (highest first) to layer dominant colors on top
     let mut sorted: Vec<&NeuroColor> = neuro_colors.iter().collect();
-    sorted.sort_by(|a, b| {
-        b.level
-            .partial_cmp(&a.level)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    sorted.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap_or(std::cmp::Ordering::Equal));
 
     // Create overlapping soft rectangles for each neuromodulator
     for (_i, nc) in sorted.iter().enumerate() {
@@ -93,16 +59,14 @@ pub fn generate(
         let lightness = 0.3 + snapshot.consciousness_level as f32 * 0.3;
         let color = Color::from_hsl(nc.hue, nc.saturation, lightness);
 
-        let rect = SceneNode::rect(x, y, w, h)
-            .with_style(Style {
-                fill: Some(color),
-                opacity: Some(0.15 + nc.level * 0.25),
-                ..Style::default()
-            })
-            .with_transform(Transform {
-                rotate_deg: rng.gen::<f32>() * 30.0 - 15.0,
-                ..Transform::identity()
-            });
+        let rect = SceneNode::rect(x, y, w, h).with_style(Style {
+            fill: Some(color),
+            opacity: Some(0.15 + nc.level * 0.25),
+            ..Style::default()
+        }).with_transform(Transform {
+            rotate_deg: rng.gen::<f32>() * 30.0 - 15.0,
+            ..Transform::identity()
+        });
 
         root.children.push(rect);
 
@@ -113,16 +77,13 @@ pub fn generate(
             let accent_y = y + h * 0.5;
 
             let accent = SceneNode::circle(accent_x, accent_y, accent_r).with_style(Style {
-                fill: Some(Color::from_hsl(
-                    nc.hue,
-                    nc.saturation * 1.2,
-                    lightness + 0.15,
-                )),
+                fill: Some(Color::from_hsl(nc.hue, nc.saturation * 1.2, lightness + 0.15)),
                 opacity: Some(0.3 + nc.level * 0.2),
                 ..Style::default()
             });
             root.children.push(accent);
         }
+
     }
 
     // Valence overlay: warm wash for positive, cool for negative

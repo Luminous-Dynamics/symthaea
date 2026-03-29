@@ -101,55 +101,24 @@ impl ManipulatorKinematics {
     /// Create with default 7-DOF arm parameters (Panda-like).
     pub fn default_7dof() -> Self {
         let dh_params = vec![
-            DHParams {
-                d: 0.333,
-                a: 0.0,
-                alpha: -std::f64::consts::FRAC_PI_2,
-            }, // J1: shoulder yaw
-            DHParams {
-                d: 0.0,
-                a: 0.0,
-                alpha: std::f64::consts::FRAC_PI_2,
-            }, // J2: shoulder pitch
-            DHParams {
-                d: 0.316,
-                a: 0.0825,
-                alpha: std::f64::consts::FRAC_PI_2,
-            }, // J3: shoulder roll
-            DHParams {
-                d: 0.0,
-                a: -0.0825,
-                alpha: -std::f64::consts::FRAC_PI_2,
-            }, // J4: elbow
-            DHParams {
-                d: 0.384,
-                a: 0.0,
-                alpha: std::f64::consts::FRAC_PI_2,
-            }, // J5: wrist pitch
-            DHParams {
-                d: 0.0,
-                a: 0.088,
-                alpha: std::f64::consts::FRAC_PI_2,
-            }, // J6: wrist roll
-            DHParams {
-                d: 0.107,
-                a: 0.0,
-                alpha: 0.0,
-            }, // J7: wrist yaw
+            DHParams { d: 0.333, a: 0.0, alpha: -std::f64::consts::FRAC_PI_2 },   // J1: shoulder yaw
+            DHParams { d: 0.0, a: 0.0, alpha: std::f64::consts::FRAC_PI_2 },       // J2: shoulder pitch
+            DHParams { d: 0.316, a: 0.0825, alpha: std::f64::consts::FRAC_PI_2 },  // J3: shoulder roll
+            DHParams { d: 0.0, a: -0.0825, alpha: -std::f64::consts::FRAC_PI_2 },  // J4: elbow
+            DHParams { d: 0.384, a: 0.0, alpha: std::f64::consts::FRAC_PI_2 },     // J5: wrist pitch
+            DHParams { d: 0.0, a: 0.088, alpha: std::f64::consts::FRAC_PI_2 },     // J6: wrist roll
+            DHParams { d: 0.107, a: 0.0, alpha: 0.0 },                              // J7: wrist yaw
         ];
         let joint_limits = vec![
-            [-2.89, 2.89],  // J1
-            [-1.76, 1.76],  // J2
-            [-2.89, 2.89],  // J3
-            [-3.07, -0.07], // J4 (elbow, negative range)
-            [-2.89, 2.89],  // J5
-            [-0.02, 3.75],  // J6
-            [-2.89, 2.89],  // J7
+            [-2.89, 2.89],   // J1
+            [-1.76, 1.76],   // J2
+            [-2.89, 2.89],   // J3
+            [-3.07, -0.07],  // J4 (elbow, negative range)
+            [-2.89, 2.89],   // J5
+            [-0.02, 3.75],   // J6
+            [-2.89, 2.89],   // J7
         ];
-        Self {
-            dh_params,
-            joint_limits,
-        }
+        Self { dh_params, joint_limits }
     }
 
     /// Number of joints (DOF).
@@ -274,9 +243,9 @@ impl ManipulatorKinematics {
 
     /// Check if joint angles are within limits.
     pub fn within_limits(&self, q: &[f64]) -> bool {
-        q.iter()
-            .zip(&self.joint_limits)
-            .all(|(&angle, limits)| angle >= limits[0] && angle <= limits[1])
+        q.iter().zip(&self.joint_limits).all(|(&angle, limits)| {
+            angle >= limits[0] && angle <= limits[1]
+        })
     }
 }
 
@@ -301,11 +270,7 @@ mod tests {
         assert!(pos[1].is_finite());
         assert!(pos[2].is_finite());
         // Should be above the base (positive z)
-        assert!(
-            pos[2] > 0.0,
-            "End effector should be above base: z={}",
-            pos[2]
-        );
+        assert!(pos[2] > 0.0, "End effector should be above base: z={}", pos[2]);
     }
 
     #[test]
@@ -322,10 +287,7 @@ mod tests {
             + (pos_zero[2] - pos_bent[2]).powi(2))
         .sqrt();
 
-        assert!(
-            dist > 0.01,
-            "Different angles should produce different positions: dist={dist}"
-        );
+        assert!(dist > 0.01, "Different angles should produce different positions: dist={dist}");
     }
 
     #[test]
@@ -343,15 +305,8 @@ mod tests {
         let q = vec![0.1, 0.2, 0.1, -0.5, 0.1, 0.3, 0.1];
         let jac = kin.jacobian(&q, 1e-6);
         // At least some entries should be nonzero
-        let max_val: f64 = jac
-            .iter()
-            .flat_map(|row| row.iter())
-            .map(|v| v.abs())
-            .fold(0.0, f64::max);
-        assert!(
-            max_val > 0.01,
-            "Jacobian should have nonzero entries: max={max_val}"
-        );
+        let max_val: f64 = jac.iter().flat_map(|row| row.iter()).map(|v| v.abs()).fold(0.0, f64::max);
+        assert!(max_val > 0.01, "Jacobian should have nonzero entries: max={max_val}");
     }
 
     #[test]
@@ -365,20 +320,14 @@ mod tests {
         let q0 = vec![0.0; 7];
         let result = kin.ik_dls(&target_pos, &q0, 0.1, 200, 0.01);
 
-        assert!(
-            result.is_some(),
-            "IK should converge for a reachable target"
-        );
+        assert!(result.is_some(), "IK should converge for a reachable target");
         let q_solution = result.unwrap();
         let solution_pos = kin.end_effector_position(&q_solution);
         let error = ((solution_pos[0] - target_pos[0]).powi(2)
             + (solution_pos[1] - target_pos[1]).powi(2)
             + (solution_pos[2] - target_pos[2]).powi(2))
         .sqrt();
-        assert!(
-            error < 0.01,
-            "IK solution should be within tolerance: error={error}"
-        );
+        assert!(error < 0.01, "IK solution should be within tolerance: error={error}");
     }
 
     #[test]
@@ -390,20 +339,13 @@ mod tests {
         let result = kin.ik_dls(&target_pos, &q0, 0.1, 200, 0.01);
 
         if let Some(q) = result {
-            assert!(
-                kin.within_limits(&q),
-                "IK solution should respect joint limits"
-            );
+            assert!(kin.within_limits(&q), "IK solution should respect joint limits");
         }
     }
 
     #[test]
     fn test_dh_transform_identity() {
-        let dh = DHParams {
-            d: 0.0,
-            a: 0.0,
-            alpha: 0.0,
-        };
+        let dh = DHParams { d: 0.0, a: 0.0, alpha: 0.0 };
         let t = Transform::from_dh(&dh, 0.0);
         let pos = t.position();
         assert!((pos[0]).abs() < 1e-10);

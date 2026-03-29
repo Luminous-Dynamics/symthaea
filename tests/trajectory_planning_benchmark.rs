@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Trajectory Planning Benchmark
 //!
 //! Validates that ODE-based trajectory planning in the FEP module
@@ -105,10 +108,8 @@ fn trajectory_planning_does_not_regress_consciousness() {
     let without_metrics = run_cycles(&mut without_traj, measure);
 
     let with_consciousness: Vec<f64> = with_metrics.iter().map(|m| m.consciousness_level).collect();
-    let without_consciousness: Vec<f64> = without_metrics
-        .iter()
-        .map(|m| m.consciousness_level)
-        .collect();
+    let without_consciousness: Vec<f64> =
+        without_metrics.iter().map(|m| m.consciousness_level).collect();
 
     let avg_with = avg(&with_consciousness);
     let avg_without = avg(&without_consciousness);
@@ -227,10 +228,8 @@ fn trajectory_telemetry_populates_when_enabled() {
     let metrics = run_cycles(&mut service, measure);
 
     // At least some cycles should have trajectory data (planning_interval = 5)
-    let cycles_with_ode_steps: Vec<&CycleMetrics> = metrics
-        .iter()
-        .filter(|m| m.trajectory_ode_steps > 0)
-        .collect();
+    let cycles_with_ode_steps: Vec<&CycleMetrics> =
+        metrics.iter().filter(|m| m.trajectory_ode_steps > 0).collect();
 
     println!("=== Trajectory Telemetry ===");
     println!(
@@ -240,10 +239,7 @@ fn trajectory_telemetry_populates_when_enabled() {
     );
 
     if let Some(first_planned) = cycles_with_ode_steps.first() {
-        println!(
-            "  First planned EFE:     {:.6}",
-            first_planned.trajectory_efe
-        );
+        println!("  First planned EFE:     {:.6}", first_planned.trajectory_efe);
         println!(
             "  First planned surprise: {:.6}",
             first_planned.trajectory_surprise
@@ -300,10 +296,7 @@ fn trajectory_planning_overhead_acceptable() {
     let with_metrics = run_cycles(&mut with_traj, measure);
     let without_metrics = run_cycles(&mut without_traj, measure);
 
-    let with_times: Vec<f64> = with_metrics
-        .iter()
-        .map(|m| m.cycle_time_us as f64)
-        .collect();
+    let with_times: Vec<f64> = with_metrics.iter().map(|m| m.cycle_time_us as f64).collect();
     let without_times: Vec<f64> = without_metrics
         .iter()
         .map(|m| m.cycle_time_us as f64)

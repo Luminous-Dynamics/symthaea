@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Experimental module: fields will be read when GIS DHT integration is wired
 #![allow(dead_code)]
 //! # Dark Spot DHT - Privacy-Preserving Ignorance Sharing

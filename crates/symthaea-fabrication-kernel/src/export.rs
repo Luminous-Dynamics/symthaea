@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! STL and 3MF file export
 //!
 //! Binary STL: 80-byte header + u32 triangle count + per-triangle data (50 bytes each)

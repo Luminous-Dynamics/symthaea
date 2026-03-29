@@ -162,11 +162,7 @@ impl PowerNetwork {
         }
 
         // Find slack bus
-        let slack_idx = self
-            .buses
-            .iter()
-            .position(|b| b.bus_type == BusType::Slack)
-            .unwrap_or(0);
+        let slack_idx = self.buses.iter().position(|b| b.bus_type == BusType::Slack).unwrap_or(0);
 
         // Build B matrix (n-1 × n-1, excluding slack)
         let m = n - 1; // reduced system size
@@ -227,12 +223,7 @@ impl PowerNetwork {
         let mut overloaded = Vec::new();
 
         // Build bus id → index map
-        let bus_idx: HashMap<usize, usize> = self
-            .buses
-            .iter()
-            .enumerate()
-            .map(|(i, b)| (b.id, i))
-            .collect();
+        let bus_idx: HashMap<usize, usize> = self.buses.iter().enumerate().map(|(i, b)| (b.id, i)).collect();
 
         for (bi, branch) in self.branches.iter().enumerate() {
             if !branch.in_service {
@@ -300,8 +291,7 @@ impl PowerNetwork {
         // Sort generators by cost (merit order dispatch)
         let mut gen_order: Vec<usize> = (0..self.generators.len()).collect();
         gen_order.sort_by(|&a, &b| {
-            self.generators[a]
-                .cost_per_mwh
+            self.generators[a].cost_per_mwh
                 .partial_cmp(&self.generators[b].cost_per_mwh)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
@@ -331,28 +321,17 @@ impl PowerNetwork {
         let flow_result = network.dc_power_flow();
 
         // Compute total cost
-        let total_cost: f64 = dispatch
-            .iter()
-            .enumerate()
+        let total_cost: f64 = dispatch.iter().enumerate()
             .map(|(i, &p)| p * self.generators[i].cost_per_mwh)
             .sum();
 
         // LMP approximation: marginal cost at each bus
         // (simplified: use the marginal generator's cost for all buses)
-        let marginal_cost = gen_order
-            .iter()
-            .filter(|&&gi| {
-                dispatch[gi] > self.generators[gi].p_min_mw
-                    && dispatch[gi] < self.generators[gi].p_max_mw
-            })
+        let marginal_cost = gen_order.iter()
+            .filter(|&&gi| dispatch[gi] > self.generators[gi].p_min_mw && dispatch[gi] < self.generators[gi].p_max_mw)
             .map(|&gi| self.generators[gi].cost_per_mwh)
             .next()
-            .unwrap_or(
-                gen_order
-                    .last()
-                    .map(|&gi| self.generators[gi].cost_per_mwh)
-                    .unwrap_or(0.0),
-            );
+            .unwrap_or(gen_order.last().map(|&gi| self.generators[gi].cost_per_mwh).unwrap_or(0.0));
 
         let lmp = vec![marginal_cost; self.buses.len()];
 
@@ -441,9 +420,7 @@ fn gauss_solve(a: &[Vec<f64>], b: &[f64]) -> Vec<f64> {
     }
 
     // Augmented matrix [A|b]
-    let mut aug: Vec<Vec<f64>> = a
-        .iter()
-        .enumerate()
+    let mut aug: Vec<Vec<f64>> = a.iter().enumerate()
         .map(|(i, row)| {
             let mut r = row.clone();
             r.push(b[i]);
@@ -507,58 +484,18 @@ mod tests {
     fn three_bus_network() -> PowerNetwork {
         PowerNetwork {
             buses: vec![
-                Bus {
-                    id: 0,
-                    name: "Gen".into(),
-                    bus_type: BusType::Slack,
-                    load_mw: 0.0,
-                    generation_mw: 80.0,
-                },
-                Bus {
-                    id: 1,
-                    name: "Load1".into(),
-                    bus_type: BusType::PQ,
-                    load_mw: 50.0,
-                    generation_mw: 0.0,
-                },
-                Bus {
-                    id: 2,
-                    name: "Load2".into(),
-                    bus_type: BusType::PQ,
-                    load_mw: 30.0,
-                    generation_mw: 0.0,
-                },
+                Bus { id: 0, name: "Gen".into(), bus_type: BusType::Slack, load_mw: 0.0, generation_mw: 80.0 },
+                Bus { id: 1, name: "Load1".into(), bus_type: BusType::PQ, load_mw: 50.0, generation_mw: 0.0 },
+                Bus { id: 2, name: "Load2".into(), bus_type: BusType::PQ, load_mw: 30.0, generation_mw: 0.0 },
             ],
             branches: vec![
-                Branch {
-                    from_bus: 0,
-                    to_bus: 1,
-                    reactance_pu: 0.1,
-                    thermal_limit_mw: 100.0,
-                    in_service: true,
-                },
-                Branch {
-                    from_bus: 0,
-                    to_bus: 2,
-                    reactance_pu: 0.2,
-                    thermal_limit_mw: 60.0,
-                    in_service: true,
-                },
-                Branch {
-                    from_bus: 1,
-                    to_bus: 2,
-                    reactance_pu: 0.15,
-                    thermal_limit_mw: 40.0,
-                    in_service: true,
-                },
+                Branch { from_bus: 0, to_bus: 1, reactance_pu: 0.1, thermal_limit_mw: 100.0, in_service: true },
+                Branch { from_bus: 0, to_bus: 2, reactance_pu: 0.2, thermal_limit_mw: 60.0, in_service: true },
+                Branch { from_bus: 1, to_bus: 2, reactance_pu: 0.15, thermal_limit_mw: 40.0, in_service: true },
             ],
-            generators: vec![Generator {
-                bus_id: 0,
-                name: "Gen1".into(),
-                p_min_mw: 0.0,
-                p_max_mw: 100.0,
-                cost_per_mwh: 30.0,
-            }],
+            generators: vec![
+                Generator { bus_id: 0, name: "Gen1".into(), p_min_mw: 0.0, p_max_mw: 100.0, cost_per_mwh: 30.0 },
+            ],
             base_mva: 100.0,
         }
     }
@@ -609,18 +546,14 @@ mod tests {
         let mut net = three_bus_network();
         // Add a second, more expensive generator
         net.generators.push(Generator {
-            bus_id: 1,
-            name: "Gen2".into(),
-            p_min_mw: 0.0,
-            p_max_mw: 50.0,
-            cost_per_mwh: 50.0,
+            bus_id: 1, name: "Gen2".into(), p_min_mw: 0.0, p_max_mw: 50.0, cost_per_mwh: 50.0,
         });
 
         let opf = net.dc_opf();
 
         // Cheapest generator should be dispatched first
         assert!(opf.dispatch_mw[0] > 0.0); // Gen1 at $30/MWh
-                                           // Total dispatch should equal total load
+        // Total dispatch should equal total load
         let total_dispatch: f64 = opf.dispatch_mw.iter().sum();
         assert!((total_dispatch - 80.0).abs() < 1.0);
     }
@@ -644,7 +577,7 @@ mod tests {
         let ptdf = net.compute_ptdf();
 
         // PTDF matrix: branches × buses
-        assert_eq!(ptdf.len(), 3); // 3 branches
+        assert_eq!(ptdf.len(), 3);  // 3 branches
         assert_eq!(ptdf[0].len(), 3); // 3 buses
 
         // Slack bus should have zero PTDF (reference)

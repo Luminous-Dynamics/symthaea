@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Minimal AI Assistant - Symthaea's First Conscious AI
 //!
 //! This example demonstrates end-to-end AI functionality:

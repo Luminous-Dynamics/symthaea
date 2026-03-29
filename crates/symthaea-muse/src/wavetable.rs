@@ -110,9 +110,7 @@ impl WavetableOscillator {
 
 fn generate_sine(size: usize) -> Wavetable {
     Wavetable {
-        samples: (0..size)
-            .map(|i| (TAU * i as f32 / size as f32).sin())
-            .collect(),
+        samples: (0..size).map(|i| (TAU * i as f32 / size as f32).sin()).collect(),
         name: "sine",
     }
 }
@@ -122,13 +120,9 @@ fn generate_triangle(size: usize) -> Wavetable {
         samples: (0..size)
             .map(|i| {
                 let t = i as f32 / size as f32;
-                if t < 0.25 {
-                    4.0 * t
-                } else if t < 0.75 {
-                    2.0 - 4.0 * t
-                } else {
-                    4.0 * t - 4.0
-                }
+                if t < 0.25 { 4.0 * t }
+                else if t < 0.75 { 2.0 - 4.0 * t }
+                else { 4.0 * t - 4.0 }
             })
             .collect(),
         name: "triangle",
@@ -238,11 +232,8 @@ mod tests {
         let sine_val = bank.read(0.25, 0.0); // pure sine
         let tri_val = bank.read(0.25, 0.25); // 50% sine + 50% triangle
         let saw_val = bank.read(0.25, 0.5); // pure triangle (table index 1→2 midpoint)
-                                            // Values should differ across morph positions
-        assert!(
-            (sine_val - saw_val).abs() > 0.01,
-            "morph should change output"
-        );
+        // Values should differ across morph positions
+        assert!((sine_val - saw_val).abs() > 0.01, "morph should change output");
     }
 
     #[test]
@@ -261,19 +252,12 @@ mod tests {
         let bank = WavetableBank::default_bank();
         let mut osc = WavetableOscillator::new();
         osc.set_consciousness_morph(0.0); // sine
-        for _ in 0..500 {
-            osc.tick(&bank, 440.0, 44100.0);
-        }
+        for _ in 0..500 { osc.tick(&bank, 440.0, 44100.0); }
         assert!(osc.morph_position < 0.1, "low consciousness → sine region");
 
         osc.set_consciousness_morph(1.0); // organ
-        for _ in 0..500 {
-            osc.tick(&bank, 440.0, 44100.0);
-        }
-        assert!(
-            osc.morph_position > 0.8,
-            "high consciousness → organ region"
-        );
+        for _ in 0..500 { osc.tick(&bank, 440.0, 44100.0); }
+        assert!(osc.morph_position > 0.8, "high consciousness → organ region");
     }
 
     #[test]
@@ -282,9 +266,6 @@ mod tests {
         // Read at exact positions and between — should be smooth
         let v1 = cubic_read(&table, 0.1);
         let v2 = cubic_read(&table, 0.1001);
-        assert!(
-            (v1 - v2).abs() < 0.01,
-            "cubic should be smooth between samples"
-        );
+        assert!((v1 - v2).abs() < 0.01, "cubic should be smooth between samples");
     }
 }

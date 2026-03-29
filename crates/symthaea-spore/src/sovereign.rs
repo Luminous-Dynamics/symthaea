@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Sovereign Inoculation: orchestration layer for OS deployment.
 //!
 //! This module defines the types and interfaces for the Promethean deployment
@@ -784,6 +787,130 @@ impl InoculationOrchestrator {
   swapDevices = [{{ device = "/swap/swapfile"; size = {swap_gb} * 1024; }}];
 }}"#
         ))
+    }
+
+    /// Generate a dual-disk disko configuration.
+    ///
+    /// Layout:
+    /// - Fast drive (TLC): btrfs with @home, @srv, @swap, @snapshots (data, compressible)
+    /// - Standard drive (QLC): ext4 root + EFI boot (OS, nix store, ephemeral caches)
+    pub fn generate_dual_disk_disko_config(
+        &self,
+        fast_device: &str,
+        standard_device: &str,
+    ) -> Result<String, String> {
+        let profile = self
+            .hardware_profile
+            .as_ref()
+            .ok_or("Hardware profile required")?;
+
+        let device_memory_gb = profile
+            .get("device_memory_gb")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(8.0);
+
+        let swap_gb = if device_memory_gb <= 16.0 {
+            device_memory_gb as u32
+        } else {
+            64 // Cap at 64G for large RAM systems
+        };
+
+        let efi_size = if self.lanzaboote_enabled { "1G" } else { "512M" };
+
+        Ok(format!(
+            r#"{{
+  disko.devices.disk = {{
+    # Standard drive: OS + Nix Store
+    standard = {{
+      type = "disk";
+      device = "{standard_device}";
+      content = {{
+        type = "gpt";
+        partitions = {{
+          boot = {{
+            name = "boot";
+            size = "{efi_size}";
+            type = "EF00";
+            content = {{
+              type = "filesystem";
+              format = "vfat";
+              mountpoint = "/boot";
+              mountOptions = [ "fmask=0077" "dmask=0077" ];
+            }};
+          }};
+          root = {{
+            name = "nixos-root";
+            size = "100%";
+            content = {{
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/";
+              mountOptions = [ "relatime" ];
+            }};
+          }};
+        }};
+      }};
+    }};
+
+    # Fast drive: Data (btrfs with subvolumes)
+    fast = {{
+      type = "disk";
+      device = "{fast_device}";
+      content = {{
+        type = "gpt";
+        partitions = {{
+          data = {{
+            name = "data";
+            size = "100%";
+            content = {{
+              type = "btrfs";
+              extraArgs = [ "-L" "samsung" "-f" ];
+              subvolumes = {{
+                "@home" = {{
+                  mountpoint = "/home";
+                  mountOptions = [ "compress=zstd:3" "noatime" "discard=async" "space_cache=v2" "nofail" ];
+                }};
+                "@srv" = {{
+                  mountpoint = "/srv";
+                  mountOptions = [ "compress=zstd:3" "noatime" "discard=async" "space_cache=v2" "nofail" ];
+                }};
+                "@swap" = {{
+                  mountpoint = "/swap";
+                  mountOptions = [ "noatime" "nofail" ];
+                }};
+                "@snapshots" = {{
+                  mountpoint = "/.snapshots";
+                  mountOptions = [ "compress=zstd:3" "noatime" "nofail" ];
+                }};
+              }};
+            }};
+          }};
+        }};
+      }};
+    }};
+  }};
+
+  swapDevices = [{{ device = "/swap/swapfile"; size = {swap_gb} * 1024; }}];
+}}"#
+        ))
+    }
+
+    /// Detect if dual-disk layout should be used based on hardware profile.
+    /// Returns (fast_device, standard_device) if two NVMe drives detected.
+    pub fn detect_dual_disk(&self) -> Option<(String, String)> {
+        let profile = self.hardware_profile.as_ref()?;
+        let storage = profile.get("storage_quota_bytes")?.as_u64()?;
+        let cpu_cores = profile.get("cpu_cores")?.as_u64().unwrap_or(4);
+
+        // Heuristic: if storage > 500GB and cores >= 8, likely a workstation
+        // with multiple NVMe drives. Browser can't detect individual drives,
+        // so this is a recommendation — the user confirms.
+        if storage > 500_000_000_000 && cpu_cores >= 8 {
+            // Default device names — user must verify
+            Some(("/dev/nvme0n1".into(), "/dev/nvme1n1".into()))
+        } else {
+            None
+        }
     }
 }
 

@@ -59,19 +59,8 @@ fn social_manager_default_values() {
     assert!((service.behavior.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     assert!((service.behavior.social_mgr.social.external_reward - 0.0).abs() < f32::EPSILON);
     assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
-    assert!(
-        (service.behavior.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON
-    );
-    assert!(
-        (service
-            .behavior
-            .social_mgr
-            .social
-            .social_prediction_accuracy
-            - 0.5)
-            .abs()
-            < f32::EPSILON
-    );
+    assert!((service.behavior.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
+    assert!((service.behavior.social_mgr.social.social_prediction_accuracy - 0.5).abs() < f32::EPSILON);
     assert_eq!(service.behavior.social_mgr.social.social_models_count, 0);
     assert!((service.behavior.social_mgr.social.social_mean_trust - 0.5).abs() < f32::EPSILON);
 }
@@ -110,15 +99,13 @@ fn gwt_manager_default_flags() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Memory flag should be false initially
     assert!(!service
-        .consciousness
-        .gwt_mgr
+        .consciousness.gwt_mgr
         .memory_flag
         .load(std::sync::atomic::Ordering::Relaxed));
     // Perception count should be 0
     assert_eq!(
         service
-            .consciousness
-            .gwt_mgr
+            .consciousness.gwt_mgr
             .perception_count
             .load(std::sync::atomic::Ordering::Relaxed),
         0
@@ -415,21 +402,13 @@ fn test_mce_narrative_wiring() {
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     // N should start low (no episodes yet)
-    let n_start = service
-        .consciousness
-        .master_equation
-        .narrative_coherence
-        .compute();
+    let n_start = service.consciousness.master_equation.narrative_coherence.compute();
     assert!(
         n_start < 0.2,
         "N should start low with no episodes, got {n_start}"
     );
     assert_eq!(
-        service
-            .consciousness
-            .master_equation
-            .narrative_coherence
-            .episode_count(),
+        service.consciousness.master_equation.narrative_coherence.episode_count(),
         0
     );
 
@@ -438,21 +417,9 @@ fn test_mce_narrative_wiring() {
         let _ = service.cycle("narrative wiring test");
     }
 
-    let n_end = service
-        .consciousness
-        .master_equation
-        .narrative_coherence
-        .compute();
-    let episodes = service
-        .consciousness
-        .master_equation
-        .narrative_coherence
-        .episode_count();
-    let scenarios = service
-        .consciousness
-        .master_equation
-        .narrative_coherence
-        .scenario_count();
+    let n_end = service.consciousness.master_equation.narrative_coherence.compute();
+    let episodes = service.consciousness.master_equation.narrative_coherence.episode_count();
+    let scenarios = service.consciousness.master_equation.narrative_coherence.scenario_count();
 
     // After 200 cycles, should have accumulated episodes from consolidation events
     assert!(

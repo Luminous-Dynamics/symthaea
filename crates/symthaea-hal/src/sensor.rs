@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! HAL sensor adapter: generic I2C sensor → f32 readings.
 //!
 //! The [`HalSensorAdapter`] trait provides a uniform interface for reading

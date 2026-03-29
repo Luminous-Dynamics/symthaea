@@ -147,11 +147,8 @@ impl CognitiveLoopService {
         // Clamp attention_sensitivity to [0.5, 2.0] after all modifications.
         // 10+ subsystems multiply this field per cycle; without bounding, it can drift
         // to extreme values. Science: Weber-Fechner law — perception has bounded dynamic range.
-        self.behavior.adaptive_behavior.attention_sensitivity = self
-            .behavior
-            .adaptive_behavior
-            .attention_sensitivity
-            .clamp(0.5, 2.0);
+        self.behavior.adaptive_behavior.attention_sensitivity =
+            self.behavior.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
 
         // Boredom↔confidence homeostasis (Turrigiano 2004 — homeostatic plasticity)
         // High boredom signals stagnation → dampen confidence (system shouldn't be confident
@@ -178,9 +175,8 @@ impl CognitiveLoopService {
 
         // Exploration urge homeostasis: slow drift toward neutral (0.3) prevents saturation.
         // Phase 18: urgency-adaptive pull (Cruise=1.5×, Critical=0.6×)
-        let drift_delta = (0.3 - self.behavior.curiosity_drive.exploration_urge)
-            * 0.03
-            * homeostasis_pull_strength as f64;
+        let drift_delta =
+            (0.3 - self.behavior.curiosity_drive.exploration_urge) * 0.03 * homeostasis_pull_strength as f64;
         self.adjust_exploration("homeostasis_drift", drift_delta as f32);
 
         // Store urgency for next cycle's hysteresis

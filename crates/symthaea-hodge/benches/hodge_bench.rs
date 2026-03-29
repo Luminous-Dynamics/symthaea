@@ -74,7 +74,9 @@ fn bench_one(label: &str, n: usize, p: f64) {
 
     // Bench: fraction extraction
     let t3 = Instant::now();
-    let fracs = decomp.as_ref().map(|d| black_box(d.fractions()));
+    let fracs = decomp.as_ref().map(|d| {
+        black_box(d.fractions())
+    });
     let t_fractions = t3.elapsed();
 
     println!(
@@ -97,17 +99,8 @@ fn main() {
     println!("=== Hodge Laplacian Performance Benchmarks ===\n");
     println!(
         "{:<20} {:<10} {:<12} {:<12} {:>5} {:>5} | {:>12} {:>12} {:>12} {:>10} | {:>8}",
-        "Label",
-        "N",
-        "Edges",
-        "Triangles",
-        "β₀",
-        "β₁",
-        "Construct",
-        "Betti",
-        "Decompose",
-        "Fracs",
-        "Harmonic"
+        "Label", "N", "Edges", "Triangles", "β₀", "β₁",
+        "Construct", "Betti", "Decompose", "Fracs", "Harmonic"
     );
     println!("{}", "-".repeat(130));
 

@@ -31,64 +31,28 @@ pub struct SpatialPosition {
 
 impl SpatialPosition {
     pub fn front(distance: f32) -> Self {
-        Self {
-            azimuth: 0.0,
-            elevation: 0.0,
-            distance,
-        }
+        Self { azimuth: 0.0, elevation: 0.0, distance }
     }
 }
 
 /// Eight Harmony spatial positions (fixed reference points in auditory space).
 const HARMONY_POSITIONS: [SpatialPosition; 8] = [
     // ResonantCoherence: center, close
-    SpatialPosition {
-        azimuth: 0.0,
-        elevation: 0.0,
-        distance: 1.0,
-    },
+    SpatialPosition { azimuth: 0.0, elevation: 0.0, distance: 1.0 },
     // PanSentientFlourishing: right-front, warm
-    SpatialPosition {
-        azimuth: 0.5,
-        elevation: 0.1,
-        distance: 1.5,
-    },
+    SpatialPosition { azimuth: 0.5, elevation: 0.1, distance: 1.5 },
     // IntegralWisdom: left-front, grounded
-    SpatialPosition {
-        azimuth: -0.4,
-        elevation: -0.1,
-        distance: 1.5,
-    },
+    SpatialPosition { azimuth: -0.4, elevation: -0.1, distance: 1.5 },
     // InfinitePlay: left-rear, playful
-    SpatialPosition {
-        azimuth: -2.3,
-        elevation: -0.15,
-        distance: 2.5,
-    },
+    SpatialPosition { azimuth: -2.3, elevation: -0.15, distance: 2.5 },
     // UniversalInterconnectedness: wide right
-    SpatialPosition {
-        azimuth: 1.2,
-        elevation: 0.0,
-        distance: 2.0,
-    },
+    SpatialPosition { azimuth: 1.2, elevation: 0.0, distance: 2.0 },
     // SacredReciprocity: behind, reciprocal
-    SpatialPosition {
-        azimuth: 3.0,
-        elevation: 0.0,
-        distance: 2.0,
-    },
+    SpatialPosition { azimuth: 3.0, elevation: 0.0, distance: 2.0 },
     // EvolutionaryProgression: ascending front-right
-    SpatialPosition {
-        azimuth: 0.3,
-        elevation: 0.4,
-        distance: 1.8,
-    },
+    SpatialPosition { azimuth: 0.3, elevation: 0.4, distance: 1.8 },
     // SacredStillness: directly above
-    SpatialPosition {
-        azimuth: 0.0,
-        elevation: 1.2,
-        distance: 1.5,
-    },
+    SpatialPosition { azimuth: 0.0, elevation: 1.2, distance: 1.5 },
 ];
 
 /// A binaural source with delay-line ITD and gain-based ILD.
@@ -108,10 +72,7 @@ struct DelayLine {
 
 impl DelayLine {
     fn new(max_samples: usize) -> Self {
-        Self {
-            buffer: vec![0.0; max_samples.max(1)],
-            write_pos: 0,
-        }
+        Self { buffer: vec![0.0; max_samples.max(1)], write_pos: 0 }
     }
 
     fn write_and_read(&mut self, input: f32, delay: usize) -> f32 {
@@ -201,16 +162,9 @@ pub struct BinauralConsciousnessRenderer {
 impl BinauralConsciousnessRenderer {
     /// Create renderer for a given number of voices.
     pub fn new(num_voices: usize, sample_rate: u32) -> Self {
-        let sources = (0..num_voices)
-            .map(|_| BinauralSource::new(sample_rate))
-            .collect();
+        let sources = (0..num_voices).map(|_| BinauralSource::new(sample_rate)).collect();
         let positions = vec![SpatialPosition::front(1.5); num_voices];
-        Self {
-            sources,
-            sample_rate,
-            phi_spread: 0.5,
-            positions,
-        }
+        Self { sources, sample_rate, phi_spread: 0.5, positions }
     }
 
     /// Update spatial positions from consciousness state.
@@ -294,7 +248,10 @@ mod tests {
         let mut renderer = BinauralConsciousnessRenderer::new(2, 44100);
         renderer.update_state(&MusicalState::default());
 
-        let voices = vec![vec![0.5f32; 1024], vec![0.3f32; 1024]];
+        let voices = vec![
+            vec![0.5f32; 1024],
+            vec![0.3f32; 1024],
+        ];
         let output = renderer.render(&voices);
         assert_eq!(output.len(), 1024);
         assert!(output.iter().any(|s| s[0].abs() > 0.01));
@@ -305,24 +262,15 @@ mod tests {
     fn high_phi_narrows_spread() {
         let mut renderer = BinauralConsciousnessRenderer::new(4, 44100);
 
-        let high_phi = MusicalState {
-            consciousness_level: 0.95,
-            ..Default::default()
-        };
+        let high_phi = MusicalState { consciousness_level: 0.95, ..Default::default() };
         renderer.update_state(&high_phi);
         let high_spread = renderer.phi_spread;
 
-        let low_phi = MusicalState {
-            consciousness_level: 0.1,
-            ..Default::default()
-        };
+        let low_phi = MusicalState { consciousness_level: 0.1, ..Default::default() };
         renderer.update_state(&low_phi);
         let low_spread = renderer.phi_spread;
 
-        assert!(
-            high_spread < low_spread,
-            "high Phi should narrow: {high_spread} vs {low_spread}"
-        );
+        assert!(high_spread < low_spread, "high Phi should narrow: {high_spread} vs {low_spread}");
         assert!(high_spread < 0.2, "high Phi spread should be narrow");
     }
 
@@ -346,10 +294,7 @@ mod tests {
         let first_r = output.iter().position(|s| s[1].abs() > 0.01).unwrap_or(256);
         let first_l = output.iter().position(|s| s[0].abs() > 0.01).unwrap_or(256);
         // With source on right, right ear is closer
-        assert!(
-            first_r <= first_l,
-            "right should hear first: R={first_r}, L={first_l}"
-        );
+        assert!(first_r <= first_l, "right should hear first: R={first_r}, L={first_l}");
     }
 
     #[test]

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Holochain Cortex Layer - Trust & Identity for the Nervous System
 //!
 //! This module implements the "Cortex" of Symthaea's nervous system:
@@ -61,8 +64,8 @@
 
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::num::NonZeroUsize;
+use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ============================================================================

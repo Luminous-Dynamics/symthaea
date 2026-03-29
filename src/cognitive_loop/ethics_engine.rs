@@ -713,6 +713,12 @@ impl EthicsEngine {
                 dim,
                 exact_betti: enable_hodge,
                 adaptive_rips_enabled: enable_hodge,
+                // Hodge decomposition is O(n³) per scale. Bench results:
+                //   n=32: 3.6ms/cycle amortized (7.2% of 20Hz budget) ← viable
+                //   n=64: 214ms/cycle amortized (427% of budget) ← too expensive
+                // Reduce window and scales when Hodge is on.
+                window_size: if enable_hodge { 32 } else { 64 },
+                num_scales: if enable_hodge { 8 } else { 10 },
                 ..Default::default()
             },
             shared_basis.clone(),

@@ -148,7 +148,10 @@ fn train_prototypes(train_questions: &[MmluQuestion]) -> HashMap<String, (Binary
         }
         let correct_answer = &q.choices[q.answer];
         if let Some(hv) = encode_question_answer(&q.question, correct_answer) {
-            subject_hvs.entry(q.subject.clone()).or_default().push(hv);
+            subject_hvs
+                .entry(q.subject.clone())
+                .or_default()
+                .push(hv);
         }
     }
 
@@ -275,7 +278,10 @@ fn main() {
     // --- Load data ---
     let data_path = mmlu_data_path();
     if !data_path.exists() {
-        eprintln!("ERROR: MMLU data not found at {}", data_path.display());
+        eprintln!(
+            "ERROR: MMLU data not found at {}",
+            data_path.display()
+        );
         eprintln!("Place test.jsonl in data/benchmarks/mmlu/ or set SYMTHAEA_MMLU_DATA_PATH");
         std::process::exit(1);
     }
@@ -364,8 +370,10 @@ fn main() {
     );
 
     // Report training stats per subject
-    let mut train_counts: Vec<(&String, usize)> =
-        prototypes.iter().map(|(s, (_, c))| (s, *c)).collect();
+    let mut train_counts: Vec<(&String, usize)> = prototypes
+        .iter()
+        .map(|(s, (_, c))| (s, *c))
+        .collect();
     train_counts.sort_by(|a, b| b.1.cmp(&a.1));
 
     println!("Training examples per subject (top 5):");
@@ -383,10 +391,7 @@ fn main() {
     println!();
 
     // --- Evaluate ---
-    println!(
-        "Evaluating on {} held-out questions...",
-        eval_questions.len()
-    );
+    println!("Evaluating on {} held-out questions...", eval_questions.len());
     let eval_start = Instant::now();
 
     let mut subject_correct: HashMap<String, usize> = HashMap::new();
@@ -510,9 +515,7 @@ fn main() {
     for sr in results.per_subject.iter().take(5) {
         println!(
             "  {:<40} {}/{} = {:.1}% (trained on {} examples)",
-            sr.subject,
-            sr.correct,
-            sr.total,
+            sr.subject, sr.correct, sr.total,
             sr.accuracy * 100.0,
             sr.train_examples,
         );
@@ -522,9 +525,7 @@ fn main() {
     for sr in results.per_subject.iter().rev().take(5) {
         println!(
             "  {:<40} {}/{} = {:.1}% (trained on {} examples)",
-            sr.subject,
-            sr.correct,
-            sr.total,
+            sr.subject, sr.correct, sr.total,
             sr.accuracy * 100.0,
             sr.train_examples,
         );

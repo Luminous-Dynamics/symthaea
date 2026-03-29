@@ -333,13 +333,17 @@ mod tests {
         assert!(!index.is_full());
 
         index.add(create_entry(
-            ArtModality::Poetry { text: "one".into() },
+            ArtModality::Poetry {
+                text: "one".into(),
+            },
             test_score(),
             [0.5; 8],
             1,
         ));
         index.add(create_entry(
-            ArtModality::Poetry { text: "two".into() },
+            ArtModality::Poetry {
+                text: "two".into(),
+            },
             test_score(),
             [0.5; 8],
             2,

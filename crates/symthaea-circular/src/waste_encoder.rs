@@ -624,18 +624,18 @@ mod tests {
     fn test_self_similarity_high() {
         let encoder = WasteHdcEncoder::new();
         let sim = encoder.similarity(&organic_props(), &organic_props());
-        assert!(sim > 0.99, "Self-similarity should be > 0.99, got {}", sim);
+        assert!(
+            sim > 0.99,
+            "Self-similarity should be > 0.99, got {}",
+            sim
+        );
     }
 
     #[test]
     fn test_self_similarity_pet() {
         let encoder = WasteHdcEncoder::new();
         let sim = encoder.similarity(&pet_props(), &pet_props());
-        assert!(
-            sim > 0.99,
-            "PET self-similarity should be > 0.99, got {}",
-            sim
-        );
+        assert!(sim > 0.99, "PET self-similarity should be > 0.99, got {}", sim);
     }
 
     #[test]

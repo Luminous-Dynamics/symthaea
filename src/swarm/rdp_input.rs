@@ -273,11 +273,7 @@ pub fn auto_detect_injector(width: u32, height: u32) -> Box<dyn InputInjector> {
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
         match WaylandInputInjector::new(width, height) {
             Ok(inj) => {
-                tracing::info!(
-                    "Input injection: Wayland virtual input ({}x{})",
-                    width,
-                    height
-                );
+                tracing::info!("Input injection: Wayland virtual input ({}x{})", width, height);
                 return Box::new(inj);
             }
             Err(e) => {
@@ -314,7 +310,9 @@ mod tests {
 
         match &inj.events[0] {
             InjectedEvent::Pointer {
-                screen_x, screen_y, ..
+                screen_x,
+                screen_y,
+                ..
             } => {
                 assert_eq!(*screen_x, 960);
                 assert_eq!(*screen_y, 540);

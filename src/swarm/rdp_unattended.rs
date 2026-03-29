@@ -100,10 +100,7 @@ impl UnattendedDaemon {
     /// Check if an agent is allowed to connect.
     pub fn authorize(&mut self, agent_did: &str, assurance_level: u8, phi: f32) -> bool {
         // Check identity allowlist.
-        let identity_ok = self
-            .config
-            .allowed_identities
-            .contains(&agent_did.to_string());
+        let identity_ok = self.config.allowed_identities.contains(&agent_did.to_string());
 
         // Check assurance level.
         let assurance_ok = assurance_level >= self.config.min_assurance_level;
@@ -128,7 +125,10 @@ impl UnattendedDaemon {
 
         self.log(AuditEntry {
             timestamp: now_secs(),
-            event: AuditEvent::ConnectionAttempt { allowed, reason },
+            event: AuditEvent::ConnectionAttempt {
+                allowed,
+                reason,
+            },
             agent_did: Some(agent_did.to_string()),
             session_id: None,
         });
@@ -145,7 +145,8 @@ impl UnattendedDaemon {
             max_duration: Duration::from_secs(self.config.max_session_duration_secs),
         };
 
-        self.active_sessions.insert(session_id.to_string(), session);
+        self.active_sessions
+            .insert(session_id.to_string(), session);
 
         self.log(AuditEntry {
             timestamp: now_secs(),

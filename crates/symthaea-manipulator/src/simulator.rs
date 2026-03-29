@@ -39,9 +39,7 @@ impl SimpleManipulatorSimulator {
 }
 
 impl Default for SimpleManipulatorSimulator {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
@@ -50,8 +48,7 @@ impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
             // Scale normalized torque to actual Nm
             let torque = cmd.joint_torques[i] as f64 * self.max_torques[i];
             // Joint dynamics: I * ddq = torque - damping * dq
-            let ddq =
-                (torque - self.damping[i] * self.state.joint_velocities[i]) / self.inertias[i];
+            let ddq = (torque - self.damping[i] * self.state.joint_velocities[i]) / self.inertias[i];
             // Semi-implicit Euler
             self.state.joint_velocities[i] += ddq * dt;
             self.state.joint_angles[i] += self.state.joint_velocities[i] * dt;
@@ -67,16 +64,12 @@ impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
             }
         }
         // Update end-effector position via FK
-        self.state.end_effector_position = self
-            .kinematics
-            .end_effector_position(&self.state.joint_angles);
+        self.state.end_effector_position = self.kinematics.end_effector_position(&self.state.joint_angles);
         // Update gripper
         self.state.gripper_opening = cmd.gripper as f64;
     }
 
-    fn state(&self) -> &ManipulatorState {
-        &self.state
-    }
+    fn state(&self) -> &ManipulatorState { &self.state }
 
     fn reset(&mut self) {
         self.state = ManipulatorState::home();
@@ -93,14 +86,9 @@ mod tests {
         // Give initial velocity
         sim.state.joint_velocities[0] = 1.0;
         let cmd = ManipulatorCommand::zero();
-        for _ in 0..1000 {
-            sim.step(&cmd, 0.001);
-        }
+        for _ in 0..1000 { sim.step(&cmd, 0.001); }
         // Velocity should decay toward zero via damping
-        assert!(
-            sim.state().joint_velocities[0].abs() < 0.1,
-            "Should damp to near-zero"
-        );
+        assert!(sim.state().joint_velocities[0].abs() < 0.1, "Should damp to near-zero");
     }
 
     #[test]
@@ -109,13 +97,8 @@ mod tests {
         let initial_angle = sim.state().joint_angles[0];
         let mut cmd = ManipulatorCommand::zero();
         cmd.joint_torques[0] = 0.5; // Positive torque on J1
-        for _ in 0..100 {
-            sim.step(&cmd, 0.001);
-        }
-        assert!(
-            sim.state().joint_angles[0] > initial_angle,
-            "Positive torque should increase angle"
-        );
+        for _ in 0..100 { sim.step(&cmd, 0.001); }
+        assert!(sim.state().joint_angles[0] > initial_angle, "Positive torque should increase angle");
     }
 
     #[test]
@@ -123,14 +106,9 @@ mod tests {
         let mut sim = SimpleManipulatorSimulator::new();
         let mut cmd = ManipulatorCommand::zero();
         cmd.joint_torques[0] = 1.0; // Max torque
-        for _ in 0..100000 {
-            sim.step(&cmd, 0.001);
-        }
+        for _ in 0..100000 { sim.step(&cmd, 0.001); }
         let limits = sim.kinematics.joint_limits[0];
-        assert!(
-            sim.state().joint_angles[0] <= limits[1] + 0.01,
-            "Should not exceed upper limit"
-        );
+        assert!(sim.state().joint_angles[0] <= limits[1] + 0.01, "Should not exceed upper limit");
     }
 
     #[test]
@@ -139,14 +117,9 @@ mod tests {
         let initial_pos = sim.state().end_effector_position;
         let mut cmd = ManipulatorCommand::zero();
         cmd.joint_torques[1] = 0.3; // Move shoulder
-        for _ in 0..500 {
-            sim.step(&cmd, 0.001);
-        }
+        for _ in 0..500 { sim.step(&cmd, 0.001); }
         let new_pos = sim.state().end_effector_position;
-        let dist = ((new_pos[0] - initial_pos[0]).powi(2)
-            + (new_pos[1] - initial_pos[1]).powi(2)
-            + (new_pos[2] - initial_pos[2]).powi(2))
-        .sqrt();
+        let dist = ((new_pos[0] - initial_pos[0]).powi(2) + (new_pos[1] - initial_pos[1]).powi(2) + (new_pos[2] - initial_pos[2]).powi(2)).sqrt();
         assert!(dist > 0.001, "End effector should move: dist={dist}");
     }
 

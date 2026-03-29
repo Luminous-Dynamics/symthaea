@@ -98,9 +98,8 @@ impl PlayerStressModel {
     pub fn tick(&mut self, stress: &StressVector, dt_secs: f32) {
         // Cortisol: rises with sustained high arousal
         if stress.arousal > CORTISOL_AROUSAL_THRESHOLD {
-            self.cortisol_proxy += CORTISOL_ACCUMULATION_RATE
-                * (stress.arousal - CORTISOL_AROUSAL_THRESHOLD)
-                * dt_secs;
+            self.cortisol_proxy +=
+                CORTISOL_ACCUMULATION_RATE * (stress.arousal - CORTISOL_AROUSAL_THRESHOLD) * dt_secs;
         }
         // Natural cortisol decay
         self.cortisol_proxy -= CORTISOL_DECAY_RATE * dt_secs;

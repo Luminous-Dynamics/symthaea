@@ -84,7 +84,13 @@ impl SomaRdpServer {
     ///
     /// Called each Soma cycle. Frame pacing is handled internally.
     /// `pixels`: RGBA row-major from ScreenVisionBridge or MediaProjection.
-    pub fn tick(&mut self, pixels: &[u8], width: u32, height: u32, consciousness_level: f32) {
+    pub fn tick(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        consciousness_level: f32,
+    ) {
         if !self.active {
             return;
         }
@@ -177,7 +183,9 @@ impl HolonRdpViewer {
     /// Create a viewer for a Soma device's screen.
     pub fn new(width: u32, height: u32, tile_cols: u16, tile_rows: u16) -> Self {
         Self {
-            frame_buffer: super::rdp_client::FrameBuffer::new(width, height, tile_cols, tile_rows),
+            frame_buffer: super::rdp_client::FrameBuffer::new(
+                width, height, tile_cols, tile_rows,
+            ),
             outbound_input: Vec::new(),
             input_seq: 0,
             active: false,
@@ -261,8 +269,8 @@ pub enum HolonRdpMessage {
 
 #[cfg(test)]
 mod tests {
-    use super::super::rdp_codec::TILE_SIZE;
     use super::*;
+    use super::super::rdp_codec::TILE_SIZE;
 
     fn make_test_pixels(w: u32, h: u32, seed: u8) -> Vec<u8> {
         let n = w as usize * h as usize;

@@ -320,6 +320,30 @@ impl Default for PhaseCoherenceTracker {
 // MASTER EQUATION V2.0
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Maximum amplifier boost (caps the amplifier factor).
+/// Evolved via evolutionary architecture search (pop=20, gen=50):
+/// 2.27 ceiling outperformed 1.0 by +6.36% composite fitness.
+pub const DEFAULT_AMPLIFIER_CAP: f64 = 1.27;
+
+/// Weight of pure necessary conditions vs amplified necessary conditions.
+/// C = w × necessary + (1-w) × necessary × amplifier.
+/// 0.0 = pure amplification (current behavior: necessary × amp).
+/// 0.42 = evolved optimal (reduces sensitivity but improves stability).
+/// Default: 0.0 preserves existing behavior; tune via config for research.
+pub const DEFAULT_NECESSARY_WEIGHT: f64 = 0.0;
+
+/// Default amplifier weight for Attention
+pub const DEFAULT_AMPLIFIER_W_ATTENTION: f64 = 0.30;
+
+/// Default amplifier weight for Recursion (HOT)
+pub const DEFAULT_AMPLIFIER_W_RECURSION: f64 = 0.25;
+
+/// Default amplifier weight for Efficacy (FEP)
+pub const DEFAULT_AMPLIFIER_W_EFFICACY: f64 = 0.25;
+
+/// Default amplifier weight for Knowledge (Epistemic)
+pub const DEFAULT_AMPLIFIER_W_KNOWLEDGE: f64 = 0.20;
+
 /// Configuration for Master Equation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EquationConfig {
@@ -340,6 +364,19 @@ pub struct EquationConfig {
 
     /// Temporal decay rate
     pub temporal_decay: f64,
+
+    /// Amplifier weights for structured bottleneck {A, R, E, K}.
+    /// Only used when `structured_bottleneck` feature is enabled.
+    pub amplifier_weights: [f64; 4],
+
+    /// Maximum amplifier boost above 1.0 (caps at 1.0 + cap).
+    /// Only used when `structured_bottleneck` feature is enabled.
+    pub amplifier_cap: f64,
+
+    /// Weight of pure necessary term vs amplified term [0, 1].
+    /// C = w × necessary + (1-w) × necessary × amplifier.
+    /// Only used when `structured_bottleneck` feature is enabled.
+    pub necessary_weight: f64,
 }
 
 impl Default for EquationConfig {
@@ -351,6 +388,14 @@ impl Default for EquationConfig {
             temporal_window: DEFAULT_TEMPORAL_WINDOW,
             coherence_window: DEFAULT_COHERENCE_WINDOW,
             temporal_decay: 0.05, // 5% decay per timestep
+            amplifier_weights: [
+                DEFAULT_AMPLIFIER_W_ATTENTION,
+                DEFAULT_AMPLIFIER_W_RECURSION,
+                DEFAULT_AMPLIFIER_W_EFFICACY,
+                DEFAULT_AMPLIFIER_W_KNOWLEDGE,
+            ],
+            amplifier_cap: DEFAULT_AMPLIFIER_CAP,
+            necessary_weight: DEFAULT_NECESSARY_WEIGHT,
         }
     }
 }
@@ -381,6 +426,14 @@ pub struct ConsciousnessResult {
 
     /// Explanation in natural language
     pub explanation: String,
+
+    /// Necessary conditions minimum (softmin of {Φ, B, W} only)
+    /// Only populated when `structured_bottleneck` feature is enabled.
+    pub necessary_minimum: f64,
+
+    /// Amplifier factor from {A, R, E, K} components
+    /// Only meaningful when `structured_bottleneck` feature is enabled.
+    pub amplifier_factor: f64,
 }
 
 /// Master Equation of Consciousness v2.0
@@ -491,32 +544,67 @@ impl ConsciousnessEquationV2 {
         // B' = B * (1 + PAC) normalized
         let effective_binding = (binding * (1.0 + pac_modulation)).clamp(0.0, 1.0);
 
-        let core_values = [
-            phi,
-            effective_binding,
-            workspace,
-            attention,
-            recursion,
-            efficacy,
-            knowledge,
-        ];
+        // 3-5. Compute core term and limiting factor.
+        //
+        // With `structured_bottleneck`: only {Φ, B, W} are necessary conditions
+        // (softmin bottleneck); {A, R, E, K} are amplifiers that enrich but don't gate.
+        // Rationale: HOT theory argues consciousness without deep recursion is possible
+        // (Rosenthal 2005); first-order theories deny the need for higher-order thoughts.
+        // By separating necessary from amplifier, the equation respects these debates.
+        // See: Michel (2023) "How (Not) to Test Theories of Consciousness".
+        //
+        // Without the feature: original flat softmin over all 7 components.
+        #[cfg(feature = "structured_bottleneck")]
+        let (core_min, core_term, amplifier_factor, limiting_factor) = {
+            // Necessary conditions: Integration, Binding, Workspace
+            let necessary = [phi, effective_binding, workspace];
+            let necessary_min = self.soft_min(&necessary);
+            let necessary_term = self.sigmoid(necessary_min);
 
-        // 3. Soft minimum (differentiable)
-        let core_min = self.soft_min(&core_values);
+            // Amplifier: weighted sum of {A, R, E, K}, bounded by cap
+            let [w_a, w_r, w_e, w_k] = self.config.amplifier_weights;
+            let raw_amp = w_a * attention + w_r * recursion + w_e * efficacy + w_k * knowledge;
+            let amp = 1.0 + raw_amp.clamp(0.0, self.config.amplifier_cap);
 
-        // 4. Sigmoid smoothing
-        let core_term = self.sigmoid(core_min);
+            // Limiting factor searches necessary conditions only
+            let lf = self.find_limiting_factor(&[
+                (CoreComponent::Integration, phi),
+                (CoreComponent::Binding, effective_binding),
+                (CoreComponent::Workspace, workspace),
+            ]);
 
-        // 5. Find limiting factor
-        let limiting_factor = self.find_limiting_factor(&[
-            (CoreComponent::Integration, phi),
-            (CoreComponent::Binding, effective_binding), // Use boosted binding
-            (CoreComponent::Workspace, workspace),
-            (CoreComponent::Attention, attention),
-            (CoreComponent::Recursion, recursion),
-            (CoreComponent::Efficacy, efficacy),
-            (CoreComponent::Knowledge, knowledge),
-        ]);
+            // Blend: w × necessary + (1-w) × necessary × amplifier
+            // Evolution found w=0.42 outperforms pure amplification (w=0)
+            let w = self.config.necessary_weight;
+            let blended = necessary_term * (w + (1.0 - w) * amp);
+
+            (necessary_min, blended, amp, lf)
+        };
+
+        #[cfg(not(feature = "structured_bottleneck"))]
+        let (core_min, core_term, amplifier_factor, limiting_factor) = {
+            let core_values = [
+                phi,
+                effective_binding,
+                workspace,
+                attention,
+                recursion,
+                efficacy,
+                knowledge,
+            ];
+            let cm = self.soft_min(&core_values);
+            let ct = self.sigmoid(cm);
+            let lf = self.find_limiting_factor(&[
+                (CoreComponent::Integration, phi),
+                (CoreComponent::Binding, effective_binding),
+                (CoreComponent::Workspace, workspace),
+                (CoreComponent::Attention, attention),
+                (CoreComponent::Recursion, recursion),
+                (CoreComponent::Efficacy, efficacy),
+                (CoreComponent::Knowledge, knowledge),
+            ]);
+            (cm, ct, 1.0, lf)
+        };
 
         // 6. Weighted component sum with phase coherence
         let weighted_sum = self.weighted_coherent_sum(state);
@@ -527,7 +615,7 @@ impl ConsciousnessEquationV2 {
         // 8. Temporal continuity ρ(t)
         let temporal = self.temporal_continuity();
 
-        // 9. Final computation: C(t) = σ(softmin(...)) × weighted_sum × S × ρ(t)
+        // 9. Final computation: C(t) = core_term × weighted_sum × S × ρ(t)
         let consciousness = core_term * weighted_sum * substrate * temporal;
 
         // Guard: if any upstream factor was NaN/Inf, clamp to valid range [0, 1]
@@ -543,6 +631,22 @@ impl ConsciousnessEquationV2 {
         // 11. Update phase tracking (use core_min as global phase proxy)
         self.phase_tracker
             .update_global(core_min * std::f64::consts::TAU);
+
+        // 11b. Update per-component phase tracking (enables PLV coherence computation)
+        self.phase_tracker
+            .update_phase("integration", phi * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_phase("binding", effective_binding * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_phase("workspace", workspace * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_phase("attention", attention * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_phase("recursion", recursion * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_phase("efficacy", efficacy * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_phase("knowledge", knowledge * std::f64::consts::TAU);
 
         // 12. Generate explanation
         let explanation = self.generate_explanation(
@@ -572,6 +676,8 @@ impl ConsciousnessEquationV2 {
             core_breakdown,
             limiting_factor,
             explanation,
+            necessary_minimum: core_min,
+            amplifier_factor,
         };
 
         // Record history
@@ -776,6 +882,15 @@ impl ConsciousnessEquationV2 {
     /// Get weights
     pub fn weights(&self) -> &HashMap<String, f64> {
         &self.weights
+    }
+
+    /// Get the consciousness level from the most recent computation.
+    /// Returns 0.0 if no computation has been performed yet.
+    pub fn last_consciousness(&self) -> f64 {
+        self.history
+            .back()
+            .map(|r| r.consciousness)
+            .unwrap_or(0.0)
     }
 }
 
@@ -1022,5 +1137,158 @@ mod tests {
                 target
             );
         }
+    }
+
+    // ── Structured Bottleneck Tests ─────────────────────────────────────
+    // These verify the structured bottleneck behavior regardless of feature flag.
+    // With the feature enabled, amplifiers don't gate; without, they do.
+
+    #[test]
+    fn test_new_fields_populated() {
+        let mut eq = ConsciousnessEquationV2::new();
+        let state = ConsciousnessStateV2::new(); // defaults to 0.5 all
+
+        let result = eq.compute(&state);
+        assert!(
+            result.necessary_minimum >= 0.0 && result.necessary_minimum <= 1.0,
+            "necessary_minimum should be in [0, 1]"
+        );
+        assert!(
+            result.amplifier_factor >= 1.0,
+            "amplifier_factor should be >= 1.0 (got {})",
+            result.amplifier_factor
+        );
+    }
+
+    #[cfg(feature = "structured_bottleneck")]
+    #[test]
+    fn test_structured_bottleneck_amplifiers_dont_gate() {
+        // With structured bottleneck, zero amplifiers should NOT collapse consciousness
+        let mut eq = ConsciousnessEquationV2::new();
+        let mut state = ConsciousnessStateV2::new();
+
+        // High necessary conditions
+        state.set_core(CoreComponent::Integration, 0.8);
+        state.set_core(CoreComponent::Binding, 0.8);
+        state.set_core(CoreComponent::Workspace, 0.8);
+
+        // Zero amplifiers
+        state.set_core(CoreComponent::Attention, 0.0);
+        state.set_core(CoreComponent::Recursion, 0.0);
+        state.set_core(CoreComponent::Efficacy, 0.0);
+        state.set_core(CoreComponent::Knowledge, 0.0);
+
+        let result = eq.compute(&state);
+        assert!(
+            result.consciousness > 0.1,
+            "Structured bottleneck: zero amplifiers should NOT collapse consciousness (got {})",
+            result.consciousness,
+        );
+        assert!(
+            (result.amplifier_factor - 1.0).abs() < 0.01,
+            "Amplifier factor should be ~1.0 with zero amplifiers (got {})",
+            result.amplifier_factor,
+        );
+    }
+
+    #[cfg(feature = "structured_bottleneck")]
+    #[test]
+    fn test_structured_bottleneck_necessary_gates() {
+        // With structured bottleneck, low Phi should still collapse consciousness
+        let mut eq = ConsciousnessEquationV2::new();
+        let mut state = ConsciousnessStateV2::new();
+
+        state.set_core(CoreComponent::Integration, 0.05); // Very low Phi
+        state.set_core(CoreComponent::Binding, 0.8);
+        state.set_core(CoreComponent::Workspace, 0.8);
+        state.set_core(CoreComponent::Attention, 0.9);
+        state.set_core(CoreComponent::Recursion, 0.9);
+        state.set_core(CoreComponent::Efficacy, 0.9);
+        state.set_core(CoreComponent::Knowledge, 0.9);
+
+        let result = eq.compute(&state);
+        assert!(
+            result.consciousness < 0.15,
+            "Low necessary condition (Phi) should collapse consciousness (got {})",
+            result.consciousness,
+        );
+        assert_eq!(
+            result.limiting_factor,
+            CoreComponent::Integration,
+            "Integration should be the limiting factor"
+        );
+    }
+
+    #[cfg(feature = "structured_bottleneck")]
+    #[test]
+    fn test_structured_bottleneck_amplifier_monotonic() {
+        // C(t) should increase monotonically with amplifier values when necessary fixed
+        let mut state = ConsciousnessStateV2::new();
+        state.set_core(CoreComponent::Integration, 0.7);
+        state.set_core(CoreComponent::Binding, 0.7);
+        state.set_core(CoreComponent::Workspace, 0.7);
+
+        let mut prev_c = 0.0;
+        for level in [0.0, 0.2, 0.4, 0.6, 0.8, 1.0] {
+            let mut eq = ConsciousnessEquationV2::new();
+            state.set_core(CoreComponent::Attention, level);
+            state.set_core(CoreComponent::Recursion, level);
+            state.set_core(CoreComponent::Efficacy, level);
+            state.set_core(CoreComponent::Knowledge, level);
+
+            let result = eq.compute(&state);
+            assert!(
+                result.consciousness >= prev_c - 1e-9,
+                "C(t) should be monotonic in amplifiers: C({})={} < prev={}",
+                level,
+                result.consciousness,
+                prev_c,
+            );
+            prev_c = result.consciousness;
+        }
+    }
+
+    #[cfg(feature = "structured_bottleneck")]
+    #[test]
+    fn test_structured_bottleneck_limiting_factor_narrowed() {
+        // Limiting factor should only be from {Phi, B, W}
+        let mut eq = ConsciousnessEquationV2::new();
+        let mut state = ConsciousnessStateV2::new();
+
+        // Make Attention the lowest overall, but it should NOT be limiting
+        state.set_core(CoreComponent::Integration, 0.5);
+        state.set_core(CoreComponent::Binding, 0.6);
+        state.set_core(CoreComponent::Workspace, 0.7);
+        state.set_core(CoreComponent::Attention, 0.01); // Lowest overall
+        state.set_core(CoreComponent::Recursion, 0.5);
+        state.set_core(CoreComponent::Efficacy, 0.5);
+        state.set_core(CoreComponent::Knowledge, 0.5);
+
+        let result = eq.compute(&state);
+        assert_eq!(
+            result.limiting_factor,
+            CoreComponent::Integration,
+            "Limiting factor should be Integration (lowest necessary), not Attention"
+        );
+    }
+
+    #[test]
+    fn test_per_component_phase_coherence_tracked() {
+        let mut eq = ConsciousnessEquationV2::new();
+        let state = ConsciousnessStateV2::new();
+
+        // Run enough cycles to build phase history
+        for _ in 0..60 {
+            eq.compute(&state);
+        }
+
+        // Phase tracker should now have data for individual components
+        let coherence = eq.phase_tracker.compute_coherence("integration");
+        // With constant input, phases are perfectly correlated
+        assert!(
+            coherence > 0.8,
+            "Constant input should yield high phase coherence (got {})",
+            coherence,
+        );
     }
 }

@@ -28,7 +28,18 @@ impl CognitiveLoopService {
         let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
-                    let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    let mut activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    // Warm-start: spontaneous baseline activation during early cycles
+                    // when PE is necessarily high (untrained system). Decays over 50 cycles.
+                    // Science: Raichle (2001) — resting-state default mode provides
+                    // spontaneous workspace activation before learned predictions emerge.
+                    // 0.6 guarantees GWT entry (threshold 0.5) and approaches ignition
+                    // (threshold 0.65) in the first cycles.
+                    if self.stats.total_cycles < 50 {
+                        let warmup_boost =
+                            0.6 * (1.0 - self.stats.total_cycles as f64 / 50.0);
+                        activation = (activation + warmup_boost).min(1.0);
+                    }
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
                         "cognitive_loop",
@@ -36,6 +47,18 @@ impl CognitiveLoopService {
                         vec![ctx.hv16_cached],
                         vec!["encoder".to_string()],
                     );
+                    // Submit memory retrieval as competing strategy (default mode network).
+                    // GWT requires coalition competition for ignition (Dehaene 2011).
+                    // Memory activation = prediction confidence (familiar → stronger retrieval).
+                    let memory_activation =
+                        (self.prediction_confidence * 0.8 + 0.1).clamp(0.0, 1.0);
+                    gwt.submit_strategy(
+                        "memory_retrieval",
+                        memory_activation,
+                        vec![ctx.hv16_cached],
+                        vec!["memory".to_string()],
+                    );
+
                     // If previous cycle's subsystems requested broadcast, boost salience
                     if self.carryover.gwt_broadcast_occurred {
                         gwt.submit_strategy(
@@ -45,6 +68,22 @@ impl CognitiveLoopService {
                             vec!["priming".to_string()],
                         );
                     }
+                    // CTC: Wire binding coherence and PAC modulation index into GWT
+                    // Science: Fries (2015) — phase-locked binding gates workspace entry
+                    #[cfg(feature = "ctc_wiring")]
+                    {
+                        // Use equation V2's cached PAC modulation and multimodal binding
+                        let binding_c = self
+                            .consciousness
+                            .consciousness_engine
+                            .last_multimodal_binding_coherence();
+                        let pac = self
+                            .consciousness
+                            .consciousness_engine
+                            .last_pac_modulation();
+                        gwt.set_ctc_signals(binding_c, pac);
+                    }
+
                     let result = gwt.process();
                     let coalition_size = result
                         .winning_coalition
@@ -279,9 +318,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (phenomenal_binding_strength, phenomenal_fragmented) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut binding) =
-                    self.consciousness.consciousness_monitors.phenomenal_binding
-                {
+                if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding {
                     let dims = [
                         ctx.unified_psi,
                         ctx.coherence as f64,
@@ -763,13 +800,10 @@ impl CognitiveLoopService {
         // memory even without full conscious access (pre-attentive encoding).
         if ctx.surprise_triggered {
             let valence = -(ctx.prediction_error as f64 * 0.3); // surprise is mildly negative
-            self.consciousness
-                .master_equation
-                .narrative_coherence
-                .add_episode(
-                    format!("surprise_pre_pe{:.2}", ctx.prediction_error),
-                    valence,
-                );
+            self.consciousness.master_equation.narrative_coherence.add_episode(
+                format!("surprise_pre_pe{:.2}", ctx.prediction_error),
+                valence,
+            );
         }
 
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
@@ -780,20 +814,16 @@ impl CognitiveLoopService {
             // Wire embodiment factor from cognitive loop signals.
             // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
             // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
-            self.consciousness
-                .master_equation
-                .embodiment_factor
-                .record_prediction(
-                    1.0 - ctx.prediction_error as f64,
-                    1.0 - ctx.prediction_error as f64,
-                );
+            self.consciousness.master_equation.embodiment_factor.record_prediction(
+                1.0 - ctx.prediction_error as f64,
+                1.0 - ctx.prediction_error as f64,
+            );
             // Use allostatic load as direct interoceptive coherence signal.
             // Low allostatic load = high body coherence (expected ≈ actual).
             {
                 let allostatic = self.neuromod.bath.allostatic_load;
                 let coherence = 1.0 - allostatic as f64;
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .embodiment_factor
                     .update_interoceptive(coherence, coherence);
             }
@@ -804,8 +834,7 @@ impl CognitiveLoopService {
             // Conway (2005) — narrative identity forms from dense episodic sampling.
             if self.stats.total_cycles % 5 == 0 {
                 let valence = (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0);
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_episode(format!("cycle_{}", self.stats.total_cycles), valence);
             }
@@ -815,8 +844,7 @@ impl CognitiveLoopService {
             // Science: Schacter et al. (2012) — prospection uses same networks as episodic memory
             if self.stats.total_cycles % 25 == 0 {
                 let horizon = ((1.0 - ctx.prediction_error as f64) * 10.0).max(1.0) as usize;
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_horizon_{}", self.stats.total_cycles),
@@ -845,10 +873,11 @@ impl CognitiveLoopService {
                     format!("coherence_{:.1}", ctx.coherence),
                     format!("safety_{:.1}", late.predictive_self_safety),
                 ];
-                self.consciousness
-                    .master_equation
-                    .social_embedding
-                    .update_self_model(self_goals, self_beliefs, late.affective_valence as f64);
+                self.consciousness.master_equation.social_embedding.update_self_model(
+                    self_goals,
+                    self_beliefs,
+                    late.affective_valence as f64,
+                );
 
                 // User agent model: the system IS modeling the user (their input
                 // drives prediction, their patterns are tracked by social_coherence).
@@ -861,16 +890,13 @@ impl CognitiveLoopService {
                         self.behavior.social_mgr.social.social_cooperation_rate
                     ),
                 ];
-                self.consciousness
-                    .master_equation
-                    .social_embedding
-                    .update_agent_model(
-                        "user",
-                        user_beliefs,
-                        user_goals,
-                        0.0, // neutral valence (we don't know user's emotions)
-                        self.behavior.social_mgr.social.social_prediction_accuracy as f64,
-                    );
+                self.consciousness.master_equation.social_embedding.update_agent_model(
+                    "user",
+                    user_beliefs,
+                    user_goals,
+                    0.0, // neutral valence (we don't know user's emotions)
+                    self.behavior.social_mgr.social.social_prediction_accuracy as f64,
+                );
 
                 // Feed prediction accuracy as ToM feedback — when the system
                 // correctly predicts user input patterns, its "other_modeling_accuracy"
@@ -883,12 +909,10 @@ impl CognitiveLoopService {
                 let c_level = self.carryover.history.consciousness_level;
                 let c_tom_mod = 0.85 + 0.25 * c_level; // [0.85, 1.10]
                 let accuracy = (raw_accuracy * c_tom_mod).clamp(0.0, 1.0);
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .social_embedding
                     .record_tom_prediction("user", accuracy);
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .social_embedding
                     .provide_tom_feedback("user", accuracy);
             }
@@ -1035,6 +1059,18 @@ impl CognitiveLoopService {
                 }
             }
 
+            // Blend MCE level with ConsciousnessEquationV2 output.
+            // V2 has structured bottleneck (necessary/amplifier split, evolved parameters).
+            // MCE provides the base; V2 provides a scientifically grounded correction.
+            // Blend: max(MCE, V2 * 0.8) — V2 can lift the floor but MCE remains primary.
+            let v2_cached = self
+                .consciousness
+                .consciousness_engine
+                .consciousness_equation_v2()
+                .map(|eq| eq.last_consciousness())
+                .unwrap_or(0.0);
+            let level = level.max(v2_cached * 0.8);
+
             // Track consciousness level for learning gating (Task C)
             self.carryover.history.consciousness_level = level;
 
@@ -1090,8 +1126,7 @@ impl CognitiveLoopService {
                 } else {
                     format!("consolidation_c{:.2}", level)
                 };
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_episode(episode_label, episode_valence);
             }
@@ -1113,8 +1148,7 @@ impl CognitiveLoopService {
                 let probability = (1.0 - pe).clamp(0.1, 0.9);
                 // Desirability: valence of the predicted state
                 let desirability = late.body_valence as f64;
-                self.consciousness
-                    .master_equation
+                self.consciousness.master_equation
                     .narrative_coherence
                     .add_future_scenario(
                         format!("prediction_h{}_pe{:.2}", horizon_steps, pe),

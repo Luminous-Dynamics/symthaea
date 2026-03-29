@@ -63,12 +63,9 @@ impl AuvTrainer {
             let hv = self.encoder.encode(self.simulator.state());
 
             if step % self.config.cognitive_interval == 0 {
-                self.store_forward
-                    .update_blackout(self.simulator.state().depth);
+                self.store_forward.update_blackout(self.simulator.state().depth);
                 self.fep_agent.set_blackout(self.store_forward.in_blackout);
-                let _fep = self
-                    .fep_agent
-                    .tick(self.simulator.state(), self.target_depth);
+                let _fep = self.fep_agent.tick(self.simulator.state(), self.target_depth);
             }
 
             let cmd = self.controller.forward(&hv, dt as f32);
@@ -98,9 +95,7 @@ impl AuvTrainer {
                 metrics.exceeded_crush_depth = true;
                 break;
             }
-            if !state.is_finite() {
-                break;
-            }
+            if !state.is_finite() { break; }
         }
 
         let n = metrics.steps_survived.max(1) as f64;

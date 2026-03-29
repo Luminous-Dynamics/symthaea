@@ -108,6 +108,10 @@ pub struct ThermodynamicFeedback {
     pub hfe_lr_adjustment: f64,
     /// Whether Landauer pressure is suppressing memory consolidation.
     pub memory_consolidation_suppressed: bool,
+    /// Whether England dissipation-driven adaptation signal is active.
+    /// When true, entropy production is correlated with order growth and PE reduction
+    /// — exploration should be boosted, not dampened.
+    pub england_boost: bool,
 }
 
 /// Consolidated thermodynamic integration — owns unified state + physics bridge.
@@ -172,8 +176,7 @@ impl ThermodynamicIntegration {
         }
 
         if input.has_hfe {
-            self.state
-                .update_hfe(input.hfe_total, input.hfe_complexity, input.hfe_accuracy);
+            self.state.update_hfe(input.hfe_total, input.hfe_complexity, input.hfe_accuracy);
         }
 
         self.state.update_energy(
@@ -244,16 +247,28 @@ impl ThermodynamicIntegration {
         // 4b: Prigogine violation → exploration damping
         // Science: Prigogine (1947) — increasing entropy production in LinearNonEquilibrium
         // violates minimum entropy production principle → system destabilizing.
+        // Note: only valid in LinearNonEquilibrium — at EdgeOfChaos, entropy production
+        // is necessary for complex dynamics (Langton 1990).
         if self.bridge.prigogine_violated {
             feedback.exploration_factor *= thresholds::THERMO_PRIGOGINE_VIOLATION_DAMPING;
             feedback.prigogine_violated = true;
+        }
+
+        // 4b2: England dissipation-driven adaptation → exploration boost
+        // Science: England (2013) — systems driven by external energy self-organize
+        // to maximize entropy production while building internal order.
+        // When entropy + order + PE-reduction align, dissipation is driving learning.
+        if self.bridge.england_exploration_boost {
+            feedback.exploration_factor *= 1.1; // 10% boost
+            feedback.england_boost = true;
         }
 
         // 4c: Jarzynski-HFE divergence → HFE learning rate correction
         // Science: Crooks (1999) — divergence between nonequilibrium and model free energy
         // indicates model inaccuracy → boost learning to correct.
         let divergence = self.bridge.jarzynski_hfe_divergence;
-        if divergence.is_finite() && divergence > thresholds::THERMO_JARZYNSKI_DIVERGENCE_THRESHOLD
+        if divergence.is_finite()
+            && divergence > thresholds::THERMO_JARZYNSKI_DIVERGENCE_THRESHOLD
         {
             let correction = (divergence * 0.5).min(2.0);
             feedback.hfe_lr_adjustment = correction;
@@ -264,7 +279,9 @@ impl ThermodynamicIntegration {
         // 4d: Onsager asymmetry → coherence-seeking response
         // Science: Onsager (1931) — asymmetric transport = decoupled dimensions.
         let asymmetry = self.bridge.onsager_asymmetry;
-        if asymmetry.is_finite() && asymmetry > thresholds::THERMO_ONSAGER_ASYMMETRY_THRESHOLD {
+        if asymmetry.is_finite()
+            && asymmetry > thresholds::THERMO_ONSAGER_ASYMMETRY_THRESHOLD
+        {
             feedback.exploration_factor *= thresholds::THERMO_ONSAGER_COHERENCE_DAMPING;
         }
 
@@ -337,7 +354,7 @@ impl ThermodynamicIntegration {
                 s.effective_temperature.max(0.01) * 300.0, // Scale to Kelvin range
                 s.entropy_production_rate.abs().max(0.001) * 101325.0, // Scale to Pa range
                 (1.0 - s.criticality_distance).max(0.001) * 0.001, // Scale to m³ range
-                s.order_parameter.max(0.001) * 1000.0,     // Scale to Joules range
+                s.order_parameter.max(0.001) * 1000.0, // Scale to Joules range
             )
             .vector;
 
@@ -490,7 +507,7 @@ mod tests {
         let mut ti = ThermodynamicIntegration::default();
         let mut input = default_input();
         input.analyzer_temperature = 1.5; // High temp → high Carnot
-                                          // Run several cycles to build up Onsager history and stabilize
+        // Run several cycles to build up Onsager history and stabilize
         for _ in 0..5 {
             ti.run_cycle(&input);
         }

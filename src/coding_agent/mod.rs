@@ -726,15 +726,13 @@ impl CodingAgent {
         if reasoning.should_defer() && self.phase == TaskPhase::Generating {
             self.consciousness_deferrals += 1;
             self.observations.push(format!(
-                "Reasoning deferral: confidence={:.2}",
-                reasoning.reasoning_confidence
+                "Reasoning deferral: confidence={:.2}", reasoning.reasoning_confidence
             ));
             return;
         }
         if reasoning.should_diagnose() && self.phase == TaskPhase::Generating {
             self.observations.push(format!(
-                "Reasoning diagnosis: confidence={:.2}",
-                reasoning.reasoning_confidence
+                "Reasoning diagnosis: confidence={:.2}", reasoning.reasoning_confidence
             ));
             self.phase = TaskPhase::Understanding;
             return;

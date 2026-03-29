@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Epistemic Mirror (GIS v3)
 //!
 //! Meta-cognitive reflection system for understanding and monitoring one's own

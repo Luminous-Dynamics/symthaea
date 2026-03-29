@@ -112,7 +112,9 @@ impl ThermodynamicManager {
     }
 
     /// Access unified thermodynamic state (for telemetry export).
-    pub fn state(&self) -> &super::super::thermodynamic_state::UnifiedThermodynamicState {
+    pub fn state(
+        &self,
+    ) -> &super::super::thermodynamic_state::UnifiedThermodynamicState {
         &self.integration.state
     }
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Causal Mind: The Revolutionary Core of Symthaea
 //!
 //! This module unifies HDC, causal reasoning, and language understanding into

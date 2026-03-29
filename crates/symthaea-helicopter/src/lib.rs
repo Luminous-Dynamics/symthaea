@@ -57,3 +57,20 @@ pub use perturbations::{HelicopterPerturbation, PerturbationSchedule};
 pub use simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
 pub use training::HelicopterTrainer;
 pub use types::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn helicopter_command_hover() {
+        let cmd = HelicopterCommand::hover();
+        assert!(cmd.thrust > 0.0, "hover thrust should be positive");
+        assert!(cmd.collective > 0.0, "hover collective should be positive");
+    }
+
+    #[test]
+    fn channel_names_count() {
+        assert_eq!(CHANNEL_NAMES.len(), NUM_STATE_CHANNELS);
+    }
+}

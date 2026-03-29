@@ -12,6 +12,7 @@ keywords = ["robotics", "hal", "i2c", "servo", "embedded"]
 categories = ["embedded", "hardware-support"]
 
 [dependencies]
+symthaea-core = { path = "../../symthaea-core" }
 symthaea-humanoid = { path = "../symthaea-humanoid" }
 serde = { workspace = true }
 serde_json = { workspace = true }

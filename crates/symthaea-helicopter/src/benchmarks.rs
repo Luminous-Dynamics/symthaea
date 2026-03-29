@@ -71,15 +71,10 @@ pub fn benchmark_hover(
     let mut steps_survived = 0;
 
     // Motor gain based on consciousness level
-    let gain = if phi > 0.6 {
-        1.0f32
-    } else if phi > 0.3 {
-        0.6
-    } else if phi > 0.1 {
-        0.3
-    } else {
-        0.0
-    };
+    let gain = if phi > 0.6 { 1.0f32 }
+    else if phi > 0.3 { 0.6 }
+    else if phi > 0.1 { 0.3 }
+    else { 0.0 };
 
     for step in 0..steps {
         let hv = encoder.encode(sim.state());
@@ -145,15 +140,7 @@ pub fn benchmark_perturbation_recovery(
     let perturb_start = total_steps / 3;
     let perturb_end = 2 * total_steps / 3;
 
-    let gain = if phi > 0.6 {
-        1.0f32
-    } else if phi > 0.3 {
-        0.6
-    } else if phi > 0.1 {
-        0.3
-    } else {
-        0.0
-    };
+    let gain = if phi > 0.6 { 1.0f32 } else if phi > 0.3 { 0.6 } else if phi > 0.1 { 0.3 } else { 0.0 };
 
     let mut pre_error = 0.0;
     let mut during_error = 0.0;
@@ -243,10 +230,7 @@ mod tests {
 
     #[test]
     fn test_hover_benchmark_runs() {
-        let config = HelicopterConfig {
-            steps_per_episode: 300,
-            ..Default::default()
-        };
+        let config = HelicopterConfig { steps_per_episode: 300, ..Default::default() };
         let result = benchmark_hover(&config, 20.0, 300, 0.7);
         assert!(result.steps_survived > 0);
         assert!(result.mean_altitude_error.is_finite());
@@ -255,10 +239,7 @@ mod tests {
 
     #[test]
     fn test_higher_phi_better_hover() {
-        let config = HelicopterConfig {
-            steps_per_episode: 300,
-            ..Default::default()
-        };
+        let config = HelicopterConfig { steps_per_episode: 300, ..Default::default() };
         let high_phi = benchmark_hover(&config, 20.0, 300, 0.8);
         let low_phi = benchmark_hover(&config, 20.0, 300, 0.05);
 
@@ -270,10 +251,7 @@ mod tests {
 
     #[test]
     fn test_perturbation_recovery_benchmark() {
-        let config = HelicopterConfig {
-            steps_per_episode: 900,
-            ..Default::default()
-        };
+        let config = HelicopterConfig { steps_per_episode: 900, ..Default::default() };
         let result = benchmark_perturbation_recovery(&config, 20.0, 0.7);
         assert!(result.pre_perturbation_error.is_finite());
         assert!(result.during_perturbation_error.is_finite());
@@ -281,16 +259,13 @@ mod tests {
 
     #[test]
     fn test_phi_sweep() {
-        let config = HelicopterConfig {
-            steps_per_episode: 100,
-            ..Default::default()
-        };
+        let config = HelicopterConfig { steps_per_episode: 100, ..Default::default() };
         let results = phi_correlation_sweep(&config, 20.0, 100);
         assert_eq!(results.len(), 11); // 11 phi values
-                                       // Higher phi should generally have lower error (consciousness helps)
+        // Higher phi should generally have lower error (consciousness helps)
         let first = &results[0].1; // phi=0.05 (Red)
         let last = &results[10].1; // phi=1.0 (Green)
-                                   // Red has zero effort, Green has positive effort
+        // Red has zero effort, Green has positive effort
         assert!(last.mean_control_effort > first.mean_control_effort);
     }
 }

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Quick test of principled causal primitives (skips slow unified method)
 use symthaea::benchmarks::{
     discover_by_phi, discover_by_principled_hdc, discover_information_theoretic,

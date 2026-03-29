@@ -128,7 +128,9 @@ fn extract_numbers(text: &str) -> Vec<f64> {
             while i < len
                 && (chars[i].is_ascii_digit()
                     || chars[i] == '.'
-                    || (chars[i] == ',' && i + 1 < len && chars[i + 1].is_ascii_digit()))
+                    || (chars[i] == ','
+                        && i + 1 < len
+                        && chars[i + 1].is_ascii_digit()))
             {
                 i += 1;
             }
@@ -139,7 +141,10 @@ fn extract_numbers(text: &str) -> Vec<f64> {
                 end -= 1;
             }
 
-            let num_str: String = chars[start..end].iter().filter(|c| **c != ',').collect();
+            let num_str: String = chars[start..end]
+                .iter()
+                .filter(|c| **c != ',')
+                .collect();
 
             if let Ok(n) = num_str.parse::<f64>() {
                 // Skip numbers that are likely not operands (years, etc.)
@@ -495,10 +500,7 @@ fn main() {
             }),
             None => {
                 if line_no < 5 {
-                    eprintln!(
-                        "  Warning: could not extract gold answer from line {}",
-                        line_no + 1
-                    );
+                    eprintln!("  Warning: could not extract gold answer from line {}", line_no + 1);
                 }
                 parse_failures += 1;
             }
@@ -523,14 +525,8 @@ fn main() {
     let t = Instant::now();
     let (ordinality, monotonicity, self_sim) = validate_hdc_number_encoding();
 
-    println!(
-        "  Ordinality (nearby > far similarity): {:.1}%",
-        ordinality * 100.0
-    );
-    println!(
-        "  Monotonicity (density increases):     {:.1}%",
-        monotonicity * 100.0
-    );
+    println!("  Ordinality (nearby > far similarity): {:.1}%", ordinality * 100.0);
+    println!("  Monotonicity (density increases):     {:.1}%", monotonicity * 100.0);
     println!("  Self-similarity (deterministic):      {:.4}", self_sim);
     println!("  Time: {:.1}ms\n", t.elapsed().as_secs_f64() * 1000.0);
 
@@ -643,12 +639,7 @@ fn main() {
     println!("Test 4: Accuracy by Operation Type");
     println!("------------------------------------------------------------------");
 
-    for op in &[
-        ArithOp::Add,
-        ArithOp::Subtract,
-        ArithOp::Multiply,
-        ArithOp::Divide,
-    ] {
+    for op in &[ArithOp::Add, ArithOp::Subtract, ArithOp::Multiply, ArithOp::Divide] {
         let relevant: Vec<&SolveAttempt> = attempts
             .iter()
             .filter(|a| a.operations.contains(op))
@@ -714,33 +705,15 @@ fn main() {
         }
     }
 
-    let avg_sim_close = if n_close > 0 {
-        sim_close / n_close as f64
-    } else {
-        0.0
-    };
-    let avg_sim_far = if n_far > 0 {
-        sim_far / n_far as f64
-    } else {
-        0.0
-    };
+    let avg_sim_close = if n_close > 0 { sim_close / n_close as f64 } else { 0.0 };
+    let avg_sim_far = if n_far > 0 { sim_far / n_far as f64 } else { 0.0 };
 
     println!("  Gold answer range: 0 to {:.0}", max_gold);
-    println!(
-        "  Close-value pairs (diff < 5%): avg sim = {:.4} (n={})",
-        avg_sim_close, n_close
-    );
-    println!(
-        "  Far-value pairs (diff > 30%):  avg sim = {:.4} (n={})",
-        avg_sim_far, n_far
-    );
+    println!("  Close-value pairs (diff < 5%): avg sim = {:.4} (n={})", avg_sim_close, n_close);
+    println!("  Far-value pairs (diff > 30%):  avg sim = {:.4} (n={})", avg_sim_far, n_far);
     println!(
         "  Encoding preserves ordinality: {}",
-        if avg_sim_close > avg_sim_far {
-            "YES"
-        } else {
-            "NO"
-        }
+        if avg_sim_close > avg_sim_far { "YES" } else { "NO" }
     );
     println!("  Time: {:.1}ms\n", t.elapsed().as_secs_f64() * 1000.0);
 
@@ -797,11 +770,26 @@ fn main() {
     println!("======================================================================");
 
     let checks = vec![
-        ("Number extraction rate > 90%", extraction_rate > 0.90),
-        ("Operation detection rate > 70%", op_detection_rate > 0.70),
-        ("HDC ordinality > 80%", ordinality > 0.80),
-        ("HDC monotonicity > 90%", monotonicity > 0.90),
-        ("HDC self-similarity > 0.99", self_sim > 0.99),
+        (
+            "Number extraction rate > 90%",
+            extraction_rate > 0.90,
+        ),
+        (
+            "Operation detection rate > 70%",
+            op_detection_rate > 0.70,
+        ),
+        (
+            "HDC ordinality > 80%",
+            ordinality > 0.80,
+        ),
+        (
+            "HDC monotonicity > 90%",
+            monotonicity > 0.90,
+        ),
+        (
+            "HDC self-similarity > 0.99",
+            self_sim > 0.99,
+        ),
         (
             "HDC encoding preserves ordinality",
             avg_sim_close > avg_sim_far,
@@ -818,11 +806,7 @@ fn main() {
     }
 
     println!();
-    println!(
-        "  Result: {}/{} validation checks passed",
-        passed,
-        checks.len()
-    );
+    println!("  Result: {}/{} validation checks passed", passed, checks.len());
     println!();
     println!("  NOTE: GSM8K requires multi-step chain-of-thought reasoning.");
     println!("  A pattern-matching arithmetic baseline is expected to score low.");

@@ -378,8 +378,8 @@ impl ExecutionOracle {
         // converge slower, so we relax the threshold proportionally.
         // Single low-tau statement: threshold stays at 0.95
         // Mixed body with IO ops: threshold drops to ~0.85
-        let avg_tau: f64 =
-            loop_body.iter().map(|(_, op)| op.tau()).sum::<f64>() / loop_body.len() as f64;
+        let avg_tau: f64 = loop_body.iter().map(|(_, op)| op.tau()).sum::<f64>()
+            / loop_body.len() as f64;
         let body_complexity = (loop_body.len() as f32 - 1.0).max(0.0) * 0.02;
         let tau_factor = ((avg_tau - 0.1) as f32 * 0.03).min(0.08);
         let effective_threshold = (CONVERGENCE_THRESHOLD - body_complexity - tau_factor).max(0.75);

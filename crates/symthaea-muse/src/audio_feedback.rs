@@ -75,10 +75,7 @@ impl AudioFeedbackEncoder {
 
         // Zero-crossing rate
         let zcr = if mono.len() > 1 {
-            let crossings = mono
-                .windows(2)
-                .filter(|w| w[0].signum() != w[1].signum())
-                .count();
+            let crossings = mono.windows(2).filter(|w| w[0].signum() != w[1].signum()).count();
             crossings as f32 / mono.len() as f32
         } else {
             0.0
@@ -126,13 +123,8 @@ impl AudioFeedbackEncoder {
             self.onset_history.remove(0);
         }
         let rhythm_entropy = if self.onset_history.len() > 2 {
-            let mean: f32 =
-                self.onset_history.iter().sum::<f32>() / self.onset_history.len() as f32;
-            let variance: f32 = self
-                .onset_history
-                .iter()
-                .map(|&x| (x - mean).powi(2))
-                .sum::<f32>()
+            let mean: f32 = self.onset_history.iter().sum::<f32>() / self.onset_history.len() as f32;
+            let variance: f32 = self.onset_history.iter().map(|&x| (x - mean).powi(2)).sum::<f32>()
                 / self.onset_history.len() as f32;
             (variance.sqrt() * 10.0).clamp(0.0, 1.0)
         } else {
@@ -158,16 +150,12 @@ impl AudioFeedbackEncoder {
 
         // EMA smoothing
         let a = self.ema_alpha;
-        self.smoothed.spectral_centroid +=
-            a * (features.spectral_centroid - self.smoothed.spectral_centroid);
+        self.smoothed.spectral_centroid += a * (features.spectral_centroid - self.smoothed.spectral_centroid);
         self.smoothed.spectral_flux += a * (features.spectral_flux - self.smoothed.spectral_flux);
-        self.smoothed.rhythm_entropy +=
-            a * (features.rhythm_entropy - self.smoothed.rhythm_entropy);
-        self.smoothed.harmonic_tension +=
-            a * (features.harmonic_tension - self.smoothed.harmonic_tension);
+        self.smoothed.rhythm_entropy += a * (features.rhythm_entropy - self.smoothed.rhythm_entropy);
+        self.smoothed.harmonic_tension += a * (features.harmonic_tension - self.smoothed.harmonic_tension);
         self.smoothed.rms_energy += a * (features.rms_energy - self.smoothed.rms_energy);
-        self.smoothed.zero_crossing_rate +=
-            a * (features.zero_crossing_rate - self.smoothed.zero_crossing_rate);
+        self.smoothed.zero_crossing_rate += a * (features.zero_crossing_rate - self.smoothed.zero_crossing_rate);
 
         features
     }
@@ -211,8 +199,7 @@ impl AudioFeatures {
         state.dopamine += s * 0.08 * (self.rms_energy - state.dopamine);
 
         // Harmonic tension → attenuate ResonantCoherence harmony
-        state.harmony_activations[0] +=
-            s * 0.05 * (1.0 - self.harmonic_tension - state.harmony_activations[0]);
+        state.harmony_activations[0] += s * 0.05 * (1.0 - self.harmonic_tension - state.harmony_activations[0]);
 
         // Clamp all to valid ranges
         state.serotonin = state.serotonin.clamp(0.0, 1.0);
@@ -274,10 +261,7 @@ mod tests {
 
         assert!(features.rms_energy > 0.0, "should have energy");
         assert!(features.spectral_centroid > 0.0, "should have centroid");
-        assert!(
-            features.spectral_centroid < 0.5,
-            "440Hz centroid should be low"
-        );
+        assert!(features.spectral_centroid < 0.5, "440Hz centroid should be low");
     }
 
     #[test]
@@ -295,10 +279,7 @@ mod tests {
         let features3 = encoder.extract(&chunk2, 44100);
         let high_flux = features3.spectral_flux;
 
-        assert!(
-            high_flux > low_flux,
-            "frequency change should increase flux: {high_flux} vs {low_flux}"
-        );
+        assert!(high_flux > low_flux, "frequency change should increase flux: {high_flux} vs {low_flux}");
     }
 
     #[test]
@@ -331,10 +312,7 @@ mod tests {
         features.modulate_state(&mut state, 1.0);
 
         // Arousal should increase (rhythm_entropy 0.7 > default arousal 0.4)
-        assert!(
-            state.arousal > original_arousal,
-            "arousal should increase from rhythm entropy"
-        );
+        assert!(state.arousal > original_arousal, "arousal should increase from rhythm entropy");
         // All values should remain in bounds
         assert!(state.serotonin >= 0.0 && state.serotonin <= 1.0);
         assert!(state.dopamine >= 0.0 && state.dopamine <= 1.0);

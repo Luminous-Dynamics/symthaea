@@ -3,40 +3,26 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Manipulator HDC encoder: 21D state → 16,384D ContinuousHV.
 
-use crate::types::{ManipulatorState, NUM_STATE_CHANNELS};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
+use crate::types::{ManipulatorState, NUM_STATE_CHANNELS};
 
 const CHANNEL_RANGES: [[f32; 2]; NUM_STATE_CHANNELS] = [
-    [-3.14, 3.14],
-    [-3.14, 3.14],
-    [-3.14, 3.14],
-    [-3.14, 3.14], // J1-4 angles
-    [-3.14, 3.14],
-    [-3.14, 3.14],
-    [-3.14, 3.14], // J5-7 angles
-    [-5.0, 5.0],
-    [-5.0, 5.0],
-    [-5.0, 5.0],
-    [-5.0, 5.0], // J1-4 velocities
-    [-5.0, 5.0],
-    [-5.0, 5.0],
-    [-5.0, 5.0], // J5-7 velocities
-    [-1.0, 1.0],
-    [-1.0, 1.0],
-    [-1.0, 1.0], // end-effector pos
-    [-50.0, 50.0],
-    [-50.0, 50.0],
-    [-50.0, 50.0], // end-effector force
-    [0.0, 1.0],    // gripper
+    [-3.14, 3.14], [-3.14, 3.14], [-3.14, 3.14], [-3.14, 3.14], // J1-4 angles
+    [-3.14, 3.14], [-3.14, 3.14], [-3.14, 3.14],                 // J5-7 angles
+    [-5.0, 5.0], [-5.0, 5.0], [-5.0, 5.0], [-5.0, 5.0],         // J1-4 velocities
+    [-5.0, 5.0], [-5.0, 5.0], [-5.0, 5.0],                       // J5-7 velocities
+    [-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0],                       // end-effector pos
+    [-50.0, 50.0], [-50.0, 50.0], [-50.0, 50.0],                 // end-effector force
+    [0.0, 1.0],                                                    // gripper
 ];
 
 const CHANNEL_WEIGHTS: [f32; NUM_STATE_CHANNELS] = [
-    1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, // Joint angles (precision-critical)
-    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, // Velocities
-    2.0, 2.0, 2.0, // End-effector position (CRITICAL)
-    2.5, 2.5, 2.5, // Force feedback (SUPREME — safety)
-    1.5, // Gripper state
+    1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,  // Joint angles (precision-critical)
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  // Velocities
+    2.0, 2.0, 2.0,                         // End-effector position (CRITICAL)
+    2.5, 2.5, 2.5,                         // Force feedback (SUPREME — safety)
+    1.5,                                    // Gripper state
 ];
 
 pub struct ManipulatorHdcEncoder {
@@ -54,11 +40,7 @@ impl ManipulatorHdcEncoder {
         let level_vectors: Vec<ContinuousHV> = (0..num_levels)
             .map(|i| ContinuousHV::from_genesis(genesis, &format!("manip::lv::{i}"), dim))
             .collect();
-        Self {
-            base_vectors,
-            level_vectors,
-            num_levels,
-        }
+        Self { base_vectors, level_vectors, num_levels }
     }
 
     pub fn encode(&mut self, state: &ManipulatorState) -> ContinuousHV {
@@ -68,17 +50,11 @@ impl ManipulatorHdcEncoder {
         for ch in 0..NUM_STATE_CHANNELS {
             let [lo, hi] = CHANNEL_RANGES[ch];
             let range = hi - lo;
-            let norm = if range.abs() < 1e-10 {
-                0.5
-            } else {
-                ((channels[ch] - lo) / range).clamp(0.0, 1.0)
-            };
+            let norm = if range.abs() < 1e-10 { 0.5 } else { ((channels[ch] - lo) / range).clamp(0.0, 1.0) };
             let k = (norm * (self.num_levels - 1) as f32).round() as usize;
             let k = k.min(self.num_levels - 1);
             let mut level_hv = ContinuousHV::zero(dim);
-            for l in 0..=k {
-                level_hv.add_in_place(&self.level_vectors[l]);
-            }
+            for l in 0..=k { level_hv.add_in_place(&self.level_vectors[l]); }
             level_hv = level_hv.normalize();
             let bound = level_hv.bind(&self.base_vectors[ch]);
             let mut scaled = bound;

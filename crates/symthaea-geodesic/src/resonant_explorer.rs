@@ -324,15 +324,9 @@ mod tests {
             ..ExplorationConfig::default()
         });
         let result = explorer.explore(&expected);
-        assert!(
-            result.source_code.is_some(),
-            "should always emit source code"
-        );
+        assert!(result.source_code.is_some(), "should always emit source code");
         let code = result.source_code.unwrap();
-        assert!(
-            code.contains("fn generated"),
-            "should contain function name"
-        );
+        assert!(code.contains("fn generated"), "should contain function name");
     }
 
     #[test]
@@ -352,7 +346,10 @@ mod tests {
             explorer.temperature
         );
         // Sigma should have changed from initial
-        assert!(result.history.len() > 0, "should have recorded history");
+        assert!(
+            result.history.len() > 0,
+            "should have recorded history"
+        );
     }
 
     #[test]

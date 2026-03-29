@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Psych-bench → cognitive loop calibration bridge.
 //!
 //! Translates normative z-scores from the psych-bench suite into neuromodulator

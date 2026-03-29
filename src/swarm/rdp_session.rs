@@ -125,12 +125,7 @@ pub struct RdpSession {
 
 impl RdpSession {
     /// Create a new session in Connecting state.
-    pub fn new(
-        session_id: String,
-        peer_id: String,
-        config: RdpSessionConfig,
-        is_initiator: bool,
-    ) -> Self {
+    pub fn new(session_id: String, peer_id: String, config: RdpSessionConfig, is_initiator: bool) -> Self {
         Self {
             session_id,
             peer_id,
@@ -273,10 +268,9 @@ impl RdpSession {
     /// Initiate graceful close.
     pub fn close(&mut self, reason: &str) {
         self.state = SessionState::Closing;
-        self.outbound
-            .push(RdpFrame::Control(ControlMessage::Goodbye {
-                reason: reason.to_string(),
-            }));
+        self.outbound.push(RdpFrame::Control(ControlMessage::Goodbye {
+            reason: reason.to_string(),
+        }));
     }
 
     /// Check if this session needs re-attestation.

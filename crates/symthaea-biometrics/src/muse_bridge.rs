@@ -30,7 +30,10 @@ use symthaea_muse::MusicalState;
 /// Maps psychological dimensions to neuromodulator levels and harmony
 /// activations. The mapping is designed so that increasing stress produces
 /// increasingly hostile, dissonant, fast-tempo audio.
-pub fn stress_to_musical_state(stress: &StressVector, model: &PlayerStressModel) -> MusicalState {
+pub fn stress_to_musical_state(
+    stress: &StressVector,
+    model: &PlayerStressModel,
+) -> MusicalState {
     // Dopamine: arousal drives FM modulation depth (metallic/harsh at high stress)
     let dopamine = (stress.arousal * 0.8 + model.allostatic_load * 0.2).clamp(0.0, 1.0);
 
@@ -147,7 +150,10 @@ mod tests {
         // Panic = low serotonin (harsh timbre)
         assert!(state.serotonin < 0.4, "serotonin should be low in panic");
         // Panic = high NE (edgy overtones)
-        assert!(state.noradrenaline > 0.5, "NE should be high in panic");
+        assert!(
+            state.noradrenaline > 0.5,
+            "NE should be high in panic"
+        );
         // Panic = InfinitePlay (minor 7th tension)
         assert!(
             state.harmony_activations[3] > 0.6,

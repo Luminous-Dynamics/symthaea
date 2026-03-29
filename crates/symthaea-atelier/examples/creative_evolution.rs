@@ -17,14 +17,10 @@ use symthaea_atelier::{AtelierConfig, AtelierStyle};
 use symthaea_canvas::CognitiveSnapshot;
 
 fn main() {
-    let output_dir = {
+        let output_dir = {
         let project_gallery = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("gallery")
-            .join("evolution");
+            .parent().unwrap().parent().unwrap()
+            .join("gallery").join("evolution");
         if project_gallery.parent().map_or(false, |p| p.exists()) {
             project_gallery
         } else {
@@ -92,8 +88,11 @@ fn main() {
         };
 
         // Generate artwork
-        let artwork =
-            symthaea_atelier::create_artwork_iterative(&config, &snapshot, 42 + cycle as u64);
+        let artwork = symthaea_atelier::create_artwork_iterative(
+            &config,
+            &snapshot,
+            42 + cycle as u64,
+        );
 
         // Evaluate aesthetics
         let mut score = artwork.aesthetic_score;
@@ -125,14 +124,8 @@ fn main() {
             .map(|(i, _)| i)
             .unwrap_or(0);
         let harmony_names = [
-            "Coherence",
-            "Flourish",
-            "Wisdom",
-            "Play",
-            "Connect",
-            "Reciproc",
-            "Progress",
-            "Stillness",
+            "Coherence", "Flourish", "Wisdom", "Play",
+            "Connect", "Reciproc", "Progress", "Stillness",
         ];
 
         println!(
@@ -208,10 +201,8 @@ fn main() {
 
     let weights = taste.weights();
     println!("  Learned taste weights:");
-    println!(
-        "    order={:.3}  complexity={:.3}  harmony={:.3}  birkhoff={:.3}",
-        weights[0], weights[1], weights[2], weights[3]
-    );
+    println!("    order={:.3}  complexity={:.3}  harmony={:.3}  birkhoff={:.3}",
+        weights[0], weights[1], weights[2], weights[3]);
 
     let avg_novelty: f32 = novelties.iter().sum::<f32>() / novelties.len() as f32;
     println!("  Average novelty:    {:.3}", avg_novelty);

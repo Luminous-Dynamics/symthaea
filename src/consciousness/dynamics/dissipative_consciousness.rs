@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Dissipative Consciousness: Prigogine's Far-From-Equilibrium Dynamics
 //!
 //! **PARADIGM SHIFT**: Consciousness as a dissipative structure.
@@ -262,9 +265,22 @@ impl DissipativeConsciousness {
         // Information flux
         self.information_flux = information_processed * phi;
 
-        // Dissipation efficiency: how much order per unit entropy
+        // Dissipation efficiency
+        // Prigogine (default): order / entropy_rate (favors low entropy — stabilize)
+        // England (feature): order * entropy_rate (favors high entropy when building
+        //   order — dissipation-driven adaptation, England 2013)
         self.dissipation_efficiency = if self.entropy_production_rate > 0.001 {
-            self.order_parameter / self.entropy_production_rate
+            #[cfg(feature = "england_dissipation")]
+            {
+                // England mode: multiplicative — high entropy + high order = good
+                // This captures the insight that dissipation drives self-organization
+                // when entropy production correlates with order growth.
+                self.order_parameter * self.entropy_production_rate
+            }
+            #[cfg(not(feature = "england_dissipation"))]
+            {
+                self.order_parameter / self.entropy_production_rate
+            }
         } else {
             0.0
         };

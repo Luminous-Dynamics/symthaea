@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Sleep/Wake metabolism: state machine governing cycle frequency and compute budget.
 //!
 //! State machine: Sleep(0.5Hz) <-> Drowsy(5Hz) <-> Alert(20Hz) <-> Focused(50Hz)

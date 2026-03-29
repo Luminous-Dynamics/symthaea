@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Spore persistence — checkpoint/restore for the consciousness kernel.
 //!
 //! Provides a storage trait and in-memory backend for testing.
@@ -100,6 +103,127 @@ impl SporeStorage for FileStorage {
     }
 }
 
+// ============================================================================
+// TREND HISTORY
+// ============================================================================
+
+/// A snapshot of consciousness trends at a point in time.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TrendSnapshot {
+    pub cycle: u64,
+    pub consciousness_level: f32,
+    pub phi: f32,
+    pub harmony_alignment: f32,
+    pub neuromod_balance: f32,
+}
+
+/// Quality-of-life snapshot with richer fields (used by engine.rs).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct QolSnapshot {
+    pub cycle: u64,
+    pub timestamp_secs: u64,
+    pub consciousness_level: f32,
+    pub harmony_alignment: f32,
+    pub metacog_accuracy: f32,
+    pub allostatic_load: f32,
+    pub dream_wisdom_count: usize,
+    pub coherence_score: f32,
+    pub safety_level: u8,
+}
+
+/// Summary statistics over trend history.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TrendSummary {
+    pub snapshot_count: usize,
+    pub consciousness_mean: f32,
+    pub consciousness_stability: f32,
+    pub phi_mean: f32,
+    pub harmony_trend: f32,
+}
+
+/// Tracks consciousness trends over time for QOL analysis.
+#[derive(Debug, Clone)]
+pub struct TrendHistory {
+    snapshots: Vec<TrendSnapshot>,
+    max_snapshots: usize,
+}
+
+impl TrendHistory {
+    pub fn new() -> Self {
+        Self { snapshots: Vec::new(), max_snapshots: 1000 }
+    }
+
+    pub fn record(&mut self, snapshot: TrendSnapshot) {
+        if self.snapshots.len() >= self.max_snapshots {
+            self.snapshots.remove(0);
+        }
+        self.snapshots.push(snapshot);
+    }
+
+    /// Record a QolSnapshot by converting to TrendSnapshot. Called every cycle.
+    pub fn maybe_record(&mut self, qol: QolSnapshot) {
+        // Only record every 100 cycles to avoid bloat
+        if qol.cycle % 100 != 0 && self.snapshots.len() > 10 {
+            return;
+        }
+        self.record(TrendSnapshot {
+            cycle: qol.cycle,
+            consciousness_level: qol.consciousness_level,
+            phi: qol.coherence_score,
+            harmony_alignment: qol.harmony_alignment,
+            neuromod_balance: 0.0, // Not tracked in QolSnapshot
+        });
+    }
+
+    pub fn snapshots(&self) -> &[TrendSnapshot] {
+        &self.snapshots
+    }
+
+    pub fn count(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    pub fn trend_summary(&self) -> TrendSummary {
+        if self.snapshots.is_empty() {
+            return TrendSummary {
+                snapshot_count: 0,
+                consciousness_mean: 0.0,
+                consciousness_stability: 1.0,
+                phi_mean: 0.0,
+                harmony_trend: 0.0,
+            };
+        }
+        let n = self.snapshots.len() as f32;
+        let c_mean: f32 = self.snapshots.iter().map(|s| s.consciousness_level).sum::<f32>() / n;
+        let c_var: f32 = self.snapshots.iter()
+            .map(|s| (s.consciousness_level - c_mean).powi(2))
+            .sum::<f32>() / n;
+        let phi_mean: f32 = self.snapshots.iter().map(|s| s.phi).sum::<f32>() / n;
+        let harmony_trend = if self.snapshots.len() >= 2 {
+            let last = self.snapshots.last().unwrap().harmony_alignment;
+            let first = self.snapshots.first().unwrap().harmony_alignment;
+            last - first
+        } else {
+            0.0
+        };
+        TrendSummary {
+            snapshot_count: self.snapshots.len(),
+            consciousness_mean: c_mean,
+            consciousness_stability: 1.0 - c_var.sqrt().min(1.0),
+            phi_mean,
+            harmony_trend,
+        }
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(&self.snapshots).unwrap_or_else(|_| "[]".to_string())
+    }
+}
+
+impl Default for TrendHistory {
+    fn default() -> Self { Self::new() }
+}
+
 /// A serializable snapshot of the Spore engine state.
 ///
 /// Contains the minimal state needed to restore the engine after restart.
@@ -115,6 +239,8 @@ pub struct SporeCheckpoint {
     pub semantic_entries: Vec<(String, Vec<u8>)>,
     /// Serialized episodic memory entries.
     pub episodic_entries: Vec<Vec<u8>>,
+    /// Trend snapshots for QOL history.
+    pub trend_snapshots: Vec<TrendSnapshot>,
     /// Format version for forward compatibility.
     pub format_version: u32,
 }
@@ -257,6 +383,7 @@ impl SporeCheckpoint {
             neuromodulators,
             semantic_entries,
             episodic_entries,
+            trend_snapshots: vec![], // Trend snapshots not yet serialized in binary format
             format_version,
         })
     }
@@ -301,6 +428,7 @@ mod tests {
                 ("concept2".to_string(), vec![4, 5, 6, 7]),
             ],
             episodic_entries: vec![vec![10, 20, 30], vec![40, 50]],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         };
 
@@ -324,6 +452,7 @@ mod tests {
             neuromodulators: [0.0; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         };
 
@@ -342,6 +471,7 @@ mod tests {
             neuromodulators: [0.0; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         }
         .to_bytes();
@@ -358,6 +488,7 @@ mod tests {
             neuromodulators: [0.0; 4],
             semantic_entries: vec![],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         }
         .to_bytes();
@@ -382,6 +513,7 @@ mod tests {
             neuromodulators: [0.6, 0.5, 0.7, 0.3],
             semantic_entries: vec![("test".to_string(), vec![42])],
             episodic_entries: vec![],
+            trend_snapshots: vec![],
             format_version: SporeCheckpoint::FORMAT_VERSION,
         };
 

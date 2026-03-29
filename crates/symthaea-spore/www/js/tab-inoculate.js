@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // ==================================================================
 // tab-inoculate.js — Tab 5: Hardware probe, NixOS config, deployment
 // ==================================================================
@@ -327,8 +330,97 @@
 
     nextSteps.parentNode.insertBefore(panel, nextSteps.nextSibling);
 
+    // Inject evaluation panel (calls eval-api to show closure size)
+    var evalPanel = document.createElement('div');
+    evalPanel.id = 'eval-panel';
+    evalPanel.className = 'glass-panel inoc-section';
+    evalPanel.style.marginTop = '1rem';
+    evalPanel.innerHTML = [
+      '<h3 style="text-align:center; font-weight:200; margin-bottom:1rem;">Evaluate Configuration</h3>',
+      '<p style="text-align:center; font-size:0.82rem; color:var(--fg-dim); margin-bottom:1rem;">',
+      'Optionally evaluate your flake to see how many derivations and how large the closure is before installing.',
+      '</p>',
+      '<div style="text-align:center; margin-bottom:1rem;">',
+      '  <button id="btn-eval" class="btn-glow" style="padding:0.6rem 1.5rem; cursor:pointer;">',
+      '    Evaluate Flake',
+      '  </button>',
+      '</div>',
+      '<div id="eval-results" style="display:none; background:rgba(0,0,0,0.3); border-radius:8px; padding:1rem; font-size:0.85rem; line-height:1.6; text-align:center;">',
+      '</div>',
+      '<div id="eval-status" style="text-align:center; font-size:0.78rem; color:var(--teal); min-height:1.2em; margin-top:0.5rem;"></div>'
+    ].join('\n');
+    panel.parentNode.insertBefore(evalPanel, panel.nextSibling);
+
     // Wire up download buttons
     var hostname = 'guardian';
+
+    // Wire eval button (uses hostname declared above)
+    document.getElementById('btn-eval').addEventListener('click', async function() {
+      var evalStatus = document.getElementById('eval-status');
+      var evalResults = document.getElementById('eval-results');
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = 'Evaluating...';
+      evalStatus.textContent = 'Connecting to eval service...';
+
+      var evalUrls = ['http://localhost:8090/api/v1/eval', 'https://eval.luminousdynamics.io/api/v1/eval'];
+      var hwContent = '';
+      try {
+        hwContent = await window.send('generateHardwareNix', { hardwareJson: hardwareJson });
+      } catch(e) {
+        hwContent = '{ config, lib, ... }: { fileSystems."/" = { device = "/dev/disk/by-label/nixos"; fsType = "ext4"; }; }';
+      }
+
+      var evalReq = {
+        flake_ref: 'path:.',
+        hardware_config: hwContent,
+        hostname: hostname,
+        disko_config: null,
+        platform: 'x86_64-linux',
+        include_holochain: state.chosenPath === 'mycelial',
+        include_broca_weights: false,
+        substrate_type: null,
+        lanzaboote_enabled: false
+      };
+
+      var succeeded = false;
+      for (var i = 0; i < evalUrls.length; i++) {
+        try {
+          evalStatus.textContent = 'Evaluating at ' + evalUrls[i] + '...';
+          var resp = await fetch(evalUrls[i], {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(evalReq),
+            signal: AbortSignal.timeout(120000)
+          });
+          var result = await resp.json();
+          if (result.success) {
+            evalResults.style.display = 'block';
+            evalResults.innerHTML = [
+              '<div style="color:var(--solar-gold); font-size:1.1rem; margin-bottom:0.5rem;">',
+              result.derivation_count + ' derivations. ' + result.closure_size_human + '. Fully reproducible.',
+              '</div>',
+              '<div style="font-size:0.75rem; color:var(--fg-dim);">',
+              'Hash: ' + result.closure_hash.substring(0, 16) + '&hellip; &middot; Evaluated in ' + (result.eval_time_ms / 1000).toFixed(1) + 's',
+              '</div>'
+            ].join('');
+            evalStatus.textContent = '';
+            window.addNarration(result.derivation_count + ' derivations. ' + result.closure_size_human + '. Every byte deterministic. Every dependency accounted for.');
+            succeeded = true;
+            break;
+          } else {
+            evalStatus.textContent = 'Eval failed: ' + (result.error || 'unknown error');
+          }
+        } catch(e) {
+          if (i === evalUrls.length - 1) {
+            evalStatus.textContent = 'Eval service not available. You can still install manually with the downloaded files.';
+            evalStatus.style.color = 'var(--fg-dim)';
+          }
+        }
+      }
+      btn.disabled = false;
+      btn.textContent = succeeded ? 'Re-evaluate' : 'Evaluate Flake';
+    });
     var hostnameEl = document.getElementById('install-hostname');
 
     document.getElementById('btn-dl-flake').addEventListener('click', function() {
@@ -373,6 +465,416 @@
     });
   }
 
+  // ── SSH Deployment Panel ──
+  function injectSshPanel(nextSteps, hardwareJson) {
+    if (document.getElementById('ssh-deploy-panel')) {
+      document.getElementById('ssh-deploy-panel').scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    var panel = document.createElement('div');
+    panel.id = 'ssh-deploy-panel';
+    panel.className = 'glass-panel inoc-section';
+    panel.style.marginTop = '1.5rem';
+    panel.innerHTML = [
+      '<h3 style="text-align:center; font-weight:200; margin-bottom:1rem;">Deploy via SSH</h3>',
+      '<p style="text-align:center; font-size:0.82rem; color:var(--fg-dim); margin-bottom:1.5rem;">',
+      'Boot your target machine from a NixOS minimal ISO, then connect here to orchestrate the installation.',
+      '</p>',
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; max-width:500px; margin:0 auto 1rem;">',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim);">Host / IP',
+      '    <input id="ssh-host" type="text" placeholder="192.168.1.100" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  </label>',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim);">Port',
+      '    <input id="ssh-port" type="number" value="22" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  </label>',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim);">Username',
+      '    <input id="ssh-user" type="text" value="root" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  </label>',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim);">Password',
+      '    <input id="ssh-pass" type="password" placeholder="(from NixOS ISO)" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  </label>',
+      '</div>',
+      '<div style="text-align:center; margin-bottom:1rem;">',
+      '  <button id="btn-ssh-connect" class="btn-glow" style="padding:0.6rem 2rem; cursor:pointer;">Connect &amp; Deploy</button>',
+      '</div>',
+      // Progress bar
+      '<div id="ssh-progress-wrap" style="display:none; max-width:500px; margin:0 auto 1rem;">',
+      '  <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:var(--fg-dim); margin-bottom:0.3rem;">',
+      '    <span id="ssh-stage-label">Connecting...</span>',
+      '    <span id="ssh-percentage">0%</span>',
+      '  </div>',
+      '  <div style="height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden;">',
+      '    <div id="ssh-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--teal),var(--solar-gold)); border-radius:3px; transition:width 0.5s ease;"></div>',
+      '  </div>',
+      '</div>',
+      // Terminal output
+      '<div id="ssh-terminal" style="display:none; background:rgba(0,0,0,0.5); border:1px solid var(--border); border-radius:8px; padding:0.8rem; max-height:300px; overflow-y:auto; font-family:monospace; font-size:0.72rem; line-height:1.5; white-space:pre-wrap; color:var(--fg-dim); max-width:600px; margin:0 auto;">',
+      '</div>',
+      '<div id="ssh-status" style="text-align:center; font-size:0.78rem; color:var(--teal); min-height:1.2em; margin-top:0.5rem;"></div>'
+    ].join('\n');
+
+    nextSteps.parentNode.insertBefore(panel, nextSteps.nextSibling);
+    panel.scrollIntoView({ behavior: 'smooth' });
+
+    window.addNarration('SSH deployment panel ready. Enter the target machine\'s IP address to begin the Sovereign Birth ceremony.');
+
+    // Wire connect button
+    document.getElementById('btn-ssh-connect').addEventListener('click', async function() {
+      var host = document.getElementById('ssh-host').value.trim();
+      var port = parseInt(document.getElementById('ssh-port').value) || 22;
+      var user = document.getElementById('ssh-user').value.trim() || 'root';
+      var pass = document.getElementById('ssh-pass').value;
+      var btn = this;
+      var terminal = document.getElementById('ssh-terminal');
+      var progressWrap = document.getElementById('ssh-progress-wrap');
+      var progressBar = document.getElementById('ssh-progress-bar');
+      var stageLabel = document.getElementById('ssh-stage-label');
+      var percentLabel = document.getElementById('ssh-percentage');
+      var sshStatus = document.getElementById('ssh-status');
+
+      if (!host) {
+        sshStatus.textContent = 'Please enter a host/IP address.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      terminal.style.display = 'block';
+      progressWrap.style.display = 'block';
+      terminal.textContent = '';
+      sshStatus.textContent = '';
+
+      // Confirm destructive action
+      if (!confirm('WARNING: This will ERASE ALL DATA on the target disk at ' + host + '.\n\nThe target should be booted from a NixOS minimal ISO.\n\nContinue?')) {
+        btn.disabled = false;
+        btn.textContent = 'Connect & Deploy';
+        sshStatus.textContent = 'Deployment cancelled.';
+        return;
+      }
+
+      window.addNarration('Initiating Sovereign Birth ceremony for ' + host + '...');
+
+      // Connect to SSH relay via WebSocket
+      var relayUrls = ['ws://localhost:8091', 'wss://relay.luminousdynamics.io'];
+      var ws = null;
+
+      for (var i = 0; i < relayUrls.length; i++) {
+        try {
+          sshStatus.textContent = 'Connecting to relay at ' + relayUrls[i] + '...';
+          ws = await new Promise(function(resolve, reject) {
+            var socket = new WebSocket(relayUrls[i]);
+            socket.onopen = function() { resolve(socket); };
+            socket.onerror = function() { reject(new Error('WebSocket failed')); };
+            setTimeout(function() { reject(new Error('timeout')); }, 5000);
+          });
+          break;
+        } catch(e) {
+          if (i === relayUrls.length - 1) {
+            sshStatus.textContent = 'SSH relay not available. Start with: ssh-relay --port 8091';
+            sshStatus.style.color = 'var(--clay)';
+            btn.disabled = false;
+            btn.textContent = 'Connect & Deploy';
+            return;
+          }
+        }
+      }
+
+      function appendTerminal(text, color) {
+        var span = document.createElement('span');
+        span.style.color = color || 'var(--fg-dim)';
+        span.textContent = text + '\n';
+        terminal.appendChild(span);
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+
+      function updateProgress(stage, pct, phase) {
+        progressBar.style.width = pct + '%';
+        stageLabel.textContent = stage;
+        percentLabel.textContent = pct + '%';
+        // Trigger narration for phase transitions
+        if (phase) {
+          window.fetchNarration(phase, state.chosenPath || 'hermit').then(function(n) {
+            if (n && n.text) window.addNarration(n.text);
+          });
+        }
+      }
+
+      var selectedDisk = null;
+      var wsRef = { current: null };
+
+      ws.onmessage = function(evt) {
+        var msg;
+        try { msg = JSON.parse(evt.data); } catch(e) { return; }
+
+        switch (msg.type) {
+          case 'connected':
+            appendTerminal('SSH connected to ' + host, 'var(--leaf-green)');
+            sshStatus.textContent = 'Connected. Discovering drives...';
+            updateProgress('Connected', 5);
+            // Auto-discover disks after connection
+            ws.send(JSON.stringify({ action: 'discover_disks' }));
+            break;
+
+          case 'disks':
+            var disks = [];
+            try { disks = JSON.parse(msg.data); } catch(e) { disks = []; }
+            appendTerminal('Found ' + disks.length + ' drive(s)', 'var(--leaf-green)');
+            sshStatus.textContent = 'Select a drive for installation.';
+            showDiskSelector(disks, panel, ws);
+            break;
+
+          case 'output':
+            appendTerminal(msg.data, msg.stream === 'stderr' ? 'var(--clay)' : 'var(--fg-dim)');
+            break;
+
+          case 'progress':
+            updateProgress(msg.stage || msg.message, msg.percentage || 0, msg.phase);
+            appendTerminal('>> Stage: ' + (msg.stage || msg.message), 'var(--solar-gold)');
+            break;
+
+          case 'exit':
+            if (msg.code === 0) {
+              appendTerminal('Installation complete!', 'var(--leaf-green)');
+              updateProgress('Complete', 100, 'FirstBreath');
+              sshStatus.textContent = 'Sovereign Birth complete. The machine draws its first breath.';
+              sshStatus.style.color = 'var(--solar-gold)';
+              window.addNarration('The machine draws its first breath. It is sovereign.', true);
+              // Browser TTS narration
+              if (window.speechSynthesis) {
+                var utt = new SpeechSynthesisUtterance('The machine draws its first breath. It is sovereign.');
+                utt.rate = 0.85; utt.pitch = 0.9;
+                window.speechSynthesis.speak(utt);
+              }
+            } else {
+              appendTerminal('Command exited with code ' + msg.code, 'var(--clay)');
+              sshStatus.textContent = 'Command exited with code ' + msg.code;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Connect & Deploy';
+            break;
+
+          case 'error':
+            appendTerminal('Error: ' + msg.message, 'var(--clay)');
+            sshStatus.textContent = msg.message;
+            sshStatus.style.color = 'var(--clay)';
+            btn.disabled = false;
+            btn.textContent = 'Connect & Deploy';
+            break;
+        }
+      };
+
+      ws.onclose = function() {
+        appendTerminal('Connection closed.', 'var(--fg-dim)');
+        btn.disabled = false;
+        btn.textContent = 'Connect & Deploy';
+      };
+
+      wsRef.current = ws;
+
+      // Send connect command
+      ws.send(JSON.stringify({
+        action: 'connect',
+        host: host,
+        port: port,
+        username: user,
+        password: pass
+      }));
+    });
+  }
+
+  // ── Glassmorphic Disk Selector ──
+  function showDiskSelector(disks, parentPanel, ws) {
+    // Remove existing selector if present
+    var existing = document.getElementById('disk-selector');
+    if (existing) existing.remove();
+
+    var selector = document.createElement('div');
+    selector.id = 'disk-selector';
+    selector.style.cssText = 'margin-top:1.5rem;';
+    selector.innerHTML = '<h3 style="text-align:center; font-weight:200; margin-bottom:1rem;">Select Target Drive</h3>';
+
+    if (disks.length === 0) {
+      selector.innerHTML += '<p style="text-align:center; color:var(--clay);">No drives detected. Ensure the target machine has accessible storage.</p>';
+      parentPanel.appendChild(selector);
+      return;
+    }
+
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid; gap:0.8rem; max-width:550px; margin:0 auto;';
+
+    var transportIcons = { nvme: 'NVMe', sata: 'SATA', usb: 'USB', virtio: 'VirtIO', unknown: '' };
+
+    disks.forEach(function(disk) {
+      if (disk.removable) return; // Skip USB drives by default
+
+      var card = document.createElement('div');
+      card.className = 'glass-panel';
+      card.style.cssText = [
+        'padding:1rem 1.2rem; cursor:pointer; border:2px solid transparent;',
+        'transition:border-color 0.3s, transform 0.15s, box-shadow 0.3s;',
+        'display:grid; grid-template-columns:auto 1fr auto; gap:0.8rem; align-items:center;'
+      ].join('');
+
+      var badge = transportIcons[disk.transport] || disk.transport.toUpperCase();
+      var sizeDisplay = disk.size;
+      // Convert bytes to human-readable if numeric
+      var sizeNum = parseInt(disk.size);
+      if (!isNaN(sizeNum) && sizeNum > 1000000000) {
+        sizeDisplay = (sizeNum / 1000000000).toFixed(0) + ' GB';
+      }
+
+      card.innerHTML = [
+        '<div style="font-size:1.8rem; opacity:0.6;">&#x1f4be;</div>',
+        '<div>',
+        '  <div style="font-size:0.95rem; font-weight:500; color:var(--fg);">' + disk.model + '</div>',
+        '  <div style="font-size:0.78rem; color:var(--fg-dim); font-family:monospace;">' + disk.name + '</div>',
+        '</div>',
+        '<div style="text-align:right;">',
+        '  <div style="font-size:1.1rem; font-weight:500; color:var(--solar-gold);">' + sizeDisplay + '</div>',
+        badge ? '  <div style="font-size:0.7rem; padding:0.15rem 0.5rem; background:rgba(122,162,247,0.15); border-radius:4px; color:var(--teal); display:inline-block; margin-top:0.3rem;">' + badge + '</div>' : '',
+        '</div>'
+      ].join('');
+
+      card.addEventListener('mouseenter', function() {
+        this.style.borderColor = 'var(--teal)';
+        this.style.transform = 'translateY(-2px)';
+        this.style.boxShadow = '0 4px 20px rgba(125,207,255,0.15)';
+      });
+      card.addEventListener('mouseleave', function() {
+        if (!this.classList.contains('disk-selected')) {
+          this.style.borderColor = 'transparent';
+          this.style.transform = 'none';
+          this.style.boxShadow = 'none';
+        }
+      });
+
+      card.addEventListener('click', function() {
+        // Deselect all
+        grid.querySelectorAll('.disk-selected').forEach(function(el) {
+          el.classList.remove('disk-selected');
+          el.style.borderColor = 'transparent';
+          el.style.boxShadow = 'none';
+        });
+        // Select this one
+        this.classList.add('disk-selected');
+        this.style.borderColor = 'var(--solar-gold)';
+        this.style.boxShadow = '0 4px 20px rgba(224,175,104,0.2)';
+
+        // Enable deploy button
+        var deployBtn = document.getElementById('btn-deploy-to-disk');
+        if (deployBtn) {
+          deployBtn.disabled = false;
+          deployBtn.textContent = 'Deploy to ' + disk.name;
+        }
+
+        // Store selected disk info
+        selector.dataset.selectedDisk = disk.name;
+        selector.dataset.selectedTransport = disk.transport;
+        selector.dataset.selectedSize = disk.size;
+
+        window.addNarration('Selected ' + disk.model + ' (' + sizeDisplay + ') at ' + disk.name);
+      });
+
+      grid.appendChild(card);
+    });
+
+    selector.appendChild(grid);
+
+    // Recommend layout based on disk count
+    var nvmeCount = disks.filter(function(d) { return d.transport === 'nvme' && !d.removable; }).length;
+    var recommendation = '';
+    if (nvmeCount >= 2) {
+      recommendation = 'Two NVMe drives detected. Recommended: <strong>Dual-NVMe Workstation</strong> layout (fast drive for data, standard for OS).';
+    } else if (nvmeCount === 1) {
+      recommendation = 'Single NVMe drive detected. Recommended: <strong>Encrypted Btrfs</strong> with subvolumes.';
+    } else {
+      recommendation = 'SATA drive detected. Recommended: <strong>Encrypted ext4</strong> layout.';
+    }
+
+    var recDiv = document.createElement('div');
+    recDiv.style.cssText = 'text-align:center; font-size:0.82rem; color:var(--fg-dim); margin-top:1rem; padding:0.8rem; background:rgba(122,162,247,0.08); border-radius:8px; max-width:550px; margin-left:auto; margin-right:auto;';
+    recDiv.innerHTML = recommendation;
+    selector.appendChild(recDiv);
+
+    // Deploy button (disabled until drive selected)
+    var deployDiv = document.createElement('div');
+    deployDiv.style.cssText = 'text-align:center; margin-top:1.5rem;';
+    deployDiv.innerHTML = '<button id="btn-deploy-to-disk" class="btn-glow" disabled style="padding:0.7rem 2.5rem; cursor:pointer; font-size:1rem;">Select a drive above</button>';
+    selector.appendChild(deployDiv);
+
+    parentPanel.appendChild(selector);
+    selector.scrollIntoView({ behavior: 'smooth' });
+
+    // Wire deploy button
+    document.getElementById('btn-deploy-to-disk').addEventListener('click', function() {
+      var diskName = selector.dataset.selectedDisk;
+      var transport = selector.dataset.selectedTransport;
+      if (!diskName) return;
+
+      if (!confirm('WARNING: ALL DATA on ' + diskName + ' will be ERASED.\n\nThis cannot be undone.\n\nContinue with Sovereign Birth?')) {
+        return;
+      }
+
+      this.disabled = true;
+      this.textContent = 'Deploying...';
+
+      window.addNarration('Beginning Sovereign Birth on ' + diskName + '...');
+      if (window.speechSynthesis && window.narrateTTS) {
+        var utt = new SpeechSynthesisUtterance('Beginning Sovereign Birth on ' + diskName);
+        utt.rate = 0.85;
+        window.speechSynthesis.speak(utt);
+      }
+
+      var hostname = document.getElementById('install-hostname')?.textContent || 'guardian';
+
+      // Detect layout from disk count and type
+      var nvmeDisks = disks.filter(function(d) { return d.transport === 'nvme' && !d.removable; });
+      var layout = 'single';
+      var fastDisk = '';
+      var standardDisk = '';
+
+      if (nvmeDisks.length >= 2) {
+        layout = 'dual';
+        // Assume selected is the fast drive, other is standard
+        fastDisk = diskName;
+        standardDisk = nvmeDisks.find(function(d) { return d.name !== diskName; })?.name || '';
+        if (!confirm('Dual-NVMe layout detected.\n\nFast drive (data): ' + fastDisk + '\nStandard drive (OS): ' + standardDisk + '\n\nBOTH drives will be wiped.\n\nContinue?')) {
+          this.disabled = false;
+          this.textContent = 'Deploy to ' + diskName;
+          return;
+        }
+      }
+
+      // Generate configs via WASM
+      var hwJson = buildHardwareJson(state.hardwareProfile || {});
+      var flakeContent = '', diskoContent = '', hwContent = '';
+      try {
+        flakeContent = await window.send('generateFlake', { hardwareJson: hwJson, path: '/', hostname: hostname });
+        diskoContent = await window.send('generateDiskoConfig', { hardwareJson: hwJson });
+        hwContent = await window.send('generateHardwareNix', { hardwareJson: hwJson });
+      } catch(e) {
+        window.addNarration('Failed to generate configuration: ' + e.message);
+        this.disabled = false;
+        this.textContent = 'Deploy to ' + diskName;
+        return;
+      }
+
+      // Send fully automated install command
+      ws.send(JSON.stringify({
+        action: 'install',
+        disk: diskName,
+        layout: layout,
+        fast_disk: fastDisk,
+        standard_disk: standardDisk,
+        hostname: hostname,
+        flake_nix: flakeContent,
+        disko_nix: diskoContent,
+        hardware_nix: hwContent
+      }));
+    });
+  }
+
   async function showNextSteps() {
     var nextSteps = document.getElementById('next-steps-section');
     nextSteps.style.display = 'block';
@@ -386,6 +888,22 @@
     if (!hasWebUSB) {
       document.getElementById('step-usb').classList.add('step-unavailable');
     }
+
+    // Wire step option click handlers
+    document.getElementById('step-usb').addEventListener('click', function() {
+      if (this.classList.contains('step-unavailable')) {
+        window.addNarration('WebUSB is not available in this browser. Use the download option instead.');
+        return;
+      }
+      window.addNarration('USB Forge is not yet implemented. Use the download option below to get your configuration files.');
+    });
+    document.getElementById('step-download').addEventListener('click', function() {
+      var panel = document.getElementById('download-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth' });
+    });
+    document.getElementById('step-ssh').addEventListener('click', function() {
+      injectSshPanel(nextSteps, hardwareJson);
+    });
 
     var narration = await window.fetchNarration('FlakeEvaluation', state.chosenPath);
     if (narration && narration.text) window.addNarration(narration.text);

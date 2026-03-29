@@ -108,7 +108,11 @@ pub struct Artwork {
 ///
 /// This is the main entry point. It selects the generative subsystem,
 /// runs the iterative creative loop, and returns the best artwork.
-pub fn create_artwork(config: &AtelierConfig, snapshot: &CognitiveSnapshot, seed: u64) -> Artwork {
+pub fn create_artwork(
+    config: &AtelierConfig,
+    snapshot: &CognitiveSnapshot,
+    seed: u64,
+) -> Artwork {
     let mut rng = StdRng::seed_from_u64(seed);
     let scene = generate(config, snapshot, &mut rng);
     let score = score_scene(&scene, snapshot);

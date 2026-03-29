@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #![deny(unsafe_code)]
 //! # CfC-HDC Neuroevolution
 //!
@@ -30,6 +33,7 @@
 pub mod fitness;
 pub mod genome;
 pub mod organism;
+pub mod phi_fitness;
 pub mod tournament;
 
 pub use fitness::{FepFitnessBridge, FepFitnessConfig, FitnessWeights, InputStrategy};

@@ -17,9 +17,7 @@
 //! ```
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
-};
+use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 use crate::MusicalState;
@@ -42,10 +40,7 @@ impl MelDecoder {
         let projections = (0..mel_dim)
             .map(|i| genesis.hv(&format!("spectral_vocoder_mel_{i}"), HDC_DIMENSION))
             .collect();
-        Self {
-            projections,
-            mel_dim,
-        }
+        Self { projections, mel_dim }
     }
 
     /// Decode a 16,384D HV to mel frame via dot-product projection.
@@ -128,7 +123,11 @@ impl SpectralVocoder {
     ///
     /// Returns stereo samples. The CfC network evolves once per mel frame
     /// (~1ms), producing spectral envelopes that the oscillator bank renders.
-    pub fn render_chunk(&mut self, state: &MusicalState, chunk_samples: usize) -> Vec<[f32; 2]> {
+    pub fn render_chunk(
+        &mut self,
+        state: &MusicalState,
+        chunk_samples: usize,
+    ) -> Vec<[f32; 2]> {
         let genesis = GenesisSeed::from_phrase("spectral-vocoder-v1");
         let input_hv = Self::encode_state(state, &genesis);
         let sr = self.sample_rate as f32;
@@ -236,9 +235,7 @@ mod tests {
         let chunk = vocoder.render_chunk(&state, 1024);
         assert_eq!(chunk.len(), 1024);
         // Should have non-zero audio
-        let has_signal = chunk
-            .iter()
-            .any(|s| s[0].abs() > 0.0001 || s[1].abs() > 0.0001);
+        let has_signal = chunk.iter().any(|s| s[0].abs() > 0.0001 || s[1].abs() > 0.0001);
         assert!(has_signal, "vocoder should produce audio signal");
     }
 
@@ -248,47 +245,27 @@ mod tests {
         let n = 4096; // enough samples for CfC to diverge
 
         let mut v1 = SpectralVocoder::new(&genesis, 44100);
-        let calm = MusicalState {
-            consciousness_level: 0.9,
-            arousal: 0.1,
-            ..Default::default()
-        };
+        let calm = MusicalState { consciousness_level: 0.9, arousal: 0.1, ..Default::default() };
         let chunk1 = v1.render_chunk(&calm, n);
 
         let mut v2 = SpectralVocoder::new(&genesis, 44100);
-        let intense = MusicalState {
-            consciousness_level: 0.2,
-            arousal: 0.9,
-            noradrenaline: 0.8,
-            ..Default::default()
-        };
+        let intense = MusicalState { consciousness_level: 0.2, arousal: 0.9, noradrenaline: 0.8, ..Default::default() };
         let chunk2 = v2.render_chunk(&intense, n);
 
         // Waveforms should differ (compare sample-by-sample)
-        let diff_count = chunk1
-            .iter()
-            .zip(chunk2.iter())
+        let diff_count = chunk1.iter().zip(chunk2.iter())
             .filter(|(a, b)| (a[0] - b[0]).abs() > 1e-6)
             .count();
-        assert!(
-            diff_count > n / 4,
-            "different states should produce different waveforms: {diff_count}/{n} samples differ"
-        );
+        assert!(diff_count > n / 4, "different states should produce different waveforms: {diff_count}/{n} samples differ");
     }
 
     #[test]
     fn mel_bin_frequency_mapping() {
         let low = mel_bin_to_hz(0, 64, 44100.0);
         let high = mel_bin_to_hz(63, 64, 44100.0);
-        assert!(
-            low >= 80.0 && low < 200.0,
-            "lowest bin should be ~80Hz: {low}"
-        );
+        assert!(low >= 80.0 && low < 200.0, "lowest bin should be ~80Hz: {low}");
         assert!(high > 10000.0, "highest bin should be >10kHz: {high}");
-        assert!(
-            high < 22050.0,
-            "highest bin should be below Nyquist: {high}"
-        );
+        assert!(high < 22050.0, "highest bin should be below Nyquist: {high}");
     }
 
     #[test]

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Swarm Replay E2E Validation: verifies cross-drone experience sharing works with MuJoCo.
 //!
 //! Runs a minimal swarm (4 drones, 2 episodes, 500 steps) and checks that:

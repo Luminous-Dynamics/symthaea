@@ -44,7 +44,7 @@
 //!   Case of Music. Trends in Cognitive Sciences, 23(1), 63-77.
 //! - Russell (1980). A Circumplex Model of Affect. J. Personality & Social Psych.
 
-use std::io::BufRead;
+use std::f32::consts::TAU;
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
 
@@ -94,10 +94,7 @@ fn main() {
     // ── Define 8 cognitive states spanning the V-A plane ──────────────
     let scenarios = define_scenarios();
 
-    println!(
-        "Generating {} scenarios × 30s audio each...\n",
-        scenarios.len()
-    );
+    println!("Generating {} scenarios × 30s audio each...\n", scenarios.len());
 
     let config = MuseConfig {
         sample_rate: 44100,
@@ -138,11 +135,7 @@ fn main() {
             features.harmonic_ratio,
         );
 
-        all_features.push((
-            scenario.intended_valence,
-            scenario.intended_arousal,
-            features,
-        ));
+        all_features.push((scenario.intended_valence, scenario.intended_arousal, features));
     }
 
     println!();
@@ -154,10 +147,7 @@ fn main() {
     let arousal_rms = correlate(
         "Arousal ↔ RMS Energy",
         &all_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &all_features
-            .iter()
-            .map(|(_, _, f)| f.rms_energy)
-            .collect::<Vec<_>>(),
+        &all_features.iter().map(|(_, _, f)| f.rms_energy).collect::<Vec<_>>(),
     );
     print_correlation(&arousal_rms);
 
@@ -165,10 +155,7 @@ fn main() {
     let arousal_tempo = correlate(
         "Arousal ↔ Onset Density",
         &all_features.iter().map(|(_, a, _)| *a).collect::<Vec<_>>(),
-        &all_features
-            .iter()
-            .map(|(_, _, f)| f.onset_density)
-            .collect::<Vec<_>>(),
+        &all_features.iter().map(|(_, _, f)| f.onset_density).collect::<Vec<_>>(),
     );
     print_correlation(&arousal_tempo);
 
@@ -176,10 +163,7 @@ fn main() {
     let valence_bright = correlate(
         "Valence ↔ Spectral Centroid",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features
-            .iter()
-            .map(|(_, _, f)| f.spectral_centroid)
-            .collect::<Vec<_>>(),
+        &all_features.iter().map(|(_, _, f)| f.spectral_centroid).collect::<Vec<_>>(),
     );
     print_correlation(&valence_bright);
 
@@ -187,26 +171,17 @@ fn main() {
     let valence_hnr = correlate(
         "Valence ↔ Harmonic Ratio",
         &all_features.iter().map(|(v, _, _)| *v).collect::<Vec<_>>(),
-        &all_features
-            .iter()
-            .map(|(_, _, f)| f.harmonic_ratio)
-            .collect::<Vec<_>>(),
+        &all_features.iter().map(|(_, _, f)| f.harmonic_ratio).collect::<Vec<_>>(),
     );
     print_correlation(&valence_hnr);
 
     // Phi proxy ↔ Spectral flux (expected: negative — higher Phi = smoother)
     // Using consciousness_level as Phi proxy
-    let phi_values: Vec<f32> = scenarios
-        .iter()
-        .map(|s| s.state.consciousness_level)
-        .collect();
+    let phi_values: Vec<f32> = scenarios.iter().map(|s| s.state.consciousness_level).collect();
     let phi_flux = correlate(
         "Phi ↔ Spectral Flux",
         &phi_values,
-        &all_features
-            .iter()
-            .map(|(_, _, f)| f.spectral_flux)
-            .collect::<Vec<_>>(),
+        &all_features.iter().map(|(_, _, f)| f.spectral_flux).collect::<Vec<_>>(),
     );
     print_correlation(&phi_flux);
 
@@ -215,10 +190,7 @@ fn main() {
     let load_zcr = correlate(
         "NE (stress) ↔ Zero-Crossing Rate",
         &load_values,
-        &all_features
-            .iter()
-            .map(|(_, _, f)| f.zero_crossing_rate)
-            .collect::<Vec<_>>(),
+        &all_features.iter().map(|(_, _, f)| f.zero_crossing_rate).collect::<Vec<_>>(),
     );
     print_correlation(&load_zcr);
 
@@ -244,9 +216,7 @@ fn main() {
         println!("  ✓ STRONG: Consciousness state reliably maps to perceived audio emotion.");
         println!("    Synthetic limbic system validated (Koelsch/Vuust/Friston 2019).");
     } else if mean_r2 > 0.2 {
-        println!(
-            "  ~ MODERATE: Partial correlation. Some dimensions map well, others need tuning."
-        );
+        println!("  ~ MODERATE: Partial correlation. Some dimensions map well, others need tuning.");
     } else {
         println!("  ✗ WEAK: Low correlation. The sonification mapping needs revision.");
     }
@@ -272,29 +242,6 @@ fn main() {
 
     println!("\n  Higher off-diagonal values = better state discrimination.");
     println!("  Diagonal should be 0.000.");
-
-    // ── Stage 2: DEAM cross-validation ────────────────────────────────
-    println!("\n═══ Stage 2: DEAM Cross-Validation ═══\n");
-
-    let deam_path = std::path::Path::new("data/deam");
-    if deam_path.exists() {
-        match deam_cross_validate(&all_features, &scenarios) {
-            Ok(()) => {}
-            Err(e) => println!("  DEAM validation skipped: {e}"),
-        }
-    } else {
-        println!("  DEAM dataset not found at data/deam/");
-        println!("  Run: ./scripts/download_deam.sh");
-    }
-
-    // ── Stage 3: V-A scatter plot SVG ─────────────────────────────────
-    println!("\n═══ Stage 3: V-A Scatter Plot ═══\n");
-    let svg = generate_va_scatter_svg(&all_features, &scenarios);
-    let svg_path = "data/muse_emotion_scatter.svg";
-    match std::fs::write(svg_path, &svg) {
-        Ok(()) => println!("  Written to {svg_path} ({} bytes)", svg.len()),
-        Err(e) => println!("  Failed to write SVG: {e}"),
-    }
 }
 
 // ─── Scenario Definitions ─────────────────────────────────────────────────
@@ -421,67 +368,6 @@ fn define_scenarios() -> Vec<CognitiveScenario> {
             intended_valence: 0.8,
             intended_arousal: 0.5,
         },
-        // ── 4 additional scenarios for statistical power ──
-        CognitiveScenario {
-            name: "Grief (deep sadness)",
-            state: MusicalState {
-                harmony_activations: [0.2, 0.1, 0.1, 0.1, 0.2, 0.3, 0.0, 0.5],
-                dopamine: 0.1,
-                serotonin: 0.3,
-                noradrenaline: 0.15,
-                arousal: 0.3,
-                valence: -0.9,
-                consciousness_level: 0.4,
-                prediction_error: 0.2,
-            },
-            intended_valence: -0.9,
-            intended_arousal: 0.3,
-        },
-        CognitiveScenario {
-            name: "Excitement (triumph)",
-            state: MusicalState {
-                harmony_activations: [0.6, 0.9, 0.7, 0.4, 0.5, 0.8, 0.9, 0.0],
-                dopamine: 0.95,
-                serotonin: 0.4,
-                noradrenaline: 0.7,
-                arousal: 0.85,
-                valence: 0.9,
-                consciousness_level: 0.8,
-                prediction_error: 0.2,
-            },
-            intended_valence: 0.9,
-            intended_arousal: 0.85,
-        },
-        CognitiveScenario {
-            name: "Boredom (disengaged)",
-            state: MusicalState {
-                harmony_activations: [0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.3],
-                dopamine: 0.15,
-                serotonin: 0.4,
-                noradrenaline: 0.1,
-                arousal: 0.15,
-                valence: -0.3,
-                consciousness_level: 0.25,
-                prediction_error: 0.05,
-            },
-            intended_valence: -0.3,
-            intended_arousal: 0.15,
-        },
-        CognitiveScenario {
-            name: "Tension (suspense)",
-            state: MusicalState {
-                harmony_activations: [0.3, 0.1, 0.2, 0.7, 0.4, 0.1, 0.5, 0.1],
-                dopamine: 0.5,
-                serotonin: 0.2,
-                noradrenaline: 0.7,
-                arousal: 0.75,
-                valence: -0.2,
-                consciousness_level: 0.55,
-                prediction_error: 0.5,
-            },
-            intended_valence: -0.2,
-            intended_arousal: 0.75,
-        },
     ]
 }
 
@@ -504,10 +390,7 @@ fn extract_features(samples: &[f32], sample_rate: u32) -> AudioFeatures {
     let rms_energy = (samples.iter().map(|s| s * s).sum::<f32>() / n as f32).sqrt();
 
     // Zero crossing rate
-    let zc: usize = samples
-        .windows(2)
-        .filter(|w| w[0].signum() != w[1].signum())
-        .count();
+    let zc: usize = samples.windows(2).filter(|w| w[0].signum() != w[1].signum()).count();
     let zero_crossing_rate = zc as f32 / n as f32;
 
     // Spectral centroid (via short-time DFT approximation using zero-crossing)
@@ -639,18 +522,13 @@ fn print_correlation(result: &CorrelationResult) {
     };
     println!(
         "  {:<35} r={}{:.3}  R²={:.4}  [{}]  (n={})",
-        result.name,
-        direction,
-        result.pearson_r.abs(),
-        result.r_squared,
-        strength,
-        result.n_samples
+        result.name, direction, result.pearson_r.abs(), result.r_squared, strength, result.n_samples
     );
 }
 
 fn feature_distance(a: &AudioFeatures, b: &AudioFeatures) -> f32 {
     let d = [
-        (a.rms_energy - b.rms_energy) * 10.0,
+        (a.rms_energy - b.rms_energy) * 10.0, // scale to comparable range
         (a.spectral_centroid - b.spectral_centroid) / 500.0,
         (a.zero_crossing_rate - b.zero_crossing_rate) * 100.0,
         (a.spectral_flux - b.spectral_flux) * 100.0,
@@ -658,363 +536,4 @@ fn feature_distance(a: &AudioFeatures, b: &AudioFeatures) -> f32 {
         (a.harmonic_ratio - b.harmonic_ratio) * 5.0,
     ];
     d.iter().map(|x| x * x).sum::<f32>().sqrt()
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STAGE 2: DEAM CROSS-VALIDATION
-// Train linear V-A regressor on DEAM audio features, apply to Symthaea output
-// ═══════════════════════════════════════════════════════════════════════════
-
-fn deam_cross_validate(
-    synth_features: &[(f32, f32, AudioFeatures)],
-    scenarios: &[CognitiveScenario],
-) -> Result<(), String> {
-    let annot_dir = "data/deam/annotations/annotations averaged per song/song_level";
-    let valence_path = format!("{annot_dir}/valence.csv");
-    let arousal_path = format!("{annot_dir}/arousal.csv");
-
-    if !std::path::Path::new(&valence_path).exists() {
-        // Try alternate path
-        let alt = "data/deam/annotations/annotations averaged per song";
-        let vp2 = format!("{alt}/static_annotations.csv");
-        if std::path::Path::new(&vp2).exists() {
-            return deam_cross_validate_static(&vp2, synth_features, scenarios);
-        }
-        return Err(format!("DEAM annotations not found at {valence_path}"));
-    }
-
-    // Parse DEAM song-level V-A annotations
-    let valence_map = parse_deam_song_level(&valence_path)?;
-    let arousal_map = parse_deam_song_level(&arousal_path)?;
-
-    println!(
-        "  Loaded DEAM annotations: {} valence, {} arousal",
-        valence_map.len(),
-        arousal_map.len()
-    );
-
-    // Compute mean/std of DEAM V-A distribution
-    let deam_v: Vec<f32> = valence_map.values().copied().collect();
-    let deam_a: Vec<f32> = arousal_map.values().copied().collect();
-
-    let (deam_v_mean, deam_v_std) = mean_std(&deam_v);
-    let (deam_a_mean, deam_a_std) = mean_std(&deam_a);
-
-    println!(
-        "  DEAM distribution: V={:.3}+/-{:.3}, A={:.3}+/-{:.3}",
-        deam_v_mean, deam_v_std, deam_a_mean, deam_a_std
-    );
-
-    // FAD-like score: Fréchet distance between DEAM feature distribution
-    // and Symthaea's feature distribution (simplified: 1D per feature)
-    // Using mean + covariance approximation
-    let synth_rms: Vec<f32> = synth_features
-        .iter()
-        .map(|(_, _, f)| f.rms_energy)
-        .collect();
-    let synth_zcr: Vec<f32> = synth_features
-        .iter()
-        .map(|(_, _, f)| f.zero_crossing_rate)
-        .collect();
-    let synth_hnr: Vec<f32> = synth_features
-        .iter()
-        .map(|(_, _, f)| f.harmonic_ratio)
-        .collect();
-
-    let (s_rms_m, s_rms_s) = mean_std(&synth_rms);
-    let (s_zcr_m, s_zcr_s) = mean_std(&synth_zcr);
-    let (s_hnr_m, s_hnr_s) = mean_std(&synth_hnr);
-
-    println!(
-        "  Symthaea distribution: RMS={:.3}+/-{:.3}, ZCR={:.3}+/-{:.3}, HNR={:.3}+/-{:.3}",
-        s_rms_m, s_rms_s, s_zcr_m, s_zcr_s, s_hnr_m, s_hnr_s
-    );
-
-    // Simple V-A prediction from features using DEAM-calibrated linear model
-    // Model: V = w0 + w1*HNR + w2*centroid (from our correlation analysis)
-    // A = w0 + w1*RMS + w2*onset_density
-    // We use the Symthaea correlation coefficients as weights (self-consistent validation)
-    println!("\n  Predicted V-A for each Symthaea scenario (feature-based):");
-    println!(
-        "  {:>25}  Intended V/A    Predicted V/A   Error",
-        "Scenario"
-    );
-
-    let mut total_v_error = 0.0f32;
-    let mut total_a_error = 0.0f32;
-
-    for (i, scenario) in scenarios.iter().enumerate() {
-        let f = &synth_features[i].2;
-        // Valence prediction: HNR is strong positive, centroid is strong negative
-        // Normalize to [-1, 1] range using empirical scaling
-        let pred_v = (f.harmonic_ratio - 0.8) * 5.0 + (1000.0 - f.spectral_centroid) / 1000.0;
-        let pred_v = pred_v.clamp(-1.0, 1.0);
-
-        // Arousal prediction: RMS + onset density
-        let pred_a = f.rms_energy * 1.5 + f.onset_density * 0.1;
-        let pred_a = pred_a.clamp(0.0, 1.0);
-
-        let v_err = (scenario.intended_valence - pred_v).abs();
-        let a_err = (scenario.intended_arousal - pred_a).abs();
-        total_v_error += v_err;
-        total_a_error += a_err;
-
-        println!(
-            "  {:>25}  V={:+.2} A={:.2}    V={:+.2} A={:.2}    dV={:.2} dA={:.2}",
-            scenario.name,
-            scenario.intended_valence,
-            scenario.intended_arousal,
-            pred_v,
-            pred_a,
-            v_err,
-            a_err,
-        );
-    }
-
-    let n = scenarios.len() as f32;
-    let mae_v = total_v_error / n;
-    let mae_a = total_a_error / n;
-    println!("\n  MAE: Valence={:.3}, Arousal={:.3}", mae_v, mae_a);
-
-    if mae_v < 0.3 && mae_a < 0.3 {
-        println!("  ✓ GOOD: Mean absolute error below 0.3 on both axes.");
-    } else if mae_v < 0.5 && mae_a < 0.5 {
-        println!("  ~ FAIR: Moderate prediction error. Mapping is directionally correct.");
-    } else {
-        println!("  ✗ POOR: High prediction error. Feature→V-A model needs calibration.");
-    }
-
-    Ok(())
-}
-
-fn deam_cross_validate_static(
-    _path: &str,
-    _synth: &[(f32, f32, AudioFeatures)],
-    _scenarios: &[CognitiveScenario],
-) -> Result<(), String> {
-    println!("  Static annotation format detected — using song-level means.");
-    Ok(())
-}
-
-fn parse_deam_song_level(path: &str) -> Result<std::collections::HashMap<u32, f32>, String> {
-    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open {path}: {e}"))?;
-    let reader = std::io::BufReader::new(file);
-    let mut map = std::collections::HashMap::new();
-
-    for (i, line) in reader.lines().enumerate() {
-        let line: String = line.map_err(|e| e.to_string())?;
-        if i == 0 {
-            continue;
-        } // header
-        let parts: Vec<&str> = line.split(',').collect();
-        if parts.len() >= 3 {
-            if let (Ok(id), Ok(mean)) = (
-                parts[0].trim().parse::<u32>(),
-                parts[1].trim().parse::<f32>(),
-            ) {
-                map.insert(id, mean);
-            }
-        }
-    }
-    Ok(map)
-}
-
-fn mean_std(values: &[f32]) -> (f32, f32) {
-    if values.is_empty() {
-        return (0.0, 0.0);
-    }
-    let n = values.len() as f32;
-    let mean = values.iter().sum::<f32>() / n;
-    let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
-    (mean, var.sqrt())
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STAGE 3: V-A SCATTER PLOT SVG
-// Figure 1 of the paper: intended vs actual position in Russell's circumplex
-// ═══════════════════════════════════════════════════════════════════════════
-
-fn generate_va_scatter_svg(
-    features: &[(f32, f32, AudioFeatures)],
-    scenarios: &[CognitiveScenario],
-) -> String {
-    // Build SVG without raw strings to avoid # delimiter conflicts with color codes
-    let w = 600.0f32;
-    let h = 600.0f32;
-    let margin = 60.0f32;
-    let plot_w = w - 2.0 * margin;
-    let plot_h = h - 2.0 * margin;
-
-    // Map V-A to pixel coordinates
-    // Valence: -1..1 → left..right
-    // Arousal: 0..1 → bottom..top
-    let vx = |v: f32| -> f32 { margin + (v + 1.0) / 2.0 * plot_w };
-    let ay = |a: f32| -> f32 { margin + (1.0 - a) * plot_h };
-
-    let colors = [
-        "#2196F3", // Flow - blue
-        "#4CAF50", // Contentment - green
-        "#F44336", // Panic - red
-        "#795548", // Burnout - brown
-        "#FF9800", // Curiosity - orange
-        "#9C27B0", // Sacred Stillness - purple
-        "#D32F2F", // Anger - dark red
-        "#E91E63", // Wonder - pink
-        "#607D8B", // Grief - gray
-        "#FFC107", // Excitement - gold
-        "#9E9E9E", // Boredom - gray
-        "#FF5722", // Tension - deep orange
-    ];
-
-    let mut svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" font-family="sans-serif">
-  <rect width="{w}" height="{h}" fill="rgb(250,250,250)"/>
-  <text x="{}" y="25" text-anchor="middle" font-size="16" font-weight="bold">Symthaea Muse: Consciousness State in V-A Space</text>
-  <text x="{}" y="42" text-anchor="middle" font-size="11" fill="rgb(102,102,102)">Russell's Circumplex Model (1980) | Koelsch/Vuust/Friston (2019) Predictive Coding</text>
-"#,
-        w / 2.0,
-        w / 2.0
-    );
-
-    // Axes
-    svg += &format!(
-        r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(204,204,204)" stroke-width="1"/>
-  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(204,204,204)" stroke-width="1"/>
-"#,
-        margin,
-        ay(0.5),
-        margin + plot_w,
-        ay(0.5), // horizontal midline
-        vx(0.0),
-        margin,
-        vx(0.0),
-        margin + plot_h, // vertical midline
-    );
-
-    // Quadrant labels
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="10" fill="rgb(170,170,170)">High Arousal</text>"#,
-        vx(0.0),
-        margin - 5.0
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="10" fill="rgb(170,170,170)">Low Arousal</text>"#,
-        vx(0.0),
-        margin + plot_h + 15.0
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="end" font-size="10" fill="rgb(170,170,170)">Negative</text>"#,
-        margin - 5.0,
-        ay(0.5) + 4.0
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="start" font-size="10" fill="rgb(170,170,170)">Positive</text>"#,
-        margin + plot_w + 5.0,
-        ay(0.5) + 4.0
-    );
-
-    // Quadrant annotations
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Excited/Happy</text>"#,
-        vx(0.5),
-        ay(0.85)
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Calm/Content</text>"#,
-        vx(0.5),
-        ay(0.15)
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Angry/Stressed</text>"#,
-        vx(-0.5),
-        ay(0.85)
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" text-anchor="middle" font-size="9" fill="rgb(221,221,221)">Sad/Depressed</text>"#,
-        vx(-0.5),
-        ay(0.15)
-    );
-
-    // Plot each scenario: intended (circle) and predicted (cross) with line
-    for (i, scenario) in scenarios.iter().enumerate() {
-        let f = &features[i].2;
-        let color = colors[i % colors.len()];
-
-        let ix = vx(scenario.intended_valence);
-        let iy = ay(scenario.intended_arousal);
-
-        // Predicted V-A (same formula as DEAM stage)
-        let pred_v = ((f.harmonic_ratio - 0.8) * 5.0 + (1000.0 - f.spectral_centroid) / 1000.0)
-            .clamp(-1.0, 1.0);
-        let pred_a = (f.rms_energy * 1.5 + f.onset_density * 0.1).clamp(0.0, 1.0);
-        let px = vx(pred_v);
-        let py = ay(pred_a);
-
-        // Line from intended to predicted
-        svg += &format!(
-            r#"  <line x1="{ix:.1}" y1="{iy:.1}" x2="{px:.1}" y2="{py:.1}" stroke="{color}" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
-"#
-        );
-
-        // Intended (filled circle)
-        svg += &format!(
-            r#"  <circle cx="{ix:.1}" cy="{iy:.1}" r="8" fill="{color}" opacity="0.8"/>
-"#
-        );
-
-        // Predicted (open circle with cross)
-        svg += &format!(
-            r#"  <circle cx="{px:.1}" cy="{py:.1}" r="6" fill="none" stroke="{color}" stroke-width="2"/>
-  <line x1="{}" y1="{py:.1}" x2="{}" y2="{py:.1}" stroke="{color}" stroke-width="1.5"/>
-  <line x1="{px:.1}" y1="{}" x2="{px:.1}" y2="{}" stroke="{color}" stroke-width="1.5"/>
-"#,
-            px - 4.0,
-            px + 4.0,
-            py - 4.0,
-            py + 4.0
-        );
-
-        // Label
-        let label = &scenario.name[..scenario.name.len().min(15)];
-        svg += &format!(
-            r#"  <text x="{}" y="{}" font-size="8" fill="{color}">{label}</text>
-"#,
-            ix + 10.0,
-            iy + 3.0
-        );
-    }
-
-    // Legend
-    svg += &format!(
-        r#"  <circle cx="{}" cy="{}" r="6" fill="rgb(102,102,102)" opacity="0.8"/>"#,
-        margin + 10.0,
-        h - 25.0
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" font-size="9" fill="rgb(102,102,102)">= Intended state</text>"#,
-        margin + 22.0,
-        h - 21.0
-    );
-    svg += &format!(
-        r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(102,102,102)" stroke-width="1.5"/>"#,
-        margin + 130.0,
-        h - 25.0,
-        margin + 142.0,
-        h - 25.0
-    );
-    svg += &format!(
-        r#"  <line x1="{}" y1="{}" x2="{}" y2="{}" stroke="rgb(102,102,102)" stroke-width="1.5"/>"#,
-        margin + 136.0,
-        h - 31.0,
-        margin + 136.0,
-        h - 19.0
-    );
-    svg += &format!(
-        r#"  <text x="{}" y="{}" font-size="9" fill="rgb(102,102,102)">= Perceived (from audio features)</text>"#,
-        margin + 148.0,
-        h - 21.0
-    );
-
-    svg += "\n</svg>";
-    svg
 }

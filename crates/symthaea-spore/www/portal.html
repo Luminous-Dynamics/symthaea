@@ -1263,6 +1263,11 @@ h2, h3 { letter-spacing: 0.02em; }
 
       <!-- RIGHT: Telemetry sidebar -->
       <div class="telemetry-sidebar">
+        <!-- Music toggle -->
+        <div style="display:flex;gap:0.5rem;">
+          <button id="music-toggle" class="glass-panel" style="flex:1;cursor:pointer;padding:0.5rem 0.6rem;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--fg);font-size:0.78rem;text-align:center;transition:background 0.3s" aria-label="Toggle music">&#x1f507; Music</button>
+          <button id="narrate-toggle" class="glass-panel" style="flex:1;cursor:pointer;padding:0.5rem 0.6rem;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--fg);font-size:0.78rem;text-align:center;transition:background 0.3s" aria-label="Toggle voice narration" onclick="window.toggleNarrateTTS();this.textContent=window.narrateTTS?'&#x1f50a; Voice':'&#x1f507; Voice'">&#x1f507; Voice</button>
+        </div>
         <!-- Phi meter -->
         <div class="glass-panel phi-meter">
           <div class="phi-big" id="phi-big" style="color:var(--lichen-grey)">&Phi; --</div>
@@ -1913,17 +1918,34 @@ h2, h3 { letter-spacing: 0.02em; }
   // ==================================================================
   // Narration helpers
   // ==================================================================
+  var narrateTTS = false; // Toggle via settings or #music-toggle
   function addNarration(text, isGlyph) {
     var stream = document.getElementById('narration-stream');
     var inner = document.getElementById('narration-inner');
     stream.classList.add('visible');
     var line = document.createElement('div');
     line.className = isGlyph ? 'narration-line glyph-echo' : 'narration-line';
+    line.setAttribute('role', 'status');
+    line.setAttribute('aria-live', 'polite');
     line.textContent = text;
     inner.appendChild(line);
     line.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    // Browser TTS narration — speaks every narration entry aloud
+    if (narrateTTS && window.speechSynthesis && text.length > 5) {
+      var utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.88;
+      utt.pitch = 0.92;
+      utt.volume = 0.8;
+      window.speechSynthesis.speak(utt);
+    }
   }
   window.addNarration = addNarration;
+  window.toggleNarrateTTS = function() {
+    narrateTTS = !narrateTTS;
+    window.narrateTTS = narrateTTS;
+    addNarration(narrateTTS ? 'Voice narration enabled.' : 'Voice narration disabled.');
+  };
+  window.narrateTTS = narrateTTS;
 
   function fetchNarration(phase, context) {
     if (!state.workerReady) return Promise.resolve(null);
@@ -3402,8 +3424,78 @@ window.drawLineChart = drawLineChart;
 
     loading.style.display = 'none';
     results.style.display = 'block';
+
+    // Platform detection + routing
+    detectPlatformAndRoute(profile);
   }
   window.runHardwareProbe = runHardwareProbe;
+
+  function detectPlatformAndRoute(profile) {
+    var platform = (profile.platform || '').toLowerCase();
+    var ua = (navigator.userAgent || '').toLowerCase();
+    var banner = document.getElementById('platform-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'platform-banner';
+      banner.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:8px;font-size:0.85rem;line-height:1.6;max-width:600px;margin-left:auto;margin-right:auto;';
+      var results = document.getElementById('inoc-probe-results');
+      if (results) results.parentNode.insertBefore(banner, results.nextSibling);
+    }
+
+    if (platform.includes('win') || ua.includes('windows')) {
+      state.detectedPlatform = 'windows';
+      banner.style.background = 'rgba(122,162,247,0.1)';
+      banner.style.border = '1px solid rgba(122,162,247,0.3)';
+      banner.innerHTML = [
+        '<div style="font-size:1rem;font-weight:500;margin-bottom:0.5rem;color:var(--teal);">Windows Detected</div>',
+        '<p style="color:var(--fg-dim);margin-bottom:0.8rem;">You have two options:</p>',
+        '<div style="display:grid;gap:0.5rem;">',
+        '  <div class="glass-panel" style="padding:0.8rem;cursor:pointer;" onclick="document.getElementById(\'btn-hermit\').click()">',
+        '    <strong style="color:var(--leaf-green);">Run alongside Windows</strong> (recommended)',
+        '    <div style="font-size:0.78rem;color:var(--fg-dim);margin-top:0.3rem;">Keep your files. Shrink Windows, install NixOS in the free space. Dual-boot menu at startup.</div>',
+        '  </div>',
+        '  <div class="glass-panel" style="padding:0.8rem;cursor:pointer;" onclick="document.getElementById(\'btn-hermit\').click()">',
+        '    <strong style="color:var(--solar-gold);">Replace Windows</strong>',
+        '    <div style="font-size:0.78rem;color:var(--fg-dim);margin-top:0.3rem;">Full disk for NixOS. 30-day recovery window (Ahimsa). Backup your files first.</div>',
+        '  </div>',
+        '</div>',
+        '<p style="font-size:0.75rem;color:var(--fg-muted);margin-top:0.8rem;font-style:italic;">',
+        'To run alongside: open Windows Disk Management, right-click C:, select "Shrink Volume" by at least 100 GB, then come back here.',
+        '</p>'
+      ].join('');
+      window.addNarration('Windows detected. You can run Symthaea alongside Windows or replace it entirely.');
+    } else if (platform.includes('mac') || ua.includes('macintosh') || ua.includes('mac os')) {
+      state.detectedPlatform = 'macos';
+      banner.style.background = 'rgba(187,154,247,0.1)';
+      banner.style.border = '1px solid rgba(187,154,247,0.3)';
+      var isAppleSilicon = ua.includes('arm') || (navigator.platform && navigator.platform.includes('Mac') && !ua.includes('intel'));
+      banner.innerHTML = [
+        '<div style="font-size:1rem;font-weight:500;margin-bottom:0.5rem;color:var(--bb9af7);">macOS Detected' + (isAppleSilicon ? ' (Apple Silicon)' : ' (Intel)') + '</div>',
+        isAppleSilicon ? [
+          '<p style="color:var(--fg-dim);">Apple Silicon Macs support native dual-boot via Asahi Linux. macOS stays untouched.</p>',
+          '<div class="glass-panel" style="padding:0.8rem;margin-top:0.5rem;">',
+          '  <strong style="color:var(--leaf-green);">Guided Dual-Boot (Ahimsa)</strong>',
+          '  <div style="font-size:0.78rem;color:var(--fg-dim);margin-top:0.3rem;">macOS remains. NixOS installs alongside. Hold power button at startup to choose.</div>',
+          '  <div style="font-size:0.75rem;color:var(--fg-muted);margin-top:0.5rem;">Requires: M1 or M2 Mac. M3/M4 support is experimental (no GPU/display yet).</div>',
+          '</div>'
+        ].join('') : [
+          '<p style="color:var(--fg-dim);">Intel Macs support standard dual-boot. Resize your macOS partition in Disk Utility, then install NixOS.</p>'
+        ].join(''),
+        '<p style="font-size:0.75rem;color:var(--fg-muted);margin-top:0.8rem;font-style:italic;">',
+        'Choose "Inoculate This Machine" below to continue with your preferred path.',
+        '</p>'
+      ].join('');
+      window.addNarration('macOS detected.' + (isAppleSilicon ? ' Apple Silicon supports native dual-boot via Asahi.' : ' Intel Mac supports standard dual-boot.'));
+    } else {
+      state.detectedPlatform = 'linux';
+      banner.style.background = 'rgba(156,206,106,0.08)';
+      banner.style.border = '1px solid rgba(156,206,106,0.2)';
+      banner.innerHTML = [
+        '<div style="font-size:1rem;font-weight:500;margin-bottom:0.5rem;color:var(--leaf-green);">Linux Detected</div>',
+        '<p style="color:var(--fg-dim);">Ready for direct deployment. Choose your path below, then connect via SSH or download configuration files.</p>'
+      ].join('');
+    }
+  }
 
   function formatBytes(bytes) {
     if (!bytes || bytes === 0) return 'Unknown';

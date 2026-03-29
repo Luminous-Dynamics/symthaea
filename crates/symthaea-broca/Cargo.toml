@@ -17,6 +17,7 @@ tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
 rayon = { workspace = true, optional = true }
+symthaea-stt = { path = "../symthaea-stt", optional = true }
 
 # Distillation collection (optional)
 ureq = { version = "2.9", optional = true }
@@ -90,6 +91,11 @@ path = "src/bin/gen_creativity_training.rs"
 name = "gen-moral-training"
 path = "src/bin/gen_moral_training.rs"
 
+[[bin]]
+name = "gen-speech-training"
+path = "src/bin/gen_speech_training.rs"
+required-features = ["speech-data"]
+
 [features]
 default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
@@ -108,3 +114,4 @@ collect = ["dep:ureq"]
 simd = ["symthaea-core/simd"]
 test-helpers = ["mamba-cpu"]
 therapeutic = []
+speech-data = ["dep:symthaea-stt"]

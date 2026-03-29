@@ -62,65 +62,40 @@ use super::{
     WorldModelBridge,
 };
 
-/// Adapter: wraps HelicopterEmbodiment to implement the main crate's EmbodimentBridge trait.
-/// Needed because the helicopter crate can't depend on the main crate (circular dep).
-#[cfg(feature = "helicopter")]
-struct HelicopterBridgeAdapter(crate::helicopter::embodiment::HelicopterEmbodiment);
+/// Macro: generate a thin adapter that wraps a platform's embodiment struct
+/// and delegates all EmbodimentBridge methods. Since all types now come from
+/// `symthaea_core::embodiment`, step/telemetry/safety_level pass through directly.
+macro_rules! bridge_adapter {
+    ($name:ident, $inner:ty, $platform:ident, $actuators:expr, $feature:literal) => {
+        #[cfg(feature = $feature)]
+        struct $name($inner);
 
-#[cfg(feature = "helicopter")]
-impl super::motor_bridge::EmbodimentBridge for HelicopterBridgeAdapter {
-    fn step(
-        &mut self,
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        dt: f32,
-        phi: f64,
-    ) -> super::motor_bridge::EmbodimentResult {
-        let r = self.0.step(thought_hv, dt, phi);
-        super::motor_bridge::EmbodimentResult {
-            num_actuators: r.num_actuators,
-            control_effort: r.control_effort,
-            success: r.success,
-            prediction_error: r.prediction_error,
-            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
+        #[cfg(feature = $feature)]
+        impl super::motor_bridge::EmbodimentBridge for $name {
+            fn step(&mut self, thought_hv: &symthaea_core::hdc::ContinuousHV, dt: f32, phi: f64)
+                -> super::motor_bridge::EmbodimentResult
+            { self.0.step(thought_hv, dt, phi) }
+
+            fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV
+            { self.0.encode_perception() }
+
+            fn reset(&mut self) { self.0.reset(); }
+            fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel { self.0.safety_level() }
+            fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) { self.0.set_safety_override(level); }
+            fn clear_safety_override(&mut self) { self.0.clear_safety_override(); }
+            fn platform(&self) -> super::motor_bridge::EmbodimentPlatform { super::motor_bridge::EmbodimentPlatform::$platform }
+            fn num_actuators(&self) -> usize { $actuators }
+            fn total_steps(&self) -> usize { self.0.total_steps() }
+            fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry { self.0.telemetry() }
         }
-    }
-
-    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.0.encode_perception()
-    }
-
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-
-    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-        super::motor_bridge::MotorSafetyLevel::from_phi(0.5) // Default; updated on step()
-    }
-
-    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-        super::motor_bridge::EmbodimentPlatform::Helicopter
-    }
-
-    fn num_actuators(&self) -> usize {
-        6
-    }
-
-    fn total_steps(&self) -> usize {
-        self.0.total_steps()
-    }
-
-    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-        let t = self.0.telemetry();
-        super::motor_bridge::EmbodimentTelemetry {
-            total_steps: t.total_steps,
-            control_effort: t.control_effort,
-            prediction_error: t.prediction_error,
-            safety_level: t.safety_level,
-            platform: t.platform,
-            num_actuators: t.num_actuators,
-        }
-    }
+    };
 }
+
+bridge_adapter!(HelicopterBridgeAdapter, crate::helicopter::embodiment::HelicopterEmbodiment, Helicopter, 6, "helicopter");
+bridge_adapter!(FlightBridgeAdapter, crate::flight::embodiment::FlightEmbodiment, Quadrotor, 4, "flight");
+bridge_adapter!(VehicleBridgeAdapter, crate::vehicle::embodiment::VehicleEmbodiment, Vehicle, 3, "vehicle");
+bridge_adapter!(ManipulatorBridgeAdapter, crate::manipulator::embodiment::ManipulatorEmbodiment, Manipulator, 8, "manipulator");
+bridge_adapter!(AuvBridgeAdapter, crate::auv::embodiment::AuvEmbodiment, Auv, 8, "auv");
 
 impl CognitiveLoopService {
     /// Create a new cognitive loop service
@@ -562,8 +537,9 @@ impl CognitiveLoopService {
 
         // Create safety alert channel — bounded (32) so the cognitive loop never blocks.
         // Host application drains via take_safety_alert_receiver().
-        let (safety_alert_tx, safety_alert_rx) =
-            std::sync::mpsc::sync_channel(super::safety_alert::SAFETY_ALERT_CHANNEL_CAPACITY);
+        let (safety_alert_tx, safety_alert_rx) = std::sync::mpsc::sync_channel(
+            super::safety_alert::SAFETY_ALERT_CHANNEL_CAPACITY,
+        );
 
         // Create Holon inbound channel eagerly so the sender is always available.
         // HTTP handlers (HolonHttpState) clone the tx to inject SomaMessages.
@@ -639,28 +615,79 @@ impl CognitiveLoopService {
                 use super::motor_bridge::EmbodimentPlatform;
                 match config.embodiment_platform {
                     EmbodimentPlatform::Humanoid => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let bridge =
-                            super::motor_bridge::MotorBridge::new(&genesis.unwrap_or_else(|| {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let bridge = super::motor_bridge::MotorBridge::new(
+                            &genesis.unwrap_or_else(|| {
                                 symthaea_core::genesis::GenesisSeed::from_phrase("default")
-                            }));
+                            }),
+                        );
                         Some(Box::new(bridge) as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "helicopter")]
                     EmbodimentPlatform::Helicopter => {
-                        let genesis = config
-                            .genesis_phrase
-                            .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
                         let inner = crate::helicopter::embodiment::HelicopterEmbodiment::new(
                             &genesis.unwrap_or_else(|| {
                                 symthaea_core::genesis::GenesisSeed::from_phrase("default")
                             }),
                         );
                         Some(Box::new(HelicopterBridgeAdapter(inner))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "flight")]
+                    EmbodimentPlatform::Quadrotor => {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let inner = crate::flight::embodiment::FlightEmbodiment::new(
+                            &genesis.unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            }),
+                        );
+                        Some(Box::new(FlightBridgeAdapter(inner))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "vehicle")]
+                    EmbodimentPlatform::Vehicle => {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let inner = crate::vehicle::embodiment::VehicleEmbodiment::new(
+                            &genesis.unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            }),
+                        );
+                        Some(Box::new(VehicleBridgeAdapter(inner))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "manipulator")]
+                    EmbodimentPlatform::Manipulator => {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let inner = crate::manipulator::embodiment::ManipulatorEmbodiment::new(
+                            &genesis.unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            }),
+                        );
+                        Some(Box::new(ManipulatorBridgeAdapter(inner))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "auv")]
+                    EmbodimentPlatform::Auv => {
+                        let genesis = config.genesis_phrase.as_ref().map(|p| {
+                            symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                        });
+                        let inner = crate::auv::embodiment::AuvEmbodiment::new(
+                            &genesis.unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            }),
+                        );
+                        Some(Box::new(AuvBridgeAdapter(inner))
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     _ => None,
@@ -777,72 +804,69 @@ impl CognitiveLoopService {
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
             memory: super::memory_execution::MemoryExecution {
                 memory_consol: super::memory_consolidation_manager::MemoryAndConsolidationManager {
-                    stability_regime: StabilityRegimeProcessor::new(),
-                    discovery_service: PrimitiveDiscoveryService::new(
-                        DiscoveryServiceConfig::default(),
-                    ),
-                    semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
-                    memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
-                    resonator_memory: if enable_resonator_recall {
-                        let dim = resonator_cfc_input_dim;
-                        let res_config = crate::dynamics::resonator::ResonatorConfig {
-                            dim,
-                            max_iters: 50,
-                            convergence_threshold: 0.995,
-                            temperature: 0.1,
-                            bipolar: true,
-                        };
-                        let mut mem =
-                            crate::dynamics::resonator::ResonatorMemory::new(res_config, 500);
-                        let make_hv = |seed: u64, d: usize| -> Vec<f32> {
-                            let mut state = seed ^ 0x9E3779B97F4A7C15;
-                            (0..d)
-                                .map(|_| {
-                                    state ^= state << 13;
-                                    state ^= state >> 7;
-                                    state ^= state << 17;
-                                    if state % 2 == 0 {
-                                        1.0
-                                    } else {
-                                        -1.0
-                                    }
-                                })
-                                .collect()
-                        };
-                        let seed_base: u64 = resonator_genesis_phrase
-                            .as_ref()
-                            .map(|p| {
-                                let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
-                                genesis.domain("resonator_memory").gen::<u64>()
+                stability_regime: StabilityRegimeProcessor::new(),
+                discovery_service: PrimitiveDiscoveryService::new(DiscoveryServiceConfig::default()),
+                semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
+                memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
+                resonator_memory: if enable_resonator_recall {
+                    let dim = resonator_cfc_input_dim;
+                    let res_config = crate::dynamics::resonator::ResonatorConfig {
+                        dim,
+                        max_iters: 50,
+                        convergence_threshold: 0.995,
+                        temperature: 0.1,
+                        bipolar: true,
+                    };
+                    let mut mem = crate::dynamics::resonator::ResonatorMemory::new(res_config, 500);
+                    let make_hv = |seed: u64, d: usize| -> Vec<f32> {
+                        let mut state = seed ^ 0x9E3779B97F4A7C15;
+                        (0..d)
+                            .map(|_| {
+                                state ^= state << 13;
+                                state ^= state >> 7;
+                                state ^= state << 17;
+                                if state % 2 == 0 {
+                                    1.0
+                                } else {
+                                    -1.0
+                                }
                             })
-                            .unwrap_or_else(|| {
-                                tracing::debug!(
-                                    "ResonatorMemory: using default seed (no genesis phrase)"
-                                );
-                                super::thresholds::RESONATOR_MEMORY_SEED_DEFAULT
-                            });
-                        let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
-                        for i in 0..8u64 {
-                            semantic_cb.add(
-                                &format!("proto_{i}"),
-                                make_hv(seed_base.wrapping_add(i), dim),
+                            .collect()
+                    };
+                    let seed_base: u64 = resonator_genesis_phrase
+                        .as_ref()
+                        .map(|p| {
+                            let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
+                            genesis.domain("resonator_memory").gen::<u64>()
+                        })
+                        .unwrap_or_else(|| {
+                            tracing::debug!(
+                                "ResonatorMemory: using default seed (no genesis phrase)"
                             );
-                        }
-                        mem.add_codebook(semantic_cb);
-                        let mut valence_cb = crate::dynamics::Codebook::new("valence");
-                        valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
-                        valence_cb.add("neutral", make_hv(seed_base.wrapping_add(101), dim));
-                        valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
-                        mem.add_codebook(valence_cb);
-                        let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
-                        phi_cb.add("low", make_hv(seed_base.wrapping_add(200), dim));
-                        phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
-                        phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
-                        mem.add_codebook(phi_cb);
-                        Some(mem)
-                    } else {
-                        None
-                    },
+                            super::thresholds::RESONATOR_MEMORY_SEED_DEFAULT
+                        });
+                    let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
+                    for i in 0..8u64 {
+                        semantic_cb.add(
+                            &format!("proto_{i}"),
+                            make_hv(seed_base.wrapping_add(i), dim),
+                        );
+                    }
+                    mem.add_codebook(semantic_cb);
+                    let mut valence_cb = crate::dynamics::Codebook::new("valence");
+                    valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
+                    valence_cb.add("neutral", make_hv(seed_base.wrapping_add(101), dim));
+                    valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
+                    mem.add_codebook(valence_cb);
+                    let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
+                    phi_cb.add("low", make_hv(seed_base.wrapping_add(200), dim));
+                    phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
+                    phi_cb.add("high", make_hv(seed_base.wrapping_add(202), dim));
+                    mem.add_codebook(phi_cb);
+                    Some(mem)
+                } else {
+                    None
+                },
                 },
                 causal_enhancer,
                 episodic_persistence:
@@ -854,11 +878,10 @@ impl CognitiveLoopService {
                         graph_capacity: knowledge_graph_capacity,
                         causal_capacity: knowledge_causal_capacity,
                         search_top_k: knowledge_search_top_k,
-                        ontology_config:
-                            crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
-                                max_primitives: knowledge_ontology_max,
-                                ..Default::default()
-                            },
+                        ontology_config: crate::knowledge::adaptive_ontology::AdaptiveOntologyConfig {
+                            max_primitives: knowledge_ontology_max,
+                            ..Default::default()
+                        },
                         db_path: knowledge_db_path.clone(),
                         ..Default::default()
                     };
@@ -974,8 +997,7 @@ impl CognitiveLoopService {
                 affective_bridge,
             },
             primitive_tier,
-            thermodynamic_mgr:
-                super::managers::thermodynamic_manager::ThermodynamicManager::default(),
+            thermodynamic_mgr: super::managers::thermodynamic_manager::ThermodynamicManager::default(),
             #[cfg(feature = "support")]
             support: super::support_manager::SupportManager::new(),
             carryover: CycleCarryover::default(),
@@ -1069,7 +1091,11 @@ impl CognitiveLoopService {
                     phenomenal_binding,
                     hierarchical_free_energy,
                 },
-                super::gwt_manager::GwtManager::new(gwt, gwt_memory_flag, gwt_perception_count),
+                super::gwt_manager::GwtManager::new(
+                    gwt,
+                    gwt_memory_flag,
+                    gwt_perception_count,
+                ),
                 self_model_tier,
                 MasterConsciousnessEquation::default(),
             ),
@@ -1522,9 +1548,7 @@ mod tests {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
         // social_trust defaults to 0.5, cooperation_rate defaults to 0.0
         assert!((service.behavior.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
-        assert!(
-            (service.behavior.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON
-        );
+        assert!((service.behavior.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]

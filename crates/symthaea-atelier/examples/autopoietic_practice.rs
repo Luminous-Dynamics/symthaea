@@ -15,12 +15,12 @@
 //! cargo run -p symthaea-atelier --example autopoietic_practice
 //! ```
 
-use symthaea_atelier::critic::{auto_improve, PerceptualInput, SelfCritic};
-use symthaea_atelier::{create_artwork, AtelierConfig};
+use symthaea_atelier::critic::{auto_improve, SelfCritic, PerceptualInput};
+use symthaea_atelier::{AtelierConfig, create_artwork};
 use symthaea_canvas::CognitiveSnapshot;
-use symthaea_gallery::evolution::analyze_evolution;
+use symthaea_gallery::{GalleryIndex, GalleryEntry, ArtModality};
 use symthaea_gallery::style::{compute_style, StyleEmbedding};
-use symthaea_gallery::{ArtModality, GalleryEntry, GalleryIndex};
+use symthaea_gallery::evolution::analyze_evolution;
 
 fn main() {
     println!("═══════════════════════════════════════════════════════");
@@ -125,9 +125,7 @@ fn main() {
             id: uuid::Uuid::new_v4(),
             created_at_cycle: i,
             created_at: chrono::Utc::now(),
-            modality: ArtModality::Visual {
-                filename: filename.clone(),
-            },
+            modality: ArtModality::Visual { filename: filename.clone() },
             aesthetic_score: artwork.aesthetic_score,
             harmony_activations: snapshot.harmony_activations,
             tags: vec![format!("{:?}", artwork.style)],
@@ -136,16 +134,8 @@ fn main() {
 
         println!(
             "  [{:02}] {} | composite={:.3} | novelty={:.3} | taste={:.3} | {}",
-            i,
-            filename,
-            verdict.composite,
-            verdict.novelty,
-            verdict.taste_alignment,
-            if verdict.reached_stillness {
-                "STILL"
-            } else {
-                "evolving"
-            }
+            i, filename, verdict.composite, verdict.novelty, verdict.taste_alignment,
+            if verdict.reached_stillness { "STILL" } else { "evolving" }
         );
     }
 
@@ -156,32 +146,15 @@ fn main() {
 
     let style = compute_style(&gallery, 50);
     println!("  Style embedding (16D):");
-    println!(
-        "    Harmony means:  [{:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}]",
-        style.vector[0],
-        style.vector[1],
-        style.vector[2],
-        style.vector[3],
-        style.vector[4],
-        style.vector[5],
-        style.vector[6],
-        style.vector[7]
-    );
+    println!("    Harmony means:  [{:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}]",
+        style.vector[0], style.vector[1], style.vector[2], style.vector[3],
+        style.vector[4], style.vector[5], style.vector[6], style.vector[7]);
     println!("    Aesthetic means: order={:.2}, complexity={:.2}, surprise={:.2}, harmony={:.2}, birkhoff={:.2}, composite={:.2}",
         style.vector[8], style.vector[9], style.vector[10], style.vector[11],
         style.vector[12], style.vector[13]);
-    println!(
-        "    Score trend:     {:.3} (>0.5 = improving)",
-        style.vector[14]
-    );
-    println!(
-        "    Novelty pref:    {:.3} (>0.5 = explorer)",
-        style.vector[15]
-    );
-    println!(
-        "    Confidence:      {:.2} ({} samples)",
-        style.confidence, style.sample_count
-    );
+    println!("    Score trend:     {:.3} (>0.5 = improving)", style.vector[14]);
+    println!("    Novelty pref:    {:.3} (>0.5 = explorer)", style.vector[15]);
+    println!("    Confidence:      {:.2} ({} samples)", style.confidence, style.sample_count);
 
     // Compare to neutral
     let neutral = StyleEmbedding::neutral();
@@ -203,11 +176,8 @@ fn main() {
     for period in &evolution.periods {
         println!(
             "    Cycles {}-{}: {} (avg score {:.3}, {} works)",
-            period.start_cycle,
-            period.end_cycle,
-            period.harmony_name,
-            period.average_score,
-            period.artwork_count
+            period.start_cycle, period.end_cycle,
+            period.harmony_name, period.average_score, period.artwork_count
         );
     }
 
@@ -221,20 +191,11 @@ fn main() {
     println!("  Arousal:        {:.3}", snapshot.arousal);
     println!("  Dopamine:       {:.3}", snapshot.dopamine);
     println!("  Serotonin:      {:.3}", snapshot.serotonin);
-    println!(
-        "  Harmonies:     [{:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}]",
-        snapshot.harmony_activations[0],
-        snapshot.harmony_activations[1],
-        snapshot.harmony_activations[2],
-        snapshot.harmony_activations[3],
-        snapshot.harmony_activations[4],
-        snapshot.harmony_activations[5],
-        snapshot.harmony_activations[6],
-        snapshot.harmony_activations[7]
-    );
-    println!(
-        "\n  Gallery: {} artworks in target/practice-gallery/",
-        gallery.entries.len()
-    );
+    println!("  Harmonies:     [{:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}]",
+        snapshot.harmony_activations[0], snapshot.harmony_activations[1],
+        snapshot.harmony_activations[2], snapshot.harmony_activations[3],
+        snapshot.harmony_activations[4], snapshot.harmony_activations[5],
+        snapshot.harmony_activations[6], snapshot.harmony_activations[7]);
+    println!("\n  Gallery: {} artworks in target/practice-gallery/", gallery.entries.len());
     println!("  Open any .svg file in a browser to view.\n");
 }

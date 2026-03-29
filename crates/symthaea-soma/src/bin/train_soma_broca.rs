@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Train a Broca checkpoint on Soma's embodied vocabulary.
 //!
 //! Produces a checkpoint that `BrocaSoma::load_checkpoint()` can load, so Soma

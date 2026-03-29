@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #![deny(unsafe_code)]
 #![allow(clippy::needless_range_loop)]
 //! # Symthaea Cell Foundry
@@ -8,7 +11,11 @@
 //! temporal jumps to predict cell behavior from 1 hour to 9 months.
 
 pub mod cell_encoder;
+pub mod consciousness_ethics_framework;
 pub mod culture_controller;
+pub mod digital_organoid;
+pub mod morphogenetic_consciousness;
+pub mod organoid_pipeline;
 pub mod epigenetics;
 pub mod ethics_gate;
 pub mod experiment_planner;

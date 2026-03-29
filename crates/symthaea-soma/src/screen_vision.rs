@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Screen embodiment: framebuffer capture → holographic visual perception.
 //!
 //! This module lets Soma "see" the phone screen by feeding screen framebuffer

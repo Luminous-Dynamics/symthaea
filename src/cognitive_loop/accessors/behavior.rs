@@ -386,8 +386,7 @@ impl CognitiveLoopService {
     ) {
         self.behavior.social_mgr.social.social_trust = trust.clamp(0.0, 1.0);
         self.behavior.social_mgr.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
-        self.behavior.social_mgr.social.social_prediction_accuracy =
-            prediction_accuracy.clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_prediction_accuracy = prediction_accuracy.clamp(0.0, 1.0);
         self.behavior.social_mgr.social.social_models_count = models_count;
         self.behavior.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
@@ -865,11 +864,9 @@ impl CognitiveLoopService {
         let combined = identity * 0.25 + reputation * 0.25 + community * 0.30 + engagement * 0.20;
 
         self.behavior.social_mgr.social.social_trust = (community as f32).clamp(0.0, 1.0);
-        self.behavior.social_mgr.social.social_cooperation_rate =
-            (reputation as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_cooperation_rate = (reputation as f32).clamp(0.0, 1.0);
         self.behavior.social_mgr.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
-        self.behavior.social_mgr.social.social_prediction_accuracy =
-            (identity as f32).clamp(0.0, 1.0);
+        self.behavior.social_mgr.social.social_prediction_accuracy = (identity as f32).clamp(0.0, 1.0);
 
         // Modulate oxytocin from community dimension (social bonding).
         // Community trust maps to 0.0–0.3 oxytocin injection (conservative range).
@@ -926,17 +923,17 @@ impl CognitiveLoopService {
     /// rt.block_on(cls.enable_network_attestation())?;
     /// ```
     #[cfg(feature = "identity")]
-    pub async fn enable_network_attestation(&self) -> anyhow::Result<()> {
-        use super::super::managers::network_service_bridge::NetworkServiceBridge;
+    pub async fn enable_network_attestation(
+        &self,
+    ) -> anyhow::Result<()> {
         use crate::swarm::{NetworkService, SwarmConfig};
+        use super::super::managers::network_service_bridge::NetworkServiceBridge;
 
         let swarm_config = SwarmConfig::production();
-        let mut service = NetworkService::new(swarm_config)
-            .await
+        let mut service = NetworkService::new(swarm_config).await
             .map_err(|e| anyhow::anyhow!("NetworkService init failed: {e}"))?;
 
-        let attestation_mgr = service
-            .initialize_attestation()
+        let attestation_mgr = service.initialize_attestation()
             .map_err(|e| anyhow::anyhow!("Attestation init failed: {e}"))?;
 
         let tx = self.swarm_event_sender();

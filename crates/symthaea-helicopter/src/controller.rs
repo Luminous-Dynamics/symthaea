@@ -48,8 +48,11 @@ impl HelicopterController {
 
         // Output weights from genesis (small for stability)
         let total_weights = NUM_ACTUATORS * HDC_DIM;
-        let weight_hv =
-            ContinuousHV::from_genesis(genesis, "helicopter::output_weights", total_weights);
+        let weight_hv = ContinuousHV::from_genesis(
+            genesis,
+            "helicopter::output_weights",
+            total_weights,
+        );
         let mut output_weights: Vec<f32> = weight_hv.as_slice().to_vec();
         for w in &mut output_weights {
             *w *= 0.01;
@@ -58,9 +61,9 @@ impl HelicopterController {
         // Bias initialized to hover command
         let output_bias = [
             HelicopterCommand::HOVER_COLLECTIVE,
-            0.0, // cyclic_lon
-            0.0, // cyclic_lat
-            0.0, // pedal
+            0.0,  // cyclic_lon
+            0.0,  // cyclic_lat
+            0.0,  // pedal
             HelicopterCommand::HOVER_THRUST,
             HelicopterCommand::HOVER_TAIL,
         ];

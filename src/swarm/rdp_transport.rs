@@ -87,7 +87,10 @@ impl RdpTransportHandle {
     ///
     /// `inbound_capacity`: max buffered inbound frames (default 128).
     /// `outbound_capacity`: max buffered outbound frames (default 64).
-    pub fn new(inbound_capacity: usize, outbound_capacity: usize) -> (Self, RdpTransportActor) {
+    pub fn new(
+        inbound_capacity: usize,
+        outbound_capacity: usize,
+    ) -> (Self, RdpTransportActor) {
         let (inbound_tx, inbound_rx) = mpsc::sync_channel(inbound_capacity);
         let (outbound_tx, outbound_rx) = mpsc::sync_channel(outbound_capacity);
         let alive = Arc::new(AtomicBool::new(true));
@@ -123,10 +126,7 @@ impl RdpTransportHandle {
 
     /// Non-blocking: send a frame to the actor for transmission.
     pub fn send_frame(&mut self, frame: RdpFrame) -> bool {
-        match self
-            .outbound_tx
-            .try_send(TransportOutbound::SendFrame(frame))
-        {
+        match self.outbound_tx.try_send(TransportOutbound::SendFrame(frame)) {
             Ok(()) => {
                 self.frames_sent += 1;
                 true
@@ -137,14 +137,18 @@ impl RdpTransportHandle {
 
     /// Request PQC handshake initiation.
     pub fn start_handshake(&self) {
-        let _ = self.outbound_tx.try_send(TransportOutbound::StartHandshake);
+        let _ = self
+            .outbound_tx
+            .try_send(TransportOutbound::StartHandshake);
     }
 
     /// Request graceful disconnect.
     pub fn disconnect(&self, reason: &str) {
-        let _ = self.outbound_tx.try_send(TransportOutbound::Disconnect {
-            reason: reason.to_string(),
-        });
+        let _ = self
+            .outbound_tx
+            .try_send(TransportOutbound::Disconnect {
+                reason: reason.to_string(),
+            });
     }
 
     /// Whether the transport actor is still alive.
@@ -293,14 +297,9 @@ impl RdpTransportActor {
     /// Stub server when swarm feature is not enabled.
     #[cfg(not(feature = "swarm"))]
     pub async fn run_server(self, _listen_addr: &str) {
-        tracing::info!(
-            "RDP transport actor started (stub — enable 'swarm' feature for real Iroh QUIC)"
-        );
+        tracing::info!("RDP transport actor started (stub — enable 'swarm' feature for real Iroh QUIC)");
         while self.alive.load(Ordering::Relaxed) {
-            match self
-                .outbound_rx
-                .recv_timeout(std::time::Duration::from_millis(100))
-            {
+            match self.outbound_rx.recv_timeout(std::time::Duration::from_millis(100)) {
                 Ok(TransportOutbound::Disconnect { reason }) => {
                     tracing::info!("RDP transport disconnect: {}", reason);
                     break;
@@ -338,10 +337,7 @@ impl RdpTransportActor {
 
         // Stub connection loop (real impl needs EndpointAddr resolution).
         while self.alive.load(Ordering::Relaxed) {
-            match self
-                .outbound_rx
-                .recv_timeout(std::time::Duration::from_millis(100))
-            {
+            match self.outbound_rx.recv_timeout(std::time::Duration::from_millis(100)) {
                 Ok(TransportOutbound::Disconnect { .. }) => break,
                 Ok(_) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
@@ -356,10 +352,7 @@ impl RdpTransportActor {
     pub async fn run_client(self, _server_addr: &str) {
         tracing::info!("RDP client stub (enable 'swarm' for Iroh QUIC)");
         while self.alive.load(Ordering::Relaxed) {
-            match self
-                .outbound_rx
-                .recv_timeout(std::time::Duration::from_millis(100))
-            {
+            match self.outbound_rx.recv_timeout(std::time::Duration::from_millis(100)) {
                 Ok(TransportOutbound::Disconnect { .. }) => break,
                 Ok(_) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
@@ -378,8 +371,8 @@ impl Drop for RdpTransportActor {
 
 #[cfg(test)]
 mod tests {
-    use super::super::rdp_protocol::{ControlMessage, FullFrame, QuantizedPatch};
     use super::*;
+    use super::super::rdp_protocol::{ControlMessage, FullFrame, QuantizedPatch};
 
     #[test]
     fn test_handle_actor_creation() {

@@ -148,9 +148,7 @@ mod tests {
         s.set_social_signals(0.8, 0.3, 0.7, 5, 0.6);
         assert!((s.behavior.social_mgr.social.social_trust - 0.8).abs() < f32::EPSILON);
         assert!((s.behavior.social_mgr.social.social_cooperation_rate - 0.3).abs() < f32::EPSILON);
-        assert!(
-            (s.behavior.social_mgr.social.social_prediction_accuracy - 0.7).abs() < f32::EPSILON
-        );
+        assert!((s.behavior.social_mgr.social.social_prediction_accuracy - 0.7).abs() < f32::EPSILON);
         assert_eq!(s.behavior.social_mgr.social.social_models_count, 5);
         assert!((s.behavior.social_mgr.social.social_mean_trust - 0.6).abs() < f32::EPSILON);
     }

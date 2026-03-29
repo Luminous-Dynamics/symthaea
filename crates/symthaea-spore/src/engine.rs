@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SporeEngine: the core consciousness loop for WASM targets.
 
 use crate::broca::BrocaLite;
@@ -585,30 +588,20 @@ impl SporeEngine {
         // Wellbeing profile bias
         {
             let bias = self.wellbeing.effective_bias(0.0);
-            self.bath.dopamine.level =
-                (self.bath.dopamine.level + bias.dopamine * 0.1).clamp(0.0, 1.0);
-            self.bath.noradrenaline.level =
-                (self.bath.noradrenaline.level + bias.norepinephrine * 0.1).clamp(0.0, 1.0);
-            self.bath.serotonin.level =
-                (self.bath.serotonin.level + bias.serotonin * 0.1).clamp(0.0, 1.0);
-            self.bath.oxytocin.level =
-                (self.bath.oxytocin.level + bias.oxytocin * 0.1).clamp(0.0, 1.0);
+            self.bath.dopamine.level = (self.bath.dopamine.level + bias.dopamine * 0.1).clamp(0.0, 1.0);
+            self.bath.noradrenaline.level = (self.bath.noradrenaline.level + bias.norepinephrine * 0.1).clamp(0.0, 1.0);
+            self.bath.serotonin.level = (self.bath.serotonin.level + bias.serotonin * 0.1).clamp(0.0, 1.0);
+            self.bath.oxytocin.level = (self.bath.oxytocin.level + bias.oxytocin * 0.1).clamp(0.0, 1.0);
         }
 
         // PE-driven production (no manual decay — reuptake handles that).
         // Immune lr_factor attenuates production under threat conditions.
         // DA: reward prediction error (Schultz 1997)
-        self.bath
-            .dopamine
-            .produce(prediction_error * 0.08 * lr_factor);
+        self.bath.dopamine.produce(prediction_error * 0.08 * lr_factor);
         // NE: arousal/alertness from surprise (Aston-Jones & Cohen 2005)
-        self.bath
-            .noradrenaline
-            .produce(prediction_error * 0.10 * lr_factor);
+        self.bath.noradrenaline.produce(prediction_error * 0.10 * lr_factor);
         // 5-HT: contentment from low surprise (Dayan & Huys 2009)
-        self.bath
-            .serotonin
-            .produce((1.0 - prediction_error) * 0.04 * lr_factor);
+        self.bath.serotonin.produce((1.0 - prediction_error) * 0.04 * lr_factor);
         // OT: baseline social presence — doesn't require BLE peers
         self.bath.oxytocin.produce(0.003);
 
@@ -768,22 +761,12 @@ impl SporeEngine {
         );
         self.workspace.submit(
             "emotion",
-            if neuromods[2] > 0.6 {
-                "contentment"
-            } else if neuromods[0] > 0.6 {
-                "excitement"
-            } else {
-                "neutral"
-            },
+            if neuromods[2] > 0.6 { "contentment" } else if neuromods[0] > 0.6 { "excitement" } else { "neutral" },
             ((neuromods[0] + neuromods[2]) * 0.5).clamp(0.0, 1.0),
         );
         self.workspace.submit(
             "consciousness",
-            if consciousness_level > 0.5 {
-                "high_awareness"
-            } else {
-                "low_awareness"
-            },
+            if consciousness_level > 0.5 { "high_awareness" } else { "low_awareness" },
             consciousness_level,
         );
 
@@ -796,24 +779,16 @@ impl SporeEngine {
 
             // Apply empathic neuromodulation
             let emp = self.social.empathic_modulation();
-            self.bath.oxytocin.level =
-                (self.bath.oxytocin.level + emp.oxytocin_delta).clamp(0.0, 1.0);
-            self.bath.noradrenaline.level =
-                (self.bath.noradrenaline.level + emp.norepinephrine_delta).clamp(0.0, 1.0);
-            self.bath.serotonin.level =
-                (self.bath.serotonin.level + emp.serotonin_delta).clamp(0.0, 1.0);
-            self.bath.dopamine.level =
-                (self.bath.dopamine.level + emp.dopamine_delta).clamp(0.0, 1.0);
+            self.bath.oxytocin.level = (self.bath.oxytocin.level + emp.oxytocin_delta).clamp(0.0, 1.0);
+            self.bath.noradrenaline.level = (self.bath.noradrenaline.level + emp.norepinephrine_delta).clamp(0.0, 1.0);
+            self.bath.serotonin.level = (self.bath.serotonin.level + emp.serotonin_delta).clamp(0.0, 1.0);
+            self.bath.dopamine.level = (self.bath.dopamine.level + emp.dopamine_delta).clamp(0.0, 1.0);
         }
 
         // Knowledge: learn from high-confidence cycle outputs.
         if consciousness_level > 0.3 {
             if let Some(text) = input_text {
-                let source = if prediction_error < 0.3 {
-                    "observed"
-                } else {
-                    "inferred"
-                };
+                let source = if prediction_error < 0.3 { "observed" } else { "inferred" };
                 // Extract a simple fact from the input
                 let words: Vec<&str> = text.split_whitespace().collect();
                 if words.len() >= 2 {
@@ -850,21 +825,15 @@ impl SporeEngine {
         }
 
         // QOL trend recording
-        self.trend_history
-            .maybe_record(crate::persistence::QolSnapshot {
-                cycle: self.cycle_count,
-                timestamp_secs: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
-                consciousness_level,
-                harmony_alignment,
-                metacog_accuracy: 0.0,
-                allostatic_load: 0.0,
-                dream_wisdom_count: self.dream_journal.count(),
-                coherence_score: consciousness_level,
-                safety_level: self.immune.safety_level() as u8,
-            });
+        self.trend_history.maybe_record(crate::persistence::QolSnapshot {
+            cycle: self.cycle_count,
+            timestamp_secs: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+            consciousness_level, harmony_alignment,
+            metacog_accuracy: 0.0, allostatic_load: 0.0,
+            dream_wisdom_count: self.dream_journal.count() as usize,
+            coherence_score: consciousness_level,
+            safety_level: self.immune.safety_level() as u8,
+        });
 
         // Auto-checkpoint
         if self.checkpoint_interval > 0 && self.cycle_count % self.checkpoint_interval == 0 {
@@ -1622,76 +1591,21 @@ impl SporeEngine {
         self.dream_journal.count()
     }
 
-    pub fn trend_snapshots_json(&self) -> String {
-        self.trend_history.to_json()
-    }
-    pub fn trend_summary_json(&self) -> String {
-        serde_json::to_string(&self.trend_history.trend_summary())
-            .unwrap_or_else(|_| "{}".to_string())
-    }
-    pub fn trend_snapshot_count(&self) -> usize {
-        self.trend_history.count()
-    }
-    pub fn trend_summary_stability(&self) -> f32 {
-        self.trend_history.trend_summary().consciousness_stability
-    }
+    pub fn trend_snapshots_json(&self) -> String { self.trend_history.to_json() }
+    pub fn trend_summary_json(&self) -> String { serde_json::to_string(&self.trend_history.trend_summary()).unwrap_or_else(|_| "{}".to_string()) }
+    pub fn trend_snapshot_count(&self) -> usize { self.trend_history.count() }
+    pub fn trend_summary_stability(&self) -> f32 { self.trend_history.trend_summary().consciousness_stability }
 
-    pub fn set_wellbeing_profile(&mut self, profile: crate::wellbeing_profiles::WellbeingProfile) {
-        self.wellbeing = crate::wellbeing_profiles::WellbeingConfig::for_profile(profile);
-    }
-    pub fn set_wellbeing_profile_by_name(&mut self, name: &str) -> bool {
-        if let Some(p) = crate::wellbeing_profiles::WellbeingProfile::from_name(name) {
-            self.set_wellbeing_profile(p);
-            true
-        } else {
-            false
-        }
-    }
-    pub fn wellbeing_profile_name(&self) -> &'static str {
-        self.wellbeing.profile.name()
-    }
-    pub fn wellbeing_config_json(&self) -> String {
-        serde_json::to_string(&self.wellbeing).unwrap_or_else(|_| "{}".to_string())
-    }
-    pub fn wellbeing_profiles_json() -> String {
-        let p: Vec<serde_json::Value> = crate::wellbeing_profiles::WellbeingProfile::all()
-            .iter()
-            .map(|p| serde_json::json!({"name": p.name(), "description": p.description()}))
-            .collect();
-        serde_json::to_string(&p).unwrap_or_else(|_| "[]".to_string())
-    }
+    pub fn set_wellbeing_profile(&mut self, profile: crate::wellbeing_profiles::WellbeingProfile) { self.wellbeing = crate::wellbeing_profiles::WellbeingConfig::for_profile(profile); }
+    pub fn set_wellbeing_profile_by_name(&mut self, name: &str) -> bool { if let Some(p) = crate::wellbeing_profiles::WellbeingProfile::from_name(name) { self.set_wellbeing_profile(p); true } else { false } }
+    pub fn wellbeing_profile_name(&self) -> &'static str { self.wellbeing.profile.name() }
+    pub fn wellbeing_config_json(&self) -> String { serde_json::to_string(&self.wellbeing).unwrap_or_else(|_| "{}".to_string()) }
+    pub fn wellbeing_profiles_json() -> String { let p: Vec<serde_json::Value> = crate::wellbeing_profiles::WellbeingProfile::all().iter().map(|p| serde_json::json!({"name": p.name(), "description": p.description()})).collect(); serde_json::to_string(&p).unwrap_or_else(|_| "[]".to_string()) }
 
-    pub fn generate_morning_ritual(&self) -> crate::daily_ritual::RitualSequence {
-        let recent: Vec<crate::dream_journal::DreamFragment> = self
-            .dream_journal
-            .fragments()
-            .iter()
-            .rev()
-            .take(5)
-            .cloned()
-            .collect();
-        crate::daily_ritual::generate_morning(&crate::daily_ritual::MorningContext {
-            consciousness_level: self.last_consciousness,
-            dominant_harmony: self.dominant_harmony(),
-            harmony_alignment: self.harmony_alignment(),
-            recent_dreams: &recent,
-        })
-    }
-    pub fn generate_evening_ritual(&self) -> crate::daily_ritual::RitualSequence {
-        crate::daily_ritual::generate_evening(&crate::daily_ritual::EveningContext {
-            consciousness_level: self.last_consciousness,
-            dominant_harmony: self.dominant_harmony(),
-            harmony_alignment: self.harmony_alignment(),
-            cycle_count: self.cycle_count,
-            dream_wisdom_count: self.dream_journal.count(),
-        })
-    }
-    pub fn morning_ritual_json(&self) -> String {
-        serde_json::to_string(&self.generate_morning_ritual()).unwrap_or_else(|_| "{}".to_string())
-    }
-    pub fn evening_ritual_json(&self) -> String {
-        serde_json::to_string(&self.generate_evening_ritual()).unwrap_or_else(|_| "{}".to_string())
-    }
+    pub fn generate_morning_ritual(&self) -> crate::daily_ritual::RitualSequence { let recent: Vec<crate::dream_journal::DreamFragment> = self.dream_journal.fragments().iter().rev().take(5).cloned().collect(); crate::daily_ritual::generate_morning(&crate::daily_ritual::MorningContext { consciousness_level: self.last_consciousness, dominant_harmony: self.dominant_harmony(), harmony_alignment: self.harmony_alignment(), recent_dreams: &recent }) }
+    pub fn generate_evening_ritual(&self) -> crate::daily_ritual::RitualSequence { crate::daily_ritual::generate_evening(&crate::daily_ritual::EveningContext { consciousness_level: self.last_consciousness, dominant_harmony: self.dominant_harmony(), harmony_alignment: self.harmony_alignment(), cycle_count: self.cycle_count, dream_wisdom_count: self.dream_journal.count() }) }
+    pub fn morning_ritual_json(&self) -> String { serde_json::to_string(&self.generate_morning_ritual()).unwrap_or_else(|_| "{}".to_string()) }
+    pub fn evening_ritual_json(&self) -> String { serde_json::to_string(&self.generate_evening_ritual()).unwrap_or_else(|_| "{}".to_string()) }
 
     // ======================================================================
     // 1. ANESTHESIA ANALOGUE
@@ -2252,8 +2166,7 @@ impl SporeEngine {
             self.bath.oxytocin.effective(),
         ];
         let harmony = self.evaluate_harmony_alignment(self.last_consciousness);
-        self.reasoning
-            .run(input, self.last_consciousness, 0.0, &neuromods, harmony)
+        self.reasoning.run(input, self.last_consciousness, 0.0, &neuromods, harmony)
     }
 
     /// Assess an input for threats. Returns ThreatAssessment.

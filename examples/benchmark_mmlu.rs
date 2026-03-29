@@ -120,7 +120,10 @@ impl WordEncoder {
     /// Encode a sentence as a bag-of-words bundle of word HVs.
     /// Returns None if the text has no alphanumeric tokens.
     fn encode_sentence(&mut self, text: &str) -> Option<BinaryHV> {
-        let word_hvs: Vec<BinaryHV> = tokenize(text).iter().map(|w| self.encode_word(w)).collect();
+        let word_hvs: Vec<BinaryHV> = tokenize(text)
+            .iter()
+            .map(|w| self.encode_word(w))
+            .collect();
         if word_hvs.is_empty() {
             return None;
         }
@@ -132,11 +135,7 @@ impl WordEncoder {
 /// lowercases, and filters empty tokens.
 fn tokenize(text: &str) -> Vec<String> {
     text.split(|c: char| c.is_whitespace() || c == '/' || c == '-')
-        .map(|w| {
-            w.chars()
-                .filter(|c| c.is_alphanumeric() || *c == '\'')
-                .collect::<String>()
-        })
+        .map(|w| w.chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect::<String>())
         .map(|w| w.to_lowercase())
         .filter(|w| !w.is_empty())
         .collect()
@@ -185,7 +184,10 @@ fn main() {
     // --- Load data ---
     let data_path = mmlu_data_path();
     if !data_path.exists() {
-        eprintln!("ERROR: MMLU data not found at {}", data_path.display());
+        eprintln!(
+            "ERROR: MMLU data not found at {}",
+            data_path.display()
+        );
         eprintln!("Place test.jsonl in data/benchmarks/mmlu/ or set SYMTHAEA_MMLU_DATA_PATH");
         std::process::exit(1);
     }
@@ -342,10 +344,7 @@ fn main() {
         total_evaluated,
         overall_accuracy * 100.0,
     );
-    println!(
-        "Elapsed: {elapsed:.1}s ({:.0} questions/sec)",
-        total_evaluated as f64 / elapsed
-    );
+    println!("Elapsed: {elapsed:.1}s ({:.0} questions/sec)", total_evaluated as f64 / elapsed);
     println!("Vocabulary size: {} unique tokens", encoder.cache.len());
     println!();
 
@@ -388,10 +387,7 @@ fn main() {
             }
         }
         Err(e) => {
-            eprintln!(
-                "WARNING: Could not create results file {}: {e}",
-                results_path.display()
-            );
+            eprintln!("WARNING: Could not create results file {}: {e}", results_path.display());
         }
     }
 }

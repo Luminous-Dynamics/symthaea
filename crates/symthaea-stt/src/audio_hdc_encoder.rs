@@ -29,11 +29,7 @@ impl AudioHdcEncoder {
     pub fn new(mel_dim: usize, genesis: &GenesisSeed) -> Self {
         let mel_basis = (0..mel_dim)
             .map(|i| {
-                ContinuousHV::from_genesis(
-                    genesis,
-                    &format!("audio_hdc_encoder::mel_bin_{i}"),
-                    HDC_DIMENSION,
-                )
+                ContinuousHV::from_genesis(genesis, &format!("audio_hdc_encoder::mel_bin_{i}"), HDC_DIMENSION)
             })
             .collect();
 
@@ -92,11 +88,7 @@ mod tests {
         assert_eq!(hv.dim(), HDC_DIMENSION);
         // Should be approximately unit length
         let norm = hv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!(
-            (norm - 1.0).abs() < 0.01,
-            "HV should be unit length: {}",
-            norm
-        );
+        assert!((norm - 1.0).abs() < 0.01, "HV should be unit length: {}", norm);
     }
 
     #[test]
@@ -150,10 +142,6 @@ mod tests {
         let hv = encoder.encode_frame(&mel);
 
         let norm = hv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!(
-            norm < 0.01,
-            "Zero mel should produce near-zero HV: norm={}",
-            norm
-        );
+        assert!(norm < 0.01, "Zero mel should produce near-zero HV: norm={}", norm);
     }
 }

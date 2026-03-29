@@ -45,7 +45,7 @@ impl SimpleHelicopterSimulator {
             mass: 500.0,
             inertia: [1500.0, 1500.0, 2000.0],
             external_force: [0.0; 3],
-            drag_coeff: 0.15, // Higher drag than quadrotor (larger body)
+            drag_coeff: 0.15,      // Higher drag than quadrotor (larger body)
             angular_damping: 2.0,
         }
     }

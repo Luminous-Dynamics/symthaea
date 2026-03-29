@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #![allow(dead_code)]
 #![deny(clippy::dbg_macro, clippy::todo, clippy::unimplemented)]
 
@@ -33,6 +36,11 @@ pub mod narrative_integration;
 pub mod safety;
 pub mod scope_guard;
 pub mod shadow;
+
+// Research directions
+pub mod consciousness_protocols;
+pub mod digital_twin_psychiatry;
+pub mod twin_therapeutic_bridge;
 
 pub use affect_regulation::{RegulationEngine, RegulationStrategy};
 pub use alliance::{RuptureType, TherapeuticAlliance};

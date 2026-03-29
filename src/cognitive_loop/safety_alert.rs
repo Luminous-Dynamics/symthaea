@@ -143,7 +143,7 @@ mod tests {
     fn test_emit_alert_disconnected() {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         drop(rx); // Disconnect
-                  // Should not panic
+        // Should not panic
         emit_alert(&tx, SafetyAlertKind::MotorHalt, "test", 1, 0.05);
     }
 }

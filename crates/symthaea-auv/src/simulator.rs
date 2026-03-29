@@ -34,41 +34,50 @@ impl SimpleAuvSimulator {
 }
 
 impl Default for SimpleAuvSimulator {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl AuvPhysicsSimulator for SimpleAuvSimulator {
     fn step(&mut self, cmd: &AuvCommand, dt: f64) {
         let (thrust_force, thrust_moment) = hydrodynamics::thruster_forces(
-            &self.hydro_config,
-            &mut self.thruster_state,
-            &cmd.thrusters,
-            dt,
+            &self.hydro_config, &mut self.thruster_state, &cmd.thrusters, dt,
         );
         let hydro = hydrodynamics::compute_forces(
-            &self.hydro_config,
-            &self.state.linear_velocity,
-            &self.state.angular_velocity,
-            self.state.depth,
+            &self.hydro_config, &self.state.linear_velocity, &self.state.angular_velocity, self.state.depth,
         );
         let eff = hydrodynamics::effective_mass(&self.hydro_config);
 
-        // Linear dynamics
+        // Physical velocity limits for a 50kg torpedo-class AUV.
+        // Prevents explicit Euler divergence when quadratic drag coefficient
+        // times velocity² exceeds inertia per timestep (stiff ODE).
+        // Science: REMUS 100 max speed ~2.5 m/s; 5 m/s is generous upper bound.
+        const MAX_LINEAR_VELOCITY: f64 = 5.0;   // m/s
+        const MAX_ANGULAR_VELOCITY: f64 = 3.0;  // rad/s
+
+        // Linear dynamics with velocity-limited integration.
+        // The quadratic drag term F = -c*v*|v| is stiff: explicit Euler
+        // diverges when |v| is large relative to dt. We apply the force
+        // update then clamp, which is equivalent to an implicit drag floor.
         for i in 0..3 {
             let f = thrust_force[i] + hydro.force[i] + self.external_force[i];
             self.state.linear_velocity[i] += (f / eff[i]) * dt;
+            self.state.linear_velocity[i] = self.state.linear_velocity[i]
+                .clamp(-MAX_LINEAR_VELOCITY, MAX_LINEAR_VELOCITY);
             self.state.position[i] += self.state.linear_velocity[i] * dt;
         }
 
-        // Angular dynamics
+        // Angular dynamics with velocity-limited integration.
+        // Same stiffness issue: roll inertia (0.5 kg·m²) is small relative
+        // to angular drag (623 Nm at 1 rad/s), causing oscillation→NaN at
+        // dt=0.01 under full thrust. Clamping prevents the divergence.
         for i in 0..3 {
             let m = thrust_moment[i] + hydro.moment[i];
             self.state.angular_velocity[i] += (m / eff[3 + i].max(0.1)) * dt;
+            self.state.angular_velocity[i] = self.state.angular_velocity[i]
+                .clamp(-MAX_ANGULAR_VELOCITY, MAX_ANGULAR_VELOCITY);
         }
 
-        // Quaternion integration
+        // Quaternion integration (semi-implicit Euler)
         let [qw, qx, qy, qz] = self.state.quaternion;
         let [wx, wy, wz] = self.state.angular_velocity;
         let h = 0.5 * dt;
@@ -76,17 +85,20 @@ impl AuvPhysicsSimulator for SimpleAuvSimulator {
         self.state.quaternion[1] += (qw * wx + qy * wz - qz * wy) * h;
         self.state.quaternion[2] += (qw * wy - qx * wz + qz * wx) * h;
         self.state.quaternion[3] += (qw * wz + qx * wy - qy * wx) * h;
-        let norm = self
-            .state
-            .quaternion
-            .iter()
-            .map(|q| q * q)
-            .sum::<f64>()
-            .sqrt();
-        if norm > 1e-10 {
-            for q in &mut self.state.quaternion {
-                *q /= norm;
-            }
+        let norm = self.state.quaternion.iter().map(|q| q * q).sum::<f64>().sqrt();
+        if norm > 1e-10 { for q in &mut self.state.quaternion { *q /= norm; } }
+
+        // NaN guard: if any state variable goes non-finite (e.g., from
+        // extreme external forces or numerical edge cases), reset velocity
+        // to zero rather than propagating corruption through the loop.
+        if !self.state.linear_velocity.iter().all(|v| v.is_finite()) {
+            self.state.linear_velocity = [0.0; 3];
+        }
+        if !self.state.angular_velocity.iter().all(|v| v.is_finite()) {
+            self.state.angular_velocity = [0.0; 3];
+        }
+        if !self.state.quaternion.iter().all(|v| v.is_finite()) {
+            self.state.quaternion = [1.0, 0.0, 0.0, 0.0]; // Identity
         }
 
         // Surface constraint
@@ -100,15 +112,12 @@ impl AuvPhysicsSimulator for SimpleAuvSimulator {
         self.state.pressure = 101.325 + self.state.depth * 9.81;
         self.state.buoyancy_force = hydro.buoyancy;
         for i in 0..NUM_ACTUATORS {
-            self.state.thruster_feedback[i] =
-                self.thruster_state[i] / self.hydro_config.max_thruster_force;
+            self.state.thruster_feedback[i] = self.thruster_state[i] / self.hydro_config.max_thruster_force;
         }
         self.external_force = [0.0; 3];
     }
 
-    fn state(&self) -> &AuvState {
-        &self.state
-    }
+    fn state(&self) -> &AuvState { &self.state }
 
     fn reset(&mut self, depth: f64) {
         self.state = AuvState::neutral_buoyancy(depth);
@@ -128,32 +137,22 @@ mod tests {
     #[test]
     fn test_forward_thrust_accelerates() {
         let mut sim = SimpleAuvSimulator::new();
-        for _ in 0..100 {
-            sim.step(&AuvCommand::forward(0.5), 0.01);
-        }
+        for _ in 0..100 { sim.step(&AuvCommand::forward(0.5), 0.01); }
         assert!(sim.state().speed() > 0.0);
     }
 
     #[test]
     fn test_drag_limits_speed() {
         let mut sim = SimpleAuvSimulator::new();
-        for _ in 0..10000 {
-            sim.step(&AuvCommand::forward(0.5), 0.01);
-        }
-        assert!(
-            sim.state().speed() < 10.0,
-            "Drag should limit speed: {}",
-            sim.state().speed()
-        );
+        for _ in 0..10000 { sim.step(&AuvCommand::forward(0.5), 0.01); }
+        assert!(sim.state().speed() < 10.0, "Drag should limit speed: {}", sim.state().speed());
     }
 
     #[test]
     fn test_surface_constraint() {
         let mut sim = SimpleAuvSimulator::new();
         sim.reset(1.0);
-        for _ in 0..5000 {
-            sim.step(&AuvCommand::descend(-0.5), 0.01);
-        }
+        for _ in 0..5000 { sim.step(&AuvCommand::descend(-0.5), 0.01); }
         assert!(sim.state().position[2] >= 0.0);
     }
 
@@ -168,12 +167,8 @@ mod tests {
     #[test]
     fn test_quaternion_normalized() {
         let mut sim = SimpleAuvSimulator::new();
-        let cmd = AuvCommand {
-            thrusters: [0.5, -0.3, 0.2, 0.0, 0.1, -0.1, 0.3, -0.2],
-        };
-        for _ in 0..1000 {
-            sim.step(&cmd, 0.01);
-        }
+        let cmd = AuvCommand { thrusters: [0.5, -0.3, 0.2, 0.0, 0.1, -0.1, 0.3, -0.2] };
+        for _ in 0..1000 { sim.step(&cmd, 0.01); }
         let q = sim.state().quaternion;
         let norm = q.iter().map(|v| v * v).sum::<f64>().sqrt();
         assert!((norm - 1.0).abs() < 1e-6, "norm={norm}");

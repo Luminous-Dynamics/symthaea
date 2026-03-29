@@ -128,13 +128,12 @@ mod identity_integration;
 
 // ── Impl-block submodules (split from this file) ────────────────────────────
 mod accessors;
-pub(crate) mod behavioral_synthesis;
 pub(crate) mod biorhythm_manager;
-#[cfg(feature = "mycelix")]
-pub(crate) mod broca_factcheck;
 pub(crate) mod cantor_dream_manager;
 pub(crate) mod consciousness_engine;
+pub(crate) mod behavioral_synthesis;
 pub(crate) mod consciousness_execution;
+pub(crate) mod sensorimotor_execution;
 pub(crate) mod consciousness_monitor_tier;
 pub(crate) mod consciousness_state_manager;
 mod constructor;
@@ -151,16 +150,18 @@ mod cycle_strategy;
 mod cycle_subsystems;
 pub(crate) mod episodic_persistence_manager;
 pub(crate) mod ethics_engine;
+pub(crate) mod memory_execution;
 pub(crate) mod ethics_values_manager;
 pub(crate) mod feature_integration_manager;
 pub mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
+#[cfg(feature = "mycelix")]
+pub(crate) mod broca_factcheck;
 pub(crate) mod language_comm_manager;
 pub(crate) mod managers;
 pub(crate) mod memory_consolidation_manager;
-pub(crate) mod memory_execution;
 mod moral;
 pub mod motor_output_bridge;
 pub(crate) mod motor_rendering_manager;
@@ -169,11 +170,10 @@ pub(crate) mod neuromodulators;
 mod phase_results;
 mod prediction;
 pub(crate) mod primitive_tier;
-pub mod radiation_environment;
 pub(crate) mod self_model_tier;
-pub(crate) mod sensorimotor_execution;
 pub(crate) mod social_manager;
 pub(crate) mod substrate_manager;
+pub mod radiation_environment;
 #[cfg(feature = "support")]
 pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
@@ -200,17 +200,14 @@ pub(crate) mod physics_integration;
 #[cfg(feature = "physics-bridge")]
 pub use physics_integration::ParetoContext;
 
-pub(crate) mod thermodynamic_integration;
-pub(crate) mod thermodynamic_physics_bridge;
 pub(crate) mod thermodynamic_state;
+pub(crate) mod thermodynamic_physics_bridge;
+pub(crate) mod thermodynamic_integration;
 
 #[cfg(feature = "mycelix")]
-pub use broca_factcheck::{
-    BrocaFactcheckBridge, BrocaModulation, FactCheckResult, FactCheckVerdict, FactcheckChannels,
-    FactcheckTelemetry,
-};
-#[cfg(feature = "mycelix")]
 pub use managers::governance_manager::{GovernanceEvent, GovernanceEventKind, GovernanceOutcome};
+#[cfg(feature = "mycelix")]
+pub use broca_factcheck::{BrocaFactcheckBridge, BrocaModulation, FactCheckResult, FactCheckVerdict, FactcheckChannels, FactcheckTelemetry};
 
 pub use ethics_engine::EthicalVerdict;
 pub use managers::network_service_bridge::{
@@ -390,6 +387,7 @@ pub struct CognitiveLoopService {
     prediction_confidence: f64,
 
     // NOTE: self_reflection moved to self_model_tier.self_reflection (Phase 3, Step 5)
+
     /// Consciousness Unification Engine - integrates all consciousness subsystems
     /// Provides: EmotionalBridge (VAD emotions), CausalReasoning, DialoguePipeline
     /// This replaces simple EmotionContagion with full VAD emotional tracking
@@ -566,6 +564,7 @@ pub struct CognitiveLoopService {
     policy_agreement_window: VecDeque<bool>,
 
     // master_equation moved to consciousness_execution::ConsciousnessExecution
+
     /// Unified Living Mind: life-mind continuity integration (full_consciousness feature).
     /// Integrates autopoietic self-maintenance, enactive sense-making, affect, and prediction
     /// into a unified vitality/coherence state that measures "aliveness" of the system.
@@ -614,6 +613,7 @@ pub struct CognitiveLoopService {
     pub(crate) neuromod: neuromod_manager::NeuromodManager,
 
     // somatic_bridge, pain_tx, thermal_bridge, thermal_tx moved to sensorimotor_execution
+
     /// Subsystem output collector (Phase 2.3 staged computation model).
     /// Collects SubsystemOutput proposals during Phase B (COMPUTE),
     /// integrates them in Phase C for consensus-averaged state updates.
@@ -625,6 +625,7 @@ pub struct CognitiveLoopService {
     last_snapshot: Option<subsystem_trait::CycleSnapshot>,
 
     // consciousness_engine moved to consciousness_execution::ConsciousnessExecution
+
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
@@ -706,16 +707,12 @@ pub struct CognitiveLoopService {
 
     /// Receiver for Holon inbound messages from the HTTP layer.
     /// Created eagerly at construction; clone `holon_inbound_tx` to feed from HTTP handlers.
-    holon_inbound_rx: std::sync::Mutex<
-        Option<
-            std::sync::mpsc::Receiver<(String, crate::consciousness::holon_receiver::SomaMessage)>,
-        >,
-    >,
+    holon_inbound_rx:
+        std::sync::Mutex<Option<std::sync::mpsc::Receiver<(String, crate::consciousness::holon_receiver::SomaMessage)>>>,
 
     /// Sender half of the Holon inbound channel. Clone via `holon_inbound_sender()` to
     /// feed messages from HTTP handlers (HolonHttpState).
-    holon_inbound_tx:
-        std::sync::mpsc::Sender<(String, crate::consciousness::holon_receiver::SomaMessage)>,
+    holon_inbound_tx: std::sync::mpsc::Sender<(String, crate::consciousness::holon_receiver::SomaMessage)>,
 
     /// Receiver for swarm events from external async P2P layer.
     /// Drained non-blocking in Phase B before `swarm_manager.process()`.
@@ -733,7 +730,8 @@ pub struct CognitiveLoopService {
     safety_alert_tx: std::sync::mpsc::SyncSender<safety_alert::SafetyAlert>,
     /// Receiver for safety alerts. Wrapped in Mutex<Option<>> so the host can
     /// take ownership via `take_safety_alert_receiver()`.
-    safety_alert_rx: std::sync::Mutex<Option<std::sync::mpsc::Receiver<safety_alert::SafetyAlert>>>,
+    safety_alert_rx:
+        std::sync::Mutex<Option<std::sync::mpsc::Receiver<safety_alert::SafetyAlert>>>,
 
     /// Handle for the federated coordinator task (if enabled).
     federation_handle:
@@ -839,6 +837,7 @@ pub struct CognitiveLoopService {
     pub(crate) cantor_dream: cantor_dream_manager::CantorDreamManager,
 
     // motor_rendering moved to sensorimotor_execution
+
     /// Hierarchical bundler for per-region BinaryHV aggregation.
     /// Accumulates HDC encodings per cortical region, enabling structured
     /// role-bound aggregation and per-region recovery via XOR unbinding.
@@ -893,6 +892,7 @@ pub struct CognitiveLoopService {
 
     /// Aggregate security telemetry for the crypto/swarm stack.
     pub(crate) security_telemetry: crate::swarm::SecurityTelemetry,
+
     // embodiment_bridge, last_proprioceptive_hv, embodiment_telemetry moved to sensorimotor_execution
 }
 

@@ -46,16 +46,16 @@ pub struct HydrodynamicConfig {
 impl Default for HydrodynamicConfig {
     fn default() -> Self {
         Self {
-            mass: 50.0,                // 50 kg (REMUS-class)
-            displacement_volume: 0.05, // Slightly positively buoyant
+            mass: 50.0,                          // 50 kg (REMUS-class)
+            displacement_volume: 0.05,           // Slightly positively buoyant
             added_mass: [10.0, 30.0, 30.0, 0.5, 5.0, 5.0],
             drag_coefficients: [50.0, 100.0, 100.0, 5.0, 10.0, 10.0],
-            frontal_areas: [0.03, 0.15, 0.15], // Torpedo shape: narrow surge, wide sway/heave
+            frontal_areas: [0.03, 0.15, 0.15],   // Torpedo shape: narrow surge, wide sway/heave
             buoyancy_center_offset: [0.0, 0.0, 0.02], // CB 2cm above CG
             metacentric_height: 0.02,
-            water_density: 998.0,     // Freshwater
-            max_thruster_force: 50.0, // 50N per thruster
-            thruster_tau: 0.1,        // 100ms response
+            water_density: 998.0,                // Freshwater
+            max_thruster_force: 50.0,            // 50N per thruster
+            thruster_tau: 0.1,                   // 100ms response
         }
     }
 }
@@ -145,9 +145,9 @@ pub fn effective_mass(config: &HydrodynamicConfig) -> [f64; 6] {
         config.mass + config.added_mass[0],
         config.mass + config.added_mass[1],
         config.mass + config.added_mass[2],
-        config.added_mass[3], // Roll inertia (simplified)
-        config.added_mass[4], // Pitch inertia
-        config.added_mass[5], // Yaw inertia
+        config.added_mass[3],  // Roll inertia (simplified)
+        config.added_mass[4],  // Pitch inertia
+        config.added_mass[5],  // Yaw inertia
     ]
 }
 
@@ -171,11 +171,11 @@ pub fn thruster_forces(
 
     // Thruster layout: 0-3 horizontal (surge/sway/yaw), 4-5 vertical (heave), 6-7 vectored
     let surge = thruster_state[0] + thruster_state[1]; // Forward pair
-    let sway = thruster_state[2] - thruster_state[3]; // Lateral pair (differential)
-    let heave = thruster_state[4] + thruster_state[5]; // Vertical pair
+    let sway = thruster_state[2] - thruster_state[3];  // Lateral pair (differential)
+    let heave = thruster_state[4] + thruster_state[5];  // Vertical pair
     let yaw = (thruster_state[0] - thruster_state[1]) * 0.3; // Differential thrust → yaw
     let pitch = (thruster_state[6] - thruster_state[7]) * 0.2; // Vectored → pitch
-    let roll = (thruster_state[6] + thruster_state[7]) * 0.1; // Vectored → roll (weak)
+    let roll = (thruster_state[6] + thruster_state[7]) * 0.1;  // Vectored → roll (weak)
 
     ([surge, sway, heave], [roll, pitch, yaw])
 }
@@ -201,10 +201,7 @@ mod tests {
         let f2 = compute_forces(&config, &v2, &[0.0; 3], 10.0);
         // At 2× speed, drag should be ~4× (quadratic)
         let ratio = f2.force[0].abs() / f1.force[0].abs();
-        assert!(
-            (ratio - 4.0).abs() < 0.5,
-            "Drag should scale quadratically: ratio={ratio}"
-        );
+        assert!((ratio - 4.0).abs() < 0.5, "Drag should scale quadratically: ratio={ratio}");
     }
 
     #[test]
@@ -251,9 +248,6 @@ mod tests {
             thruster_forces(&config, &mut state, &command, 0.01);
         }
         let (force, moment) = thruster_forces(&config, &mut state, &command, 0.01);
-        assert!(
-            moment[2].abs() > 0.0,
-            "Differential thrust should produce yaw moment"
-        );
+        assert!(moment[2].abs() > 0.0, "Differential thrust should produce yaw moment");
     }
 }

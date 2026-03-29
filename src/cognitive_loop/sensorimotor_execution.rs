@@ -85,9 +85,7 @@ impl SensoriMotorExecution {
         #[cfg(feature = "humanoid")] embodiment_bridge: Option<
             Box<dyn super::motor_bridge::EmbodimentBridge>,
         >,
-        #[cfg(feature = "humanoid")] last_proprioceptive_hv: Option<
-            symthaea_core::hdc::ContinuousHV,
-        >,
+        #[cfg(feature = "humanoid")] last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
         #[cfg(feature = "humanoid")] embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry,
     ) -> Self {
         Self {

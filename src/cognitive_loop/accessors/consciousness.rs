@@ -31,11 +31,7 @@ impl CognitiveLoopService {
             self.language_comm.voice_coherence.temporal.classify_state();
         let temporal_summary = self.language_comm.voice_coherence.temporal.summary();
         let reflection_summary = self.consciousness.self_model_tier.self_reflection.summary();
-        let thresholds = self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .get_thresholds();
+        let thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
         let (emotion_nudge, _) = self.behavior.emotion_contagion.pattern_nudge();
 
         let consciousness_level = ConsciousnessSnapshot::compute_consciousness_level(
@@ -58,8 +54,7 @@ impl CognitiveLoopService {
             predictions_trustworthy: self.predictions_trustworthy(),
             effective_learning_rate: self.stats.adaptive_learning_rate,
             learning_effectiveness: self
-                .consciousness
-                .self_model_tier
+                .consciousness.self_model_tier
                 .self_reflection
                 .learning_effectiveness(),
             in_flow: self.behavior.flow_state.in_flow,
@@ -75,11 +70,7 @@ impl CognitiveLoopService {
             emotional_arousal: self.unification_engine.emotional.state().arousal as f32,
             has_emotional_content: self.has_emotional_content(),
             emotion_nudge,
-            self_assessment: self
-                .consciousness
-                .self_model_tier
-                .self_reflection
-                .self_assessment,
+            self_assessment: self.consciousness.self_model_tier.self_reflection.self_assessment,
             reflection_count: reflection_summary.reflection_count,
             adjustments_made: reflection_summary.adjustments_made,
             next_reflection_in: reflection_summary.next_reflection_in,
@@ -307,9 +298,7 @@ impl CognitiveLoopService {
     pub fn consciousness_equation_v2(
         &self,
     ) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
-        self.consciousness
-            .consciousness_engine
-            .consciousness_equation_v2()
+        self.consciousness.consciousness_engine.consciousness_equation_v2()
     }
 
     /// Borrow the hierarchical LTC (if enabled).
@@ -354,18 +343,14 @@ impl CognitiveLoopService {
         &self,
     ) -> Option<&crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>
     {
-        self.consciousness
-            .consciousness_engine
-            .unified_consciousness_pipeline()
+        self.consciousness.consciousness_engine.unified_consciousness_pipeline()
     }
 
     /// Borrow the multi-modal integrator (owned by ConsciousnessEngine).
     pub fn multi_modal_integrator(
         &self,
     ) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
-        self.consciousness
-            .consciousness_engine
-            .multi_modal_integrator()
+        self.consciousness.consciousness_engine.multi_modal_integrator()
     }
 
     /// Borrow the synthetic states NSM grounding (if enabled).

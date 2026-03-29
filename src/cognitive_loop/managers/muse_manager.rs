@@ -27,9 +27,7 @@
 //! - Koelsch (2014): Brain correlates of music-evoked emotions
 //! - Fritz et al. (2009): Universal recognition of emotional cues in music
 
-use super::super::subsystem_trait::{
-    output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput,
-};
+use super::super::subsystem_trait::{output_flags, CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 use serde::{Deserialize, Serialize};
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::{MuseConfig, MusicalState};
@@ -142,6 +140,11 @@ pub struct MuseManager {
     /// Current fade level [0.0 = silence, 1.0 = full volume].
     fade_level: f32,
 
+    // ── Live audio output ─────────────────────────────────────────────
+    /// When enabled, streams audio to system speakers via cpal.
+    #[cfg(feature = "muse-live")]
+    live_output: Option<symthaea_muse::live_output::LiveMuseOutput>,
+
     // ── Telemetry ─────────────────────────────────────────────────────
     underruns: u64,
 }
@@ -160,7 +163,7 @@ impl MuseManager {
             ..Default::default()
         };
 
-        let mut synth = StreamingSynth::new(config, MUSE_SAMPLE_RATE);
+        let mut synth = StreamingSynth::new(config.clone(), MUSE_SAMPLE_RATE);
         synth.set_chunk_duration_ms(MUSE_CHUNK_MS);
 
         Self {
@@ -175,6 +178,8 @@ impl MuseManager {
             injected_energy_ratio: 0.0,
             injected_safety_level: SAFETY_GREEN,
             peer_distress: None,
+            #[cfg(feature = "muse-live")]
+            live_output: symthaea_muse::live_output::LiveMuseOutput::new(config).ok(),
             fade_level: 1.0,
             underruns: 0,
         }
@@ -220,6 +225,11 @@ impl MuseManager {
         &self.last_chunk
     }
 
+    /// Get the current MusicalState driving synthesis.
+    pub fn musical_state(&self) -> &MusicalState {
+        &self.last_musical_state
+    }
+
     /// Get current telemetry.
     pub fn telemetry(&self) -> MuseTelemetry {
         MuseTelemetry {
@@ -236,18 +246,22 @@ impl MuseManager {
     // ── CycleSnapshot → MusicalState mapping ──────────────────────────
 
     fn map_snapshot_to_musical_state(&self, snapshot: &CycleSnapshot) -> MusicalState {
-        // Decompose harmonic_coherence into 8 activations using compressed_state
-        // The first 8 values of compressed_state serve as per-harmony weights
+        // Decompose harmonic_coherence into 8 activations using compressed_state.
+        // Preserve signed values: positive compressed_state[i] → active harmony,
+        // negative → suppressed. Map to [0, 1] via sigmoid for smooth activation.
         let mut harmony_activations = [0.0f32; 8];
         let hc = snapshot.harmonic_coherence as f32;
         for i in 0..8 {
-            // Use compressed state as relative weights, scaled by harmonic_coherence
-            let raw = snapshot.compressed_state[i].abs().min(1.0);
-            harmony_activations[i] = raw * hc.max(0.1);
+            // Sigmoid mapping: preserves polarity information, maps R → (0, 1)
+            let raw = snapshot.compressed_state[i];
+            let sigmoid = 1.0 / (1.0 + (-raw * 3.0).exp()); // steepness=3: ±1 maps to ~0.05-0.95
+            harmony_activations[i] = sigmoid * hc.clamp(0.05, 1.0);
         }
-        // Ensure at least some activation for music generation
-        if harmony_activations.iter().all(|&a| a < 0.1) {
-            harmony_activations = [0.3; 8];
+        // Fallback: if coherence is near-zero, use consciousness-proportional baseline
+        // (not uniform — scale with how conscious the system is)
+        if harmony_activations.iter().all(|&a| a < 0.05) {
+            let baseline = (snapshot.unified_psi as f32 * 0.4).max(0.1);
+            harmony_activations = [baseline; 8];
         }
 
         MusicalState {
@@ -330,9 +344,9 @@ impl MuseManager {
     fn apply_safety_fade(&mut self, chunk: &mut [[f32; 2]]) {
         let target = match self.injected_safety_level {
             SAFETY_RED => 0.0,
-            SAFETY_ORANGE => 0.3, // Low drone level
+            SAFETY_ORANGE => 0.3,  // Low drone level
             SAFETY_YELLOW => 0.7,
-            _ => 1.0, // Green: full volume
+            _ => 1.0,              // Green: full volume
         };
 
         // Fade completes in MUSE_SILENCE_FADE_MS milliseconds of audio
@@ -388,7 +402,13 @@ impl CognitiveSubsystem for MuseManager {
 
         // 6. Store for external access (RDP, direct output)
         self.last_chunk = chunk;
-        self.last_musical_state = musical_state;
+        self.last_musical_state = musical_state.clone();
+
+        // 6b. Push to live speakers if enabled
+        #[cfg(feature = "muse-live")]
+        if let Some(ref live) = self.live_output {
+            live.update_state(&musical_state);
+        }
 
         // 7. Build subsystem output
         // Music slightly modulates affect: consonant music → positive valence

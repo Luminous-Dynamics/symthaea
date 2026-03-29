@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Round 7 numerical validation tests (Sections 39-55).
 //!
 //! Extracted from physics_numerical_validation.rs for manageability.

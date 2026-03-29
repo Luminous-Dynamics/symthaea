@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physiological Signal Processing
 //!
 //! This module provides tools for processing physiological signals:
@@ -27,6 +30,7 @@ pub mod edf_loader;
 pub mod emotion_detector;
 pub mod entropy; // Permutation Entropy for consciousness detection
 pub mod meditation_detector;
+pub mod neuro_digital_twin;
 pub mod sleep_sentinel;
 
 pub use edf_loader::{EdfFile, EdfSignal, SleepAnnotation, SleepStage};

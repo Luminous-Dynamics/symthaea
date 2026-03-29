@@ -37,6 +37,7 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Maxwell's Demon as Attention
     // ═══════════════════════════════════════════════════════════════════════
+
     /// Bits of information gathered by attention this cycle.
     pub attention_demon_bits: f64,
     /// Work extracted by attention (information → action) in effective joules.
@@ -47,12 +48,14 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Landauer Limit for Memory
     // ═══════════════════════════════════════════════════════════════════════
+
     /// Minimum energy to consolidate memory this cycle (effective joules).
     pub memory_landauer_cost: f64,
 
     // ═══════════════════════════════════════════════════════════════════════
     // Carnot Efficiency
     // ═══════════════════════════════════════════════════════════════════════
+
     /// Theoretical maximum efficiency (1 - T_cold/T_hot).
     pub carnot_efficiency: f64,
     /// Actual consciousness efficiency (useful work / total energy).
@@ -63,6 +66,7 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Fluctuation Theorem for Insight
     // ═══════════════════════════════════════════════════════════════════════
+
     /// Probability of spontaneous insight (rare entropy-decreasing event).
     pub insight_probability: f64,
     /// Whether an insight event was detected this cycle.
@@ -71,6 +75,7 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Onsager Cross-Coupling Health
     // ═══════════════════════════════════════════════════════════════════════
+
     /// Onsager symmetry measure (0 = perfectly symmetric, higher = asymmetric).
     /// Lower is better — symmetric transport indicates well-integrated consciousness.
     pub onsager_asymmetry: f64,
@@ -82,6 +87,7 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Nonequilibrium Physics (Phase 6)
     // ═══════════════════════════════════════════════════════════════════════
+
     /// Rolling work samples for Jarzynski free energy estimation.
     #[serde(skip)]
     pub(crate) work_samples: std::collections::VecDeque<f64>,
@@ -102,6 +108,18 @@ pub struct ThermodynamicPhysicsBridge {
     /// Previous entropy production rate (for Prigogine trend detection).
     #[serde(skip)]
     pub(crate) prev_entropy_production: f64,
+
+    /// Previous order parameter (for England signal detection).
+    #[serde(skip)]
+    pub(crate) prev_order_parameter: f64,
+
+    /// England dissipation-driven adaptation signal.
+    /// True when entropy production correlates with order growth AND prediction
+    /// error reduction — indicating that dissipation is driving useful learning.
+    /// Science: England (2013) — matter driven by external energy self-organizes
+    /// to maximize entropy production while building internal order.
+    /// Only active when `england_dissipation` feature is enabled.
+    pub england_exploration_boost: bool,
 }
 
 impl Default for ThermodynamicPhysicsBridge {
@@ -117,16 +135,14 @@ impl Default for ThermodynamicPhysicsBridge {
             insight_probability: 0.0,
             insight_detected: false,
             onsager_asymmetry: 1.0,
-            history: std::collections::VecDeque::with_capacity(
-                thresholds::THERMO_ONSAGER_WINDOW + 1,
-            ),
-            work_samples: std::collections::VecDeque::with_capacity(
-                thresholds::THERMO_JARZYNSKI_WINDOW + 1,
-            ),
+            history: std::collections::VecDeque::with_capacity(thresholds::THERMO_ONSAGER_WINDOW + 1),
+            work_samples: std::collections::VecDeque::with_capacity(thresholds::THERMO_JARZYNSKI_WINDOW + 1),
             jarzynski_free_energy: 0.0,
             jarzynski_hfe_divergence: 0.0,
             prigogine_violated: false,
             prev_entropy_production: 0.0,
+            prev_order_parameter: 0.5,
+            england_exploration_boost: false,
         }
     }
 }
@@ -159,7 +175,8 @@ impl ThermodynamicPhysicsBridge {
         let t_eff = effective_temperature.max(0.01); // Avoid division by zero
         let ln2 = std::f64::consts::LN_2;
 
-        self.attention_demon_bits = (attention_sensitivity * information_processed).max(0.0);
+        self.attention_demon_bits = (attention_sensitivity * information_processed)
+            .max(0.0);
         let demon_efficiency = thresholds::THERMO_ATTENTION_DEMON_EFFICIENCY;
         self.attention_work = self.attention_demon_bits * k_eff * t_eff * ln2 * demon_efficiency;
         self.attention_erasure_cost = self.attention_demon_bits * k_eff * t_eff * ln2;
@@ -256,7 +273,11 @@ impl ThermodynamicPhysicsBridge {
 
         if self.work_samples.len() >= 3 {
             let beta = 1.0 / (k_eff * t_eff);
-            let exp_sum: f64 = self.work_samples.iter().map(|&w| (-beta * w).exp()).sum();
+            let exp_sum: f64 = self
+                .work_samples
+                .iter()
+                .map(|&w| (-beta * w).exp())
+                .sum();
             let avg_exp = exp_sum / self.work_samples.len() as f64;
             if avg_exp > 0.0 && avg_exp.is_finite() {
                 self.jarzynski_free_energy = -avg_exp.ln() / beta;
@@ -265,7 +286,8 @@ impl ThermodynamicPhysicsBridge {
 
         // Compare with HFE — divergence indicates model inaccuracy
         if hfe_total.is_finite() && self.jarzynski_free_energy.is_finite() {
-            self.jarzynski_hfe_divergence = (self.jarzynski_free_energy - hfe_total).abs();
+            self.jarzynski_hfe_divergence =
+                (self.jarzynski_free_energy - hfe_total).abs();
         }
 
         // 6c. Prigogine minimum entropy production principle
@@ -276,6 +298,29 @@ impl ThermodynamicPhysicsBridge {
             && entropy_production_rate > self.prev_entropy_production + 0.01
             && self.prev_entropy_production > 0.001; // Only after warm-up
 
+        // 6d. England dissipation-driven adaptation (England 2013)
+        // When entropy production is high AND order is growing AND we're at
+        // or near the edge of chaos, the dissipation is driving useful
+        // self-organization — boost exploration rather than dampen it.
+        #[cfg(feature = "england_dissipation")]
+        {
+            let order_delta = order_parameter - self.prev_order_parameter;
+            let high_entropy = entropy_production_rate > 0.15;
+            let order_growing = order_delta > 0.01;
+            let prediction_error_decreasing = prediction_error < 0.3;
+            let at_edge = matches!(
+                regime,
+                ThermodynamicRegime::EdgeOfChaos | ThermodynamicRegime::FarFromEquilibrium
+            );
+            self.england_exploration_boost =
+                high_entropy && order_growing && prediction_error_decreasing && at_edge;
+        }
+        #[cfg(not(feature = "england_dissipation"))]
+        {
+            self.england_exploration_boost = false;
+        }
+
+        self.prev_order_parameter = order_parameter;
         self.prev_entropy_production = entropy_production_rate;
     }
 
@@ -359,16 +404,16 @@ mod tests {
     fn test_maxwell_demon_accounting() {
         let mut b = make_bridge();
         b.compute(
-            0.8,   // attention_sensitivity
+            0.8,  // attention_sensitivity
             100.0, // information_processed
-            0.7,   // coherence
-            0.3,   // prediction_error
-            0.5,   // effective_temperature
-            0.2,   // entropy_production_rate
-            0.6,   // order_parameter
+            0.7,  // coherence
+            0.3,  // prediction_error
+            0.5,  // effective_temperature
+            0.2,  // entropy_production_rate
+            0.6,  // order_parameter
             1e-10, // energy_per_cycle
-            0.5,   // prev_order_parameter
-            0.5,   // hfe_total
+            0.5,  // prev_order_parameter
+            0.5,  // hfe_total
             &default_regime(),
         );
         // Demon gathers bits = sensitivity × info
@@ -384,19 +429,7 @@ mod tests {
     #[test]
     fn test_landauer_cost_positive() {
         let mut b = make_bridge();
-        b.compute(
-            0.5,
-            50.0,
-            0.5,
-            0.5,
-            0.4,
-            0.1,
-            0.5,
-            1e-10,
-            0.5,
-            0.5,
-            &default_regime(),
-        );
+        b.compute(0.5, 50.0, 0.5, 0.5, 0.4, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
         assert!(b.memory_landauer_cost > 0.0);
         assert!(b.memory_landauer_cost.is_finite());
     }
@@ -405,38 +438,14 @@ mod tests {
     fn test_carnot_efficiency_bounded() {
         let mut b = make_bridge();
         // High temperature → high Carnot efficiency
-        b.compute(
-            0.5,
-            50.0,
-            0.5,
-            0.3,
-            1.0,
-            0.1,
-            0.5,
-            1e-10,
-            0.5,
-            0.5,
-            &default_regime(),
-        );
+        b.compute(0.5, 50.0, 0.5, 0.3, 1.0, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
         assert!(b.carnot_efficiency > 0.0);
         assert!(b.carnot_efficiency < 1.0);
         // T_hot=1.0, T_cold=0.2 → η = 1 - 0.2/1.0 = 0.8
         assert!((b.carnot_efficiency - 0.8).abs() < 0.01);
 
         // Low temperature → low efficiency
-        b.compute(
-            0.5,
-            50.0,
-            0.5,
-            0.3,
-            0.25,
-            0.1,
-            0.5,
-            1e-10,
-            0.5,
-            0.5,
-            &default_regime(),
-        );
+        b.compute(0.5, 50.0, 0.5, 0.3, 0.25, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
         assert!((b.carnot_efficiency - 0.2).abs() < 0.01);
     }
 
@@ -444,19 +453,7 @@ mod tests {
     fn test_insight_detection() {
         let mut b = make_bridge();
         // Sudden order increase (0.3 → 0.8) = entropy-decreasing event
-        b.compute(
-            0.5,
-            50.0,
-            0.5,
-            0.3,
-            0.5,
-            0.1,
-            0.8,
-            1e-10,
-            0.3,
-            0.5,
-            &default_regime(),
-        );
+        b.compute(0.5, 50.0, 0.5, 0.3, 0.5, 0.1, 0.8, 1e-10, 0.3, 0.5, &default_regime());
         assert!(b.insight_probability > 0.0);
         // The delta is 0.5, so exp(-0.5/(1.0*0.5)) = exp(-1.0) ≈ 0.37
         assert!(b.insight_probability > thresholds::THERMO_INSIGHT_PROBABILITY_THRESHOLD);
@@ -468,19 +465,7 @@ mod tests {
         let mut b = make_bridge();
         // Feed identical samples → perfectly symmetric → asymmetry ≈ 0
         for _ in 0..5 {
-            b.compute(
-                0.5,
-                50.0,
-                0.5,
-                0.3,
-                0.5,
-                0.1,
-                0.5,
-                1e-10,
-                0.5,
-                0.5,
-                &default_regime(),
-            );
+            b.compute(0.5, 50.0, 0.5, 0.3, 0.5, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
         }
         // Covariance of identical inputs = 0 variance → asymmetry = 0
         assert!(b.onsager_asymmetry < 0.01);
@@ -490,19 +475,7 @@ mod tests {
     fn test_all_values_finite() {
         let mut b = make_bridge();
         // Edge case: very small values
-        b.compute(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.01,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            &default_regime(),
-        );
+        b.compute(0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, &default_regime());
         assert!(b.attention_demon_bits.is_finite());
         assert!(b.attention_work.is_finite());
         assert!(b.memory_landauer_cost.is_finite());
@@ -511,19 +484,7 @@ mod tests {
         assert!(b.onsager_asymmetry.is_finite());
 
         // Edge case: very large values
-        b.compute(
-            1.0,
-            1e6,
-            1.0,
-            1.0,
-            2.0,
-            1.0,
-            1.0,
-            1e-5,
-            0.0,
-            1.0,
-            &default_regime(),
-        );
+        b.compute(1.0, 1e6, 1.0, 1.0, 2.0, 1.0, 1.0, 1e-5, 0.0, 1.0, &default_regime());
         assert!(b.attention_demon_bits.is_finite());
         assert!(b.carnot_efficiency.is_finite());
         assert!(b.efficiency_ratio.is_finite());

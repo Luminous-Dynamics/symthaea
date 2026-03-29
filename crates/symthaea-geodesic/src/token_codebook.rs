@@ -64,7 +64,9 @@ fn token_seed(token: &str) -> u64 {
     token
         .bytes()
         .enumerate()
-        .fold(0u64, |acc, (i, b)| acc.wrapping_add((b as u64) << (i % 8)))
+        .fold(0u64, |acc, (i, b)| {
+            acc.wrapping_add((b as u64) << (i % 8))
+        })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -200,7 +202,10 @@ impl TokenCodebook {
     ///
     /// Returns `None` if the token is not in the vocabulary.
     pub fn encode(&self, token: &str) -> Option<BinaryHV> {
-        self.entries.iter().find(|e| e.token == token).map(|e| e.hv)
+        self.entries
+            .iter()
+            .find(|e| e.token == token)
+            .map(|e| e.hv)
     }
 
     /// Compose an expression from a sequence of decoded tokens.
@@ -353,9 +358,7 @@ const PATTERNS: &[&str] = &[
 
 const LITERALS: &[&str] = &["0", "1", "true", "false", "0.0", "\"\""];
 
-const DELIMITERS: &[&str] = &[
-    "(", ")", "{", "}", "[", "]", ";", ",", "::", "->", "=>", ".",
-];
+const DELIMITERS: &[&str] = &["(", ")", "{", "}", "[", "]", ";", ",", "::", "->", "=>", "."];
 
 const CONTROL: &[&str] = &["break", "continue", "return", "yield"];
 
@@ -438,7 +441,10 @@ mod tests {
         let cb = TokenCodebook::new();
         let let_hv = cb.encode("let").expect("'let' should be in codebook");
         let expr = cb.decode_expression(&let_hv, 3);
-        assert!(!expr.is_empty(), "decoded expression should not be empty");
+        assert!(
+            !expr.is_empty(),
+            "decoded expression should not be empty"
+        );
         assert!(
             expr.contains("let"),
             "expression from 'let' HV should contain 'let', got: {expr}"

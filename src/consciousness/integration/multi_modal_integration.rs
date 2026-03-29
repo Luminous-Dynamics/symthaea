@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Multi-Modal Consciousness Integration
 //!
 //! Integrates multi-modal perception with consciousness processing:
@@ -495,6 +498,30 @@ impl MultiModalIntegrator {
     /// Get statistics
     pub fn stats(&self) -> &IntegrationStats {
         &self.stats
+    }
+
+    /// Get modal channel feature HVs as ContinuousHV for IIT4 analysis.
+    ///
+    /// Returns one ContinuousHV per active modality channel, converted from
+    /// the BinaryHV features (true → +1.0, false → -1.0). Used by the
+    /// consciousness engine at interval 101 to compute concept structures
+    /// (Albantakis et al. 2023).
+    #[cfg(feature = "iit4")]
+    pub fn component_hvs_for_iit4(&self) -> Vec<symthaea_core::hdc::ContinuousHV> {
+        self.channels
+            .values()
+            .filter(|ch| ch.attention > 0.01) // Only active channels
+            .map(|ch| {
+                // BinaryHV is [u8; 2048] — each byte has 8 bits → 16384 dimensions
+                let mut values = Vec::with_capacity(16384);
+                for &byte in ch.features.0.iter() {
+                    for bit in 0..8 {
+                        values.push(if (byte >> bit) & 1 == 1 { 1.0 } else { -1.0 });
+                    }
+                }
+                symthaea_core::hdc::ContinuousHV::from_vec(values)
+            })
+            .collect()
     }
 
     /// Emit integration event

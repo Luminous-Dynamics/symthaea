@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Core
 //!
 //! The mathematical and structural foundation for the Holographic Liquid Brain.
@@ -73,3 +76,6 @@ pub mod phi_engine;
 pub mod physics;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+/// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
+#[allow(missing_docs)]
+pub mod embodiment;

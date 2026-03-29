@@ -106,8 +106,7 @@ fn bench_delta_frame_encode() {
 
     // Create frame with ~10% changes (modify a rectangular region).
     let mut frame2 = frame1.clone();
-    for y in 0..108 {
-        // 10% of 1080
+    for y in 0..108 { // 10% of 1080
         for x in 0..1920 {
             let offset = (y * 1920 + x) * 4;
             frame2[offset] = 200;
@@ -151,7 +150,10 @@ fn bench_test_capture() {
     let elapsed = start.elapsed();
     let per_frame_ms = elapsed.as_millis() as f64 / iterations as f64;
 
-    println!("TestCapture (1920x1080): {:.1}ms/frame", per_frame_ms,);
+    println!(
+        "TestCapture (1920x1080): {:.1}ms/frame",
+        per_frame_ms,
+    );
 }
 
 /// Benchmark: X11 capture latency (only with rdp-x11 feature).

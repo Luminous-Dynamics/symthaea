@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Bivariate Causal Discovery Engine
 //!
 //! **Revolutionary Paradigm**: Ensemble meta-learning for cause-effect inference.
@@ -24,8 +27,8 @@
 //!
 //! This is the best known result on Tübingen benchmark using classical methods.
 
-use rand::prelude::*;
 use rand::SeedableRng;
+use rand::prelude::*;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::f64;
@@ -947,11 +950,7 @@ impl CausalDiscoveryEngine {
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
-                if p > 1e-15 {
-                    -p * p.log2()
-                } else {
-                    0.0
-                }
+                if p > 1e-15 { -p * p.log2() } else { 0.0 }
             })
             .sum()
     }
@@ -971,11 +970,7 @@ impl CausalDiscoveryEngine {
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
-                if p > 1e-15 {
-                    -p * p.log2()
-                } else {
-                    0.0
-                }
+                if p > 1e-15 { -p * p.log2() } else { 0.0 }
             })
             .sum()
     }

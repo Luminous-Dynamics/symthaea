@@ -179,7 +179,8 @@ mod tests {
     fn test_progress_tracking() {
         let data = vec![0u8; 200_000]; // 200KB = ~4 chunks
         let (sender, hash) = FileTransfer::new_send(1, "big.bin".into(), &data);
-        let mut receiver = FileTransfer::new_receive(1, "big.bin".into(), data.len() as u64, hash);
+        let mut receiver =
+            FileTransfer::new_receive(1, "big.bin".into(), data.len() as u64, hash);
 
         let chunks = sender.chunks();
         assert!(chunks.len() >= 3);

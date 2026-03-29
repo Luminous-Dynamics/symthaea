@@ -16,11 +16,11 @@
 //! cargo run -p symthaea-atelier --example overnight_practice --release
 //! ```
 
-use symthaea_atelier::critic::{auto_improve_with, PerceptualInput, PracticeResult, SelfCritic};
-use symthaea_atelier::{create_artwork, AtelierConfig};
+use symthaea_atelier::critic::{auto_improve_with, SelfCritic, PerceptualInput, PracticeResult};
+use symthaea_atelier::{AtelierConfig, create_artwork};
 use symthaea_canvas::CognitiveSnapshot;
+use symthaea_gallery::{GalleryIndex, GalleryEntry, ArtModality};
 use symthaea_gallery::style::{compute_style, StyleEmbedding, STYLE_DIM};
-use symthaea_gallery::{ArtModality, GalleryEntry, GalleryIndex};
 
 fn main() {
     let total_rounds = 500;
@@ -114,9 +114,7 @@ fn main() {
             id: uuid::Uuid::new_v4(),
             created_at_cycle: round as u64,
             created_at: chrono::Utc::now(),
-            modality: ArtModality::Visual {
-                filename: format!("round_{round:04}.svg"),
-            },
+            modality: ArtModality::Visual { filename: format!("round_{round:04}.svg") },
             aesthetic_score: artwork.aesthetic_score,
             harmony_activations: snapshot.harmony_activations,
             tags: vec![],
@@ -146,7 +144,7 @@ fn main() {
             ));
 
             let recent_avg: f32 = if all_scores.len() >= 10 {
-                all_scores[all_scores.len() - 10..].iter().sum::<f32>() / 10.0
+                all_scores[all_scores.len()-10..].iter().sum::<f32>() / 10.0
             } else {
                 all_scores.iter().sum::<f32>() / all_scores.len() as f32
             };
@@ -170,66 +168,34 @@ fn main() {
     let initial_style = &style_checkpoints[0].1;
     let total_drift = 1.0 - final_style.similarity(initial_style);
 
-    println!(
-        "  Score range: {:.4} (worst, round {worst_round}) → {:.4} (best, round {best_round})",
-        worst_score, best_score
-    );
+    println!("  Score range: {:.4} (worst, round {worst_round}) → {:.4} (best, round {best_round})", worst_score, best_score);
 
-    let first_50: f32 = all_scores[..50.min(all_scores.len())].iter().sum::<f32>()
-        / 50.0f32.min(all_scores.len() as f32);
+    let first_50: f32 = all_scores[..50.min(all_scores.len())].iter().sum::<f32>() / 50.0f32.min(all_scores.len() as f32);
     let last_50: f32 = if all_scores.len() >= 50 {
-        all_scores[all_scores.len() - 50..].iter().sum::<f32>() / 50.0
+        all_scores[all_scores.len()-50..].iter().sum::<f32>() / 50.0
     } else {
         first_50
     };
-    println!(
-        "  First 50 avg: {:.4} | Last 50 avg: {:.4} | Delta: {:+.4}",
-        first_50,
-        last_50,
-        last_50 - first_50
-    );
+    println!("  First 50 avg: {:.4} | Last 50 avg: {:.4} | Delta: {:+.4}", first_50, last_50, last_50 - first_50);
     println!("  Total style drift: {:.4}", total_drift);
 
     println!("\n  Style evolution:");
     for (round, style) in &style_checkpoints {
         let drift = 1.0 - style.similarity(initial_style);
-        println!(
-            "    Round {:4}: drift={:.4} novelty_pref={:.3} trend={:.3}",
-            round + 1,
-            drift,
-            style.vector[15],
-            style.vector[14]
-        );
+        println!("    Round {:4}: drift={:.4} novelty_pref={:.3} trend={:.3}",
+            round + 1, drift, style.vector[15], style.vector[14]);
     }
 
     println!("\n  Final cognitive state:");
-    println!(
-        "    Arousal:       {:.3} (was {:.3})",
-        snapshot.arousal, initial_snapshot.arousal
-    );
-    println!(
-        "    Valence:       {:+.3} (was {:+.3})",
-        snapshot.valence, initial_snapshot.valence
-    );
-    println!(
-        "    Serotonin:     {:.3} (was {:.3})",
-        snapshot.serotonin, initial_snapshot.serotonin
-    );
-    println!(
-        "    Consciousness: {:.3} (was {:.3})",
-        snapshot.consciousness_level, initial_snapshot.consciousness_level
-    );
-    println!(
-        "    Harmonies:     [{:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}]",
-        snapshot.harmony_activations[0],
-        snapshot.harmony_activations[1],
-        snapshot.harmony_activations[2],
-        snapshot.harmony_activations[3],
-        snapshot.harmony_activations[4],
-        snapshot.harmony_activations[5],
-        snapshot.harmony_activations[6],
-        snapshot.harmony_activations[7]
-    );
+    println!("    Arousal:       {:.3} (was {:.3})", snapshot.arousal, initial_snapshot.arousal);
+    println!("    Valence:       {:+.3} (was {:+.3})", snapshot.valence, initial_snapshot.valence);
+    println!("    Serotonin:     {:.3} (was {:.3})", snapshot.serotonin, initial_snapshot.serotonin);
+    println!("    Consciousness: {:.3} (was {:.3})", snapshot.consciousness_level, initial_snapshot.consciousness_level);
+    println!("    Harmonies:     [{:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}, {:.2}]",
+        snapshot.harmony_activations[0], snapshot.harmony_activations[1],
+        snapshot.harmony_activations[2], snapshot.harmony_activations[3],
+        snapshot.harmony_activations[4], snapshot.harmony_activations[5],
+        snapshot.harmony_activations[6], snapshot.harmony_activations[7]);
 
     println!("\n  Files:");
     println!("    target/practice-study/best.svg (round {best_round}, score {best_score:.4})");

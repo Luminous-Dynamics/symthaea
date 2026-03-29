@@ -222,6 +222,15 @@ symthaea-helicopter = { path = "crates/symthaea-helicopter", optional = true }
 # Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
 symthaea-humanoid = { path = "crates/symthaea-humanoid", optional = true }
 
+# Symthaea Vehicle - HDC-LTC + FEP Active Inference autonomous vehicle control
+symthaea-vehicle = { path = "crates/symthaea-vehicle", optional = true }
+
+# Symthaea AUV - HDC-LTC + FEP Active Inference autonomous underwater vehicle control
+symthaea-auv = { path = "crates/symthaea-auv", optional = true }
+
+# Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
+symthaea-manipulator = { path = "crates/symthaea-manipulator", optional = true }
+
 # Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
 symthaea-hal = { path = "crates/symthaea-hal", optional = true }
 
@@ -460,9 +469,6 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 rdp = []                                   # Core RDP protocol + codec + session
 rdp-server = ["rdp"]                       # RDP server with screen capture
 rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (x11rb TODO)
-rdp-client = ["rdp"]                       # RDP client with frame reconstruction
-rdp-support = ["rdp"]                      # Mycelix support integration
-rdp-full = ["rdp-server", "rdp-client", "rdp-support"]  # Everything
 
 # ── Voice & Audio ───────────────────────────────────────────────────
 # Voice Pipeline (hierarchy):
@@ -483,14 +489,14 @@ muse = ["dep:symthaea-muse"]                             # Consciousness-driven 
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
-embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # UNTESTED: not in CI matrix; GPU passthrough only (0 cfg gates in src/)
+# REMOVED: embeddings-gpu (0 cfg gates; pure dependency passthrough, never tested in CI)
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
-vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # UNTESTED: not in CI (requires V4L2 hardware); passthrough only (0 cfg gates in src/)
+# REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
-foveation-perception = ["foveation", "symthaea-foveation/perception"]  # UNTESTED: not in CI (requires GPU models); passthrough only (0 cfg gates in src/)
+# REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
 integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
 glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
@@ -500,6 +506,7 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Motor / Embodiment ─────────────────────────────────────────────
 cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
+creative = []                               # Creative agency: motor rendering bridge, artistic expression
 complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
 spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
 
@@ -517,7 +524,7 @@ lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh ra
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
-secure-mesh = ["identity", "mesh-key-exchange", "swarm"]  # UNTESTED: not in CI matrix; pure bundle (0 cfg gates in src/)
+# REMOVED: secure-mesh (0 cfg gates; pure convenience bundle — enable identity + mesh-key-exchange + swarm directly)
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
@@ -539,6 +546,9 @@ flight-mujoco-renderer = ["flight-mujoco", "symthaea-flight/mujoco-renderer"]  #
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
 helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
+vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control via FEP Active Inference
+auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
+manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
@@ -565,6 +575,13 @@ epistemic_auditor = ["symthaea-core/duck", "dep:duckdb"]  # DuckDB-backed consci
 
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
 multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)
+structured_bottleneck = []                  # Structured consciousness equation: necessary {Phi,B,W} + amplifiers {A,R,E,K} (Michel 2023)
+continuous_hot = []                         # Continuous HOT depth: sub-level resolution + self-Phi + attention schema (Brown et al. 2019)
+ctc_wiring = ["symthaea-core/ctc_wiring"]    # Communication Through Coherence: binding gates GWT entry (Fries 2015)
+unified_precision = []                      # Dynamic precision = IIT-Phi × interoception × blanket (Parr & Friston 2019)
+interoceptive_inference = []                # Interoceptive prediction error in FEP hierarchy (Seth 2021)
+england_dissipation = []                    # England's dissipation-driven adaptation + Prigogine regime gating (England 2013)
+iit4 = ["symthaea-core/iit4"]              # IIT 4.0: concept structures, cause-effect power (Albantakis 2023)
 full_consciousness = []                     # Extended consciousness submodules
 full_perception = []                        # Extended perception submodules
 full_language = ["neural-bridge"]                          # Advanced language features (grammar, parsers) — candle deps via neural-bridge
@@ -602,12 +619,10 @@ genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  
 # ── Genesis Mission Challenges (DOE 2026) ─────────────────────────
 fusion-twin = ["physics"]
 safety-agents = []
-lab-controller = ["cell-foundry"]
 materials = ["dep:symthaea-materials"]
 nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
 water-prediction = ["cell-foundry"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
-physics-unification = ["physics"]
 grid-scaling = ["physics"]
 fission-reactor = ["physics"]
 accelerator = ["physics"]
@@ -617,22 +632,12 @@ experiment-planner = ["cell-foundry"]
 strategic-materials = ["materials"]
 critical-minerals = ["materials"]
 advanced-manufacturing = ["dep:symthaea-fabrication-kernel"]
-building-systems = ["dep:symthaea-fabrication-kernel"]
-design-production = ["dep:symthaea-fabrication-kernel"]
 proliferation-safeguards = ["nuclear-forensics"]
-genesis-missions = [
-    "fusion-twin", "safety-agents", "lab-controller", "materials",
-    "nuclear-forensics", "water-prediction", "physics-unification",
-    "grid-scaling", "fission-reactor", "accelerator", "threat-assessment",
-    "datacenter", "experiment-planner", "strategic-materials",
-    "critical-minerals", "advanced-manufacturing", "building-systems",
-    "design-production", "proliferation-safeguards"
-]
 
 
 # ── Convenience bundles ───────────────────────────────────────────
 # Group related features that users commonly enable together.
-consciousness_full = ["reasoning_engine", "identity"]   # UNTESTED: not in CI matrix (pure bundle, 0 cfg gates in src/)
+# REMOVED: consciousness_full (0 cfg gates; pure bundle — enable reasoning_engine + identity directly)
 # REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
 # REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
@@ -646,22 +651,9 @@ default-mind = [
     "safety-agents",
     "cpg",
     "spectral_state",
-]
-networked-mind = [  # UNTESTED: not in CI matrix (pure bundle)
-    "default-mind",
-    "mycelix",
-    "mesh",
-    "multi_agent",
-]
-embodied-mind = [  # UNTESTED: not in CI matrix (pure bundle)
-    "default-mind",
-    "flight",
-    "humanoid",
-]
-sovereign-mind = [  # UNTESTED: not in CI matrix (pure bundle)
-    "networked-mind",
-    "secure-mesh",
-    "ssm_language",
+    "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
+    "ctc_wiring",             # GWT entry gated by binding coherence (Fries 2015)
+    "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
 ]
 
 
@@ -721,6 +713,11 @@ path = "src/bin/symthaea-demo.rs"
 required-features = ["api_module"]
 
 [[bin]]
+name = "symthaea-multi-embodiment-demo"
+path = "src/bin/symthaea-multi-embodiment-demo.rs"
+required-features = ["humanoid"]
+
+[[bin]]
 name = "symthaea-story"
 path = "src/bin/symthaea-story.rs"
 
@@ -775,6 +772,14 @@ required-features = ["flight-mujoco-renderer"]
 [[example]]
 name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
+
+[[test]]
+name = "robotics_scenarios"
+required-features = ["humanoid"]
+
+[[test]]
+name = "substrate_embodiment_integration"
+required-features = ["humanoid"]
 
 [[test]]
 name = "humanoid_integration"
@@ -1232,7 +1237,7 @@ required-features = ["safety-agents"]
 
 [[example]]
 name = "benchmark_genesis_lab"
-required-features = ["lab-controller"]
+required-features = ["cell-foundry"]
 
 [[example]]
 name = "benchmark_genesis_materials"
@@ -1248,11 +1253,11 @@ required-features = ["water-prediction"]
 
 [[example]]
 name = "benchmark_genesis_multiscale"
-required-features = ["physics-unification"]
+required-features = ["physics"]
 
 [[example]]
 name = "benchmark_genesis_temporal_unified"
-required-features = ["genesis-missions"]
+required-features = ["safety-agents"]
 
 [[example]]
 name = "benchmark_genesis_grid"
@@ -1288,15 +1293,15 @@ required-features = ["critical-minerals"]
 
 [[example]]
 name = "benchmark_genesis_manufacturing"
-required-features = ["genesis-missions"]
+required-features = ["advanced-manufacturing"]
 
 [[example]]
 name = "benchmark_genesis_building"
-required-features = ["genesis-missions"]
+required-features = ["advanced-manufacturing"]
 
 [[example]]
 name = "benchmark_genesis_design_loop"
-required-features = ["genesis-missions"]
+required-features = ["advanced-manufacturing"]
 
 [[example]]
 name = "benchmark_genesis_safeguards"
@@ -1304,11 +1309,11 @@ required-features = ["proliferation-safeguards"]
 
 [[example]]
 name = "benchmark_genesis_suite"
-required-features = ["genesis-missions"]
+required-features = ["safety-agents"]
 
 [[example]]
 name = "benchmark_genesis_safety_dashboard"
-required-features = ["genesis-missions"]
+required-features = ["safety-agents"]
 
 [[example]]
 name = "six_watt_benchmark"
@@ -1405,6 +1410,11 @@ harness = false
 [[bench]]
 name = "cognitive_cycle"
 harness = false
+
+[[bench]]
+name = "embodied_cycle"
+harness = false
+required-features = ["humanoid"]
 
 [[bench]]
 name = "dynamics_ode"

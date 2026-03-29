@@ -82,15 +82,9 @@ impl AudioCaptureSource for TestAudioSource {
 pub struct SilentAudioSource;
 
 impl AudioCaptureSource for SilentAudioSource {
-    fn capture(&mut self) -> Option<AudioChunk> {
-        None
-    }
-    fn sample_rate(&self) -> u32 {
-        44100
-    }
-    fn is_active(&self) -> bool {
-        false
-    }
+    fn capture(&mut self) -> Option<AudioChunk> { None }
+    fn sample_rate(&self) -> u32 { 44100 }
+    fn is_active(&self) -> bool { false }
 }
 
 /// Encode an audio chunk into an AudioFrame based on consciousness level.
@@ -156,19 +150,23 @@ pub fn encode_audio_frame(
 /// Decode an AudioFrame back to f32 PCM stereo samples.
 pub fn decode_audio_frame(frame: &AudioFrame) -> Vec<f32> {
     match frame.encoding {
-        AudioEncoding::RawF32Stereo => frame
-            .data
-            .chunks_exact(4)
-            .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-            .collect(),
-        AudioEncoding::RawI16Stereo => frame
-            .data
-            .chunks_exact(2)
-            .map(|b| {
-                let i = i16::from_le_bytes([b[0], b[1]]);
-                i as f32 / 32767.0
-            })
-            .collect(),
+        AudioEncoding::RawF32Stereo => {
+            frame
+                .data
+                .chunks_exact(4)
+                .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+                .collect()
+        }
+        AudioEncoding::RawI16Stereo => {
+            frame
+                .data
+                .chunks_exact(2)
+                .map(|b| {
+                    let i = i16::from_le_bytes([b[0], b[1]]);
+                    i as f32 / 32767.0
+                })
+                .collect()
+        }
         AudioEncoding::MuLawMono => {
             // Decode mu-law mono → stereo.
             frame
@@ -267,9 +265,7 @@ mod tests {
             assert!(
                 (decoded - s).abs() < 0.05,
                 "Mu-law roundtrip failed: {} → {} → {}",
-                s,
-                encoded,
-                decoded
+                s, encoded, decoded
             );
         }
     }

@@ -47,8 +47,8 @@ impl SpeechThoughtEncoder {
     pub fn new(genesis: &GenesisSeed) -> Self {
         // Configure LTC neuron for speech timescales
         let config = UnifiedConfig {
-            tau_base: 0.05,    // 50ms base time constant (vowel duration)
-            backbone_tau: 0.3, // State-dependent modulation
+            tau_base: 0.05,       // 50ms base time constant (vowel duration)
+            backbone_tau: 0.3,    // State-dependent modulation
             learning_rate: 0.001,
             momentum: 0.9,
             weight_decay: 1e-5,
@@ -251,10 +251,7 @@ impl SpeechThoughtEncoder {
     }
 
     /// Load encoder weights from a binary file.
-    pub fn load<P: AsRef<std::path::Path>>(
-        path: P,
-        genesis: &GenesisSeed,
-    ) -> std::io::Result<Self> {
+    pub fn load<P: AsRef<std::path::Path>>(path: P, genesis: &GenesisSeed) -> std::io::Result<Self> {
         use std::io::Read;
         let mut file = std::fs::File::open(path)?;
 
@@ -415,7 +412,10 @@ mod tests {
         // Verify probes match
         for i in 0..NUM_CHANNELS {
             let sim = enc.channel_probes[i].similarity(&loaded.channel_probes[i]);
-            assert!(sim > 0.999, "Probe {i} mismatch after save/load: sim={sim}");
+            assert!(
+                sim > 0.999,
+                "Probe {i} mismatch after save/load: sim={sim}"
+            );
         }
 
         let _ = std::fs::remove_file(&path);

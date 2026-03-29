@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Two-step task (Daw et al., 2011).
 //!
 //! Tests model-based vs model-free behavior. A choice at stage 1 leads

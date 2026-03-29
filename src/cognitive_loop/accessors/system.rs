@@ -215,8 +215,7 @@ impl CognitiveLoopService {
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
-        self.sensorimotor
-            .vision_sensory
+        self.sensorimotor.vision_sensory
             .vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
@@ -489,8 +488,7 @@ impl CognitiveLoopService {
     /// Get the current embodiment platform.
     #[cfg(feature = "humanoid")]
     pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
-        self.sensorimotor
-            .embodiment_bridge
+        self.sensorimotor.embodiment_bridge
             .as_ref()
             .map(|b| b.platform())
             .unwrap_or(super::super::motor_bridge::EmbodimentPlatform::None)
@@ -547,18 +545,12 @@ impl CognitiveLoopService {
 
     /// Get the latest knowledge telemetry (if enabled).
     pub fn knowledge_telemetry(&self) -> Option<&crate::knowledge::KnowledgeTelemetry> {
-        self.memory
-            .knowledge_manager
-            .as_ref()
-            .map(|km| km.telemetry())
+        self.memory.knowledge_manager.as_ref().map(|km| km.telemetry())
     }
 
     /// Get the latest knowledge signals (if enabled).
     pub fn knowledge_signals(&self) -> Option<&crate::knowledge::KnowledgeSignals> {
-        self.memory
-            .knowledge_manager
-            .as_ref()
-            .map(|km| km.signals())
+        self.memory.knowledge_manager.as_ref().map(|km| km.signals())
     }
 
     /// Register a custom entity in the knowledge extractor.
@@ -588,10 +580,7 @@ impl CognitiveLoopService {
 
     /// Get the last assembled reasoning context (if knowledge engine is enabled).
     pub fn reasoning_context(&self) -> Option<&crate::knowledge::ReasoningContext> {
-        self.memory
-            .episodic_persistence
-            .last_reasoning_context
-            .as_ref()
+        self.memory.episodic_persistence.last_reasoning_context.as_ref()
     }
 
     /// Trace causal chains from a starting concept through the knowledge causal bridge.
@@ -692,8 +681,7 @@ impl CognitiveLoopService {
     /// Last Birkhoff aesthetic score (0.0-1.0) from the canvas pipeline.
     #[cfg(feature = "canvas")]
     pub fn canvas_aesthetic_score(&self) -> f32 {
-        self.sensorimotor
-            .motor_rendering
+        self.sensorimotor.motor_rendering
             .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().aesthetic_score)
@@ -703,8 +691,7 @@ impl CognitiveLoopService {
     /// Take the last generated canvas SVG (drains it).
     #[cfg(feature = "canvas")]
     pub fn take_canvas_svg(&mut self) -> Option<String> {
-        self.sensorimotor
-            .motor_rendering
+        self.sensorimotor.motor_rendering
             .canvas_manager
             .as_mut()
             .and_then(|m| m.take_svg())
@@ -713,8 +700,7 @@ impl CognitiveLoopService {
     /// Last canvas generation time in microseconds.
     #[cfg(feature = "canvas")]
     pub fn canvas_generation_time_us(&self) -> u64 {
-        self.sensorimotor
-            .motor_rendering
+        self.sensorimotor.motor_rendering
             .canvas_manager
             .as_ref()
             .map(|m| m.last_telemetry().generation_time_us)
@@ -1061,7 +1047,9 @@ impl CognitiveLoopService {
     // ── Thermodynamic Unification Accessors ──────────────────────────────
 
     /// Access the unified thermodynamic state (read-only).
-    pub fn thermodynamic_state(&self) -> &super::thermodynamic_state::UnifiedThermodynamicState {
+    pub fn thermodynamic_state(
+        &self,
+    ) -> &super::thermodynamic_state::UnifiedThermodynamicState {
         self.thermodynamic_mgr.state()
     }
 
@@ -1075,5 +1063,27 @@ impl CognitiveLoopService {
     /// Whether Landauer memory pressure is suppressing consolidation.
     pub fn thermodynamic_memory_suppressed(&self) -> bool {
         self.thermodynamic_mgr.memory_consolidation_suppressed()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MUSE ACCESSORS (consciousness-driven music synthesis)
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "muse")]
+impl CognitiveLoopService {
+    /// Get the last rendered stereo PCM audio chunk from the muse manager.
+    pub fn muse_audio_chunk(&self) -> &[[f32; 2]] {
+        self.muse_manager.last_chunk()
+    }
+
+    /// Get muse telemetry (tempo, active notes, chunks rendered, etc.).
+    pub fn muse_telemetry(&self) -> super::super::managers::muse_manager::MuseTelemetry {
+        self.muse_manager.telemetry()
+    }
+
+    /// Get the current MusicalState driving synthesis.
+    pub fn muse_musical_state(&self) -> &symthaea_muse::MusicalState {
+        self.muse_manager.musical_state()
     }
 }

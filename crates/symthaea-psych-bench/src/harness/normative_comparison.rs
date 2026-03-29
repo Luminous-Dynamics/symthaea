@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Normative comparison of agent performance against human baselines.
 //!
 //! Computes z-scores, percentiles, and clinical-style interpretations for each
@@ -113,7 +116,9 @@ fn baseline_for_benchmark<'a>(
         // Binding domain — route to binding baselines, not worm
         name if name.contains("TemporalOrder") => Some(("discrimination_slope", &bl.binding)),
         name if name.contains("CrossModal") => Some(("cross_modal_binding_accuracy", &bl.binding)),
-        name if name.contains("FeatureConjunction") => Some(("conjunction_accuracy", &bl.binding)),
+        name if name.contains("FeatureConjunction") => {
+            Some(("conjunction_accuracy", &bl.binding))
+        }
         name if name.contains("Binding") => Some(("binding_accuracy", &bl.worm)),
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 

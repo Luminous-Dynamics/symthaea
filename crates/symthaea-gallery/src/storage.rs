@@ -79,7 +79,8 @@ impl GalleryStorage {
     /// Load the gallery index from JSON.
     pub fn load_index(&self) -> std::io::Result<GalleryIndex> {
         let json = std::fs::read_to_string(self.index_path())?;
-        serde_json::from_str(&json).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        serde_json::from_str(&json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
 
@@ -141,24 +142,14 @@ mod tests {
     #[test]
     fn storage_paths() {
         let storage = GalleryStorage::new("/tmp/test-gallery");
-        assert_eq!(
-            storage.index_path(),
-            PathBuf::from("/tmp/test-gallery/index.json")
-        );
-        assert_eq!(
-            storage.visual_dir(),
-            PathBuf::from("/tmp/test-gallery/visual")
-        );
-        assert_eq!(
-            storage.music_dir(),
-            PathBuf::from("/tmp/test-gallery/music")
-        );
+        assert_eq!(storage.index_path(), PathBuf::from("/tmp/test-gallery/index.json"));
+        assert_eq!(storage.visual_dir(), PathBuf::from("/tmp/test-gallery/visual"));
+        assert_eq!(storage.music_dir(), PathBuf::from("/tmp/test-gallery/music"));
     }
 
     #[test]
     fn round_trip_index() {
-        let dir =
-            std::env::temp_dir().join(format!("symthaea-gallery-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("symthaea-gallery-test-{}", std::process::id()));
         let storage = GalleryStorage::new(&dir);
         storage.ensure_dirs().unwrap();
 
@@ -186,12 +177,13 @@ mod tests {
 
     #[test]
     fn save_visual_file() {
-        let dir =
-            std::env::temp_dir().join(format!("symthaea-gallery-visual-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("symthaea-gallery-visual-{}", std::process::id()));
         let storage = GalleryStorage::new(&dir);
         storage.ensure_dirs().unwrap();
 
-        let path = storage.save_visual("test.svg", "<svg></svg>").unwrap();
+        let path = storage
+            .save_visual("test.svg", "<svg></svg>")
+            .unwrap();
         assert!(path.exists());
 
         let content = std::fs::read_to_string(&path).unwrap();

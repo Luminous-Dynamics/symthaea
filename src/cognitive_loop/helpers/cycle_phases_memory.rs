@@ -466,10 +466,7 @@ impl CognitiveLoopService {
                             for ep in &top_eps_for_tracking {
                                 let hash =
                                     crate::memory::memory_coordinator::content_hash(&ep.input);
-                                self.memory
-                                    .memory_consol
-                                    .memory_coordinator
-                                    .record_retrieval(hash);
+                                self.memory.memory_consol.memory_coordinator.record_retrieval(hash);
                             }
                         }
 
@@ -666,8 +663,7 @@ impl CognitiveLoopService {
                 .bridge
                 .smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory
-                .memory_consol
+            self.memory.memory_consol
                 .memory_coordinator
                 .update_signals_with_sigma(
                     coord_phi,
@@ -717,8 +713,7 @@ impl CognitiveLoopService {
                                 memory_db_flushed: false,
                             };
                         };
-                        let flush_guard =
-                            self.memory.episodic_persistence.flush_in_progress.clone();
+                        let flush_guard = self.memory.episodic_persistence.flush_in_progress.clone();
                         flush_guard.store(true, Ordering::Relaxed);
 
                         let records: Vec<crate::databases::MemoryRecord> = top_episodes

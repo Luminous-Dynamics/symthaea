@@ -57,10 +57,7 @@ fn main() {
     println!("  Substance: {}", opioid.name);
     println!("  Primary effects: DA↑↑ (0.8), Endocannabinoid↑↑ (0.5)");
     println!("  Secondary: 5-HT↓ (0.3), NE↓ (0.2), GABA↑ (0.3)");
-    println!(
-        "  Tolerance acceleration: {}x",
-        opioid.tolerance_acceleration
-    );
+    println!("  Tolerance acceleration: {}x", opioid.tolerance_acceleration);
     println!();
 
     // Simulate chronic use (fast-forward tolerance development)
@@ -93,10 +90,7 @@ fn main() {
     println!("  After 20 cycles of withdrawal:");
     print_neuromod_state(&bath, "    ");
     println!("    In withdrawal: {}", bath.is_in_withdrawal());
-    println!(
-        "    Total withdrawal cycles remaining: {}",
-        bath.total_withdrawal_cycles()
-    );
+    println!("    Total withdrawal cycles remaining: {}", bath.total_withdrawal_cycles());
     println!("    Allostatic load: {:.3}", bath.allostatic_load);
     println!();
 
@@ -106,9 +100,7 @@ fn main() {
     println!("  Mechanism: mild DA elevation (ceiling effect), prevents withdrawal");
     println!("  Science: Mattick et al. (2014)");
     match bath.apply_mat_protocol(&MatProtocol::Buprenorphine) {
-        Ok(()) => {
-            println!("  Buprenorphine initiated successfully (patient in sufficient withdrawal)")
-        }
+        Ok(()) => println!("  Buprenorphine initiated successfully (patient in sufficient withdrawal)"),
         Err(risk) => println!("  WARNING: {}", risk),
     }
 
@@ -191,10 +183,7 @@ fn main() {
         println!("  │  • {} [neuromod]", desc);
     }
     if bath.allostatic_load > 0.5 {
-        println!(
-            "  │  • Elevated allostatic load ({:.2}) → chronic stress   │",
-            bath.allostatic_load
-        );
+        println!("  │  • Elevated allostatic load ({:.2}) → chronic stress   │", bath.allostatic_load);
     }
     println!("  │  • Negative reinforcement cycle (use to escape dysphoria)│");
     println!("  ├─────────────────────────────────────────────────────────┤");
@@ -245,14 +234,8 @@ fn main() {
 
     // Also show comparison across substances
     println!("  ── Comparative Recovery Timelines (moderate severity, 100 cycles) ──");
-    println!(
-        "  {:20} {:>8} {:>8} {:>12} {:>12}",
-        "Substance", "Acute", "PAWS", "Baseline", "Allostatic"
-    );
-    println!(
-        "  {:20} {:>8} {:>8} {:>12} {:>12}",
-        "─────────", "─────", "────", "────────", "──────────"
-    );
+    println!("  {:20} {:>8} {:>8} {:>12} {:>12}", "Substance", "Acute", "PAWS", "Baseline", "Allostatic");
+    println!("  {:20} {:>8} {:>8} {:>12} {:>12}", "─────────", "─────", "────", "────────", "──────────");
 
     for cat in [
         SubstanceCategory::Opioids,
@@ -395,10 +378,7 @@ fn print_neuromod_state(bath: &NeuromodulatorBath, indent: &str) {
 ///
 /// Simplified version of RegulationEngine::select_strategy_with_substance_context
 /// for demonstration purposes.
-fn select_substance_aware_strategy(
-    withdrawal_severity: f32,
-    craving_intensity: f32,
-) -> &'static str {
+fn select_substance_aware_strategy(withdrawal_severity: f32, craving_intensity: f32) -> &'static str {
     if withdrawal_severity > 0.7 || craving_intensity > 0.7 {
         "Grounding (somatic anchoring — GABA↑, NE↓)"
     } else if withdrawal_severity > 0.4 {

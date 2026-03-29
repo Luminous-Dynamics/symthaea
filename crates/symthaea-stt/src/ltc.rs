@@ -347,7 +347,11 @@ impl LtcCell {
     /// Forward pass that caches activations for BPTT.
     ///
     /// Returns (output_state, cache) where cache is used by `backward_step`.
-    pub fn forward_cached(&mut self, input: &[f32], dt: f32) -> (Vec<f32>, LtcStepCache) {
+    pub fn forward_cached(
+        &mut self,
+        input: &[f32],
+        dt: f32,
+    ) -> (Vec<f32>, LtcStepCache) {
         let h = self.config.hidden_size;
         let prev_state = self.state.clone();
 
@@ -429,8 +433,8 @@ impl LtcCell {
             // ∂L/∂tau[j] = ∂L/∂x(t+dt) · (dt/τ²) · exp(-dt/τ) · (activation - prev_state)
             let tau_j = self.tau[j].clamp(self.config.tau_min, self.config.tau_max);
             let ddecay_dtau = (cache.dt / (tau_j * tau_j)) * cache.decay[j];
-            grads.tau[j] +=
-                dl_dstate[j] * ddecay_dtau * (cache.activation[j] - cache.prev_state[j]);
+            grads.tau[j] += dl_dstate[j] * ddecay_dtau
+                * (cache.activation[j] - cache.prev_state[j]);
 
             // ∂L/∂x(t) = ∂L/∂x(t+dt) · decay + sum_k(∂L/∂pre[k] · w_rec[k][j])
             dl_dprev_state[j] += dl_dstate[j] * cache.decay[j];
@@ -519,18 +523,8 @@ impl LtcGradients {
 
     /// Clip gradient norms to prevent exploding gradients.
     pub fn clip_norm(&mut self, max_norm: f32) {
-        let norm_sq: f32 = self
-            .w_in
-            .iter()
-            .flat_map(|r| r.iter())
-            .map(|x| x * x)
-            .sum::<f32>()
-            + self
-                .w_rec
-                .iter()
-                .flat_map(|r| r.iter())
-                .map(|x| x * x)
-                .sum::<f32>()
+        let norm_sq: f32 = self.w_in.iter().flat_map(|r| r.iter()).map(|x| x * x).sum::<f32>()
+            + self.w_rec.iter().flat_map(|r| r.iter()).map(|x| x * x).sum::<f32>()
             + self.bias.iter().map(|x| x * x).sum::<f32>()
             + self.tau.iter().map(|x| x * x).sum::<f32>();
         let norm = norm_sq.sqrt();

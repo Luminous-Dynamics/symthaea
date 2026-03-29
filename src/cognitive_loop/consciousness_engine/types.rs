@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Types for the consciousness engine — output, input, weights, coupling, cache.
 
 use crate::consciousness::consciousness_equation_v2::CoreComponent;
@@ -317,6 +320,12 @@ pub struct ConsciousnessEngineCache {
     pub(crate) weight_history: std::collections::VecDeque<[f64; 4]>,
     /// Consecutive cycles with weight variance < 0.001 (for Converged detection).
     pub(crate) converged_streak: usize,
+    /// Last PAC modulation index from ConsciousnessEquationV2 (for CTC wiring).
+    #[cfg(feature = "ctc_wiring")]
+    pub(crate) last_pac_modulation: f64,
+    /// Last multimodal binding coherence (for CTC wiring).
+    #[cfg(feature = "ctc_wiring")]
+    pub(crate) last_binding_coherence: f64,
 }
 
 impl Default for ConsciousnessEngineCache {
@@ -334,6 +343,10 @@ impl Default for ConsciousnessEngineCache {
             smoothed_emergence_ratio: None,
             weight_history: std::collections::VecDeque::new(),
             converged_streak: 0,
+            #[cfg(feature = "ctc_wiring")]
+            last_pac_modulation: 0.0,
+            #[cfg(feature = "ctc_wiring")]
+            last_binding_coherence: 0.0,
         }
     }
 }

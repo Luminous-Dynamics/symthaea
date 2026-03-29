@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Logic Engine
 //!
 //! Propositional and first-order logic with SAT solving, natural deduction,
@@ -1083,11 +1086,7 @@ impl LogicEngine {
             .map(|(name, args, pol)| {
                 let args_str: Vec<String> = args.iter().map(Self::format_term).collect();
                 let pred = format!("{}({})", name, args_str.join(", "));
-                if *pol {
-                    pred
-                } else {
-                    format!("¬{}", pred)
-                }
+                if *pol { pred } else { format!("¬{}", pred) }
             })
             .collect();
         format!("{{{}}}", lits.join(", "))

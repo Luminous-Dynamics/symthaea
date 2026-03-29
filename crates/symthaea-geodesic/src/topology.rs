@@ -262,12 +262,7 @@ impl TopologicalFingerprint {
     /// the same Betti numbers but have different structural complexity.
     /// A 3-line function and a 50-line function both with β₁=0 will get
     /// DIFFERENT encodings, enabling meaningful manifold clustering.
-    fn encode_full(
-        betti: &BettiNumbers,
-        euler: i64,
-        node_count: usize,
-        edge_count: usize,
-    ) -> BinaryHV {
+    fn encode_full(betti: &BettiNumbers, euler: i64, node_count: usize, edge_count: usize) -> BinaryHV {
         let topo_role = BinaryHV::random(TOPO_ROLE_SEED);
 
         // Role vectors

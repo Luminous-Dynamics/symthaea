@@ -565,12 +565,10 @@ impl CognitiveLoopService {
         //    has clear direction for improvement → focus rather than explore
         if consciousness_gradient_magnitude > 1.0 {
             // Strong gradient = clear optimization direction → reduce random exploration
-            self.behavior.curiosity_drive.boredom =
-                (self.behavior.curiosity_drive.boredom - 0.05).max(0.0);
+            self.behavior.curiosity_drive.boredom = (self.behavior.curiosity_drive.boredom - 0.05).max(0.0);
         } else if consciousness_gradient_magnitude > 0.0 && consciousness_gradient_magnitude < 0.1 {
             // Near-zero gradient = plateau → boost exploration to escape
-            self.behavior.curiosity_drive.boredom =
-                (self.behavior.curiosity_drive.boredom + 0.03).min(1.0);
+            self.behavior.curiosity_drive.boredom = (self.behavior.curiosity_drive.boredom + 0.03).min(1.0);
         }
 
         // 3. Holographic unity gates learning: high unity = coherent representation →

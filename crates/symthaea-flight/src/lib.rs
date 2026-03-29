@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-flight
 //!
 //! Unified HDC-LTC + FEP Active Inference quadrotor flight control.
@@ -33,6 +36,7 @@
 
 pub mod benchmarks;
 pub mod controller;
+pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod formation;
@@ -76,4 +80,21 @@ pub mod mujoco_reexports {
 
     #[cfg(feature = "mujoco-renderer")]
     pub use mujoco_rs::renderer::MjRenderer;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quadrotor_command_hover() {
+        let cmd = QuadrotorCommand::hover();
+        assert!(cmd.thrust > 0.0, "hover thrust should be positive");
+    }
+
+    #[test]
+    fn flight_state_hover_altitude() {
+        let state = FlightState::hover(5.0);
+        assert!((state.position[2] - 5.0).abs() < 1e-6);
+    }
 }

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Reverse-Mode Autodiff for Consciousness Optimization
 //!
 //! Implements true reverse-mode automatic differentiation for Phi (integrated information),
@@ -1154,7 +1157,11 @@ impl PhiLbfgsOptimizer {
         let final_phi = final_result.phi;
 
         // Compute sparsity
-        let near_zero_count = opt_result.x.iter().filter(|v| v.abs() < 0.01).count();
+        let near_zero_count = opt_result
+            .x
+            .iter()
+            .filter(|v| v.abs() < 0.01)
+            .count();
         let sparsity = near_zero_count as f64 / total_vars.max(1) as f64;
 
         PhiLbfgsResult {
@@ -1363,20 +1370,11 @@ mod tests {
 
         let result = optimizer.optimize(&mut network);
 
-        assert!(
-            result.initial_phi.is_finite(),
-            "Initial Phi should be finite"
-        );
+        assert!(result.initial_phi.is_finite(), "Initial Phi should be finite");
         assert!(result.final_phi.is_finite(), "Final Phi should be finite");
-        assert!(
-            result.initial_phi >= 0.0,
-            "Initial Phi should be non-negative"
-        );
+        assert!(result.initial_phi >= 0.0, "Initial Phi should be non-negative");
         assert!(result.final_phi >= 0.0, "Final Phi should be non-negative");
-        assert!(
-            result.sparsity >= 0.0 && result.sparsity <= 1.0,
-            "Sparsity should be in [0,1]"
-        );
+        assert!(result.sparsity >= 0.0 && result.sparsity <= 1.0, "Sparsity should be in [0,1]");
         assert!(result.iterations > 0, "Should take at least 1 iteration");
     }
 
@@ -1461,10 +1459,7 @@ mod tests {
         // After optimization + normalization, all values should be finite
         for node in &network.nodes {
             for &v in &node.values {
-                assert!(
-                    v.is_finite(),
-                    "Node values should be finite after optimization"
-                );
+                assert!(v.is_finite(), "Node values should be finite after optimization");
             }
         }
     }

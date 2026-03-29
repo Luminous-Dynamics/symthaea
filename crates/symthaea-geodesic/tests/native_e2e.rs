@@ -6,13 +6,13 @@
 //! Tests the full pipeline: spec → skeleton → fill → emit → verify.
 //! No LLM involved — this is pure Geodesic Code Synthesis.
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_geodesic::emitter_bridge::emit_rust_from_skeleton;
 use symthaea_geodesic::manifold::ProgramManifold;
 use symthaea_geodesic::manifold_bootstrap::bootstrap_with_topology;
 use symthaea_geodesic::skeleton_synthesis::{build_skeleton_from_topology, fill_from_manifold};
 use symthaea_geodesic::topology::BettiNumbers;
 use symthaea_geodesic::verification::verify_generated_code;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Populate a manifold with real function implementations for retrieval.
 fn seed_manifold() -> ProgramManifold {
@@ -138,11 +138,7 @@ fn test_e2e_linear_function() {
 
     // Verify
     let result = verify_generated_code(&code, "add", &betti, None, 0.1);
-    assert!(
-        result.syntax_ok,
-        "syntax should pass: {:?}",
-        result.syntax_errors
-    );
+    assert!(result.syntax_ok, "syntax should pass: {:?}", result.syntax_errors);
     assert!(
         result.structural_ok,
         "structural should pass (β₁=0): {:?}",
@@ -299,7 +295,10 @@ fn test_e2e_recursive_function() {
     );
     assert!(code.is_some());
     let code = code.unwrap();
-    assert!(code.contains("factorial"), "should contain function name");
+    assert!(
+        code.contains("factorial"),
+        "should contain function name"
+    );
 }
 
 #[test]

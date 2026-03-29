@@ -203,11 +203,7 @@ pub fn to_score_svg(comp: &Composition, tempo_bpm: f32) -> String {
         // Stem (up if below middle, down if above)
         if divs < 16 {
             // no stem for whole notes
-            let stem_dir = if y > staff_top + 2 * line_spacing {
-                -1
-            } else {
-                1
-            };
+            let stem_dir = if y > staff_top + 2 * line_spacing { -1 } else { 1 };
             let stem_x = if stem_dir < 0 { x + 5 } else { x - 5 };
             let stem_y_end = y + stem_dir * 30;
             svg.push_str(&format!(
@@ -231,30 +227,10 @@ mod tests {
             audio: AudioData::F32(vec![0.0; 100]),
             sample_rate: 44100,
             notes: vec![
-                Note {
-                    frequency: 261.63,
-                    start_time: 0.0,
-                    duration: 1.0,
-                    velocity: 0.8,
-                },
-                Note {
-                    frequency: 329.63,
-                    start_time: 1.0,
-                    duration: 0.5,
-                    velocity: 0.7,
-                },
-                Note {
-                    frequency: 392.00,
-                    start_time: 1.5,
-                    duration: 0.25,
-                    velocity: 0.9,
-                },
-                Note {
-                    frequency: 523.25,
-                    start_time: 1.75,
-                    duration: 2.0,
-                    velocity: 0.6,
-                },
+                Note { frequency: 261.63, start_time: 0.0, duration: 1.0, velocity: 0.8 },
+                Note { frequency: 329.63, start_time: 1.0, duration: 0.5, velocity: 0.7 },
+                Note { frequency: 392.00, start_time: 1.5, duration: 0.25, velocity: 0.9 },
+                Note { frequency: 523.25, start_time: 1.75, duration: 2.0, velocity: 0.6 },
             ],
             duration_secs: 4.0,
             section: SectionType::Developmental,
@@ -295,10 +271,7 @@ mod tests {
         let svg = to_score_svg(&test_comp(), 120.0);
         let line_count = svg.matches("<line").count();
         // At least 5 staff lines (plus stems)
-        assert!(
-            line_count >= 5,
-            "should have at least 5 staff lines, got {line_count}"
-        );
+        assert!(line_count >= 5, "should have at least 5 staff lines, got {line_count}");
     }
 
     #[test]

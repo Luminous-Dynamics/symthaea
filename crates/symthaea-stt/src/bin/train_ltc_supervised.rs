@@ -24,8 +24,9 @@ use std::time::Instant;
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_stt::{
-    audio_hdc_encoder::AudioHdcEncoder, id_to_audio_path, load_alignments,
-    phoneme_hdc_ltc::PhonemeHdcLtc, AudioConfig, AudioFrontend,
+    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend,
+    audio_hdc_encoder::AudioHdcEncoder,
+    phoneme_hdc_ltc::PhonemeHdcLtc,
 };
 
 #[derive(Parser)]
@@ -76,18 +77,9 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    println!(
-        "{}",
-        style("╔══════════════════════════════════════════════════════════╗").cyan()
-    );
-    println!(
-        "{}",
-        style("║   UNIFIED HDC-LTC TRAINING — 16,384D Phoneme Neuron     ║").cyan()
-    );
-    println!(
-        "{}",
-        style("╚══════════════════════════════════════════════════════════╝").cyan()
-    );
+    println!("{}", style("╔══════════════════════════════════════════════════════════╗").cyan());
+    println!("{}", style("║   UNIFIED HDC-LTC TRAINING — 16,384D Phoneme Neuron     ║").cyan());
+    println!("{}", style("╚══════════════════════════════════════════════════════════╝").cyan());
     println!();
 
     let genesis = GenesisSeed::from_phrase(&cli.genesis);

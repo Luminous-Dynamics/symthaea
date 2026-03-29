@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Water quality monitoring missions for commons stewardship.
 
-use crate::types::ChemicalReadings;
 use serde::{Deserialize, Serialize};
+use crate::types::ChemicalReadings;
 
 /// Mission types for AUV water stewardship.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,21 +43,12 @@ pub struct Waypoint {
 }
 
 /// Generate depth transect waypoints.
-pub fn depth_transect_waypoints(
-    start: f64,
-    end: f64,
-    interval: f64,
-    x: f64,
-    y: f64,
-) -> Vec<Waypoint> {
+pub fn depth_transect_waypoints(start: f64, end: f64, interval: f64, x: f64, y: f64) -> Vec<Waypoint> {
     let mut waypoints = Vec::new();
     let mut depth = start;
     let step = if end > start { interval } else { -interval };
     while (step > 0.0 && depth <= end) || (step < 0.0 && depth >= end) {
-        waypoints.push(Waypoint {
-            position: [x, y, depth],
-            sample_at_waypoint: true,
-        });
+        waypoints.push(Waypoint { position: [x, y, depth], sample_at_waypoint: true });
         depth += step;
     }
     waypoints
@@ -65,11 +56,7 @@ pub fn depth_transect_waypoints(
 
 /// Generate horizontal grid waypoints (lawn-mower at fixed depth).
 pub fn grid_patrol_waypoints(
-    center: [f64; 2],
-    width: f64,
-    height: f64,
-    depth: f64,
-    lane_spacing: f64,
+    center: [f64; 2], width: f64, height: f64, depth: f64, lane_spacing: f64,
 ) -> Vec<Waypoint> {
     let mut waypoints = Vec::new();
     let x_start = center[0] - width / 2.0;
@@ -81,23 +68,11 @@ pub fn grid_patrol_waypoints(
     let mut going_right = true;
     while y <= y_end {
         if going_right {
-            waypoints.push(Waypoint {
-                position: [x_start, y, depth],
-                sample_at_waypoint: true,
-            });
-            waypoints.push(Waypoint {
-                position: [x_end, y, depth],
-                sample_at_waypoint: true,
-            });
+            waypoints.push(Waypoint { position: [x_start, y, depth], sample_at_waypoint: true });
+            waypoints.push(Waypoint { position: [x_end, y, depth], sample_at_waypoint: true });
         } else {
-            waypoints.push(Waypoint {
-                position: [x_end, y, depth],
-                sample_at_waypoint: true,
-            });
-            waypoints.push(Waypoint {
-                position: [x_start, y, depth],
-                sample_at_waypoint: true,
-            });
+            waypoints.push(Waypoint { position: [x_end, y, depth], sample_at_waypoint: true });
+            waypoints.push(Waypoint { position: [x_start, y, depth], sample_at_waypoint: true });
         }
         going_right = !going_right;
         y += lane_spacing;

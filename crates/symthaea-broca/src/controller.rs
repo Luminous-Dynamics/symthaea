@@ -598,39 +598,9 @@ impl LanguageController {
         self.last_effective_dt
     }
 
-    // ── Projection API stubs (TODO: implement for projected-gradient training) ──
-
-    /// Position base vector reference for projected gradient computation.
+    /// Position base vector reference (used by GPU CfC trainer).
     pub fn position_base_ref(&self) -> &ContinuousHV {
         &self.position_base
-    }
-
-    /// Projection dimensionality (stub: returns None until projection is implemented).
-    pub fn projection_dim(&self) -> Option<usize> {
-        None
-    }
-
-    /// Projected embedding matrix (stub: returns None).
-    pub fn projected_embeddings(&self) -> Option<&[Vec<f32>]> {
-        None
-    }
-
-    /// Projection weight matrix (stub: returns None).
-    pub fn projection_weights(&self) -> Option<&[f32]> {
-        None
-    }
-
-    /// Mutable projection weights (stub: returns None).
-    pub fn projection_weights_mut(&mut self) -> Option<&mut [f32]> {
-        None
-    }
-
-    /// Refresh projected embeddings after weight update (stub: no-op).
-    pub fn refresh_projected_embeddings(&mut self) {}
-
-    /// Project and normalize a vector through the projection matrix (stub).
-    pub fn project_and_normalize(_output: &[f32], _weights: &[f32], _dim: usize) -> Vec<f32> {
-        vec![]
     }
 
     /// Get the refined output HV from the last forward step.

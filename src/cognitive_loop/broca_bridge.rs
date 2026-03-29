@@ -243,11 +243,9 @@ impl BrocaManager {
         );
 
         // Set epistemic cube channels from consciousness signals
-        if let (Some(e), Some(n), Some(m)) = (
-            signals.cube_e_tier,
-            signals.cube_n_tier,
-            signals.cube_m_tier,
-        ) {
+        if let (Some(e), Some(n), Some(m)) =
+            (signals.cube_e_tier, signals.cube_n_tier, signals.cube_m_tier)
+        {
             channels.set_epistemic_cube(e, n, m, signals.cube_h_value, signals.cube_quality);
         }
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Revolutionary Improvement #70: GWT Integration Layer
 //!
 //! **Unifies Revolutionary Improvements #23 and #69**
@@ -709,6 +712,26 @@ impl UnifiedGlobalWorkspace {
     /// Get statistics
     pub fn stats(&self) -> &UnifiedGWTStats {
         &self.stats
+    }
+
+    /// Set CTC (Communication Through Coherence) signals from the binding network.
+    ///
+    /// When `ctc_wiring` is enabled, binding coherence lowers the workspace entry
+    /// threshold, and PAC MI boosts coalition activation. Call this before `process()`.
+    ///
+    /// Science: Fries (2015) — phase-locked oscillations control which neural
+    /// populations can communicate with the global workspace.
+    #[cfg(feature = "ctc_wiring")]
+    pub fn set_ctc_signals(&mut self, binding_coherence: f64, pac_mi: f64) {
+        self.hdc_workspace.set_binding_coherence(binding_coherence);
+        self.hdc_workspace.set_pac_mi(pac_mi);
+    }
+
+    /// Get the ignition strength from the last GWT cycle.
+    /// Used to feed back to the binding network as a Kuramoto coupling boost.
+    #[cfg(feature = "ctc_wiring")]
+    pub fn last_ignition_strength(&self) -> f64 {
+        self.hdc_workspace.last_ignition_strength()
     }
 
     /// Reset workspace

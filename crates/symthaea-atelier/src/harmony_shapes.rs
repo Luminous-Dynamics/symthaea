@@ -80,15 +80,9 @@ fn bloom(cx: f32, cy: f32, radius: f32, activation: f32, hue: f32) -> SceneNode 
         let cpy = cy + cp_r * cp_angle.sin();
 
         if i == 0 {
-            let _ = write!(
-                path,
-                "M {cx:.1} {cy:.1} Q {cpx:.1} {cpy:.1} {tip_x:.1} {tip_y:.1}"
-            );
+            let _ = write!(path, "M {cx:.1} {cy:.1} Q {cpx:.1} {cpy:.1} {tip_x:.1} {tip_y:.1}");
         } else {
-            let _ = write!(
-                path,
-                " M {cx:.1} {cy:.1} Q {cpx:.1} {cpy:.1} {tip_x:.1} {tip_y:.1}"
-            );
+            let _ = write!(path, " M {cx:.1} {cy:.1} Q {cpx:.1} {cpy:.1} {tip_x:.1} {tip_y:.1}");
         }
     }
 
@@ -111,8 +105,7 @@ fn crystal(cx: f32, cy: f32, radius: f32, activation: f32, hue: f32) -> SceneNod
         let r = radius * (layer as f32 + 1.0) / layers as f32;
         let mut points = Vec::with_capacity(sides);
         for i in 0..sides {
-            let angle =
-                (i as f32 / sides as f32) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_6;
+            let angle = (i as f32 / sides as f32) * std::f32::consts::TAU - std::f32::consts::FRAC_PI_6;
             points.push((cx + r * angle.cos(), cy + r * angle.sin()));
         }
         let hex = SceneNode::polygon(points, true).with_style(Style {
@@ -166,10 +159,7 @@ fn web(cx: f32, cy: f32, radius: f32, activation: f32, hue: f32) -> SceneNode {
     let positions: Vec<(f32, f32)> = (0..nodes)
         .map(|i| {
             let angle = (i as f32 / nodes as f32) * std::f32::consts::TAU;
-            (
-                cx + radius * 0.6 * angle.cos(),
-                cy + radius * 0.6 * angle.sin(),
-            )
+            (cx + radius * 0.6 * angle.cos(), cy + radius * 0.6 * angle.sin())
         })
         .collect();
 
@@ -186,18 +176,13 @@ fn web(cx: f32, cy: f32, radius: f32, activation: f32, hue: f32) -> SceneNode {
     // Connect nodes with lines
     for i in 0..positions.len() {
         for j in (i + 1)..positions.len() {
-            let line = SceneNode::line(
-                positions[i].0,
-                positions[i].1,
-                positions[j].0,
-                positions[j].1,
-            )
-            .with_style(Style {
-                stroke: Some(Color::from_hsl(hue, 0.4, 0.5)),
-                stroke_width: Some(0.5 + activation),
-                opacity: Some(0.2 + activation * 0.2),
-                ..Style::default()
-            });
+            let line = SceneNode::line(positions[i].0, positions[i].1, positions[j].0, positions[j].1)
+                .with_style(Style {
+                    stroke: Some(Color::from_hsl(hue, 0.4, 0.5)),
+                    stroke_width: Some(0.5 + activation),
+                    opacity: Some(0.2 + activation * 0.2),
+                    ..Style::default()
+                });
             group.children.push(line);
         }
     }
@@ -299,7 +284,7 @@ fn enso(cx: f32, cy: f32, radius: f32, activation: f32, hue: f32) -> SceneNode {
     SceneNode::path(path).with_style(Style {
         fill: None,
         stroke: Some(Color::from_hsl(hue, 0.15, 0.25)), // muted, ink-like
-        stroke_width: Some(4.0 + activation * 6.0),     // thick brushstroke
+        stroke_width: Some(4.0 + activation * 6.0), // thick brushstroke
         opacity: Some(0.7 + activation * 0.25),
         ..Style::default()
     })
@@ -313,7 +298,10 @@ mod tests {
     fn all_harmonies_produce_shapes() {
         for i in 0..8 {
             let shape = harmony_shape(i, 0.7, 256.0, 256.0, 100.0, 180.0);
-            assert!(shape.node_count() >= 1, "harmony {i} produced empty shape");
+            assert!(
+                shape.node_count() >= 1,
+                "harmony {i} produced empty shape"
+            );
         }
     }
 

@@ -10,18 +10,11 @@ use symthaea_fep::{ActiveInferenceAgentConfig, EnhancedFEPBridge, HiddenState, O
 
 fn bench_compute_permeability(c: &mut Criterion) {
     let mut op = MarkovBoundaryOperator::new(MarkovPartition {
-        internal_dim: 16384,
-        sensory_dim: 4,
-        active_dim: 8,
+        internal_dim: 16384, sensory_dim: 4, active_dim: 8,
     });
     let inputs = PermeabilityInputs {
-        serotonin: 0.7,
-        oxytocin: 0.6,
-        flow_state: 0.5,
-        threat_level: 0.2,
-        noradrenaline: 0.3,
-        acetylcholine: 0.4,
-        peer_trust: 0.7,
+        serotonin: 0.7, oxytocin: 0.6, flow_state: 0.5,
+        threat_level: 0.2, noradrenaline: 0.3, acetylcholine: 0.4, peer_trust: 0.7,
     };
     c.bench_function("compute_permeability", |b| {
         b.iter(|| op.compute_permeability(black_box(&inputs)))
@@ -30,14 +23,10 @@ fn bench_compute_permeability(c: &mut Criterion) {
 
 fn bench_gate_observation(c: &mut Criterion) {
     let mut op = MarkovBoundaryOperator::new(MarkovPartition {
-        internal_dim: 16384,
-        sensory_dim: 4,
-        active_dim: 8,
+        internal_dim: 16384, sensory_dim: 4, active_dim: 8,
     });
     let inputs = PermeabilityInputs::default();
-    for _ in 0..50 {
-        op.compute_permeability(&inputs);
-    }
+    for _ in 0..50 { op.compute_permeability(&inputs); }
     let obs = Observation::from_consciousness_state(0.7, 0.6, 0.5, 0.4);
     let prior = HiddenState::new(4);
     c.bench_function("gate_observation", |b| {
@@ -47,18 +36,12 @@ fn bench_gate_observation(c: &mut Criterion) {
 
 fn bench_topology_constraints(c: &mut Criterion) {
     let mut op = MarkovBoundaryOperator::new(MarkovPartition {
-        internal_dim: 16384,
-        sensory_dim: 4,
-        active_dim: 8,
+        internal_dim: 16384, sensory_dim: 4, active_dim: 8,
     });
     let inputs = PermeabilityInputs::default();
-    for _ in 0..50 {
-        op.compute_permeability(&inputs);
-    }
+    for _ in 0..50 { op.compute_permeability(&inputs); }
     let topo = TopologyBoundaryInputs {
-        boundary_thickness: 0.5,
-        fiedler_value: 0.8,
-        boundary_components: 3,
+        boundary_thickness: 0.5, fiedler_value: 0.8, boundary_components: 3,
     };
     c.bench_function("apply_topology_constraints", |b| {
         b.iter(|| op.apply_topology_constraints(black_box(&topo)))
@@ -96,12 +79,7 @@ fn bench_full_fep_cycle_with_blanket(c: &mut Criterion) {
     c.bench_function("full_fep_cycle_with_blanket", |b| {
         b.iter(|| {
             bridge.update_blanket_permeability(black_box(&inputs));
-            bridge.cycle(
-                black_box(0.5),
-                black_box(0.5),
-                black_box(0.5),
-                black_box(0.5),
-            )
+            bridge.cycle(black_box(0.5), black_box(0.5), black_box(0.5), black_box(0.5))
         })
     });
 }

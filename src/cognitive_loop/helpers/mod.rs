@@ -586,8 +586,7 @@ impl CognitiveLoopService {
         }
         self.stats.learning_paused = self.behavior.adaptive_behavior.pause_learning;
         self.stats.adaptive_learning_rate = self
-            .behavior
-            .adaptive_behavior
+            .behavior.adaptive_behavior
             .effective_learning_rate(self.combined_learning_rate());
         self.stats.adaptive_speech_rate = self.behavior.adaptive_behavior.speech_rate_multiplier;
 
@@ -628,41 +627,25 @@ impl CognitiveLoopService {
 
         // Self-reflection stats
         let assess_str = self
-            .consciousness
-            .self_model_tier
+            .consciousness.self_model_tier
             .self_reflection
             .self_assessment
             .as_str();
         if self.stats.self_assessment != assess_str {
             self.stats.self_assessment = assess_str.to_string();
         }
-        self.stats.reflection_count = self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .reflection_count;
-        self.stats.adjustments_made = self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .adjustments_made;
+        self.stats.reflection_count = self.consciousness.self_model_tier.self_reflection.reflection_count;
+        self.stats.adjustments_made = self.consciousness.self_model_tier.self_reflection.adjustments_made;
         self.stats.learning_effectiveness = self
-            .consciousness
-            .self_model_tier
+            .consciousness.self_model_tier
             .self_reflection
             .learning_effectiveness();
         let summary = self.consciousness.self_model_tier.self_reflection.summary();
         self.stats.next_reflection_in = summary.next_reflection_in;
-        self.stats.adapted_flow_threshold = self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .flow_error_threshold;
-        self.stats.adapted_boredom_threshold = self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .boredom_threshold;
+        self.stats.adapted_flow_threshold =
+            self.consciousness.self_model_tier.self_reflection.flow_error_threshold;
+        self.stats.adapted_boredom_threshold =
+            self.consciousness.self_model_tier.self_reflection.boredom_threshold;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE STATS
@@ -854,18 +837,13 @@ impl CognitiveLoopService {
                 crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
             );
         }
-        if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding
-        {
+        if let Some(ref mut binding) = self.consciousness.consciousness_monitors.phenomenal_binding {
             *binding =
                 crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
                     crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
                 );
         }
-        if let Some(ref mut hfe) = self
-            .consciousness
-            .consciousness_monitors
-            .hierarchical_free_energy
-        {
+        if let Some(ref mut hfe) = self.consciousness.consciousness_monitors.hierarchical_free_energy {
             *hfe = crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );

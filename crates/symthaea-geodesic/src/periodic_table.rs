@@ -92,209 +92,72 @@ pub fn periodic_table() -> &'static [OperationElement] {
         use ReturnClass::*;
         vec![
             // ── Arithmetic (binary, pure) ──
-            OperationElement {
-                name: "ADD",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: true,
-                associativity: true,
-                has_identity: true,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "SUB",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: false,
-                associativity: false,
-                has_identity: true,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "MUL",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: true,
-                associativity: true,
-                has_identity: true,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "DIV",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: false,
-                associativity: false,
-                has_identity: true,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "MOD",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "MAX",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: true,
-                associativity: true,
-                has_identity: false,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "MIN",
-                arity: Binary,
-                kind: Arithmetic,
-                commutativity: true,
-                associativity: true,
-                has_identity: false,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "SUM",
-                arity: Unary,
-                kind: Arithmetic,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Same,
-                purity: true,
-            },
+            OperationElement { name: "ADD", arity: Binary, kind: Arithmetic,
+                commutativity: true, associativity: true, has_identity: true,
+                return_class: Same, purity: true },
+            OperationElement { name: "SUB", arity: Binary, kind: Arithmetic,
+                commutativity: false, associativity: false, has_identity: true,
+                return_class: Same, purity: true },
+            OperationElement { name: "MUL", arity: Binary, kind: Arithmetic,
+                commutativity: true, associativity: true, has_identity: true,
+                return_class: Same, purity: true },
+            OperationElement { name: "DIV", arity: Binary, kind: Arithmetic,
+                commutativity: false, associativity: false, has_identity: true,
+                return_class: Same, purity: true },
+            OperationElement { name: "MOD", arity: Binary, kind: Arithmetic,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Same, purity: true },
+            OperationElement { name: "MAX", arity: Binary, kind: Arithmetic,
+                commutativity: true, associativity: true, has_identity: false,
+                return_class: Same, purity: true },
+            OperationElement { name: "MIN", arity: Binary, kind: Arithmetic,
+                commutativity: true, associativity: true, has_identity: false,
+                return_class: Same, purity: true },
+            OperationElement { name: "SUM", arity: Unary, kind: Arithmetic,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Same, purity: true },
+
             // ── Comparison (binary → bool) ──
-            OperationElement {
-                name: "EQ",
-                arity: Binary,
-                kind: Comparison,
-                commutativity: true,
-                associativity: false,
-                has_identity: false,
-                return_class: Bool,
-                purity: true,
-            },
-            OperationElement {
-                name: "LT",
-                arity: Binary,
-                kind: Comparison,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Bool,
-                purity: true,
-            },
-            OperationElement {
-                name: "GT",
-                arity: Binary,
-                kind: Comparison,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Bool,
-                purity: true,
-            },
+            OperationElement { name: "EQ", arity: Binary, kind: Comparison,
+                commutativity: true, associativity: false, has_identity: false,
+                return_class: Bool, purity: true },
+            OperationElement { name: "LT", arity: Binary, kind: Comparison,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Bool, purity: true },
+            OperationElement { name: "GT", arity: Binary, kind: Comparison,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Bool, purity: true },
+
             // ── Logic (→ bool) ──
-            OperationElement {
-                name: "AND",
-                arity: Binary,
-                kind: Logic,
-                commutativity: true,
-                associativity: true,
-                has_identity: true,
-                return_class: Bool,
-                purity: true,
-            },
-            OperationElement {
-                name: "OR",
-                arity: Binary,
-                kind: Logic,
-                commutativity: true,
-                associativity: true,
-                has_identity: true,
-                return_class: Bool,
-                purity: true,
-            },
-            OperationElement {
-                name: "NOT",
-                arity: Unary,
-                kind: Logic,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Bool,
-                purity: true,
-            },
+            OperationElement { name: "AND", arity: Binary, kind: Logic,
+                commutativity: true, associativity: true, has_identity: true,
+                return_class: Bool, purity: true },
+            OperationElement { name: "OR", arity: Binary, kind: Logic,
+                commutativity: true, associativity: true, has_identity: true,
+                return_class: Bool, purity: true },
+            OperationElement { name: "NOT", arity: Unary, kind: Logic,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Bool, purity: true },
+
             // ── Data (collection operations) ──
-            OperationElement {
-                name: "SORT",
-                arity: Unary,
-                kind: Data,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Collection,
-                purity: true,
-            },
-            OperationElement {
-                name: "REVERSE",
-                arity: Unary,
-                kind: Data,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Collection,
-                purity: true,
-            },
-            OperationElement {
-                name: "LEN",
-                arity: Unary,
-                kind: Data,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "INDEX",
-                arity: Binary,
-                kind: Data,
-                commutativity: false,
-                associativity: false,
-                has_identity: false,
-                return_class: Same,
-                purity: true,
-            },
-            OperationElement {
-                name: "SWAP",
-                arity: Binary,
-                kind: Data,
-                commutativity: true,
-                associativity: false,
-                has_identity: false,
-                return_class: Void,
-                purity: false,
-            },
-            OperationElement {
-                name: "CONCAT",
-                arity: Binary,
-                kind: Data,
-                commutativity: false,
-                associativity: true,
-                has_identity: true,
-                return_class: Same,
-                purity: true,
-            },
+            OperationElement { name: "SORT", arity: Unary, kind: Data,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Collection, purity: true },
+            OperationElement { name: "REVERSE", arity: Unary, kind: Data,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Collection, purity: true },
+            OperationElement { name: "LEN", arity: Unary, kind: Data,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Same, purity: true },
+            OperationElement { name: "INDEX", arity: Binary, kind: Data,
+                commutativity: false, associativity: false, has_identity: false,
+                return_class: Same, purity: true },
+            OperationElement { name: "SWAP", arity: Binary, kind: Data,
+                commutativity: true, associativity: false, has_identity: false,
+                return_class: Void, purity: false },
+            OperationElement { name: "CONCAT", arity: Binary, kind: Data,
+                commutativity: false, associativity: true, has_identity: true,
+                return_class: Same, purity: true },
         ]
     })
 }
@@ -345,9 +208,7 @@ pub fn encode_element(element: &OperationElement) -> BinaryHV {
     let ret_hv = BinaryHV::random(RET_SEED + element.return_class as u64);
     let pure_hv = BinaryHV::random(PURE_SEED + element.purity as u64);
 
-    BinaryHV::bundle(&[
-        arity_hv, kind_hv, comm_hv, assoc_hv, ident_hv, ret_hv, pure_hv,
-    ])
+    BinaryHV::bundle(&[arity_hv, kind_hv, comm_hv, assoc_hv, ident_hv, ret_hv, pure_hv])
 }
 
 /// Generic slot encoding — same for ALL variables regardless of name.
@@ -385,7 +246,9 @@ pub fn encode_structural(node: &ProgramNode) -> BinaryHV {
 fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
     match node {
         // Variables: generic slot encoding (name-independent)
-        ProgramNode::Atom(_) | ProgramNode::Typed(_, _) => slot_hv().permute(depth),
+        ProgramNode::Atom(_) | ProgramNode::Typed(_, _) => {
+            slot_hv().permute(depth)
+        }
 
         // Apply: encode operation by properties, args by position
         ProgramNode::Apply { func, args } => {
@@ -405,9 +268,7 @@ fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
         // Sequence: encode each step by position
         ProgramNode::Sequence(steps) => {
             let seq_role = BinaryHV::random(SEQUENCE_STRUCT_SEED);
-            let step_hvs: Vec<BinaryHV> = steps
-                .iter()
-                .enumerate()
+            let step_hvs: Vec<BinaryHV> = steps.iter().enumerate()
                 .map(|(i, s)| encode_structural_inner(s, depth + 1).permute(i + 1))
                 .collect();
             let bundle = BinaryHV::bundle(&step_hvs);
@@ -415,11 +276,7 @@ fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
         }
 
         // Branch: encode condition + branches by role
-        ProgramNode::Branch {
-            condition,
-            then_branch,
-            else_branch,
-        } => {
+        ProgramNode::Branch { condition, then_branch, else_branch } => {
             let branch_role = BinaryHV::random(BRANCH_STRUCT_SEED);
             branch_role
                 .bind(&encode_structural_inner(condition, depth + 1))
@@ -428,11 +285,7 @@ fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
         }
 
         // Iterate: encode init + step + condition
-        ProgramNode::Iterate {
-            init,
-            step,
-            condition,
-        } => {
+        ProgramNode::Iterate { init, step, condition } => {
             let iter_role = BinaryHV::random(ITERATE_STRUCT_SEED);
             iter_role
                 .bind(&encode_structural_inner(init, depth + 1))
@@ -441,10 +294,7 @@ fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
         }
 
         // Recurse: encode base + step
-        ProgramNode::Recurse {
-            base_case,
-            recursive_step,
-        } => {
+        ProgramNode::Recurse { base_case, recursive_step } => {
             let rec_role = BinaryHV::random(RECURSE_STRUCT_SEED);
             rec_role
                 .bind(&encode_structural_inner(base_case, depth + 1))
@@ -458,20 +308,13 @@ fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
                 .bind(&encode_structural_inner(func, depth + 1))
                 .bind(&encode_structural_inner(collection, depth + 1).permute(1))
         }
-        ProgramNode::Filter {
-            predicate,
-            collection,
-        } => {
+        ProgramNode::Filter { predicate, collection } => {
             let filter_role = BinaryHV::random(FILTER_STRUCT_SEED);
             filter_role
                 .bind(&encode_structural_inner(predicate, depth + 1))
                 .bind(&encode_structural_inner(collection, depth + 1).permute(1))
         }
-        ProgramNode::Reduce {
-            func,
-            initial,
-            collection,
-        } => {
+        ProgramNode::Reduce { func, initial, collection } => {
             let reduce_role = BinaryHV::random(REDUCE_STRUCT_SEED);
             reduce_role
                 .bind(&encode_structural_inner(func, depth + 1))
@@ -490,8 +333,7 @@ fn encode_structural_inner(node: &ProgramNode, depth: usize) -> BinaryHV {
         }
         ProgramNode::Abstract(examples) => {
             // Majority vote of structural encodings → abstract pattern
-            let hvs: Vec<BinaryHV> = examples
-                .iter()
+            let hvs: Vec<BinaryHV> = examples.iter()
                 .map(|e| encode_structural_inner(e, depth + 1))
                 .collect();
             BinaryHV::bundle(&hvs)
@@ -555,10 +397,8 @@ mod tests {
         // Share some but not all → moderate
         let add_mul = encode_element(lookup("MUL").unwrap()).similarity(&add_hv);
         // ADD-MUL should be more similar than ADD-SUB
-        assert!(
-            add_mul >= sim - 0.1,
-            "ADD-MUL ({add_mul:.4}) should be >= ADD-SUB ({sim:.4})"
-        );
+        assert!(add_mul >= sim - 0.1,
+            "ADD-MUL ({add_mul:.4}) should be >= ADD-SUB ({sim:.4})");
     }
 
     #[test]
@@ -576,23 +416,17 @@ mod tests {
         let enc2 = encode_structural(&prog2);
         let sim = enc1.similarity(&enc2);
         println!("ADD(a,b) vs ADD(x,y) structural similarity: {:.4}", sim);
-        assert!(
-            sim > 0.99,
-            "same structure with different names should be identical, got {sim}"
-        );
+        assert!(sim > 0.99, "same structure with different names should be identical, got {sim}");
     }
 
     #[test]
     fn test_structural_different_ops() {
         let add = ProgramNode::apply(
-            ProgramNode::op("ADD"),
-            vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-        );
+            ProgramNode::op("ADD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]);
         let mul = ProgramNode::apply(
-            ProgramNode::op("MUL"),
-            vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-        );
-        let sort = ProgramNode::apply(ProgramNode::atom("sort"), vec![ProgramNode::atom("arr")]);
+            ProgramNode::op("MUL"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]);
+        let sort = ProgramNode::apply(
+            ProgramNode::atom("sort"), vec![ProgramNode::atom("arr")]);
 
         let add_enc = encode_structural(&add);
         let mul_enc = encode_structural(&mul);
@@ -603,10 +437,7 @@ mod tests {
         println!("ADD vs MUL structural: {:.4}", add_mul);
         println!("ADD vs SORT structural: {:.4}", add_sort);
         // ADD-MUL should be more similar than ADD-SORT
-        assert!(
-            add_mul > add_sort,
-            "ADD-MUL ({add_mul:.4}) > ADD-SORT ({add_sort:.4})"
-        );
+        assert!(add_mul > add_sort, "ADD-MUL ({add_mul:.4}) > ADD-SORT ({add_sort:.4})");
     }
 
     #[test]
@@ -615,42 +446,31 @@ mod tests {
         let loop1 = ProgramNode::iterate(
             ProgramNode::atom("i = 0"),
             ProgramNode::branch(
-                ProgramNode::apply(
-                    ProgramNode::op("GT"),
-                    vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max")],
-                ),
+                ProgramNode::apply(ProgramNode::op("GT"),
+                    vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max")]),
                 ProgramNode::atom("max = arr[i]"),
                 ProgramNode::atom("skip"),
             ),
-            ProgramNode::apply(
-                ProgramNode::op("LT"),
-                vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
-            ),
+            ProgramNode::apply(ProgramNode::op("LT"),
+                vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
         );
         let loop2 = ProgramNode::iterate(
             ProgramNode::atom("j = 0"),
             ProgramNode::branch(
-                ProgramNode::apply(
-                    ProgramNode::op("GT"),
-                    vec![ProgramNode::atom("data[j]"), ProgramNode::atom("best")],
-                ),
+                ProgramNode::apply(ProgramNode::op("GT"),
+                    vec![ProgramNode::atom("data[j]"), ProgramNode::atom("best")]),
                 ProgramNode::atom("best = data[j]"),
                 ProgramNode::atom("noop"),
             ),
-            ProgramNode::apply(
-                ProgramNode::op("LT"),
-                vec![ProgramNode::atom("j"), ProgramNode::atom("n")],
-            ),
+            ProgramNode::apply(ProgramNode::op("LT"),
+                vec![ProgramNode::atom("j"), ProgramNode::atom("n")]),
         );
         let enc1 = encode_structural(&loop1);
         let enc2 = encode_structural(&loop2);
         let sim = enc1.similarity(&enc2);
         println!("Iterate(GT branch) with different names: {:.4}", sim);
         // Same structure → high similarity
-        assert!(
-            sim > 0.9,
-            "same loop structure should be highly similar, got {sim}"
-        );
+        assert!(sim > 0.9, "same loop structure should be highly similar, got {sim}");
     }
 
     #[test]
@@ -673,9 +493,6 @@ mod tests {
         let sim = enc_loop.similarity(&enc_add);
         println!("Iterate(Branch) vs ADD: {:.4}", sim);
         // Very different structures → low similarity
-        assert!(
-            sim < 0.7,
-            "different structures should be dissimilar, got {sim}"
-        );
+        assert!(sim < 0.7, "different structures should be dissimilar, got {sim}");
     }
 }

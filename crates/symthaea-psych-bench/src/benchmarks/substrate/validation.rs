@@ -119,7 +119,9 @@ impl SubstrateValidationBenchmark {
                 substrate: "spacecraft",
                 prediction_idx: 0,
                 description: "Spacecraft computers sustain Phi > 0",
-                pass: |transfer, _degradation| metric_f64(transfer, "phi_preservation") > 0.0,
+                pass: |transfer, _degradation| {
+                    metric_f64(transfer, "phi_preservation") > 0.0
+                },
             },
             PredictionTest {
                 substrate: "spacecraft",
@@ -182,34 +184,16 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
 
         result.insert(
             "predictions_tested",
-            MetricValue {
-                mean: tested_f,
-                std_dev: 0.0,
-                n: 1,
-                ci_lower: tested_f,
-                ci_upper: tested_f,
-            },
+            MetricValue { mean: tested_f, std_dev: 0.0, n: 1, ci_lower: tested_f, ci_upper: tested_f },
         );
         result.insert(
             "predictions_passed",
-            MetricValue {
-                mean: passed_f,
-                std_dev: 0.0,
-                n: 1,
-                ci_lower: passed_f,
-                ci_upper: passed_f,
-            },
+            MetricValue { mean: passed_f, std_dev: 0.0, n: 1, ci_lower: passed_f, ci_upper: passed_f },
         );
         let pass_rate = if tested > 0 { passed_f / tested_f } else { 0.0 };
         result.insert(
             "pass_rate",
-            MetricValue {
-                mean: pass_rate,
-                std_dev: 0.0,
-                n: 1,
-                ci_lower: pass_rate,
-                ci_upper: pass_rate,
-            },
+            MetricValue { mean: pass_rate, std_dev: 0.0, n: 1, ci_lower: pass_rate, ci_upper: pass_rate },
         );
 
         // Add per-substrate evidence levels
@@ -217,24 +201,12 @@ impl PsychBenchmark for SubstrateValidationBenchmark {
             let conf = summary.honest_confidence;
             result.insert(
                 format!("{}_honest_confidence", summary.substrate),
-                MetricValue {
-                    mean: conf,
-                    std_dev: 0.0,
-                    n: 1,
-                    ci_lower: conf,
-                    ci_upper: conf,
-                },
+                MetricValue { mean: conf, std_dev: 0.0, n: 1, ci_lower: conf, ci_upper: conf },
             );
             let p = summary.passed as f64;
             result.insert(
                 format!("{}_predictions_passed", summary.substrate),
-                MetricValue {
-                    mean: p,
-                    std_dev: 0.0,
-                    n: 1,
-                    ci_lower: p,
-                    ci_upper: p,
-                },
+                MetricValue { mean: p, std_dev: 0.0, n: 1, ci_lower: p, ci_upper: p },
             );
             // Evidence level stored as a note since MetricValue is numeric-only
             result.notes.push(format!(
@@ -291,14 +263,19 @@ mod tests {
         assert!(tested > 0, "Should have tested at least one prediction");
 
         // Should have per-substrate confidence metrics
-        assert!(result.metrics.contains_key("silicon_honest_confidence"));
-        assert!(result.metrics.contains_key("biological_honest_confidence"));
+        assert!(result
+            .metrics
+            .contains_key("silicon_honest_confidence"));
+        assert!(result
+            .metrics
+            .contains_key("biological_honest_confidence"));
     }
 
     #[test]
     fn test_prediction_tests_cover_all_substrates() {
         let tests = SubstrateValidationBenchmark::prediction_tests();
-        let substrates: std::collections::HashSet<_> = tests.iter().map(|t| t.substrate).collect();
+        let substrates: std::collections::HashSet<_> =
+            tests.iter().map(|t| t.substrate).collect();
 
         // Should cover at least these key substrates
         assert!(substrates.contains("silicon"));

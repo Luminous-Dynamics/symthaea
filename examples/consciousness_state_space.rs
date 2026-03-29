@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Consciousness State-Space Explorer
 //!
 //! Systematic exploration of the 7-component consciousness equation parameter space.
@@ -132,22 +135,16 @@ fn parse_args() -> Config {
                 eprintln!("  cargo run --example consciousness_state_space -- [OPTIONS]");
                 eprintln!();
                 eprintln!("OPTIONS:");
-                eprintln!(
-                    "  --mode <MODE>        heatmap|lhs|transition|substrate (default: heatmap)"
-                );
+                eprintln!("  --mode <MODE>        heatmap|lhs|transition|substrate (default: heatmap)");
                 eprintln!("  --resolution <N>     Steps per dimension (default: 20)");
                 eprintln!("  --samples <N>        LHS sample count (default: 10000)");
                 eprintln!("  --seed <N>           Random seed (default: 42)");
                 eprintln!("  --axis-a <COMP>      Heatmap X axis component (default: integration)");
                 eprintln!("  --axis-b <COMP>      Heatmap Y axis component (default: binding)");
-                eprintln!(
-                    "  --fixed <F>          Fixed value for non-swept components (default: 0.5)"
-                );
+                eprintln!("  --fixed <F>          Fixed value for non-swept components (default: 0.5)");
                 eprintln!();
                 eprintln!("COMPONENTS:");
-                eprintln!(
-                    "  integration, binding, workspace, attention, recursion, efficacy, knowledge"
-                );
+                eprintln!("  integration, binding, workspace, attention, recursion, efficacy, knowledge");
                 std::process::exit(0);
             }
             _ => {}
@@ -249,10 +246,7 @@ fn run_lhs(config: &Config) {
     let n_dims = components.len(); // 7
 
     eprintln!("=== Latin Hypercube Sampling ===");
-    eprintln!(
-        "Samples: {}, Dimensions: {}, Seed: {}",
-        config.samples, n_dims, config.seed
-    );
+    eprintln!("Samples: {}, Dimensions: {}, Seed: {}", config.samples, n_dims, config.seed);
 
     // CSV header
     println!(
@@ -337,10 +331,7 @@ fn run_transition(config: &Config) {
     let components = CoreComponent::all();
 
     eprintln!("=== Phase Transition Detection ===");
-    eprintln!(
-        "Resolution: {}, Fixed: {}",
-        config.resolution, config.fixed_value
-    );
+    eprintln!("Resolution: {}, Fixed: {}", config.resolution, config.fixed_value);
 
     // CSV header
     println!("component,value,consciousness,gradient,is_transition");
@@ -451,10 +442,7 @@ fn run_substrate(config: &Config) {
 
     // Summary: consciousness at default (all 0.5) for each substrate level
     eprintln!();
-    eprintln!(
-        "--- Substrate Impact at Default Config (all components = {}) ---",
-        config.fixed_value
-    );
+    eprintln!("--- Substrate Impact at Default Config (all components = {}) ---", config.fixed_value);
     for &substrate in &config.substrate_values {
         let mut state = ConsciousnessStateV2::new();
         for c in &components {

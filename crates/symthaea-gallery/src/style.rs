@@ -43,12 +43,7 @@ impl StyleEmbedding {
 
     /// Cosine similarity between two style embeddings.
     pub fn similarity(&self, other: &StyleEmbedding) -> f32 {
-        let dot: f32 = self
-            .vector
-            .iter()
-            .zip(other.vector.iter())
-            .map(|(a, b)| a * b)
-            .sum();
+        let dot: f32 = self.vector.iter().zip(other.vector.iter()).map(|(a, b)| a * b).sum();
         let mag_a: f32 = self.vector.iter().map(|v| v * v).sum::<f32>().sqrt();
         let mag_b: f32 = other.vector.iter().map(|v| v * v).sum::<f32>().sqrt();
         if mag_a < 0.001 || mag_b < 0.001 {
@@ -120,10 +115,7 @@ pub fn compute_style(index: &GalleryIndex, window: usize) -> StyleEmbedding {
 
     // Dimension 14: score trend (linear regression slope, normalized)
     if entries.len() >= 2 {
-        let scores: Vec<f32> = entries
-            .iter()
-            .map(|e| e.aesthetic_score.composite)
-            .collect();
+        let scores: Vec<f32> = entries.iter().map(|e| e.aesthetic_score.composite).collect();
         let slope = linear_slope(&scores);
         vector[14] = (slope * 10.0 + 0.5).clamp(0.0, 1.0); // normalize: 0.5 = flat
     } else {
@@ -299,17 +291,13 @@ mod tests {
     #[test]
     fn similarity_identical() {
         let s = StyleEmbedding {
-            vector: [
-                0.3, 0.5, 0.7, 0.2, 0.8, 0.4, 0.6, 0.1, 0.5, 0.4, 0.3, 0.6, 0.5, 0.7, 0.5, 0.4,
-            ],
+            vector: [0.3, 0.5, 0.7, 0.2, 0.8, 0.4, 0.6, 0.1,
+                     0.5, 0.4, 0.3, 0.6, 0.5, 0.7, 0.5, 0.4],
             sample_count: 10,
             confidence: 0.8,
         };
         let sim = s.similarity(&s);
-        assert!(
-            (sim - 1.0).abs() < 0.01,
-            "self-similarity should be ~1.0: {sim}"
-        );
+        assert!((sim - 1.0).abs() < 0.01, "self-similarity should be ~1.0: {sim}");
     }
 
     #[test]
@@ -333,9 +321,8 @@ mod tests {
     #[test]
     fn apply_style_modifies_harmonies() {
         let s = StyleEmbedding {
-            vector: [
-                0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.7, 0.8,
-            ],
+            vector: [0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1,
+                     0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.7, 0.8],
             sample_count: 50,
             confidence: 1.0,
         };
@@ -345,24 +332,14 @@ mod tests {
         apply_style(&mut harmonies, &mut valence, &mut arousal, &s, 0.5);
 
         // Odd harmonies should have moved toward 0.9, even toward 0.1
-        assert!(
-            harmonies[0] > 0.5,
-            "harmony 0 should increase: {}",
-            harmonies[0]
-        );
-        assert!(
-            harmonies[1] < 0.5,
-            "harmony 1 should decrease: {}",
-            harmonies[1]
-        );
+        assert!(harmonies[0] > 0.5, "harmony 0 should increase: {}", harmonies[0]);
+        assert!(harmonies[1] < 0.5, "harmony 1 should decrease: {}", harmonies[1]);
     }
 
     #[test]
     fn window_limits_entries() {
         let index = GalleryIndex {
-            entries: (0..100)
-                .map(|i| mock_entry(i, (i % 8) as usize, 0.5))
-                .collect(),
+            entries: (0..100).map(|i| mock_entry(i, (i % 8) as usize, 0.5)).collect(),
             max_entries: 200,
         };
         let s = compute_style(&index, 10);
@@ -378,9 +355,6 @@ mod tests {
     #[test]
     fn linear_slope_flat() {
         let slope = linear_slope(&[3.0, 3.0, 3.0, 3.0]);
-        assert!(
-            slope.abs() < 0.01,
-            "flat data should have ~0 slope: {slope}"
-        );
+        assert!(slope.abs() < 0.01, "flat data should have ~0 slope: {slope}");
     }
 }

@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Parameter sweep for vocal tract LTC controller.
 //!
 //! Tests one parameter at a time while holding others at Phase 24 baseline

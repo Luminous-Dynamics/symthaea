@@ -247,9 +247,7 @@ impl SupportSessionManager {
     pub fn awaiting_governance(&self, ticket_id: &str) -> bool {
         self.sessions
             .get(ticket_id)
-            .map(|s| {
-                !s.governance_approved && self.policy.requires_governance(s.category, s.priority)
-            })
+            .map(|s| !s.governance_approved && self.policy.requires_governance(s.category, s.priority))
             .unwrap_or(false)
     }
 

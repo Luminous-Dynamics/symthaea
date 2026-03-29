@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! wasm_bindgen exports for browser/JS consumption.
 //!
 //! Activated by the `wasm` feature flag.
@@ -489,39 +492,82 @@ pub fn generate_flake(hardware_json: &str, path: &str, hostname: &str) -> Result
 }
 
 /// Generate disko disk configuration from hardware probe.
+///
+/// If the hardware profile suggests a workstation (>500GB storage, 8+ cores),
+/// generates a dual-disk layout comment suggesting the optimized profile.
 #[wasm_bindgen]
 pub fn generate_disko_config(hardware_json: &str) -> Result<String, JsError> {
     let profile: crate::hardware_probe::HardwareProfile =
         serde_json::from_str(hardware_json).map_err(|e| JsError::new(&e.to_string()))?;
     let nix_config = crate::hardware_probe::NixHardwareConfig::from_profile(&profile);
 
+    // Detect if dual-disk might be appropriate
+    let dual_disk_hint = if profile.cpu_cores >= 8 && profile.storage_quota_bytes > 500_000_000_000
+    {
+        r#"# NOTE: Your system appears to be a workstation with multiple drives.
+# Consider the dual-NVMe layout for optimal performance:
+#   Fast drive (TLC) → btrfs data (@home, @srv, @swap, @snapshots)
+#   Standard drive (QLC) → ext4 root (OS, nix store, build caches)
+# See: symthaea/nix/disko-dual-nvme.nix
+
+"#
+    } else {
+        ""
+    };
+
     let disko = format!(
-        r#"{{ disko.devices.disk.main = {{
+        r#"{dual_disk_hint}{{ ... }}: {{
+  disko.devices.disk.main = {{
     type = "disk";
-    device = "/dev/sda";  # ← Change to your target disk
+    device = "/dev/nvme0n1";  # ← Verify your target disk
     content = {{
       type = "gpt";
       partitions = {{
-        ESP = {{
-          size = "512M";
+        boot = {{
+          size = "1G";
           type = "EF00";
           content = {{
             type = "filesystem";
             format = "vfat";
             mountpoint = "/boot";
+            mountOptions = [ "fmask=0077" "dmask=0077" ];
           }};
         }};
-        luks = {{
+        root = {{
           size = "100%";
           content = {{
             type = "luks";
-            name = "cryptroot";
+            name = "symthaea-root";
             settings.allowDiscards = true;
             content = {{
-              type = "filesystem";
-              format = "{filesystem}";
-              mountpoint = "/";
-              mountOptions = [ "compress=zstd" "noatime" ];
+              type = "btrfs";
+              extraArgs = [ "-L" "symthaea" "-f" ];
+              subvolumes = {{
+                "@" = {{
+                  mountpoint = "/";
+                  mountOptions = [ "compress=zstd:3" "noatime" ];
+                }};
+                "@home" = {{
+                  mountpoint = "/home";
+                  mountOptions = [ "compress=zstd:3" "noatime" ];
+                }};
+                "@nix" = {{
+                  mountpoint = "/nix";
+                  mountOptions = [ "compress=zstd:3" "noatime" ];
+                }};
+                "@log" = {{
+                  mountpoint = "/var/log";
+                  mountOptions = [ "compress=zstd:3" "noatime" ];
+                }};
+                "@snapshots" = {{
+                  mountpoint = "/.snapshots";
+                  mountOptions = [ "compress=zstd:3" "noatime" ];
+                }};
+                "@swap" = {{
+                  mountpoint = "/swap";
+                  mountOptions = [ "noatime" ];
+                }};
+              }};
             }};
           }};
         }};
@@ -529,17 +575,10 @@ pub fn generate_disko_config(hardware_json: &str) -> Result<String, JsError> {
     }};
   }};
 
-  # Swap
-  disko.devices.disk.main.content.partitions.swap = {{
-    size = "{swap_gb}G";
-    content = {{
-      type = "swap";
-      resumeDevice = true;
-    }};
-  }};
+  swapDevices = [{{ device = "/swap/swapfile"; size = {swap_mb}; }}];
 }}"#,
-        filesystem = nix_config.filesystem,
-        swap_gb = nix_config.swap_size_gb,
+        dual_disk_hint = dual_disk_hint,
+        swap_mb = nix_config.swap_size_gb as u32 * 1024,
     );
 
     Ok(disko)

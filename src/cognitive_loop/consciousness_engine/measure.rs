@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Core measurement method for the consciousness engine.
 
 use std::time::Instant;
@@ -280,6 +283,13 @@ impl ConsciousnessEngine {
                 let result = eq.compute(&state);
                 self.cache.last_equation_v2_consciousness = result.consciousness;
                 self.cache.last_limiting_component = Some(result.limiting_factor);
+                // Cache PAC modulation and binding for CTC wiring
+                #[cfg(feature = "ctc_wiring")]
+                {
+                    self.cache.last_pac_modulation = result.pac_modulation;
+                    self.cache.last_binding_coherence =
+                        *result.core_breakdown.get(&crate::consciousness::consciousness_equation_v2::CoreComponent::Binding).unwrap_or(&0.0);
+                }
                 result.consciousness
             } else {
                 self.cache.last_equation_v2_consciousness
@@ -354,6 +364,27 @@ impl ConsciousnessEngine {
                     - super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD)
                     * super::super::thresholds::PIPELINE_LR_SCALE;
             lr_factor *= pipeline_lr_scale as f32;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // LAYER 5: IIT 4.0 Concept Structure Analysis (Albantakis 2023)
+        // Co-prime interval 101 (~3x/sec at 31Hz). O(2^n) per mechanism,
+        // but n = active modal channels (typically 3-6), so fast enough.
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "iit4")]
+        if input.cycle % 101 == 0 {
+            if let Some(ref mmi) = self.multi_modal_integrator {
+                let components = mmi.component_hvs_for_iit4();
+                if components.len() >= 2 {
+                    let calc = symthaea_core::consciousness_metrics::IIT4Calculator::new();
+                    let result = calc.analyze(&components);
+                    // Feed IIT4 Big Phi into learning modulation
+                    // More integrated concept structure → sharper learning
+                    if result.big_phi > 0.0 {
+                        lr_factor *= 1.0 + (result.big_phi * 0.05) as f32;
+                    }
+                }
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════

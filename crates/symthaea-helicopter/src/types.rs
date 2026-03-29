@@ -115,7 +115,9 @@ impl HelicopterState {
     /// 1.0 = perfectly upright, 0.0 = horizontal, -1.0 = inverted.
     pub fn uprightness(&self) -> f64 {
         let [w, x, y, _z] = self.quaternion;
-        1.0 - 2.0 * (x * x + y * y) + 2.0 * w * w - 1.0 // Simplification; full rotation matrix z column
+        1.0 - 2.0 * (x * x + y * y)
+            + 2.0 * w * w
+            - 1.0 // Simplification; full rotation matrix z column
     }
 
     /// Euler angles (roll, pitch, yaw) from quaternion.
@@ -146,9 +148,9 @@ impl HelicopterState {
             quaternion: [1.0, 0.0, 0.0, 0.0],
             linear_velocity: [0.0; 3],
             angular_velocity: [0.0; 3],
-            main_rotor_rpm: 3500.0, // Typical hover RPM
+            main_rotor_rpm: 3500.0,  // Typical hover RPM
             tail_rotor_rpm: 2000.0,
-            collective_pitch: 0.15, // ~9 degrees for hover
+            collective_pitch: 0.15,  // ~9 degrees for hover
             cyclic_lon_feedback: 0.0,
             cyclic_lat_feedback: 0.0,
         }
@@ -478,9 +480,7 @@ mod tests {
     fn test_task_target_altitudes() {
         assert_eq!(HelicopterTask::Hover.target_altitude(), 20.0);
         assert_eq!(HelicopterTask::Autorotation.target_altitude(), 0.0);
-        assert!(
-            HelicopterTask::SearchGrid.target_altitude() > HelicopterTask::Hover.target_altitude()
-        );
+        assert!(HelicopterTask::SearchGrid.target_altitude() > HelicopterTask::Hover.target_altitude());
     }
 
     #[test]

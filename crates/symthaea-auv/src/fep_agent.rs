@@ -33,10 +33,7 @@ impl ActiveInferenceAuvAgent {
             action_temperature: 0.5,
             ..symthaea_fep::ActiveInferenceAgentConfig::default()
         };
-        Self {
-            agent: symthaea_fep::ActiveInferenceAgent::new(config),
-            in_blackout: false,
-        }
+        Self { agent: symthaea_fep::ActiveInferenceAgent::new(config), in_blackout: false }
     }
 
     /// Update blackout status (affects uncertainty).
@@ -47,12 +44,7 @@ impl ActiveInferenceAuvAgent {
     /// Cognitive tick: observe state, modulate controller.
     pub fn tick(&mut self, state: &AuvState, target_depth: f64) -> AuvFepResult {
         let depth_error = (state.depth - target_depth).abs();
-        let angular_speed = state
-            .angular_velocity
-            .iter()
-            .map(|w| w * w)
-            .sum::<f64>()
-            .sqrt();
+        let angular_speed = state.angular_velocity.iter().map(|w| w * w).sum::<f64>().sqrt();
         let speed = state.speed();
 
         let tau_factor = if depth_error > 10.0 || angular_speed > 1.0 {
@@ -71,9 +63,7 @@ impl ActiveInferenceAuvAgent {
             1.0
         };
 
-        let free_energy = depth_error
-            + angular_speed * 2.0
-            + speed * 0.5
+        let free_energy = depth_error + angular_speed * 2.0 + speed * 0.5
             + if self.in_blackout { 5.0 } else { 0.0 };
 
         AuvFepResult {
@@ -91,9 +81,7 @@ impl ActiveInferenceAuvAgent {
 }
 
 impl Default for ActiveInferenceAuvAgent {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]

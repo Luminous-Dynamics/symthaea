@@ -155,7 +155,8 @@ impl AdaptiveQualityEngine {
                 .max(1.0) as u8;
             self.current.target_fps = new_fps;
             // Increase surprise threshold to reduce bandwidth.
-            self.current.surprise_threshold = (self.current.surprise_threshold + 0.05).min(0.8);
+            self.current.surprise_threshold =
+                (self.current.surprise_threshold + 0.05).min(0.8);
         } else if rtt < RTT_GOOD_MS && frame_lag < 2 {
             // Additive increase (up to ceiling).
             let new_fps = self
@@ -170,7 +171,10 @@ impl AdaptiveQualityEngine {
 
         // Apply consciousness ceiling.
         self.current.target_fps = self.current.target_fps.min(ceiling.max_fps);
-        self.current.surprise_threshold = self.current.surprise_threshold.max(ceiling.min_surprise);
+        self.current.surprise_threshold = self
+            .current
+            .surprise_threshold
+            .max(ceiling.min_surprise);
         self.current.enable_sideband = ceiling.sideband;
 
         &self.current

@@ -58,7 +58,11 @@ pub fn generate(
 
         let rose = SceneNode::path(rose_data).with_style(Style {
             fill: None,
-            stroke: Some(Color::from_hsl(300.0 + snapshot.valence * 60.0, 0.7, 0.5)),
+            stroke: Some(Color::from_hsl(
+                300.0 + snapshot.valence * 60.0,
+                0.7,
+                0.5,
+            )),
             stroke_width: Some(0.8),
             opacity: Some(0.5),
             ..Style::default()
@@ -114,11 +118,7 @@ fn lissajous_path(
         let p0 = if i > 0 { points[i - 1] } else { points[i] };
         let p1 = points[i];
         let p2 = points[i + 1];
-        let p3 = if i + 2 < points.len() {
-            points[i + 2]
-        } else {
-            points[i + 1]
-        };
+        let p3 = if i + 2 < points.len() { points[i + 2] } else { points[i + 1] };
 
         // Catmull-Rom to cubic Bezier control points
         let tension = 6.0;
@@ -165,11 +165,7 @@ mod tests {
         let path = lissajous_path(256.0, 256.0, 3.0, 2.0, 0.5, 100.0, 50);
         assert!(path.starts_with("M "));
         // Now uses cubic Bezier (C) instead of straight lines (L)
-        assert!(
-            path.contains(" C "),
-            "should contain Bezier curves: {}",
-            &path[..80.min(path.len())]
-        );
+        assert!(path.contains(" C "), "should contain Bezier curves: {}", &path[..80.min(path.len())]);
     }
 
     #[test]

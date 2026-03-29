@@ -180,7 +180,9 @@ pub const MYCELIX_BOOTSTRAP_NODES_PRIMARY: &[&str] = &[
 ];
 
 /// Fallback bootstrap nodes operated by community partners.
-pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &["iroh://bootstrap.mycelix.community:4433"];
+pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &[
+    "iroh://bootstrap.mycelix.community:4433",
+];
 
 /// Combined bootstrap nodes (primary + fallback) for backward compatibility.
 pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
@@ -195,12 +197,14 @@ pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
 /// replace the compiled-in defaults. This enables runtime configuration
 /// without recompilation.
 fn bootstrap_nodes_from_env() -> Option<Vec<String>> {
-    std::env::var("MYCELIX_BOOTSTRAP_NODES").ok().map(|val| {
-        val.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
-    })
+    std::env::var("MYCELIX_BOOTSTRAP_NODES")
+        .ok()
+        .map(|val| {
+            val.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
 }
 
 /// Bootstrap node configuration for different environments
@@ -375,10 +379,7 @@ mod tests {
     #[test]
     fn test_bootstrap_config_has_primary_and_fallback() {
         let config = BootstrapConfig::default();
-        assert!(
-            !config.primary.is_empty(),
-            "Default must have primary nodes"
-        );
+        assert!(!config.primary.is_empty(), "Default must have primary nodes");
         assert!(
             !config.fallback.is_empty(),
             "Default must have fallback nodes"

@@ -13,7 +13,7 @@
 //! - BPTT gradient accumulation across sequence
 
 #[cfg(feature = "gpu")]
-use candle_core::{DType, Device, Result as CandleResult, Tensor};
+use candle_core::{Device, Tensor, DType, Result as CandleResult};
 
 /// Select the best available device (CUDA if available, else CPU).
 #[cfg(feature = "gpu")]
@@ -74,7 +74,7 @@ impl GpuLtcTrainer {
 
         // Copy LTC weights to tensors
         let w_in_data: Vec<f32> = ltc.state().iter().copied().collect(); // placeholder
-                                                                         // We need actual weight access — use the accessor methods
+        // We need actual weight access — use the accessor methods
         let w_in = Tensor::zeros((h, input_size), DType::F32, &device)?;
         let w_rec = Tensor::zeros((h, h), DType::F32, &device)?;
         let bias = Tensor::zeros(h, DType::F32, &device)?;
@@ -108,25 +108,19 @@ impl GpuLtcTrainer {
     /// Returns average loss.
     pub fn train_batch(
         &mut self,
-        mel_batch: &[Vec<Vec<f32>>], // [batch][frames][mel_dim]
-        label_batch: &[Vec<String>], // [batch][frames]
+        mel_batch: &[Vec<Vec<f32>>],   // [batch][frames][mel_dim]
+        label_batch: &[Vec<String>],     // [batch][frames]
     ) -> CandleResult<f32> {
         let mut total_loss = 0.0f32;
         let mut total_frames = 0usize;
 
         for (mel_frames, labels) in mel_batch.iter().zip(label_batch) {
             let n = mel_frames.len().min(labels.len());
-            if n == 0 {
-                continue;
-            }
+            if n == 0 { continue; }
 
             // Convert mel frames to tensor [n, mel_dim]
             let mel_dim = mel_frames[0].len();
-            let mel_flat: Vec<f32> = mel_frames
-                .iter()
-                .take(n)
-                .flat_map(|f| f.iter().copied())
-                .collect();
+            let mel_flat: Vec<f32> = mel_frames.iter().take(n).flat_map(|f| f.iter().copied()).collect();
             let mel_tensor = Tensor::from_vec(mel_flat, (n, mel_dim), &self.device)?;
 
             // Forward pass: batched LTC
@@ -147,9 +141,7 @@ impl GpuLtcTrainer {
                 // decay = exp(-dt / tau)
                 let neg_dt_over_tau = (self.tau.affine(-1.0 / dt as f64, 0.0))?;
                 // Actually: exp(-dt/tau) — need element-wise
-                let decay_vec: Vec<f32> = self
-                    .tau
-                    .to_vec1::<f32>()?
+                let decay_vec: Vec<f32> = self.tau.to_vec1::<f32>()?
                     .iter()
                     .map(|&t| (-dt / t.max(0.001)).exp())
                     .collect();
@@ -168,9 +160,7 @@ impl GpuLtcTrainer {
                 let log_probs = candle_core::ops::log_softmax(&logits_scaled, 0)?;
 
                 // Find label index
-                let label_idx = self
-                    .phoneme_labels
-                    .iter()
+                let label_idx = self.phoneme_labels.iter()
                     .position(|l| l == &labels[t])
                     .unwrap_or(0);
 
@@ -211,17 +201,14 @@ impl GpuLtcTrainer {
             let dt = 0.010f32;
 
             for t in 0..n {
-                let input =
-                    Tensor::from_vec(mel_frames[t].clone(), mel_frames[t].len(), &self.device)?;
+                let input = Tensor::from_vec(mel_frames[t].clone(), mel_frames[t].len(), &self.device)?;
 
                 let in_contrib = self.w_in.matmul(&input.unsqueeze(1)?)?.squeeze(1)?;
                 let rec_contrib = self.w_rec.matmul(&state.unsqueeze(1)?)?.squeeze(1)?;
                 let pre = ((&in_contrib + &rec_contrib)? + &self.bias)?;
                 let activation = pre.tanh()?;
 
-                let decay_vec: Vec<f32> = self
-                    .tau
-                    .to_vec1::<f32>()?
+                let decay_vec: Vec<f32> = self.tau.to_vec1::<f32>()?
                     .iter()
                     .map(|&t| (-dt / t.max(0.001)).exp())
                     .collect();
@@ -256,9 +243,6 @@ impl GpuLtcTrainer {
         _mel_batch: &[Vec<Vec<f32>>],
         _label_batch: &[Vec<String>],
     ) -> Result<f32, String> {
-        Err(
-            "GPU feature not enabled. Use --features gpu or fall back to CPU ltc_training."
-                .to_string(),
-        )
+        Err("GPU feature not enabled. Use --features gpu or fall back to CPU ltc_training.".to_string())
     }
 }

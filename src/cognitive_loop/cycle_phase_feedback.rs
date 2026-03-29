@@ -351,8 +351,7 @@ impl CognitiveLoopService {
             let rate_mod = 1.0 - empathic_tone_adj as f32 * EMPATHIC_TONE_RATE_SCALE;
             self.behavior.adaptive_behavior.speech_rate_multiplier *= rate_mod;
             self.behavior.adaptive_behavior.speech_rate_multiplier = self
-                .behavior
-                .adaptive_behavior
+                .behavior.adaptive_behavior
                 .speech_rate_multiplier
                 .clamp(SPEECH_RATE_CLAMP_MIN, SPEECH_RATE_CLAMP_MAX);
             empathic_tone_adj as f32
@@ -367,8 +366,7 @@ impl CognitiveLoopService {
             match consciousness_limiting_component.as_str() {
                 "Attention" => {
                     self.behavior.adaptive_behavior.attention_sensitivity =
-                        (self.behavior.adaptive_behavior.attention_sensitivity
-                            * EFFICACY_ATTENTION_BOOST)
+                        (self.behavior.adaptive_behavior.attention_sensitivity * EFFICACY_ATTENTION_BOOST)
                             .min(NEUROMOD_ATTENTION_SENSITIVITY_MAX);
                     self.stats.limiting_component_boost_count += 1;
                     "Attention"
@@ -628,11 +626,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
         // ═══════════════════════════════════════════════════════════════════════
-        let reflection_thresholds = self
-            .consciousness
-            .self_model_tier
-            .self_reflection
-            .get_thresholds();
+        let reflection_thresholds = self.consciousness.self_model_tier.self_reflection.get_thresholds();
         let ResonatorCodebookResult {
             resonator_promotions,
             codebook_evictions,
@@ -907,13 +901,40 @@ impl CognitiveLoopService {
                 // Basis: Kruger & Dunning (1999) — miscalibrated self-assessment.
                 hot_depth: {
                     let raw_hot = self
-                        .consciousness
-                        .self_model_tier
+                        .consciousness.self_model_tier
                         .meta_cognition
                         .as_ref()
                         .map(|mc| {
-                            let normalized_depth = mc.depth() as f64 / 3.0;
-                            normalized_depth * self.substrate_manager.hot_capability(&self.config)
+                            // ── Continuous HOT depth (Brown, Lau & LeDoux 2019) ──
+                            // When `continuous_hot` is enabled, blend discrete recursion
+                            // depth with meta-cognitive accuracy for sub-level resolution,
+                            // and enrich with narrative self-Φ (self-integration deepens
+                            // recursive awareness) and attention schema focus (Graziano 2019:
+                            // consciousness IS the model of attention).
+                            #[cfg(feature = "continuous_hot")]
+                            {
+                                let discrete = mc.depth() as f64 / 3.0;
+                                let accuracy = mc.accuracy() as f64;
+
+                                // Blend: 60% discrete depth + 20% meta-cognitive accuracy
+                                let mut continuous = discrete * 0.6 + accuracy * 0.2;
+
+                                // Self-Phi enrichment: narrative integration deepens recursion
+                                let self_phi = narrative_self_psi; // from late_result
+                                continuous += 0.1 * self_phi.clamp(0.0, 1.0);
+
+                                // Attention schema: focus intensity as HOT modulator
+                                continuous += 0.1 * (attention_schema_focus as f64).clamp(0.0, 1.0);
+
+                                // Scale by substrate HOT capability
+                                continuous.clamp(0.0, 1.0) * self.substrate_manager.hot_capability(&self.config)
+                            }
+
+                            #[cfg(not(feature = "continuous_hot"))]
+                            {
+                                let normalized_depth = mc.depth() as f64 / 3.0;
+                                normalized_depth * self.substrate_manager.hot_capability(&self.config)
+                            }
                         })
                         .unwrap_or(HOT_DEPTH_DEFAULT); // preserve backward compat when disabled
                                                        // Hubris attenuates HOT: can't claim deep self-knowledge while
@@ -1008,8 +1029,7 @@ impl CognitiveLoopService {
                     .phi_contribution(),
             },
         );
-        self.consciousness
-            .consciousness_engine
+        self.consciousness.consciousness_engine
             .update_cache(&mut self.carryover.consciousness);
         if consciousness_output.confidence_delta != 0.0 {
             self.adjust_confidence(
@@ -1319,10 +1339,9 @@ impl CognitiveLoopService {
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
         if self.behavior.social_mgr.recent_ai_hvs.len() >= 2 {
-            if let (Some(ref dyad), Some(ref model)) = (
-                &self.behavior.social_mgr.phi_dyad,
-                &self.behavior.social_mgr.partner_model,
-            ) {
+            if let (Some(ref dyad), Some(ref model)) =
+                (&self.behavior.social_mgr.phi_dyad, &self.behavior.social_mgr.partner_model)
+            {
                 use symthaea_core::hdc::relational_consciousness::{
                     RelationMode, RelationalAssessment,
                 };

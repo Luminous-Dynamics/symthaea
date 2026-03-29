@@ -258,10 +258,7 @@ impl X11ShmCapture {
         let n = width as usize * height as usize * 4;
         tracing::info!(
             "X11 SHM capture: {}x{} depth={} root=0x{:x}",
-            width,
-            height,
-            depth,
-            root
+            width, height, depth, root
         );
 
         Ok(Self {
@@ -375,11 +372,7 @@ impl ScreenCapture for X11ShmCapture {
     }
 
     fn backend_name(&self) -> &str {
-        if cfg!(feature = "rdp-x11") {
-            "x11-real"
-        } else {
-            "x11-stub"
-        }
+        if cfg!(feature = "rdp-x11") { "x11-real" } else { "x11-stub" }
     }
 
     #[cfg(feature = "rdp-x11")]
@@ -514,11 +507,7 @@ pub fn auto_detect_capture() -> Box<dyn ScreenCapture> {
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
         match WaylandCapture::new() {
             Ok(cap) => {
-                tracing::info!(
-                    "Screen capture: Wayland PipeWire ({}x{})",
-                    cap.width(),
-                    cap.height()
-                );
+                tracing::info!("Screen capture: Wayland PipeWire ({}x{})", cap.width(), cap.height());
                 return Box::new(cap);
             }
             Err(e) => {
@@ -571,7 +560,8 @@ mod tests {
         // Active region should differ.
         let active_offset = (100 * 256 + 100) * 4; // Inside active region
         assert_ne!(
-            f1.pixels[active_offset], f2.pixels[active_offset],
+            f1.pixels[active_offset],
+            f2.pixels[active_offset],
             "Active region should change between frames"
         );
     }

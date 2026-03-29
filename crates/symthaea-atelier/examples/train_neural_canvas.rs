@@ -25,48 +25,32 @@ fn main() {
 
     let training_snapshots = vec![
         CognitiveSnapshot {
-            consciousness_level: 0.85,
-            valence: 0.6,
-            arousal: 0.3,
-            dopamine: 0.5,
-            serotonin: 0.8,
-            noradrenaline: 0.2,
+            consciousness_level: 0.85, valence: 0.6, arousal: 0.3,
+            dopamine: 0.5, serotonin: 0.8, noradrenaline: 0.2,
             harmony_activations: [0.7, 0.8, 0.6, 0.3, 0.7, 0.6, 0.5, 0.8],
             prediction_error: 0.05,
             thought_vector: vec![0.3, -0.1],
             ..CognitiveSnapshot::dormant()
         },
         CognitiveSnapshot {
-            consciousness_level: 0.6,
-            valence: -0.6,
-            arousal: 0.9,
-            dopamine: 0.3,
-            serotonin: 0.2,
-            noradrenaline: 0.9,
+            consciousness_level: 0.6, valence: -0.6, arousal: 0.9,
+            dopamine: 0.3, serotonin: 0.2, noradrenaline: 0.9,
             harmony_activations: [0.3, 0.2, 0.4, 0.9, 0.5, 0.2, 0.8, 0.1],
             prediction_error: 0.7,
             thought_vector: vec![0.8, -0.7],
             ..CognitiveSnapshot::dormant()
         },
         CognitiveSnapshot {
-            consciousness_level: 0.75,
-            valence: 0.4,
-            arousal: 0.7,
-            dopamine: 0.8,
-            serotonin: 0.5,
-            noradrenaline: 0.5,
+            consciousness_level: 0.75, valence: 0.4, arousal: 0.7,
+            dopamine: 0.8, serotonin: 0.5, noradrenaline: 0.5,
             harmony_activations: [0.4, 0.5, 0.3, 0.95, 0.6, 0.4, 0.7, 0.1],
             prediction_error: 0.3,
             thought_vector: vec![0.5, 0.3],
             ..CognitiveSnapshot::dormant()
         },
         CognitiveSnapshot {
-            consciousness_level: 0.9,
-            valence: 0.2,
-            arousal: 0.15,
-            dopamine: 0.4,
-            serotonin: 0.7,
-            noradrenaline: 0.1,
+            consciousness_level: 0.9, valence: 0.2, arousal: 0.15,
+            dopamine: 0.4, serotonin: 0.7, noradrenaline: 0.1,
             harmony_activations: [0.8, 0.6, 0.9, 0.2, 0.5, 0.7, 0.4, 0.95],
             prediction_error: 0.02,
             thought_vector: vec![0.1, 0.0],
@@ -81,20 +65,15 @@ fn main() {
         epochs: 15,
     };
 
-    println!(
-        "  Training on {} cognitive states, {} epochs, population {}\n",
-        training_snapshots.len(),
-        config.epochs,
-        config.population_size
-    );
+    println!("  Training on {} cognitive states, {} epochs, population {}\n",
+        training_snapshots.len(), config.epochs, config.population_size);
 
     let result = train_projections(&mut canvas, &config, &atelier_config, &training_snapshots);
 
     println!("  ━━━ Training Results ━━━\n");
     println!("  Initial score:     {:.4}", result.initial_score);
     println!("  Final score:       {:.4}", result.final_score);
-    let improvement =
-        (result.final_score - result.initial_score) / result.initial_score.max(0.001) * 100.0;
+    let improvement = (result.final_score - result.initial_score) / result.initial_score.max(0.001) * 100.0;
     println!("  Improvement:       {:+.1}%", improvement);
     println!("  Total evaluations: {}", result.total_evaluations);
     println!();

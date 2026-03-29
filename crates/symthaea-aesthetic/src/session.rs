@@ -51,63 +51,14 @@ const HARMONY_NAMES: [&str; 8] = [
 
 /// Thematic word pools for each harmony.
 const HARMONY_THEMES: [&[&str]; 8] = [
-    &[
-        "unity",
-        "wholeness",
-        "integration",
-        "harmony",
-        "resonance",
-        "center",
-    ],
-    &[
-        "bloom",
-        "nurture",
-        "care",
-        "warmth",
-        "flourishing",
-        "tenderness",
-    ],
-    &[
-        "clarity",
-        "knowledge",
-        "truth",
-        "insight",
-        "depth",
-        "understanding",
-    ],
-    &[
-        "dance",
-        "surprise",
-        "wonder",
-        "play",
-        "delight",
-        "spontaneous",
-    ],
+    &["unity", "wholeness", "integration", "harmony", "resonance", "center"],
+    &["bloom", "nurture", "care", "warmth", "flourishing", "tenderness"],
+    &["clarity", "knowledge", "truth", "insight", "depth", "understanding"],
+    &["dance", "surprise", "wonder", "play", "delight", "spontaneous"],
     &["weave", "together", "thread", "bridge", "bond", "communion"],
-    &[
-        "gift",
-        "return",
-        "balance",
-        "exchange",
-        "gratitude",
-        "offering",
-    ],
-    &[
-        "ascend",
-        "unfold",
-        "emerge",
-        "transform",
-        "grow",
-        "becoming",
-    ],
-    &[
-        "silence",
-        "breath",
-        "stillness",
-        "rest",
-        "emptiness",
-        "peace",
-    ],
+    &["gift", "return", "balance", "exchange", "gratitude", "offering"],
+    &["ascend", "unfold", "emerge", "transform", "grow", "becoming"],
+    &["silence", "breath", "stillness", "rest", "emptiness", "peace"],
 ];
 
 /// Derive a creative session from harmony activations and affect.
@@ -134,11 +85,7 @@ pub fn derive_session(
 
     // Color palette from neuromodulators (consistent with canvas palette)
     let palette = [
-        (
-            45.0 + dominant as f32 * 20.0,
-            0.7 + dopamine * 0.2,
-            0.4 + consciousness_level * 0.2,
-        ),
+        (45.0 + dominant as f32 * 20.0, 0.7 + dopamine * 0.2, 0.4 + consciousness_level * 0.2),
         (25.0 + serotonin * 15.0, 0.6, 0.5),
         (200.0 + noradrenaline * 40.0, 0.5 + noradrenaline * 0.3, 0.5),
         (300.0 - arousal * 40.0, 0.3, 0.6),
@@ -153,8 +100,8 @@ pub fn derive_session(
     let major_mode = valence >= -0.2;
 
     // Tempo from arousal + NE
-    let tempo =
-        (60.0 + arousal * 80.0 + noradrenaline * 40.0) * (1.0 - harmony_activations[7] * 0.3); // stillness slows
+    let tempo = (60.0 + arousal * 80.0 + noradrenaline * 40.0)
+        * (1.0 - harmony_activations[7] * 0.3); // stillness slows
 
     // Thematic vocabulary from top 3 harmonies
     let mut pairs: Vec<(usize, f32)> = harmony_activations
@@ -174,9 +121,7 @@ pub fn derive_session(
     // Energy, warmth, complexity
     let energy = (arousal * 0.6 + dopamine * 0.3 + noradrenaline * 0.1).clamp(0.0, 1.0);
     let warmth = ((valence + 1.0) / 2.0 * 0.6 + serotonin * 0.4).clamp(0.0, 1.0);
-    let complexity = (consciousness_level * 0.5
-        + harmony_activations.iter().filter(|&&v| v > 0.3).count() as f32 / 8.0 * 0.5)
-        .clamp(0.0, 1.0);
+    let complexity = (consciousness_level * 0.5 + harmony_activations.iter().filter(|&&v| v > 0.3).count() as f32 / 8.0 * 0.5).clamp(0.0, 1.0);
 
     CreativeSession {
         palette,
@@ -225,21 +170,11 @@ mod tests {
     fn stillness_slower_tempo() {
         let active = derive_session(
             &[0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0],
-            0.0,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
+            0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
         );
         let still = derive_session(
             &[0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0],
-            0.0,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
-            0.5,
+            0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
         );
         assert!(still.tempo_bpm < active.tempo_bpm);
     }
@@ -249,14 +184,8 @@ mod tests {
         let harmonies = [0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8];
         let session = derive_session(&harmonies, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5);
         // Should have InfinitePlay + SacredStillness themes
-        assert!(session
-            .thematic_vocabulary
-            .iter()
-            .any(|t| t == "dance" || t == "wonder"));
-        assert!(session
-            .thematic_vocabulary
-            .iter()
-            .any(|t| t == "silence" || t == "breath"));
+        assert!(session.thematic_vocabulary.iter().any(|t| t == "dance" || t == "wonder"));
+        assert!(session.thematic_vocabulary.iter().any(|t| t == "silence" || t == "breath"));
     }
 
     #[test]

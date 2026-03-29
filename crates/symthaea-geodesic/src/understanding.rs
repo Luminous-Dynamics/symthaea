@@ -63,11 +63,7 @@ pub enum Adaptation {
     /// Change comparison operator ("maximum" → "minimum" = GT→LT)
     ChangeOperator { from: String, to: String },
     /// Change accumulation operation ("sum" → "product" = ADD→MUL)
-    ChangeAccumulator {
-        from: String,
-        to: String,
-        new_identity: String,
-    },
+    ChangeAccumulator { from: String, to: String, new_identity: String },
     /// Add early return ("find first" → add return in branch)
     AddEarlyReturn,
     /// Wrap in recursion ("iterative" → "recursive")
@@ -92,20 +88,14 @@ pub enum UnderstandingResult {
 impl UnderstandingResult {
     pub fn program(&self) -> Option<&ProgramNode> {
         match self {
-            Self::Known(p, _)
-            | Self::Adapted(p, _, _)
-            | Self::Composed(p, _)
-            | Self::BestGuess(p, _) => Some(p),
+            Self::Known(p, _) | Self::Adapted(p, _, _) | Self::Composed(p, _) | Self::BestGuess(p, _) => Some(p),
             Self::Unknown => None,
         }
     }
 
     pub fn score(&self) -> f32 {
         match self {
-            Self::Known(_, s)
-            | Self::Adapted(_, s, _)
-            | Self::Composed(_, s)
-            | Self::BestGuess(_, s) => *s,
+            Self::Known(_, s) | Self::Adapted(_, s, _) | Self::Composed(_, s) | Self::BestGuess(_, s) => *s,
             Self::Unknown => 0.0,
         }
     }
@@ -118,8 +108,7 @@ impl UnderstandingResult {
 /// Encode a natural language spec as a BinaryHV.
 /// Uses word-level encoding: each word gets a position-permuted HV, bundled together.
 fn encode_spec(spec: &str) -> BinaryHV {
-    let words: Vec<&str> = spec
-        .split_whitespace()
+    let words: Vec<&str> = spec.split_whitespace()
         .filter(|w| w.len() > 2) // skip small words
         .collect();
 
@@ -127,13 +116,9 @@ fn encode_spec(spec: &str) -> BinaryHV {
         return BinaryHV::random(0xDEAD_59EC_0000_0001);
     }
 
-    let word_hvs: Vec<BinaryHV> = words
-        .iter()
-        .enumerate()
+    let word_hvs: Vec<BinaryHV> = words.iter().enumerate()
         .map(|(i, word)| {
-            let seed = word
-                .bytes()
-                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let seed = word.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
             BinaryHV::random(seed).permute(i)
         })
         .collect();
@@ -205,221 +190,120 @@ impl UnderstandingEngine {
     /// Seed with basic programming knowledge (~30 pairs).
     pub fn seed_basic_knowledge(&mut self) {
         // ── Arithmetic ──
-        self.learn(
-            "add two numbers",
-            &ProgramNode::apply(
-                ProgramNode::op("ADD"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
-        );
-        self.learn(
-            "subtract two numbers",
-            &ProgramNode::apply(
-                ProgramNode::op("SUB"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
-        );
-        self.learn(
-            "multiply two numbers",
-            &ProgramNode::apply(
-                ProgramNode::op("MUL"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
-        );
-        self.learn(
-            "divide two numbers",
-            &ProgramNode::apply(
-                ProgramNode::op("DIV"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
-        );
-        self.learn(
-            "check equality",
-            &ProgramNode::apply(
-                ProgramNode::op("EQ"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
-        );
-        self.learn(
-            "compare less than",
-            &ProgramNode::apply(
-                ProgramNode::op("LT"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
-        );
+        self.learn("add two numbers", &ProgramNode::apply(
+            ProgramNode::op("ADD"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]));
+        self.learn("subtract two numbers", &ProgramNode::apply(
+            ProgramNode::op("SUB"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]));
+        self.learn("multiply two numbers", &ProgramNode::apply(
+            ProgramNode::op("MUL"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]));
+        self.learn("divide two numbers", &ProgramNode::apply(
+            ProgramNode::op("DIV"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]));
+        self.learn("check equality", &ProgramNode::apply(
+            ProgramNode::op("EQ"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]));
+        self.learn("compare less than", &ProgramNode::apply(
+            ProgramNode::op("LT"), vec![ProgramNode::atom("a"), ProgramNode::atom("b")]));
 
         // ── Searching ──
-        self.learn(
-            "find maximum in array",
-            &ProgramNode::Sequence(vec![
-                ProgramNode::atom("max = arr[0]"),
-                ProgramNode::iterate(
-                    ProgramNode::atom("i = 1"),
-                    ProgramNode::branch(
-                        ProgramNode::apply(
-                            ProgramNode::op("GT"),
-                            vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max")],
-                        ),
-                        ProgramNode::atom("max = arr[i]"),
-                        ProgramNode::atom("skip"),
-                    ),
-                    ProgramNode::apply(
-                        ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
-                    ),
+        self.learn("find maximum in array", &ProgramNode::Sequence(vec![
+            ProgramNode::atom("max = arr[0]"),
+            ProgramNode::iterate(
+                ProgramNode::atom("i = 1"),
+                ProgramNode::branch(
+                    ProgramNode::apply(ProgramNode::op("GT"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("max")]),
+                    ProgramNode::atom("max = arr[i]"),
+                    ProgramNode::atom("skip"),
                 ),
-                ProgramNode::atom("max"),
-            ]),
-        );
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ),
+            ProgramNode::atom("max"),
+        ]));
 
-        self.learn(
-            "find minimum in array",
-            &ProgramNode::Sequence(vec![
-                ProgramNode::atom("min = arr[0]"),
-                ProgramNode::iterate(
-                    ProgramNode::atom("i = 1"),
-                    ProgramNode::branch(
-                        ProgramNode::apply(
-                            ProgramNode::op("LT"),
-                            vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("min")],
-                        ),
-                        ProgramNode::atom("min = arr[i]"),
-                        ProgramNode::atom("skip"),
-                    ),
-                    ProgramNode::apply(
-                        ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
-                    ),
+        self.learn("find minimum in array", &ProgramNode::Sequence(vec![
+            ProgramNode::atom("min = arr[0]"),
+            ProgramNode::iterate(
+                ProgramNode::atom("i = 1"),
+                ProgramNode::branch(
+                    ProgramNode::apply(ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("min")]),
+                    ProgramNode::atom("min = arr[i]"),
+                    ProgramNode::atom("skip"),
                 ),
-                ProgramNode::atom("min"),
-            ]),
-        );
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ),
+            ProgramNode::atom("min"),
+        ]));
 
-        self.learn(
-            "find element in array",
-            &ProgramNode::Sequence(vec![
-                ProgramNode::iterate(
-                    ProgramNode::atom("i = 0"),
-                    ProgramNode::branch(
-                        ProgramNode::apply(
-                            ProgramNode::op("EQ"),
-                            vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("target")],
-                        ),
-                        ProgramNode::atom("return true"),
-                        ProgramNode::atom("i += 1"),
-                    ),
-                    ProgramNode::apply(
-                        ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
-                    ),
+        self.learn("find element in array", &ProgramNode::Sequence(vec![
+            ProgramNode::iterate(
+                ProgramNode::atom("i = 0"),
+                ProgramNode::branch(
+                    ProgramNode::apply(ProgramNode::op("EQ"),
+                        vec![ProgramNode::atom("arr[i]"), ProgramNode::atom("target")]),
+                    ProgramNode::atom("return true"),
+                    ProgramNode::atom("i += 1"),
                 ),
-                ProgramNode::atom("false"),
-            ]),
-        );
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
+            ),
+            ProgramNode::atom("false"),
+        ]));
 
         // ── Accumulation ──
-        self.learn(
-            "sum of array",
-            &ProgramNode::reduce(
-                ProgramNode::op("ADD"),
-                ProgramNode::typed("0", "INT"),
-                ProgramNode::atom("arr"),
+        self.learn("sum of array", &ProgramNode::reduce(
+            ProgramNode::op("ADD"), ProgramNode::typed("0", "INT"), ProgramNode::atom("arr")));
+        self.learn("product of array", &ProgramNode::reduce(
+            ProgramNode::op("MUL"), ProgramNode::typed("1", "INT"), ProgramNode::atom("arr")));
+        self.learn("count elements in array", &ProgramNode::Sequence(vec![
+            ProgramNode::atom("count = 0"),
+            ProgramNode::iterate(
+                ProgramNode::atom("i = 0"),
+                ProgramNode::atom("count += 1"),
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("i"), ProgramNode::atom("len")]),
             ),
-        );
-        self.learn(
-            "product of array",
-            &ProgramNode::reduce(
-                ProgramNode::op("MUL"),
-                ProgramNode::typed("1", "INT"),
-                ProgramNode::atom("arr"),
-            ),
-        );
-        self.learn(
-            "count elements in array",
-            &ProgramNode::Sequence(vec![
-                ProgramNode::atom("count = 0"),
-                ProgramNode::iterate(
-                    ProgramNode::atom("i = 0"),
-                    ProgramNode::atom("count += 1"),
-                    ProgramNode::apply(
-                        ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("i"), ProgramNode::atom("len")],
-                    ),
-                ),
-                ProgramNode::atom("count"),
-            ]),
-        );
+            ProgramNode::atom("count"),
+        ]));
 
         // ── Transformation ──
-        self.learn(
-            "transform each element",
-            &ProgramNode::map(ProgramNode::atom("transform"), ProgramNode::atom("items")),
-        );
-        self.learn(
-            "filter elements matching condition",
-            &ProgramNode::filter(ProgramNode::atom("predicate"), ProgramNode::atom("items")),
-        );
+        self.learn("transform each element", &ProgramNode::map(
+            ProgramNode::atom("transform"), ProgramNode::atom("items")));
+        self.learn("filter elements matching condition", &ProgramNode::filter(
+            ProgramNode::atom("predicate"), ProgramNode::atom("items")));
 
         // ── Recursion ──
-        self.learn(
-            "factorial of number",
-            &ProgramNode::recurse(
-                ProgramNode::branch(
-                    ProgramNode::apply(
-                        ProgramNode::op("EQ"),
-                        vec![ProgramNode::atom("n"), ProgramNode::typed("0", "INT")],
-                    ),
-                    ProgramNode::typed("1", "INT"),
-                    ProgramNode::apply(
-                        ProgramNode::op("MUL"),
-                        vec![
-                            ProgramNode::atom("n"),
-                            ProgramNode::apply(
-                                ProgramNode::atom("factorial"),
-                                vec![ProgramNode::apply(
-                                    ProgramNode::op("SUB"),
-                                    vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")],
-                                )],
-                            ),
-                        ],
-                    ),
-                ),
-                ProgramNode::atom("factorial"),
-            ),
-        );
-
-        self.learn(
-            "fibonacci number",
-            &ProgramNode::recurse(
-                ProgramNode::branch(
-                    ProgramNode::apply(
-                        ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
-                    ),
+        self.learn("factorial of number", &ProgramNode::recurse(
+            ProgramNode::branch(
+                ProgramNode::apply(ProgramNode::op("EQ"),
+                    vec![ProgramNode::atom("n"), ProgramNode::typed("0", "INT")]),
+                ProgramNode::typed("1", "INT"),
+                ProgramNode::apply(ProgramNode::op("MUL"), vec![
                     ProgramNode::atom("n"),
-                    ProgramNode::apply(
-                        ProgramNode::op("ADD"),
-                        vec![
-                            ProgramNode::apply(
-                                ProgramNode::atom("fib"),
-                                vec![ProgramNode::apply(
-                                    ProgramNode::op("SUB"),
-                                    vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")],
-                                )],
-                            ),
-                            ProgramNode::apply(
-                                ProgramNode::atom("fib"),
-                                vec![ProgramNode::apply(
-                                    ProgramNode::op("SUB"),
-                                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
-                                )],
-                            ),
-                        ],
-                    ),
-                ),
-                ProgramNode::atom("fib"),
+                    ProgramNode::apply(ProgramNode::atom("factorial"),
+                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
+                            vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")])])]),
             ),
-        );
+            ProgramNode::atom("factorial"),
+        ));
+
+        self.learn("fibonacci number", &ProgramNode::recurse(
+            ProgramNode::branch(
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")]),
+                ProgramNode::atom("n"),
+                ProgramNode::apply(ProgramNode::op("ADD"), vec![
+                    ProgramNode::apply(ProgramNode::atom("fib"),
+                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
+                            vec![ProgramNode::atom("n"), ProgramNode::typed("1", "INT")])]),
+                    ProgramNode::apply(ProgramNode::atom("fib"),
+                        vec![ProgramNode::apply(ProgramNode::op("SUB"),
+                            vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")])]),
+                ]),
+            ),
+            ProgramNode::atom("fib"),
+        ));
 
         // Auto-abstract after seeding
         self.auto_abstract();
@@ -436,9 +320,7 @@ impl UnderstandingEngine {
         let spec_hv = encode_spec(spec);
 
         // Find nearest pairs by spec similarity
-        let mut matches: Vec<(&SpecStructurePair, f32)> = self
-            .pairs
-            .iter()
+        let mut matches: Vec<(&SpecStructurePair, f32)> = self.pairs.iter()
             .chain(self.patterns.iter())
             .map(|p| (p, p.spec_hv.similarity(&spec_hv)))
             .collect();
@@ -476,13 +358,11 @@ impl UnderstandingEngine {
     fn compute_adaptations(&self, base_spec: &str, target_spec: &str) -> Vec<Adaptation> {
         let mut adaptations = Vec::new();
 
-        let base_words: HashSet<&str> = base_spec
-            .split_whitespace()
+        let base_words: HashSet<&str> = base_spec.split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
             .filter(|w| w.len() > 1)
             .collect();
-        let target_words: HashSet<&str> = target_spec
-            .split_whitespace()
+        let target_words: HashSet<&str> = target_spec.split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
             .filter(|w| w.len() > 1)
             .collect();
@@ -568,15 +448,11 @@ impl UnderstandingEngine {
         let mut used = vec![false; self.pairs.len()];
 
         for i in 0..self.pairs.len() {
-            if used[i] {
-                continue;
-            }
+            if used[i] { continue; }
 
             let mut cluster = vec![i];
             for j in (i + 1)..self.pairs.len() {
-                if used[j] {
-                    continue;
-                }
+                if used[j] { continue; }
                 let shared = keyword_overlap(&self.pairs[i].keywords, &self.pairs[j].keywords);
                 if shared > 0.3 {
                     cluster.push(j);
@@ -586,8 +462,7 @@ impl UnderstandingEngine {
 
             if cluster.len() >= 2 {
                 // Extract common structure
-                let programs: Vec<ProgramNode> = cluster
-                    .iter()
+                let programs: Vec<ProgramNode> = cluster.iter()
                     .map(|&idx| self.pairs[idx].program.clone())
                     .collect();
                 let abstract_node = ProgramNode::Abstract(programs);
@@ -595,11 +470,7 @@ impl UnderstandingEngine {
 
                 // Common keywords
                 let common: Vec<String> = common_keywords(
-                    &cluster
-                        .iter()
-                        .map(|&i| &self.pairs[i].keywords)
-                        .collect::<Vec<_>>(),
-                );
+                    &cluster.iter().map(|&i| &self.pairs[i].keywords).collect::<Vec<_>>());
                 let abstract_spec = if common.is_empty() {
                     format!("pattern_{}", self.patterns.len())
                 } else {
@@ -645,13 +516,11 @@ fn apply_one(node: &ProgramNode, adaptation: &Adaptation) -> ProgramNode {
             ])
         }
 
-        Adaptation::ChangeOperator { from, to } => replace_op(node, from, to),
+        Adaptation::ChangeOperator { from, to } => {
+            replace_op(node, from, to)
+        }
 
-        Adaptation::ChangeAccumulator {
-            from,
-            to,
-            new_identity,
-        } => {
+        Adaptation::ChangeAccumulator { from, to, new_identity } => {
             let mut result = replace_op(node, from, to);
             // Also replace the identity element
             result = replace_atom(&result, "0", new_identity);
@@ -664,17 +533,17 @@ fn apply_one(node: &ProgramNode, adaptation: &Adaptation) -> ProgramNode {
             add_early_return(node)
         }
 
-        Adaptation::WrapRecursive => ProgramNode::recurse(
-            ProgramNode::branch(
-                ProgramNode::apply(
-                    ProgramNode::op("LT"),
-                    vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")],
+        Adaptation::WrapRecursive => {
+            ProgramNode::recurse(
+                ProgramNode::branch(
+                    ProgramNode::apply(ProgramNode::op("LT"),
+                        vec![ProgramNode::atom("n"), ProgramNode::typed("2", "INT")]),
+                    ProgramNode::atom("base_case"),
+                    node.clone(),
                 ),
-                ProgramNode::atom("base_case"),
-                node.clone(),
-            ),
-            ProgramNode::atom("recurse"),
-        ),
+                ProgramNode::atom("recurse"),
+            )
+        }
     }
 }
 
@@ -684,47 +553,42 @@ fn replace_op(node: &ProgramNode, from: &str, to: &str) -> ProgramNode {
         ProgramNode::Atom(name) if name.to_uppercase() == from.to_uppercase() => {
             ProgramNode::op(to)
         }
-        ProgramNode::Apply { func, args } => ProgramNode::apply(
-            replace_op(func, from, to),
-            args.iter().map(|a| replace_op(a, from, to)).collect(),
-        ),
+        ProgramNode::Apply { func, args } => {
+            ProgramNode::apply(
+                replace_op(func, from, to),
+                args.iter().map(|a| replace_op(a, from, to)).collect(),
+            )
+        }
         ProgramNode::Sequence(steps) => {
             ProgramNode::Sequence(steps.iter().map(|s| replace_op(s, from, to)).collect())
         }
-        ProgramNode::Branch {
-            condition,
-            then_branch,
-            else_branch,
-        } => ProgramNode::branch(
-            replace_op(condition, from, to),
-            replace_op(then_branch, from, to),
-            replace_op(else_branch, from, to),
-        ),
-        ProgramNode::Iterate {
-            init,
-            step,
-            condition,
-        } => ProgramNode::iterate(
-            replace_op(init, from, to),
-            replace_op(step, from, to),
-            replace_op(condition, from, to),
-        ),
-        ProgramNode::Recurse {
-            base_case,
-            recursive_step,
-        } => ProgramNode::recurse(
-            replace_op(base_case, from, to),
-            replace_op(recursive_step, from, to),
-        ),
-        ProgramNode::Reduce {
-            func,
-            initial,
-            collection,
-        } => ProgramNode::reduce(
-            replace_op(func, from, to),
-            replace_op(initial, from, to),
-            replace_op(collection, from, to),
-        ),
+        ProgramNode::Branch { condition, then_branch, else_branch } => {
+            ProgramNode::branch(
+                replace_op(condition, from, to),
+                replace_op(then_branch, from, to),
+                replace_op(else_branch, from, to),
+            )
+        }
+        ProgramNode::Iterate { init, step, condition } => {
+            ProgramNode::iterate(
+                replace_op(init, from, to),
+                replace_op(step, from, to),
+                replace_op(condition, from, to),
+            )
+        }
+        ProgramNode::Recurse { base_case, recursive_step } => {
+            ProgramNode::recurse(
+                replace_op(base_case, from, to),
+                replace_op(recursive_step, from, to),
+            )
+        }
+        ProgramNode::Reduce { func, initial, collection } => {
+            ProgramNode::reduce(
+                replace_op(func, from, to),
+                replace_op(initial, from, to),
+                replace_op(collection, from, to),
+            )
+        }
         _ => node.clone(),
     }
 }
@@ -734,52 +598,48 @@ fn replace_atom(node: &ProgramNode, from: &str, to: &str) -> ProgramNode {
     match node {
         ProgramNode::Atom(name) if name == from => ProgramNode::atom(to),
         ProgramNode::Typed(name, ty) if name == from => ProgramNode::typed(to, ty),
-        ProgramNode::Apply { func, args } => ProgramNode::apply(
-            replace_atom(func, from, to),
-            args.iter().map(|a| replace_atom(a, from, to)).collect(),
-        ),
+        ProgramNode::Apply { func, args } => {
+            ProgramNode::apply(
+                replace_atom(func, from, to),
+                args.iter().map(|a| replace_atom(a, from, to)).collect(),
+            )
+        }
         ProgramNode::Sequence(steps) => {
             ProgramNode::Sequence(steps.iter().map(|s| replace_atom(s, from, to)).collect())
         }
-        ProgramNode::Branch {
-            condition,
-            then_branch,
-            else_branch,
-        } => ProgramNode::branch(
-            replace_atom(condition, from, to),
-            replace_atom(then_branch, from, to),
-            replace_atom(else_branch, from, to),
-        ),
+        ProgramNode::Branch { condition, then_branch, else_branch } => {
+            ProgramNode::branch(
+                replace_atom(condition, from, to),
+                replace_atom(then_branch, from, to),
+                replace_atom(else_branch, from, to),
+            )
+        }
         _ => node.clone(),
     }
 }
 
 fn add_early_return(node: &ProgramNode) -> ProgramNode {
     match node {
-        ProgramNode::Branch {
-            condition,
-            then_branch,
-            else_branch,
-        } => ProgramNode::branch(
-            condition.as_ref().clone(),
-            ProgramNode::Sequence(vec![
-                then_branch.as_ref().clone(),
-                ProgramNode::atom("return"),
-            ]),
-            else_branch.as_ref().clone(),
-        ),
+        ProgramNode::Branch { condition, then_branch, else_branch } => {
+            ProgramNode::branch(
+                condition.as_ref().clone(),
+                ProgramNode::Sequence(vec![
+                    then_branch.as_ref().clone(),
+                    ProgramNode::atom("return"),
+                ]),
+                else_branch.as_ref().clone(),
+            )
+        }
         ProgramNode::Sequence(steps) => {
             ProgramNode::Sequence(steps.iter().map(|s| add_early_return(s)).collect())
         }
-        ProgramNode::Iterate {
-            init,
-            step,
-            condition,
-        } => ProgramNode::iterate(
-            init.as_ref().clone(),
-            add_early_return(step),
-            condition.as_ref().clone(),
-        ),
+        ProgramNode::Iterate { init, step, condition } => {
+            ProgramNode::iterate(
+                init.as_ref().clone(),
+                add_early_return(step),
+                condition.as_ref().clone(),
+            )
+        }
         _ => node.clone(),
     }
 }
@@ -797,24 +657,16 @@ fn expr_text(node: &ProgramNode) -> String {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn keyword_overlap(a: &[String], b: &[String]) -> f32 {
-    if a.is_empty() || b.is_empty() {
-        return 0.0;
-    }
+    if a.is_empty() || b.is_empty() { return 0.0; }
     let set_a: HashSet<&str> = a.iter().map(|s| s.as_str()).collect();
     let set_b: HashSet<&str> = b.iter().map(|s| s.as_str()).collect();
     let intersection = set_a.intersection(&set_b).count();
     let union = set_a.union(&set_b).count();
-    if union == 0 {
-        0.0
-    } else {
-        intersection as f32 / union as f32
-    }
+    if union == 0 { 0.0 } else { intersection as f32 / union as f32 }
 }
 
 fn common_keywords(groups: &[&Vec<String>]) -> Vec<String> {
-    if groups.is_empty() {
-        return Vec::new();
-    }
+    if groups.is_empty() { return Vec::new(); }
     let mut common: HashSet<String> = groups[0].iter().cloned().collect();
     for group in &groups[1..] {
         let set: HashSet<String> = group.iter().cloned().collect();
@@ -835,26 +687,15 @@ mod tests {
     #[test]
     fn test_seed_knowledge() {
         let engine = UnderstandingEngine::with_basic_knowledge();
-        assert!(
-            engine.knowledge_count() >= 15,
-            "should have 15+ pairs, got {}",
-            engine.knowledge_count()
-        );
-        assert!(
-            engine.pattern_count() >= 1,
-            "should have at least 1 pattern"
-        );
+        assert!(engine.knowledge_count() >= 15, "should have 15+ pairs, got {}", engine.knowledge_count());
+        assert!(engine.pattern_count() >= 1, "should have at least 1 pattern");
     }
 
     #[test]
     fn test_understand_known_spec() {
         let engine = UnderstandingEngine::with_basic_knowledge();
         let result = engine.understand("add two numbers");
-        assert!(
-            result.score() > 0.7,
-            "should find 'add' with high score, got {:.4}",
-            result.score()
-        );
+        assert!(result.score() > 0.7, "should find 'add' with high score, got {:.4}", result.score());
         if let Some(prog) = result.program() {
             let code = emit_expression(prog);
             println!("'add two numbers' → {}", code);
@@ -865,18 +706,16 @@ mod tests {
     fn test_understand_similar_spec() {
         let engine = UnderstandingEngine::with_basic_knowledge();
         let result = engine.understand("find the largest element in the array");
-        assert!(
-            result.score() > 0.4,
-            "should match 'find maximum', got {:.4}",
-            result.score()
-        );
+        assert!(result.score() > 0.4, "should match 'find maximum', got {:.4}", result.score());
     }
 
     #[test]
     fn test_adaptation_minimum_from_maximum() {
         let engine = UnderstandingEngine::with_basic_knowledge();
-        let adaptations =
-            engine.compute_adaptations("find maximum in array", "find minimum in array");
+        let adaptations = engine.compute_adaptations(
+            "find maximum in array",
+            "find minimum in array",
+        );
         assert!(!adaptations.is_empty(), "should produce adaptations");
         assert!(adaptations.iter().any(|a| matches!(a, Adaptation::ChangeOperator { from, to } if from == "GT" && to == "LT")),
             "should change GT to LT");
@@ -885,20 +724,21 @@ mod tests {
     #[test]
     fn test_adaptation_second_largest() {
         let engine = UnderstandingEngine::with_basic_knowledge();
-        let adaptations =
-            engine.compute_adaptations("find maximum in array", "find second largest in array");
-        assert!(
-            adaptations
-                .iter()
-                .any(|a| matches!(a, Adaptation::AddTracker { .. })),
-            "should add tracker for 'second'"
+        let adaptations = engine.compute_adaptations(
+            "find maximum in array",
+            "find second largest in array",
         );
+        assert!(adaptations.iter().any(|a| matches!(a, Adaptation::AddTracker { .. })),
+            "should add tracker for 'second'");
     }
 
     #[test]
     fn test_adaptation_product_from_sum() {
         let engine = UnderstandingEngine::with_basic_knowledge();
-        let adaptations = engine.compute_adaptations("sum of array", "product of array");
+        let adaptations = engine.compute_adaptations(
+            "sum of array",
+            "product of array",
+        );
         assert!(adaptations.iter().any(|a| matches!(a, Adaptation::ChangeAccumulator { from, to, .. } if from == "ADD" && to == "MUL")),
             "should change ADD to MUL");
     }
@@ -906,27 +746,17 @@ mod tests {
     #[test]
     fn test_apply_change_operator() {
         let find_max = ProgramNode::branch(
-            ProgramNode::apply(
-                ProgramNode::op("GT"),
-                vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
-            ),
+            ProgramNode::apply(ProgramNode::op("GT"),
+                vec![ProgramNode::atom("a"), ProgramNode::atom("b")]),
             ProgramNode::atom("a"),
             ProgramNode::atom("b"),
         );
-        let adapted = apply_adaptations(
-            &find_max,
-            &[Adaptation::ChangeOperator {
-                from: "GT".into(),
-                to: "LT".into(),
-            }],
-        );
+        let adapted = apply_adaptations(&find_max, &[Adaptation::ChangeOperator {
+            from: "GT".into(), to: "LT".into(),
+        }]);
         let code = emit_expression(&adapted);
         println!("Adapted GT→LT: {}", code);
-        assert!(
-            code.contains("< ") || code.contains("LT"),
-            "should contain LT, got: {}",
-            code
-        );
+        assert!(code.contains("< ") || code.contains("LT"), "should contain LT, got: {}", code);
     }
 
     #[test]
@@ -950,21 +780,16 @@ mod tests {
         let score_before = engine.understand("reverse array elements").score();
 
         // Learn a new pattern
-        engine.learn(
-            "reverse array elements",
-            &ProgramNode::Sequence(vec![
-                ProgramNode::atom("left = 0"),
-                ProgramNode::atom("right = len - 1"),
-                ProgramNode::iterate(
-                    ProgramNode::atom("init"),
-                    ProgramNode::atom("swap(arr[left], arr[right]); left += 1; right -= 1"),
-                    ProgramNode::apply(
-                        ProgramNode::op("LT"),
-                        vec![ProgramNode::atom("left"), ProgramNode::atom("right")],
-                    ),
-                ),
-            ]),
-        );
+        engine.learn("reverse array elements", &ProgramNode::Sequence(vec![
+            ProgramNode::atom("left = 0"),
+            ProgramNode::atom("right = len - 1"),
+            ProgramNode::iterate(
+                ProgramNode::atom("init"),
+                ProgramNode::atom("swap(arr[left], arr[right]); left += 1; right -= 1"),
+                ProgramNode::apply(ProgramNode::op("LT"),
+                    vec![ProgramNode::atom("left"), ProgramNode::atom("right")]),
+            ),
+        ]));
 
         let score_after = engine.understand("reverse array elements").score();
         println!("Before: {:.4}, After: {:.4}", score_before, score_after);
@@ -978,9 +803,6 @@ mod tests {
         engine.learn("find minimum in array", &ProgramNode::atom("min_impl"));
         engine.learn("find median in array", &ProgramNode::atom("median_impl"));
         engine.auto_abstract();
-        assert!(
-            engine.pattern_count() >= 1,
-            "should abstract 'find X in array' pattern"
-        );
+        assert!(engine.pattern_count() >= 1, "should abstract 'find X in array' pattern");
     }
 }

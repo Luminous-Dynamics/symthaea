@@ -96,8 +96,11 @@ impl RdpEguiRenderer {
             );
 
             let texture = self.texture.get_or_insert_with(|| {
-                ui.ctx()
-                    .load_texture("rdp-frame", image.clone(), egui::TextureOptions::NEAREST)
+                ui.ctx().load_texture(
+                    "rdp-frame",
+                    image.clone(),
+                    egui::TextureOptions::NEAREST,
+                )
             });
             texture.set(image, egui::TextureOptions::NEAREST);
 
@@ -248,18 +251,10 @@ fn egui_key_to_code(key: &egui::Key) -> u32 {
 #[cfg(feature = "gui")]
 fn egui_modifiers_to_flags(mods: &egui::Modifiers) -> u8 {
     let mut flags = 0u8;
-    if mods.shift {
-        flags |= 1;
-    }
-    if mods.ctrl {
-        flags |= 2;
-    }
-    if mods.alt {
-        flags |= 4;
-    }
-    if mods.mac_cmd || mods.command {
-        flags |= 8;
-    }
+    if mods.shift { flags |= 1; }
+    if mods.ctrl { flags |= 2; }
+    if mods.alt { flags |= 4; }
+    if mods.mac_cmd || mods.command { flags |= 8; }
     flags
 }
 
@@ -269,7 +264,5 @@ pub struct RdpEguiRenderer;
 
 #[cfg(not(feature = "gui"))]
 impl RdpEguiRenderer {
-    pub fn new(_name: &str) -> Self {
-        Self
-    }
+    pub fn new(_name: &str) -> Self { Self }
 }

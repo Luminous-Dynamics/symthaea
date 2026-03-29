@@ -137,8 +137,7 @@ impl BehavioralAuthenticator {
                     && self.recent_events.len() >= MIN_ENROLLMENT_EVENTS
                 {
                     // Enrollment complete — build profile from collected events.
-                    let profile =
-                        self.build_profile(&self.recent_events.iter().cloned().collect::<Vec<_>>());
+                    let profile = self.build_profile(&self.recent_events.iter().cloned().collect::<Vec<_>>());
                     self.enrolled_profile = Some(profile);
                     self.state = AuthState::Active;
                 }
@@ -163,12 +162,7 @@ impl BehavioralAuthenticator {
         }
 
         // Normalize.
-        let norm: f32 = combined
-            .iter()
-            .map(|v| v * v)
-            .sum::<f32>()
-            .sqrt()
-            .max(1e-10);
+        let norm: f32 = combined.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-10);
         for v in &mut combined {
             *v /= norm;
         }

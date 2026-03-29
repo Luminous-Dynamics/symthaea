@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! LanceDB-Backed Persistent Memory Storage
 //!
 //! Columnar, async-native storage backend for Symthaea's consciousness system.

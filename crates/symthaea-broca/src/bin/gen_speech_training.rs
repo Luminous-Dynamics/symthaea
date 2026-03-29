@@ -137,10 +137,7 @@ fn id_to_audio_path(id: &str, base_dir: &Path) -> Option<std::path::PathBuf> {
     if parts.len() >= 3 {
         let speaker = parts[0];
         let chapter = parts[1];
-        let path = base_dir
-            .join(speaker)
-            .join(chapter)
-            .join(format!("{id}.flac"));
+        let path = base_dir.join(speaker).join(chapter).join(format!("{id}.flac"));
         if path.exists() {
             return Some(path);
         }
@@ -185,10 +182,7 @@ fn main() {
             }
         }
     } else {
-        eprintln!(
-            "  Warning: Alignment file not found: {}",
-            alignment_path.display()
-        );
+        eprintln!("  Warning: Alignment file not found: {}", alignment_path.display());
         HashMap::new()
     };
 
@@ -256,11 +250,7 @@ fn main() {
         });
 
         if utterances.len() % 100 == 0 {
-            print!(
-                "\r  Loaded {} utterances ({} skipped)...",
-                utterances.len(),
-                skipped
-            );
+            print!("\r  Loaded {} utterances ({} skipped)...", utterances.len(), skipped);
             let _ = std::io::stdout().flush();
         }
     }
@@ -310,10 +300,7 @@ fn main() {
 
     // ── Phase B: Train SpeechThoughtEncoder ─────────────────────────────
 
-    println!(
-        "\nPhase B: Training SpeechThoughtEncoder ({} epochs)...",
-        ENCODER_TRAIN_EPOCHS
-    );
+    println!("\nPhase B: Training SpeechThoughtEncoder ({} epochs)...", ENCODER_TRAIN_EPOCHS);
     let phase_b_start = Instant::now();
 
     let mut encoder = SpeechThoughtEncoder::new(&genesis);
@@ -334,11 +321,7 @@ fn main() {
             count += 1;
         }
 
-        let avg_loss = if count > 0 {
-            total_loss / count as f32
-        } else {
-            0.0
-        };
+        let avg_loss = if count > 0 { total_loss / count as f32 } else { 0.0 };
         println!(
             "  Epoch {}/{}: avg_loss={:.4} ({:.1}s)",
             epoch + 1,
@@ -414,6 +397,9 @@ fn main() {
     println!("  Encoder saved: {ENCODER_OUTPUT}");
     println!("  Train JSONL: {TRAIN_OUTPUT}");
     println!("  Eval JSONL: {EVAL_OUTPUT}");
-    println!("  Total time: {:.1}s", total_start.elapsed().as_secs_f32());
+    println!(
+        "  Total time: {:.1}s",
+        total_start.elapsed().as_secs_f32()
+    );
     println!("═══════════════════════════════════════════════════════════════");
 }

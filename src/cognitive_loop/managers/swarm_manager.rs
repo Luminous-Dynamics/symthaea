@@ -984,31 +984,13 @@ impl SwarmManager {
                 }
 
                 SwarmEvent::DistressSignal {
-                    prediction_error,
-                    energy_depletion,
-                    safety_level,
-                    allostatic_load,
-                    consciousness_level,
-                    ..
+                    prediction_error, energy_depletion, safety_level,
+                    allostatic_load, consciousness_level, ..
                 } => {
-                    let pe = if prediction_error.is_finite() {
-                        prediction_error.clamp(0.0, 1.0)
-                    } else {
-                        0.0
-                    };
-                    let energy = if energy_depletion.is_finite() {
-                        energy_depletion.clamp(0.0, 1.0)
-                    } else {
-                        0.0
-                    };
-                    let load = if allostatic_load.is_finite() {
-                        allostatic_load.clamp(0.0, 1.0)
-                    } else {
-                        0.0
-                    };
-                    let severity = energy * 0.4
-                        + load * 0.3
-                        + pe * 0.2
+                    let pe = if prediction_error.is_finite() { prediction_error.clamp(0.0, 1.0) } else { 0.0 };
+                    let energy = if energy_depletion.is_finite() { energy_depletion.clamp(0.0, 1.0) } else { 0.0 };
+                    let load = if allostatic_load.is_finite() { allostatic_load.clamp(0.0, 1.0) } else { 0.0 };
+                    let severity = energy * 0.4 + load * 0.3 + pe * 0.2
                         + (1.0 - consciousness_level.clamp(0.0, 1.0)) * 0.1;
                     if safety_level >= 3 && energy > 0.9 {
                         self.affective_arousal_acc += 0.15 * severity as f64;

@@ -134,8 +134,8 @@ pub struct MetabolicState {
 
 impl MetabolicState {
     pub fn new() -> Self {
-        let platform_available =
-            cfg!(target_os = "linux") && std::path::Path::new("/proc/stat").exists();
+        let platform_available = cfg!(target_os = "linux")
+            && std::path::Path::new("/proc/stat").exists();
 
         Self {
             cpu_load_ema: 0.0,
@@ -248,9 +248,15 @@ impl MetabolicState {
 
         for line in data.lines() {
             if line.starts_with("MemTotal:") {
-                mem_total = line.split_whitespace().nth(1).and_then(|s| s.parse().ok());
+                mem_total = line
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|s| s.parse().ok());
             } else if line.starts_with("MemAvailable:") {
-                mem_available = line.split_whitespace().nth(1).and_then(|s| s.parse().ok());
+                mem_available = line
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|s| s.parse().ok());
             }
             if mem_total.is_some() && mem_available.is_some() {
                 break;
@@ -342,13 +348,11 @@ mod tests {
     #[test]
     fn test_stress_formula_bounds() {
         // All inputs at 0 → stress = 0
-        let stress =
-            STRESS_WEIGHT_CPU * 0.0 + STRESS_WEIGHT_MEMORY * 0.0 + STRESS_WEIGHT_THERMAL * 0.0;
+        let stress = STRESS_WEIGHT_CPU * 0.0 + STRESS_WEIGHT_MEMORY * 0.0 + STRESS_WEIGHT_THERMAL * 0.0;
         assert_eq!(stress, 0.0);
 
         // All inputs at 1 → stress = sum of weights = 1.0
-        let stress =
-            STRESS_WEIGHT_CPU * 1.0 + STRESS_WEIGHT_MEMORY * 1.0 + STRESS_WEIGHT_THERMAL * 1.0;
+        let stress = STRESS_WEIGHT_CPU * 1.0 + STRESS_WEIGHT_MEMORY * 1.0 + STRESS_WEIGHT_THERMAL * 1.0;
         assert!((stress - 1.0).abs() < 0.001);
     }
 

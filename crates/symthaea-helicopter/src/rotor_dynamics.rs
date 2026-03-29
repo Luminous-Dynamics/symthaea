@@ -41,13 +41,13 @@ impl Default for RotorDynamicsConfig {
         Self {
             max_main_rpm: 5500.0,
             max_tail_rpm: 4000.0,
-            main_rotor_tau: 0.5,        // 500ms to reach target RPM
-            tail_rotor_tau: 0.2,        // 200ms (faster for yaw control)
+            main_rotor_tau: 0.5,      // 500ms to reach target RPM
+            tail_rotor_tau: 0.2,      // 200ms (faster for yaw control)
             thrust_coefficient: 3.5e-7, // ~5000N at 3500 RPM, coll=0.3
             torque_reaction_coefficient: 1.0e-8,
-            precession_gain: 0.15, // 15% of cyclic input appears as precession
+            precession_gain: 0.15,     // 15% of cyclic input appears as precession
             autorotation_rpm_threshold: 1500.0,
-            autorotation_descent_rate: -5.0, // ~5 m/s descent in autorotation
+            autorotation_descent_rate: -5.0,  // ~5 m/s descent in autorotation
         }
     }
 }
@@ -182,7 +182,8 @@ impl RotorDynamics {
             self.config.thrust_coefficient * self.state.main_rpm.powi(2) * effective_collective;
 
         // 4. Torque reaction: main rotor creates yaw torque
-        let torque_reaction = self.config.torque_reaction_coefficient * self.state.main_rpm.powi(2);
+        let torque_reaction =
+            self.config.torque_reaction_coefficient * self.state.main_rpm.powi(2);
 
         // 5. Gyroscopic precession: cyclic input appears 90° ahead
         // Longitudinal cyclic → roll precession, lateral cyclic → pitch precession
@@ -242,10 +243,7 @@ mod tests {
     fn test_rotor_hover_produces_thrust() {
         let mut rotor = RotorDynamics::new();
         let output = rotor.step(0.6, 0.5, 0.3, 0.0, 0.0, 0.01);
-        assert!(
-            output.thrust_force > 0.0,
-            "Hover should produce positive thrust"
-        );
+        assert!(output.thrust_force > 0.0, "Hover should produce positive thrust");
         assert!(output.descent_rate_override.is_none());
     }
 
@@ -324,17 +322,11 @@ mod tests {
         let mut rotor = RotorDynamics::new();
         // Longitudinal cyclic → roll precession
         let output = rotor.step(0.6, 0.5, 0.3, 0.5, 0.0, 0.01);
-        assert!(
-            output.precession_roll.abs() > 0.0,
-            "Cyclic lon should produce roll precession"
-        );
+        assert!(output.precession_roll.abs() > 0.0, "Cyclic lon should produce roll precession");
 
         // Lateral cyclic → pitch precession
         let output = rotor.step(0.6, 0.5, 0.3, 0.0, 0.5, 0.01);
-        assert!(
-            output.precession_pitch.abs() > 0.0,
-            "Cyclic lat should produce pitch precession"
-        );
+        assert!(output.precession_pitch.abs() > 0.0, "Cyclic lat should produce pitch precession");
     }
 
     #[test]
@@ -356,9 +348,6 @@ mod tests {
             rotor.step(0.6, 0.5, 0.3, 0.0, 0.0, 0.001);
         }
         let after = rotor.state().main_revolutions;
-        assert!(
-            after > before + 50.0,
-            "Should accumulate ~58 revolutions in 1s at 3500 RPM"
-        );
+        assert!(after > before + 50.0, "Should accumulate ~58 revolutions in 1s at 3500 RPM");
     }
 }

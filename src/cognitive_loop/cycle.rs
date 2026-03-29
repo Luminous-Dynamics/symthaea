@@ -123,10 +123,9 @@ impl CognitiveLoopService {
             // Flow → boost exploration (user engaged, safe to explore)
             // Science: Yerkes-Dodson (1908) — moderate arousal optimal for learning
             if state.frustration > super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD {
-                self.carryover.quality.last_exploration_bonus *= 1.0
-                    - super::thresholds::FRUSTRATION_DAMPEN_GAIN
-                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD)
-                            as f32;
+                self.carryover.quality.last_exploration_bonus *=
+                    1.0 - super::thresholds::FRUSTRATION_DAMPEN_GAIN
+                        * (state.frustration - super::thresholds::FRUSTRATION_DAMPEN_THRESHOLD) as f32;
             }
             if state.is_in_flow() {
                 self.carryover.quality.last_exploration_bonus +=
@@ -249,11 +248,11 @@ impl CognitiveLoopService {
                     let proprioceptive_hv = bridge.encode_perception();
                     let w = self.config.embodiment_blend_weight;
                     if w > 0.0 {
-                        perception.encoding.encoding_result.hdv.lerp_in_place(
-                            &proprioceptive_hv,
-                            1.0 - w,
-                            w,
-                        );
+                        perception
+                            .encoding
+                            .encoding_result
+                            .hdv
+                            .lerp_in_place(&proprioceptive_hv, 1.0 - w, w);
                     }
                     self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
                 }
@@ -436,17 +435,13 @@ impl CognitiveLoopService {
                     }
                     super::defense::DefenseActionKind::RestrictMotorToReadOnly => {
                         // Restrict motor output to read-only via safety level gate
-                        if let Some(ref mut bridge) =
-                            self.sensorimotor.motor_rendering.output_bridge
-                        {
+                        if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
                             bridge.set_safety_level(crate::safety::SafetyLevel::Orange);
                         }
                     }
                     super::defense::DefenseActionKind::HaltMotor => {
                         // Halt all motor output via safety level gate
-                        if let Some(ref mut bridge) =
-                            self.sensorimotor.motor_rendering.output_bridge
-                        {
+                        if let Some(ref mut bridge) = self.sensorimotor.motor_rendering.output_bridge {
                             bridge.set_safety_level(crate::safety::SafetyLevel::Red);
                         }
                     }

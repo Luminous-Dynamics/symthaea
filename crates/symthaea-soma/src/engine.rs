@@ -224,8 +224,6 @@ impl SomaEngine {
                 consciousness_level, // phi proxy
                 valence,
                 arousal,
-                harmony,
-                stability,
             );
         }
 

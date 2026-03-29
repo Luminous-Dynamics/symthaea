@@ -9,42 +9,12 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
+pub use symthaea_core::embodiment::{EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel};
+
 use crate::controller::HelicopterController;
 use crate::encoder::HelicopterHdcEncoder;
 use crate::simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
 use crate::types::HelicopterConfig;
-
-/// Safety level for consciousness-gated motor authority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MotorSafetyLevel {
-    Green,
-    Yellow,
-    Orange,
-    Red,
-}
-
-impl MotorSafetyLevel {
-    pub fn from_phi(phi: f64) -> Self {
-        if phi > 0.6 {
-            Self::Green
-        } else if phi > 0.3 {
-            Self::Yellow
-        } else if phi > 0.1 {
-            Self::Orange
-        } else {
-            Self::Red
-        }
-    }
-
-    pub fn motor_gain(&self) -> f32 {
-        match self {
-            Self::Green => 1.0,
-            Self::Yellow => 0.6,
-            Self::Orange => 0.3,
-            Self::Red => 0.0,
-        }
-    }
-}
 
 /// Helicopter embodiment bridge.
 ///
@@ -158,15 +128,9 @@ impl HelicopterEmbodiment {
         self.last_prediction_error = 0.0;
     }
 
-    pub fn safety_level(&self) -> MotorSafetyLevel {
-        self.current_safety
-    }
-    pub fn total_steps(&self) -> usize {
-        self.total_steps
-    }
-    pub fn last_perception(&self) -> Option<&ContinuousHV> {
-        self.last_perception.as_ref()
-    }
+    pub fn safety_level(&self) -> MotorSafetyLevel { self.current_safety }
+    pub fn total_steps(&self) -> usize { self.total_steps }
+    pub fn last_perception(&self) -> Option<&ContinuousHV> { self.last_perception.as_ref() }
 
     /// Telemetry summary.
     pub fn telemetry(&self) -> EmbodimentTelemetry {
@@ -179,27 +143,6 @@ impl HelicopterEmbodiment {
             num_actuators: 6,
         }
     }
-}
-
-/// Result of a single embodiment step.
-#[derive(Debug, Clone)]
-pub struct EmbodimentResult {
-    pub num_actuators: usize,
-    pub control_effort: f32,
-    pub success: bool,
-    pub prediction_error: f32,
-    pub safety_level: MotorSafetyLevel,
-}
-
-/// Telemetry from the embodiment subsystem.
-#[derive(Debug, Clone, Default)]
-pub struct EmbodimentTelemetry {
-    pub total_steps: u64,
-    pub control_effort: f32,
-    pub prediction_error: f32,
-    pub safety_level: String,
-    pub platform: String,
-    pub num_actuators: usize,
 }
 
 #[cfg(test)]

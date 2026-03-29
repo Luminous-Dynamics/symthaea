@@ -75,7 +75,8 @@ pub fn analyze_evolution(index: &GalleryIndex, window_size: usize) -> EvolutionS
 
         if dom != current_dominant {
             // End current period, start new one
-            let avg_score = period_scores.iter().sum::<f32>() / period_scores.len().max(1) as f32;
+            let avg_score =
+                period_scores.iter().sum::<f32>() / period_scores.len().max(1) as f32;
             periods.push(StylePeriod {
                 start_cycle: period_start,
                 end_cycle: entry.created_at_cycle,

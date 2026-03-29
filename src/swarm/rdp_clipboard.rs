@@ -71,7 +71,11 @@ impl ClipboardSync {
     /// Process a received clipboard update.
     ///
     /// Returns the clipboard content if it's new (not a reflection of what we sent).
-    pub fn receive_update(&mut self, data: &[u8], _format: &ClipboardFormat) -> Option<Vec<u8>> {
+    pub fn receive_update(
+        &mut self,
+        data: &[u8],
+        _format: &ClipboardFormat,
+    ) -> Option<Vec<u8>> {
         if data.len() > CLIPBOARD_MAX_BYTES {
             return None;
         }
@@ -148,38 +152,22 @@ mod tests {
         let content = b"Hello, world!";
 
         // First send should work.
-        let msg = sync.prepare_update(
-            content,
-            ClipboardFormat::PlainText,
-            SessionPermission::Interactive,
-        );
+        let msg = sync.prepare_update(content, ClipboardFormat::PlainText, SessionPermission::Interactive);
         assert!(msg.is_some());
 
         // Same content → no send.
-        let msg = sync.prepare_update(
-            content,
-            ClipboardFormat::PlainText,
-            SessionPermission::Interactive,
-        );
+        let msg = sync.prepare_update(content, ClipboardFormat::PlainText, SessionPermission::Interactive);
         assert!(msg.is_none());
 
         // Different content → send.
-        let msg = sync.prepare_update(
-            b"Changed!",
-            ClipboardFormat::PlainText,
-            SessionPermission::Interactive,
-        );
+        let msg = sync.prepare_update(b"Changed!", ClipboardFormat::PlainText, SessionPermission::Interactive);
         assert!(msg.is_some());
     }
 
     #[test]
     fn test_view_only_blocks_clipboard() {
         let mut sync = ClipboardSync::new();
-        let msg = sync.prepare_update(
-            b"test",
-            ClipboardFormat::PlainText,
-            SessionPermission::ViewOnly,
-        );
+        let msg = sync.prepare_update(b"test", ClipboardFormat::PlainText, SessionPermission::ViewOnly);
         assert!(msg.is_none());
     }
 

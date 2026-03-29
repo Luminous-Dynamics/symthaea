@@ -106,13 +106,7 @@ mod tests {
         let mut agent = ActiveInferenceHelicopterAgent::new();
         let state = HelicopterState::hover(50.0); // 30m above target
         let result = agent.tick(&state, 20.0);
-        assert!(
-            result.tau_factor < 1.0,
-            "High error should speed up response"
-        );
-        assert!(
-            result.learning_rate_factor > 1.0,
-            "High error should boost learning"
-        );
+        assert!(result.tau_factor < 1.0, "High error should speed up response");
+        assert!(result.learning_rate_factor > 1.0, "High error should boost learning");
     }
 }

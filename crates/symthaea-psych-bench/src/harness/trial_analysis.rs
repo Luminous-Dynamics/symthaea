@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Per-trial trace analysis: learning curves, error bursts, strategy shifts, calibration.
 //!
 //! Stores per-trial outcomes instead of just aggregates, enabling fine-grained
