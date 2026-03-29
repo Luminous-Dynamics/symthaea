@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! GJK (Gilbert–Johnson–Keerthi) intersection test generalized to N dimensions.
 //!
 //! The key insight: two convex shapes intersect if and only if their

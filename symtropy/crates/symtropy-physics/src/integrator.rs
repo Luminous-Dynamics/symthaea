@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Semi-implicit Euler integrator for ND rigid body dynamics.
 //!
 //! Angular velocity is a bivector (element of so(n)), integrated via the

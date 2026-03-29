@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Sanctuary zones: consciousness-created safe regions in physics space.
 //!
 //! When the Eight Harmonies "Sacred Stillness" activation exceeds 0.6 and

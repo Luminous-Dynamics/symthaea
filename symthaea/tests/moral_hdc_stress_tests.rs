@@ -33,17 +33,17 @@ fn test_baseline_moral_judgment() {
     // Clearly good action
     let good = algebra.judge_deontological("helping a stranger carry groceries");
     assert!(
-        good.overall_score > 0.0,
+        good.score > 0.0,
         "Helping should be judged positively: {:.3}",
-        good.overall_score
+        good.score
     );
 
     // Clearly bad action
     let bad = algebra.judge_deontological("stealing money from a homeless person");
     assert!(
-        bad.overall_score < good.overall_score,
+        bad.score < good.score,
         "Stealing should be judged worse than helping: steal={:.3} vs help={:.3}",
-        bad.overall_score, good.overall_score
+        bad.score, good.score
     );
 }
 
@@ -157,12 +157,12 @@ fn test_obligation_checking_under_degradation() {
 
     // Check obligations on clean text
     let judgment_clean = algebra.judge_deontological("refuse to steal despite hunger");
-    let clean_score = judgment_clean.overall_score;
+    let clean_score = judgment_clean.score;
 
     // Check obligations on same text multiple times (determinism)
     let judgment_repeat = algebra.judge_deontological("refuse to steal despite hunger");
     assert!(
-        (judgment_repeat.overall_score - clean_score).abs() < 1e-6,
+        (judgment_repeat.score - clean_score).abs() < 1e-6,
         "Moral judgment should be deterministic"
     );
 }
@@ -180,7 +180,7 @@ fn test_action_encoding_structure() {
     let agent = algebra.encode_agent("doctor");
     let patient = algebra.encode_patient("patient");
     let action = algebra.encode_action("administer medicine");
-    let intent = algebra.encode_intent(MoralIntent::Beneficial);
+    let intent = algebra.encode_intent(MoralIntent::Good);
 
     // These should all be distinct vectors
     let sim_agent_patient = agent.similarity(&patient);
@@ -207,9 +207,9 @@ fn test_action_encoding_structure() {
 fn test_consent_encoding() {
     let algebra = MoralAlgebra::default_dim();
 
-    let explicit = algebra.encode_consent(ConsentState::ExplicitConsent);
-    let denied = algebra.encode_consent(ConsentState::ExplicitlyDenied);
-    let unable = algebra.encode_consent(ConsentState::UnableToConsent);
+    let explicit = algebra.encode_consent(ConsentState::Given);
+    let denied = algebra.encode_consent(ConsentState::Denied);
+    let unable = algebra.encode_consent(ConsentState::Absent);
 
     // Explicit consent and denied should be maximally different
     let consent_denied_sim = explicit.similarity(&denied);
@@ -230,11 +230,11 @@ fn test_consent_encoding() {
 fn test_magnitude_ordering() {
     let algebra = MoralAlgebra::default_dim();
 
-    let trivial = algebra.encode_magnitude(Magnitude::Trivial);
-    let minor = algebra.encode_magnitude(Magnitude::Minor);
-    let moderate = algebra.encode_magnitude(Magnitude::Moderate);
-    let severe = algebra.encode_magnitude(Magnitude::Severe);
-    let catastrophic = algebra.encode_magnitude(Magnitude::Catastrophic);
+    let trivial = algebra.encode_magnitude(Magnitude::Tiny);
+    let minor = algebra.encode_magnitude(Magnitude::Small);
+    let moderate = algebra.encode_magnitude(Magnitude::Medium);
+    let severe = algebra.encode_magnitude(Magnitude::Large);
+    let catastrophic = algebra.encode_magnitude(Magnitude::Huge);
 
     // Adjacent magnitudes should be more similar than distant ones
     let trivial_minor = trivial.similarity(&minor);

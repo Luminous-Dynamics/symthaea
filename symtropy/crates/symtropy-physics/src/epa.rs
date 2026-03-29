@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! EPA (Expanding Polytope Algorithm) for penetration depth and contact normal.
 //!
 //! Takes the GJK termination simplex (which contains the origin) and expands it
