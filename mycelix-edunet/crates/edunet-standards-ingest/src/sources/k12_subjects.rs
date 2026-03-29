@@ -97,6 +97,7 @@ impl CurriculumSource for C3Source {
                         grade_level: grade_level.to_string(),
                     }],
                     credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
+                    exam_weight: None,
                 });
 
                 if i > 0 {
@@ -178,6 +179,7 @@ impl CurriculumSource for IsteSource {
                     description: desc.to_string(), grade_level: "K-12".into(),
                 }],
                 credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
+                exam_weight: None,
             }
         }).collect();
 
@@ -257,6 +259,7 @@ impl CurriculumSource for ArtsSource {
                         description: desc.to_string(), grade_level: grade_level.to_string(),
                     }],
                     credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
+                    exam_weight: None,
                 });
 
                 if i > 0 {
@@ -341,6 +344,7 @@ impl CurriculumSource for PeSource {
                     description: desc.to_string(), grade_level: grade_level.to_string(),
                 }],
                 credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
+                exam_weight: None,
             }
         }).collect();
 
@@ -425,6 +429,7 @@ impl CurriculumSource for CefrSource {
                         description: desc.to_string(), grade_level: grade.to_string(),
                     }],
                     credit_hours: None, course_level: None, cip_code: None, program_id: None, corequisites: vec![], supplementary_resources: vec![],
+                    exam_weight: None,
                 });
 
                 // Prerequisite: same skill at previous level

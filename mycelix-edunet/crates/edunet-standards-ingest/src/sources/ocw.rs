@@ -286,6 +286,7 @@ fn course_to_node(course: &OcwCourse, subject_area: &str, cip_code: Option<&str>
         cip_code: cip_code.map(|c| c.to_string()),
         program_id: None,
         corequisites: vec![], supplementary_resources: vec![],
+        exam_weight: None,
     }
 }
 

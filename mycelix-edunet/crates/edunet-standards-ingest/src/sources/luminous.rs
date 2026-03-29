@@ -309,6 +309,7 @@ fn build_course_document(
             cip_code: None,
             program_id: None,
             corequisites: vec![], supplementary_resources: vec![],
+            exam_weight: None,
         });
 
         for prereq in prereqs {

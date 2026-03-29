@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Session 6B: SimHash - CORRECT LSH for Binary Vectors (Hamming Distance)
 //
 // This is the CORRECT LSH algorithm for binary hyperdimensional vectors.

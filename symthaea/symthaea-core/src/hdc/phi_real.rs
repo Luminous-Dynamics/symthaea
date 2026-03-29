@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # DEPRECATED - Use `spectral_connectivity` module instead
 //!
 //! This module has been renamed to `spectral_connectivity` to accurately

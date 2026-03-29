@@ -539,6 +539,7 @@ mod tests {
             subject_area: subject.into(), academic_standards: vec![],
             credit_hours: None, course_level: None, cip_code: None,
             program_id: None, corequisites: vec![], supplementary_resources: vec![],
+            exam_weight: None,
         }
     }
 

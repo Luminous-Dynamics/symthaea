@@ -84,6 +84,23 @@ pub struct CurriculumNode {
     /// Supplementary external resources (for when generated content is insufficient).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supplementary_resources: Vec<SupplementaryResource>,
+    exam_weight: None,
+    /// Exam weight (marks allocated in formal assessments).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exam_weight: Option<ExamWeight>,
+}
+
+/// Exam mark allocation for a curriculum node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExamWeight {
+    /// Paper number (1 or 2 for NSC Matric).
+    pub paper: u8,
+    /// Marks allocated to this topic.
+    pub marks: u16,
+    /// Total marks for the paper.
+    pub total_paper_marks: u16,
+    /// Percentage weight (marks/total * 100).
+    pub percentage: f32,
 }
 
 /// An external resource that supplements the generated content for a node.
@@ -266,6 +283,7 @@ fn standard_to_node(
         cip_code: None,
         program_id: None,
         corequisites: vec![], supplementary_resources: vec![],
+        exam_weight: None,
     }
 }
 
@@ -335,6 +353,7 @@ pub fn convert_program(program: &ProgramDescriptor) -> CurriculumDocument {
             cip_code: program.cip_code.clone(),
             program_id: Some(program.id.clone()),
             corequisites: course.corequisites.clone(), supplementary_resources: vec![],
+            exam_weight: None,
         };
         nodes.push(node);
 
@@ -427,6 +446,7 @@ pub fn convert_phd_template(
             cip_code: cip_code.map(|s| s.to_string()),
             program_id: None,
             corequisites: vec![], supplementary_resources: vec![],
+            exam_weight: None,
         })
         .collect();
 

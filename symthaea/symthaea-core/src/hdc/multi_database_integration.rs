@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // NOTE: This module is theoretical/aspirational. The "Mental Roles" mapping below describes
 // a future multi-database architecture. Currently, only SQLite (via sqlite_client.rs) and
 // LanceDB (behind `lancedb-backend` feature) are implemented. DuckDB is gated behind the

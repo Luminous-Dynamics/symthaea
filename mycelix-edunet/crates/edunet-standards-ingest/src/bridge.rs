@@ -451,6 +451,7 @@ mod tests {
             cip_code: None,
             program_id: None,
             corequisites: vec![], supplementary_resources: vec![],
+            exam_weight: None,
         }
     }
 

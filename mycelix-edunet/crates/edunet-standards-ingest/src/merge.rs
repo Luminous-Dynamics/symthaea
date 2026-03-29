@@ -136,6 +136,7 @@ fn clone_node(n: &CurriculumNode) -> CurriculumNode {
         cip_code: n.cip_code.clone(),
         program_id: n.program_id.clone(),
         corequisites: n.corequisites.clone(), supplementary_resources: n.supplementary_resources.clone(),
+        exam_weight: None,
     }
 }
 
@@ -194,6 +195,7 @@ mod tests {
             cip_code: None,
             program_id: None,
             corequisites: vec![], supplementary_resources: vec![],
+            exam_weight: None,
         }
     }
 
