@@ -220,6 +220,47 @@ impl PositionFilter {
         [self.state.state[3], self.state.state[4], self.state.state[5]]
     }
 
+    /// Update with barometric altitude measurement.
+    ///
+    /// # Arguments
+    /// - `pressure_hpa`: Current barometric pressure
+    /// - `reference_hpa`: Reference pressure at sea level (default 1013.25)
+    /// - `sigma_m`: Altitude measurement uncertainty (typically 1.0m absolute, 0.3m relative)
+    pub fn update_barometer(&mut self, pressure_hpa: f64, reference_hpa: f64, sigma_m: f64) {
+        if pressure_hpa < 100.0 || sigma_m <= 0.0 { return; }
+        let measured_alt = crate::dead_reckoning::barometric_altitude(pressure_hpa, reference_hpa);
+
+        // Observation: z-component only. H = [0, 0, 1, 0, 0, 0]
+        let predicted_z = self.state.state[2];
+        let innovation = measured_alt - predicted_z;
+
+        let r = sigma_m * sigma_m;
+        let p_zz = self.state.covariance[2 * STATE_DIM + 2];
+        let s = p_zz + r;
+        if s.abs() < 1e-30 { return; }
+
+        // Kalman gain for z-only observation
+        let mut k = [0.0_f64; STATE_DIM];
+        for i in 0..STATE_DIM {
+            k[i] = self.state.covariance[i * STATE_DIM + 2] / s;
+        }
+
+        // State update
+        for i in 0..STATE_DIM {
+            self.state.state[i] += k[i] * innovation;
+        }
+
+        // Covariance update (Joseph form for z-only)
+        let mut new_cov = self.state.covariance.clone();
+        for i in 0..STATE_DIM {
+            for j in 0..STATE_DIM {
+                new_cov[i * STATE_DIM + j] -= k[i] * self.state.covariance[2 * STATE_DIM + j];
+            }
+        }
+        self.state.covariance = new_cov;
+        self.state.update_count += 1;
+    }
+
     /// Get 1-sigma position uncertainty (meters).
     pub fn position_sigma(&self) -> f64 {
         let var_x = self.state.covariance[0];
@@ -286,6 +327,18 @@ mod tests {
         let error = ((pos[0]-true_pos[0]).powi(2) + (pos[1]-true_pos[1]).powi(2) + (pos[2]-true_pos[2]).powi(2)).sqrt();
         assert!(error < 5.0, "EKF should converge to within 5m, got {}m error", error);
         assert!(filter.position_sigma() < 50.0, "Sigma should shrink: {}", filter.position_sigma());
+    }
+
+    #[test]
+    fn barometer_updates_altitude() {
+        let mut filter = PositionFilter::new([0.0, 0.0, 0.0], 100.0, FilterConfig::default());
+        let sigma_z_before = filter.state.covariance[2 * 6 + 2];
+        // Feed barometric reading at ~100m altitude
+        filter.update_barometer(1001.3, 1013.25, 1.0);
+        let sigma_z_after = filter.state.covariance[2 * 6 + 2];
+        assert!(sigma_z_after < sigma_z_before, "Barometer should reduce z uncertainty");
+        // Z state should move toward ~100m
+        assert!(filter.position()[2].abs() > 10.0, "Z should update: {}", filter.position()[2]);
     }
 
     #[test]

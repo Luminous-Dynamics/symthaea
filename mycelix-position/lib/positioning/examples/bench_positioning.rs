@@ -11,6 +11,7 @@ fn main() {
     bench_trilateration_3d();
     bench_trilateration_2d();
     bench_ekf_convergence();
+    bench_pdr_walkabout();
     bench_ranging_models();
     bench_gdop();
     bench_geodetic_roundtrip();
@@ -137,6 +138,56 @@ fn bench_ekf_convergence() {
     println!("  Final position error: {error:.3} m");
     println!("  Final sigma: {:.3} m", filter.position_sigma());
     println!("  Update count: {}\n", filter.state.update_count);
+}
+
+fn bench_pdr_walkabout() {
+    use positioning::dead_reckoning::*;
+
+    // Simulate a 500-step walk around a square (125 steps per side)
+    let steps_per_side = 125;
+    let config = PdrConfig::default();
+
+    let n = 1_000;
+    let start = Instant::now();
+    for _ in 0..n {
+        let mut pdr = PedestrianDeadReckoning::new(config.clone());
+        // Walk north
+        pdr.set_heading(0.0);
+        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+        // Walk east
+        pdr.set_heading(90.0);
+        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+        // Walk south
+        pdr.set_heading(180.0);
+        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+        // Walk west
+        pdr.set_heading(270.0);
+        for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+    }
+    let elapsed = start.elapsed();
+    let per_run = elapsed / n;
+
+    // Final accuracy check
+    let mut pdr = PedestrianDeadReckoning::new(config);
+    pdr.set_heading(0.0);
+    for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+    pdr.set_heading(90.0);
+    for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+    pdr.set_heading(180.0);
+    for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+    pdr.set_heading(270.0);
+    for _ in 0..steps_per_side { pdr.step(10.5, 0.0, 1013.0, 1, 0.5); }
+
+    let pos = pdr.get_position();
+    let error = (pos[0].powi(2) + pos[1].powi(2)).sqrt();
+    let distance_walked = steps_per_side as f64 * 4.0 * pdr.stride_length();
+
+    println!("PDR Walkabout (500 steps, square, ~{:.0}m total):", distance_walked);
+    println!("  {n} full walks: {elapsed:?} ({per_run:?}/walk, {:.1}µs/step)",
+        per_run.as_nanos() as f64 / 500.0 / 1000.0);
+    println!("  Return-to-origin error: {error:.3}m");
+    println!("  Drift estimate: {:.1}m", pdr.get_drift_estimate());
+    println!("  Total steps: {}\n", pdr.total_steps());
 }
 
 fn bench_ranging_models() {

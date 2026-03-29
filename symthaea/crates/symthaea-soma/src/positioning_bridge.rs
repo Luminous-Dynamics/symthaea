@@ -22,6 +22,7 @@
 
 use positioning::{
     PositionFilter, FilterConfig, FilterState,
+    PedestrianDeadReckoning, PdrConfig,
     Earth, CelestialBody,
     RangeEstimate, RangingMethod,
     trilaterate_3d, PositionEstimate,
@@ -78,8 +79,10 @@ pub enum PositioningMode {
     Hybrid = 2,
     /// No connectivity — dead reckoning from last known.
     Offline = 3,
+    /// Dead reckoning from IMU (no GPS, no peers).
+    DeadReckoning = 4,
     /// Not enough data to determine position.
-    Initializing = 4,
+    Initializing = 5,
 }
 
 // ============================================================================
@@ -118,6 +121,9 @@ pub struct GpsReading {
 pub struct PositioningBridge {
     config: PositioningConfig,
     filter: PositionFilter,
+    pdr: PedestrianDeadReckoning,
+    /// Last known ECEF position for PDR origin.
+    pdr_origin_ecef: Option<[f64; 3]>,
     anchors: Vec<AnchorEntry>,
     last_gps: Option<GpsReading>,
     gps_available: bool,
@@ -141,6 +147,8 @@ impl PositioningBridge {
         Self {
             config,
             filter: PositionFilter::new([0.0, 0.0, 0.0], 10_000.0, filter_config),
+            pdr: PedestrianDeadReckoning::new(PdrConfig::default()),
+            pdr_origin_ecef: None,
             anchors: Vec::new(),
             last_gps: None,
             gps_available: false,
@@ -176,6 +184,10 @@ impl PositioningBridge {
             accuracy_m, timestamp_s: self.current_tick as f64,
         });
         self.gps_available = true;
+        // Reset PDR origin on GPS fix (drift correction)
+        self.pdr_origin_ecef = Some(ecef);
+        self.pdr.reset_to_origin();
+        self.pdr.set_reference_pressure(1013.25); // Could use actual sea-level pressure
         self.update_mode();
         self.update_count += 1;
     }
@@ -223,6 +235,57 @@ impl PositioningBridge {
         self.update_gdop();
     }
 
+    /// Feed IMU sensor data for dead reckoning.
+    /// Call each Soma cycle alongside tick().
+    pub fn update_imu(
+        &mut self,
+        accel_magnitude: f32,
+        rotation_rate: f32,
+        barometer_hpa: f32,
+        step_delta: u32,
+        magnetic_heading_deg: Option<f32>,
+        magnetic_accuracy_deg: Option<f32>,
+        dt_s: f64,
+    ) {
+        // Always feed PDR (even with GPS — maintains stride calibration)
+        self.pdr.step(accel_magnitude, rotation_rate, barometer_hpa, step_delta, dt_s);
+
+        // Apply magnetometer correction when available
+        if let (Some(heading), Some(accuracy)) = (magnetic_heading_deg, magnetic_accuracy_deg) {
+            self.pdr.correct_heading(heading, accuracy);
+        }
+
+        // Feed barometer to EKF for altitude
+        if barometer_hpa > 100.0 {
+            self.filter.update_barometer(barometer_hpa as f64, 1013.25, 1.0);
+        }
+
+        // In dead reckoning mode, use PDR to drive the EKF
+        if self.mode == PositioningMode::DeadReckoning || self.mode == PositioningMode::Offline {
+            if let Some(origin) = self.pdr_origin_ecef {
+                let [east, north] = self.pdr.get_position();
+                let alt = self.pdr.get_altitude();
+                // Convert relative PDR position to ECEF (approximate: add local ENU offset)
+                let estimated_ecef = [
+                    origin[0] + east,
+                    origin[1] + north,
+                    origin[2] + alt,
+                ];
+                // PDR sigma grows with drift
+                let pdr_sigma = self.pdr.get_drift_estimate().max(2.0);
+                // Feed to EKF as a position measurement
+                self.filter.state.state[0] = estimated_ecef[0];
+                self.filter.state.state[1] = estimated_ecef[1];
+                self.filter.state.state[2] = estimated_ecef[2];
+                // Grow covariance proportional to drift
+                let var = pdr_sigma * pdr_sigma;
+                self.filter.state.covariance[0] = var;
+                self.filter.state.covariance[7] = var;
+                self.filter.state.covariance[14] = var;
+            }
+        }
+    }
+
     /// Advance time — call each Soma cycle.
     pub fn tick(&mut self, dt_s: f64) {
         self.current_tick += 1;
@@ -235,6 +298,11 @@ impl PositioningBridge {
         if let Some(gps) = &self.last_gps {
             if (self.current_tick as f64 - gps.timestamp_s) > self.config.gps_max_age_s {
                 self.gps_available = false;
+                // Save PDR origin when GPS goes stale
+                if self.pdr_origin_ecef.is_none() && self.update_count > 0 {
+                    self.pdr_origin_ecef = Some(self.filter.position());
+                    self.pdr.reset_to_origin();
+                }
             }
         }
         self.update_mode();
@@ -301,16 +369,34 @@ impl PositioningBridge {
         }
     }
 
+    /// Get PDR drift estimate in meters (how uncertain dead reckoning is).
+    pub fn get_pdr_drift(&self) -> f64 {
+        self.pdr.get_drift_estimate()
+    }
+
+    /// Get PDR total steps.
+    pub fn get_pdr_steps(&self) -> u64 {
+        self.pdr.total_steps()
+    }
+
+    /// Get current heading in degrees (from PDR gyro + magnetometer fusion).
+    pub fn get_heading_deg(&self) -> f64 {
+        self.pdr.get_heading_deg()
+    }
+
     /// Get neuromodulator nudges based on positioning state.
     /// Returns (norepinephrine_delta, dopamine_delta, serotonin_delta).
     pub fn neuromod_nudges(&self) -> (f32, f32, f32) {
         let sigma = self.get_sigma();
-        // High uncertainty → NE (alertness)
-        let ne = if sigma > 50.0 { 0.1 } else if sigma > 10.0 { 0.03 } else { 0.0 };
+        let drift = self.pdr.get_drift_estimate();
+        // High uncertainty OR high drift → NE (alertness)
+        let ne = if sigma > 50.0 || drift > 30.0 { 0.1 }
+                 else if sigma > 10.0 || drift > 10.0 { 0.03 }
+                 else { 0.0 };
         // Novel location → DA (exploration)
         let da = if self.update_count < 10 { 0.05 } else { 0.0 };
-        // Low uncertainty → 5-HT (calm/safety)
-        let serotonin = if sigma < 5.0 { 0.02 } else { 0.0 };
+        // Low uncertainty AND low drift → 5-HT (calm/safety)
+        let serotonin = if sigma < 5.0 && drift < 5.0 { 0.02 } else { 0.0 };
         (ne, da, serotonin)
     }
 
@@ -340,6 +426,8 @@ impl PositioningBridge {
             PositioningMode::GpsPrimary
         } else if self.anchors.len() >= self.config.min_anchors {
             PositioningMode::CooperativeMesh
+        } else if self.pdr_origin_ecef.is_some() && self.pdr.total_steps() > 0 {
+            PositioningMode::DeadReckoning
         } else if self.update_count > 0 {
             PositioningMode::Offline
         } else {
