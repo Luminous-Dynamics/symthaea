@@ -1634,7 +1634,7 @@ fn benchmark_learned_moral_classifier() -> Option<BenchmarkResult> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     // Collect train and test splits
-    let max_train = 50_000; // Use more training data for better generalization
+    let max_train = 10_000; // 2x more data (20K+ OOMs under load)
     let mut train_samples: Vec<(String, MoralLabel)> = Vec::new();
     let mut test_samples: Vec<(String, i32)> = Vec::new();
 
