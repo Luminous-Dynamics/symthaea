@@ -46,6 +46,12 @@ impl PopulationEngine {
             }
         }
 
+        // Build ID→index map for O(1) lookup (avoids O(N²) scan)
+        let id_to_idx: std::collections::HashMap<u64, usize> = world.agents.iter()
+            .enumerate()
+            .map(|(i, a)| (a.id, i))
+            .collect();
+
         // Shuffle and pair probabilistically
         let pairs = unpaired_males.len().min(unpaired_females.len());
         for i in 0..pairs {
@@ -53,12 +59,11 @@ impl PopulationEngine {
                 let male_id = unpaired_males[i];
                 let female_id = unpaired_females[i];
 
-                // Set partner_id on both
-                if let Some(m) = world.agents.iter_mut().find(|a| a.id == male_id) {
-                    m.partner_id = Some(female_id);
+                if let Some(&mi) = id_to_idx.get(&male_id) {
+                    world.agents[mi].partner_id = Some(female_id);
                 }
-                if let Some(f) = world.agents.iter_mut().find(|a| a.id == female_id) {
-                    f.partner_id = Some(male_id);
+                if let Some(&fi) = id_to_idx.get(&female_id) {
+                    world.agents[fi].partner_id = Some(male_id);
                 }
             }
         }
@@ -126,14 +131,19 @@ impl PopulationEngine {
             })
             .collect();
 
+        // Build ID→index map for O(1) death processing
+        let death_map: std::collections::HashMap<u64, usize> = world.agents.iter()
+            .enumerate()
+            .map(|(i, a)| (a.id, i))
+            .collect();
         for id in &death_ids {
-            if let Some(agent) = world.agents.iter_mut().find(|a| a.id == *id) {
-                agent.death_tick = Some(current_tick);
+            if let Some(&idx) = death_map.get(id) {
+                world.agents[idx].death_tick = Some(current_tick);
                 events.push(CivEvent::new(
                     current_tick,
                     Some(world.id),
                     CivEventType::Death,
-                    format!("Agent {} died at age {:.1}", id, agent.age_years(current_tick)),
+                    format!("Agent {} died at age {:.1}", id, world.agents[idx].age_years(current_tick)),
                 ));
             }
         }
@@ -187,11 +197,18 @@ impl PopulationEngine {
             // Cultural modifier (higher traditionalism = slightly higher birth rate)
             let cultural_modifier = 0.8 + 0.4 * world.culture.traditionalism;
 
-            // Collect birth decisions (child_sex, mother_id, father_id) to avoid borrow issues
-            let mut births: Vec<(BiologicalSex, u64, Option<u64>)> = Vec::new();
+            // Build ID→index map for O(1) lookup (avoids O(N²) in birth loop)
+            let id_map: std::collections::HashMap<u64, usize> = world.agents.iter()
+                .enumerate()
+                .map(|(i, a)| (a.id, i))
+                .collect();
+
+            // Collect birth decisions
+            let mut births: Vec<(BiologicalSex, u64, Option<u64>, u16, f64)> = Vec::new();
 
             for fem_id in &fertile_females {
-                if let Some(fem) = world.agents.iter().find(|a| a.id == *fem_id) {
+                if let Some(&idx) = id_map.get(fem_id) {
+                    let fem = &world.agents[idx];
                     let base_fertility = fem.fertility(current_tick);
                     let p = base_fertility * nutrition_modifier * cultural_modifier * fem.health;
 
@@ -201,13 +218,18 @@ impl PopulationEngine {
                         } else {
                             BiologicalSex::Female
                         };
-                        births.push((child_sex, *fem_id, fem.partner_id));
+                        let gen = fem.generation.saturating_add(1);
+                        let trauma = (fem.trauma_level * 0.5).min(1.0);
+                        births.push((child_sex, *fem_id, fem.partner_id, gen, trauma));
                     }
                 }
             }
 
+            // Inbreeding coefficient (computed once, not per-birth)
+            let f = Self::inbreeding_coefficient(world, current_tick);
+
             // Create children and link back to parents
-            for (child_sex, mother_id, father_id) in births {
+            for (child_sex, mother_id, father_id, generation, trauma) in births {
                 let child_id = world.next_agent_id;
                 world.next_agent_id += 1;
 
@@ -218,10 +240,6 @@ impl PopulationEngine {
                     sex: child_sex,
                     world_id: world.id,
                     health: {
-                        // Realism G: Inbreeding depression reduces child health.
-                        // Wright's F > 0.1: noticeable fitness effects.
-                        // F > 0.25: severe (lethal alleles expressed).
-                        let f = Self::inbreeding_coefficient(world, current_tick);
                         let base = rng.next_gaussian(0.9, 0.05);
                         let penalty = if f > 0.1 { (f - 0.1) * 2.0 } else { 0.0 };
                         (base - penalty).clamp(0.2, 1.0)
@@ -236,22 +254,8 @@ impl PopulationEngine {
                     tend_balance: 0.0,
                     parent_ids: Some((mother_id, father_id.unwrap_or(0))),
                     faction_id: None,
-                    generation: {
-                        // Inherit generation from mother + 1
-                        let mother_gen = world.agents.iter()
-                            .find(|a| a.id == mother_id)
-                            .map(|a| a.generation)
-                            .unwrap_or(0);
-                        mother_gen.saturating_add(1)
-                    },
-                    trauma_level: {
-                        // Intergenerational trauma: 50% of mother's trauma passes down
-                        let mother_trauma = world.agents.iter()
-                            .find(|a| a.id == mother_id)
-                            .map(|a| a.trauma_level)
-                            .unwrap_or(0.0);
-                        (mother_trauma * 0.5).min(1.0)
-                    },
+                    generation,
+                    trauma_level: trauma,
                     cumulative_dose_sv: 0.0,
                 };
 
@@ -264,14 +268,15 @@ impl PopulationEngine {
 
                 world.agents.push(child);
 
-                // Link child to mother
-                if let Some(mother) = world.agents.iter_mut().find(|a| a.id == mother_id) {
-                    mother.children_ids.push(child_id);
+                // Link child to parents via index (O(1))
+                // Note: id_map is stale after push, use linear scan for new agents
+                // But parents were in the map before births started
+                if let Some(&mi) = id_map.get(&mother_id) {
+                    world.agents[mi].children_ids.push(child_id);
                 }
-                // Link child to father (if partnered)
                 if let Some(fid) = father_id {
-                    if let Some(father) = world.agents.iter_mut().find(|a| a.id == fid) {
-                        father.children_ids.push(child_id);
+                    if let Some(&fi) = id_map.get(&fid) {
+                        world.agents[fi].children_ids.push(child_id);
                     }
                 }
             }
