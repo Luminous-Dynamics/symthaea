@@ -38,8 +38,8 @@ fn main() {
     println!("=== CIVILIZATION RESULTS ===");
     println!("Duration: {:.0} years ({} ticks)", report.total_ticks as f64 / 12.0, report.total_ticks);
     println!("RESULT: {} (CVS: {:.3})", if report.survived { "SURVIVED" } else { "COLLAPSED" }, report.cvs);
-    println!("Population: {} across {} worlds", report.total_population, report.world_count);
-    println!("Breakthroughs: {}", report.total_breakthroughs);
+    println!("Population: {}", report.final_population);
+    println!("Breakthroughs: {}", report.breakthroughs);
     println!();
 
     // Print generation ship results
