@@ -836,13 +836,14 @@ impl StreamingSynth {
             // Apply melodic grammar: stepwise motion, leap resolution, tension arcs
             if !self.chord_progression.is_empty() {
                 let chord = &self.chord_progression[self.chord_idx % self.chord_progression.len()];
-                let root_freq = 130.81 * 2.0f32.powf(chord.root_semitones as f32 / 12.0);
+                let root_freq = 261.63 * 2.0f32.powf(chord.root_semitones as f32 / 12.0); // C4 base (was C3)
 
                 // Extended chord type from consciousness state (7ths, 9ths, sus, dim)
                 let ext_chord = ExtendedChordType::from_state(&self.state, grooved_beat);
                 let chord_ratios = ext_chord.ratios();
+                // Spread chord tones across 3 octaves for variety
                 let chord_freqs: Vec<f32> = chord_ratios.iter()
-                    .flat_map(|&r| vec![root_freq * r, root_freq * r * 2.0])
+                    .flat_map(|&r| vec![root_freq * r * 0.5, root_freq * r, root_freq * r * 2.0])
                     .collect();
 
                 // Build scale tones (major or minor based on emotional gesture)
@@ -889,8 +890,9 @@ impl StreamingSynth {
                 }
 
                 // Constrain pitch range (analysis showed 119 semitone scatter — need ~14)
-                let center_freq = 330.0; // E4, comfortable middle register
-                note.frequency = production::constrain_pitch_range(note.frequency, center_freq, 16.0);
+                // Center on A4 (440Hz) — comfortable singing range
+                // Allow 20 semitones (just over 1.5 octaves each direction)
+                note.frequency = production::constrain_pitch_range(note.frequency, 440.0, 20.0);
 
                 // Apply key modulation from dramatic state
                 note.frequency = self.dramatic.apply_key_shift(note.frequency);

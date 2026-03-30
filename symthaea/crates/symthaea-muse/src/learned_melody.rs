@@ -87,7 +87,12 @@ impl MelodyPredictor {
             interval_raw += INTERVAL_WEIGHTS[i] * f;
         }
         // Amplify prediction (weights are small from training — need 5x boost for musical range)
-        let predicted_interval = (interval_raw * 5.0).tanh() * 12.0; // scale to [-12, 12] semitones
+        let mut predicted_interval = (interval_raw * 5.0).tanh() * 12.0; // scale to [-12, 12] semitones
+
+        // Prevent stagnation: if interval is near zero, nudge it to at least ±1 semitone
+        if predicted_interval.abs() < 0.5 {
+            predicted_interval = if predicted_interval >= 0.0 { 1.5 } else { -1.5 };
+        }
 
         // Duration prediction
         let mut duration_raw = DURATION_BIAS;
