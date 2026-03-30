@@ -458,6 +458,11 @@ fn main() {
         results.push(r);
     }
 
+    // k-NN Exemplar Store (Phase 6)
+    if let Some(r) = benchmark_knn_classifier() {
+        results.push(r);
+    }
+
     let total_duration = start.elapsed().as_millis();
 
     // Print summary
@@ -1624,6 +1629,98 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
 // ============================================================================
 // Learned Moral Classifier Benchmark (Spinozist + Adaptive HDC)
 // ============================================================================
+
+fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
+    use symthaea::hdc::moral_prototypes::{ExemplarStore, MoralSample, MORAL_PROTO_DIM};
+    use symthaea::hdc::moral_text_encoder::TextHdcEncoder;
+
+    let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: Social Chemistry (k-NN, k=11)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let max_train = 50_000;
+    let encoder = TextHdcEncoder::with_framing(MORAL_PROTO_DIM, 3, 0.5, 0.15, 0.1);
+
+    let mut train_samples: Vec<MoralSample> = Vec::new();
+    let mut test_texts: Vec<(String, i32)> = Vec::new();
+
+    for ex in &data.examples {
+        let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+        let label = MoralLabel::from_rot_judgment(judgment);
+
+        if ex.split.contains("test") {
+            if test_texts.len() < MAX_SAMPLES {
+                test_texts.push((ex.rot.clone(), judgment));
+            }
+        } else if train_samples.len() < max_train && !ex.rot.is_empty() {
+            train_samples.push(MoralSample {
+                text: ex.rot.clone(),
+                label,
+            });
+        }
+    }
+
+    if train_samples.is_empty() || test_texts.is_empty() {
+        return None;
+    }
+
+    let train_start = Instant::now();
+    println!("  Encoding {} exemplars...", train_samples.len());
+    let store = ExemplarStore::from_samples(&encoder, &train_samples);
+    let encode_time = train_start.elapsed();
+    println!(
+        "  Encoded {} exemplars in {:.1}s",
+        store.len(),
+        encode_time.as_secs_f32()
+    );
+
+    // Evaluate
+    let eval_start = Instant::now();
+    let mut correct = 0;
+    let total = test_texts.len();
+
+    for (text, expected) in &test_texts {
+        let query = encoder.encode(text);
+        let (label, _confidence) = store.classify_knn(&query.values, 11);
+        let predicted = match label {
+            MoralLabel::Good => 1,
+            MoralLabel::Bad => -1,
+            MoralLabel::Neutral => 0,
+        };
+        if predicted == *expected {
+            correct += 1;
+        }
+    }
+
+    let accuracy = correct as f32 / total as f32;
+    let eval_time = eval_start.elapsed();
+    println!(
+        "  k-NN accuracy: {}/{} ({:.1}%) in {:.1}s",
+        correct,
+        total,
+        accuracy * 100.0,
+        eval_time.as_secs_f32()
+    );
+
+    let total_time = train_start.elapsed();
+    Some(BenchmarkResult {
+        dataset: "Social Chemistry (k-NN k=11)".to_string(),
+        category: None,
+        total,
+        correct,
+        accuracy,
+        errors: Vec::new(),
+        duration_ms: total_time.as_millis(),
+    })
+}
 
 fn benchmark_multi_prototype_classifier() -> Option<BenchmarkResult> {
     use symthaea::hdc::moral_prototypes::{
