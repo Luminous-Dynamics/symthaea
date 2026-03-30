@@ -196,8 +196,17 @@ pub fn App() -> impl IntoView {
 
     let conductor = identity.conductor_status;
 
+    // Root class reflects conductor state — CSS responds
+    let universe_class = move || {
+        if conductor.get() == ConductorStatus::Connected {
+            "portal-universe conductor-live"
+        } else {
+            "portal-universe"
+        }
+    };
+
     view! {
-        <div class="portal-universe">
+        <div class=universe_class>
             <HomeostasisBackground />
 
             // Sovereignty badge (top-left)

@@ -218,7 +218,38 @@ body {
         0 0 30px var(--orb-glow),
         0 0 60px rgba(6, 214, 200, 0.15),
         0 0 120px rgba(6, 214, 200, 0.05);
-    animation: orb-pulse 8s ease-in-out infinite;
+    animation: orb-pulse-demo 8s ease-in-out infinite;
+    transition: box-shadow 2s ease;
+}
+
+/* Demo mode — gentle, muted pulse */
+@keyframes orb-pulse-demo {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* LIVE mode — the network is alive, the orb breathes deeper */
+.conductor-live .orb-core {
+    box-shadow:
+        0 0 40px rgba(6, 214, 200, 0.4),
+        0 0 80px rgba(6, 214, 200, 0.2),
+        0 0 160px rgba(6, 214, 200, 0.08),
+        0 0 300px rgba(6, 214, 200, 0.02);
+    animation: orb-pulse-live 6s ease-in-out infinite;
+}
+
+@keyframes orb-pulse-live {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50% { transform: scale(1.12); filter: brightness(1.25); }
+}
+
+/* Live mode makes the 4D rings brighter */
+.conductor-live .orb-ring { opacity: 0.35; }
+
+/* Sovereignty badge glows when live */
+.conductor-live .sovereignty-badge {
+    border-color: rgba(5, 150, 105, 0.4);
+    box-shadow: 0 0 8px rgba(5, 150, 105, 0.1);
 }
 
 @keyframes orb-pulse {
