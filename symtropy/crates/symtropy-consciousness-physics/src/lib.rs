@@ -16,6 +16,7 @@
 //! 5. **Bottleneck → Environment**: Agent's limiting factor triggers environmental response
 
 pub mod coupling;
+pub mod dimensional_leakage;
 pub mod energy;
 pub mod fep_gradient;
 pub mod harmony_field;
