@@ -94,17 +94,30 @@ layout(location = 2) in vec2 a_uv;
 uniform mat4 u_projection;
 uniform mat4 u_model_view;
 uniform mat3 u_normal_matrix;
+uniform sampler2D u_topo_vertex;  // topology texture for vertex displacement
+uniform float u_relief_scale;     // 0.0 = flat, 1.0 = full relief
 
 out vec3 v_normal;
 out vec2 v_uv;
 out vec3 v_view_position;
 out vec3 v_world_normal;
+out float v_elevation;
 
 void main() {
+    // Sample topology for elevation (vertex shader uses textureLod)
+    float elevation = textureLod(u_topo_vertex, a_uv, 0.0).r;
+
+    // Displace vertex outward along normal based on elevation
+    // Scale: 0.0 = sea level, 0.03 = Everest-scale peak
+    float displacement = elevation * 0.03 * u_relief_scale;
+    vec3 displaced = a_position + a_normal * displacement;
+
     v_normal = normalize(u_normal_matrix * a_normal);
-    v_world_normal = a_normal;
+    v_world_normal = normalize(displaced);  // use displaced position for world normal
     v_uv = a_uv;
-    vec4 mv_position = u_model_view * vec4(a_position, 1.0);
+    v_elevation = elevation;
+
+    vec4 mv_position = u_model_view * vec4(displaced, 1.0);
     v_view_position = -mv_position.xyz;
     gl_Position = u_projection * mv_position;
 }
@@ -128,6 +141,7 @@ in vec3 v_normal;
 in vec2 v_uv;
 in vec3 v_view_position;
 in vec3 v_world_normal;
+in float v_elevation;
 
 out vec4 frag_color;
 

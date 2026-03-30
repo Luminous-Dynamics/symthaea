@@ -138,7 +138,8 @@ pub struct GlobeRenderer {
     time: f64,
     psi: f32,           // consciousness level [0, 1]
     psi_heartbeat: bool, // if true, psi pulses automatically
-    pub show_core: bool, // cutaway view toggle
+    pub show_core: bool,   // cutaway view toggle
+    pub relief_scale: f32, // 0.0 = flat, 1.0 = full 3D relief
 
     // Localized Φ hotspots (up to 12): [x, y, z, intensity] per hotspot
     phi_hotspots: Vec<[f32; 4]>,
@@ -291,6 +292,7 @@ impl GlobeRenderer {
             psi: 0.5,
             psi_heartbeat: true,
             show_core: false,
+            relief_scale: 1.0, // default: full 3D relief
             phi_hotspots: Vec::new(),
         })
     }
@@ -716,6 +718,14 @@ impl GlobeRenderer {
 
         let core_loc = gl.get_uniform_location(&self.programs.earth, "u_show_core");
         gl.uniform1f(core_loc.as_ref(), if self.show_core { 1.0 } else { 0.0 });
+
+        // 3D relief: bind topology texture for vertex displacement
+        gl.active_texture(GL::TEXTURE3);
+        gl.bind_texture(GL::TEXTURE_2D, Some(&self.bump_texture));
+        let topo_loc = gl.get_uniform_location(&self.programs.earth, "u_topo_vertex");
+        gl.uniform1i(topo_loc.as_ref(), 3);
+        let relief_loc = gl.get_uniform_location(&self.programs.earth, "u_relief_scale");
+        gl.uniform1f(relief_loc.as_ref(), self.relief_scale);
 
         // Pass sun direction for day/night shading (from Sun body orbit)
         let sun_angle_e = self.time as f32 * 0.02; // matches bodies[0].orbit_speed
