@@ -54,9 +54,34 @@ pub fn generate_character_name(world_name: &str, role: &str, generation: u16) ->
 }
 
 /// The narrative engine accumulates memorable events across the simulation.
+/// #7: Cultural memory — civilizations learn from their past.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CulturalMemory {
+    /// Name of the event that created this memory.
+    pub name: String,
+    /// Which world this memory belongs to.
+    pub world: Option<String>,
+    /// Tick when the event occurred.
+    pub origin_tick: u32,
+    /// Lesson learned: modifies future behavior.
+    pub lesson: CulturalLesson,
+    /// Strength [0, 1]. Decays over generations (half-life ~100 years).
+    pub strength: f64,
+}
+
+/// What the civilization learned from a major event.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct CulturalLesson {
+    /// Preparedness bonus for similar disasters [0, 0.3].
+    pub preparedness: f64,
+    /// Risk tolerance shift [-0.2, +0.2]. Negative = more cautious.
+    pub risk_shift: f64,
+    /// Community cohesion bonus [0, 0.2].
+    pub cohesion: f64,
+}
+
 pub struct NarrativeEngine {
-    /// Memorable events (kept to ~100 most significant).
+    /// Memorable events (kept to ~200 most significant).
     pub events: Vec<NarrativeEvent>,
     /// Previous tick's per-world population (for detecting crashes).
     prev_populations: Vec<(String, usize)>,
@@ -64,11 +89,56 @@ pub struct NarrativeEngine {
     prev_cvs: f64,
     /// Tech milestones already narrated (to avoid duplicates).
     narrated_milestones: Vec<String>,
+    /// #7: Cultural memories — lessons from major events.
+    pub cultural_memories: Vec<CulturalMemory>,
 }
 
 impl NarrativeEngine {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            events: Vec::new(),
+            prev_populations: Vec::new(),
+            prev_cvs: 0.0,
+            narrated_milestones: Vec::new(),
+            cultural_memories: Vec::new(),
+        }
+    }
+
+    /// Create a cultural memory from a major event.
+    pub fn remember(&mut self, name: String, world: Option<String>, tick: u32, lesson: CulturalLesson) {
+        self.cultural_memories.push(CulturalMemory {
+            name, world, origin_tick: tick, lesson, strength: 1.0,
+        });
+    }
+
+    /// Decay all cultural memories. Half-life ~100 years (1200 ticks).
+    pub fn decay_memories(&mut self) {
+        let decay = 0.5_f64.powf(1.0 / 1200.0); // Per-tick decay for 100yr half-life
+        for mem in &mut self.cultural_memories {
+            mem.strength *= decay;
+        }
+        // Remove memories below perception threshold
+        self.cultural_memories.retain(|m| m.strength > 0.01);
+    }
+
+    /// Get the aggregate cultural lesson for a world (sum of all active memories).
+    pub fn cultural_lesson_for(&self, world: Option<&str>) -> CulturalLesson {
+        let mut lesson = CulturalLesson::default();
+        for mem in &self.cultural_memories {
+            let applies = match (&mem.world, world) {
+                (None, _) => true,               // Civilization-wide memory
+                (Some(w), Some(q)) => w == q,    // World-specific
+                _ => false,
+            };
+            if applies {
+                lesson.preparedness += mem.lesson.preparedness * mem.strength;
+                lesson.risk_shift += mem.lesson.risk_shift * mem.strength;
+                lesson.cohesion += mem.lesson.cohesion * mem.strength;
+            }
+        }
+        lesson.preparedness = lesson.preparedness.min(0.5);
+        lesson.cohesion = lesson.cohesion.min(0.3);
+        lesson
     }
 
     /// Generate narrative events from current simulation state.

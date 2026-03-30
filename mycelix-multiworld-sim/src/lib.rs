@@ -710,7 +710,19 @@ impl MultiWorldSimulator {
                     {
                         production *= 1.5;
                     }
-                    stock.current = (stock.current + production - consumption)
+                    // #2: Resource spoilage — entropy is real.
+                    // NASA ISS: water recovery 90% (not 100%), O2 leaks ~1%/month.
+                    let spoilage_rate = match *name {
+                        "food" => 0.03,      // 3%/month — perishable
+                        "water" => 0.005,    // 0.5%/month — contamination
+                        "materials" => 0.01, // 1%/month — radiation embrittlement
+                        "energy" => 0.15,    // 15%/month — storage/transmission loss
+                        "oxygen" => 0.005,   // 0.5%/month — seal leakage
+                        _ => 0.01,
+                    };
+                    let spoilage = stock.current * spoilage_rate;
+
+                    stock.current = (stock.current + production - consumption - spoilage)
                         .clamp(0.0, stock.capacity);
                 }
             }
@@ -1345,11 +1357,19 @@ impl MultiWorldSimulator {
             // Power generation based on location + tech
             let has_fission = self.disaster_engine.tech_tree.is_achieved("Fission Surface Power");
             let has_fusion = self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
+            // #6: Solar panel dust degradation (Mars: 0.3%/sol, ~9%/month).
+            // Ref: Spirit/Opportunity dust accumulation data (NASA MER).
+            // Cleaning resets degradation. Assumes monthly cleaning if maintenance available.
+            let dust_penalty = match world.location.as_str() {
+                "Mars" => 0.95,   // 5% loss from dust between cleanings
+                "Moon" => 0.98,   // 2% from regolith electrostatic dust
+                _ => 1.0,
+            };
             let solar_kw = match world.location.as_str() {
                 "Earth" => pop * 5.0,
-                "Moon" => pop * 4.0,
-                "Mars" => pop * 2.0,
-                "Europa" | "Titan" => 0.0,      // No solar
+                "Moon" => pop * 4.0 * dust_penalty,
+                "Mars" => pop * 2.0 * dust_penalty,
+                "Europa" | "Titan" => 0.0,
                 _ => pop * 3.0,
             };
             let nuclear_kw = if has_fusion {

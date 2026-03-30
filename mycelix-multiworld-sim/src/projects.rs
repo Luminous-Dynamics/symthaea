@@ -166,7 +166,24 @@ impl ProjectManager {
         Self::default()
     }
 
-    /// Start a new project if resources allow.
+    /// Start a new project with realistic variance.
+    /// Duration varies ±30% (Flyvbjerg 2002: construction overruns average 20-50%).
+    pub fn start_project_with_variance(&mut self, blueprint: ProjectBlueprint, rng: &mut crate::stochastic::StochasticEngine) {
+        // Duration: base ± 30% gaussian
+        let variance = rng.next_gaussian(1.0, 0.15).clamp(0.7, 1.5);
+        let actual_duration = ((blueprint.duration() as f64 * variance) as u32).max(1);
+        self.active.push(ActiveProject {
+            blueprint,
+            ticks_remaining: actual_duration,
+            total_ticks: actual_duration,
+            labor_per_tick: blueprint.labor_per_tick(),
+            materials_per_tick: blueprint.materials_per_tick(),
+            stalled: false,
+            stall_ticks: 0,
+        });
+    }
+
+    /// Start a new project (deterministic duration, for testing).
     pub fn start_project(&mut self, blueprint: ProjectBlueprint) {
         self.active.push(ActiveProject {
             blueprint,
@@ -179,9 +196,54 @@ impl ProjectManager {
         });
     }
 
-    /// Advance all active projects by one tick. Returns completed blueprints.
-    /// Stalls projects if labor or materials are insufficient.
+    /// Advance all active projects by one tick with realistic variance.
+    /// Includes 3% setback chance and 0.5% critical failure per tick.
+    pub fn tick_with_variance(
+        &mut self,
+        available_labor: f64,
+        available_materials: f64,
+        rng: &mut crate::stochastic::StochasticEngine,
+    ) -> (Vec<ProjectBlueprint>, f64, f64, Vec<String>) {
+        let mut events = Vec::new();
+        let (completed, labor, materials) = self.tick_inner(available_labor, available_materials);
+
+        // Setbacks and failures for active projects
+        let mut failed_indices = Vec::new();
+        for (i, project) in self.active.iter_mut().enumerate() {
+            if project.stalled { continue; }
+            // 3% chance of setback: adds 1-3 months
+            if rng.bernoulli(0.03) {
+                let delay = (rng.next_f64() * 3.0).ceil() as u32;
+                project.ticks_remaining += delay;
+                project.total_ticks += delay;
+                events.push(format!("{} setback: +{} months delay",
+                    project.blueprint.name(), delay));
+            }
+            // 0.5% chance of critical failure: project abandoned
+            if rng.bernoulli(0.005) {
+                events.push(format!("{} CRITICAL FAILURE: project abandoned, materials lost",
+                    project.blueprint.name()));
+                failed_indices.push(i);
+            }
+        }
+        // Remove failed projects (reverse order to preserve indices)
+        for &i in failed_indices.iter().rev() {
+            self.active.remove(i);
+        }
+
+        (completed, labor, materials, events)
+    }
+
+    /// Advance all active projects by one tick (deterministic, no variance).
     pub fn tick(
+        &mut self,
+        available_labor: f64,
+        available_materials: f64,
+    ) -> (Vec<ProjectBlueprint>, f64, f64) {
+        self.tick_inner(available_labor, available_materials)
+    }
+
+    fn tick_inner(
         &mut self,
         available_labor: f64,
         available_materials: f64,

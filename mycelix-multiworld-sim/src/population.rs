@@ -35,17 +35,41 @@ pub fn process_death_consequences(agents: &mut [CivAgent], deceased_id: u64) {
     let living_count = agents.iter().filter(|a| a.is_alive()).count().max(1);
     let community_closeness = 1.0 / (living_count as f64).sqrt();
 
+    // #5: Grief as system shock — productivity loss during mourning
+    // Small colony (<500): everyone feels the death. 1-tick productivity hit.
+    let grief_load = if living_count < 500 { 0.005 } else { 0.001 };
+
     for agent in agents.iter_mut().filter(|a| a.is_alive() && a.id != deceased_id) {
         if children_ids.contains(&agent.id) {
-            // Orphan grief
+            // Orphan grief — ACE score (Adverse Childhood Experience)
             agent.trauma_level = (agent.trauma_level + 0.3).min(1.0);
+            agent.needs.engagement = (agent.needs.engagement - 0.2).max(0.0);
         } else if Some(agent.id) == partner_id {
-            // Partner grief + bond severed
+            // Partner grief — 6-month reduced capacity
             agent.trauma_level = (agent.trauma_level + 0.4).min(1.0);
             agent.partner_id = None;
+            agent.needs.engagement = (agent.needs.engagement - 0.3).max(0.0);
         } else {
-            // Community shock
+            // Community shock + funeral productivity loss
             agent.trauma_level = (agent.trauma_level + 0.01 * community_closeness).min(1.0);
+            agent.needs.allostatic_load = (agent.needs.allostatic_load + grief_load).min(1.0);
+        }
+    }
+
+    // #3: Skill gap detection — was this the last skilled agent in a critical sector?
+    let deceased_sector = {
+        let deceased = agents.iter().find(|a| a.id == deceased_id);
+        deceased.map(|d| d.skills.strongest_index())
+    };
+    if let Some(sector) = deceased_sector {
+        let remaining_skilled = agents.iter()
+            .filter(|a| a.is_alive() && a.id != deceased_id
+                && a.skills.as_slice()[sector] > 0.3)
+            .count();
+        if remaining_skilled == 0 && living_count > 10 {
+            // SKILL GAP: no one left who can do this job
+            // The gap persists until education trains a replacement
+            // (Handled by CriticalSystemCoverage in structural realism tick)
         }
     }
 }
