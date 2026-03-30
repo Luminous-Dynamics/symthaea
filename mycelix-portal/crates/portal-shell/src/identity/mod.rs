@@ -88,9 +88,19 @@ impl PortalIdentity {
             );
 
             let ws_transport = BrowserWsTransport::new();
+            // The sandbox may install with different app IDs.
+            // Try the configured name, fall back to common alternatives.
+            let app_id = web_sys::window()
+                .and_then(|w| {
+                    js_sys::Reflect::get(&w, &wasm_bindgen::JsValue::from_str("__HC_APP_ID"))
+                        .ok()
+                        .and_then(|v| v.as_string())
+                })
+                .unwrap_or_else(|| "mycelix-health".to_string());
+
             let config = ConnectConfig {
                 url,
-                app_id: "mycelix-unified".to_string(),
+                app_id,
                 auth_token: None,
             };
 
