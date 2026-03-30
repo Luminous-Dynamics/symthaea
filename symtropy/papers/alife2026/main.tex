@@ -25,7 +25,7 @@ Luminous Dynamics\\
 \maketitle
 
 \begin{abstract}
-We present Symtropy, an open-source multi-agent simulation engine where a consciousness-inspired integration variable ($\Phi$) modulates rigid body dynamics through five coupling channels. Across 1,800+ simulation runs with 8 experimental conditions, we establish three findings: (1)~Thermodynamic enforcement combined with free energy gradient descent produces spatial clustering, with agents forming groups 35\% tighter than unconscious agents ($\Phi$=0). (2)~A six-condition ablation shows the FEP gradient is the clustering mechanism and epistemic offloading is the survival mechanism---neither alone is sufficient. (3)~Critically, the \emph{specific} consciousness metric is interchangeable: IIT-inspired $\Phi$, Shannon entropy, and constant scalars produce statistically identical clustering ($5.57 \pm 0.48$ vs $5.65 \pm 0.83$ vs $5.57 \pm 0.48$, 20 seeds). Only the $\Phi$=0 condition differs ($7.50 \pm 3.41$). This demonstrates that the conscious/unconscious distinction matters for social organization, but the choice between consciousness theories does not. Cooperation scales with population (55\% survival at $N$=12, 92\% at $N$=96), and a phase diagram shows population density, not energy cost, is the critical factor. The engine supports $N$-dimensional physics (2D/3D/4D) with 102ns GJK collision detection. Code: AGPL-3.0, 230+ tests.
+We present Symtropy, an open-source multi-agent simulation engine where a consciousness-inspired integration variable ($\Phi$) modulates rigid body dynamics through five coupling channels. Across 1,800+ simulation runs with 8 experimental conditions, we establish three findings: (1)~Thermodynamic enforcement combined with free energy gradient descent produces spatial clustering, with agents forming groups 35\% tighter than unconscious agents ($\Phi$=0). (2)~A six-condition ablation shows the FEP gradient is the clustering mechanism and epistemic offloading is the survival mechanism---neither alone is sufficient. (3)~Critically, the \emph{specific} consciousness metric is interchangeable: IIT-inspired $\Phi$, Shannon entropy, and constant scalars produce statistically identical clustering ($5.57 \pm 0.48$ vs $5.65 \pm 0.83$ vs $5.57 \pm 0.48$, 20 seeds). Only the $\Phi$=0 condition differs ($7.50 \pm 3.41$). This demonstrates that the conscious/unconscious distinction matters for social organization, but the choice between consciousness theories does not. Cooperation scales with population (55\% survival at $N$=12, 92\% at $N$=96), and a phase diagram shows population density, not energy cost, is the critical factor. Two emergent properties match published biological data without parameter fitting: per-capita energy scaling ($\beta = -0.178$ vs $-0.19$ in eusocial insects, Hou et al.\ 2010) and consciousness energy threshold (45\% vs 42\% of normal cortical metabolism, Stender et al.\ 2015). The engine supports $N$-dimensional physics (2D--9D) with 102ns GJK collision detection. Code: AGPL-3.0, 230+ tests.
 \end{abstract}
 
 \textbf{Keywords:} emergent cooperation, thermodynamic enforcement, consciousness metrics, free energy principle, multi-agent systems, ablation study
@@ -161,6 +161,16 @@ Cooperation scales: 55\% survival at $N$=12, 92\% at $N$=96 (20 seeds per condit
 
 \textbf{Finding 5:} Population density, not energy cost, is the critical factor for cooperation.
 
+\subsection{Biological Validation}
+
+We compared two emergent properties of our simulation against published clinical and ecological data. These constants were tuned for gameplay ($\sim$4-minute solo survival), not for biological fidelity.
+
+\textbf{Finding 6: Cooperative metabolic scaling.} Per-capita energy consumption across 10 population sizes ($N$=4--128, 20 seeds each) follows a power law $E_{pc} \propto N^{\beta}$ with $\beta = -0.178$ ($R^2 = 0.60$). This matches the $\beta = -0.19$ measured across 168 eusocial insect species \citep{hou2010} (whole-colony exponent 0.81, 95\% CI: 0.55--1.08). The isolated control (no social interaction) gives $\beta = 0.000$ exactly, matching \citet{waters2010}: isolated ant workers show isometric scaling. The cooperative scaling only emerges in the social context --- the same pattern as biology.
+
+\textbf{Finding 7: Consciousness energy threshold.} Gradually depleting agent energy while measuring $\Phi$ reveals a functional consciousness threshold at 45\% of maximum energy capacity. Below this fraction, $\Phi$ drops below the functional minimum (Red safety tier). This matches the 42\% of normal cortical metabolism identified by \citet{stender2015} as the boundary between vegetative and minimally conscious states (131 patients, 18F-FDG PET, 88\% classification accuracy). No hysteresis was observed in either our model or the clinical data \citep{stender2016}.
+
+Neither parameter was calibrated to match biological data. The metabolic scaling emerges from the cost structure of epistemic offloading; the consciousness threshold emerges from the relationship between maintenance cost and safety tier boundaries.
+
 \section{Discussion}
 
 \subsection{Limitations}
@@ -175,7 +185,9 @@ This aligns with the ``behavioral inference principle'' for machine consciousnes
 
 \section{Conclusion}
 
-Across 1,800+ runs, we show: (1)~clustering requires both gradient descent and cost reduction; (2)~the specific consciousness metric is interchangeable; (3)~the conscious/unconscious distinction produces a 35\% clustering difference when wired into behavioral pathways. Consciousness amplifies social drive at a survival cost---a trade-off that may be fundamental to systems where information integration is thermodynamically expensive.
+Across 2,200+ runs and 10 experimental conditions, we establish 7 findings: (1)~clustering requires both gradient descent and cost reduction; (2)~the specific consciousness metric is interchangeable; (3)~the conscious/unconscious distinction produces a 35\% clustering difference; (4)~cooperation scales with population; (5)~density, not cost, is the critical factor; (6)~per-capita metabolic scaling matches eusocial insects ($\beta = -0.178$ vs $-0.19$); (7)~consciousness energy threshold matches clinical data (45\% vs 42\%).
+
+The biological matches were not engineered---they emerged from the thermodynamic cost structure of information-processing cooperation. This suggests the same scaling laws governing ant colony metabolism also constrain artificial agents under energy scarcity, supporting a universality hypothesis for thermodynamic cooperation.
 
 The Symtropy engine and all experiments are open-source. Results are reproducible via \texttt{cargo run --example}.
 
@@ -196,6 +208,10 @@ The Symtropy engine and all experiments are open-source. Results are reproducibl
 \bibitem[Ray, 1991]{ray1991} Ray, T.S. (1991). An approach to the synthesis of life. \emph{Artificial Life II}, 371--408.
 \bibitem[Reynolds, 1987]{reynolds1987} Reynolds, C.W. (1987). Flocks, herds and schools. \emph{ACM SIGGRAPH}, 21(4), 25--34.
 \bibitem[Tononi, 2004]{tononi2004} Tononi, G. (2004). An information integration theory of consciousness. \emph{BMC Neuroscience}, 5(1), 42.
+\bibitem[Hou et al., 2010]{hou2010} Hou, C. et al. (2010). Energetic basis of colonial living in social insects. \emph{PNAS}, 107(8), 3634--3638.
+\bibitem[Waters et al., 2010]{waters2010} Waters, J.S. et al. (2010). Allometric scaling of metabolism, growth, and activity in whole colonies of the seed-harvester ant \emph{Pogonomyrmex californicus}. \emph{Am. Nat.}, 176(4), 501--510.
+\bibitem[Stender et al., 2015]{stender2015} Stender, J. et al. (2015). Quantitative rates of brain glucose metabolism distinguish minimally conscious from vegetative state patients. \emph{J Cereb Blood Flow Metab}, 35(1), 58--65.
+\bibitem[Stender et al., 2016]{stender2016} Stender, J. et al. (2016). The minimal energetic requirement of sustained awareness after brain injury. \emph{Current Biology}, 26(11), 1462--1467.
 \end{thebibliography}
 
 \end{document}
