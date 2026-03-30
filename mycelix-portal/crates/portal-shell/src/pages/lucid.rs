@@ -274,12 +274,13 @@ fn CreateThoughtForm() -> impl IntoView {
     let (submitted, set_submitted) = signal(false);
     let (expanded, set_expanded) = signal(false);
 
+    let identity_for_submit = identity.clone();
     let on_submit = move |ev: web_sys::SubmitEvent| {
         ev.prevent_default();
         let c = content.get();
         if c.trim().is_empty() { return; }
 
-        let identity = identity.clone();
+        let identity = identity_for_submit.clone();
         let tt = thought_type.get();
         let conf = confidence.get();
         let tags: Vec<String> = tags_input.get().split(',')
@@ -332,8 +333,8 @@ fn CreateThoughtForm() -> impl IntoView {
                 {move || if expanded.get() { "- Close" } else { "+ New Thought" }}
             </button>
 
-            <Show when=move || expanded.get()>
-                <form class="thought-form" on:submit=on_submit>
+            <form class="thought-form" on:submit=on_submit
+                style:display=move || if expanded.get() { "flex" } else { "none" }>
                     <textarea
                         class="form-textarea"
                         placeholder="What are you thinking?..."
@@ -378,7 +379,6 @@ fn CreateThoughtForm() -> impl IntoView {
                         <p class="form-success">"Thought added to the knowledge graph!"</p>
                     </Show>
                 </form>
-            </Show>
         </div>
     }
 }

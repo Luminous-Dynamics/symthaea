@@ -51,6 +51,7 @@ web-sys = { version = "0.3", features = [
     "Performance", "Crypto",
     "Request", "RequestInit", "RequestMode", "Response", "Headers",
     "HtmlTextAreaElement", "HtmlSelectElement",
+    "CanvasRenderingContext2d", "WebSocket", "MessageEvent", "BinaryType",
 ] }
 serde-wasm-bindgen = "0.6"
 console_error_panic_hook = "0.1"

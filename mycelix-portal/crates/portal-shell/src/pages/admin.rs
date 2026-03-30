@@ -110,21 +110,21 @@ fn RdpViewer() -> impl IntoView {
         canvas.set_width(1024);
         canvas.set_height(768);
 
-        let ctx = match canvas.get_context("2d").ok().flatten() {
-            Some(c) => c.dyn_into::<CanvasRenderingContext2d>().ok(),
-            None => None,
-        };
-        let Some(ctx) = ctx else {
-            set_status.set("Failed to get 2d context".into());
-            return;
+        let ctx: CanvasRenderingContext2d = match canvas
+            .get_context("2d")
+            .ok()
+            .flatten()
+            .and_then(|c| c.dyn_into::<CanvasRenderingContext2d>().ok())
+        {
+            Some(c) => c,
+            None => { set_status.set("Failed to get 2d context".into()); return; }
         };
 
-        // Clear canvas
         ctx.set_fill_style_str("#1a1a2e");
         ctx.fill_rect(0.0, 0.0, 1024.0, 768.0);
         ctx.set_fill_style_str("#94A3B8");
         ctx.set_font("14px monospace");
-        ctx.fill_text(&format!("Connecting to {url}..."), 20.0, 40.0).ok();
+        let _ = ctx.fill_text(&format!("Connecting to {url}..."), 20.0, 40.0);
 
         // Try WebSocket connection
         let ws = match WebSocket::new(&url) {
