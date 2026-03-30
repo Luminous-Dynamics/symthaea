@@ -26,6 +26,8 @@
 //! let similarity = cosine_similarity(&emb_a, &emb_b);
 //! ```
 
+pub mod model;
+
 #[cfg(feature = "candle")]
 use candle_core::Device;
 use serde::{Deserialize, Serialize};

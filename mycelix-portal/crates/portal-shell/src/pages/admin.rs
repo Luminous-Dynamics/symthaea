@@ -3,6 +3,12 @@
 //! Admin/IT domain page — system health + RDP viewer stub.
 
 use leptos::prelude::*;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebSocket, MessageEvent};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::identity::{ConductorStatus, PortalIdentity};
 
 #[component]
@@ -61,9 +67,7 @@ pub fn AdminOverview() -> impl IntoView {
                     "View-only remote desktop via WebSocket relay to Symthaea's RDP server. "
                     "Frames rendered as Canvas2D draw commands in the browser."
                 </p>
-                <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 2rem; text-align: center; border: 1px dashed var(--border);">
-                    <p style="color: var(--text-muted); font-size: 0.75rem;">"RDP canvas — connect to ws://localhost:3389/rdp to stream"</p>
-                </div>
+                <RdpViewer />
             </div>
 
             // Observatory migration note
@@ -78,3 +82,129 @@ pub fn AdminOverview() -> impl IntoView {
         </div>
     }
 }
+
+/// RDP web viewer — connects to Symthaea's RDP server via WebSocket
+/// and renders frames on a Canvas2D element.
+///
+/// Architecture:
+/// 1. Portal opens WebSocket to ws://host:port/rdp
+/// 2. Server sends frame updates as binary messages (Canvas2D draw commands)
+/// 3. Client decodes and renders on <canvas>
+/// 4. View-only — no input forwarding (future: keyboard/mouse events)
+#[component]
+fn RdpViewer() -> impl IntoView {
+    let canvas_ref = NodeRef::<leptos::html::Canvas>::new();
+    let (connected, set_connected) = signal(false);
+    let (status_text, set_status) = signal("Disconnected".to_string());
+    let (rdp_url, set_rdp_url) = signal("ws://localhost:3389/rdp".to_string());
+
+    let connect = move |_| {
+        let url = rdp_url.get();
+        set_status.set(format!("Connecting to {url}..."));
+
+        let Some(canvas_el) = canvas_ref.get() else {
+            set_status.set("No canvas element".into());
+            return;
+        };
+        let canvas: HtmlCanvasElement = canvas_el.into();
+        canvas.set_width(1024);
+        canvas.set_height(768);
+
+        let ctx = match canvas.get_context("2d").ok().flatten() {
+            Some(c) => c.dyn_into::<CanvasRenderingContext2d>().ok(),
+            None => None,
+        };
+        let Some(ctx) = ctx else {
+            set_status.set("Failed to get 2d context".into());
+            return;
+        };
+
+        // Clear canvas
+        ctx.set_fill_style_str("#1a1a2e");
+        ctx.fill_rect(0.0, 0.0, 1024.0, 768.0);
+        ctx.set_fill_style_str("#94A3B8");
+        ctx.set_font("14px monospace");
+        ctx.fill_text(&format!("Connecting to {url}..."), 20.0, 40.0).ok();
+
+        // Try WebSocket connection
+        let ws = match WebSocket::new(&url) {
+            Ok(ws) => ws,
+            Err(e) => {
+                set_status.set(format!("WebSocket error: {:?}", e));
+                return;
+            }
+        };
+        ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
+
+        // onopen
+        let set_connected_clone = set_connected;
+        let set_status_clone = set_status;
+        let onopen = Closure::<dyn FnMut()>::new(move || {
+            set_connected_clone.set(true);
+            set_status_clone.set("Connected — streaming frames".into());
+        });
+        ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
+        onopen.forget();
+
+        // onmessage — render frame data on canvas
+        let onmessage = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
+            // Frame data would be decoded here (draw commands, bitmap tiles, etc.)
+            // For now, just show that we received data
+            let data = event.data();
+            if let Ok(buf) = data.dyn_into::<js_sys::ArrayBuffer>() {
+                let len = buf.byte_length();
+                ctx.set_fill_style_str("#1a1a2e");
+                ctx.fill_rect(0.0, 0.0, 1024.0, 30.0);
+                ctx.set_fill_style_str("#22c55e");
+                ctx.set_font("11px monospace");
+                ctx.fill_text(&format!("Frame: {} bytes received", len), 10.0, 20.0).ok();
+            }
+        });
+        ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
+        onmessage.forget();
+
+        // onclose
+        let set_connected_close = set_connected;
+        let set_status_close = set_status;
+        let onclose = Closure::<dyn FnMut()>::new(move || {
+            set_connected_close.set(false);
+            set_status_close.set("Disconnected".into());
+        });
+        ws.set_onclose(Some(onclose.as_ref().unchecked_ref()));
+        onclose.forget();
+
+        // onerror
+        let set_status_err = set_status;
+        let onerror = Closure::<dyn FnMut()>::new(move || {
+            set_status_err.set("Connection failed — RDP server not running".into());
+        });
+        ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+        onerror.forget();
+    };
+
+    view! {
+        <div class="rdp-viewer">
+            <div class="form-row" style="margin-bottom: 0.5rem;">
+                <input
+                    type="text"
+                    class="form-input"
+                    style="flex: 1;"
+                    prop:value=move || rdp_url.get()
+                    on:input=move |ev| set_rdp_url.set(event_target_value(&ev))
+                />
+                <button class="form-submit" on:click=connect>
+                    {move || if connected.get() { "Reconnect" } else { "Connect" }}
+                </button>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                {move || status_text.get()}
+            </p>
+            <canvas
+                node_ref=canvas_ref
+                width="1024" height="768"
+                style="width: 100%; max-width: 1024px; border-radius: 8px; border: 1px solid var(--border); background: #1a1a2e;"
+            />
+        </div>
+    }
+}
+
