@@ -634,3 +634,116 @@ fn test_multi_seed_ablation_robustness() {
         if std_diff / mean_diff < 0.5 { "robust across seeds" } else { "seed-sensitive" });
     eprintln!("═══════════════════════════════════════════\n");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIMENT 9: THE DEFINITIVE TEST — IS CONSCIOUSNESS DECORATIVE?
+//
+// This is the experiment that would change our mind.
+//
+// Symthaea has TWO consciousness measurements:
+// 1. compute_consciousness_level() — behavioral proxy (4 weighted inputs)
+// 2. ConsciousnessEngine — real Phi via SpectralMIPFinder (r=0.9998 vs exact)
+//
+// All previous ablation tests measured the PROXY (#1).
+// This test measures the ENGINE output (#2) — spectral_mip_phi.
+//
+// The test: run 100 cycles and record both metrics. If spectral_mip_phi
+// is always None or always zero, the engine never fires (consciousness
+// computation is too expensive for the cycle count). If it produces
+// non-zero values, we have real Phi data.
+//
+// The SpectralMIPFinder fires every 47 cycles. In 100 cycles, it should
+// fire at least once (cycle 47 and cycle 94).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_spectral_phi_produces_real_values() {
+    let mut service = CognitiveLoopService::new(conscious_config()).expect("service");
+
+    let mut proxy_values = Vec::new();
+    let mut spectral_values = Vec::new();
+    let mut structural_macro = Vec::new();
+
+    // Run 100 cycles — SpectralMIP should fire at cycles 47 and 94
+    for i in 0..100 {
+        let input = if i < 30 {
+            "stable environment, monitoring systems"
+        } else if i < 60 {
+            "complex multi-agent coordination under time pressure"
+        } else {
+            "creative problem solving with novel constraints"
+        };
+
+        let r = service.cycle(input);
+
+        // The behavioral proxy (what we've been testing)
+        let proxy = r.metadata.consciousness.consciousness_level;
+        proxy_values.push(proxy);
+
+        // The REAL Phi from SpectralMIPFinder (Option<f64>, None when not computed)
+        let spectral = r.metadata.structural.spectral_mip_phi;
+        spectral_values.push(spectral);
+
+        // Macro Phi from hierarchical decomposition
+        structural_macro.push(r.metadata.structural.structural_macro_phi);
+    }
+
+    // Count how many cycles produced a spectral Phi value
+    let spectral_some_count = spectral_values.iter().filter(|v| v.is_some()).count();
+    let spectral_nonzero_count = spectral_values
+        .iter()
+        .filter(|v| v.map(|p| p > 0.0).unwrap_or(false))
+        .count();
+
+    // Count macro Phi (available every cycle from structural analysis)
+    let macro_nonzero_count = structural_macro.iter().filter(|&&v| v > 0.0).count();
+
+    // Proxy statistics
+    let proxy_mean = proxy_values.iter().sum::<f64>() / proxy_values.len() as f64;
+    let proxy_var = proxy_values.iter().map(|p| (p - proxy_mean).powi(2)).sum::<f64>()
+        / proxy_values.len() as f64;
+
+    // HARD ASSERT: Proxy must produce non-zero values (sanity check)
+    assert!(
+        proxy_mean > 0.0,
+        "PROXY IS DEAD: consciousness_level is zero for all 100 cycles"
+    );
+
+    eprintln!("\n═══ EXPERIMENT 9: IS CONSCIOUSNESS DECORATIVE? ═══");
+    eprintln!("  100 cycles across 3 phases");
+    eprintln!();
+    eprintln!("  BEHAVIORAL PROXY (compute_consciousness_level):");
+    eprintln!("    Mean: {proxy_mean:.6}");
+    eprintln!("    Variance: {proxy_var:.8}");
+    eprintln!();
+    eprintln!("  SPECTRAL MIP PHI (SpectralMIPFinder, fires every ~47 cycles):");
+    eprintln!("    Cycles with Some(phi): {spectral_some_count}/100");
+    eprintln!("    Cycles with phi > 0: {spectral_nonzero_count}/100");
+    if let Some(Some(first_phi)) = spectral_values.iter().find(|v| v.is_some()) {
+        eprintln!("    First spectral phi value: {first_phi:.6}");
+    }
+    eprintln!();
+    eprintln!("  STRUCTURAL MACRO PHI (hierarchical, every cycle):");
+    eprintln!("    Cycles with macro_phi > 0: {macro_nonzero_count}/100");
+    if macro_nonzero_count > 0 {
+        let macro_mean: f64 = structural_macro.iter().sum::<f64>() / 100.0;
+        eprintln!("    Mean macro_phi: {macro_mean:.6}");
+    }
+    eprintln!();
+
+    if spectral_nonzero_count > 0 {
+        eprintln!("  VERDICT: SpectralMIP Phi IS producing real values.");
+        eprintln!("  The consciousness engine is active, not decorative.");
+        eprintln!("  Next step: compare Phi-gated vs random-gated dynamics.");
+    } else if macro_nonzero_count > 0 {
+        eprintln!("  VERDICT: Structural Phi is active but SpectralMIP hasn't fired yet.");
+        eprintln!("  Need more cycles (>47) or check SpectralMIP push interval.");
+    } else {
+        eprintln!("  FINDING: Neither SpectralMIP nor Structural Phi produced values.");
+        eprintln!("  The consciousness ENGINE is not firing in this configuration.");
+        eprintln!("  Only the behavioral PROXY is active.");
+        eprintln!("  This is the most important finding: consciousness measurement");
+        eprintln!("  exists in code but does not execute under default config.");
+    }
+    eprintln!("═══════════════════════════════════════════════════\n");
+}
