@@ -880,8 +880,14 @@ impl StreamingSynth {
                         self.state.arousal,
                     );
                     if let Some(prev) = self.lead_voice.prev_freq {
+                        // Exclude previous note from scale tones to force movement
+                        let filtered_tones: Vec<f32> = scale_tones.iter()
+                            .copied()
+                            .filter(|&f| (f - prev).abs() > prev * 0.03) // exclude ±3%
+                            .collect();
+                        let tones = if filtered_tones.is_empty() { &scale_tones } else { &filtered_tones };
                         note.frequency = self.melody_predictor.interval_to_freq(
-                            prev, pred_interval, &scale_tones,
+                            prev, pred_interval, tones,
                         );
                         note.duration = (pred_duration * 60.0 / self.muse_stream.tempo()).max(0.05);
                     }
