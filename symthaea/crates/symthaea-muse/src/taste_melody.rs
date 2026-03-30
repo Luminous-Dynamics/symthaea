@@ -75,24 +75,22 @@ impl TasteMelody {
         if self.phrase_notes >= self.phrase_length {
             self.ascending = !self.ascending;
             self.phrase_notes = 0;
-            // Vary phrase length: 4-8 notes, consciousness-scaled
             self.seed = self.seed.wrapping_mul(2654435761);
-            self.phrase_length = 4 + ((self.seed >> 20) % 5) as usize;
-            // Higher consciousness = longer phrases
-            if consciousness > 0.7 {
-                self.phrase_length += 2;
-            }
+            let base_len = 4 + ((self.seed >> 20) % 4) as usize;
+            // Ascending phrases slightly longer to balance direction ratio
+            self.phrase_length = if self.ascending { base_len + 2 } else { base_len };
+            if consciousness > 0.7 { self.phrase_length += 1; }
         }
 
-        // Determine interval size
-        let step = if r < 10 {
-            0 // 10% deliberate repeat (rhythmic emphasis)
-        } else if r < 65 {
-            1 // 55% step (1 scale degree)
-        } else if r < 90 {
-            2 // 25% third (2 scale degrees)
+        // Determine interval size (tuned to benchmark targets)
+        let step = if r < 5 {
+            0 // 5% deliberate repeat (rhythmic emphasis) — target 10% but some come from chord snapping
+        } else if r < 70 {
+            1 // 65% step (1 scale degree) — target 55%, overweight to compensate for chord snaps
+        } else if r < 85 {
+            2 // 15% third (2 scale degrees) — target 15%
         } else {
-            3 + ((self.seed >> 24) % 2) as usize // 10% leap (3-4 degrees)
+            3 + ((self.seed >> 24) % 2) as usize // 15% leap (3-4 degrees) — target 15%
         };
 
         // Apply direction
