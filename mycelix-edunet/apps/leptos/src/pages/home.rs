@@ -15,8 +15,9 @@ use wasm_bindgen::JsCast;
 
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
+use crate::curriculum::{use_progress, caps_graph};
 use crate::role::{use_set_role, UserRole};
-use crate::student_profile::use_profile;
+use crate::student_profile::{use_profile, use_set_profile};
 
 fn event_target_value(ev: &leptos::ev::Event) -> String {
     ev.target()
@@ -36,6 +37,8 @@ fn event_target_value(ev: &leptos::ev::Event) -> String {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum HomeView {
+    /// First-time onboarding — collect name and grade
+    Onboarding,
     /// The mentor's greeting — "What do you want to do today?"
     MentorGreeting,
     /// Teacher/parent setup (accessible from bottom link)
@@ -49,7 +52,13 @@ enum HomeView {
 
 #[component]
 pub fn HomePage() -> impl IntoView {
-    let (view_state, set_view_state) = signal(HomeView::MentorGreeting);
+    let profile = use_profile();
+    let initial_view = if profile.get_untracked().onboarding_complete {
+        HomeView::MentorGreeting
+    } else {
+        HomeView::Onboarding
+    };
+    let (view_state, set_view_state) = signal(initial_view);
     let set_role = use_set_role();
     let adaptivity = use_adaptivity();
 
@@ -58,6 +67,9 @@ pub fn HomePage() -> impl IntoView {
     view! {
         <div class="home-landing">
             {move || match view_state.get() {
+                HomeView::Onboarding => view! {
+                    <OnboardingFlow set_view_state=set_view_state set_role=set_role />
+                }.into_any(),
                 HomeView::MentorGreeting => view! {
                     <MentorGreeting set_role=set_role adaptivity=adaptivity.clone() set_view_state=set_view_state />
                 }.into_any(),
@@ -152,6 +164,49 @@ fn MentorGreeting(
                 <p class="mentor-question">"What do you want to do today?"</p>
             </div>
 
+            // Session orchestrator — smart start based on current state
+            {
+                let progress = use_progress();
+                let navigate_session = navigate.clone();
+                let set_role_session = set_role;
+                let (session_dest, set_session_dest) = signal("/skill-map".to_string());
+                let (session_hint, set_session_hint) = signal("Explore the constellation and start growing".to_string());
+
+                // Compute session recommendation reactively
+                Effect::new(move |_| {
+                    let p = progress.get();
+                    let now = js_sys::Date::now();
+                    let due_cards = p.srs_cards.values().filter(|c| now >= c.next_review_ms).count();
+                    let weakest = p.weakest_topics(1);
+                    let weakest_topic = weakest.first().map(|(id, pct)| {
+                        let title = caps_graph().node(id).map(|n| n.title.clone()).unwrap_or_default();
+                        (id.clone(), title, *pct)
+                    });
+
+                    if due_cards > 3 {
+                        set_session_dest.set("/review".to_string());
+                        set_session_hint.set(format!("{} cards due for review", due_cards));
+                    } else if let Some((ref id, ref title, pct)) = weakest_topic {
+                        set_session_dest.set(format!("/study/{}", id));
+                        set_session_hint.set(format!("{} needs attention ({}% mastery)", title, (pct * 100.0) as u32));
+                    } else {
+                        set_session_dest.set("/skill-map".to_string());
+                        set_session_hint.set("Explore the constellation and start growing".to_string());
+                    }
+                });
+
+                view! {
+                    <button class="session-start-btn" on:click=move |_| {
+                        set_role_session.set(Some(UserRole::Student));
+                        let dest = session_dest.get();
+                        navigate_session(&dest, Default::default());
+                    }>
+                        <span style="font-size: 1.2rem; font-weight: 700">"Begin your session"</span>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">{move || session_hint.get()}</span>
+                    </button>
+                }
+            }
+
             <div class="intention-cards">
                 <button class="intention-card intention-practice" on:click=on_practice>
                     <span class="intention-icon">"\u{1f4dd}"</span>
@@ -162,13 +217,13 @@ fn MentorGreeting(
                 <button class="intention-card intention-explore" on:click=on_explore>
                     <span class="intention-icon">"\u{1f4d0}"</span>
                     <span class="intention-label">"Study a topic"</span>
-                    <span class="intention-hint">"Browse the curriculum"</span>
+                    <span class="intention-hint">"Browse the constellation"</span>
                 </button>
 
                 <button class="intention-card intention-create" on:click=on_create>
                     <span class="intention-icon">"\u{1f4ca}"</span>
                     <span class="intention-label">"View my progress"</span>
-                    <span class="intention-hint">"Track mastery and find gaps"</span>
+                    <span class="intention-hint">"Track growth and find gaps"</span>
                 </button>
 
                 <button class="intention-card intention-help" on:click=on_help>
@@ -323,6 +378,98 @@ fn ParentConnectForm(
             >
                 "Connect"
             </button>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Conversational onboarding — 30 seconds, no forms
+// ---------------------------------------------------------------------------
+
+#[component]
+fn OnboardingFlow(
+    set_view_state: WriteSignal<HomeView>,
+    set_role: WriteSignal<Option<UserRole>>,
+) -> impl IntoView {
+    let set_profile = use_set_profile();
+    let (step, set_step) = signal(0_u8);
+    let (name, set_name) = signal(String::new());
+    let (grade, set_grade) = signal(12_u8);
+
+    let finish_onboarding = move || {
+        set_profile.update(|p| {
+            p.name = name.get_untracked();
+            p.grade = grade.get_untracked();
+            p.onboarding_complete = true;
+            if grade.get_untracked() == 12 {
+                p.exam_date = "2026-10-26".to_string();
+            }
+        });
+        set_role.set(Some(UserRole::Student));
+        set_view_state.set(HomeView::MentorGreeting);
+    };
+
+    view! {
+        <div class="onboarding" style="max-width: 500px; margin: 0 auto; padding: 3rem 1.5rem; text-align: center">
+            // Step 0: Name
+            {move || if step.get() == 0 {
+                view! {
+                    <div class="onboarding-step" style="animation: card-in 0.4s ease-out">
+                        <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary)">"Hey there."</h1>
+                        <p style="color: var(--text-secondary); margin-bottom: 2rem">"Welcome to EduNet."</p>
+                        <p style="font-size: 1.1rem; margin-bottom: 1rem">"What should I call you?"</p>
+                        <input
+                            type="text"
+                            placeholder="Your name"
+                            autofocus=true
+                            style="width: 100%; max-width: 300px; padding: 0.75rem 1rem; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; color: var(--text); font-size: 1.1rem; text-align: center; outline: none; font-family: inherit"
+                            prop:value=move || name.get()
+                            on:input=move |ev| set_name.set(leptos::prelude::event_target_value(&ev))
+                            on:keydown=move |ev: leptos::ev::KeyboardEvent| {
+                                if ev.key() == "Enter" && !name.get_untracked().is_empty() {
+                                    set_step.set(1);
+                                }
+                            }
+                        />
+                        <br />
+                        <button
+                            style="margin-top: 1.5rem; padding: 0.6rem 2rem; background: var(--primary); color: var(--text-on-primary); border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit"
+                            on:click=move |_| if !name.get_untracked().is_empty() { set_step.set(1); }
+                        >"Continue"</button>
+                    </div>
+                }.into_any()
+            } else if step.get() == 1 {
+                let name_val = name.get();
+                view! {
+                    <div class="onboarding-step" style="animation: card-in 0.4s ease-out">
+                        <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--primary)">
+                            "Nice to meet you, "{name_val}"."
+                        </h1>
+                        <p style="color: var(--text-secondary); margin-bottom: 2rem">"What grade are you in?"</p>
+                        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap">
+                            {[9_u8, 10, 11, 12].into_iter().map(|g| {
+                                view! {
+                                    <button
+                                        style="padding: 1.25rem 1.5rem; background: var(--surface); border: 2px solid var(--border); border-radius: 16px; color: var(--text); font-size: 1.1rem; font-weight: 600; cursor: pointer; min-width: 80px; font-family: inherit; transition: border-color 0.15s"
+                                        on:click=move |_| {
+                                            set_grade.set(g);
+                                            finish_onboarding();
+                                        }
+                                    >
+                                        "Grade "{g}
+                                    </button>
+                                }
+                            }).collect::<Vec<_>>()}
+                        </div>
+                    </div>
+                }.into_any()
+            } else {
+                view! { <span></span> }.into_any()
+            }}
+
+            <p style="margin-top: 3rem; font-size: 0.8rem; color: var(--text-tertiary)">
+                "Your data stays on your device. You own it."
+            </p>
         </div>
     }
 }

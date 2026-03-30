@@ -5,188 +5,195 @@
     "title": "CAPS.PhysicalSciences.Gr10.CHM.6: Water as a resource. The water cycle. Water quality (pH, ...",
     "grade_level": "Grade10",
     "bloom_level": "Apply",
-    "explanation": "Reaction rate measures how fast reactants are consumed or products formed. Rate = −Δ[reactant]/Δt = +Δ[product]/Δt. Factors: concentration (more collisions), temperature (faster molecules, more exceed Ea), surface area (more exposed particles), catalysts (lower Ea, provide alternative pathway). Collision theory: reactions only occur when particles collide with sufficient energy (≥ Ea) and correct orientation.",
+    "explanation": "Water is essential for life and is treated to make it safe for drinking. Water purification steps: screening (removes large debris), flocculation (chemicals cause particles to clump), sedimentation (clumps settle), filtration (removes remaining particles), chlorination (kills bacteria). Water pollution sources: industrial waste, agricultural runoff (fertilisers cause eutrophication), sewage. pH testing measures water acidity/alkalinity.",
     "examples": [
       {
-        "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
+        "problem": "Solve a Water Chemistry problem.",
         "steps": [
           {
-            "instruction": "Step 1: Δ[H₂O₂] = 0.60 − 0.80 = −0.20 mol/dm³",
-            "result": "change in concentration"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: Rate = −Δ[H₂O₂]/Δt = −(−0.20)/20 = 0.01 mol/dm³/s",
-            "result": "apply formula"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
+          },
+          {
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Rate = 0.01 mol·dm⁻³·s⁻¹",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       },
       {
-        "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
+        "problem": "Solve a Water Chemistry problem.",
         "steps": [
           {
-            "instruction": "Step 1: Δ[H₂O₂] = 0.60 − 0.80 = −0.20 mol/dm³",
-            "result": "change in concentration"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: Rate = −Δ[H₂O₂]/Δt = −(−0.20)/20 = 0.01 mol/dm³/s",
-            "result": "apply formula"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
+          },
+          {
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Rate = 0.01 mol·dm⁻³·s⁻¹",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       },
       {
-        "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
+        "problem": "Solve a Water Chemistry problem.",
         "steps": [
           {
-            "instruction": "Step 1: Δ[H₂O₂] = 0.60 − 0.80 = −0.20 mol/dm³",
-            "result": "change in concentration"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: Rate = −Δ[H₂O₂]/Δt = −(−0.20)/20 = 0.01 mol/dm³/s",
-            "result": "apply formula"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
+          },
+          {
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Rate = 0.01 mol·dm⁻³·s⁻¹",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Practice: Water Chemistry",
+        "answer": "Answer",
         "difficulty_permille": 875,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       }
     ],
     "hints": [
-      "Reaction rate depends on the frequency of effective collisions. What factors increase collision frequency?",
-      "Reaction rate depends on the frequency of effective collisions. What factors increase collision frequency?",
-      "Reaction rate depends on the frequency of effective collisions. What factors increase collision frequency?"
+      "What concept from Water Chemistry applies here?",
+      "Apply the method for Water Chemistry step by step.",
+      "Start by writing down what you know about Water Chemistry."
     ],
     "key_vocabulary": [
       {
-        "term": "activation energy",
-        "definition": "The minimum energy needed for a reaction to occur",
-        "example_usage": "Catalysts lower the activation energy."
+        "term": "purification",
+        "definition": "A key term",
+        "example_usage": "Used in this topic."
       },
       {
-        "term": "collision theory",
-        "definition": "Reactions occur when particles collide with enough energy and correct orientation",
-        "example_usage": "Not all collisions lead to reactions."
-      },
-      {
-        "term": "catalyst",
-        "definition": "A substance that speeds up a reaction without being consumed",
-        "example_usage": "MnO₂ catalyses the decomposition of H₂O₂."
+        "term": "concept",
+        "definition": "An important idea",
+        "example_usage": "Fundamental to understanding."
       }
     ],
     "misconceptions": [
       {
-        "misconception": "Students think catalysts are 'used up' in the reaction.",
-        "correction": "Catalysts provide an alternative pathway with lower activation energy but are regenerated — they are not consumed.",
-        "why_students_think_this": "The catalyst participates in an intermediate step but returns to its original form by the end."
+        "misconception": "A common error in Water Chemistry.",
+        "correction": "The correct understanding.",
+        "why_students_think_this": "This mistake is common because students often skip a key step."
       }
     ],
     "generation_quality": {
@@ -202,69 +209,69 @@
     "title": "Assessment: Water as a resource. The water cycle. Water quality (pH, dissolved oxygen, turbidity). Water purification and treatment. Pollution",
     "items": [
       {
-        "question": "Sketch and label energy profiles for a reaction with and without a catalyst.",
+        "question": "Explain Water Chemistry.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Both curves start and end at the same energy levels. The catalysed curve has a lower peak (lower Ea).",
+        "correct_answer": "Key concept answer.",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Sketch and label energy profiles for a reaction with and without a catalyst.",
+        "question": "Explain Water Chemistry.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Both curves start and end at the same energy levels. The catalysed curve has a lower peak (lower Ea).",
+        "correct_answer": "Key concept answer.",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Sketch and label energy profiles for a reaction with and without a catalyst.",
+        "question": "Explain Water Chemistry.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Both curves start and end at the same energy levels. The catalysed curve has a lower peak (lower Ea).",
+        "correct_answer": "Key concept answer.",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Sketch and label energy profiles for a reaction with and without a catalyst.",
+        "question": "Explain Water Chemistry.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Both curves start and end at the same energy levels. The catalysed curve has a lower peak (lower Ea).",
+        "correct_answer": "Key concept answer.",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Sketch and label energy profiles for a reaction with and without a catalyst.",
+        "question": "Explain Water Chemistry.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Both curves start and end at the same energy levels. The catalysed curve has a lower peak (lower Ea).",
+        "correct_answer": "Key concept answer.",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Sketch and label energy profiles for a reaction with and without a catalyst.",
+        "question": "Explain Water Chemistry.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Both curves start and end at the same energy levels. The catalysed curve has a lower peak (lower Ea).",
+        "correct_answer": "Key concept answer.",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       }
     ],
     "total_points": 15,
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Apply",
+        "Evaluate",
         1
       ],
       [
-        "Evaluate",
+        "Apply",
         1
       ],
       [
@@ -272,11 +279,11 @@
         1
       ],
       [
-        "Create",
+        "Understand",
         1
       ],
       [
-        "Understand",
+        "Create",
         1
       ],
       [
@@ -287,8 +294,8 @@
   },
   "flashcards": [
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -297,8 +304,8 @@
       "difficulty_permille": 111
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -307,8 +314,8 @@
       "difficulty_permille": 222
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -317,8 +324,8 @@
       "difficulty_permille": 333
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -327,8 +334,8 @@
       "difficulty_permille": 444
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -337,8 +344,8 @@
       "difficulty_permille": 555
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -347,8 +354,8 @@
       "difficulty_permille": 666
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -357,8 +364,8 @@
       "difficulty_permille": 777
     },
     {
-      "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "front": "What is the key idea in Water Chemistry?",
+      "back": "Water is essential for life and is treated to make it safe for drinking",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
@@ -373,5 +380,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:35"
+  "generated_at": "2026-03-30T13:18:12"
 }

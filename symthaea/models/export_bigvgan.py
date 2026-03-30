@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """Export BigVGAN v2 (24kHz, 100-band mel) to ONNX format.
 
 Downloads the model from HuggingFace and exports with dynamic axes on the

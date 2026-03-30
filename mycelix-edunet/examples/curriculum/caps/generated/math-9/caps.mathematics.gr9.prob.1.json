@@ -5,212 +5,190 @@
     "title": "CAPS.Mathematics.Gr9.PROB.1: Probability of single events. Probability scale (0 to 1)....",
     "grade_level": "Grade9",
     "bloom_level": "Understand",
-    "explanation": "Grade 12 trigonometry combines compound angles, identities, equations, and applications. Key identities: sin(α±β) = sinα·cosβ ± cosα·sinβ, cos(α±β) = cosα·cosβ ∓ sinα·sinβ. Double angles: sin2α = 2sinα·cosα, cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1. For triangles: sine rule a/sinA = b/sinB, cosine rule a² = b² + c² − 2bc·cosA, area = ½ab·sinC.",
+    "explanation": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
     "examples": [
       {
-        "problem": "Prove that cos2x/(1 + sin2x) = (cosx − sinx)/(cosx + sinx).",
+        "problem": "Solve a basic Probability problem.",
         "steps": [
           {
-            "instruction": "Step 1: LHS numerator = cos²x − sin²x = (cosx − sinx)(cosx + sinx)",
-            "result": "factorise using difference of squares"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = sin²x + cos²x + 2sinx·cosx = (sinx + cosx)²",
-            "result": "rewrite 1 and complete square"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: LHS = (cosx − sinx)(cosx + sinx)/(cosx + sinx)²",
-            "result": "combine"
-          },
-          {
-            "instruction": "Step 4: Cancel (cosx + sinx): = (cosx − sinx)/(cosx + sinx) = RHS ✓",
-            "result": "simplify"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: LHS = RHS. QED",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       },
       {
-        "problem": "Prove that cos2x/(1 + sin2x) = (cosx − sinx)/(cosx + sinx).",
+        "problem": "Solve a basic Probability problem.",
         "steps": [
           {
-            "instruction": "Step 1: LHS numerator = cos²x − sin²x = (cosx − sinx)(cosx + sinx)",
-            "result": "factorise using difference of squares"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = sin²x + cos²x + 2sinx·cosx = (sinx + cosx)²",
-            "result": "rewrite 1 and complete square"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: LHS = (cosx − sinx)(cosx + sinx)/(cosx + sinx)²",
-            "result": "combine"
-          },
-          {
-            "instruction": "Step 4: Cancel (cosx + sinx): = (cosx − sinx)/(cosx + sinx) = RHS ✓",
-            "result": "simplify"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: LHS = RHS. QED",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       },
       {
-        "problem": "Prove that cos2x/(1 + sin2x) = (cosx − sinx)/(cosx + sinx).",
+        "problem": "Solve a basic Probability problem.",
         "steps": [
           {
-            "instruction": "Step 1: LHS numerator = cos²x − sin²x = (cosx − sinx)(cosx + sinx)",
-            "result": "factorise using difference of squares"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = sin²x + cos²x + 2sinx·cosx = (sinx + cosx)²",
-            "result": "rewrite 1 and complete square"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: LHS = (cosx − sinx)(cosx + sinx)/(cosx + sinx)²",
-            "result": "combine"
-          },
-          {
-            "instruction": "Step 4: Cancel (cosx + sinx): = (cosx − sinx)/(cosx + sinx) = RHS ✓",
-            "result": "simplify"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: LHS = RHS. QED",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Probability problem.",
+        "answer": "Answer",
         "difficulty_permille": 875,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       }
     ],
     "hints": [
-      "Can you rewrite this trig equation as a quadratic?",
-      "Let u = cosθ (or sinθ). Solve the quadratic, then find all angles.",
-      "2cos²θ − cosθ − 1 = 0: let c = cosθ. Then 2c² − c − 1 = (2c+1)(c−1) = 0."
+      "What is the key concept in Probability?",
+      "Remember the method for Probability. Apply it step by step.",
+      "For Probability: start by identifying what you know, then apply the formula."
     ],
     "key_vocabulary": [
       {
-        "term": "compound angle",
-        "definition": "An angle formed by adding or subtracting two angles",
-        "example_usage": "sin(α + β) is a compound angle formula."
-      },
-      {
-        "term": "identity",
-        "definition": "An equation true for all values of the variable",
-        "example_usage": "sin²θ + cos²θ = 1 is a trigonometric identity."
-      },
-      {
-        "term": "general solution",
-        "definition": "The full set of angles satisfying a trig equation",
-        "example_usage": "General solution of sinθ = ½ is θ = 30° + k·360° or θ = 150° + k·360°."
+        "term": "probability",
+        "definition": "A key term in this topic",
+        "example_usage": "Used in Grade 9 mathematics."
       }
     ],
     "misconceptions": [
       {
-        "misconception": "Students think sin(A + B) = sinA + sinB.",
-        "correction": "sin(A + B) = sinA·cosB + cosA·sinB. You cannot distribute sin over addition.",
-        "why_students_think_this": "Sine is a function, not a multiplier. Test it: sin(30° + 60°) = sin90° = 1, but sin30° + sin60° = 0.5 + 0.866 = 1.366 ≠ 1."
+        "misconception": "A common mistake in Probability.",
+        "correction": "The correct approach.",
+        "why_students_think_this": "Understanding why students make this error helps avoid it."
       }
     ],
     "generation_quality": {
@@ -226,69 +204,77 @@
     "title": "Assessment: Probability of single events. Probability scale (0 to 1). Relative frequency. Comparing experimental and theoretical probability. Tree diagrams for compound events",
     "items": [
       {
-        "question": "If sinA = 3/5 (A acute) and cosB = −12/13 (B obtuse), find cos(A + B) without a calculator.",
+        "question": "Explain the key idea behind Probability.",
         "item_type": "ShortAnswer",
-        "correct_answer": "cos(A+B) = cosA·cosB − sinA·sinB = (4/5)(−12/13) − (3/5)(5/13) = −48/65 − 15/65 = −63/65",
+        "correct_answer": "The main concept is...",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
-        "hint": "5"
+        "hint": "3"
       },
       {
-        "question": "If sinA = 3/5 (A acute) and cosB = −12/13 (B obtuse), find cos(A + B) without a calculator.",
+        "question": "Explain the key idea behind Probability.",
         "item_type": "ShortAnswer",
-        "correct_answer": "cos(A+B) = cosA·cosB − sinA·sinB = (4/5)(−12/13) − (3/5)(5/13) = −48/65 − 15/65 = −63/65",
+        "correct_answer": "The main concept is...",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
-        "hint": "5"
+        "hint": "3"
       },
       {
-        "question": "If sinA = 3/5 (A acute) and cosB = −12/13 (B obtuse), find cos(A + B) without a calculator.",
+        "question": "Explain the key idea behind Probability.",
         "item_type": "ShortAnswer",
-        "correct_answer": "cos(A+B) = cosA·cosB − sinA·sinB = (4/5)(−12/13) − (3/5)(5/13) = −48/65 − 15/65 = −63/65",
+        "correct_answer": "The main concept is...",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
-        "hint": "5"
+        "hint": "3"
       },
       {
-        "question": "If sinA = 3/5 (A acute) and cosB = −12/13 (B obtuse), find cos(A + B) without a calculator.",
+        "question": "Explain the key idea behind Probability.",
         "item_type": "ShortAnswer",
-        "correct_answer": "cos(A+B) = cosA·cosB − sinA·sinB = (4/5)(−12/13) − (3/5)(5/13) = −48/65 − 15/65 = −63/65",
+        "correct_answer": "The main concept is...",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
-        "hint": "5"
+        "hint": "3"
       },
       {
-        "question": "If sinA = 3/5 (A acute) and cosB = −12/13 (B obtuse), find cos(A + B) without a calculator.",
+        "question": "Explain the key idea behind Probability.",
         "item_type": "ShortAnswer",
-        "correct_answer": "cos(A+B) = cosA·cosB − sinA·sinB = (4/5)(−12/13) − (3/5)(5/13) = −48/65 − 15/65 = −63/65",
+        "correct_answer": "The main concept is...",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
-        "hint": "5"
+        "hint": "3"
       },
       {
-        "question": "If sinA = 3/5 (A acute) and cosB = −12/13 (B obtuse), find cos(A + B) without a calculator.",
+        "question": "Explain the key idea behind Probability.",
         "item_type": "ShortAnswer",
-        "correct_answer": "cos(A+B) = cosA·cosB − sinA·sinB = (4/5)(−12/13) − (3/5)(5/13) = −48/65 − 15/65 = −63/65",
+        "correct_answer": "The main concept is...",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
-        "hint": "5"
+        "hint": "3"
       }
     ],
     "total_points": 15,
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
+        "Apply",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
         "Remember",
         1
       ],
       [
-        "Apply",
+        "Analyze",
         1
       ],
       [
@@ -298,21 +284,13 @@
       [
         "Evaluate",
         1
-      ],
-      [
-        "Create",
-        1
-      ],
-      [
-        "Analyze",
-        1
       ]
     ]
   },
   "flashcards": [
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -321,8 +299,8 @@
       "difficulty_permille": 111
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -331,8 +309,8 @@
       "difficulty_permille": 222
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -341,8 +319,8 @@
       "difficulty_permille": 333
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -351,8 +329,8 @@
       "difficulty_permille": 444
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -361,8 +339,8 @@
       "difficulty_permille": 555
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -371,8 +349,8 @@
       "difficulty_permille": 666
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -381,8 +359,8 @@
       "difficulty_permille": 777
     },
     {
-      "front": "Write the double angle formula for cos2α (three forms).",
-      "back": "cos2α = cos²α − sin²α = 1 − 2sin²α = 2cos²α − 1",
+      "front": "What is the key concept in Probability?",
+      "back": "Probability measures how likely an event is to occur, on a scale from 0 (impossible) to 1 (certain). P(event) = number of favourable outcomes / total number of outcomes. The probability of an event NOT happening is 1 - P(event). Tree diagrams show all possible outcomes for two or more events and help calculate combined probabilities.",
       "tags": [
         "CAPS.Mathematics.Gr9.PROB.1",
         "Grade9",
@@ -397,5 +375,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T15:47:37"
+  "generated_at": "2026-03-30T13:17:55"
 }

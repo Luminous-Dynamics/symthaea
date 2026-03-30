@@ -62,370 +62,40 @@ use super::{
     WorldModelBridge,
 };
 
-/// Adapter: wraps HelicopterEmbodiment to implement the main crate's EmbodimentBridge trait.
-/// Needed because the helicopter crate can't depend on the main crate (circular dep).
-#[cfg(feature = "helicopter")]
-struct HelicopterBridgeAdapter(crate::helicopter::embodiment::HelicopterEmbodiment);
+/// Macro: generate a thin adapter that wraps a platform's embodiment struct
+/// and delegates all EmbodimentBridge methods. Since all types now come from
+/// `symthaea_core::embodiment`, step/telemetry/safety_level pass through directly.
+macro_rules! bridge_adapter {
+    ($name:ident, $inner:ty, $platform:ident, $actuators:expr, $feature:literal) => {
+        #[cfg(feature = $feature)]
+        struct $name($inner);
 
-#[cfg(feature = "helicopter")]
-impl super::motor_bridge::EmbodimentBridge for HelicopterBridgeAdapter {
-    fn step(
-        &mut self,
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        dt: f32,
-        phi: f64,
-    ) -> super::motor_bridge::EmbodimentResult {
-        let r = self.0.step(thought_hv, dt, phi);
-        super::motor_bridge::EmbodimentResult {
-            num_actuators: r.num_actuators,
-            control_effort: r.control_effort,
-            success: r.success,
-            prediction_error: r.prediction_error,
-            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
+        #[cfg(feature = $feature)]
+        impl super::motor_bridge::EmbodimentBridge for $name {
+            fn step(&mut self, thought_hv: &symthaea_core::hdc::ContinuousHV, dt: f32, phi: f64)
+                -> super::motor_bridge::EmbodimentResult
+            { self.0.step(thought_hv, dt, phi) }
+
+            fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV
+            { self.0.encode_perception() }
+
+            fn reset(&mut self) { self.0.reset(); }
+            fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel { self.0.safety_level() }
+            fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) { self.0.set_safety_override(level); }
+            fn clear_safety_override(&mut self) { self.0.clear_safety_override(); }
+            fn platform(&self) -> super::motor_bridge::EmbodimentPlatform { super::motor_bridge::EmbodimentPlatform::$platform }
+            fn num_actuators(&self) -> usize { $actuators }
+            fn total_steps(&self) -> usize { self.0.total_steps() }
+            fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry { self.0.telemetry() }
         }
-    }
-
-    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.0.encode_perception()
-    }
-
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-
-    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-        super::motor_bridge::MotorSafetyLevel::from_phi(0.5) // Default; updated on step()
-    }
-
-    fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) {
-        let platform_level = crate::helicopter::embodiment::MotorSafetyLevel::from_phi(
-            bridge_safety_to_phi(&level),
-        );
-        self.0.set_safety_override(platform_level);
-    }
-
-    fn clear_safety_override(&mut self) {
-        self.0.clear_safety_override();
-    }
-
-    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-        super::motor_bridge::EmbodimentPlatform::Helicopter
-    }
-
-    fn num_actuators(&self) -> usize {
-        6
-    }
-
-    fn total_steps(&self) -> usize {
-        self.0.total_steps()
-    }
-
-    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-        let t = self.0.telemetry();
-        super::motor_bridge::EmbodimentTelemetry {
-            total_steps: t.total_steps,
-            control_effort: t.control_effort,
-            prediction_error: t.prediction_error,
-            safety_level: t.safety_level,
-            platform: t.platform,
-            num_actuators: t.num_actuators,
-        }
-    }
+    };
 }
 
-/// Helper: convert main-crate MotorSafetyLevel to a representative phi value
-/// so the platform crate's `MotorSafetyLevel::from_phi()` reproduces the same level.
-#[cfg(any(feature = "helicopter", feature = "flight", feature = "vehicle", feature = "manipulator", feature = "auv"))]
-#[inline]
-fn bridge_safety_to_phi(level: &super::motor_bridge::MotorSafetyLevel) -> f64 {
-    match level {
-        super::motor_bridge::MotorSafetyLevel::Green => 0.7,
-        super::motor_bridge::MotorSafetyLevel::Yellow => 0.4,
-        super::motor_bridge::MotorSafetyLevel::Orange => 0.2,
-        super::motor_bridge::MotorSafetyLevel::Red => 0.0,
-    }
-}
-
-// ── Flight (Quadrotor) adapter ──────────────────────────────────────────────
-
-#[cfg(feature = "flight")]
-struct FlightBridgeAdapter(crate::flight::embodiment::FlightEmbodiment);
-
-#[cfg(feature = "flight")]
-impl super::motor_bridge::EmbodimentBridge for FlightBridgeAdapter {
-    fn step(
-        &mut self,
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        dt: f32,
-        phi: f64,
-    ) -> super::motor_bridge::EmbodimentResult {
-        let r = self.0.step(thought_hv, dt, phi);
-        super::motor_bridge::EmbodimentResult {
-            num_actuators: r.num_actuators,
-            control_effort: r.control_effort,
-            success: r.success,
-            prediction_error: r.prediction_error,
-            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
-        }
-    }
-
-    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.0.encode_perception()
-    }
-
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-
-    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-        super::motor_bridge::MotorSafetyLevel::from_phi(0.5)
-    }
-
-    fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) {
-        let platform_level =
-            crate::flight::embodiment::MotorSafetyLevel::from_phi(bridge_safety_to_phi(&level));
-        self.0.set_safety_override(platform_level);
-    }
-
-    fn clear_safety_override(&mut self) {
-        self.0.clear_safety_override();
-    }
-
-    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-        super::motor_bridge::EmbodimentPlatform::Quadrotor
-    }
-
-    fn num_actuators(&self) -> usize {
-        4
-    }
-
-    fn total_steps(&self) -> usize {
-        self.0.total_steps()
-    }
-
-    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-        let t = self.0.telemetry();
-        super::motor_bridge::EmbodimentTelemetry {
-            total_steps: t.total_steps,
-            control_effort: t.control_effort,
-            prediction_error: t.prediction_error,
-            safety_level: t.safety_level,
-            platform: t.platform,
-            num_actuators: t.num_actuators,
-        }
-    }
-}
-
-// ── Vehicle adapter ─────────────────────────────────────────────────────────
-
-#[cfg(feature = "vehicle")]
-struct VehicleBridgeAdapter(crate::vehicle::embodiment::VehicleEmbodiment);
-
-#[cfg(feature = "vehicle")]
-impl super::motor_bridge::EmbodimentBridge for VehicleBridgeAdapter {
-    fn step(
-        &mut self,
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        dt: f32,
-        phi: f64,
-    ) -> super::motor_bridge::EmbodimentResult {
-        let r = self.0.step(thought_hv, dt, phi);
-        super::motor_bridge::EmbodimentResult {
-            num_actuators: r.num_actuators,
-            control_effort: r.control_effort,
-            success: r.success,
-            prediction_error: r.prediction_error,
-            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
-        }
-    }
-
-    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.0.encode_perception()
-    }
-
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-
-    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-        super::motor_bridge::MotorSafetyLevel::from_phi(0.5)
-    }
-
-    fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) {
-        let platform_level =
-            crate::vehicle::embodiment::MotorSafetyLevel::from_phi(bridge_safety_to_phi(&level));
-        self.0.set_safety_override(platform_level);
-    }
-
-    fn clear_safety_override(&mut self) {
-        self.0.clear_safety_override();
-    }
-
-    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-        super::motor_bridge::EmbodimentPlatform::Vehicle
-    }
-
-    fn num_actuators(&self) -> usize {
-        3
-    }
-
-    fn total_steps(&self) -> usize {
-        self.0.total_steps()
-    }
-
-    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-        let t = self.0.telemetry();
-        super::motor_bridge::EmbodimentTelemetry {
-            total_steps: t.total_steps,
-            control_effort: t.control_effort,
-            prediction_error: t.prediction_error,
-            safety_level: t.safety_level,
-            platform: t.platform,
-            num_actuators: t.num_actuators,
-        }
-    }
-}
-
-// ── Manipulator adapter ─────────────────────────────────────────────────────
-
-#[cfg(feature = "manipulator")]
-struct ManipulatorBridgeAdapter(crate::manipulator::embodiment::ManipulatorEmbodiment);
-
-#[cfg(feature = "manipulator")]
-impl super::motor_bridge::EmbodimentBridge for ManipulatorBridgeAdapter {
-    fn step(
-        &mut self,
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        dt: f32,
-        phi: f64,
-    ) -> super::motor_bridge::EmbodimentResult {
-        let r = self.0.step(thought_hv, dt, phi);
-        super::motor_bridge::EmbodimentResult {
-            num_actuators: r.num_actuators,
-            control_effort: r.control_effort,
-            success: r.success,
-            prediction_error: r.prediction_error,
-            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
-        }
-    }
-
-    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.0.encode_perception()
-    }
-
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-
-    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-        super::motor_bridge::MotorSafetyLevel::from_phi(0.5)
-    }
-
-    fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) {
-        let platform_level = crate::manipulator::embodiment::MotorSafetyLevel::from_phi(
-            bridge_safety_to_phi(&level),
-        );
-        self.0.set_safety_override(platform_level);
-    }
-
-    fn clear_safety_override(&mut self) {
-        self.0.clear_safety_override();
-    }
-
-    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-        super::motor_bridge::EmbodimentPlatform::Manipulator
-    }
-
-    fn num_actuators(&self) -> usize {
-        8
-    }
-
-    fn total_steps(&self) -> usize {
-        self.0.total_steps()
-    }
-
-    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-        let t = self.0.telemetry();
-        super::motor_bridge::EmbodimentTelemetry {
-            total_steps: t.total_steps,
-            control_effort: t.control_effort,
-            prediction_error: t.prediction_error,
-            safety_level: t.safety_level,
-            platform: t.platform,
-            num_actuators: t.num_actuators,
-        }
-    }
-}
-
-// ── AUV adapter ─────────────────────────────────────────────────────────────
-
-#[cfg(feature = "auv")]
-struct AuvBridgeAdapter(crate::auv::embodiment::AuvEmbodiment);
-
-#[cfg(feature = "auv")]
-impl super::motor_bridge::EmbodimentBridge for AuvBridgeAdapter {
-    fn step(
-        &mut self,
-        thought_hv: &symthaea_core::hdc::ContinuousHV,
-        dt: f32,
-        phi: f64,
-    ) -> super::motor_bridge::EmbodimentResult {
-        let r = self.0.step(thought_hv, dt, phi);
-        super::motor_bridge::EmbodimentResult {
-            num_actuators: r.num_actuators,
-            control_effort: r.control_effort,
-            success: r.success,
-            prediction_error: r.prediction_error,
-            safety_level: super::motor_bridge::MotorSafetyLevel::from_phi(phi),
-        }
-    }
-
-    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
-        self.0.encode_perception()
-    }
-
-    fn reset(&mut self) {
-        self.0.reset();
-    }
-
-    fn safety_level(&self) -> super::motor_bridge::MotorSafetyLevel {
-        super::motor_bridge::MotorSafetyLevel::from_phi(0.5)
-    }
-
-    fn set_safety_override(&mut self, level: super::motor_bridge::MotorSafetyLevel) {
-        let platform_level =
-            crate::auv::embodiment::MotorSafetyLevel::from_phi(bridge_safety_to_phi(&level));
-        self.0.set_safety_override(platform_level);
-    }
-
-    fn clear_safety_override(&mut self) {
-        self.0.clear_safety_override();
-    }
-
-    fn platform(&self) -> super::motor_bridge::EmbodimentPlatform {
-        super::motor_bridge::EmbodimentPlatform::Auv
-    }
-
-    fn num_actuators(&self) -> usize {
-        8
-    }
-
-    fn total_steps(&self) -> usize {
-        self.0.total_steps()
-    }
-
-    fn telemetry(&self) -> super::motor_bridge::EmbodimentTelemetry {
-        let t = self.0.telemetry();
-        super::motor_bridge::EmbodimentTelemetry {
-            total_steps: t.total_steps,
-            control_effort: t.control_effort,
-            prediction_error: t.prediction_error,
-            safety_level: t.safety_level,
-            platform: t.platform,
-            num_actuators: t.num_actuators,
-        }
-    }
-}
+bridge_adapter!(HelicopterBridgeAdapter, crate::helicopter::embodiment::HelicopterEmbodiment, Helicopter, 6, "helicopter");
+bridge_adapter!(FlightBridgeAdapter, crate::flight::embodiment::FlightEmbodiment, Quadrotor, 4, "flight");
+bridge_adapter!(VehicleBridgeAdapter, crate::vehicle::embodiment::VehicleEmbodiment, Vehicle, 3, "vehicle");
+bridge_adapter!(ManipulatorBridgeAdapter, crate::manipulator::embodiment::ManipulatorEmbodiment, Manipulator, 8, "manipulator");
+bridge_adapter!(AuvBridgeAdapter, crate::auv::embodiment::AuvEmbodiment, Auv, 8, "auv");
 
 impl CognitiveLoopService {
     /// Create a new cognitive loop service
@@ -1430,6 +1100,8 @@ impl CognitiveLoopService {
                 MasterConsciousnessEquation::default(),
             ),
             substrate_manager,
+            #[cfg(feature = "neural_validation")]
+            cortical_history: std::collections::VecDeque::with_capacity(1000),
             // physics_integration moved to feature_integ manager
             convergence_cycle: 0,
             governance_consciousness_lag: std::collections::VecDeque::with_capacity(
@@ -1502,6 +1174,8 @@ impl CognitiveLoopService {
             governance_mgr: super::managers::GovernanceManager::default(),
             #[cfg(feature = "mycelix")]
             factcheck_bridge: super::broca_factcheck::BrocaFactcheckBridge::new(),
+            #[cfg(feature = "epistemic")]
+            known_unknowns: Some(crate::consciousness::sacred_stillness::KnownUnknowns::new()),
             swarm_manager: super::managers::SwarmManager::default(),
             #[cfg(feature = "muse")]
             muse_manager: super::managers::MuseManager::new(),

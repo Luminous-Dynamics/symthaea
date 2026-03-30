@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """Fine-grained BFT testing between 35% and 40% in 1% increments.
 
 Based on initial sweep:

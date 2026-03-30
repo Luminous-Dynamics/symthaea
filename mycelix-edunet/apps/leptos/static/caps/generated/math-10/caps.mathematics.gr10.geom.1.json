@@ -79,33 +79,33 @@
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
+        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "No because angles aren't equal",
+          "Yes because all angles = 90°",
+          "Cannot determine"
         ]
       },
       {
@@ -284,11 +284,11 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Evaluate",
+        "Create",
         1
       ],
       [
-        "Create",
+        "Analyze",
         1
       ],
       [
@@ -300,11 +300,11 @@
         1
       ],
       [
-        "Analyze",
+        "Remember",
         1
       ],
       [
-        "Remember",
+        "Evaluate",
         1
       ]
     ]
@@ -397,5 +397,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:30"
+  "generated_at": "2026-03-30T13:18:01"
 }

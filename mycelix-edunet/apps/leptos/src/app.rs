@@ -41,6 +41,9 @@ fn AppInner() -> impl IntoView {
     let (_profile, _set_profile) = provide_profile_context();
     provide_curriculum_context();
 
+    // Wire consciousness signals to CSS custom properties
+    crate::consciousness_ui::init_consciousness_ui();
+
     view! {
         <Router>
             <nav class="navbar">
@@ -53,6 +56,7 @@ fn AppInner() -> impl IntoView {
                     <ConnectionBadge />
                 </div>
             </nav>
+            <CelebrationOverlay />
             <main>
                 <Routes fallback=|| view! { <p>"Page not found"</p> }>
                     <Route path=path!("/") view=HomePage />
@@ -109,6 +113,34 @@ fn RoleNav(role: ReadSignal<Option<UserRole>>) -> impl IntoView {
             <A href="/dashboard">"Progress"</A>
             <A href="/credentials">"Reports"</A>
         }.into_any(),
+    }
+}
+
+/// Brief celebration overlay when a topic is mastered.
+#[component]
+fn CelebrationOverlay() -> impl IntoView {
+    let celebrating = expect_context::<ReadSignal<bool>>();
+    let topic = expect_context::<ReadSignal<String>>();
+
+    view! {
+        {move || {
+            if celebrating.get() {
+                let topic_name = topic.get();
+                view! {
+                    <div class="mastery-celebration">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem">"\u{1F331}"</div>
+                        <div class="mastery-celebration-text">"Deeply rooted"</div>
+                        {if !topic_name.is_empty() {
+                            view! { <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem">{topic_name}" has taken root in your garden"</div> }.into_any()
+                        } else {
+                            view! { <span></span> }.into_any()
+                        }}
+                    </div>
+                }.into_any()
+            } else {
+                view! { <span></span> }.into_any()
+            }
+        }}
     }
 }
 

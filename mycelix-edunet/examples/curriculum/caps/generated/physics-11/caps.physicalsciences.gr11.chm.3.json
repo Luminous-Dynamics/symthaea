@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.CHM.3: Open and closed systems. Reversible reactions. Dynamic eq...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Dynamic equilibrium occurs in a closed system when the rate of the forward reaction equals the rate of the reverse reaction. Le Chatelier's principle: if a system at equilibrium is disturbed, it shifts to counteract the disturbance. Kc = [products]ᵖ/[reactants]ʳ at equilibrium. A large Kc means products are favoured. A catalyst speeds up both directions equally — it does NOT shift equilibrium.",
+    "explanation": "Reaction rate measures how fast reactants are consumed or products formed. Rate = −Δ[reactant]/Δt = +Δ[product]/Δt. Factors: concentration (more collisions), temperature (faster molecules, more exceed Ea), surface area (more exposed particles), catalysts (lower Ea, provide alternative pathway). Collision theory: reactions only occur when particles collide with sufficient energy (≥ Ea) and correct orientation.",
     "examples": [
       {
         "problem": "For N₂(g) + 3H₂(g) ⇌ 2NH₃(g) (ΔH < 0), predict the effect of increasing temperature.",
@@ -279,19 +279,7 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Evaluate",
-        1
-      ],
-      [
         "Apply",
-        1
-      ],
-      [
-        "Analyze",
-        1
-      ],
-      [
-        "Remember",
         1
       ],
       [
@@ -299,7 +287,19 @@
         1
       ],
       [
+        "Remember",
+        1
+      ],
+      [
         "Understand",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Evaluate",
         1
       ]
     ]
@@ -392,5 +392,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:37"
+  "generated_at": "2026-03-30T13:18:17"
 }

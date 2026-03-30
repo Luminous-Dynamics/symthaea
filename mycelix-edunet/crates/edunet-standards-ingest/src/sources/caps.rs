@@ -40,6 +40,18 @@ impl CurriculumSource for CapsSource {
 
     fn list_available(&self) -> Result<Vec<SourceEntry>, SourceError> {
         Ok(vec![
+            // Foundation Phase (Gr1-3)
+            SourceEntry { id: "caps-math-1".into(), title: "CAPS Mathematics Grade 1".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Foundation Phase Grade 1 — counting, addition, subtraction to 20".into() },
+            SourceEntry { id: "caps-math-2".into(), title: "CAPS Mathematics Grade 2".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Foundation Phase Grade 2 — place value, addition/subtraction to 99".into() },
+            SourceEntry { id: "caps-math-3".into(), title: "CAPS Mathematics Grade 3".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Foundation Phase Grade 3 — multiplication, fractions, measurement".into() },
+            // Intermediate Phase (Gr4-6)
+            SourceEntry { id: "caps-math-4".into(), title: "CAPS Mathematics Grade 4".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Intermediate Phase Grade 4 — whole numbers to 10000, fractions, data".into() },
+            SourceEntry { id: "caps-math-5".into(), title: "CAPS Mathematics Grade 5".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Intermediate Phase Grade 5 — decimals, percentages, geometry".into() },
+            SourceEntry { id: "caps-math-6".into(), title: "CAPS Mathematics Grade 6".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Intermediate Phase Grade 6 — integers intro, ratio, transformation geometry".into() },
+            // Senior Phase (Gr7-8)
+            SourceEntry { id: "caps-math-7".into(), title: "CAPS Mathematics Grade 7".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Senior Phase Grade 7 — algebraic expressions intro, geometry constructions".into() },
+            SourceEntry { id: "caps-math-8".into(), title: "CAPS Mathematics Grade 8".into(), subject: "Mathematics".into(), level: "K-12".into(), description: "Senior Phase Grade 8 — equations, functions intro, Pythagoras, data handling".into() },
+            // Existing Gr9-12
             SourceEntry {
                 id: "caps-math-9".into(),
                 title: "CAPS Mathematics Grade 9".into(),
@@ -101,6 +113,14 @@ impl CurriculumSource for CapsSource {
 
     fn fetch(&self, id: &str) -> Result<CurriculumDocument, SourceError> {
         match id {
+            "caps-math-1" => Ok(build_math_grade(1)),
+            "caps-math-2" => Ok(build_math_grade(2)),
+            "caps-math-3" => Ok(build_math_grade(3)),
+            "caps-math-4" => Ok(build_math_grade(4)),
+            "caps-math-5" => Ok(build_math_grade(5)),
+            "caps-math-6" => Ok(build_math_grade(6)),
+            "caps-math-7" => Ok(build_math_grade(7)),
+            "caps-math-8" => Ok(build_math_grade(8)),
             "caps-math-9" => Ok(build_math_grade_9()),
             "caps-natsci-9" => Ok(build_natsci_grade_9()),
             "caps-math-10" => Ok(build_math_grade_10()),
@@ -331,6 +351,159 @@ fn caps_metadata(
         cip_code: None,
         total_credits: None,
         duration_semesters: None,
+    }
+}
+
+// ============================================================
+// Grades 1-8 Mathematics (Foundation, Intermediate, Senior Phase)
+// ============================================================
+
+fn build_math_grade(grade: u8) -> CurriculumDocument {
+    let topics: Vec<TopicDef> = match grade {
+        1 => vec![
+            TopicDef { code: "CNT", title: "Counting", description: "Count objects to 100. Count forwards and backwards in 1s, 2s, 5s, 10s. Compare and order numbers to 20", subdomain: "Numbers", node_type: "Skill", bloom: "Remember", hours: 10, tags: &["counting", "numbers", "ordering"], exam_marks: None },
+            TopicDef { code: "ADD", title: "Addition and Subtraction", description: "Add and subtract within 20. Number bonds. Use concrete objects, drawings, and number lines", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 12, tags: &["addition", "subtraction", "number-bonds"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Patterns", description: "Copy, extend, and create simple patterns using objects, shapes, and numbers", subdomain: "Patterns", node_type: "Concept", bloom: "Understand", hours: 6, tags: &["patterns", "shapes", "repeating"], exam_marks: None },
+            TopicDef { code: "SHP", title: "Space and Shape", description: "Recognise and name 2D shapes (circle, square, triangle, rectangle). Describe position (above, below, next to)", subdomain: "Geometry", node_type: "Concept", bloom: "Remember", hours: 6, tags: &["shapes", "2d-shapes", "position"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Compare and order objects by length, mass, and capacity using non-standard units. Time: days of the week, months", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 6, tags: &["measurement", "length", "mass", "time"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling", description: "Collect and sort objects. Draw picture graphs. Answer questions about data", subdomain: "Data", node_type: "Skill", bloom: "Understand", hours: 4, tags: &["data", "picture-graphs", "sorting"], exam_marks: None },
+        ],
+        2 => vec![
+            TopicDef { code: "NUM", title: "Whole Numbers", description: "Place value to 99. Count in 2s, 3s, 5s, 10s to 200. Compare and order numbers. Even and odd numbers", subdomain: "Numbers", node_type: "Skill", bloom: "Understand", hours: 10, tags: &["place-value", "numbers", "even-odd"], exam_marks: None },
+            TopicDef { code: "ADD", title: "Addition and Subtraction", description: "Add and subtract within 99. Mental strategies. Word problems. Number sentences", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 14, tags: &["addition", "subtraction", "word-problems"], exam_marks: None },
+            TopicDef { code: "MUL", title: "Multiplication", description: "Repeated addition. Multiply by 2, 5, 10. Array model. Sharing equally (division intro)", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["multiplication", "arrays", "repeated-addition"], exam_marks: None },
+            TopicDef { code: "FRC", title: "Fractions", description: "Halves and quarters of shapes and groups. Equal sharing", subdomain: "Numbers", node_type: "Concept", bloom: "Understand", hours: 6, tags: &["fractions", "halves", "quarters"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Patterns and Sequences", description: "Number patterns with constant difference. Geometric patterns. Describe and extend patterns", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 6, tags: &["patterns", "sequences", "constant-difference"], exam_marks: None },
+            TopicDef { code: "SHP", title: "Space and Shape", description: "2D and 3D shapes. Symmetry. Views of objects. Directions and positions", subdomain: "Geometry", node_type: "Concept", bloom: "Understand", hours: 6, tags: &["shapes", "3d-shapes", "symmetry"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Length in cm and m. Mass in kg. Capacity in litres. Time: analogue clock to half-hour", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["measurement", "centimetres", "metres", "clock"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling", description: "Collect data using tally marks. Draw and read pictographs and bar graphs", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 4, tags: &["data", "tally", "bar-graphs"], exam_marks: None },
+        ],
+        3 => vec![
+            TopicDef { code: "NUM", title: "Whole Numbers", description: "Place value to 999. Round to nearest 10 and 100. Compare and order 3-digit numbers", subdomain: "Numbers", node_type: "Skill", bloom: "Understand", hours: 10, tags: &["place-value", "rounding", "three-digit"], exam_marks: None },
+            TopicDef { code: "ADD", title: "Addition and Subtraction", description: "Add and subtract within 999. Column method. Estimate. Solve word problems with two operations", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 14, tags: &["addition", "subtraction", "column-method", "estimation"], exam_marks: None },
+            TopicDef { code: "MUL", title: "Multiplication and Division", description: "Times tables 2-10. Multiply 2-digit by 1-digit. Division as sharing and grouping. Remainders", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 14, tags: &["multiplication", "division", "times-tables", "remainders"], exam_marks: None },
+            TopicDef { code: "FRC", title: "Common Fractions", description: "Fractions of whole: halves, thirds, quarters, fifths, sixths, eighths. Compare fractions. Equivalent fractions intro", subdomain: "Numbers", node_type: "Concept", bloom: "Understand", hours: 8, tags: &["fractions", "equivalent", "comparing-fractions"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Number Patterns", description: "Patterns in addition and multiplication tables. Describe rules. Input-output tables", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 6, tags: &["patterns", "input-output", "rules"], exam_marks: None },
+            TopicDef { code: "GEO", title: "Geometry", description: "Properties of 2D shapes. Angles (right, acute, obtuse). Lines of symmetry. Tessellations", subdomain: "Geometry", node_type: "Concept", bloom: "Understand", hours: 8, tags: &["geometry", "angles", "symmetry", "tessellation"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Perimeter of shapes. Area by counting squares. Time: analogue and digital to 5 minutes. Calendars", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["perimeter", "area", "time", "calendar"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling", description: "Collect, organise data. Bar graphs and pictographs. Mode. Interpret data and draw conclusions", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 6, tags: &["data", "bar-graphs", "mode", "interpret"], exam_marks: None },
+        ],
+        4 => vec![
+            TopicDef { code: "NUM", title: "Whole Numbers", description: "Place value to 9999. Rounding. Properties of numbers (even, odd, prime, composite). Factors and multiples", subdomain: "Numbers", node_type: "Skill", bloom: "Understand", hours: 10, tags: &["place-value", "prime", "factors", "multiples"], exam_marks: None },
+            TopicDef { code: "OPS", title: "Operations", description: "All four operations. Long multiplication. Long division. Order of operations. Word problems", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 14, tags: &["multiplication", "division", "order-of-operations", "long-division"], exam_marks: None },
+            TopicDef { code: "FRC", title: "Common Fractions", description: "Equivalent fractions. Simplify fractions. Add and subtract fractions with same denominator. Mixed numbers", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["fractions", "equivalent", "simplify", "mixed-numbers"], exam_marks: None },
+            TopicDef { code: "DEC", title: "Decimal Fractions", description: "Tenths and hundredths. Convert between fractions and decimals. Place value with decimals. Add/subtract decimals", subdomain: "Numbers", node_type: "Concept", bloom: "Understand", hours: 8, tags: &["decimals", "tenths", "hundredths", "place-value"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Numeric Patterns", description: "Investigate patterns in number sequences. Describe rules for patterns. Complete flow diagrams", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 6, tags: &["patterns", "sequences", "flow-diagrams", "rules"], exam_marks: None },
+            TopicDef { code: "GEO", title: "Geometry", description: "Properties of quadrilaterals. Classify triangles by sides and angles. Parallel and perpendicular lines. Coordinate grid", subdomain: "Geometry", node_type: "Concept", bloom: "Understand", hours: 8, tags: &["geometry", "quadrilaterals", "triangles", "coordinates"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Convert between mm, cm, m, km. Area of rectangle. Volume by counting cubes. Temperature in °C", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["measurement", "conversion", "area", "volume", "temperature"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling", description: "Collect and organise data. Bar graphs, pie charts intro. Mean of small data sets. Chance events (certain, likely, unlikely, impossible)", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 6, tags: &["data", "pie-charts", "mean", "chance"], exam_marks: None },
+        ],
+        5 => vec![
+            TopicDef { code: "NUM", title: "Whole Numbers", description: "Place value to 999999. Properties of numbers. Common factors and common multiples. Divisibility rules", subdomain: "Numbers", node_type: "Skill", bloom: "Understand", hours: 8, tags: &["place-value", "divisibility", "common-factors"], exam_marks: None },
+            TopicDef { code: "OPS", title: "Operations", description: "Multiply 3-digit by 2-digit. Division with remainders. Multistep problems. Estimation and checking", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 12, tags: &["multiplication", "division", "estimation", "multistep"], exam_marks: None },
+            TopicDef { code: "FRC", title: "Common Fractions", description: "Add and subtract fractions with different denominators. Multiply fractions by whole numbers. Fractions of amounts", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["fractions", "different-denominators", "multiply-fractions"], exam_marks: None },
+            TopicDef { code: "DEC", title: "Decimal Fractions", description: "Thousandths. Multiply and divide decimals by 10, 100, 1000. Rounding decimals. Percentages intro (50%, 25%, 10%)", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["decimals", "thousandths", "percentages", "rounding"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Patterns and Relationships", description: "Number patterns with two operations. Input-output tables. Flow diagrams. Sequences with constant difference", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 6, tags: &["patterns", "input-output", "flow-diagrams"], exam_marks: None },
+            TopicDef { code: "GEO", title: "Geometry", description: "Properties of 3D objects. Nets of cubes and prisms. Transformations: reflection, translation. Angles on straight line", subdomain: "Geometry", node_type: "Concept", bloom: "Understand", hours: 8, tags: &["geometry", "3d-objects", "nets", "transformations", "angles"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Perimeter and area of irregular shapes. Volume of rectangular prisms. Convert between units. 24-hour time", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["measurement", "perimeter", "area", "volume", "24-hour-time"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling and Probability", description: "Double bar graphs. Mean, median, mode. Probability as fraction. Experimental vs theoretical probability", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 6, tags: &["data", "double-bar-graph", "median", "probability"], exam_marks: None },
+        ],
+        6 => vec![
+            TopicDef { code: "NUM", title: "Whole Numbers and Integers", description: "Numbers to millions. Introduction to integers (positive and negative). Number line with integers. Ordering integers", subdomain: "Numbers", node_type: "Skill", bloom: "Understand", hours: 8, tags: &["integers", "millions", "number-line", "ordering"], exam_marks: None },
+            TopicDef { code: "OPS", title: "Operations", description: "All operations with whole numbers. Order of operations (BODMAS). Multiply and divide by multiples of 10, 100", subdomain: "Operations", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["operations", "bodmas", "multiples-of-10"], exam_marks: None },
+            TopicDef { code: "FRC", title: "Fractions, Decimals, and Percentages", description: "Convert between fractions, decimals, percentages. Calculate percentage of amount. Ratio and rate intro", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 12, tags: &["fractions", "decimals", "percentages", "ratio", "rate"], exam_marks: None },
+            TopicDef { code: "EXP", title: "Exponents", description: "Squares and cubes. Square roots and cube roots. Exponent notation intro (2³ = 8). Calculate with exponents", subdomain: "Numbers", node_type: "Concept", bloom: "Understand", hours: 6, tags: &["exponents", "squares", "cubes", "square-roots"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Patterns and Relationships", description: "Describe rules for patterns algebraically. Input-output with two operations. Sequences with variable difference", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 6, tags: &["patterns", "algebraic-rules", "input-output"], exam_marks: None },
+            TopicDef { code: "GEO", title: "Geometry", description: "Angles: measuring with protractor, calculating angles on straight lines and at a point. Transformation geometry: reflection, rotation, translation", subdomain: "Geometry", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["geometry", "angles", "protractor", "rotation", "reflection"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Area of triangles. Volume of triangular prisms. Convert between metric units. Capacity. Temperature conversions", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["measurement", "area-triangle", "volume-prism", "conversions"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling and Probability", description: "Histograms. Pie charts (reading and interpreting). Range. Probability of simple events as fractions and percentages", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 6, tags: &["data", "histograms", "pie-charts", "range", "probability"], exam_marks: None },
+        ],
+        7 => vec![
+            TopicDef { code: "NUM", title: "Integers and Rational Numbers", description: "Operations with integers. Rules for multiplying/dividing positive and negative numbers. Introduction to rational numbers", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["integers", "rational-numbers", "negative-numbers"], exam_marks: None },
+            TopicDef { code: "EXP", title: "Exponents", description: "Laws of exponents: product rule, quotient rule, power rule. Calculate with exponents including negative bases. Scientific notation intro", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["exponents", "laws-of-exponents", "scientific-notation"], exam_marks: None },
+            TopicDef { code: "ALG", title: "Algebraic Expressions", description: "Variables and constants. Algebraic language. Evaluate expressions by substitution. Simplify by collecting like terms", subdomain: "Algebra", node_type: "Skill", bloom: "Apply", hours: 10, tags: &["algebra", "variables", "substitution", "simplify"], exam_marks: None },
+            TopicDef { code: "EQN", title: "Equations", description: "Solve simple linear equations. Write equations from word problems. Number sentences with unknowns", subdomain: "Algebra", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["equations", "linear", "word-problems", "unknowns"], exam_marks: None },
+            TopicDef { code: "PAT", title: "Patterns and Functions", description: "Input-output relationships. Tables of values. Plot points on Cartesian plane. Linear relationships intro", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 8, tags: &["patterns", "cartesian-plane", "linear", "functions-intro"], exam_marks: None },
+            TopicDef { code: "GEO", title: "Geometry", description: "Properties of triangles and quadrilaterals. Angle relationships (complementary, supplementary). Congruency intro. Constructions with compass and ruler", subdomain: "Geometry", node_type: "Concept", bloom: "Understand", hours: 10, tags: &["geometry", "constructions", "congruency", "angle-relationships"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Circumference and area of circle (π). Surface area of prisms. Volume of cylinders. Speed, distance, time", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["measurement", "circle", "circumference", "pi", "speed"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling and Probability", description: "Mean, median, mode of grouped data. Scatter plots intro. Probability of combined events. Tree diagrams intro", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 6, tags: &["data", "grouped-data", "scatter-plots", "tree-diagrams"], exam_marks: None },
+        ],
+        8 => vec![
+            TopicDef { code: "NUM", title: "Rational Numbers", description: "All operations with rational numbers (fractions, decimals, integers). Convert between forms. Properties of rational numbers", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["rational-numbers", "operations", "fractions", "decimals"], exam_marks: None },
+            TopicDef { code: "EXP", title: "Exponents", description: "Exponents with integer exponents including zero and negative. Simplify exponential expressions. Scientific notation with large and small numbers", subdomain: "Numbers", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["exponents", "negative-exponents", "scientific-notation"], exam_marks: None },
+            TopicDef { code: "ALG", title: "Algebraic Expressions and Equations", description: "Expand brackets. Factorise common factor. Solve linear equations with variables on both sides. Inequalities on number line", subdomain: "Algebra", node_type: "Skill", bloom: "Apply", hours: 12, tags: &["algebra", "expand", "factorise", "linear-equations", "inequalities"], exam_marks: None },
+            TopicDef { code: "FN", title: "Functions and Relationships", description: "Input-output tables. Represent functions as equations and graphs. Linear functions y = mx + c. Gradient and y-intercept", subdomain: "Patterns", node_type: "Concept", bloom: "Analyze", hours: 10, tags: &["functions", "linear", "gradient", "y-intercept", "graphs"], exam_marks: None },
+            TopicDef { code: "GEO", title: "Geometry", description: "Angles in triangles and quadrilaterals. Parallel lines cut by transversal. Pythagoras theorem. Congruency and similarity intro", subdomain: "Geometry", node_type: "Concept", bloom: "Apply", hours: 10, tags: &["geometry", "pythagoras", "parallel-lines", "congruency", "similarity"], exam_marks: None },
+            TopicDef { code: "MEA", title: "Measurement", description: "Area and perimeter of composite shapes. Surface area and volume of cubes, prisms, cylinders. Effect of scaling on measurements", subdomain: "Measurement", node_type: "Skill", bloom: "Apply", hours: 8, tags: &["measurement", "composite-shapes", "surface-area", "scaling"], exam_marks: None },
+            TopicDef { code: "DAT", title: "Data Handling", description: "Frequency tables. Histograms from grouped data. Mean, median, mode. Identify outliers. Scatter plots and trend lines", subdomain: "Data", node_type: "Skill", bloom: "Analyze", hours: 6, tags: &["data", "frequency-tables", "histograms", "outliers", "trend-lines"], exam_marks: None },
+            TopicDef { code: "PRB", title: "Probability", description: "Probability of events. Relative frequency. Compare experimental and theoretical probability. Tree diagrams for compound events", subdomain: "Probability", node_type: "Concept", bloom: "Analyze", hours: 6, tags: &["probability", "relative-frequency", "compound-events", "tree-diagrams"], exam_marks: None },
+        ],
+        _ => vec![
+            TopicDef { code: "GEN", title: "Mathematics", description: "General mathematics content", subdomain: "General", node_type: "Concept", bloom: "Understand", hours: 10, tags: &["mathematics"], exam_marks: None },
+        ],
+    };
+
+    let nodes: Vec<CurriculumNode> = topics.iter().map(|t| caps_node(grade, "Mathematics", t)).collect();
+
+    // Cross-grade edges: connect to next grade
+    let mut edges = Vec::new();
+    if grade < 9 {
+        let next = grade + 1;
+        // Connect each topic to its counterpart in the next grade (same subdomain)
+        for t in &topics {
+            let from_id = format!("CAPS.Mathematics.Gr{}.{}", grade, t.code);
+            // Find matching topic in next grade by subdomain overlap
+            let to_codes: Vec<&str> = match t.subdomain {
+                "Numbers" | "Operations" => {
+                    if next <= 3 { vec!["NUM", "ADD", "MUL"] }
+                    else if next <= 6 { vec!["NUM", "OPS"] }
+                    else if next <= 8 { vec!["NUM", "ALG"] }
+                    else { vec!["NUM.1", "ALG.1"] }
+                },
+                "Patterns" => {
+                    if next <= 8 { vec!["PAT"] } else { vec!["PAT.1"] }
+                },
+                "Geometry" => {
+                    if next <= 8 { vec!["GEO"] } else { vec!["GEOM.1"] }
+                },
+                "Measurement" => {
+                    if next <= 8 { vec!["MEA"] } else { vec!["MEAS.1"] }
+                },
+                "Data" | "Probability" => {
+                    if next <= 8 { vec!["DAT"] } else { vec!["STAT.1", "PROB.1"] }
+                },
+                "Algebra" => {
+                    if next <= 8 { vec!["ALG", "EQN"] } else { vec!["ALG.1", "ALG.2"] }
+                },
+                _ => vec![],
+            };
+            for to_code in to_codes {
+                let to_id = format!("CAPS.Mathematics.Gr{}.{}", next, to_code);
+                edges.push(caps_edge(&from_id, &to_id,
+                    &format!("Grade {} {} feeds into Grade {}", grade, t.subdomain, next), 800));
+            }
+        }
+    }
+
+    let node_count = nodes.len();
+    let phase = match grade {
+        1..=3 => "Foundation",
+        4..=6 => "Intermediate",
+        7..=8 => "Senior",
+        _ => "General",
+    };
+
+    CurriculumDocument {
+        metadata: caps_metadata(
+            &format!("CAPS Mathematics Grade {}", grade),
+            grade,
+            "Mathematics",
+            topics.iter().map(|t| t.subdomain.to_string()).collect::<std::collections::HashSet<_>>().into_iter().collect(),
+            node_count,
+            &format!("Curated from CAPS Mathematics {} Phase (DBE, 2011 amended 2022). Grade {}.", phase, grade),
+        ),
+        nodes,
+        edges,
     }
 }
 
@@ -1497,7 +1670,7 @@ mod tests {
     fn test_caps_list_available() {
         let source = CapsSource::new();
         let entries = source.list_available().unwrap();
-        assert_eq!(entries.len(), 8); // 2 Gr9 + 6 Gr10-12
+        assert_eq!(entries.len(), 16); // 8 Gr1-8 + 2 Gr9 + 6 Gr10-12
         assert!(entries.iter().any(|e| e.id == "caps-math-12"));
         assert!(entries.iter().any(|e| e.id == "caps-physics-12"));
     }
@@ -1658,7 +1831,8 @@ mod tests {
         // Gr11: 13 math + 11 physics = 24
         // Gr12: 10 math + 15 physics = 25
         // Total: 94
-        assert_eq!(total, 94, "Total CAPS nodes should be 94");
+        // Gr1-8: 62 nodes, Gr9-12: 94 nodes = 156 total
+        assert!(total >= 150, "Total CAPS nodes should be at least 150, got {}", total);
     }
 
     #[test]

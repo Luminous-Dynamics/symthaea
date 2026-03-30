@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr12.P1.DOP: The Doppler effect with sound. Observer frequency formula...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "The Doppler effect is the change in observed frequency when a source and listener move relative to each other. Formula: fL = fs × (v ± vL)/(v ± vs), where v = speed of sound, vL = listener speed, vs = source speed. Convention: use + in numerator when listener moves toward source; + in denominator when source moves away.",
+    "explanation": "Refraction: light bends when passing between media of different optical density. Snell's law: n₁ sin θ₁ = n₂ sin θ₂. Total internal reflection occurs when light travels from a denser to a less dense medium at an angle greater than the critical angle: sin θc = n₂/n₁. Lenses: converging (convex) and diverging (concave). Thin lens equation: 1/f = 1/do + 1/di. Magnification m = -di/do.",
     "examples": [
       {
         "problem": "An ambulance siren emits sound at 500 Hz and approaches at 30 m/s. Speed of sound = 340 m/s. Find the frequency heard.",
@@ -267,7 +267,7 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Remember",
+        "Apply",
         1
       ],
       [
@@ -275,19 +275,19 @@
         1
       ],
       [
+        "Understand",
+        1
+      ],
+      [
         "Evaluate",
         1
       ],
       [
-        "Apply",
+        "Remember",
         1
       ],
       [
         "Create",
-        1
-      ],
-      [
-        "Understand",
         1
       ]
     ]
@@ -380,5 +380,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:25"
+  "generated_at": "2026-03-30T13:18:21"
 }

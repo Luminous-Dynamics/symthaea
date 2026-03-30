@@ -5,7 +5,7 @@
     "title": "CAPS.Mathematics.Gr12.P1.COUNT: Fundamental counting principle. Factorial notation (n!). ...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "In Grade 12, you must solve quadratic equations using factorisation, completing the square, and the quadratic formula x = (−b ± √(b²−4ac)) / 2a. The discriminant Δ = b² − 4ac tells us about the nature of roots: Δ > 0 means two distinct real roots, Δ = 0 means two equal real roots, and Δ < 0 means no real roots. You also solve simultaneous equations where one is linear and one is quadratic, and quadratic inequalities using a sign diagram or parabola sketch.",
+    "explanation": "Independent events: P(A and B) = P(A) × P(B). The occurrence of one does not affect the other. Dependent events: P(A and B) = P(A) × P(B|A), where P(B|A) is the probability of B given A has occurred. Tree diagrams show all outcomes for multi-step experiments. Without replacement changes probabilities (dependent). Contingency tables organise two-way data to test independence.",
     "examples": [
       {
         "problem": "How many 4-letter codes can be formed from the word SUNDAY if no letter is repeated?",
@@ -272,11 +272,11 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Create",
+        "Analyze",
         1
       ],
       [
-        "Apply",
+        "Evaluate",
         1
       ],
       [
@@ -284,15 +284,15 @@
         1
       ],
       [
-        "Analyze",
-        1
-      ],
-      [
         "Remember",
         1
       ],
       [
-        "Evaluate",
+        "Apply",
+        1
+      ],
+      [
+        "Create",
         1
       ]
     ]
@@ -385,5 +385,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:24"
+  "generated_at": "2026-03-30T13:18:09"
 }

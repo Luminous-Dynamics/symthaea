@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr12.P2.ACID: Brønsted-Lowry model. Conjugate acid-base pairs. Strong v...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "Dynamic equilibrium occurs in a closed system when the rate of the forward reaction equals the rate of the reverse reaction. Le Chatelier's principle: if a system at equilibrium is disturbed, it shifts to counteract the disturbance. Kc = [products]ᵖ/[reactants]ʳ at equilibrium. A large Kc means products are favoured. A catalyst speeds up both directions equally — it does NOT shift equilibrium.",
+    "explanation": "Brønsted-Lowry: acids donate H⁺, bases accept H⁺. Strong acids (HCl, HNO₃, H₂SO₄) ionise completely; weak acids (CH₃COOH) ionise partially. pH = −log[H₃O⁺]. For water: Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴ at 25°C. Titration curves show pH change as base is added to acid. The equivalence point is where moles acid = moles base.",
     "examples": [
       {
         "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
@@ -272,11 +272,15 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Create",
+        "Remember",
         1
       ],
       [
-        "Understand",
+        "Evaluate",
+        1
+      ],
+      [
+        "Create",
         1
       ],
       [
@@ -284,15 +288,11 @@
         1
       ],
       [
-        "Remember",
+        "Understand",
         1
       ],
       [
         "Analyze",
-        1
-      ],
-      [
-        "Evaluate",
         1
       ]
     ]
@@ -385,5 +385,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:26"
+  "generated_at": "2026-03-30T13:18:24"
 }

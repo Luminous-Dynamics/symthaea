@@ -5,212 +5,190 @@
     "title": "CAPS.Mathematics.Gr9.GEOM.1: Angles on a straight line (180°), vertically opposite ang...",
     "grade_level": "Grade9",
     "bloom_level": "Understand",
-    "explanation": "Grade 12 Euclidean geometry focuses on circle theorems and proofs. You must prove and apply: angle at centre = 2 × angle at circumference, angles in the same segment are equal, opposite angles of a cyclic quad are supplementary, tangent ⊥ radius, tan-chord angle = angle in the alternate segment, and the proportionality theorem.",
+    "explanation": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
     "examples": [
       {
-        "problem": "In the diagram, O is the centre. AB is a chord and OC ⊥ AB. If AB = 10 and OC = 12, find the radius.",
+        "problem": "Solve a basic Geometry of Straight Lines problem.",
         "steps": [
           {
-            "instruction": "Step 1: OC ⊥ AB, so C is the midpoint of AB → AC = 5",
-            "result": "theorem: perpendicular from centre bisects chord"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: Triangle OCA is right-angled at C",
-            "result": "identify right triangle"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: OA² = OC² + AC² = 12² + 5² = 144 + 25 = 169",
-            "result": "Pythagoras"
-          },
-          {
-            "instruction": "Step 4: OA = √169 = 13",
-            "result": "take square root"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Radius = 13 units",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       },
       {
-        "problem": "In the diagram, O is the centre. AB is a chord and OC ⊥ AB. If AB = 10 and OC = 12, find the radius.",
+        "problem": "Solve a basic Geometry of Straight Lines problem.",
         "steps": [
           {
-            "instruction": "Step 1: OC ⊥ AB, so C is the midpoint of AB → AC = 5",
-            "result": "theorem: perpendicular from centre bisects chord"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: Triangle OCA is right-angled at C",
-            "result": "identify right triangle"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: OA² = OC² + AC² = 12² + 5² = 144 + 25 = 169",
-            "result": "Pythagoras"
-          },
-          {
-            "instruction": "Step 4: OA = √169 = 13",
-            "result": "take square root"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Radius = 13 units",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       },
       {
-        "problem": "In the diagram, O is the centre. AB is a chord and OC ⊥ AB. If AB = 10 and OC = 12, find the radius.",
+        "problem": "Solve a basic Geometry of Straight Lines problem.",
         "steps": [
           {
-            "instruction": "Step 1: OC ⊥ AB, so C is the midpoint of AB → AC = 5",
-            "result": "theorem: perpendicular from centre bisects chord"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: Triangle OCA is right-angled at C",
-            "result": "identify right triangle"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: OA² = OC² + AC² = 12² + 5² = 144 + 25 = 169",
-            "result": "Pythagoras"
-          },
-          {
-            "instruction": "Step 4: OA = √169 = 13",
-            "result": "take square root"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Radius = 13 units",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "Practice Geometry of Straight Lines problem.",
+        "answer": "Answer",
         "difficulty_permille": 875,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       }
     ],
     "hints": [
-      "Which circle theorem applies here? Look at the relationship between the angles.",
-      "Opposite angles of a cyclic quad sum to 180°. Check: 75° + 105° = ?",
-      "Opposite angles of a cyclic quad sum to 180°. Check: 75° + 105° = ?"
+      "What is the key concept in Geometry of Straight Lines?",
+      "Remember the method for Geometry of Straight Lines. Apply it step by step.",
+      "For Geometry of Straight Lines: start by identifying what you know, then apply the formula."
     ],
     "key_vocabulary": [
       {
-        "term": "cyclic quadrilateral",
-        "definition": "A quadrilateral whose vertices all lie on a circle",
-        "example_usage": "ABCD is cyclic if a circle passes through A, B, C, and D."
-      },
-      {
-        "term": "tangent",
-        "definition": "A line that touches a circle at exactly one point",
-        "example_usage": "A tangent is perpendicular to the radius at the point of contact."
-      },
-      {
-        "term": "subtend",
-        "definition": "To form an angle by connecting endpoints of an arc to a point",
-        "example_usage": "Arc AB subtends angle AOB at the centre."
+        "term": "transversal",
+        "definition": "A key term in this topic",
+        "example_usage": "Used in Grade 9 mathematics."
       }
     ],
     "misconceptions": [
       {
-        "misconception": "Students confuse 'angle at centre' with 'angle in a semicircle'.",
-        "correction": "Angle at centre = 2× angle at circumference (for the same arc). Angle in a semicircle = 90° (special case where the arc is a diameter).",
-        "why_students_think_this": "The semicircle theorem IS the angle-at-centre theorem when the central angle is 180°: half of 180° = 90°."
+        "misconception": "A common mistake in Geometry of Straight Lines.",
+        "correction": "The correct approach.",
+        "why_students_think_this": "Understanding why students make this error helps avoid it."
       }
     ],
     "generation_quality": {
@@ -226,77 +204,65 @@
     "title": "Assessment: Angles on a straight line (180°), vertically opposite angles, angles formed by parallel lines cut by a transversal (corresponding, alternate, co-interior)",
     "items": [
       {
-        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "question": "Explain the key idea behind Geometry of Straight Lines.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "correct_answer": "The main concept is...",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
-        "hint": "6"
+        "hint": "3"
       },
       {
-        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "question": "Explain the key idea behind Geometry of Straight Lines.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "correct_answer": "The main concept is...",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
-        "hint": "6"
+        "hint": "3"
       },
       {
-        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "question": "Explain the key idea behind Geometry of Straight Lines.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "correct_answer": "The main concept is...",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
-        "hint": "6"
+        "hint": "3"
       },
       {
-        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "question": "Explain the key idea behind Geometry of Straight Lines.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "correct_answer": "The main concept is...",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
-        "hint": "6"
+        "hint": "3"
       },
       {
-        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "question": "Explain the key idea behind Geometry of Straight Lines.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "correct_answer": "The main concept is...",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
-        "hint": "6"
+        "hint": "3"
       },
       {
-        "question": "Prove that the angle subtended by an arc at the centre is twice the angle at the circumference.",
+        "question": "Explain the key idea behind Geometry of Straight Lines.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Construction + proof using isosceles triangles and exterior angle theorem.",
+        "correct_answer": "The main concept is...",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
-        "hint": "6"
+        "hint": "3"
       }
     ],
     "total_points": 15,
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Remember",
-        1
-      ],
-      [
         "Analyze",
-        1
-      ],
-      [
-        "Apply",
-        1
-      ],
-      [
-        "Evaluate",
         1
       ],
       [
@@ -304,15 +270,27 @@
         1
       ],
       [
+        "Evaluate",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
         "Understand",
+        1
+      ],
+      [
+        "Apply",
         1
       ]
     ]
   },
   "flashcards": [
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -321,8 +299,8 @@
       "difficulty_permille": 111
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -331,8 +309,8 @@
       "difficulty_permille": 222
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -341,8 +319,8 @@
       "difficulty_permille": 333
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -351,8 +329,8 @@
       "difficulty_permille": 444
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -361,8 +339,8 @@
       "difficulty_permille": 555
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -371,8 +349,8 @@
       "difficulty_permille": 666
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -381,8 +359,8 @@
       "difficulty_permille": 777
     },
     {
-      "front": "What is the relationship between opposite angles of a cyclic quadrilateral?",
-      "back": "They are supplementary (add up to 180°).",
+      "front": "What is the key concept in Geometry of Straight Lines?",
+      "back": "Angles on a straight line add up to 180° (supplementary). Vertically opposite angles are equal. When a transversal crosses parallel lines: corresponding angles are equal (F-pattern), alternate angles are equal (Z-pattern), and co-interior angles add to 180° (C-pattern or U-pattern).",
       "tags": [
         "CAPS.Mathematics.Gr9.GEOM.1",
         "Grade9",
@@ -397,5 +375,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T15:47:37"
+  "generated_at": "2026-03-30T13:17:55"
 }

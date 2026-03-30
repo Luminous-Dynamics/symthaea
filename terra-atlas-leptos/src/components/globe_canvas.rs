@@ -341,10 +341,10 @@ fn update_renderer_data(
         let sites = data_state.sites.read();
         for site in sites.iter() {
             let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.005);
-            let (r, g, b) = site.energy_type.color_rgb();
+            let c = site.energy_type.rgb();
             let size = geo::marker_size_from_capacity(site.capacity_mw);
             markers.push(MarkerInstance {
-                position: pos, color: Vec3::new(r, g, b),
+                position: pos, color: Vec3::new(c[0], c[1], c[2]),
                 size, marker_type: 0.0,
             });
             picks.push(PickableMarker {

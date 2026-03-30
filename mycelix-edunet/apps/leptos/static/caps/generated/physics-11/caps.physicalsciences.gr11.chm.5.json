@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.CHM.5: Oxidation and reduction (electron transfer). Galvanic (vo...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Galvanic cells convert chemical energy to electrical energy using spontaneous redox reactions. The more reactive metal is the anode (oxidation), the less reactive is the cathode (reduction). E°cell = E°cathode − E°anode (must be positive for spontaneous). Electrolytic cells use external voltage to drive non-spontaneous reactions. In electrolysis: anode = oxidation (+), cathode = reduction (−) — opposite to galvanic.",
+    "explanation": "The mole is the chemist's counting unit: 1 mol = 6.022 × 10²³ particles (Avogadro's number). Molar mass M (g/mol) is found from the periodic table. Key formulas: n = m/M (moles from mass), n = cV (moles from concentration and volume in dm³), n = N/NA (moles from number of particles). In balanced equations, coefficients give mole ratios. The limiting reagent is used up first and determines how much product forms.",
     "examples": [
       {
         "problem": "Calculate E°cell for Zn|Zn²⁺||Cu²⁺|Cu. Given: E°(Zn²⁺/Zn) = −0.76 V, E°(Cu²⁺/Cu) = +0.34 V.",
@@ -277,15 +277,11 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Apply",
-        1
-      ],
-      [
         "Analyze",
         1
       ],
       [
-        "Understand",
+        "Create",
         1
       ],
       [
@@ -293,7 +289,11 @@
         1
       ],
       [
-        "Create",
+        "Understand",
+        1
+      ],
+      [
+        "Apply",
         1
       ],
       [
@@ -390,5 +390,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:37"
+  "generated_at": "2026-03-30T13:18:17"
 }

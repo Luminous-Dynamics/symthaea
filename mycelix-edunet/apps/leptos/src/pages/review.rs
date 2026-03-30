@@ -15,6 +15,7 @@ use leptos::prelude::*;
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
 use crate::components::suggestion_overlay::SuggestionOverlay;
+use crate::curriculum::{use_progress, use_set_progress};
 
 // ---------------------------------------------------------------------------
 // Review state machine
@@ -324,11 +325,20 @@ pub fn ReviewPage() -> impl IntoView {
     // Store adaptivity ctx for rate closure (StoredValue is Copy)
     let rate_ctx = StoredValue::new(adaptivity_for_rate);
 
+    let set_progress_for_srs = use_set_progress();
+
     // Rate and advance to next card
     let rate = move |quality: u8| {
         if let ReviewState::ShowingBack { card_index } = state.get() {
             // Record the rating
             set_ratings.update(|r| r.push(quality));
+
+            // Persist SRS state
+            let card_id = format!("review:{}", card_index);
+            set_progress_for_srs.update(|p| {
+                let srs = p.srs_cards.entry(card_id).or_default();
+                srs.update(quality);
+            });
 
             // Tell adaptivity engine about the attempt
             let correct = quality >= 3;

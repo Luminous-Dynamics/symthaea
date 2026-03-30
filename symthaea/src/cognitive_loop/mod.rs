@@ -630,6 +630,13 @@ pub struct CognitiveLoopService {
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
 
+    /// Rolling window of per-cycle cortical activation maps for temporal analysis.
+    /// Capacity: ~1000 cycles (~32s at 31Hz). Used for HRF convolution and EEG comparison.
+    #[cfg(feature = "neural_validation")]
+    pub(super) cortical_history: std::collections::VecDeque<
+        symthaea_core::hdc::cortical_activation::CorticalActivationMap,
+    >,
+
     // physics_integration moved to feature_integ manager
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
@@ -691,6 +698,10 @@ pub struct CognitiveLoopService {
     /// confidence/cadence based on verdicts. Feature-gated behind `mycelix`.
     #[cfg(feature = "mycelix")]
     factcheck_bridge: broca_factcheck::BrocaFactcheckBridge,
+
+    /// Sacred Stillness: tracks known unknowns for epistemic humility.
+    #[cfg(feature = "epistemic")]
+    known_unknowns: Option<crate::consciousness::sacred_stillness::KnownUnknowns>,
 
     /// Swarm Manager: Peer consciousness signals → social buffering, affective contagion,
     /// collective Φ modulation. Implements CognitiveSubsystem at interval 41.

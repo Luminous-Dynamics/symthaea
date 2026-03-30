@@ -415,9 +415,18 @@ pub mod substrate_independence; // Substrate type definitions // Real-time consc
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
 pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
+// Track: Neural Validation — TRIBE v2 fMRI comparison (feature-gated)
+#[cfg(feature = "neural_validation")]
+pub mod cortical_activation; // Per-region activation maps for fMRI comparison
+#[cfg(feature = "neural_validation")]
+pub mod glasser_parcellation; // Glasser atlas 360→12 CorticalRegion mapping
+#[cfg(feature = "neural_validation")]
+pub mod hemodynamic; // HRF convolution for BOLD signal comparison
+
 // Track 6: Language module dependencies
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
 pub mod grounded_understanding; // True understanding via semantic primes + embodiment
+pub mod deepnsm_integration; // DeepNSM corpus: 44K NSM explication triplets for grounding
 pub mod unified_conscious_being;
 pub mod unified_understanding; // Complete understanding pipeline (predictive + narrative + ToM)
 pub mod universal_semantics; // Universal semantic primes (Wierzbicka) // Complete unified being: A+B+C+D+E+F integration

@@ -1,3 +1,9 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
 Multi-Factor Decentralized Identity (MFDI) System for Mycelix
 Phase 1 + Phase 2 MATL Integration + Week 5-6 DHT Integration + Week 7-8 Governance

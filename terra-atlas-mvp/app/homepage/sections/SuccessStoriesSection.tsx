@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 export default function SuccessStoriesSection() {
   return (
     <section className="py-20 sm:py-24 md:py-32 px-4 sm:px-6">

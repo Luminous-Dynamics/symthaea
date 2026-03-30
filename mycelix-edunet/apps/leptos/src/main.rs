@@ -9,12 +9,15 @@ mod app;
 mod cognitive_adaptivity;
 mod components;
 mod consciousness;
+mod consciousness_ui;
 mod curriculum;
+mod games;
 mod holochain;
 mod learning_engine;
 mod pages;
 mod persistence;
 mod role;
+mod social_proof;
 mod student_profile;
 mod theme;
 

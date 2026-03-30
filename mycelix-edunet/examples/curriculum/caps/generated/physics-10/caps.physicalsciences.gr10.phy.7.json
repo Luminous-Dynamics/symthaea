@@ -5,200 +5,195 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.7: EMF and internal resistance. Ohm's law (V = IR). Series a...",
     "grade_level": "Grade10",
     "bloom_level": "Remember",
-    "explanation": "Grade 12 mechanics covers momentum, impulse, and work-energy-power. Momentum p = mv is conserved in isolated systems: Σpᵢ = Σpf. Impulse FΔt = Δp = m(vf − vi). The work-energy theorem: Wnet = ΔEk. Conservation of energy with friction: Wnc = ΔEk + ΔEp. Power P = W/Δt = Fv.",
+    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (ε) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = ε − Ir. For electrodynamics: Faraday's law ε = −NΔΦ/Δt (changing magnetic flux induces an EMF). AC: Vrms = Vmax/√2, Pavg = Vrms × Irms.",
     "examples": [
       {
-        "problem": "A 2 kg ball moving at 6 m/s collides with a stationary 4 kg ball. After collision they move together. Find their velocity.",
+        "problem": "Solve a Energy problem.",
         "steps": [
           {
-            "instruction": "Step 1: Before: p = m₁v₁ + m₂v₂ = 2(6) + 4(0) = 12 kg·m/s",
-            "result": "total initial momentum"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: After: p = (m₁ + m₂)vf = 6vf (they stick together)",
-            "result": "combined mass × final velocity"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
           },
           {
-            "instruction": "Step 3: Conservation: 12 = 6vf → vf = 2 m/s",
-            "result": "apply conservation of momentum"
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Combined velocity = 2 m/s in the original direction",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       },
       {
-        "problem": "A 2 kg ball moving at 6 m/s collides with a stationary 4 kg ball. After collision they move together. Find their velocity.",
+        "problem": "Solve a Energy problem.",
         "steps": [
           {
-            "instruction": "Step 1: Before: p = m₁v₁ + m₂v₂ = 2(6) + 4(0) = 12 kg·m/s",
-            "result": "total initial momentum"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: After: p = (m₁ + m₂)vf = 6vf (they stick together)",
-            "result": "combined mass × final velocity"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
           },
           {
-            "instruction": "Step 3: Conservation: 12 = 6vf → vf = 2 m/s",
-            "result": "apply conservation of momentum"
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Combined velocity = 2 m/s in the original direction",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       },
       {
-        "problem": "A 2 kg ball moving at 6 m/s collides with a stationary 4 kg ball. After collision they move together. Find their velocity.",
+        "problem": "Solve a Energy problem.",
         "steps": [
           {
-            "instruction": "Step 1: Before: p = m₁v₁ + m₂v₂ = 2(6) + 4(0) = 12 kg·m/s",
-            "result": "total initial momentum"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: After: p = (m₁ + m₂)vf = 6vf (they stick together)",
-            "result": "combined mass × final velocity"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
           },
           {
-            "instruction": "Step 3: Conservation: 12 = 6vf → vf = 2 m/s",
-            "result": "apply conservation of momentum"
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Combined velocity = 2 m/s in the original direction",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Practice: Energy",
+        "answer": "Answer",
         "difficulty_permille": 875,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       }
     ],
     "hints": [
-      "Draw a diagram showing before and after. List known quantities. Choose the right principle: momentum conservation or work-energy theorem.",
-      "Draw a diagram showing before and after. List known quantities. Choose the right principle: momentum conservation or work-energy theorem.",
-      "Draw a diagram showing before and after. List known quantities. Choose the right principle: momentum conservation or work-energy theorem."
+      "What concept from Energy applies here?",
+      "Apply the method for Energy step by step.",
+      "Start by writing down what you know about Energy."
     ],
     "key_vocabulary": [
       {
-        "term": "impulse",
-        "definition": "The product FΔt, equal to the change in momentum",
-        "example_usage": "A longer collision time reduces the force (e.g., airbags)."
+        "term": "kinetic energy",
+        "definition": "A key term",
+        "example_usage": "Used in this topic."
       },
       {
-        "term": "elastic collision",
-        "definition": "A collision where kinetic energy is conserved",
-        "example_usage": "Billiard ball collisions are approximately elastic."
-      },
-      {
-        "term": "inelastic collision",
-        "definition": "A collision where kinetic energy is NOT conserved (but momentum is)",
-        "example_usage": "A car crash is inelastic — energy goes to deformation."
+        "term": "concept",
+        "definition": "An important idea",
+        "example_usage": "Fundamental to understanding."
       }
     ],
     "misconceptions": [
       {
-        "misconception": "Students think momentum is always conserved.",
-        "correction": "Momentum is only conserved in an isolated system (no external net force). Kinetic energy is only conserved in elastic collisions.",
-        "why_students_think_this": "External forces like friction change the total momentum of the system."
+        "misconception": "A common error in Energy.",
+        "correction": "The correct understanding.",
+        "why_students_think_this": "This mistake is common because students often skip a key step."
       }
     ],
     "generation_quality": {
@@ -214,54 +209,54 @@
     "title": "Assessment: EMF and internal resistance. Ohm's law (V = IR). Series and parallel circuits. Power (P = VI = I²R = V²/R). Energy (E = VIt). Kirchhoff's rules (simple circuits)",
     "items": [
       {
-        "question": "Explain why a cricket player pulls their hands back when catching a fast ball.",
+        "question": "Explain Energy.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Pulling hands back increases Δt, reducing the force (FΔt = Δp, same Δp but larger Δt means smaller F).",
+        "correct_answer": "Key concept answer.",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
         "hint": "3"
       },
       {
-        "question": "Explain why a cricket player pulls their hands back when catching a fast ball.",
+        "question": "Explain Energy.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Pulling hands back increases Δt, reducing the force (FΔt = Δp, same Δp but larger Δt means smaller F).",
+        "correct_answer": "Key concept answer.",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
         "hint": "3"
       },
       {
-        "question": "Explain why a cricket player pulls their hands back when catching a fast ball.",
+        "question": "Explain Energy.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Pulling hands back increases Δt, reducing the force (FΔt = Δp, same Δp but larger Δt means smaller F).",
+        "correct_answer": "Key concept answer.",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
         "hint": "3"
       },
       {
-        "question": "Explain why a cricket player pulls their hands back when catching a fast ball.",
+        "question": "Explain Energy.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Pulling hands back increases Δt, reducing the force (FΔt = Δp, same Δp but larger Δt means smaller F).",
+        "correct_answer": "Key concept answer.",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
         "hint": "3"
       },
       {
-        "question": "Explain why a cricket player pulls their hands back when catching a fast ball.",
+        "question": "Explain Energy.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Pulling hands back increases Δt, reducing the force (FΔt = Δp, same Δp but larger Δt means smaller F).",
+        "correct_answer": "Key concept answer.",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
         "hint": "3"
       },
       {
-        "question": "Explain why a cricket player pulls their hands back when catching a fast ball.",
+        "question": "Explain Energy.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Pulling hands back increases Δt, reducing the force (FΔt = Δp, same Δp but larger Δt means smaller F).",
+        "correct_answer": "Key concept answer.",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
@@ -272,7 +267,15 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
+        "Understand",
+        1
+      ],
+      [
         "Evaluate",
+        1
+      ],
+      [
+        "Analyze",
         1
       ],
       [
@@ -280,27 +283,19 @@
         1
       ],
       [
-        "Remember",
-        1
-      ],
-      [
-        "Understand",
-        1
-      ],
-      [
         "Apply",
         1
       ],
       [
-        "Analyze",
+        "Remember",
         1
       ]
     ]
   },
   "flashcards": [
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -309,8 +304,8 @@
       "difficulty_permille": 111
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -319,8 +314,8 @@
       "difficulty_permille": 222
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -329,8 +324,8 @@
       "difficulty_permille": 333
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -339,8 +334,8 @@
       "difficulty_permille": 444
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -349,8 +344,8 @@
       "difficulty_permille": 555
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -359,8 +354,8 @@
       "difficulty_permille": 666
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -369,8 +364,8 @@
       "difficulty_permille": 777
     },
     {
-      "front": "State the impulse-momentum theorem.",
-      "back": "FnetΔt = Δp = m(vf − vi). The net impulse equals the change in momentum.",
+      "front": "What is the key idea in Energy?",
+      "back": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
@@ -385,5 +380,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:35"
+  "generated_at": "2026-03-30T13:18:12"
 }

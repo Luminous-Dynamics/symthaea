@@ -14,7 +14,7 @@ use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus};
+use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus, BktState};
 use crate::games;
 use crate::social_proof;
 
@@ -178,10 +178,10 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
     let node_id_for_status2 = node_id.clone();
 
     view! {
-        <div class="caps-skill-map">
-            // Back link
-            <a href="/skill-map" style="color: var(--primary); text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem">
-                "\u{2190} Back to Skill Map"
+        <div class="caps-skill-map study-refuge">
+            // Back link — return to prospect
+            <a href="/skill-map" class="refuge-back-link">
+                "\u{2190} Back to constellation"
             </a>
 
             // Header
@@ -349,23 +349,47 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                         }).collect::<Vec<_>>()}
                                     </div>
 
-                                    // Practice tab — active recall: click each problem to reveal
+                                    // Practice tab — BKT-adaptive active recall
                                     <div style=move || if active_tab.get() == "practice" { "display: block" } else { "display: none" }>
-                                        <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 1rem">"Try to solve each problem before revealing the answer."</p>
+                                        // BKT mastery indicator
+                                        {
+                                            let nid = node_id_for_status.clone();
+                                            move || {
+                                                let p = progress.get();
+                                                let bkt = p.bkt(&nid);
+                                                let pct = (bkt.p_mastery * 100.0) as u32;
+                                                let terrain = bkt.terrain_label();
+                                                view! {
+                                                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; padding: 0.5rem 0.75rem; background: var(--soil-rich); border-radius: 8px">
+                                                        <div style="font-size: 0.8rem; color: var(--text-secondary)">
+                                                            "Understanding: "
+                                                            <strong style="color: var(--text)">{pct}"%"</strong>
+                                                        </div>
+                                                        <div style="font-size: 0.75rem; color: var(--text-tertiary); font-style: italic">
+                                                            "Recommended: "{terrain}
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }
+                                        }
+                                        <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 1rem">"Try to solve each problem before revealing the answer. Your responses shape the difficulty."</p>
                                         {problems.iter().enumerate().map(|(i, p)| {
                                             let question = p.question.clone();
                                             let answer = p.answer.clone();
                                             let diff = match p.difficulty_permille {
-                                                0..=300 => "Easy",
-                                                301..=600 => "Medium",
-                                                601..=800 => "Challenging",
-                                                _ => "Advanced",
+                                                0..=300 => "Gentle soil",
+                                                301..=600 => "Steady ground",
+                                                601..=800 => "Rocky terrain",
+                                                _ => "Mountain path",
                                             };
                                             let bloom_level = p.bloom_level.clone();
                                             let explanation = p.explanation.clone();
                                             let hints = p.hints.clone();
                                             let (revealed, set_revealed) = signal(false);
                                             let (show_hint, set_show_hint) = signal(false);
+                                            let (evaluated, set_evaluated) = signal(false);
+                                            let nid_correct = node_id_for_status.clone();
+                                            let nid_wrong = node_id_for_status.clone();
                                             view! {
                                                 <div class="caps-problem" style="cursor: pointer">
                                                     <div class="caps-problem-q">{i + 1}". "{question}</div>
@@ -378,6 +402,41 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">
                                                                 {explanation.clone()}
                                                             </div>
+                                                            // Self-evaluation — feeds BKT
+                                                            {
+                                                                let nid_c = nid_correct.clone();
+                                                                let nid_w = nid_wrong.clone();
+                                                                move || if !evaluated.get() {
+                                                                    let nc = nid_c.clone();
+                                                                    let nw = nid_w.clone();
+                                                                    view! {
+                                                                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem">
+                                                                            <button
+                                                                                class="caps-filter-btn"
+                                                                                style="font-size: 0.75rem; border-color: var(--mastery-green); color: var(--mastery-green)"
+                                                                                on:click=move |_| {
+                                                                                    set_progress.update(|p| p.record_response(&nc, true));
+                                                                                    set_evaluated.set(true);
+                                                                                }
+                                                                            >"I got this right"</button>
+                                                                            <button
+                                                                                class="caps-filter-btn"
+                                                                                style="font-size: 0.75rem; opacity: 0.7"
+                                                                                on:click=move |_| {
+                                                                                    set_progress.update(|p| p.record_response(&nw, false));
+                                                                                    set_evaluated.set(true);
+                                                                                }
+                                                                            >"Still learning"</button>
+                                                                        </div>
+                                                                    }.into_any()
+                                                                } else {
+                                                                    view! {
+                                                                        <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.5rem; font-style: italic">
+                                                                            "Recorded — your path is adapting"
+                                                                        </div>
+                                                                    }.into_any()
+                                                                }
+                                                            }
                                                         }.into_any()
                                                     } else {
                                                         let hints_available = !hints.is_empty();

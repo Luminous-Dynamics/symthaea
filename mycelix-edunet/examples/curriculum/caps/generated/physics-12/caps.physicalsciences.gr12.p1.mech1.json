@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr12.P1.MECH1: Conservation of linear momentum (Σpi = Σpf). Impulse (Fne...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "Grade 12 mechanics covers momentum, impulse, and work-energy-power. Momentum p = mv is conserved in isolated systems: Σpᵢ = Σpf. Impulse FΔt = Δp = m(vf − vi). The work-energy theorem: Wnet = ΔEk. Conservation of energy with friction: Wnc = ΔEk + ΔEp. Power P = W/Δt = Fv.",
+    "explanation": "Newton's 1st Law: An object remains at rest or moves at constant velocity unless acted on by a net force. 2nd Law: Fnet = ma — acceleration is proportional to net force and inversely proportional to mass. 3rd Law: For every action, there is an equal and opposite reaction (forces act on different objects). Draw free-body diagrams showing all forces. Friction: f = μN where μ is the coefficient of friction and N is the normal force.",
     "examples": [
       {
         "problem": "A 2 kg ball moving at 6 m/s collides with a stationary 4 kg ball. After collision they move together. Find their velocity.",
@@ -272,11 +272,11 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Evaluate",
+        "Create",
         1
       ],
       [
-        "Understand",
+        "Analyze",
         1
       ],
       [
@@ -284,15 +284,15 @@
         1
       ],
       [
-        "Create",
+        "Understand",
+        1
+      ],
+      [
+        "Evaluate",
         1
       ],
       [
         "Apply",
-        1
-      ],
-      [
-        "Analyze",
         1
       ]
     ]
@@ -385,5 +385,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:25"
+  "generated_at": "2026-03-30T13:18:20"
 }

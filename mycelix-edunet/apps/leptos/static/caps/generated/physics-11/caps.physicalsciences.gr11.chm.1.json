@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.CHM.1: Molecular and structural formulae. Functional groups: alk...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Organic chemistry studies carbon compounds. Key functional groups: alkanes (C−C), alkenes (C═C), alcohols (−OH), carboxylic acids (−COOH), esters (−COO−), amines (−NH₂), alkyl halides (−X). IUPAC naming: longest carbon chain + position of functional group + suffix. Key reactions: substitution (haloalkanes), elimination, addition (alkenes), esterification, combustion.",
+    "explanation": "Atoms consist of protons and neutrons in the nucleus, with electrons in energy levels around it. Atomic number (Z) = number of protons = number of electrons (in a neutral atom). Mass number (A) = protons + neutrons. Isotopes are atoms of the same element with different numbers of neutrons. Electron configuration follows the Aufbau principle: fill lower energy levels first (2, 8, 18, 32 electrons per level).",
     "examples": [
       {
         "problem": "Name CH₃CH₂CH(OH)CH₃ using IUPAC nomenclature.",
@@ -272,7 +272,15 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
+        "Apply",
+        1
+      ],
+      [
         "Evaluate",
+        1
+      ],
+      [
+        "Understand",
         1
       ],
       [
@@ -280,19 +288,11 @@
         1
       ],
       [
-        "Create",
-        1
-      ],
-      [
-        "Apply",
-        1
-      ],
-      [
         "Analyze",
         1
       ],
       [
-        "Understand",
+        "Create",
         1
       ]
     ]
@@ -385,5 +385,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:37"
+  "generated_at": "2026-03-30T13:18:17"
 }

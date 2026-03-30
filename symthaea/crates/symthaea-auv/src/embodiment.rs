@@ -11,7 +11,10 @@ use crate::encoder::AuvHdcEncoder;
 use crate::simulator::{AuvPhysicsSimulator, SimpleAuvSimulator};
 use crate::types::AuvConfig;
 
-pub use symthaea_hal::MotorSafetyLevel;
+pub use symthaea_core::embodiment::{
+    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
+    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+};
 
 /// AUV embodiment bridge.
 pub struct AuvEmbodiment {
@@ -71,7 +74,7 @@ impl AuvEmbodiment {
         self.last_perception = Some(perception);
         self.total_steps += 1;
         let success = self.simulator.state().is_finite();
-        EmbodimentResult { num_actuators: 8, control_effort: self.last_control_effort, success, prediction_error: pred_error, safety_level: self.current_safety }
+        EmbodimentResult { num_actuators: 8, control_effort: self.last_control_effort, success, prediction_error: pred_error, safety_level: self.current_safety, epistemic_grounding: GROUNDING_SENSORIMOTOR, observation_confidence: grounding_from_prediction_error(pred_error) }
     }
 
     pub fn encode_perception(&mut self) -> ContinuousHV {
@@ -87,15 +90,9 @@ impl AuvEmbodiment {
     pub fn total_steps(&self) -> usize { self.total_steps }
 
     pub fn telemetry(&self) -> EmbodimentTelemetry {
-        EmbodimentTelemetry { total_steps: self.total_steps as u64, control_effort: self.last_control_effort, prediction_error: self.last_prediction_error, safety_level: format!("{:?}", self.current_safety), platform: "auv".to_string(), num_actuators: 8 }
+        EmbodimentTelemetry { total_steps: self.total_steps as u64, control_effort: self.last_control_effort, prediction_error: self.last_prediction_error, safety_level: format!("{:?}", self.current_safety), platform: "auv".to_string(), num_actuators: 8, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.last_prediction_error) }
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct EmbodimentResult { pub num_actuators: usize, pub control_effort: f32, pub success: bool, pub prediction_error: f32, pub safety_level: MotorSafetyLevel }
-
-#[derive(Debug, Clone, Default)]
-pub struct EmbodimentTelemetry { pub total_steps: u64, pub control_effort: f32, pub prediction_error: f32, pub safety_level: String, pub platform: String, pub num_actuators: usize }
 
 #[cfg(test)]
 mod tests {

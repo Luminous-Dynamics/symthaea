@@ -538,7 +538,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 s if s.starts_with("arts-") => ArtsSource::new().fetch(s)?,
                 s if s.starts_with("pe-") => PeSource::new().fetch(s)?,
                 "cefr" => CefrSource::new().fetch("cefr")?,
-                _ => return Err(format!("Unknown K-12 source: {source_id}. Options: c3-k2, c3-35, c3-68, c3-912, iste-students, arts-elementary, arts-secondary, pe-elementary, pe-secondary, cefr").into()),
+                s if s.starts_with("cyber-") => edunet_standards_ingest::sources::cybersecurity::CybersecuritySource::new().fetch(s)?,
+                s if s.starts_with("philosophy-") => edunet_standards_ingest::sources::philosophy::PhilosophySource::new().fetch(s)?,
+                "financial-literacy" | "critical-thinking" | "digital-literacy" | "health-literacy" |
+                "civic-literacy" | "systems-thinking" | "emotional-intelligence" | "communication" |
+                "sustainability" | "learning-skills" | "economics-basics" | "statistics-data" =>
+                    edunet_standards_ingest::sources::universal::UniversalSource::new().fetch(&source_id)?,
+                _ => return Err(format!("Unknown source: {source_id}").into()),
             };
             eprintln!("Generated {} nodes for {}", doc.nodes.len(), doc.metadata.title);
             write_document(&doc, output.as_deref(), true)?;

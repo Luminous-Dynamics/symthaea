@@ -12,18 +12,14 @@
         "steps": [
           {
             "instruction": "Step 1: LHS numerator = cos²x − sin²x = (cosx − sinx)(cosx + sinx)",
-            "result": "factorise using difference of squares"
+            "result": "factorise"
           },
           {
-            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = sin²x + cos²x + 2sinx·cosx = (sinx + cosx)²",
-            "result": "rewrite 1 and complete square"
+            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = (sinx + cosx)²",
+            "result": "complete square"
           },
           {
-            "instruction": "Step 3: LHS = (cosx − sinx)(cosx + sinx)/(cosx + sinx)²",
-            "result": "combine"
-          },
-          {
-            "instruction": "Step 4: Cancel (cosx + sinx): = (cosx − sinx)/(cosx + sinx) = RHS ✓",
+            "instruction": "Step 3: Cancel (cosx + sinx)",
             "result": "simplify"
           }
         ],
@@ -31,49 +27,41 @@
         "visual_description": null
       },
       {
-        "problem": "Prove that cos2x/(1 + sin2x) = (cosx − sinx)/(cosx + sinx).",
+        "problem": "In triangle PQR, PQ = 7, QR = 9, angle Q = 120°. Find PR using the cosine rule.",
         "steps": [
           {
-            "instruction": "Step 1: LHS numerator = cos²x − sin²x = (cosx − sinx)(cosx + sinx)",
-            "result": "factorise using difference of squares"
+            "instruction": "Step 1: PR² = PQ² + QR² − 2(PQ)(QR)cosQ = 49 + 81 − 2(7)(9)cos120°",
+            "result": "apply cosine rule"
           },
           {
-            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = sin²x + cos²x + 2sinx·cosx = (sinx + cosx)²",
-            "result": "rewrite 1 and complete square"
+            "instruction": "Step 2: cos120° = −0.5, so PR² = 130 − 126(−0.5) = 130 + 63 = 193",
+            "result": "substitute"
           },
           {
-            "instruction": "Step 3: LHS = (cosx − sinx)(cosx + sinx)/(cosx + sinx)²",
-            "result": "combine"
-          },
-          {
-            "instruction": "Step 4: Cancel (cosx + sinx): = (cosx − sinx)/(cosx + sinx) = RHS ✓",
-            "result": "simplify"
+            "instruction": "Step 3: PR = √193 ≈ 13.89",
+            "result": "take square root"
           }
         ],
-        "answer": "Answer: LHS = RHS. QED",
+        "answer": "Answer: PR ≈ 13.89 units",
         "visual_description": null
       },
       {
-        "problem": "Prove that cos2x/(1 + sin2x) = (cosx − sinx)/(cosx + sinx).",
+        "problem": "Solve for x ∈ [0°, 360°]: sin(x + 30°) = 0.5",
         "steps": [
           {
-            "instruction": "Step 1: LHS numerator = cos²x − sin²x = (cosx − sinx)(cosx + sinx)",
-            "result": "factorise using difference of squares"
+            "instruction": "Step 1: Reference angle: sin⁻¹(0.5) = 30°",
+            "result": "find reference"
           },
           {
-            "instruction": "Step 2: LHS denominator = 1 + 2sinx·cosx = sin²x + cos²x + 2sinx·cosx = (sinx + cosx)²",
-            "result": "rewrite 1 and complete square"
+            "instruction": "Step 2: x + 30° = 30° or x + 30° = 150° (sine positive in Q1 and Q2)",
+            "result": "general solution"
           },
           {
-            "instruction": "Step 3: LHS = (cosx − sinx)(cosx + sinx)/(cosx + sinx)²",
-            "result": "combine"
-          },
-          {
-            "instruction": "Step 4: Cancel (cosx + sinx): = (cosx − sinx)/(cosx + sinx) = RHS ✓",
-            "result": "simplify"
+            "instruction": "Step 3: x = 0° or x = 120°",
+            "result": "solve for x"
           }
         ],
-        "answer": "Answer: LHS = RHS. QED",
+        "answer": "Answer: x = 0° or x = 120°",
         "visual_description": null
       }
     ],
@@ -284,6 +272,14 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
+        "Evaluate",
+        1
+      ],
+      [
+        "Create",
+        1
+      ],
+      [
         "Remember",
         1
       ],
@@ -292,19 +288,11 @@
         1
       ],
       [
-        "Analyze",
-        1
-      ],
-      [
-        "Create",
-        1
-      ],
-      [
         "Apply",
         1
       ],
       [
-        "Evaluate",
+        "Analyze",
         1
       ]
     ]
@@ -397,5 +385,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:33"
+  "generated_at": "2026-03-30T13:18:04"
 }

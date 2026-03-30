@@ -51,10 +51,13 @@ pub enum ThreatSignalKind {
     CartelAttack,
     /// Systematic oppression pattern in governance.
     GovernanceOppression,
+    /// Epistemic threat: uncalibrated confidence, dogmatic certainty,
+    /// or systematic resistance to evidence update.
+    EpistemicThreat,
 }
 
 impl ThreatSignalKind {
-    /// Return the one-hot index for this threat kind (0-8).
+    /// Return the one-hot index for this threat kind (0-9).
     fn one_hot_index(self) -> usize {
         match self {
             Self::ProposalFlood => 0,
@@ -66,6 +69,7 @@ impl ThreatSignalKind {
             Self::ConsciousnessManipulation => 6,
             Self::CartelAttack => 7,
             Self::GovernanceOppression => 8,
+            Self::EpistemicThreat => 9,
         }
     }
 
@@ -86,6 +90,7 @@ impl ThreatSignalKind {
             SK::ConsciousnessManipulation => Self::ConsciousnessManipulation,
             SK::CartelAttack => Self::CartelAttack,
             SK::GovernanceOppression => Self::GovernanceOppression,
+            SK::EpistemicThreat => Self::EpistemicThreat,
         }
     }
 }
@@ -172,7 +177,7 @@ impl ThreatMemory {
     /// Encode a threat signal into a compact feature vector.
     ///
     /// The feature vector captures:
-    /// - Threat kind (one-hot, 7 dims)
+    /// - Threat kind (one-hot, 10 dims)
     /// - Severity (1 dim)
     /// - Confidence (1 dim)
     /// - Temporal pattern (8 dims: sin/cos encoding of detection time)
@@ -188,7 +193,7 @@ impl ThreatMemory {
     ) -> Vec<f32> {
         let mut features = vec![0.0f32; 32];
 
-        // One-hot threat kind (dims 0-6)
+        // One-hot threat kind (dims 0-9)
         features[kind.one_hot_index()] = 1.0;
 
         // Severity and confidence (dims 7-8)
@@ -627,5 +632,52 @@ mod tests {
     fn test_dream_salience_boost() {
         let memory = ThreatMemory::default();
         assert!((memory.dream_salience_boost() - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_epistemic_threat_one_hot_index() {
+        assert_eq!(ThreatSignalKind::EpistemicThreat.one_hot_index(), 9);
+    }
+
+    #[test]
+    fn test_epistemic_threat_encode_and_store() {
+        let mut memory = ThreatMemory::default();
+        let id = memory.store_threat(
+            ThreatSignalKind::EpistemicThreat,
+            0.6,
+            0.7,
+            200,
+            "dogmatic certainty detected",
+        );
+        assert_eq!(memory.pattern_count(), 1);
+        let pattern = &memory.patterns()[0];
+        assert_eq!(pattern.id, id);
+        assert_eq!(pattern.kind, ThreatSignalKind::EpistemicThreat);
+        // One-hot at index 9 should be 1.0
+        assert_eq!(pattern.feature_vector[9], 1.0);
+        // Other one-hot indices should be 0.0
+        for i in 0..9 {
+            assert_eq!(pattern.feature_vector[i], 0.0);
+        }
+    }
+
+    #[test]
+    fn test_epistemic_threat_match_against() {
+        let mut memory = ThreatMemory::default();
+        memory.store_threat(
+            ThreatSignalKind::EpistemicThreat,
+            0.5,
+            0.8,
+            100,
+            "evidence resistance",
+        );
+        let matches = memory.match_against(
+            ThreatSignalKind::EpistemicThreat,
+            0.6,
+            0.9,
+            100,
+            "evidence resistance",
+        );
+        assert!(!matches.is_empty());
     }
 }

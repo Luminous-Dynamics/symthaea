@@ -46,6 +46,22 @@ pub struct CollectiveImmuneState {
     pub blind_spots: Vec<String>,
     /// Number of federated threat patterns shared this round.
     pub patterns_shared: usize,
+    /// Domains where epistemic coverage is lacking.
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub epistemic_blind_spots: Vec<String>,
+    /// Fraction of network with calibrated epistemic confidence (0.0-1.0).
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub epistemic_herd_immunity: f32,
+    /// Network-level epistemic health: collective_phi * (1 - echo_chamber_risk).
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub network_epistemic_health: f64,
+    /// Echo chamber risk: high individual Phi + low collective Phi = fragmentation.
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub echo_chamber_risk: f32,
 }
 
 impl CollectiveImmuneState {
@@ -136,6 +152,78 @@ impl CollectiveImmuneState {
         );
 
         self.blind_spots = Self::detect_blind_spots(local_threat_kinds, swarm_threat_kinds);
+
+        #[cfg(feature = "epistemic")]
+        {
+            self.epistemic_blind_spots = Self::detect_epistemic_blind_spots(swarm_threat_kinds);
+            self.epistemic_herd_immunity =
+                Self::compute_epistemic_herd_immunity(peer_threat_reports, total_peers);
+        }
+    }
+
+    /// Detect epistemic coverage gaps: domains present in swarm threats
+    /// that relate to epistemic integrity (EpistemicThreat, ConsciousnessManipulation).
+    #[cfg(feature = "epistemic")]
+    pub fn detect_epistemic_blind_spots(swarm_threat_kinds: &[String]) -> Vec<String> {
+        const EPISTEMIC_DOMAINS: &[&str] = &[
+            "EpistemicThreat",
+            "ConsciousnessManipulation",
+            "GradientFingerprint",
+        ];
+        swarm_threat_kinds
+            .iter()
+            .filter(|k| EPISTEMIC_DOMAINS.contains(&k.as_str()))
+            .cloned()
+            .collect()
+    }
+
+    /// Compute fraction of peers with calibrated epistemic confidence.
+    ///
+    /// A peer is considered "calibrated" if its threat level is moderate
+    /// (between 0.05 and 0.6) — neither oblivious (0.0) nor panic-level.
+    /// This is a proxy for epistemic health: the node is detecting real
+    /// threats without over-reporting.
+    #[cfg(feature = "epistemic")]
+    pub fn compute_epistemic_herd_immunity(
+        peer_threat_reports: &[(String, f32)],
+        total_peers: usize,
+    ) -> f32 {
+        if total_peers == 0 {
+            return 0.0;
+        }
+        let calibrated = peer_threat_reports
+            .iter()
+            .filter(|(_, level)| *level > 0.05 && *level < 0.6)
+            .count();
+        (calibrated as f32 / total_peers as f32).clamp(0.0, 1.0)
+    }
+
+    /// Compute echo chamber risk and network epistemic health.
+    ///
+    /// Echo chamber: individual nodes have high Phi (confident in their own beliefs)
+    /// but collective Phi is low (the network isn't integrating across boundaries).
+    ///
+    /// Network epistemic health = collective_phi * (1.0 - echo_chamber_risk)
+    ///
+    /// Reference: arXiv:2512.15011 — epistemic diversity across LMs mitigates knowledge collapse
+    #[cfg(feature = "epistemic")]
+    pub fn compute_echo_chamber_risk(
+        &mut self,
+        individual_phi_mean: f64,
+        collective_phi: f64,
+    ) {
+        // High individual Phi + low collective Phi = echo chamber
+        let individual = individual_phi_mean.clamp(0.0, 1.0);
+        let collective = collective_phi.clamp(0.0, 1.0);
+
+        self.echo_chamber_risk = if individual > 0.01 {
+            ((individual - collective) / individual).clamp(0.0, 1.0) as f32
+        } else {
+            0.0
+        };
+
+        self.network_epistemic_health =
+            collective * (1.0 - self.echo_chamber_risk as f64);
     }
 
     /// Neuromodulator adjustments for collective immune response.
@@ -329,5 +417,64 @@ mod tests {
         assert!((state.swarm_threat_level - 0.8).abs() < 1e-6);
         assert_eq!(state.distinct_threat_kinds, 2);
         assert_eq!(state.blind_spots.len(), 1);
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_herd_immunity_computation() {
+        // 3 calibrated peers (threat 0.1-0.5), 2 non-calibrated (0.0 and 0.9)
+        let reports = vec![
+            ("p1".to_string(), 0.1f32),
+            ("p2".to_string(), 0.3),
+            ("p3".to_string(), 0.5),
+            ("p4".to_string(), 0.0),
+            ("p5".to_string(), 0.9),
+        ];
+        let herd = CollectiveImmuneState::compute_epistemic_herd_immunity(&reports, 5);
+        assert!((herd - 0.6).abs() < 1e-6); // 3/5 = 0.6
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_herd_immunity_zero_peers() {
+        let herd = CollectiveImmuneState::compute_epistemic_herd_immunity(&[], 0);
+        assert_eq!(herd, 0.0);
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_blind_spot_detection() {
+        let swarm_kinds = vec![
+            "ProposalFlood".to_string(),
+            "EpistemicThreat".to_string(),
+            "GradientFingerprint".to_string(),
+            "TimingAnomaly".to_string(),
+        ];
+        let spots = CollectiveImmuneState::detect_epistemic_blind_spots(&swarm_kinds);
+        assert_eq!(spots.len(), 2);
+        assert!(spots.contains(&"EpistemicThreat".to_string()));
+        assert!(spots.contains(&"GradientFingerprint".to_string()));
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_update_populates_epistemic_fields() {
+        let mut state = CollectiveImmuneState::default();
+        let reports = vec![
+            ("p1".to_string(), 0.2f32),
+            ("p2".to_string(), 0.4),
+            ("p3".to_string(), 0.0),
+        ];
+        state.update(
+            0.3,
+            &reports,
+            0.8,
+            3,
+            &["ProposalFlood".to_string()],
+            &["ProposalFlood".to_string(), "EpistemicThreat".to_string()],
+        );
+        assert_eq!(state.epistemic_blind_spots, vec!["EpistemicThreat"]);
+        // 2 calibrated out of 3 total peers
+        assert!((state.epistemic_herd_immunity - 2.0 / 3.0).abs() < 1e-5);
     }
 }

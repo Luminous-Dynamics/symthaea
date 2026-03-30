@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.CHM.2: Rate of reaction. Factors affecting rate: concentration, ...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Reaction rate measures how fast reactants are consumed or products formed. Rate = −Δ[reactant]/Δt = +Δ[product]/Δt. Factors: concentration (more collisions), temperature (faster molecules, more exceed Ea), surface area (more exposed particles), catalysts (lower Ea, provide alternative pathway). Collision theory: reactions only occur when particles collide with sufficient energy (≥ Ea) and correct orientation.",
+    "explanation": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9.8 m/s²), and height. Kinetic energy Ek = ½mv² depends on mass and speed. The law of conservation of mechanical energy states that in the absence of friction, total mechanical energy (Ep + Ek) remains constant. Work is done when a force moves an object: W = FΔx cos θ.",
     "examples": [
       {
         "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
@@ -55,33 +55,33 @@
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
+        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Surface area affects the frequency of effective collisions.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Zinc powder is less reactive",
+          "The lump has more atoms",
+          "Temperature is different"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
+        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Surface area affects the frequency of effective collisions.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "Zinc powder is less reactive",
+          "The lump has more atoms",
+          "Temperature is different"
         ]
       },
       {
@@ -260,19 +260,7 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Understand",
-        1
-      ],
-      [
-        "Analyze",
-        1
-      ],
-      [
         "Evaluate",
-        1
-      ],
-      [
-        "Remember",
         1
       ],
       [
@@ -280,7 +268,19 @@
         1
       ],
       [
+        "Understand",
+        1
+      ],
+      [
         "Create",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Remember",
         1
       ]
     ]
@@ -373,5 +373,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:37"
+  "generated_at": "2026-03-30T13:18:17"
 }

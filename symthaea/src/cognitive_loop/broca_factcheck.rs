@@ -454,6 +454,95 @@ impl BrocaFactcheckBridge {
     }
 }
 
+// ── Conductor Bridge Task ──────────────────────────────────────────────────
+
+/// Async task that bridges factcheck channels to a Holochain conductor.
+///
+/// Reads claims from `claim_rx`, calls the factcheck zome via the conductor,
+/// and sends results back through `verdict_tx`.
+///
+/// When no conductor is available, returns `FactCheckVerdict::Unknown` with
+/// confidence 0.0 so the bridge degrades gracefully.
+#[cfg(feature = "mycelix")]
+pub struct FactcheckConductorTask;
+
+#[cfg(feature = "mycelix")]
+impl FactcheckConductorTask {
+    /// Spawn the conductor bridge as a background thread.
+    ///
+    /// The task runs until the claim channel is closed (bridge dropped).
+    /// Each claim is sent to the factcheck zome and the verdict is forwarded
+    /// back to the Broca bridge.
+    ///
+    /// `conductor_url`: WebSocket URL for the Holochain conductor (e.g. "ws://localhost:8888")
+    /// `app_id`: The installed app ID (e.g. "mycelix-unified")
+    pub fn spawn(
+        channels: FactcheckChannels,
+        conductor_url: String,
+        app_id: String,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::Builder::new()
+            .name("factcheck-conductor".into())
+            .spawn(move || {
+                Self::run_blocking(channels, &conductor_url, &app_id);
+            })
+            .expect("failed to spawn factcheck conductor thread")
+    }
+
+    /// Blocking event loop: drain claims, query conductor, send verdicts.
+    fn run_blocking(
+        channels: FactcheckChannels,
+        _conductor_url: &str,
+        _app_id: &str,
+    ) {
+        // TODO: Connect to HolochainConductor via WebSocket when conductor is available.
+        // For now, this provides the scaffolding — claims are received, and Unknown
+        // verdicts are returned so the bridge pipeline is exercised end-to-end.
+        //
+        // When the conductor is wired:
+        //   let conductor = HolochainConductor::new(conductor_url, app_id);
+        //   conductor.connect().await;
+        //   let result = conductor.call_zome("knowledge", "factcheck", "fact_check", payload).await;
+
+        while let Ok(claim) = channels.claim_rx.recv() {
+            // Construct the verdict — currently a pass-through Unknown.
+            // Replace with real conductor call when available.
+            let result = FactCheckResult {
+                claim,
+                verdict: FactCheckVerdict::Unknown,
+                confidence: 0.0,
+                source_ids: Vec::new(),
+            };
+
+            // Send verdict back to bridge; stop if receiver dropped
+            if channels.verdict_tx.send(result).is_err() {
+                break;
+            }
+        }
+    }
+
+    /// Spawn with a custom verdict function (for testing / mock conductors).
+    pub fn spawn_with_handler<F>(
+        channels: FactcheckChannels,
+        handler: F,
+    ) -> std::thread::JoinHandle<()>
+    where
+        F: Fn(&str) -> FactCheckResult + Send + 'static,
+    {
+        std::thread::Builder::new()
+            .name("factcheck-conductor-mock".into())
+            .spawn(move || {
+                while let Ok(claim) = channels.claim_rx.recv() {
+                    let result = handler(&claim);
+                    if channels.verdict_tx.send(result).is_err() {
+                        break;
+                    }
+                }
+            })
+            .expect("failed to spawn mock factcheck conductor thread")
+    }
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -694,5 +783,44 @@ mod tests {
         assert_eq!(telem.total_claims_submitted, 1);
         assert_eq!(telem.total_claims_verified, 1);
         assert_eq!(telem.total_claims_suppressed, 0);
+    }
+
+    #[test]
+    fn test_channel_based_verdict_flow() {
+        let mut bridge = BrocaFactcheckBridge::new();
+        let channels = bridge.create_channels();
+        assert!(bridge.is_connected());
+
+        // Simulate a conductor: send a verdict through the channel
+        channels
+            .verdict_tx
+            .send(FactCheckResult {
+                claim: "Water boils at 100 degrees Celsius at sea level.".to_string(),
+                verdict: FactCheckVerdict::True,
+                confidence: 0.92,
+                source_ids: vec!["chemistry:bp_water".to_string()],
+            })
+            .unwrap();
+
+        // Bridge should drain the channel and process the verdict
+        let modulation = bridge.process_verdicts(1);
+        assert_eq!(modulation.claims_verified, 1);
+        assert!(!modulation.suppress);
+        assert_eq!(bridge.total_verified, 1);
+    }
+
+    #[test]
+    fn test_channel_based_claim_submission() {
+        let mut bridge = BrocaFactcheckBridge::new();
+        let channels = bridge.create_channels();
+
+        // Submit a claim — it should arrive on the channel
+        bridge.submit_for_verification(&[
+            "The Nile is the longest river in Africa.".to_string(),
+        ]);
+
+        // The conductor side should receive the claim
+        let received = channels.claim_rx.try_recv().unwrap();
+        assert!(received.contains("Nile"));
     }
 }

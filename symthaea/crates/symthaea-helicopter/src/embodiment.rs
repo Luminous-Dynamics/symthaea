@@ -9,7 +9,10 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
-pub use symthaea_hal::MotorSafetyLevel;
+pub use symthaea_core::embodiment::{
+    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
+    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+};
 
 use crate::controller::HelicopterController;
 use crate::encoder::HelicopterHdcEncoder;
@@ -105,6 +108,8 @@ impl HelicopterEmbodiment {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
 
@@ -141,29 +146,10 @@ impl HelicopterEmbodiment {
             safety_level: format!("{:?}", self.current_safety),
             platform: "helicopter".to_string(),
             num_actuators: 6,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
         }
     }
-}
-
-/// Result of a single embodiment step.
-#[derive(Debug, Clone)]
-pub struct EmbodimentResult {
-    pub num_actuators: usize,
-    pub control_effort: f32,
-    pub success: bool,
-    pub prediction_error: f32,
-    pub safety_level: MotorSafetyLevel,
-}
-
-/// Telemetry from the embodiment subsystem.
-#[derive(Debug, Clone, Default)]
-pub struct EmbodimentTelemetry {
-    pub total_steps: u64,
-    pub control_effort: f32,
-    pub prediction_error: f32,
-    pub safety_level: String,
-    pub platform: String,
-    pub num_actuators: usize,
 }
 
 #[cfg(test)]

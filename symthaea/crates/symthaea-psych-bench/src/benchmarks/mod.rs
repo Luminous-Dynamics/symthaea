@@ -33,3 +33,6 @@ pub mod substrate;
 pub mod sustained_attention;
 pub mod tombench;
 pub mod worm;
+
+#[cfg(feature = "neural_validation")]
+pub mod neural_validation;

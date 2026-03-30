@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr12.P2.ECHEM: Galvanic cells: spontaneous redox reactions, cell notatio...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "Brønsted-Lowry: acids donate H⁺, bases accept H⁺. Strong acids (HCl, HNO₃, H₂SO₄) ionise completely; weak acids (CH₃COOH) ionise partially. pH = −log[H₃O⁺]. For water: Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴ at 25°C. Titration curves show pH change as base is added to acid. The equivalence point is where moles acid = moles base.",
+    "explanation": "Galvanic cells convert chemical energy to electrical energy using spontaneous redox reactions. The more reactive metal is the anode (oxidation), the less reactive is the cathode (reduction). E°cell = E°cathode − E°anode (must be positive for spontaneous). Electrolytic cells use external voltage to drive non-spontaneous reactions. In electrolysis: anode = oxidation (+), cathode = reduction (−) — opposite to galvanic.",
     "examples": [
       {
         "problem": "Calculate E°cell for Zn|Zn²⁺||Cu²⁺|Cu. Given: E°(Zn²⁺/Zn) = −0.76 V, E°(Cu²⁺/Cu) = +0.34 V.",
@@ -277,10 +277,6 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Understand",
-        1
-      ],
-      [
         "Create",
         1
       ],
@@ -289,11 +285,15 @@
         1
       ],
       [
-        "Apply",
+        "Remember",
         1
       ],
       [
-        "Remember",
+        "Understand",
+        1
+      ],
+      [
+        "Apply",
         1
       ],
       [
@@ -390,5 +390,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:26"
+  "generated_at": "2026-03-30T13:18:24"
 }

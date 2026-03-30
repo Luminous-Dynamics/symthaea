@@ -323,6 +323,13 @@ impl SubstrateValidationFramework {
                     "Design experiments that distinguish genuine experience from simulation",
                     8,
                 ),
+                TestablePrediction::new(
+                    "Silicon consciousness simulation produces activation patterns matching fMRI predictions",
+                    "Cortical activation similarity r > 0.3 between Symthaea 12-region map and TRIBE v2 fMRI predictions",
+                    "Cortical activation similarity r < 0.1 (no better than chance for 12 regions)",
+                    "Run shared stimuli through both Symthaea cognitive loop and TRIBE v2; compare per-region activations via Pearson r",
+                    5,
+                ),
             ],
             hypothetical_feasibility: 0.71,
             feasibility_rationale: "HYPOTHETICAL based on functionalist philosophy. \
@@ -608,6 +615,26 @@ impl SubstrateValidationFramework {
         Some(new_level)
     }
 
+    /// Record a cortical activation similarity result from TRIBE v2 comparison.
+    ///
+    /// The TRIBE v2 cortical similarity prediction (index 3 in silicon predictions)
+    /// passes if `pearson_r >= threshold` (default 0.3).
+    ///
+    /// Returns the new evidence level if upgraded, or None if silicon substrate
+    /// is not found.
+    #[cfg(feature = "neural_validation")]
+    pub fn record_cortical_similarity(
+        &mut self,
+        pearson_r: f64,
+        threshold: f64,
+    ) -> Option<EvidenceLevel> {
+        let passed = pearson_r >= threshold;
+        // The TRIBE v2 prediction is the 4th prediction (index 3) in silicon knowledge.
+        let tribe_pred_idx = 3;
+        self.record_prediction_result("silicon", tribe_pred_idx, passed);
+        self.substrates.get("silicon").map(|k| k.evidence_level)
+    }
+
     /// Summarize prediction validation status for all substrates.
     pub fn prediction_summary(&self) -> Vec<PredictionSummary> {
         self.substrates
@@ -637,6 +664,103 @@ impl SubstrateValidationFramework {
 impl Default for SubstrateValidationFramework {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ==============================================================================
+// GENERALIZED EPISTEMIC CLAIM VALIDATION
+// ==============================================================================
+
+/// Validation result for an arbitrary epistemic claim.
+///
+/// Generalizes the substrate validation pattern (feasibility vs honest evidence)
+/// to any knowledge assertion. The `feasibility_gap` between how confident
+/// a claim sounds and what evidence actually supports it is the core metric.
+///
+/// Reference: Goldberg (2023) — epistemic immunity requires calibrated confidence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpistemicClaimValidation {
+    /// The claim being validated
+    pub claim: String,
+    /// Domain of the claim
+    pub claim_type: String,
+    /// How confident the claim sounds (0.0-1.0)
+    pub stated_confidence: f64,
+    /// What evidence actually supports it
+    pub evidence_level: EvidenceLevel,
+    /// Testable predictions that could validate/falsify
+    pub predictions: Vec<TestablePrediction>,
+    /// Gap between stated confidence and honest evidence
+    pub feasibility_gap: f64,
+}
+
+impl EpistemicClaimValidation {
+    /// Validate an arbitrary epistemic claim.
+    ///
+    /// `stated_confidence`: How confident the claim appears (from language cues)
+    /// `evidence`: List of evidence descriptions supporting the claim
+    pub fn validate(
+        claim: &str,
+        claim_type: &str,
+        stated_confidence: f64,
+        evidence: &[String],
+    ) -> Self {
+        let evidence_level = Self::assess_evidence_level(evidence);
+        let honest_confidence = evidence_level.confidence();
+        let feasibility_gap = (stated_confidence - honest_confidence).abs();
+
+        Self {
+            claim: claim.to_string(),
+            claim_type: claim_type.to_string(),
+            stated_confidence,
+            evidence_level,
+            predictions: Vec::new(),
+            feasibility_gap,
+        }
+    }
+
+    /// Assess evidence level from a list of evidence descriptions.
+    fn assess_evidence_level(evidence: &[String]) -> EvidenceLevel {
+        if evidence.is_empty() {
+            return EvidenceLevel::None;
+        }
+
+        let count = evidence.len();
+        let has_experimental = evidence.iter().any(|e| {
+            let lower = e.to_lowercase();
+            lower.contains("experiment") || lower.contains("controlled") || lower.contains("replicated")
+        });
+        let has_peer_review = evidence.iter().any(|e| {
+            let lower = e.to_lowercase();
+            lower.contains("peer review") || lower.contains("consensus") || lower.contains("validated")
+        });
+
+        if has_peer_review && has_experimental && count >= 3 {
+            EvidenceLevel::Validated
+        } else if has_experimental {
+            EvidenceLevel::Experimental
+        } else if count >= 3 {
+            EvidenceLevel::Observational
+        } else if count == 1 {
+            EvidenceLevel::CaseStudy
+        } else {
+            EvidenceLevel::Indirect
+        }
+    }
+
+    /// Whether this claim has a concerning gap (stated confidence >> evidence).
+    pub fn is_overconfident(&self) -> bool {
+        self.feasibility_gap > 0.3
+    }
+
+    /// Honest confidence based on actual evidence.
+    pub fn honest_confidence(&self) -> f64 {
+        self.evidence_level.confidence()
+    }
+
+    /// Add a testable prediction.
+    pub fn add_prediction(&mut self, prediction: TestablePrediction) {
+        self.predictions.push(prediction);
     }
 }
 
@@ -817,5 +941,54 @@ mod tests {
             framework.record_prediction_result("silicon", i, true);
         }
         assert!(framework.get("silicon").unwrap().evidence_level >= EvidenceLevel::CaseStudy);
+    }
+
+    // ── Generalized Epistemic Claim Validation Tests ──
+
+    #[test]
+    fn test_claim_validation_no_evidence() {
+        let v = EpistemicClaimValidation::validate(
+            "Crystals heal diseases",
+            "health",
+            0.9,
+            &[],
+        );
+        assert_eq!(v.evidence_level, EvidenceLevel::None);
+        assert!(v.is_overconfident());
+        assert!(v.feasibility_gap > 0.8);
+    }
+
+    #[test]
+    fn test_claim_validation_strong_evidence() {
+        let v = EpistemicClaimValidation::validate(
+            "Water boils at 100C at sea level",
+            "physics",
+            0.95,
+            &[
+                "Controlled experiment replicated".to_string(),
+                "Peer reviewed consensus".to_string(),
+                "Multiple independent observations".to_string(),
+            ],
+        );
+        assert_eq!(v.evidence_level, EvidenceLevel::Validated);
+        assert!(!v.is_overconfident());
+    }
+
+    #[test]
+    fn test_claim_validation_single_evidence() {
+        let v = EpistemicClaimValidation::validate(
+            "Patient reported improvement",
+            "medical",
+            0.7,
+            &["Single case report".to_string()],
+        );
+        assert_eq!(v.evidence_level, EvidenceLevel::CaseStudy);
+        assert!(v.feasibility_gap > 0.2);
+    }
+
+    #[test]
+    fn test_claim_honest_confidence() {
+        let v = EpistemicClaimValidation::validate("X", "test", 0.9, &[]);
+        assert_eq!(v.honest_confidence(), 0.0);
     }
 }

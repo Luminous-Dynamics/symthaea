@@ -20,10 +20,18 @@ pub enum VouchDecision {
 }
 
 /// Processes received capability cards and decides whether to vouch.
+///
+/// With the `epistemic` feature, also tracks reputation-modulated learning
+/// rates — high-reputation peers' knowledge is learned from faster.
 pub struct ReputationBridge {
     min_interactions: u64,
     phi_threshold: f64,
     interactions: std::collections::HashMap<String, u64>,
+    /// Reputation-weighted learning rate modulation per peer.
+    /// Reputation flows from Mycelix → Symthaea, modulating how fast
+    /// the consciousness engine integrates peer knowledge.
+    #[cfg(feature = "epistemic")]
+    reputation_learning_rates: std::collections::HashMap<String, f64>,
 }
 
 impl ReputationBridge {
@@ -35,7 +43,43 @@ impl ReputationBridge {
             min_interactions,
             phi_threshold,
             interactions: std::collections::HashMap::new(),
+            #[cfg(feature = "epistemic")]
+            reputation_learning_rates: std::collections::HashMap::new(),
         }
+    }
+
+    /// Update reputation-modulated learning rate for a peer.
+    ///
+    /// Formula: lr_modifier = 0.5 + 1.5 * reputation.clamp(0, 1)
+    /// - reputation 0.0 → 0.5x (cautious, learn slowly from untrusted)
+    /// - reputation 0.5 → 1.25x (moderate trust)
+    /// - reputation 1.0 → 2.0x (full trust, learn fast)
+    #[cfg(feature = "epistemic")]
+    pub fn update_reputation(&mut self, peer_id: &str, reputation: f64) {
+        let modifier = 0.5 + 1.5 * reputation.clamp(0.0, 1.0);
+        self.reputation_learning_rates
+            .insert(peer_id.to_string(), modifier);
+    }
+
+    /// Get the learning rate modifier for a peer.
+    /// Returns 1.0 (neutral) if no reputation data is available.
+    #[cfg(feature = "epistemic")]
+    pub fn learning_rate_modifier(&self, peer_id: &str) -> f64 {
+        self.reputation_learning_rates
+            .get(peer_id)
+            .copied()
+            .unwrap_or(1.0)
+    }
+
+    /// Compute aggregate learning rate modifier across all tracked peers.
+    /// Useful for blending into the global learning rate.
+    #[cfg(feature = "epistemic")]
+    pub fn aggregate_learning_rate_modifier(&self) -> f64 {
+        if self.reputation_learning_rates.is_empty() {
+            return 1.0;
+        }
+        let sum: f64 = self.reputation_learning_rates.values().sum();
+        sum / self.reputation_learning_rates.len() as f64
     }
 
     /// Process a received capability card.

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
 Make zome calls to Byzantine Defense hApp (Holochain 0.6)
 Uses correct hash decoding for Holochain base64url format

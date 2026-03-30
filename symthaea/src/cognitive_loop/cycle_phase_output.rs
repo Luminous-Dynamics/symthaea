@@ -1181,6 +1181,99 @@ impl CognitiveLoopService {
         metadata.substrate_tau_factor = metadata.substrate.substrate_tau_factor;
         metadata.substrate_scale_pressure = metadata.substrate.substrate_scale_pressure;
 
+        // ── Neural validation: cortical activation map from live subsystem states ──
+        #[cfg(feature = "neural_validation")]
+        {
+            use symthaea_core::hdc::cortical_activation::{
+                ActivationSource, CorticalActivationMap,
+            };
+            use symthaea_core::hdc::substrate_independence::CorticalRegion;
+
+            let mut cam = CorticalActivationMap::zeros(
+                ActivationSource::Simulated,
+                self.stats.total_cycles,
+            );
+
+            // Prefrontal: reasoning confidence (meta-cognition proxy)
+            cam.set(
+                CorticalRegion::Prefrontal,
+                dynamics.reasoning.reasoning_confidence.clamp(0.0, 1.0),
+            );
+
+            // Visual: grid encoding norm + spatial complexity
+            cam.set(
+                CorticalRegion::Visual,
+                (metadata.grid_encoding_norm * 0.5
+                    + metadata.grid_spatial_complexity * 0.5)
+                    .clamp(0.0, 1.0),
+            );
+
+            // Auditory: voice confidence (speech perception proxy)
+            cam.set(CorticalRegion::Auditory, metadata.voice_confidence);
+
+            // Language: reasoning narrative presence as proxy (0.4 when active)
+            let lang_active = if metadata.reasoning_narrative.is_empty() { 0.1 } else { 0.5 };
+            cam.set(CorticalRegion::Language, lang_active);
+
+            // Memory: codebook utilization from resonator metrics
+            cam.set(
+                CorticalRegion::Memory,
+                metadata.memory.codebook_utilization_rate,
+            );
+
+            // Emotional: affect valence magnitude + arousal (from subsystem metrics)
+            let emotional = (feedback.consciousness.affect_cons_valence.abs()
+                + feedback.consciousness.affect_cons_arousal)
+                / 2.0;
+            cam.set(CorticalRegion::Emotional, emotional.clamp(0.0, 1.0) as f32);
+
+            // Motor: FEP pragmatic value (action confidence)
+            cam.set(
+                CorticalRegion::Motor,
+                (dynamics.fep.fep_pragmatic_value as f32).clamp(0.0, 1.0),
+            );
+
+            // Social: social trust + social prediction accuracy
+            cam.set(
+                CorticalRegion::Social,
+                (metadata.social_trust_current * 0.5
+                    + metadata.social_prediction_accuracy * 0.5)
+                    .clamp(0.0, 1.0),
+            );
+
+            // Executive: epistemic gate confidence (conflict monitoring)
+            cam.set(
+                CorticalRegion::Executive,
+                feedback.reasoning.epistemic_gate_confidence,
+            );
+
+            // Integration: temporal binding + cross-module agreement
+            cam.set(
+                CorticalRegion::Integration,
+                (metadata.temporal_binding_strength * 0.5
+                    + metadata.cross_module_agreement * 0.5)
+                    .clamp(0.0, 1.0),
+            );
+
+            // Sensory: thalamic depth as proprioceptive engagement proxy
+            cam.set(
+                CorticalRegion::Sensory,
+                (thalamic_depth_score * 0.3).clamp(0.0, 1.0),
+            );
+
+            // Creative: surprise-triggered exploration as creativity proxy
+            let creative = if perception.exploration.surprise_triggered { 0.7 } else { 0.2 };
+            cam.set(CorticalRegion::Creative, creative);
+
+            // Accumulate into ring buffer for temporal analysis.
+            if self.cortical_history.len() >= 1000 {
+                self.cortical_history.pop_front();
+            }
+            self.cortical_history.push_back(cam.clone());
+
+            metadata.cortical_activation = Some(cam);
+        }
+
         // ── Thermal telemetry ──
         {
             let thermal_signals = self.sensorimotor.thermal_bridge.signals();

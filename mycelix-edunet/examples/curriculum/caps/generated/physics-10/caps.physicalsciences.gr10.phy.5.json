@@ -5,200 +5,195 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.5: Electromagnetic spectrum. Nature of EM waves. Properties:...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "The photoelectric effect demonstrates the particle nature of light. Photon energy E = hf = hc/λ (h = 6.63 × 10⁻³⁴ J·s). Einstein's equation: E = W₀ + Ek(max), where W₀ = hf₀ is the work function. Below threshold frequency f₀, no electrons are emitted regardless of intensity. Emission spectra: atoms emit photons at specific frequencies when electrons drop energy levels: E = hf.",
+    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (λ) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = fλ, period T = 1/f.",
     "examples": [
       {
-        "problem": "Light of wavelength 400 nm strikes a metal with work function 3.0 eV. Find the maximum kinetic energy of ejected electrons.",
+        "problem": "Solve a Electromagnetic Radiation problem.",
         "steps": [
           {
-            "instruction": "Step 1: E = hc/λ = (6.63×10⁻³⁴)(3×10⁸)/(400×10⁻⁹) = 4.97 × 10⁻¹⁹ J",
-            "result": "photon energy"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: Convert to eV: 4.97×10⁻¹⁹/1.6×10⁻¹⁹ = 3.11 eV",
-            "result": "convert units"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
           },
           {
-            "instruction": "Step 3: Ek(max) = E − W₀ = 3.11 − 3.0 = 0.11 eV",
-            "result": "apply Einstein's equation"
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Ek(max) = 0.11 eV (≈ 1.76 × 10⁻²⁰ J)",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       },
       {
-        "problem": "Light of wavelength 400 nm strikes a metal with work function 3.0 eV. Find the maximum kinetic energy of ejected electrons.",
+        "problem": "Solve a Electromagnetic Radiation problem.",
         "steps": [
           {
-            "instruction": "Step 1: E = hc/λ = (6.63×10⁻³⁴)(3×10⁸)/(400×10⁻⁹) = 4.97 × 10⁻¹⁹ J",
-            "result": "photon energy"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: Convert to eV: 4.97×10⁻¹⁹/1.6×10⁻¹⁹ = 3.11 eV",
-            "result": "convert units"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
           },
           {
-            "instruction": "Step 3: Ek(max) = E − W₀ = 3.11 − 3.0 = 0.11 eV",
-            "result": "apply Einstein's equation"
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Ek(max) = 0.11 eV (≈ 1.76 × 10⁻²⁰ J)",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       },
       {
-        "problem": "Light of wavelength 400 nm strikes a metal with work function 3.0 eV. Find the maximum kinetic energy of ejected electrons.",
+        "problem": "Solve a Electromagnetic Radiation problem.",
         "steps": [
           {
-            "instruction": "Step 1: E = hc/λ = (6.63×10⁻³⁴)(3×10⁸)/(400×10⁻⁹) = 4.97 × 10⁻¹⁹ J",
-            "result": "photon energy"
+            "instruction": "Step 1: Identify the given information",
+            "result": "read carefully"
           },
           {
-            "instruction": "Step 2: Convert to eV: 4.97×10⁻¹⁹/1.6×10⁻¹⁹ = 3.11 eV",
-            "result": "convert units"
+            "instruction": "Step 2: Apply the relevant formula or method",
+            "result": "show working"
           },
           {
-            "instruction": "Step 3: Ek(max) = E − W₀ = 3.11 − 3.0 = 0.11 eV",
-            "result": "apply Einstein's equation"
+            "instruction": "Step 3: State the answer with units",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Ek(max) = 0.11 eV (≈ 1.76 × 10⁻²⁰ J)",
+        "answer": "Answer: See worked solution",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Practice: Electromagnetic Radiation",
+        "answer": "Answer",
         "difficulty_permille": 875,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what method applies here.,Review the key formula for this topic."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "The answer follows from applying the correct method.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Wrong answer 1",
+          "Wrong answer 2",
+          "Wrong answer 3"
         ]
       }
     ],
     "hints": [
-      "Photon energy = hf or hc/λ. If E > W₀, photoelectrons are emitted with Ek = E − W₀.",
-      "Photon energy = hf or hc/λ. If E > W₀, photoelectrons are emitted with Ek = E − W₀.",
-      "Photon energy = hf or hc/λ. If E > W₀, photoelectrons are emitted with Ek = E − W₀."
+      "What concept from Electromagnetic Radiation applies here?",
+      "Apply the method for Electromagnetic Radiation step by step.",
+      "Start by writing down what you know about Electromagnetic Radiation."
     ],
     "key_vocabulary": [
       {
-        "term": "photoelectric effect",
-        "definition": "The emission of electrons when light strikes a metal surface",
-        "example_usage": "The photoelectric effect proves light behaves as particles."
+        "term": "electromagnetic",
+        "definition": "A key term",
+        "example_usage": "Used in this topic."
       },
       {
-        "term": "work function",
-        "definition": "The minimum energy needed to remove an electron from a metal surface",
-        "example_usage": "W₀ = hf₀."
-      },
-      {
-        "term": "threshold frequency",
-        "definition": "The minimum frequency of light needed to cause photoemission",
-        "example_usage": "Below f₀, no electrons are emitted."
+        "term": "concept",
+        "definition": "An important idea",
+        "example_usage": "Fundamental to understanding."
       }
     ],
     "misconceptions": [
       {
-        "misconception": "Students think increasing light intensity below the threshold frequency will eventually cause emission.",
-        "correction": "Below f₀, no electrons are emitted regardless of intensity. Each photon must individually have enough energy (hf ≥ W₀).",
-        "why_students_think_this": "One photon interacts with one electron. Many low-energy photons can't combine their energy."
+        "misconception": "A common error in Electromagnetic Radiation.",
+        "correction": "The correct understanding.",
+        "why_students_think_this": "This mistake is common because students often skip a key step."
       }
     ],
     "generation_quality": {
@@ -214,77 +209,77 @@
     "title": "Assessment: Electromagnetic spectrum. Nature of EM waves. Properties: wavelength, frequency, speed (c = 3×10⁸ m/s). Applications of different EM bands",
     "items": [
       {
-        "question": "Explain why the photoelectric effect cannot be explained by the wave theory of light.",
+        "question": "Explain Electromagnetic Radiation.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Wave theory predicts: (1) any frequency should cause emission given enough intensity, (2) delay before emission as energy accumulates. Both are contradicted experimentally.",
+        "correct_answer": "Key concept answer.",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Explain why the photoelectric effect cannot be explained by the wave theory of light.",
+        "question": "Explain Electromagnetic Radiation.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Wave theory predicts: (1) any frequency should cause emission given enough intensity, (2) delay before emission as energy accumulates. Both are contradicted experimentally.",
+        "correct_answer": "Key concept answer.",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Explain why the photoelectric effect cannot be explained by the wave theory of light.",
+        "question": "Explain Electromagnetic Radiation.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Wave theory predicts: (1) any frequency should cause emission given enough intensity, (2) delay before emission as energy accumulates. Both are contradicted experimentally.",
+        "correct_answer": "Key concept answer.",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Explain why the photoelectric effect cannot be explained by the wave theory of light.",
+        "question": "Explain Electromagnetic Radiation.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Wave theory predicts: (1) any frequency should cause emission given enough intensity, (2) delay before emission as energy accumulates. Both are contradicted experimentally.",
+        "correct_answer": "Key concept answer.",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Explain why the photoelectric effect cannot be explained by the wave theory of light.",
+        "question": "Explain Electromagnetic Radiation.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Wave theory predicts: (1) any frequency should cause emission given enough intensity, (2) delay before emission as energy accumulates. Both are contradicted experimentally.",
+        "correct_answer": "Key concept answer.",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Explain why the photoelectric effect cannot be explained by the wave theory of light.",
+        "question": "Explain Electromagnetic Radiation.",
         "item_type": "ShortAnswer",
-        "correct_answer": "Wave theory predicts: (1) any frequency should cause emission given enough intensity, (2) delay before emission as energy accumulates. Both are contradicted experimentally.",
+        "correct_answer": "Key concept answer.",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       }
     ],
     "total_points": 15,
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Analyze",
-        1
-      ],
-      [
         "Evaluate",
         1
       ],
       [
-        "Remember",
+        "Analyze",
         1
       ],
       [
         "Apply",
+        1
+      ],
+      [
+        "Remember",
         1
       ],
       [
@@ -299,8 +294,8 @@
   },
   "flashcards": [
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -309,8 +304,8 @@
       "difficulty_permille": 111
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -319,8 +314,8 @@
       "difficulty_permille": 222
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -329,8 +324,8 @@
       "difficulty_permille": 333
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -339,8 +334,8 @@
       "difficulty_permille": 444
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -349,8 +344,8 @@
       "difficulty_permille": 555
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -359,8 +354,8 @@
       "difficulty_permille": 666
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -369,8 +364,8 @@
       "difficulty_permille": 777
     },
     {
-      "front": "State Einstein's photoelectric equation.",
-      "back": "E = W₀ + Ek(max), or hf = hf₀ + ½mv²(max)",
+      "front": "What is the key idea in Electromagnetic Radiation?",
+      "back": "The electromagnetic spectrum (from lowest to highest frequency): radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
@@ -385,5 +380,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T14:41:34"
+  "generated_at": "2026-03-30T13:18:12"
 }

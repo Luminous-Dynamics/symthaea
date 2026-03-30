@@ -40,6 +40,12 @@ pub mod persistence;
 pub mod reasoning_context;
 #[cfg(feature = "self_schema")]
 pub mod self_schema;
+#[cfg(feature = "epistemic")]
+pub mod claim_priority;
+#[cfg(feature = "epistemic")]
+pub mod adversarial_epistemics;
+#[cfg(feature = "epistemic")]
+pub mod hdc_retrieval;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;

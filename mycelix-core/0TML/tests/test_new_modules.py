@@ -1,3 +1,6 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """Tests for v1.2.0 new modules: config, exceptions, validation, observability."""
 import pytest
 import numpy as np

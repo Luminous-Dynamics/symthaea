@@ -10,11 +10,14 @@ pub mod acm;
 pub mod caps;
 pub mod cip;
 pub mod csp;
+pub mod cybersecurity;
 pub mod esco;
 pub mod k12_subjects;
 pub mod luminous;
 pub mod ocw;
 pub mod phd;
+pub mod philosophy;
+pub mod universal;
 
 use crate::converter::CurriculumDocument;
 

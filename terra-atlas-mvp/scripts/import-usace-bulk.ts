@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Bulk Import USACE NID Dams to Supabase energy_projects table
 //
 // Reads from data/usace-dams.json (103,650 dams) and inserts into

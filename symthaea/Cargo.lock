@@ -15774,6 +15774,7 @@ dependencies = [
  "symthaea-ectogenesis",
  "symthaea-embeddings",
  "symthaea-enactive",
+ "symthaea-epistemic-types",
  "symthaea-exploration",
  "symthaea-fabrication-kernel",
  "symthaea-factor-graph",
@@ -16080,6 +16081,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-epistemic-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-exploration"
 version = "0.1.0"
 dependencies = [
@@ -16195,6 +16204,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "symthaea-core",
  "symthaea-humanoid",
  "thiserror 1.0.69",
  "tracing",
@@ -16598,6 +16608,7 @@ dependencies = [
  "console_error_panic_hook",
  "futures-util",
  "getrandom 0.2.17",
+ "getrandom 0.3.4",
  "getrandom 0.4.2",
  "rmp-serde",
  "serde",

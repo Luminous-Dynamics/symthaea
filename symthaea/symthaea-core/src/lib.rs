@@ -76,3 +76,6 @@ pub mod phi_engine;
 pub mod physics;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+/// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
+#[allow(missing_docs)]
+pub mod embodiment;

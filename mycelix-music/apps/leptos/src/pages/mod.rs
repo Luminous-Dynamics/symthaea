@@ -8,6 +8,7 @@ mod artist;
 mod dashboard;
 mod upload;
 mod gallery;
+mod consciousness;
 
 pub use home::HomePage;
 pub use discover::DiscoverPage;
@@ -15,3 +16,4 @@ pub use artist::ArtistPage;
 pub use dashboard::DashboardPage;
 pub use upload::UploadPage;
 pub use gallery::GalleryPage;
+pub use consciousness::ConsciousnessPage;

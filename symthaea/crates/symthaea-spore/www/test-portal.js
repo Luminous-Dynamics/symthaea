@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Pre-deploy portal validation
 // Catches: missing DOM IDs, undefined worker actions, broken tab references,
 // missing function definitions, CSS class mismatches
@@ -22,9 +30,20 @@ const getByIdCalls = [...html.matchAll(/getElementById\(['"]([^'"]+)['"]\)/g)];
 const htmlIds = [...html.matchAll(/id=["']([^"']+)["']/g)].map(m => m[1]);
 const idSet = new Set(htmlIds);
 
+// IDs created dynamically at runtime (not in static HTML)
+const dynamicIds = new Set([
+  'flake-download-panel', 'ssh-deploy-panel', 'disk-selector',
+  'download-panel', 'music-toggle', 'voice-toggle',
+  'app-compat-panel', 'layout-select', 'install-hostname',
+  'secure-boot-toggle', 'tpm2-toggle',
+  'cfg-timezone', 'cfg-keyboard', 'cfg-desktop', 'cfg-gpu',
+  'cfg-wifi-ssid', 'cfg-wifi-pass', 'cfg-hostname',
+  'constellation-canvas',
+]);
+
 let missingIds = 0;
 for (const [, id] of getByIdCalls) {
-  if (!idSet.has(id)) {
+  if (!idSet.has(id) && !dynamicIds.has(id)) {
     error(`getElementById('${id}') references non-existent ID`);
     missingIds++;
   }

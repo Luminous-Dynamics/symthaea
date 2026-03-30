@@ -260,11 +260,15 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
+        "Analyze",
+        1
+      ],
+      [
         "Understand",
         1
       ],
       [
-        "Apply",
+        "Create",
         1
       ],
       [
@@ -272,15 +276,11 @@
         1
       ],
       [
+        "Apply",
+        1
+      ],
+      [
         "Remember",
-        1
-      ],
-      [
-        "Analyze",
-        1
-      ],
-      [
-        "Create",
         1
       ]
     ]
@@ -373,5 +373,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:26"
+  "generated_at": "2026-03-30T13:18:24"
 }

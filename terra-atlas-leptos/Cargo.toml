@@ -5,6 +5,7 @@ edition = "2021"
 description = "Leptos WebGL globe for Terra Atlas — energy infrastructure, Resontia vaults, maglev corridors"
 
 [dependencies]
+terra-atlas-core = { path = "../terra-atlas-core" }
 leptos = { version = "0.8", features = ["csr"] }
 leptos_router = "0.8"
 leptos_meta = "0.8"

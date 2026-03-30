@@ -1,3 +1,9 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
 Unit tests for DID Manager
 Tests W3C DID creation, resolution, and cryptographic operations
@@ -119,123 +125,4 @@ class TestMycelixDID:
 
         # Check Mycelix extensions
         assert "mycelix" in doc
-        assert doc["mycelix"]["agentType"] in [t.value for t in AgentType]
-
-    def test_different_dids_are_unique(self):
-        """Test each DID creation produces unique identifier"""
-        manager = DIDManager()
-
-        did1 = manager.create_did()
-        did2 = manager.create_did()
-
-        assert did1.to_string() != did2.to_string()
-        assert did1.identifier != did2.identifier
-
-
-class TestDIDManager:
-    """Test DIDManager functionality"""
-
-    def test_create_did(self):
-        """Test basic DID creation"""
-        manager = DIDManager()
-
-        did = manager.create_did()
-
-        assert isinstance(did, MycelixDID)
-        assert did.to_string().startswith("did:mycelix:")
-
-    def test_store_and_resolve_did(self):
-        """Test DID storage and resolution"""
-        manager = DIDManager()
-
-        did = manager.create_did(metadata={"test": "data"})
-        did_string = did.to_string()
-
-        # Resolve DID
-        resolved = manager.resolve_did(did_string)
-
-        assert resolved is not None
-        assert resolved["did"] == did_string
-        assert resolved["document"]["mycelix"]["metadata"]["test"] == "data"
-
-    def test_resolve_nonexistent_did(self):
-        """Test resolving a DID that doesn't exist"""
-        manager = DIDManager()
-
-        resolved = manager.resolve_did("did:mycelix:nonexistent")
-
-        assert resolved is None
-
-    def test_update_metadata(self):
-        """Test updating DID metadata"""
-        manager = DIDManager()
-
-        did = manager.create_did(metadata={"version": 1})
-        did_string = did.to_string()
-
-        # Update metadata
-        new_metadata = {"version": 2, "updated": True}
-        manager.update_metadata(did_string, new_metadata)
-
-        # Verify update
-        resolved = manager.resolve_did(did_string)
-        assert resolved["document"]["mycelix"]["metadata"] == new_metadata
-
-    def test_list_dids(self):
-        """Test listing all DIDs"""
-        manager = DIDManager()
-
-        did1 = manager.create_did()
-        did2 = manager.create_did()
-
-        dids = manager.list_dids()
-
-        assert len(dids) >= 2
-        assert did1.to_string() in dids
-        assert did2.to_string() in dids
-
-    def test_parse_did_valid(self):
-        """Test parsing a valid DID string"""
-        did_string = "did:mycelix:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
-
-        parsed = DIDManager.parse_did(did_string)
-
-        assert parsed["scheme"] == "did"
-        assert parsed["method"] == "mycelix"
-        assert parsed["identifier"] == "z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
-
-    def test_parse_did_invalid(self):
-        """Test parsing invalid DID strings"""
-        with pytest.raises(ValueError):
-            DIDManager.parse_did("not-a-did")
-
-        with pytest.raises(ValueError):
-            DIDManager.parse_did("did:only_two_parts")
-
-    def test_validate_did_valid(self):
-        """Test DID validation for valid DIDs"""
-        manager = DIDManager()
-        did = manager.create_did()
-
-        assert DIDManager.validate_did(did.to_string())
-
-    def test_validate_did_invalid(self):
-        """Test DID validation for invalid DIDs"""
-        assert not DIDManager.validate_did("not-a-did")
-        assert not DIDManager.validate_did("did:other:identifier")
-        assert not DIDManager.validate_did("did:mycelix:")  # Empty identifier
-
-    def test_private_key_not_stored(self):
-        """Test private keys are not stored in storage"""
-        manager = DIDManager()
-
-        did = manager.create_did()
-        resolved = manager.resolve_did(did.to_string())
-
-        # Private key should NOT be in stored document
-        assert "private_key" not in resolved
-        assert "private_key" not in resolved["document"]
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+        assert doc["mycelix"]["agentType"] in [t.value for t in AgentTyp

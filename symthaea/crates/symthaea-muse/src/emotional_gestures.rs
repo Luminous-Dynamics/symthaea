@@ -62,7 +62,7 @@ pub fn detect_emotion(state: &MusicalState) -> EmotionalQuality {
         EmotionalQuality::Tension
     } else if v > 0.3 && a > 0.5 {
         EmotionalQuality::Joy
-    } else if v > 0.0 && a < 0.3 || still > 0.5 {
+    } else if (v > 0.0 && a < 0.3) || (still > 0.5 && v > -0.2) {
         EmotionalQuality::Peace
     } else if v < -0.2 && a < 0.4 {
         EmotionalQuality::Sadness
@@ -256,6 +256,20 @@ mod tests {
     fn detect_tense_state() {
         let state = MusicalState { valence: -0.5, arousal: 0.8, prediction_error: 0.6, ..Default::default() };
         assert_eq!(detect_emotion(&state), EmotionalQuality::Tension);
+    }
+
+    #[test]
+    fn high_stillness_negative_valence_is_not_peace() {
+        // Regression: precedence bug made stillness>0.5 override negative valence
+        let state = MusicalState {
+            valence: -0.8, arousal: 0.1,
+            harmony_activations: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7],
+            ..Default::default()
+        };
+        let emotion = detect_emotion(&state);
+        assert_ne!(emotion, EmotionalQuality::Peace,
+            "negative valence with high stillness should be Sadness, not Peace");
+        assert_eq!(emotion, EmotionalQuality::Sadness);
     }
 
     #[test]

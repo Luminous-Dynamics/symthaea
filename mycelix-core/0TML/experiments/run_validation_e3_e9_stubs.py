@@ -1,3 +1,6 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
     def _run_e3_coordination_detection(self, config: Dict) -> Dict:
         """E3: Coordination Detection (simplified for dry-run)."""
         from experiments.experiment_stubs import run_e3_coordination_detection

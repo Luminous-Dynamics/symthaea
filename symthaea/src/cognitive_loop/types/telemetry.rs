@@ -355,6 +355,23 @@ pub struct TemporalPhenomenalMetrics {
     pub thermodynamic_free_energy: f64,
     /// Thermodynamic load (0.0 to 1.0, where 1.0 = 6W limit reached).
     pub thermodynamic_load: f32,
+
+    /// Epistemic free energy: F = E[loss] - T*H[beliefs].
+    /// Science: arXiv 2601.17607 — Thermodynamic Theory of Learning.
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub epistemic_free_energy: f64,
+
+    /// Epistemic speed limit violation: W2^2 / (T * sigma). >1.0 = suspicious.
+    /// Science: arXiv 2601.17607 — T * sigma >= W_2(q_0, q_1)^2.
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub esl_violation: f64,
+
+    /// Wasserstein-2 proxy for belief displacement this cycle.
+    #[cfg(feature = "epistemic")]
+    #[serde(default)]
+    pub belief_distance: f64,
 }
 
 // Metadata about internal decision-making during a cycle.
@@ -1821,6 +1838,14 @@ pub struct CycleMetadata {
     /// Consecutive falling confidence cycles.
     #[serde(default)]
     pub reasoning_falling_streak: u32,
+
+    // ── Neural Validation Telemetry ─────────────────────────────────────
+    /// Per-region cortical activation map (12 regions, 0.0–1.0).
+    /// Populated from live subsystem states when `neural_validation` feature enabled.
+    /// Used for comparison against TRIBE v2 fMRI predictions.
+    #[cfg(feature = "neural_validation")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cortical_activation: Option<symthaea_core::hdc::cortical_activation::CorticalActivationMap>,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

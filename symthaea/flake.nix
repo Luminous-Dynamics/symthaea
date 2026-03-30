@@ -309,6 +309,66 @@
           '';
         };
 
+        # Sovereign Inoculation — NixOS installer development shell
+        # Usage: nix develop .#inoculation
+        devShells.inoculation = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            # Rust for ssh-relay + eval-api
+            rustToolchain
+            pkg-config
+            openssl
+            openssl.dev
+
+            # WASM build toolchain
+            wasm-bindgen-cli
+            binaryen  # provides wasm-opt
+
+            # QEMU for VM testing
+            qemu
+            OVMF.fd
+            swtpm  # Software TPM 2.0 for Secure Boot + BitLocker testing
+
+            # Screen recording
+            wf-recorder
+            ffmpeg
+
+            # Node for portal validation
+            nodejs
+
+            # Python for WebSocket automation
+            (python3.withPackages (ps: [ ps.websockets ]))
+
+            # Network tools
+            curl
+            jq
+          ];
+
+          shellHook = ''
+            echo ""
+            echo "╔═══════════════════════════════════════════════════════════════╗"
+            echo "║     SOVEREIGN INOCULATION - NixOS Installer Dev              ║"
+            echo "║     Browser-based installer with ceremony UX                 ║"
+            echo "╚═══════════════════════════════════════════════════════════════╝"
+            echo ""
+            echo "  Build commands:"
+            echo "    ./crates/symthaea-spore/build-wasm.sh     # Build WASM portal"
+            echo "    cargo build --bin ssh-relay --features server -p symthaea-spore"
+            echo "    cargo build --bin eval-api --features server -p symthaea-spore"
+            echo ""
+            echo "  Test VMs:"
+            echo "    ./scripts/test-vm-dual-nvme.sh            # NixOS dual NVMe"
+            echo "    ./scripts/test-vm-win11.sh                # Windows 11 + TPM"
+            echo "    ./scripts/automated-demo.sh               # Full E2E demo"
+            echo ""
+            echo "  Portal: https://install.nixforhumanity.org"
+            echo ""
+          '';
+
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+        };
+
         # Package definition
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "symthaea";

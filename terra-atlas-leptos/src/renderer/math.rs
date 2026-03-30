@@ -416,3 +416,29 @@ impl Default for Quat {
         Self::IDENTITY
     }
 }
+
+// ─── Conversions to/from terra-atlas-core [f32; N] ──────────────
+
+impl From<[f32; 3]> for Vec3 {
+    fn from(a: [f32; 3]) -> Self {
+        Self { x: a[0], y: a[1], z: a[2] }
+    }
+}
+
+impl From<Vec3> for [f32; 3] {
+    fn from(v: Vec3) -> Self {
+        [v.x, v.y, v.z]
+    }
+}
+
+impl From<[f32; 4]> for Vec4 {
+    fn from(a: [f32; 4]) -> Self {
+        Self { x: a[0], y: a[1], z: a[2], w: a[3] }
+    }
+}
+
+impl From<Vec4> for [f32; 4] {
+    fn from(v: Vec4) -> Self {
+        [v.x, v.y, v.z, v.w]
+    }
+}

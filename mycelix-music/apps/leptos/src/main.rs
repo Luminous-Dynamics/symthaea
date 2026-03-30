@@ -8,6 +8,7 @@ mod app;
 mod components;
 mod pages;
 mod types;
+mod visualization;
 
 fn main() {
     console_error_panic_hook::set_once();

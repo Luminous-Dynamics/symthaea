@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
 Robust Proof of Gradient Quality (PoGQ) implementation used across the 0TML
 experimental suite. This module replaces the archived mean-based variant with

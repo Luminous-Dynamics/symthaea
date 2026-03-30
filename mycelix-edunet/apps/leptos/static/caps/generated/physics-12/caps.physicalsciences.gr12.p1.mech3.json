@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr12.P1.MECH3: Work (W = FΔx cos θ, positive/negative/zero work). Work-e...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "Grade 12 mechanics covers momentum, impulse, and work-energy-power. Momentum p = mv is conserved in isolated systems: Σpᵢ = Σpf. Impulse FΔt = Δp = m(vf − vi). The work-energy theorem: Wnet = ΔEk. Conservation of energy with friction: Wnc = ΔEk + ΔEp. Power P = W/Δt = Fv.",
+    "explanation": "Work W = FΔx cos θ (only the component of force in the direction of motion does work). Work-energy theorem: Wnet = ΔEk. Conservation of energy with friction: Wnc = ΔEk + ΔEp (non-conservative work equals total energy change). Power P = W/Δt = Fv (power is the rate of doing work). Efficiency = useful work output / total energy input × 100%.",
     "examples": [
       {
         "problem": "A 2 kg ball moving at 6 m/s collides with a stationary 4 kg ball. After collision they move together. Find their velocity.",
@@ -272,18 +272,6 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Create",
-        1
-      ],
-      [
-        "Understand",
-        1
-      ],
-      [
-        "Analyze",
-        1
-      ],
-      [
         "Remember",
         1
       ],
@@ -292,7 +280,19 @@
         1
       ],
       [
+        "Create",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
         "Apply",
+        1
+      ],
+      [
+        "Analyze",
         1
       ]
     ]
@@ -385,5 +385,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:25"
+  "generated_at": "2026-03-30T13:18:21"
 }

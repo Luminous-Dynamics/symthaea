@@ -24,7 +24,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::hdc::unified_hv::{BinaryHV, HDC_DIMENSION};
+use crate::hdc::unified_hv::BinaryHV;
+#[cfg(test)]
+use crate::hdc::unified_hv::HDC_DIMENSION;
 
 /// A single NSM explication triplet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -231,8 +233,8 @@ mod tests {
         // Simple lookup that generates a deterministic HV per prime
         let hv = DeepNSMCorpus::encode_explication(&primitives, |prime| {
             let seed = prime.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-            Some(BinaryHV::random(HDC_DIMENSION, seed))
+            Some(BinaryHV::random(seed))
         });
-        assert_eq!(hv.dim(), HDC_DIMENSION);
+        assert_eq!(BinaryHV::DIM, HDC_DIMENSION);
     }
 }

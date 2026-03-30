@@ -223,6 +223,64 @@ impl ProgressStatus {
 pub struct ProgressStore {
     pub nodes: HashMap<String, NodeProgress>,
     pub exam_date: Option<String>, // ISO date
+    /// SRS flashcard state — keyed by card_id (e.g., "math:3")
+    #[serde(default)]
+    pub srs_cards: HashMap<String, SrsCardState>,
+    /// BKT adaptive difficulty state — keyed by node_id
+    #[serde(default)]
+    pub bkt_states: HashMap<String, BktState>,
+}
+
+/// SM-2 spaced repetition state for a single flashcard.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SrsCardState {
+    pub ease_factor: f32,      // starts at 2.5
+    pub interval_days: u32,    // current interval
+    pub repetitions: u32,      // consecutive correct
+    pub next_review_ms: f64,   // JS timestamp of next review
+}
+
+impl Default for SrsCardState {
+    fn default() -> Self {
+        Self {
+            ease_factor: 2.5,
+            interval_days: 0,
+            repetitions: 0,
+            next_review_ms: 0.0,
+        }
+    }
+}
+
+impl SrsCardState {
+    /// SM-2 update: quality 0-5 (0-1 = blackout, 2 = hard, 3-4 = good, 5 = easy)
+    pub fn update(&mut self, quality: u8) {
+        let q = quality as f32;
+        if quality >= 3 {
+            // Correct response
+            self.interval_days = match self.repetitions {
+                0 => 1,
+                1 => 6,
+                _ => (self.interval_days as f32 * self.ease_factor) as u32,
+            };
+            self.repetitions += 1;
+        } else {
+            // Incorrect — reset
+            self.repetitions = 0;
+            self.interval_days = 1;
+        }
+        // Update ease factor
+        self.ease_factor += 0.1 - (5.0 - q) * (0.08 + (5.0 - q) * 0.02);
+        if self.ease_factor < 1.3 { self.ease_factor = 1.3; }
+
+        // Set next review time
+        let now = js_sys::Date::now();
+        self.next_review_ms = now + (self.interval_days as f64 * 24.0 * 60.0 * 60.0 * 1000.0);
+    }
+
+    /// Is this card due for review?
+    pub fn is_due(&self) -> bool {
+        js_sys::Date::now() >= self.next_review_ms
+    }
 }
 
 impl ProgressStore {
@@ -262,54 +320,179 @@ impl ProgressStore {
     }
 }
 
+// ============================================================
+// Bayesian Knowledge Tracing (BKT) — adaptive difficulty engine
+// ============================================================
+
+/// BKT parameters for a topic — calibrated for educational assessment.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BktState {
+    /// P(L) — probability the student has learned/mastered the skill
+    pub p_mastery: f32,
+    /// Total practice attempts on this topic
+    pub attempts: u32,
+    /// Correct responses
+    pub correct: u32,
+}
+
+impl Default for BktState {
+    fn default() -> Self {
+        Self {
+            p_mastery: 0.1, // P(L₀) — low prior, student hasn't demonstrated knowledge yet
+            attempts: 0,
+            correct: 0,
+        }
+    }
+}
+
+impl BktState {
+    // BKT parameters (Corbett & Anderson, 1995)
+    const P_TRANSIT: f32 = 0.1;   // P(T) — probability of learning per opportunity
+    const P_SLIP: f32 = 0.1;      // P(S) — probability of slip (knows but answers wrong)
+    const P_GUESS: f32 = 0.25;    // P(G) — probability of guessing correctly
+
+    /// Update P(mastery) after observing a response (correct or incorrect).
+    pub fn update(&mut self, correct: bool) {
+        self.attempts += 1;
+        if correct {
+            self.correct += 1;
+        }
+
+        // BKT posterior update
+        let p_l = self.p_mastery;
+        if correct {
+            // P(L|correct) = P(L) * (1 - P(S)) / P(correct)
+            let p_correct = p_l * (1.0 - Self::P_SLIP) + (1.0 - p_l) * Self::P_GUESS;
+            let p_l_given_correct = p_l * (1.0 - Self::P_SLIP) / p_correct;
+            // Apply transition: P(L_new) = P(L|obs) + (1 - P(L|obs)) * P(T)
+            self.p_mastery = p_l_given_correct + (1.0 - p_l_given_correct) * Self::P_TRANSIT;
+        } else {
+            // P(L|incorrect) = P(L) * P(S) / P(incorrect)
+            let p_incorrect = p_l * Self::P_SLIP + (1.0 - p_l) * (1.0 - Self::P_GUESS);
+            let p_l_given_incorrect = p_l * Self::P_SLIP / p_incorrect;
+            // Apply transition
+            self.p_mastery = p_l_given_incorrect + (1.0 - p_l_given_incorrect) * Self::P_TRANSIT;
+        }
+
+        // Clamp to [0.01, 0.99]
+        self.p_mastery = self.p_mastery.clamp(0.01, 0.99);
+    }
+
+    /// Recommended difficulty tier (0-3) based on current mastery estimate.
+    /// 0 = gentle soil, 1 = steady ground, 2 = rocky terrain, 3 = mountain path
+    pub fn recommended_difficulty(&self) -> u8 {
+        match self.p_mastery {
+            p if p < 0.3 => 0,  // Still learning — gentle problems
+            p if p < 0.5 => 1,  // Getting it — steady challenge
+            p if p < 0.75 => 2, // Strong — push with harder problems
+            _ => 3,             // Near mastery — mountain paths only
+        }
+    }
+
+    /// Has the student likely mastered this topic? (P(L) > 0.95)
+    pub fn is_likely_mastered(&self) -> bool {
+        self.p_mastery > 0.95
+    }
+
+    /// Terrain label for current difficulty recommendation.
+    pub fn terrain_label(&self) -> &'static str {
+        match self.recommended_difficulty() {
+            0 => "Gentle soil",
+            1 => "Steady ground",
+            2 => "Rocky terrain",
+            _ => "Mountain path",
+        }
+    }
+}
+
+impl ProgressStore {
+    /// Get or create BKT state for a topic.
+    pub fn bkt(&self, node_id: &str) -> BktState {
+        self.bkt_states.get(node_id).cloned().unwrap_or_default()
+    }
+
+    /// Record a practice response and update BKT.
+    pub fn record_response(&mut self, node_id: &str, correct: bool) {
+        let bkt = self.bkt_states.entry(node_id.to_string()).or_default();
+        bkt.update(correct);
+
+        // Also update basic progress
+        let progress = self.nodes.entry(node_id.to_string()).or_default();
+        progress.attempts += 1;
+        if correct {
+            progress.correct += 1;
+        }
+        progress.mastery_permille = (bkt.p_mastery * 1000.0) as u16;
+
+        // Auto-promote status based on BKT
+        if bkt.is_likely_mastered() && progress.status != ProgressStatus::Mastered {
+            progress.status = ProgressStatus::Mastered;
+        } else if bkt.attempts > 0 && progress.status == ProgressStatus::NotStarted {
+            progress.status = ProgressStatus::Studying;
+        }
+    }
+
+    /// Topics sorted by weakness (lowest P(mastery) first), filtered to those with attempts.
+    pub fn weakest_topics(&self, limit: usize) -> Vec<(String, f32)> {
+        let mut topics: Vec<(String, f32)> = self.bkt_states.iter()
+            .filter(|(_, bkt)| bkt.attempts > 0)
+            .map(|(id, bkt)| (id.clone(), bkt.p_mastery))
+            .collect();
+        topics.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        topics.truncate(limit);
+        topics
+    }
+}
+
 const PROGRESS_KEY: &str = "edunet_progress";
 
 // ============================================================
 // Leptos context provider
 // ============================================================
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Subject {
-    Mathematics,
-    PhysicalSciences,
-    NaturalSciences,
-}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Subject(pub String);
 
 impl Subject {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Subject::Mathematics => "Mathematics",
-            Subject::PhysicalSciences => "Physical Sciences",
-            Subject::NaturalSciences => "Natural Sciences",
-        }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Get all unique subjects from the graph.
+    pub fn all_from_graph(graph: &CapsGraph) -> Vec<Subject> {
+        let mut subjects: Vec<String> = graph.subjects().iter().map(|s| s.to_string()).collect();
+        subjects.sort();
+        subjects.into_iter().map(Subject).collect()
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Grade {
-    Gr9,
-    Gr10,
-    Gr11,
-    Gr12,
+    Gr1, Gr2, Gr3, Gr4, Gr5, Gr6, Gr7, Gr8, Gr9, Gr10, Gr11, Gr12,
 }
 
 impl Grade {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Grade::Gr9 => "Grade9",
-            Grade::Gr10 => "Grade10",
-            Grade::Gr11 => "Grade11",
-            Grade::Gr12 => "Grade12",
+            Grade::Gr1 => "Grade1", Grade::Gr2 => "Grade2", Grade::Gr3 => "Grade3",
+            Grade::Gr4 => "Grade4", Grade::Gr5 => "Grade5", Grade::Gr6 => "Grade6",
+            Grade::Gr7 => "Grade7", Grade::Gr8 => "Grade8", Grade::Gr9 => "Grade9",
+            Grade::Gr10 => "Grade10", Grade::Gr11 => "Grade11", Grade::Gr12 => "Grade12",
         }
     }
 
     pub fn label(&self) -> &'static str {
         match self {
-            Grade::Gr9 => "Grade 9",
-            Grade::Gr10 => "Grade 10",
-            Grade::Gr11 => "Grade 11",
-            Grade::Gr12 => "Grade 12",
+            Grade::Gr1 => "Grade 1", Grade::Gr2 => "Grade 2", Grade::Gr3 => "Grade 3",
+            Grade::Gr4 => "Grade 4", Grade::Gr5 => "Grade 5", Grade::Gr6 => "Grade 6",
+            Grade::Gr7 => "Grade 7", Grade::Gr8 => "Grade 8", Grade::Gr9 => "Grade 9",
+            Grade::Gr10 => "Grade 10", Grade::Gr11 => "Grade 11", Grade::Gr12 => "Grade 12",
         }
+    }
+
+    pub fn all() -> &'static [Grade] {
+        &[Grade::Gr1, Grade::Gr2, Grade::Gr3, Grade::Gr4, Grade::Gr5, Grade::Gr6,
+          Grade::Gr7, Grade::Gr8, Grade::Gr9, Grade::Gr10, Grade::Gr11, Grade::Gr12]
     }
 }
 
@@ -321,7 +504,7 @@ pub fn provide_curriculum_context() {
     let initial_progress = persistence::load::<ProgressStore>(PROGRESS_KEY)
         .unwrap_or_default();
 
-    let (subject, set_subject) = signal(Subject::Mathematics);
+    let (subject, set_subject) = signal(Subject("Mathematics".to_string()));
     let (grade, set_grade) = signal(Grade::Gr12);
     let (progress, set_progress) = signal(initial_progress);
 
@@ -331,12 +514,20 @@ pub fn provide_curriculum_context() {
         persistence::save(PROGRESS_KEY, &p);
     });
 
+    // Celebration signal — briefly true when a topic is mastered
+    let (celebrating, set_celebrating) = signal(false);
+    let (celebration_topic, set_celebration_topic) = signal(String::new());
+
     provide_context(subject);
     provide_context(set_subject);
     provide_context(grade);
     provide_context(set_grade);
     provide_context(progress);
     provide_context(set_progress);
+    provide_context(celebrating);
+    provide_context(set_celebrating);
+    provide_context(celebration_topic);
+    provide_context(set_celebration_topic);
 }
 
 pub fn use_subject() -> ReadSignal<Subject> {
@@ -361,4 +552,23 @@ pub fn use_progress() -> ReadSignal<ProgressStore> {
 
 pub fn use_set_progress() -> WriteSignal<ProgressStore> {
     expect_context::<WriteSignal<ProgressStore>>()
+}
+
+/// Set a node's status with celebration trigger for Mastered.
+pub fn set_node_status(node_id: &str, status: ProgressStatus, topic_title: &str) {
+    let set_progress = use_set_progress();
+    set_progress.update(|p| p.set_status(node_id, status));
+
+    if status == ProgressStatus::Mastered {
+        let set_celebrating = expect_context::<WriteSignal<bool>>();
+        let set_celebration_topic = expect_context::<WriteSignal<String>>();
+        set_celebrating.set(true);
+        set_celebration_topic.set(topic_title.to_string());
+
+        // Auto-dismiss after 2 seconds
+        wasm_bindgen_futures::spawn_local(async move {
+            gloo_timers::future::sleep(std::time::Duration::from_millis(2000)).await;
+            set_celebrating.set(false);
+        });
+    }
 }

@@ -278,6 +278,32 @@ impl SubstrateType {
             _ => unreachable!("canonical covers aliases"),
         }
     }
+
+    /// Epistemic capability profile for this substrate.
+    ///
+    /// Returns `(empirical_strength, normative_strength, materiality_strength)`:
+    /// - **empirical** — ability to accumulate and weigh observational evidence
+    /// - **normative** — ability to reason about social norms, values, ethics
+    /// - **materiality** — depth of physical/material integration and binding
+    ///
+    /// Different substrates are better at different kinds of knowing.
+    /// Biological neurons excel at holistic/normative reasoning;
+    /// silicon excels at empirical throughput but lacks social grounding.
+    #[cfg(feature = "epistemic")]
+    pub fn epistemic_profile(&self) -> (f64, f64, f64) {
+        match self.canonical() {
+            SubstrateType::BiologicalNeurons => (0.7, 0.9, 0.8),   // Strong holistic integration
+            SubstrateType::SiliconDigital => (0.9, 0.5, 0.6),       // Strong analytical, weak social
+            SubstrateType::QuantumComputer => (0.6, 0.3, 0.9),      // Strong binding, weak normative
+            SubstrateType::PhotonicProcessor => (0.8, 0.4, 0.5),    // Fast but shallow
+            SubstrateType::NeuromorphicChip => (0.8, 0.7, 0.7),     // Closest to biological
+            SubstrateType::BiochemicalComputer => (0.5, 0.8, 0.9),  // Slow but deep integration
+            SubstrateType::HybridSystem => (0.7, 0.7, 0.7),         // Balanced
+            SubstrateType::ExoticSubstrate => (0.4, 0.4, 0.4),      // Unknown capabilities
+            SubstrateType::SpacecraftComputer => (0.6, 0.3, 0.4),   // Reliable but constrained
+            _ => unreachable!("canonical covers aliases"),
+        }
+    }
 }
 
 // ============================================================================
@@ -1296,5 +1322,69 @@ mod tests {
             (f_silicon_again - f_silicon).abs() < 1e-10,
             "Round-trip should return to original feasibility"
         );
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_profile_values_bounded() {
+        // All substrate profiles should have values in [0.0, 1.0]
+        let substrates = [
+            SubstrateType::BiologicalNeurons,
+            SubstrateType::SiliconDigital,
+            SubstrateType::QuantumComputer,
+            SubstrateType::PhotonicProcessor,
+            SubstrateType::NeuromorphicChip,
+            SubstrateType::BiochemicalComputer,
+            SubstrateType::HybridSystem,
+            SubstrateType::ExoticSubstrate,
+            SubstrateType::SpacecraftComputer,
+        ];
+        for s in &substrates {
+            let (e, n, m) = s.epistemic_profile();
+            assert!(e >= 0.0 && e <= 1.0, "{:?} empirical out of bounds: {e}", s);
+            assert!(n >= 0.0 && n <= 1.0, "{:?} normative out of bounds: {n}", s);
+            assert!(m >= 0.0 && m <= 1.0, "{:?} materiality out of bounds: {m}", s);
+        }
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_profile_aliases_match_canonical() {
+        // Aliases should produce the same epistemic profile as their canonical form
+        assert_eq!(
+            SubstrateType::Biological.epistemic_profile(),
+            SubstrateType::BiologicalNeurons.epistemic_profile()
+        );
+        assert_eq!(
+            SubstrateType::Silicon.epistemic_profile(),
+            SubstrateType::SiliconDigital.epistemic_profile()
+        );
+        assert_eq!(
+            SubstrateType::Quantum.epistemic_profile(),
+            SubstrateType::QuantumComputer.epistemic_profile()
+        );
+        assert_eq!(
+            SubstrateType::Hybrid.epistemic_profile(),
+            SubstrateType::HybridSystem.epistemic_profile()
+        );
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_profile_substrate_differentiation() {
+        // Silicon should be stronger empirically than biologically
+        let (e_si, _, _) = SubstrateType::SiliconDigital.epistemic_profile();
+        let (e_bio, _, _) = SubstrateType::BiologicalNeurons.epistemic_profile();
+        assert!(e_si > e_bio, "silicon should be stronger empirically");
+
+        // Biological should be stronger normatively than silicon
+        let (_, n_bio, _) = SubstrateType::BiologicalNeurons.epistemic_profile();
+        let (_, n_si, _) = SubstrateType::SiliconDigital.epistemic_profile();
+        assert!(n_bio > n_si, "biological should be stronger normatively");
+
+        // Quantum should have highest materiality (binding)
+        let (_, _, m_q) = SubstrateType::QuantumComputer.epistemic_profile();
+        let (_, _, m_si) = SubstrateType::SiliconDigital.epistemic_profile();
+        assert!(m_q > m_si, "quantum should have higher materiality than silicon");
     }
 }

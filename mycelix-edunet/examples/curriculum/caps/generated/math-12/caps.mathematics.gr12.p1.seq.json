@@ -5,7 +5,7 @@
     "title": "CAPS.Mathematics.Gr12.P1.SEQ: Arithmetic sequences (Tn = a + (n−1)d, Sn = n/2[2a + (n−1...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "In Grade 12, you must solve quadratic equations using factorisation, completing the square, and the quadratic formula x = (−b ± √(b²−4ac)) / 2a. The discriminant Δ = b² − 4ac tells us about the nature of roots: Δ > 0 means two distinct real roots, Δ = 0 means two equal real roots, and Δ < 0 means no real roots. You also solve simultaneous equations where one is linear and one is quadratic, and quadratic inequalities using a sign diagram or parabola sketch.",
+    "explanation": "Arithmetic sequences have a constant difference d: Tn = a + (n-1)d. Sum: Sn = n/2[2a + (n-1)d]. Geometric sequences have a constant ratio r: Tn = ar^(n-1). Sum: Sn = a(r^n - 1)/(r - 1). Sigma notation (Σ) compactly expresses sums. A geometric series converges when |r| < 1, with sum to infinity S∞ = a/(1 - r).",
     "examples": [
       {
         "problem": "Find S₂₀ for the arithmetic series 3 + 7 + 11 + 15 + ...",
@@ -282,14 +282,6 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Remember",
-        1
-      ],
-      [
-        "Understand",
-        1
-      ],
-      [
         "Analyze",
         1
       ],
@@ -299,6 +291,14 @@
       ],
       [
         "Create",
+        1
+      ],
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Remember",
         1
       ],
       [
@@ -395,5 +395,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:24"
+  "generated_at": "2026-03-30T13:18:09"
 }

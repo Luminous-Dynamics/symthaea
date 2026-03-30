@@ -1,18 +1,26 @@
 /* Mycelix EduNet — Leptos CSR Styles */
 /* Theme: base + consciousness modulation. See docs/EDUNET_DESIGN_PHILOSOPHY.md */
 
-/* Consciousness modulation variables (set by emotional_ui.rs) */
+/* Consciousness modulation variables (set by consciousness_ui.rs at 4Hz) */
 html {
     --consciousness-warmth: 0;
     --consciousness-density: 1;
     --consciousness-chrome-opacity: 1;
     --consciousness-animation-speed: 1;
     --consciousness-accent-saturation: 1;
-    transition:
-        --consciousness-warmth 4s ease-in-out,
-        --consciousness-density 3s ease-in-out,
-        --consciousness-chrome-opacity 2s ease-in-out;
 }
+
+/* Consciousness-driven chrome opacity — nav fades when deeply focused */
+.navbar, .nav-actions {
+    opacity: var(--consciousness-chrome-opacity);
+    transition: opacity 0.5s ease;
+}
+.navbar:hover, .navbar:focus-within { opacity: 1; }
+
+/* Consciousness-driven spacing — more breathing room when stressed */
+.feature-grid { gap: calc(1.5rem * var(--consciousness-density)); }
+.caps-detail { padding: calc(1.5rem * var(--consciousness-density)); }
+.game-sliders { gap: calc(0.75rem * var(--consciousness-density)); }
 
 :root, [data-theme="dark"] {
     --bg: #0a0a0a;
@@ -124,6 +132,7 @@ html {
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100vw; }
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -154,7 +163,7 @@ body {
 .nav-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
 
-main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+main { max-width: 1200px; margin: 0 auto; padding: 2rem; overflow-x: hidden; width: 100%; }
 
 .home { text-align: center; padding: 4rem 0; }
 .home h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
@@ -634,6 +643,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     max-width: 680px;
     margin: 0 auto;
     padding: 2rem 0;
+    overflow: hidden;
 }
 
 /* --- Loading state --- */
@@ -2948,6 +2958,34 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     font-weight: 400;
 }
 
+/* Session orchestrator — smart start button */
+.session-start-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto 1.5rem;
+    padding: 1.25rem 2rem;
+    background: linear-gradient(135deg, var(--primary), #6d28d9);
+    color: var(--text-on-primary);
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.3s;
+    font-family: inherit;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+}
+
+.session-start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.4);
+}
+
+.session-start-btn:active {
+    transform: scale(0.98);
+}
+
 .intention-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -3686,7 +3724,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
    Topic Selector — Multi-subject, multi-grade pathway picker
    =========================================================================== */
 
-.topic-selector { text-align: center; padding: 2rem 1rem; max-width: 600px; margin: 0 auto; }
+.topic-selector { text-align: center; padding: 2rem 1rem; max-width: 600px; margin: 0 auto; overflow: hidden; }
 .topic-selector h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
 .topic-selector-subtitle { color: var(--text-secondary); margin-bottom: 2rem; }
 .source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
@@ -3767,7 +3805,11 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
+.caps-skill-map * { min-width: 0; }
 
 .caps-filters {
     display: flex;
@@ -3857,6 +3899,9 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.5rem;
+    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .caps-detail-header {
@@ -3878,9 +3923,11 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 
 .caps-detail-meta {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
     margin-bottom: 1rem;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .caps-badge {
@@ -3891,6 +3938,10 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .caps-badge-grade { background: var(--primary-subtle); color: var(--primary); }
@@ -3928,11 +3979,15 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     background: var(--bg);
     border-radius: 8px;
     padding: 3px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
+.caps-tabs::-webkit-scrollbar { display: none; }
 
 .caps-tab {
-    flex: 1;
-    padding: 7px 12px;
+    flex: 0 0 auto;
+    padding: 7px 14px;
     text-align: center;
     font-size: 0.75rem;
     font-weight: 600;
@@ -3943,6 +3998,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     background: none;
     border: none;
     font-family: inherit;
+    white-space: nowrap;
 }
 
 .caps-tab:hover { color: var(--text-secondary); }
@@ -4068,6 +4124,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 /* Lesson content typography */
 .lesson-body { line-height: 1.8; font-size: 0.95rem; }
 .lesson-body p + p { margin-top: 1.25em; }
+.caps-detail p { word-wrap: break-word; overflow-wrap: break-word; }
 .caps-example-step { line-height: 1.8; }
 .caps-problem-q { line-height: 1.7; }
 
@@ -4079,6 +4136,116 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     --surface: #1e1a1a; /* warm surface */
 }
 
+/* ===========================================================================
+   Indlela Design System — "The Living Path"
+   Synthesizes: Calm Technology, Flow State, Wabi-sabi, Ubuntu, Biophilic Design
+   =========================================================================== */
+
+/* --- Indlela CSS custom properties --- */
+:root, [data-theme="dark"] {
+    --soil-rich: rgba(34, 197, 94, 0.08);
+    --soil-sandy: rgba(234, 179, 8, 0.04);
+    --weathering: rgba(180, 160, 140, 0.15);
+    --refuge-vignette: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.12) 100%);
+    --prospect-gradient: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.03) 100%);
+}
+[data-theme="light"] {
+    --soil-rich: rgba(34, 197, 94, 0.06);
+    --soil-sandy: rgba(234, 179, 8, 0.03);
+    --weathering: rgba(140, 120, 100, 0.1);
+    --refuge-vignette: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.04) 100%);
+    --prospect-gradient: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.015) 100%);
+}
+
+/* ===========================================================================
+   Knowledge Constellation (Prospect view — open, expansive)
+   =========================================================================== */
+
+.constellation-container {
+    background: var(--bg);
+    background-image: var(--prospect-gradient);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    min-height: 300px;
+    position: relative;
+}
+
+.constellation-svg {
+    width: 100%;
+    height: auto;
+    min-height: 300px;
+    display: block;
+}
+
+.constellation-node { transition: opacity 0.4s, transform 0.3s; }
+.constellation-node:hover .node-core { stroke: var(--primary); stroke-width: 2; }
+.constellation-node:hover text { fill: var(--text) !important; }
+.constellation-node:hover .soil-glow { opacity: 0.2 !important; }
+
+/* --- Growth Stage: Seed (not started) --- */
+.growth-seed .node-core {
+    fill: var(--text-tertiary);
+    filter: none;
+}
+
+/* --- Growth Stage: Sprout (studying) --- */
+.growth-sprout .node-core {
+    fill: var(--mastery-yellow);
+    animation: sprout-breathe 5s ease-in-out infinite;
+}
+
+@keyframes sprout-breathe {
+    0%, 100% { r: 12; opacity: 0.75; filter: drop-shadow(0 0 2px var(--mastery-yellow)); }
+    50% { r: 13; opacity: 0.9; filter: drop-shadow(0 0 6px var(--mastery-yellow)); }
+}
+
+/* --- Growth Stage: Tree (mastered) — deep roots, warm glow --- */
+.growth-tree .node-core {
+    fill: var(--mastery-green);
+    animation: tree-pulse 6s ease-in-out infinite;
+}
+
+@keyframes tree-pulse {
+    0%, 100% { filter: drop-shadow(0 0 4px var(--mastery-green)); }
+    50% { filter: drop-shadow(0 0 10px var(--mastery-green)); }
+}
+
+/* Root lines grow in */
+.root-line {
+    animation: root-grow 1.5s ease-out forwards;
+}
+
+@keyframes root-grow {
+    from { opacity: 0; stroke-dasharray: 0 20; }
+    to { stroke-dasharray: 20 0; }
+}
+
+/* Root edges (mastered prerequisite connections) */
+.root-edge {
+    animation: root-grow 2s ease-out forwards;
+}
+
+/* Soil glow (community warmth) */
+.soil-glow {
+    transition: opacity 0.5s;
+}
+
+/* --- Organic growth circle (progress) --- */
+.indlela-progress {
+    padding: 1.25rem 1.5rem;
+}
+
+.growth-circle .growth-arc {
+    transition: stroke-dasharray 1.2s ease-out;
+}
+
+/* Mobile: make constellation scrollable horizontally */
+@media (max-width: 768px) {
+    .constellation-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .constellation-svg { min-width: 600px; }
+}
+
 /* Prerequisite list */
 .caps-prereq-link {
     color: var(--info);
@@ -4086,6 +4253,388 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     cursor: pointer;
 }
 .caps-prereq-link:hover { text-decoration: underline; }
+
+/* ===========================================================================
+   Educational Games
+   =========================================================================== */
+
+.game-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    overflow: hidden;
+}
+
+.game-graph {
+    width: 100%;
+    max-height: 400px;
+    aspect-ratio: 1;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    touch-action: none;
+}
+
+.graph-axis {
+    stroke: var(--text-secondary);
+    stroke-width: 0.06;
+}
+
+.graph-grid {
+    stroke: var(--border);
+    stroke-width: 0.02;
+    opacity: 0.4;
+}
+
+.graph-tick-label {
+    fill: var(--text-tertiary);
+    font-size: 0.5px;
+    font-family: 'Inter', sans-serif;
+    dominant-baseline: hanging;
+}
+
+.game-curve {
+    stroke: var(--primary);
+    stroke-width: 0.12;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: d 0.1s ease-out;
+}
+
+.game-dashed-line {
+    stroke: var(--text-tertiary);
+    stroke-width: 0.04;
+    stroke-dasharray: 0.3 0.2;
+    opacity: 0.5;
+}
+
+.game-point-vertex {
+    fill: var(--primary);
+    stroke: var(--text-on-primary);
+    stroke-width: 0.06;
+}
+
+.game-point-intercept {
+    fill: var(--success);
+    stroke: var(--bg);
+    stroke-width: 0.04;
+}
+
+.game-point-label {
+    fill: var(--text);
+    font-size: 0.5px;
+    font-family: 'Inter', sans-serif;
+}
+
+.game-equation {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    padding: 0.75rem 0;
+    font-family: 'Inter', monospace;
+    letter-spacing: 0.02em;
+}
+
+.game-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+.game-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.game-slider-label {
+    width: 2.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+    text-align: right;
+    font-family: monospace;
+}
+
+.game-slider {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.game-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: 2px solid var(--text-on-primary);
+}
+
+.game-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: 2px solid var(--text-on-primary);
+}
+
+.game-slider-value {
+    width: 2.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.game-challenge {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.game-challenge-active { }
+
+.game-challenge-number {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.game-challenge-instruction {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.game-challenge-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.game-challenge-hint {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.game-success {
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--success);
+    padding: 1rem;
+    animation: game-pulse 0.5s ease-out;
+}
+
+.game-success-icon {
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+}
+
+.game-complete {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.game-complete-icon {
+    font-size: 2.5rem;
+    color: var(--success);
+    margin-bottom: 0.5rem;
+}
+
+.game-complete-text {
+    font-size: 1rem;
+    color: var(--text);
+    font-weight: 600;
+}
+
+@keyframes game-pulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Mastery celebration */
+@keyframes mastery-glow {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+    50% { box-shadow: 0 0 20px 8px rgba(34, 197, 94, 0.3); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.caps-status-btn.just-mastered {
+    animation: mastery-glow 1.5s ease-out;
+    border-color: var(--success) !important;
+    color: var(--success) !important;
+    background: rgba(34, 197, 94, 0.15) !important;
+}
+
+.mastery-celebration {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 200;
+    text-align: center;
+    animation: mastery-pop 2s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes mastery-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    40% { transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+}
+
+.mastery-celebration-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--success);
+    text-shadow: 0 2px 12px rgba(34, 197, 94, 0.4);
+}
+
+@media (max-width: 768px) {
+    .game-container { padding: 0.75rem; }
+    .game-equation { font-size: 0.95rem; }
+    .game-slider-row { gap: 0.5rem; }
+    .game-slider-label { width: 2rem; font-size: 0.8rem; }
+}
+
+/* ===========================================================================
+   Indlela: Prospect/Refuge Transitions (Biophilic Design)
+   =========================================================================== */
+
+/* Study page = Refuge: enclosed, warm, focused */
+.study-refuge {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+    animation: refuge-enter 0.5s ease-out;
+}
+
+/* Vignette overlay for refuge warmth */
+.study-refuge::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--refuge-vignette);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+}
+
+.study-refuge > * {
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes refuge-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.refuge-back-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+}
+
+.refuge-back-link:hover {
+    opacity: 1;
+}
+
+/* Constellation = Prospect: the wide view */
+.caps-skill-map:not(.study-refuge) .constellation-container {
+    animation: prospect-reveal 0.6s ease-out;
+}
+
+@keyframes prospect-reveal {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* ===========================================================================
+   Indlela: Weathering Aesthetics (Wabi-sabi)
+   =========================================================================== */
+
+/* Practice problems — organic feel, no harsh reds */
+.caps-problem {
+    border-left: 3px solid var(--border);
+    transition: border-color 0.4s, background 0.4s;
+}
+
+/* Revealed answer — subtle earth-tone acknowledgment, not red/green binary */
+.caps-problem-a {
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    background: var(--soil-rich);
+    border-radius: 6px;
+    border-left: 2px solid var(--mastery-green);
+}
+
+/* Difficulty labels — organic terrain metaphors */
+.caps-problem-meta {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+    letter-spacing: 0.02em;
+}
+
+/* Misconceptions — weathered texture, not alarming red */
+.caps-misconception {
+    border: 1px solid var(--weathering);
+    border-radius: 8px;
+    background: linear-gradient(135deg, transparent 0%, var(--soil-sandy) 100%);
+}
+
+.caps-misconception-wrong {
+    color: var(--text-secondary);
+    opacity: 0.8;
+    text-decoration: line-through;
+    text-decoration-color: var(--weathering);
+}
+
+/* Mastery celebration — more organic (tree growing, not just checkmark) */
+.mastery-celebration::after {
+    content: "";
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    width: 2px;
+    height: 20px;
+    background: var(--mastery-green);
+    opacity: 0.3;
+    transform: translateX(-50%);
+    animation: root-descend 1.5s ease-out;
+}
+
+@keyframes root-descend {
+    from { height: 0; opacity: 0; }
+    to   { height: 20px; opacity: 0.3; }
+}
 
 /* ===========================================================================
    Focus & Accessibility
@@ -4161,10 +4710,25 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 @media (max-width: 480px) {
     main { padding: 0.75rem; padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0)); }
     .caps-detail { padding: 1rem; }
-    .caps-tabs { overflow-x: auto; flex-wrap: nowrap; }
-    .caps-tab { white-space: nowrap; min-width: 0; }
+    .caps-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .caps-tab { white-space: nowrap; min-width: 0; flex-shrink: 0; }
     h1 { font-size: 1.25rem; }
     h2 { font-size: 1.1rem; }
+
+    /* Fix text overflow on study pages */
+    .caps-detail p, .lesson-body p { word-wrap: break-word; overflow-wrap: break-word; }
+
+    /* Review page fixes */
+    .topic-selector { padding: 1rem 0.5rem; }
+    .topic-selector h2 { font-size: 1.1rem; }
+    .source-cards { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .source-card { padding: 1rem 0.5rem; min-width: 0; }
+    .source-label { font-size: 0.8rem; }
+    .source-icon { font-size: 2rem; }
+    .source-meta { font-size: 0.7rem; }
+
+    /* Exam prep fixes */
+    .caps-badge-exam { font-size: 0.6rem; padding: 1px 5px; }
 }
 
 @media (max-width: 360px) {

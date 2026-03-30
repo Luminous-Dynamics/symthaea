@@ -552,6 +552,7 @@ pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybri
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
 epistemic = []                                                 # Epistemic integration: immune threats, thermodynamic cost, provenance tags, collective health
+neural_validation = ["symthaea-core/neural_validation"]        # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
 mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh

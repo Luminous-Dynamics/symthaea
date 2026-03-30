@@ -284,7 +284,7 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Create",
+        "Analyze",
         1
       ],
       [
@@ -292,11 +292,11 @@
         1
       ],
       [
-        "Remember",
+        "Create",
         1
       ],
       [
-        "Analyze",
+        "Remember",
         1
       ],
       [
@@ -397,5 +397,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:24"
+  "generated_at": "2026-03-30T13:18:09"
 }

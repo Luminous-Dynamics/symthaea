@@ -5,7 +5,7 @@
     "title": "CAPS.Mathematics.Gr12.P1.FIN: Future value and present value annuities: F = x[(1+i)^n −...",
     "grade_level": "Grade12",
     "bloom_level": "Understand",
-    "explanation": "In Grade 12, you must solve quadratic equations using factorisation, completing the square, and the quadratic formula x = (−b ± √(b²−4ac)) / 2a. The discriminant Δ = b² − 4ac tells us about the nature of roots: Δ > 0 means two distinct real roots, Δ = 0 means two equal real roots, and Δ < 0 means no real roots. You also solve simultaneous equations where one is linear and one is quadratic, and quadratic inequalities using a sign diagram or parabola sketch.",
+    "explanation": "Compound growth: A = P(1+i)^n. Compound decay: A = P(1-i)^n. Nominal rate is the stated annual rate; effective rate accounts for compounding: 1 + i_eff = (1 + i_nom/m)^m where m is compounding periods per year. Depreciation: straight-line (fixed amount per year) vs reducing balance (fixed percentage of current value). Always convert rates to match the compounding period.",
     "examples": [
       {
         "problem": "You take out a loan of R200 000 at 12% p.a. compounded monthly. Calculate the monthly repayment over 5 years.",
@@ -294,7 +294,7 @@
     "estimated_minutes": 18,
     "bloom_distribution": [
       [
-        "Understand",
+        "Create",
         1
       ],
       [
@@ -302,11 +302,7 @@
         1
       ],
       [
-        "Evaluate",
-        1
-      ],
-      [
-        "Remember",
+        "Understand",
         1
       ],
       [
@@ -314,7 +310,11 @@
         1
       ],
       [
-        "Create",
+        "Remember",
+        1
+      ],
+      [
+        "Evaluate",
         1
       ]
     ]
@@ -407,5 +407,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T16:18:24"
+  "generated_at": "2026-03-30T13:18:09"
 }

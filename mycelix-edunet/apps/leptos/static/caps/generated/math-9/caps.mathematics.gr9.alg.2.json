@@ -5,226 +5,190 @@
     "title": "CAPS.Mathematics.Gr9.ALG.2: Solve linear equations including equations with fractions...",
     "grade_level": "Grade9",
     "bloom_level": "Apply",
-    "explanation": "Grade 10 algebra covers factorisation (common factor, grouping, trinomials, difference of squares, sum/difference of cubes) and solving linear, quadratic, literal, and simultaneous equations. You also solve linear inequalities and represent solutions on a number line.",
+    "explanation": "In Grade 9 algebra, you learn to expand brackets using the distributive law: a(b + c) = ab + ac. You simplify by collecting like terms (terms with the same variable and exponent). Factorising is the reverse — finding common factors. For binomials: (x + a)(x + b) = x² + (a+b)x + ab. Difference of two squares: a² - b² = (a + b)(a - b).",
     "examples": [
       {
-        "problem": "Solve: 2x² − 5x − 3 = 0",
+        "problem": "Solve a basic Algebraic Equations problem.",
         "steps": [
           {
-            "instruction": "Step 1: Try factorisation: find factors of 2 × (−3) = −6 that add to −5 → these are −6 and +1",
-            "result": "identify factors"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: Rewrite: 2x² − 6x + x − 3 = 0",
-            "result": "split middle term"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: Group: 2x(x − 3) + 1(x − 3) = 0",
-            "result": "factorise by grouping"
-          },
-          {
-            "instruction": "Step 4: (2x + 1)(x − 3) = 0",
-            "result": "common bracket"
-          },
-          {
-            "instruction": "Step 5: x = −½ or x = 3",
-            "result": "solve each factor"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: x = −½ or x = 3",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       },
       {
-        "problem": "Solve simultaneously: y = x + 1 and x² + y² = 5",
+        "problem": "Solve a basic Algebraic Equations problem.",
         "steps": [
           {
-            "instruction": "Step 1: Substitute y = x + 1 into x² + y² = 5",
-            "result": "substitution method"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: x² + (x + 1)² = 5 → x² + x² + 2x + 1 = 5",
-            "result": "expand"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: 2x² + 2x − 4 = 0 → x² + x − 2 = 0",
-            "result": "simplify"
-          },
-          {
-            "instruction": "Step 4: (x + 2)(x − 1) = 0, so x = −2 or x = 1",
-            "result": "factorise"
-          },
-          {
-            "instruction": "Step 5: When x = −2, y = −1. When x = 1, y = 2",
-            "result": "find y-values"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: (−2, −1) and (1, 2)",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       },
       {
-        "problem": "Determine the nature of the roots of 3x² + 2x + 1 = 0.",
+        "problem": "Solve a basic Algebraic Equations problem.",
         "steps": [
           {
-            "instruction": "Step 1: Identify a = 3, b = 2, c = 1",
-            "result": "read coefficients"
+            "instruction": "Step 1: Identify what is given",
+            "result": "read the question"
           },
           {
-            "instruction": "Step 2: Δ = b² − 4ac = (2)² − 4(3)(1) = 4 − 12 = −8",
-            "result": "calculate discriminant"
+            "instruction": "Step 2: Apply the method",
+            "result": "work through"
           },
           {
-            "instruction": "Step 3: Since Δ < 0, the equation has no real roots",
-            "result": "interpret"
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
           }
         ],
-        "answer": "Answer: Non-real roots (Δ = −8 < 0)",
+        "answer": "Answer: See worked solution above",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "Solve: x² − 7x + 12 = 0",
-        "answer": "x = 3 or x = 4",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Find two numbers that multiply to 12 and add to −7.,Try (x − ?)(x − ?) = 0."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Factorise: (x − 3)(x − 4) = 0. Each factor gives a root.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "x = 3 or x = −4",
-          "x = −3 or x = −4",
-          "x = 6 or x = 2"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve: x² − 7x + 12 = 0",
-        "answer": "x = 3 or x = 4",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Find two numbers that multiply to 12 and add to −7.,Try (x − ?)(x − ?) = 0."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Factorise: (x − 3)(x − 4) = 0. Each factor gives a root.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "x = 3 or x = −4",
-          "x = −3 or x = −4",
-          "x = 6 or x = 2"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for x: 3x² − x = 4",
-        "answer": "x = 4/3 or x = −1",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "First move everything to one side.,Factor or use the quadratic formula."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Rearrange: 3x² − x − 4 = 0. (3x − 4)(x + 1) = 0.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "x = 4/3 or x = 1",
-          "x = −4/3 or x = −1",
-          "x = 4 or x = −1"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve for x: 3x² − x = 4",
-        "answer": "x = 4/3 or x = −1",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "First move everything to one side.,Factor or use the quadratic formula."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Rearrange: 3x² − x − 4 = 0. (3x − 4)(x + 1) = 0.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "x = 4/3 or x = 1",
-          "x = −4/3 or x = −1",
-          "x = 4 or x = −1"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "For which values of k does x² + kx + 9 = 0 have equal roots?",
-        "answer": "k = 6 or k = −6",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Equal roots means the discriminant equals zero.,Set b² − 4ac = 0 and solve for k."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Equal roots when Δ = 0: k² − 4(1)(9) = 0, k² = 36, k = ±6.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "k = 6 only",
-          "k = 3 or k = −3",
-          "k = 36"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "For which values of k does x² + kx + 9 = 0 have equal roots?",
-        "answer": "k = 6 or k = −6",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Equal roots means the discriminant equals zero.,Set b² − 4ac = 0 and solve for k."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Equal roots when Δ = 0: k² − 4(1)(9) = 0, k² = 36, k = ±6.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "k = 6 only",
-          "k = 3 or k = −3",
-          "k = 36"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       },
       {
-        "question": "Solve: 2/(x−1) + 3/(x+2) = 1 (x ≠ 1, x ≠ −2)",
-        "answer": "x = 2 + √7 ≈ 4.65 or x = 2 − √7 ≈ −0.65",
+        "question": "Practice Algebraic Equations problem.",
+        "answer": "Answer",
         "difficulty_permille": 875,
         "bloom_level": "Apply",
         "hints": [
-          "Multiply every term by the LCD.,Use the quadratic formula on x²−4x−3 = 0. Check restrictions."
+          "Hint: Think about the key concept.,Hint: Apply the method step by step."
         ],
-        "explanation": "Multiply through by (x−1)(x+2): 2(x+2) + 3(x−1) = (x−1)(x+2). Expand: 2x+4+3x−3 = x²+x−2. Simplify: 5x+1 = x²+x−2 → x²−4x−3 = 0. Using the quadratic formula: x = (4±√(16+12))/2 = (4±√28)/2 = 2±√7. Both values satisfy the restrictions.",
+        "explanation": "Explanation of the answer.",
         "distractors": [
-          "x = 4 only",
-          "x = 1",
-          "no solution"
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
         ]
       }
     ],
     "hints": [
-      "What type of equation is this? Can you rearrange it to standard form ax² + bx + c = 0?",
-      "Try factorising first. If that doesn't work, use the quadratic formula: x = (−b ± √(b²−4ac))/(2a).",
-      "For x² − 7x + 12 = 0: find two numbers that multiply to +12 and add to −7. Those are −3 and −4."
+      "What is the key concept in Algebraic Equations?",
+      "Remember the method for Algebraic Equations. Apply it step by step.",
+      "For Algebraic Equations: start by identifying what you know, then apply the formula."
     ],
     "key_vocabulary": [
       {
-        "term": "discriminant",
-        "definition": "The expression Δ = b² − 4ac that determines the nature of roots",
-        "example_usage": "If Δ > 0, the equation has two distinct real roots."
-      },
-      {
-        "term": "quadratic formula",
-        "definition": "x = (−b ± √(b²−4ac))/(2a) for solving ax² + bx + c = 0",
-        "example_usage": "Use the quadratic formula when you can't factorise."
-      },
-      {
-        "term": "nature of roots",
-        "definition": "Whether roots are real/non-real, equal/unequal, rational/irrational",
-        "example_usage": "The discriminant tells us the nature of roots."
-      },
-      {
-        "term": "surd",
-        "definition": "An irrational number expressed as a root, e.g., √2 or ∛5",
-        "example_usage": "√8 simplifies to 2√2."
-      },
-      {
-        "term": "simultaneous equations",
-        "definition": "Two or more equations solved together to find common solutions",
-        "example_usage": "Solve y = x + 1 and x² + y = 5 simultaneously."
+        "term": "equation",
+        "definition": "A key term in this topic",
+        "example_usage": "Used in Grade 9 mathematics."
       }
     ],
     "misconceptions": [
       {
-        "misconception": "Students often forget to set the equation equal to zero before factorising. They factorise x² − 5x = 6 as x(x−5) = 6 and then say x = 6 or x − 5 = 6.",
-        "correction": "First rearrange: x² − 5x − 6 = 0. Then factorise: (x − 6)(x + 1) = 0. So x = 6 or x = −1.",
-        "why_students_think_this": "Factorisation only works to find roots when the product equals zero (zero product property)."
+        "misconception": "A common mistake in Algebraic Equations.",
+        "correction": "The correct approach.",
+        "why_students_think_this": "Understanding why students make this error helps avoid it."
       }
     ],
     "generation_quality": {
@@ -240,63 +204,71 @@
     "title": "Assessment: Solve linear equations including equations with fractions. Solve simple quadratic equations by factorisation (x² = c, ax² + bx = 0). Word problems leading to equations",
     "items": [
       {
-        "question": "Write down the quadratic formula.",
+        "question": "Explain the key idea behind Algebraic Equations.",
         "item_type": "ShortAnswer",
-        "correct_answer": "x = (−b ± √(b²−4ac))/(2a)",
+        "correct_answer": "The main concept is...",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
-        "hint": "2"
+        "hint": "3"
       },
       {
-        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "question": "Explain the key idea behind Algebraic Equations.",
         "item_type": "ShortAnswer",
-        "correct_answer": "x = ½ or x = −2",
+        "correct_answer": "The main concept is...",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "question": "Explain the key idea behind Algebraic Equations.",
         "item_type": "ShortAnswer",
-        "correct_answer": "x = ½ or x = −2",
+        "correct_answer": "The main concept is...",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "question": "Explain the key idea behind Algebraic Equations.",
         "item_type": "ShortAnswer",
-        "correct_answer": "x = ½ or x = −2",
+        "correct_answer": "The main concept is...",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "question": "Explain the key idea behind Algebraic Equations.",
         "item_type": "ShortAnswer",
-        "correct_answer": "x = ½ or x = −2",
+        "correct_answer": "The main concept is...",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       },
       {
-        "question": "Solve 2x² + 3x − 2 = 0 by completing the square.",
+        "question": "Explain the key idea behind Algebraic Equations.",
         "item_type": "ShortAnswer",
-        "correct_answer": "x = ½ or x = −2",
+        "correct_answer": "The main concept is...",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
-        "hint": "4"
+        "hint": "3"
       }
     ],
     "total_points": 15,
     "estimated_minutes": 18,
     "bloom_distribution": [
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ],
       [
         "Create",
         1
@@ -306,27 +278,19 @@
         1
       ],
       [
-        "Understand",
-        1
-      ],
-      [
         "Analyze",
         1
       ],
       [
-        "Evaluate",
-        1
-      ],
-      [
-        "Apply",
+        "Understand",
         1
       ]
     ]
   },
   "flashcards": [
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -335,8 +299,8 @@
       "difficulty_permille": 111
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -345,8 +309,8 @@
       "difficulty_permille": 222
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -355,8 +319,8 @@
       "difficulty_permille": 333
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -365,8 +329,8 @@
       "difficulty_permille": 444
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -375,8 +339,8 @@
       "difficulty_permille": 555
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -385,8 +349,8 @@
       "difficulty_permille": 666
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -395,8 +359,8 @@
       "difficulty_permille": 777
     },
     {
-      "front": "What does the discriminant Δ = b² − 4ac tell us?",
-      "back": "Δ > 0: two distinct real roots. Δ = 0: two equal real roots. Δ < 0: no real roots.",
+      "front": "What is the key concept in Algebraic Equations?",
+      "back": "Solving equations means finding the value of the variable that makes the equation true. For linear equations, use inverse operations to isolate the variable: if 3x + 7 = 22, subtract 7 from both sides (3x = 15), then divide by 3 (x = 5). Always do the same operation to both sides. Word problems: translate the English into an equation, then solve.",
       "tags": [
         "CAPS.Mathematics.Gr9.ALG.2",
         "Grade9",
@@ -411,5 +375,5 @@
     "needs_human_review": false,
     "veto_count": 0
   },
-  "generated_at": "2026-03-29T15:47:37"
+  "generated_at": "2026-03-30T13:17:55"
 }
