@@ -15,6 +15,7 @@ mod holochain;
 mod homeostasis;
 pub mod mock_data;
 mod onboarding;
+pub mod record_bridge;
 mod pages;
 mod signal_listener;
 mod simulated_life;

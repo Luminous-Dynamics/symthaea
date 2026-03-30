@@ -3,12 +3,16 @@
 
 //! Hearth context: current hearth, member list, user's role, bonds, and all domain data.
 //!
-//! Uses `RwSignal` so pages can both read and mutate state (mock mode).
-//! In Phase 6, mutations will dispatch zome calls instead.
+//! On init: tries to load from conductor via real zome calls.
+//! Falls back to mock data if conductor is unavailable.
+//! Uses `RwSignal` so pages can both read and mutate.
 
 use leptos::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use hearth_leptos_types::*;
 use crate::mock_data;
+use crate::holochain::use_holochain;
+use crate::record_bridge::{self, WireRecord};
 
 /// The active hearth context shared across pages.
 #[derive(Clone)]
@@ -28,11 +32,14 @@ pub struct HearthCtx {
     pub resources: RwSignal<Vec<ResourceView>>,
     pub milestones: RwSignal<Vec<MilestoneView>>,
     pub autonomy_profiles: RwSignal<Vec<AutonomyProfileView>>,
-    /// The current user's agent key (mock).
     pub my_agent: RwSignal<String>,
 }
 
-/// Initialize hearth context with mock data.
+/// Initialize hearth context.
+///
+/// Starts with mock data immediately (so the UI renders instantly),
+/// then attempts to load real data from the conductor in the background.
+/// If the conductor responds, mock data is replaced with real data.
 pub fn provide_hearth_context() -> HearthCtx {
     let ctx = HearthCtx {
         current_hearth: RwSignal::new(Some(mock_data::mock_hearth())),
@@ -64,7 +71,100 @@ pub fn provide_hearth_context() -> HearthCtx {
         set_care.set(care_count);
     }
 
+    // Try to load real data from conductor (async, non-blocking)
+    let ctx_for_load = ctx.clone();
+    spawn_local(async move {
+        // Wait a moment for the conductor connection to establish
+        gloo_timers::future::TimeoutFuture::new(4000).await;
+        try_load_real_data(ctx_for_load).await;
+    });
+
     ctx
+}
+
+/// Attempt to load real data from the Holochain conductor.
+/// Replaces mock signals with real data on success.
+/// Fails silently on error (mock data remains).
+async fn try_load_real_data(ctx: HearthCtx) {
+    let hc = use_holochain();
+    if hc.is_mock() {
+        web_sys::console::log_1(&"[Hearth] Mock mode — using simulated data".into());
+        return;
+    }
+
+    web_sys::console::log_1(&"[Hearth] Connected — loading real data...".into());
+
+    // Step 1: Get my hearths
+    match hc.call_zome::<(), Vec<WireRecord>>("hearth_kinship", "get_my_hearths", &()).await {
+        Ok(hearth_records) => {
+            web_sys::console::log_1(
+                &format!("[Hearth] Found {} hearths", hearth_records.len()).into()
+            );
+
+            if let Some(first_hearth) = hearth_records.first() {
+                let hearth_hash = first_hearth.action_hash_b64();
+
+                // Step 2: Get members for this hearth
+                match hc.call_zome::<String, Vec<WireRecord>>(
+                    "hearth_kinship", "get_hearth_members", &hearth_hash
+                ).await {
+                    Ok(member_records) => {
+                        let members = record_bridge::records_to_members(&member_records);
+                        web_sys::console::log_1(
+                            &format!("[Hearth] Loaded {} members", members.len()).into()
+                        );
+                        if !members.is_empty() {
+                            ctx.members.set(members);
+                        }
+                    }
+                    Err(e) => web_sys::console::log_1(
+                        &format!("[Hearth] get_hearth_members failed: {e}").into()
+                    ),
+                }
+
+                // Step 3: Get bonds
+                match hc.call_zome::<String, Vec<WireRecord>>(
+                    "hearth_kinship", "get_kinship_graph", &hearth_hash
+                ).await {
+                    Ok(bond_records) => {
+                        let bonds = record_bridge::records_to_bonds(&bond_records);
+                        web_sys::console::log_1(
+                            &format!("[Hearth] Loaded {} bonds", bonds.len()).into()
+                        );
+                        if !bonds.is_empty() {
+                            ctx.bonds.set(bonds);
+                        }
+                    }
+                    Err(e) => web_sys::console::log_1(
+                        &format!("[Hearth] get_kinship_graph failed: {e}").into()
+                    ),
+                }
+
+                // Step 4: Get gratitude
+                match hc.call_zome::<String, Vec<WireRecord>>(
+                    "hearth_gratitude", "get_gratitude_stream", &hearth_hash
+                ).await {
+                    Ok(grat_records) => {
+                        let gratitude = record_bridge::records_to_gratitude(&grat_records);
+                        web_sys::console::log_1(
+                            &format!("[Hearth] Loaded {} gratitude expressions", gratitude.len()).into()
+                        );
+                        if !gratitude.is_empty() {
+                            ctx.gratitude.set(gratitude);
+                        }
+                    }
+                    Err(e) => web_sys::console::log_1(
+                        &format!("[Hearth] get_gratitude_stream failed: {e}").into()
+                    ),
+                }
+            }
+        }
+        Err(e) => {
+            web_sys::console::log_1(
+                &format!("[Hearth] get_my_hearths failed: {e} — staying in mock mode").into()
+            );
+        }
+    }
 }
 
 pub fn use_hearth() -> HearthCtx {
@@ -76,7 +176,14 @@ pub fn member_name(members: &[MemberView], agent: &str) -> String {
     members.iter()
         .find(|m| m.agent == agent)
         .map(|m| m.display_name.clone())
-        .unwrap_or_else(|| agent[..8.min(agent.len())].to_string())
+        .unwrap_or_else(|| {
+            // For base64 agent keys, show first 8 chars
+            if agent.len() > 8 {
+                format!("{}...", &agent[..8])
+            } else {
+                agent.to_string()
+            }
+        })
 }
 
 /// Simple mock timestamp (seconds since epoch, approximate).
