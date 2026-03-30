@@ -56,8 +56,8 @@ pub fn mock_members() -> Vec<MemberView> {
 pub fn mock_hearth() -> HearthView {
     HearthView {
         hash: "hearth_001".into(),
-        name: "The Hearthstone".into(),
-        description: "A warm, intentional family space rooted in care and trust".into(),
+        name: "the hearthstone".into(),
+        description: "a warm, intentional family space rooted in care and trust".into(),
         hearth_type: HearthType::Chosen,
         created_by: "agent_river".into(),
         created_at: 1_711_900_000,

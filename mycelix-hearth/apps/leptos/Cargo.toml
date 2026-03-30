@@ -40,6 +40,9 @@ web-sys = { version = "0.3", features = [
     "EventTarget",
     "CssStyleDeclaration",
     "HtmlElement",
+    "MouseEvent",
+    "DomRect",
+    "Element",
     # Battery Status API (graceful fallback if unavailable)
     "BatteryManager",
 ] }

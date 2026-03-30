@@ -585,6 +585,22 @@ section h2 {
     font-family: Inter, sans-serif;
 }
 
+/* === Font Size Toggle === */
+.font-size-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0.25rem 0.375rem;
+    font-weight: 600;
+    transition: color 0.3s;
+    font-family: Inter, sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.font-size-toggle:hover { color: var(--primary); }
+
 /* === Sound Toggle === */
 .sound-toggle {
     background: none;

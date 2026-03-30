@@ -37,11 +37,52 @@ pub fn Nav() -> impl IntoView {
             </div>
 
             <div class="nav-actions">
+                <FontSizeToggle />
                 <SoundToggle />
                 <ThemeSwitcher />
                 <ConnectionBadge />
             </div>
         </nav>
+    }
+}
+
+/// Font size toggle for accessibility (Sage persona).
+#[component]
+fn FontSizeToggle() -> impl IntoView {
+    let (size_level, set_size_level) = signal(0u8); // 0=normal, 1=large, 2=xlarge
+
+    let cycle = move |_| {
+        let next = (size_level.get() + 1) % 3;
+        set_size_level.set(next);
+        // Apply to <html> element
+        use wasm_bindgen::JsCast;
+        if let Some(root) = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.document_element())
+            .and_then(|e| e.dyn_ref::<web_sys::HtmlElement>().cloned())
+        {
+            let size = match next {
+                1 => "18px",
+                2 => "20px",
+                _ => "16px",
+            };
+            let _ = root.style().set_property("font-size", size);
+        }
+    };
+
+    view! {
+        <button
+            class="font-size-toggle"
+            title="change text size"
+            aria-label="change text size"
+            on:click=cycle
+        >
+            {move || match size_level.get() {
+                1 => "A+",
+                2 => "A++",
+                _ => "A",
+            }}
+        </button>
     }
 }
 

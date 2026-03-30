@@ -199,14 +199,24 @@ pub fn KinshipCanvas() -> impl IntoView {
                 });
             }
         }
+
+        // Consume pending tend (set by canvas click)
+        if let Some(edge_id) = state.pending_tend.take() {
+            drop(state); // release borrow before calling action
+            crate::hearth_actions::tend_bond(edge_id.clone());
+            let mut state = sync_state.borrow_mut();
+            state.flash_edge = Some(edge_id);
+            state.flash_ttl = 0.6;
+        }
     });
 
-    // Start animation loop after a microtask delay (DOM must be mounted)
+    // Start animation loop + click handler after DOM mount
     let anim_state = viz_state.clone();
+    let click_state = viz_state.clone();
     spawn_local(async move {
-        // Yield to let Leptos mount the DOM
         gloo_timers::future::TimeoutFuture::new(50).await;
         start_animation_loop(anim_state);
+        install_click_handler(click_state);
     });
 
     view! {
@@ -248,6 +258,13 @@ fn start_animation_loop(state: SharedVizState) {
             }
             layout::step_breathing(&mut s, dt);
             layout::step_particles(&mut s, dt);
+            // Tick flash timer
+            if s.flash_ttl > 0.0 {
+                s.flash_ttl -= dt;
+                if s.flash_ttl <= 0.0 {
+                    s.flash_edge = None;
+                }
+            }
         }
 
         // Render (acquire canvas from DOM, not from stale ref)
@@ -270,6 +287,38 @@ fn start_animation_loop(state: SharedVizState) {
 
     // Leak to keep alive
     std::mem::forget(frame_fn);
+}
+
+/// Install click handler on the canvas for bond tending.
+fn install_click_handler(state: SharedVizState) {
+    let document = match web_sys::window().and_then(|w| w.document()) {
+        Some(d) => d,
+        None => return,
+    };
+    let canvas = match document.get_element_by_id(CANVAS_ID) {
+        Some(c) => c,
+        None => return,
+    };
+
+    let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+        let target = event.target().unwrap();
+        let canvas_el: &web_sys::HtmlCanvasElement = target.unchecked_ref();
+        let rect = canvas_el.get_bounding_client_rect();
+
+        // Scale click coords to canvas logical coords
+        let scale_x = CANVAS_W / rect.width();
+        let scale_y = CANVAS_H / rect.height();
+        let cx = (event.client_x() as f64 - rect.left()) * scale_x;
+        let cy = (event.client_y() as f64 - rect.top()) * scale_y;
+
+        let mut s = state.borrow_mut();
+        if let Some(edge_id) = s.edge_at_point(cx, cy, 20.0) {
+            s.pending_tend = Some(edge_id);
+        }
+    }) as Box<dyn FnMut(web_sys::MouseEvent)>);
+
+    let _ = canvas.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref());
+    std::mem::forget(closure);
 }
 
 fn render_frame(ctx: &web_sys::CanvasRenderingContext2d, state: &VisualizationState) {
@@ -298,16 +347,30 @@ fn render_frame(ctx: &web_sys::CanvasRenderingContext2d, state: &VisualizationSt
 
     let torpor_alpha = 1.0 - state.torpor * 0.6;
 
-    // Draw edges (bonds) with breathing
+    // Draw edges (bonds) with breathing + flash on tend
     for edge in &state.edges {
         let src = state.node_pos(&edge.source);
         let tgt = state.node_pos(&edge.target);
         if let (Some((x1, y1)), Some((x2, y2))) = (src, tgt) {
-            let (r, g, b) = bond_color(edge.strength_bp);
+            let is_flashing = state.flash_edge.as_ref() == Some(&edge.id) && state.flash_ttl > 0.0;
+            let (r, g, b) = if is_flashing {
+                // Flash bright golden
+                (1.0, 0.85, 0.3)
+            } else {
+                bond_color(edge.strength_bp)
+            };
             let health = edge.strength_bp as f64 / BOND_MAX as f64;
             let breath = (edge.breath_phase.sin() * 0.5 + 0.5) * 0.3 + 0.7;
-            let alpha = health * breath * torpor_alpha;
-            let line_width = 1.0 + health * 3.0;
+            let alpha = if is_flashing {
+                (state.flash_ttl / 0.6).min(1.0) * 0.8 + 0.2
+            } else {
+                health * breath * torpor_alpha
+            };
+            let line_width = if is_flashing {
+                4.0 + (state.flash_ttl / 0.6) * 4.0
+            } else {
+                1.0 + health * 3.0
+            };
 
             ctx.set_stroke_style_str(&format!("rgba({},{},{},{:.2})",
                 (r * 255.0) as u32, (g * 255.0) as u32, (b * 255.0) as u32, alpha));
