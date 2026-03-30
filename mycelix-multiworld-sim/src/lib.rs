@@ -1434,7 +1434,7 @@ impl MultiWorldSimulator {
             if world.trust_level < 0.3 {
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.needs.allostatic_load =
-                        (agent.needs.allostatic_load + 0.005).min(1.0);
+                        (agent.needs.allostatic_load + 0.001).min(1.0);
                 }
             }
 
@@ -2140,7 +2140,7 @@ impl MultiWorldSimulator {
             if high_frac > 0.3 {
                 // Negative contagion: stress spreads
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                    agent.needs.allostatic_load = (agent.needs.allostatic_load + 0.005).min(1.0);
+                    agent.needs.allostatic_load = (agent.needs.allostatic_load + 0.001).min(1.0);
                 }
                 if prev_contagion != -1 {
                     self.events.push(CivEvent::new(
@@ -2427,14 +2427,16 @@ impl MultiWorldSimulator {
                         }
                     }
 
-                    // Bug fix #1: Disasters cause trauma.
-                    // Severity scales with consciousness_shock + load_increase.
-                    // Trauma accumulates (doesn't reset) — ref: Van der Kolk (2014).
-                    let trauma_inc = (effects.consciousness_shock * 0.5
-                        + effects.allostatic_load_increase * 0.3
-                        + effects.morale_impact.abs() * 0.2)
-                        * cascade_mult;
-                    if trauma_inc > 0.01 {
+                    // Bug fix #1: Disasters cause trauma (calibrated).
+                    // Only significant disasters (severity > 0.05) cause trauma.
+                    // Scaled down to prevent saturation — typical disaster adds 0.01-0.05,
+                    // catastrophic adds 0.1-0.2. With decay at 0.002/tick, equilibrium
+                    // for 1 disaster/month at 0.03 trauma = 0.03/0.002 ≈ 0.15 baseline.
+                    let trauma_inc = (effects.consciousness_shock * 0.3
+                        + effects.allostatic_load_increase * 0.2
+                        + effects.morale_impact.abs() * 0.1)
+                        * cascade_mult * 0.3; // Scale factor to prevent saturation
+                    if trauma_inc > 0.005 {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
                         }
@@ -3064,7 +3066,7 @@ impl MultiWorldSimulator {
                         // allostatic load from awareness of genetic bottleneck
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.needs.allostatic_load =
-                                (agent.needs.allostatic_load + 0.005).min(1.0);
+                                (agent.needs.allostatic_load + 0.001).min(1.0);
                         }
                         if self.current_tick % 120 == 0 { // Log every 10 years
                             self.events.push(CivEvent::new(
@@ -3195,11 +3197,16 @@ impl MultiWorldSimulator {
                 }
             }
 
-            // Trauma decay: 0.002/tick ≈ 0.024/year. Full trauma (1.0) takes
-            // ~40 years to fully decay. Ref: PTSD recovery timelines (Kessler 1995).
+            // Trauma decay: 0.003/tick ≈ 0.036/year. Full trauma (1.0) takes
+            // ~28 years to fully decay. Ref: PTSD recovery timelines (Kessler 1995).
+            // Care workers accelerate recovery.
             for world in &mut self.worlds {
+                let care_ratio = world.agents.iter()
+                    .filter(|a| a.is_alive() && a.skills.strongest() == "medicine")
+                    .count() as f64 / world.population().max(1) as f64;
+                let decay = 0.003 + care_ratio * 0.002; // Care helps recovery
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                    agent.trauma_level = (agent.trauma_level - 0.002).max(0.0);
+                    agent.trauma_level = (agent.trauma_level - decay).max(0.0);
                 }
             }
 
