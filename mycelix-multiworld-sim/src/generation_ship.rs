@@ -33,8 +33,9 @@
 //! - Henrich, J. (2004). Demography and cultural evolution: How adaptive
 //!   cultural processes can produce maladaptive losses. American Antiquity.
 
-use crate::world::World;
 use crate::stochastic::StochasticEngine;
+use crate::stoichiometry::ElementalLedger;
+use crate::relativistic_dht::RelativisticReconciliation;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -170,6 +171,10 @@ pub struct GenerationShip {
     pub disasters_survived: Vec<InterstellarDisaster>,
     /// Population at launch (for minimum viable tracking).
     pub launch_population: usize,
+    /// Stoichiometric mass ledger — conservation of C/H/O/N/P.
+    pub mass_ledger: ElementalLedger,
+    /// Relativistic timestamp reconciliation for Holochain DHT.
+    pub relativistic: RelativisticReconciliation,
 }
 
 impl GenerationShip {
@@ -202,6 +207,8 @@ impl GenerationShip {
             isolation_ticks: 0,
             disasters_survived: Vec::new(),
             launch_population,
+            mass_ledger: ElementalLedger::for_ship(launch_population, transit_years),
+            relativistic: RelativisticReconciliation::new(cruise_velocity_c),
         }
     }
 
@@ -255,6 +262,14 @@ impl GenerationShip {
             self.culturally_speciated = true;
         }
 
+        // Stoichiometric mass ledger: tick ECLSS chemistry
+        let pop_estimate = self.launch_population; // Approximate (real pop tracked externally)
+        self.mass_ledger.tick(pop_estimate);
+
+        // Relativistic clock drift
+        let earth_years = self.elapsed_ticks as f64 / TICKS_PER_YEAR;
+        self.relativistic.tick(earth_years);
+
         // === INTERSTELLAR DISASTERS ===
 
         // Cosmic ray burst (1% chance per tick outside heliosphere)
@@ -269,6 +284,8 @@ impl GenerationShip {
             let damage = 0.001 + rng.next_f64() * 0.01;
             self.hull_integrity -= damage;
             self.hull_integrity = self.hull_integrity.max(0.0);
+            // Hull breach loses atmosphere mass (stoichiometric consequence)
+            self.mass_ledger.hull_breach(damage);
             disasters.push(InterstellarDisaster::MicrometeoiteImpact { hull_damage: damage });
         }
 
@@ -334,7 +351,7 @@ impl GenerationShip {
 
     /// Generate a status report string.
     pub fn status_report(&self, current_pop: usize) -> String {
-        format!(
+        let mut result = format!(
             "=== GENERATION SHIP STATUS ===\n\
              Destination: {} ({:.2} ly)\n\
              Phase: {:?}\n\
@@ -365,7 +382,22 @@ impl GenerationShip {
             if self.below_minimum_viable(current_pop) { "YES — CRITICAL" } else { "No" },
             if self.henrich_risk(current_pop) { "YES — knowledge loss risk" } else { "No" },
             self.disasters_survived.len(),
-        )
+        );
+        result.push_str(&format!(
+            "\nMass Ledger:\n  C: {:.0} kg | N: {:.0} kg | O: {:.0} kg | P: {:.0} kg\n  Water: {:.0} kg | Lost to void: {:.1} kg\n  Limiting element: {} | Max sustainable: {}\n  Recycling efficiency: {:.1}%\n\
+             Relativistic:\n  {}\n",
+            self.mass_ledger.carbon_kg,
+            self.mass_ledger.nitrogen_kg,
+            self.mass_ledger.oxygen_kg,
+            self.mass_ledger.phosphorus_kg,
+            self.mass_ledger.water_kg,
+            self.mass_ledger.mass_lost_kg,
+            self.mass_ledger.limiting_element(),
+            self.mass_ledger.max_sustainable_population,
+            self.mass_ledger.recycling_efficiency * 100.0,
+            self.relativistic.summary(),
+        ));
+        result
     }
 }
 
