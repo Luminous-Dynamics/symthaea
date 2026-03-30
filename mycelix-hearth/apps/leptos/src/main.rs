@@ -14,6 +14,7 @@ mod hearth_context;
 mod holochain;
 mod homeostasis;
 pub mod mock_data;
+mod onboarding;
 mod pages;
 mod signal_listener;
 mod simulated_life;

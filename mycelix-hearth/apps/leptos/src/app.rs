@@ -75,6 +75,7 @@ fn AppInner() -> impl IntoView {
                 </Routes>
             </main>
             <ToastContainer />
+            <crate::onboarding::OnboardingOverlay />
         </Router>
     }
 }
