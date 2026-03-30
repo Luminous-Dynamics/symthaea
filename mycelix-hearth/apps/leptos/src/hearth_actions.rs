@@ -64,21 +64,30 @@ pub fn tend_bond(bond_hash: String) {
         // Real: call zome, then update signal on success
         let hc = hc.clone();
         spawn_local(async move {
+            // NOTE: bond_hash is a String in our types but ActionHash on the wire.
+            // The Holochain conductor accepts base64-encoded ActionHash bytes
+            // via MessagePack. This will work if the hash string was originally
+            // obtained from a conductor response (which it will be in Phase 6).
             #[derive(serde::Serialize)]
             struct TendBondInput {
                 bond_hash: String,
+                description: String,
                 quality_bp: u32,
             }
 
             match hc.call_zome::<TendBondInput, ()>(
                 "hearth_kinship",
                 "tend_bond",
-                &TendBondInput { bond_hash: bond_hash.clone(), quality_bp: 500 },
+                &TendBondInput {
+                    bond_hash: bond_hash.clone(),
+                    description: "tended with care".into(),
+                    quality_bp: 500,
+                },
             ).await {
                 Ok(_) => {
                     // Refresh bonds from conductor
                     if let Ok(bonds) = hc.call_zome::<(), Vec<BondView>>(
-                        "hearth_kinship", "get_hearth_bonds", &()
+                        "hearth_kinship", "get_kinship_graph", &()
                     ).await {
                         hearth.bonds.set(bonds);
                     }
@@ -133,8 +142,8 @@ pub fn express_gratitude(to_agent: String, message: String) {
                 hearth_hash: String,
                 to_agent: String,
                 message: String,
-                gratitude_type: String,
-                visibility: String,
+                gratitude_type: GratitudeType,
+                visibility: HearthVisibility,
             }
 
             let hearth_hash = hearth.current_hearth.get_untracked()
@@ -148,8 +157,8 @@ pub fn express_gratitude(to_agent: String, message: String) {
                     hearth_hash,
                     to_agent,
                     message,
-                    gratitude_type: "Appreciation".into(),
-                    visibility: "AllMembers".into(),
+                    gratitude_type: GratitudeType::Appreciation,
+                    visibility: HearthVisibility::AllMembers,
                 },
             ).await {
                 Ok(_) => toasts.push("gratitude expressed", "gratitude"),
@@ -229,21 +238,23 @@ pub fn change_presence(new_status: PresenceStatusType) {
         spawn_local(async move {
             #[derive(serde::Serialize)]
             struct SetPresenceInput {
-                status: String,
+                hearth_hash: String,
+                status: PresenceStatusType,
+                expected_return: Option<i64>,
             }
 
-            let status_str = match new_status {
-                PresenceStatusType::Home => "Home",
-                PresenceStatusType::Away => "Away",
-                PresenceStatusType::Working => "Working",
-                PresenceStatusType::Sleeping => "Sleeping",
-                PresenceStatusType::DoNotDisturb => "DoNotDisturb",
-            };
+            let hearth_hash = hearth.current_hearth.get_untracked()
+                .map(|h| h.hash)
+                .unwrap_or_default();
 
             let _ = hc.call_zome::<SetPresenceInput, ()>(
                 "hearth_rhythms",
                 "set_presence",
-                &SetPresenceInput { status: status_str.into() },
+                &SetPresenceInput {
+                    hearth_hash,
+                    status: new_status,
+                    expected_return: None,
+                },
             ).await;
         });
     }
@@ -276,6 +287,7 @@ pub fn complete_care_task(task_hash: String) {
     } else {
         let hc = hc.clone();
         spawn_local(async move {
+            // Conductor expects ActionHash for schedule_hash
             #[derive(serde::Serialize)]
             struct CompleteTaskInput { schedule_hash: String }
 
@@ -313,11 +325,16 @@ pub fn invite_member(display_name: String, role: MemberRole) {
     } else {
         let hc = hc.clone();
         spawn_local(async move {
+            // Real invite requires AgentPubKey of invitee (not just a name).
+            // In production, the inviter would select from a DID/agent lookup.
+            // For now, we send the display_name as a placeholder.
             #[derive(serde::Serialize)]
             struct InviteInput {
                 hearth_hash: String,
-                invitee_name: String,
-                proposed_role: String,
+                invitee_agent: String, // AgentPubKey on the wire
+                proposed_role: MemberRole,
+                message: String,
+                expires_at: i64,
             }
 
             let hearth_hash = hearth.current_hearth.get_untracked()
@@ -329,8 +346,10 @@ pub fn invite_member(display_name: String, role: MemberRole) {
                 "invite_member",
                 &InviteInput {
                     hearth_hash,
-                    invitee_name: display_name,
-                    proposed_role: format!("{:?}", role),
+                    invitee_agent: display_name, // placeholder — needs real AgentPubKey
+                    proposed_role: role,
+                    message: "you are invited to join the hearth".into(),
+                    expires_at: mock_now() + 7 * 86400, // 7 days
                 },
             ).await;
         });
