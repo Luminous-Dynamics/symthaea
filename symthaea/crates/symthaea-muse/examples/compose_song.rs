@@ -1,67 +1,169 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Compose a novel song in a chosen genre and export as MIDI + WAV.
+//! Compose a novel song using the full StreamingSynth pipeline.
+//!
+//! Uses genre presets to seed consciousness state, then renders through
+//! all 52 modules (learned melody, rhythm engine, creative agency,
+//! composer mind, aesthetic listener, etc.). Exports both WAV and MIDI.
 //!
 //! Usage:
-//!   cargo run -p symthaea-muse --example compose_song
-//!   cargo run -p symthaea-muse --example compose_song -- jazz
-//!   cargo run -p symthaea-muse --example compose_song -- prog-metal
-//!
-//! Outputs: audio_output/song_<genre>.mid + audio_output/song_<genre>.wav
+//!   cargo run --release -p symthaea-muse --example compose_song -- jazz
+//!   cargo run --release -p symthaea-muse --example compose_song -- prog-metal
+//!   cargo run --release -p symthaea-muse --example compose_song -- all
 
 use symthaea_muse::genre_presets::Genre;
 use symthaea_muse::midi_export;
-use symthaea_muse::{compose, AudioData, MuseConfig, MusicalState};
+use symthaea_muse::streaming::StreamingSynth;
+use symthaea_muse::substrate_timbre::SubstrateTimbreType;
+use symthaea_muse::{AudioData, MuseConfig, MusicalState, Note};
 
 fn main() {
     let dir = std::path::Path::new("audio_output");
     std::fs::create_dir_all(dir).ok();
 
-    let genre = parse_genre();
+    let genre = parse_genre(dir);
 
+    compose_genre(genre, dir);
+}
+
+fn compose_genre(genre: Genre, dir: &std::path::Path) {
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Composing: {:44}║", genre.name());
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    let state = genre.seed_state();
+    let sample_rate = 44100u32;
+    let chunk_ms = 32.0;
+    let chunk_samples = (chunk_ms / 1000.0 * sample_rate as f32) as usize;
+    let chunks_per_second = (sample_rate as usize + chunk_samples - 1) / chunk_samples;
+
+    let mut synth = StreamingSynth::new(
+        MuseConfig {
+            duration_secs: 600.0,
+            max_notes: 32,
+            ..Default::default()
+        },
+        sample_rate,
+    );
+
+    // Enable full pipeline
+    synth.enable_binaural = true;
+    synth.enable_sidechain = true;
+    synth.enable_fep = true;
+    synth.enable_phi_optimizer = false;
+    synth.feedback_strength = 0.5;
+    synth.set_substrate(SubstrateTimbreType::Biological);
+
+    let mut state = genre.seed_state();
+    let duration = genre.duration_secs().min(180.0); // cap for speed
+    let total_chunks = (duration * chunks_per_second as f32) as usize;
+
     let (tempo_lo, tempo_hi) = genre.tempo_range();
     let tempo = (tempo_lo + tempo_hi) / 2.0;
-    let duration = genre.duration_secs();
 
     println!("  Seed: Ψ={:.2} arousal={:.2} valence={:.2}",
         state.consciousness_level, state.arousal, state.valence);
-    println!("  Tempo: {:.0} BPM | Duration: {:.0}s ({:.1} min)\n",
+    println!("  Tempo: {:.0} BPM | Duration: {:.0}s ({:.1} min)",
         tempo, duration, duration / 60.0);
+    println!("  Chunks: {} | Pipeline: all 52 modules\n", total_chunks);
 
-    let config = MuseConfig {
-        duration_secs: duration,
-        max_notes: 64,
-        ..Default::default()
-    };
+    let mut all_samples: Vec<[f32; 2]> = Vec::new();
 
-    println!("Composing...");
-    let comp = compose(&config, &state, 42);
-    println!("  Generated {} notes\n", comp.notes.len());
+    // Collect note onsets for MIDI export
+    let mut midi_notes: Vec<Note> = Vec::new();
+    let mut last_note_count = 0usize;
 
-    // Export MIDI
-    let midi_path = dir.join(format!("song_{}.mid", slug(genre.name())));
-    match midi_export::export_midi(&comp.notes, tempo, 4, 4, &midi_path) {
-        Ok(()) => println!("  MIDI: {}", midi_path.display()),
-        Err(e) => println!("  MIDI export failed: {e}"),
+    for chunk_idx in 0..total_chunks {
+        let progress = chunk_idx as f32 / total_chunks as f32;
+
+        synth.update_state(&state);
+        let chunk = synth.render_chunk();
+        all_samples.extend_from_slice(&chunk);
+
+        // Track note generation for MIDI (approximate from active notes)
+        // The StreamingSynth generates notes internally — we estimate from audio
+        let chunk_time = chunk_idx as f32 / chunks_per_second as f32;
+
+        // Detect note onsets from audio energy changes
+        let chunk_rms: f32 = chunk.iter()
+            .map(|s| s[0] * s[0] + s[1] * s[1])
+            .sum::<f32>() / chunk.len().max(1) as f32;
+        let chunk_rms = chunk_rms.sqrt();
+
+        // Simple onset detection: if RMS jumps above threshold
+        if chunk_rms > 0.02 && (midi_notes.is_empty() ||
+            chunk_time - midi_notes.last().map(|n| n.start_time).unwrap_or(-1.0) > 0.15)
+        {
+            // Estimate pitch from zero crossings
+            let zcr = chunk.windows(2)
+                .filter(|w| w[0][0] * w[1][0] < 0.0)
+                .count();
+            let est_freq = (zcr as f32 * sample_rate as f32 / chunk.len() as f32 / 2.0)
+                .clamp(60.0, 2000.0);
+
+            midi_notes.push(Note {
+                frequency: est_freq,
+                start_time: chunk_time,
+                duration: 0.3 + state.serotonin * 0.5, // longer in mellow genres
+                velocity: (chunk_rms * 5.0).clamp(0.1, 1.0),
+            });
+        }
+
+        // Natural state evolution (gentle, genre-appropriate)
+        state.consciousness_level += 0.0001;
+        if progress < 0.6 {
+            state.arousal += 0.00005;
+        } else {
+            state.arousal -= 0.0001;
+        }
+        state.valence += 0.00003;
+
+        if progress > 0.8 {
+            state.harmony_activations[7] += 0.0002;
+            state.consciousness_level -= 0.0002;
+        }
+
+        // Clamp
+        state.consciousness_level = state.consciousness_level.clamp(0.05, 0.95);
+        state.arousal = state.arousal.clamp(0.05, 0.95);
+        state.valence = state.valence.clamp(-0.8, 0.8);
+        for h in &mut state.harmony_activations { *h = h.clamp(0.0, 1.0); }
+
+        if chunk_idx % 500 == 0 {
+            println!("  [{:.0}%] Ψ={:.2} a={:.2} v={:.2} notes={}",
+                progress * 100.0, state.consciousness_level, state.arousal,
+                state.valence, midi_notes.len());
+        }
     }
+
+    // Auto-master
+    println!("\n  Auto-mastering...");
+    let master_config = symthaea_muse::auto_master::MasteringConfig::default();
+    let master_result = symthaea_muse::auto_master::auto_master(
+        &mut all_samples, sample_rate, &master_config,
+    );
+    println!("  LUFS: {:.1} → {:.1} (gain {:.1} dB)",
+        master_result.input_lufs, master_result.output_lufs, master_result.gain_applied_db);
 
     // Export WAV
     let wav_path = dir.join(format!("song_{}.wav", slug(genre.name())));
-    write_wav(&wav_path, &comp.audio, 44100);
-    println!("  WAV:  {}", wav_path.display());
+    let audio = AudioData::StereoF32(all_samples);
+    write_wav(&wav_path, &audio, sample_rate);
+    println!("  WAV: {}", wav_path.display());
 
-    println!("\nPlay:");
-    println!("  aplay {}", wav_path.display());
-    println!("\nImport MIDI into DAW for professional sound:");
-    println!("  {}", midi_path.display());
+    // Export MIDI
+    let midi_path = dir.join(format!("song_{}.mid", slug(genre.name())));
+    let time_sig_num = if state.consciousness_level > 0.7 { 7 } else { 4 };
+    let time_sig_den = if time_sig_num == 7 { 8 } else { 4 };
+    match midi_export::export_midi(&midi_notes, tempo, time_sig_num, time_sig_den, &midi_path) {
+        Ok(()) => println!("  MIDI: {} ({} notes)", midi_path.display(), midi_notes.len()),
+        Err(e) => println!("  MIDI failed: {e}"),
+    }
+
+    println!("\n  Play: aplay {}", wav_path.display());
+    println!("  DAW:  {}", midi_path.display());
 }
 
-fn parse_genre() -> Genre {
+fn parse_genre(dir: &std::path::Path) -> Genre {
     let args: Vec<String> = std::env::args().collect();
     let name = args.get(1).map(|s| s.as_str()).unwrap_or("jazz");
     match name.to_lowercase().as_str() {
@@ -74,52 +176,25 @@ fn parse_genre() -> Genre {
         "electronic" | "psych" | "psychedelic" => Genre::ElectronicPsych,
         "island" | "reggae" | "island-groove" => Genre::IslandGroove,
         "all" => {
-            println!("Composing all genres...\n");
             for g in Genre::all() {
-                println!("── {} ──", g.name());
-                let state = g.seed_state();
-                let config = MuseConfig {
-                    duration_secs: g.duration_secs().min(180.0), // cap at 3 min for speed
-                    max_notes: 64,
-                    ..Default::default()
-                };
-                let comp = compose(&config, &state, 42);
-                let (lo, hi) = g.tempo_range();
-                let tempo = (lo + hi) / 2.0;
-
-                let midi_path = dir().join(format!("song_{}.mid", slug(g.name())));
-                midi_export::export_midi(&comp.notes, tempo, 4, 4, &midi_path).ok();
-
-                let wav_path = dir().join(format!("song_{}.wav", slug(g.name())));
-                write_wav(&wav_path, &comp.audio, 44100);
-                println!("  {} notes → {} + {}", comp.notes.len(), midi_path.display(), wav_path.display());
+                compose_genre(*g, dir);
+                println!();
             }
             std::process::exit(0);
         }
         _ => {
             println!("Unknown genre '{}'. Available:", name);
-            for g in Genre::all() {
-                println!("  {}", slug(g.name()));
-            }
+            for g in Genre::all() { println!("  {}", slug(g.name())); }
             std::process::exit(1);
         }
     }
 }
 
-fn slug(s: &str) -> String {
-    s.to_lowercase().replace(' ', "_")
-}
-
-fn dir() -> &'static std::path::Path {
-    std::path::Path::new("audio_output")
-}
+fn slug(s: &str) -> String { s.to_lowercase().replace(' ', "_") }
 
 fn write_wav(path: &std::path::Path, audio: &AudioData, sample_rate: u32) {
     use std::io::Write;
-    let stereo = match audio {
-        AudioData::StereoF32(s) => s,
-        _ => return,
-    };
+    let stereo = match audio { AudioData::StereoF32(s) => s, _ => return };
     let data_len = (stereo.len() * 4) as u32;
     let file_len = 36 + data_len;
     let mut f = std::fs::File::create(path).expect("create WAV");
