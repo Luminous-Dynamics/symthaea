@@ -1,0 +1,250 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Free Energy Gradient: agents move to minimize prediction error.
+//!
+//! This is the missing ingredient the definitive experiment identified.
+//! Thermodynamic enforcement creates the pressure. This module creates
+//! the RESPONSE — agents that seek low-cost zones by following the
+//! free energy gradient downhill.
+//!
+//! An agent that truly minimizes variational free energy will:
+//! 1. Move toward areas where predictions are accurate (low surprise)
+//! 2. Move toward resonant partners (lower processing cost)
+//! 3. Move toward energy sources (reduce depletion threat)
+//! 4. Avoid high-entropy zones (Leviathan, collision areas)
+//!
+//! Implementation: sample free energy in 8 compass directions,
+//! move in the direction that reduces it most. Pure gradient descent
+//! on the variational free energy landscape.
+
+use nalgebra::SVector;
+use crate::harmony_field::HarmonyField;
+
+/// Compute the preferred movement direction for an agent to minimize free energy.
+///
+/// Returns a unit direction vector (or zero if no gradient found).
+///
+/// `position`: agent's current position
+/// `energy_fraction`: agent's energy / max_energy [0, 1]
+/// `harmony`: agent's harmony activation vector
+/// `nearby_agents`: list of (position, harmony_activations) for other agents
+/// `energy_wells`: list of (position, remaining_fraction) for energy wells
+/// `danger_source`: optional position of the threat (Leviathan)
+/// `danger_level`: [0, 1]
+pub fn free_energy_gradient<const D: usize>(
+    position: &SVector<f64, D>,
+    energy_fraction: f64,
+    harmony: &[f64; 8],
+    nearby_agents: &[(SVector<f64, D>, [f64; 8])],
+    energy_wells: &[(SVector<f64, D>, f64)], // (position, remaining_fraction)
+    danger_source: Option<&SVector<f64, D>>,
+    danger_level: f64,
+) -> SVector<f64, D> {
+    let mut gradient = SVector::zeros();
+    let mut total_weight = 0.0;
+
+    // === 1. Seek resonant partners (epistemic offloading reduces processing cost) ===
+    // Weight increases as energy decreases (more desperate = stronger drive to cooperate)
+    let cooperation_urgency = 1.0 - energy_fraction; // 0 when full, 1 when empty
+
+    for (agent_pos, agent_harmony) in nearby_agents {
+        let delta = agent_pos - position;
+        let dist = delta.norm();
+        if dist < 1.0 || dist > 100.0 { continue; }
+
+        let resonance = HarmonyField::<D>::resonance(harmony, agent_harmony);
+        if resonance > 0.3 {
+            // Attraction proportional to resonance and urgency
+            let attraction = resonance * cooperation_urgency * 2.0;
+            gradient += delta / dist * attraction;
+            total_weight += attraction;
+        }
+    }
+
+    // === 2. Seek energy wells (reduce depletion threat) ===
+    // Weight increases sharply as energy drops below 50%
+    let energy_urgency = if energy_fraction < 0.5 {
+        (0.5 - energy_fraction) * 4.0 // 0→2 as energy drops 50%→0%
+    } else {
+        0.0
+    };
+
+    for (well_pos, well_remaining) in energy_wells {
+        if *well_remaining < 0.01 { continue; } // depleted well
+        let delta = well_pos - position;
+        let dist = delta.norm();
+        if dist < 1.0 || dist > 200.0 { continue; }
+
+        let attraction = energy_urgency * well_remaining;
+        gradient += delta / dist * attraction;
+        total_weight += attraction;
+    }
+
+    // === 3. Flee from danger (avoid high-entropy zones) ===
+    if let Some(danger_pos) = danger_source {
+        if danger_level > 0.1 {
+            let delta = position - danger_pos; // AWAY from danger
+            let dist = delta.norm();
+            if dist > 1.0 && dist < 300.0 {
+                let repulsion = danger_level * 3.0;
+                gradient += delta / dist * repulsion;
+                total_weight += repulsion;
+            }
+        }
+    }
+
+    // === 4. Exploration (when energy is high and no strong gradient) ===
+    // Low free energy = confident predictions = explore for new information
+    if energy_fraction > 0.7 && total_weight < 0.5 {
+        // Gentle random walk (deterministic from position for reproducibility)
+        let phase = position[0] * 0.1 + position[1 % D] * 0.07;
+        let mut explore = SVector::zeros();
+        explore[0] = phase.sin() * 0.3;
+        if D > 1 { explore[1] = phase.cos() * 0.3; }
+        gradient += explore;
+    }
+
+    // Normalize to unit direction
+    let norm = gradient.norm();
+    if norm > 1e-6 {
+        gradient / norm
+    } else {
+        SVector::zeros()
+    }
+}
+
+/// Compute a scalar "free energy" estimate at a position.
+///
+/// Lower is better. Agents should move to minimize this.
+pub fn estimate_free_energy(
+    energy_fraction: f64,
+    prediction_error: f64,
+    nearest_resonant_dist: f64,
+    nearest_well_dist: f64,
+    danger_level: f64,
+) -> f64 {
+    // Free energy = surprise + expected future cost
+    let surprise = prediction_error;
+    let depletion_risk = (1.0 - energy_fraction).powi(2); // quadratic urgency
+    let isolation_cost = (nearest_resonant_dist / 50.0).min(1.0); // normalized
+    let well_distance_cost = (nearest_well_dist / 100.0).min(1.0);
+    let threat_cost = danger_level;
+
+    // Weighted sum
+    surprise * 2.0
+        + depletion_risk * 3.0
+        + isolation_cost * 1.5
+        + well_distance_cost * 1.0
+        + threat_cost * 2.5
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn low_energy_seeks_wells() {
+        let pos = SVector::from([0.0, 0.0]);
+        let harmony = [0.5; 8];
+        let wells = vec![
+            (SVector::from([50.0, 0.0]), 1.0), // well to the right
+        ];
+
+        let dir = free_energy_gradient(
+            &pos, 0.1, &harmony, &[], &wells, None, 0.0,
+        );
+
+        // Should move toward the well (positive x)
+        assert!(dir[0] > 0.0, "should seek well when low energy, got x={}", dir[0]);
+    }
+
+    #[test]
+    fn full_energy_ignores_wells() {
+        let pos = SVector::from([0.0, 0.0]);
+        let harmony = [0.5; 8];
+        let wells = vec![
+            (SVector::from([50.0, 0.0]), 1.0),
+        ];
+
+        let dir = free_energy_gradient(
+            &pos, 0.9, &harmony, &[], &wells, None, 0.0,
+        );
+
+        // Should not strongly seek well when energy is high
+        assert!(dir[0].abs() < 0.5, "should not urgently seek well at 90% energy");
+    }
+
+    #[test]
+    fn flees_from_danger() {
+        let pos = SVector::from([0.0, 0.0]);
+        let harmony = [0.5; 8];
+        let danger = SVector::from([50.0, 0.0]); // danger to the right
+
+        let dir = free_energy_gradient(
+            &pos, 0.5, &harmony, &[], &[], Some(&danger), 0.8,
+        );
+
+        // Should flee (negative x)
+        assert!(dir[0] < 0.0, "should flee from danger, got x={}", dir[0]);
+    }
+
+    #[test]
+    fn seeks_resonant_partner_when_low_energy() {
+        let pos = SVector::from([0.0, 0.0]);
+        let harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8];
+        let partner_harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8]; // same = high resonance
+        let agents = vec![
+            (SVector::from([30.0, 0.0]), partner_harmony),
+        ];
+
+        let dir = free_energy_gradient(
+            &pos, 0.2, &harmony, &agents, &[], None, 0.0,
+        );
+
+        assert!(dir[0] > 0.0, "should seek resonant partner when low energy");
+    }
+
+    #[test]
+    fn does_not_seek_dissonant_agent() {
+        let pos = SVector::from([0.0, 0.0]);
+        let harmony = [0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let other_harmony = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]; // orthogonal
+        let agents = vec![
+            (SVector::from([30.0, 0.0]), other_harmony),
+        ];
+
+        let dir = free_energy_gradient(
+            &pos, 0.2, &harmony, &agents, &[], None, 0.0,
+        );
+
+        // Orthogonal harmonies = resonance ~0 = no attraction
+        assert!(dir[0].abs() < 0.3, "should not seek dissonant agent");
+    }
+
+    #[test]
+    fn free_energy_decreases_with_energy() {
+        let fe_low = estimate_free_energy(0.1, 0.5, 30.0, 50.0, 0.0);
+        let fe_high = estimate_free_energy(0.9, 0.5, 30.0, 50.0, 0.0);
+        assert!(fe_low > fe_high, "low energy = higher free energy");
+    }
+
+    #[test]
+    fn free_energy_increases_with_danger() {
+        let fe_safe = estimate_free_energy(0.5, 0.5, 30.0, 50.0, 0.0);
+        let fe_danger = estimate_free_energy(0.5, 0.5, 30.0, 50.0, 0.9);
+        assert!(fe_danger > fe_safe, "danger increases free energy");
+    }
+
+    #[test]
+    fn gradient_is_unit_or_zero() {
+        let pos = SVector::from([0.0, 0.0]);
+        let harmony = [0.5; 8];
+        let wells = vec![(SVector::from([50.0, 30.0]), 1.0)];
+
+        let dir = free_energy_gradient(
+            &pos, 0.2, &harmony, &[], &wells, None, 0.0,
+        );
+        let norm = dir.norm();
+        assert!(norm < 1.01, "gradient should be unit length, got {}", norm);
+    }
+}

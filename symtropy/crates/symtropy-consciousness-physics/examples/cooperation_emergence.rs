@@ -14,6 +14,7 @@
 //! Run: cargo run -p symtropy-consciousness-physics --example cooperation_emergence
 
 use nalgebra::SVector;
+use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
@@ -103,6 +104,49 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
                 recurrence: 0.4, embodiment: 0.6, knowledge: 0.4, synchrony: 0.5,
             };
             consciousness.update_entity(h, &inputs, Point::origin());
+        }
+
+        // FEP gradient-driven movement (only in enforced condition)
+        if enforce {
+            // Gather nearby agent data for gradient computation
+            let agent_data: Vec<(SVector<f64, 2>, [f64; 8])> = handles.iter()
+                .filter_map(|&h| {
+                    let body = world.body(h)?;
+                    let entity = consciousness.entities.get(&h)?;
+                    Some((body.position().0, entity.harmony_activations))
+                })
+                .collect();
+
+            for (idx, &h) in handles.iter().enumerate() {
+                let collapsed = consciousness.entities.get(&h)
+                    .map(|e| e.energy.is_collapsed()).unwrap_or(true);
+                if collapsed { continue; }
+
+                let pos = match world.body(h) {
+                    Some(b) => b.position().0,
+                    None => continue,
+                };
+                let energy_frac = consciousness.entities.get(&h)
+                    .map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
+                let harmony = consciousness.entities.get(&h)
+                    .map(|e| e.harmony_activations).unwrap_or([0.0; 8]);
+
+                // Build nearby agents list (exclude self)
+                let nearby: Vec<_> = agent_data.iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != idx)
+                    .map(|(_, data)| data.clone())
+                    .collect();
+
+                let direction = fep_gradient::free_energy_gradient(
+                    &pos, energy_frac, &harmony, &nearby, &[], None, 0.0,
+                );
+
+                // Apply as velocity (speed 30 units/sec)
+                if let Some(body) = world.body_mut(h) {
+                    body.linear_velocity = direction * 30.0;
+                }
+            }
         }
 
         // Maintenance + ambient

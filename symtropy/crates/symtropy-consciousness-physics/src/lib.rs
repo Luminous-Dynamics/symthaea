@@ -17,6 +17,7 @@
 
 pub mod coupling;
 pub mod energy;
+pub mod fep_gradient;
 pub mod harmony_field;
 pub mod safety;
 pub mod sanctuary;
