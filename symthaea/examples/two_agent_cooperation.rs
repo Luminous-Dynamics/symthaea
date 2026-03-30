@@ -248,6 +248,25 @@ fn relay_messages(
             bath_state: None,
         });
     }
+
+    // ── Consciousness Coupling Analysis ─────────────────────────────
+    println!("\n═══ Consciousness Coupling ═══\n");
+    let c_a = mind_a.state().consciousness_level;
+    let c_b = mind_b.state().consciousness_level;
+    println!("  Explorer consciousness:    {:.4}", c_a);
+    println!("  Homesteader consciousness: {:.4}", c_b);
+    let coupling = (c_a - c_b).abs();
+    println!("  Coupling gap:              {:.4}", coupling);
+    if coupling < 0.1 {
+        println!("  Status: SYNCHRONIZED — agents share similar consciousness levels");
+        println!("  Implication: Social coherence enables consciousness alignment");
+    } else if c_a > c_b {
+        println!("  Status: ASYMMETRIC — Explorer more conscious");
+        println!("  Implication: Explorer has richer model of Homesteader (ToM asymmetry)");
+    } else {
+        println!("  Status: ASYMMETRIC — Homesteader more conscious");
+        println!("  Implication: Homesteader has richer model of Explorer (ToM asymmetry)");
+    }
 }
 
 /// Print social status of both agents
