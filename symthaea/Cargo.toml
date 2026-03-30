@@ -674,7 +674,7 @@ default-mind = [
     "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
     "ctc_wiring",             # GWT entry gated by binding coherence (Fries 2015)
     "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
-    "unified_precision",      # Dynamic HFE precision: Phi × interoceptive × blanket (Parr 2019)
+    # unified_precision removed from default: 30× throughput regression (1.1 Hz vs 33 Hz)
 ]
 
 

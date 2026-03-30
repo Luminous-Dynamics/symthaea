@@ -24,9 +24,8 @@
 use std::time::Instant;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
-/// Number of cognitive cycles to run. 500 cycles shows full trajectory
-/// with plateau at C≈0.72. 200 shows rise phase only.
-const NUM_CYCLES: usize = 500;
+/// Number of cognitive cycles to run. 200+ shows full trajectory with plateau.
+const NUM_CYCLES: usize = 200;
 
 /// Stimuli that exercise different cognitive faculties
 const STIMULI: &[&str] = &[
