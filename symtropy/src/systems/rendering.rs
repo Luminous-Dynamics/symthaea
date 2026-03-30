@@ -463,6 +463,7 @@ pub fn visual_stress_system(
 pub fn camera_follow_system(
     player: Query<&Transform, With<Player>>,
     mut camera: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
+    dim: Res<crate::systems::dimension_transition::DimensionTransition>,
 ) {
     let Ok(player_tf) = player.single() else {
         return;
@@ -470,9 +471,31 @@ pub fn camera_follow_system(
     let Ok(mut cam_tf) = camera.single_mut() else {
         return;
     };
+
     let target = player_tf.translation.truncate();
     let current = cam_tf.translation.truncate();
     let smoothed = current.lerp(target, 0.08);
+
+    let pitch = dim.effective_pitch();
+    let distance = dim.effective_distance();
+
+    // 2D (pitch=0): camera directly above, z=999
+    // 2.5D (pitch~0.5): camera offset backward, tilted
+    // 3D (pitch~1.0): camera significantly behind and above
+    let base_z = 999.0;
+    let z_offset = base_z * distance;
+    let y_offset = -pitch.sin() * 300.0 * distance; // Pull camera back as pitch increases
+
     cam_tf.translation.x = smoothed.x;
-    cam_tf.translation.y = smoothed.y;
+    cam_tf.translation.y = smoothed.y + y_offset;
+    cam_tf.translation.z = z_offset;
+
+    // Apply rotation for 2.5D/3D perspective
+    // In 2D: no rotation (looking straight down)
+    // In 2.5D/3D: tilt the camera to look at the player
+    if pitch > 0.01 {
+        cam_tf.rotation = Quat::from_rotation_x(-pitch);
+    } else {
+        cam_tf.rotation = Quat::IDENTITY;
+    }
 }
