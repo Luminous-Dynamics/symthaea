@@ -8,6 +8,7 @@
 use leptos::prelude::*;
 use portal_domain_trait::ConsciousnessTier;
 
+use crate::background::HomeostasisBackground;
 use crate::identity::{PortalIdentity, VaultState};
 
 /// Experiential phenotype — how you perceive your consciousness.
@@ -72,7 +73,30 @@ pub fn App() -> impl IntoView {
     provide_context(identity.clone());
 
     let active_domain: RwSignal<Option<String>> = RwSignal::new(None);
-    let phenotype: RwSignal<Option<Phenotype>> = RwSignal::new(None);
+
+    // Load saved phenotype from localStorage
+    let saved_phenotype = web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item("mycelix_phenotype").ok().flatten())
+        .and_then(|v| match v.as_str() {
+            "orb" => Some(Phenotype::Orb),
+            "stream" => Some(Phenotype::Stream),
+            "garden" => Some(Phenotype::Garden),
+            "pulse" => Some(Phenotype::Pulse),
+            _ => None,
+        });
+    let phenotype: RwSignal<Option<Phenotype>> = RwSignal::new(saved_phenotype);
+
+    // Save phenotype changes to localStorage
+    Effect::new(move |_| {
+        if let Some(p) = phenotype.get() {
+            if let Some(storage) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                let _ = storage.set_item("mycelix_phenotype", p.label().to_lowercase().as_str());
+            }
+        }
+    });
     provide_context(active_domain);
     provide_context(phenotype);
 
@@ -153,6 +177,7 @@ pub fn App() -> impl IntoView {
 
     view! {
         <div class="portal-universe">
+            <HomeostasisBackground />
             {move || {
                 if vault.get() == VaultState::NoVault {
                     // FIRST BREATH — seed waiting
@@ -169,6 +194,8 @@ pub fn App() -> impl IntoView {
                                 "One identity. Every domain. Your consciousness made sovereign."
                             </p>
                             <button class="first-breath-cta" on:click=move |_| {
+                                // First Breath sound — a rising tone
+                                play_breath_tone();
                                 vault.set(VaultState::Unlocked);
                             }>"Breathe"</button>
                         </div>
@@ -330,17 +357,76 @@ pub fn App() -> impl IntoView {
                     }.into_any(),
                     } // end match
                 } else {
+                    let domain_id = active_domain.get().unwrap_or_default();
+                    let domain_data = domains.iter().find(|d| d.id == domain_id).cloned();
                     view! {
-                        <div class="domain-view">
+                        <div class="domain-view" style=format!("--domain-color: {}; --domain-glow: {};",
+                            domain_data.as_ref().map(|d| d.color).unwrap_or("#0D7377"),
+                            domain_data.as_ref().map(|d| d.glow).unwrap_or("#06D6C8"))>
                             <button class="domain-back" on:click=move |_| active_domain.set(None)>
-                                "← Return to Orb"
+                                "← Return"
                             </button>
-                            <h1 class="bio-title">{move || active_domain.get().unwrap_or_default()}</h1>
-                            <p class="bio-subtitle">"Domain content renders here"</p>
+                            <div class="domain-header">
+                                <div class="domain-orb-mini" />
+                                <div>
+                                    <h1 class="domain-title">{domain_data.as_ref().map(|d| d.bio_name).unwrap_or("Unknown")}</h1>
+                                    <p class="domain-subtitle">{domain_data.as_ref().map(|d| d.name).unwrap_or("")}</p>
+                                </div>
+                            </div>
+                            <div class="domain-stats">
+                                <div class="domain-stat">
+                                    <span class="stat-value">{format!("{:.0}%", domain_data.as_ref().map(|d| d.activity * 100.0).unwrap_or(0.0))}</span>
+                                    <span class="stat-label">"Activity"</span>
+                                </div>
+                                <div class="domain-stat">
+                                    <span class="stat-value">{move || format!("{:.0}%", consciousness.get() * 100.0)}</span>
+                                    <span class="stat-label">"Consciousness"</span>
+                                </div>
+                                <div class="domain-stat">
+                                    <span class="stat-value">{move || tier.get().label()}</span>
+                                    <span class="stat-label">"Tier"</span>
+                                </div>
+                            </div>
+                            <div class="domain-placeholder">
+                                <p>"Connect a Holochain conductor to load live data from the "
+                                    {domain_data.as_ref().map(|d| d.name).unwrap_or("")}
+                                    " cluster."
+                                </p>
+                            </div>
                         </div>
                     }.into_any()
                 }
             }}
         </div>
     }
+}
+
+/// Play a rising tone on First Breath using Web Audio API.
+fn play_breath_tone() {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return,
+    };
+
+    // Create AudioContext via JS eval (web-sys AudioContext needs feature flags)
+    let result = js_sys::eval(r#"
+        (function() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 2);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.5);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 3);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 3);
+            } catch(e) {}
+        })()
+    "#);
+    let _ = result;
 }

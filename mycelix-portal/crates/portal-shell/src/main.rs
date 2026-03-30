@@ -5,6 +5,7 @@
 use leptos::prelude::*;
 
 mod app;
+mod background;
 mod identity;
 
 fn main() {

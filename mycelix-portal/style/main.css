@@ -36,7 +36,33 @@ body {
     align-items: center;
     justify-content: center;
     position: relative;
-    background: radial-gradient(ellipse at 50% 50%, #0A1416 0%, #030808 70%);
+}
+
+/* Living WebGL background canvas */
+.homeostasis-bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* All content floats above the background */
+.first-breath-universe,
+.phenotype-selection,
+.orbital-view,
+.stream-view,
+.garden-view,
+.pulse-view,
+.domain-view {
+    position: relative;
+    z-index: 1;
+    animation: emerge 0.6s ease-out;
+}
+
+@keyframes emerge {
+    from { opacity: 0; transform: scale(0.95); filter: blur(4px); }
+    to { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 
 /* ═══════════════════════════════════════════
@@ -581,21 +607,78 @@ body {
     background: none;
     border: 1px solid var(--border);
     color: var(--text-secondary);
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 1rem;
     border-radius: 999px;
     cursor: pointer;
-    font-size: 0.8rem;
-    margin-bottom: 2rem;
+    font-size: 0.75rem;
+    margin-bottom: 1.5rem;
     transition: border-color 0.15s;
 }
 
 .domain-back:hover {
-    border-color: var(--bio-cyan);
-    color: var(--bio-cyan);
+    border-color: var(--domain-glow, var(--bio-cyan));
+    color: var(--domain-glow, var(--bio-cyan));
 }
 
-.bio-title { font-size: 1.75rem; font-weight: 600; color: var(--bio-cyan); }
-.bio-subtitle { color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; }
+.domain-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.domain-orb-mini {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--domain-glow), var(--domain-color));
+    box-shadow: 0 0 20px var(--domain-glow);
+    flex-shrink: 0;
+}
+
+.domain-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--domain-glow, var(--bio-cyan));
+}
+
+.domain-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.domain-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.domain-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.stat-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.domain-placeholder {
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
 
 /* ═══════════════════════════════════════════
    Accessibility
