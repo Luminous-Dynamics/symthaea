@@ -3633,3 +3633,4 @@ mod tests {
 pub mod maglev_network;
 pub mod generation_ship;
 pub mod fusion_bridge;
+pub mod cliodynamics;
