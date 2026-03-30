@@ -1427,7 +1427,7 @@ impl MultiWorldSimulator {
             let has_fab_workshop = world.project_manager
                 .has_completed(projects::ProjectBlueprint::FabricationWorkshop);
             if has_fab_workshop && tick % 6 == 0 // Check every 6 months
-                && world.fleet.total_units() < (pop as usize / 50).max(2) // 1 robot per 50 people
+                && world.fleet.total_units() < ((pop as usize) / 50 + 1).max(2) // 1 robot per 50 people + 1
             {
                 // Choose robot type by need
                 let platform = if world.fleet.count_operational(robotics::RobotPlatform::Humanoid) == 0 {

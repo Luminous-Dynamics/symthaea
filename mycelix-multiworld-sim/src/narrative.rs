@@ -457,6 +457,16 @@ impl NarrativeEngine {
                  desc.clone(),
                  "Debris clouds sealed orbit — every launch window became a gamble".into(),
                  "Earth's connection to its colonies hung by a thread".to_string())
+            } else if desc.contains("ROBOT COMMISSIONED") {
+                (1,
+                 desc.clone(),
+                 "The workshop hummed with new purpose as the machine powered up".into(),
+                 "Another pair of tireless hands joined the colony's workforce".to_string())
+            } else if desc.contains("BROWNOUT CASCADE") {
+                (3,
+                 desc.clone(),
+                 "Lights flickered. Robots froze mid-task. The colony held its breath".into(),
+                 "Humans stepped into the hazardous modules their machines had protected them from".to_string())
             } else {
                 continue; // Skip events we don't narrate
             };
