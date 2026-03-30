@@ -260,96 +260,239 @@ echo "COMPLETE"
         }
 
         "single" | "" => {
-            // Full disk wipe → disko → nixos-install
+            // Full disk wipe → direct partition → nixos-install
+            // Uses sgdisk + mkfs directly (no disko download needed on live ISO)
             format!(r#"set -euo pipefail
 echo "=== Symthaea Sovereign Birth: Single Disk ==="
 
-# Step 1: Write configs
-echo "STAGE: Writing configuration..."
-mkdir -p /tmp/symthaea-install
-cat > /tmp/symthaea-install/flake.nix << 'FLAKEEOF'
-{flake_content}
-FLAKEEOF
-
-cat > /tmp/symthaea-install/disko-config.nix << 'DISKOEOF'
-{disko_content}
-DISKOEOF
-
-cat > /tmp/symthaea-install/hardware-configuration.nix << 'HWEOF'
-{hw_content}
-HWEOF
-
-# Step 2: Run disko
+# Step 1: Wipe and partition
 echo "STAGE: Partitioning disk {disk}..."
-nix run github:nix-community/disko -- --mode destroy /tmp/symthaea-install/disko-config.nix
+# Unmount anything on this disk first
+umount -R /mnt 2>/dev/null || true
+swapoff {disk}* 2>/dev/null || true
+# Wipe all signatures (filesystem, partition table, raid)
+wipefs -af {disk} 2>/dev/null || true
+sgdisk --zap-all {disk}
+sgdisk -n 1:0:+512M -t 1:EF00 -c 1:boot {disk}
+sgdisk -n 2:0:0 -t 2:8300 -c 2:nixos {disk}
+partprobe {disk} 2>/dev/null || true
+blockdev --rereadpt {disk} 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+sleep 3
 
-# Step 3: Copy configs to /mnt
+# Detect partition names (nvme uses p1/p2, sata uses 1/2)
+if [ -b "{disk}p1" ]; then
+  BOOT="{disk}p1"
+  ROOT="{disk}p2"
+else
+  BOOT="{disk}1"
+  ROOT="{disk}2"
+fi
+echo "  Boot: $BOOT"
+echo "  Root: $ROOT"
+
+# Step 2: Format with btrfs (snapshots, compression, rollback)
+echo "STAGE: Formatting with btrfs..."
+wipefs -af "$BOOT" 2>/dev/null || true
+wipefs -af "$ROOT" 2>/dev/null || true
+mkfs.vfat -F 32 "$BOOT"
+mkfs.btrfs -f -L nixos "$ROOT"
+
+# Step 3: Create btrfs subvolumes
+mount "$ROOT" /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@nix
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@swap
+umount /mnt
+
+# Step 4: Mount with compression
+echo "STAGE: Mounting filesystems..."
+mount -o subvol=@,compress=zstd:3,noatime "$ROOT" /mnt
+mkdir -p /mnt/{{boot,home,nix,var/log,.snapshots,swap}}
+mount "$BOOT" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime "$ROOT" /mnt/home
+mount -o subvol=@nix,compress=zstd:3,noatime "$ROOT" /mnt/nix
+mount -o subvol=@log,compress=zstd:3,noatime "$ROOT" /mnt/var/log
+mount -o subvol=@snapshots,compress=zstd:3,noatime "$ROOT" /mnt/.snapshots
+mount -o subvol=@swap,noatime "$ROOT" /mnt/swap
+
+# Step 4: Generate hardware config + write our config
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+
+cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'
+{{ config, pkgs, ... }}:
+{{
+  imports = [ ./hardware-configuration.nix ];
+  networking.hostName = "{hostname}";
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # Hardening (Symthaea defaults)
+  services.openssh.enable = true;
+  services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};
+  services.fstrim.enable = true;
+  services.smartd = {{ enable = true; autodetect = true; }};
+  services.btrfs.autoScrub = {{ enable = true; interval = "monthly"; fileSystems = [ "/" ]; }};
+  zramSwap = {{ enable = true; algorithm = "zstd"; }};
+  boot.kernel.sysctl."vm.swappiness" = 60;
+
+  # User
+  users.users.{hostname} = {{
+    isNormalUser = true;
+    extraGroups = [ "wheel" "video" "networkmanager" ];
+    initialPassword = "changeme";
+  }};
+
+  environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];
+  system.stateVersion = "24.11";
+}}
+NIXCONF
+
+# Step 5: Create swap file
+echo "STAGE: Configuring swap..."
+fallocate -l 16G /mnt/swap/swapfile
+chmod 600 /mnt/swap/swapfile
+mkswap /mnt/swap/swapfile
+
+# Step 6: Install
 echo "STAGE: Installing NixOS..."
-mkdir -p /mnt/etc/nixos
-cp /tmp/symthaea-install/*.nix /mnt/etc/nixos/
+echo "This may take several minutes as packages are downloaded..."
+nixos-install --no-root-passwd 2>&1 | tail -5
 
-# Step 4: Install
-nixos-install --flake /mnt/etc/nixos#{hostname} --no-root-passwd
+# Step 6: Verify
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+ls /mnt/boot/EFI/BOOT/BOOTX64.EFI && echo "  Bootloader: OK" || echo "  Bootloader: MISSING"
 
+echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete ==="
+echo "Reboot the machine: sudo reboot"
+echo "Login as: {hostname} / changeme"
 echo "COMPLETE"
 "#,
                 disk = msg.disk,
                 hostname = hostname,
-                flake_content = msg.flake_nix.replace('\'', "'\"'\"'"),
-                disko_content = msg.disko_nix.replace('\'', "'\"'\"'"),
-                hw_content = msg.hardware_nix.replace('\'', "'\"'\"'"),
             )
         }
 
         "dual" => {
-            // Dual-disk: fast drive for data, standard for OS
+            // Dual-disk: fast drive for data (btrfs), standard for OS (ext4)
+            // Direct partitioning — no disko download needed
             format!(r#"set -euo pipefail
 echo "=== Symthaea Sovereign Birth: Dual NVMe ==="
 
-echo "STAGE: Writing configuration..."
-mkdir -p /tmp/symthaea-install
-cat > /tmp/symthaea-install/flake.nix << 'FLAKEEOF'
-{flake_content}
-FLAKEEOF
+# Step 1: Partition standard drive (OS)
+echo "STAGE: Partitioning standard drive {standard}..."
+sgdisk --zap-all {standard}
+sgdisk -n 1:0:+1G -t 1:EF00 -c 1:boot {standard}
+sgdisk -n 2:0:0 -t 2:8300 -c 2:nixos-root {standard}
+partprobe {standard} 2>/dev/null || true
 
-cat > /tmp/symthaea-install/disko-config.nix << 'DISKOEOF'
-{disko_content}
-DISKOEOF
+# Step 2: Partition fast drive (data)
+echo "STAGE: Partitioning fast drive {fast}..."
+sgdisk --zap-all {fast}
+sgdisk -n 1:0:0 -t 1:8300 -c 1:samsung-data {fast}
+partprobe {fast} 2>/dev/null || true
+sleep 2
 
-cat > /tmp/symthaea-install/hardware-configuration.nix << 'HWEOF'
-{hw_content}
-HWEOF
+# Detect partition names
+if [ -b "{standard}p1" ]; then
+  STD_BOOT="{standard}p1"; STD_ROOT="{standard}p2"
+  FAST_DATA="{fast}p1"
+else
+  STD_BOOT="{standard}1"; STD_ROOT="{standard}2"
+  FAST_DATA="{fast}1"
+fi
 
-echo "STAGE: Partitioning drives..."
-echo "  Fast: {fast} (data)"
-echo "  Standard: {standard} (OS)"
-nix run github:nix-community/disko -- --mode destroy /tmp/symthaea-install/disko-config.nix
+# Step 3: Format
+echo "STAGE: Formatting drives..."
+mkfs.vfat -F 32 "$STD_BOOT"
+mkfs.ext4 -F -L nixos "$STD_ROOT"
+mkfs.btrfs -f -L samsung "$FAST_DATA"
 
-echo "STAGE: Installing NixOS..."
-mkdir -p /mnt/etc/nixos
-cp /tmp/symthaea-install/*.nix /mnt/etc/nixos/
-nixos-install --flake /mnt/etc/nixos#{hostname} --no-root-passwd
+# Step 4: Create btrfs subvolumes on fast drive
+echo "STAGE: Creating btrfs subvolumes..."
+mount "$FAST_DATA" /mnt
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@srv
+btrfs subvolume create /mnt/@swap
+btrfs subvolume create /mnt/@snapshots
+umount /mnt
 
+# Step 5: Mount everything
+echo "STAGE: Mounting filesystems..."
+mount "$STD_ROOT" /mnt
+mkdir -p /mnt/{{boot,home,srv,swap,.snapshots}}
+mount "$STD_BOOT" /mnt/boot
+mount -o subvol=@home,compress=zstd:3,noatime "$FAST_DATA" /mnt/home
+mount -o subvol=@srv,compress=zstd:3,noatime "$FAST_DATA" /mnt/srv
+mount -o subvol=@swap,noatime "$FAST_DATA" /mnt/swap
+mount -o subvol=@snapshots,compress=zstd:3,noatime "$FAST_DATA" /mnt/.snapshots
+
+# Step 6: Generate config + write ours
+echo "STAGE: Generating configuration..."
+nixos-generate-config --root /mnt
+
+cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'
+{{ config, pkgs, ... }}:
+{{
+  imports = [ ./hardware-configuration.nix ];
+  networking.hostName = "{hostname}";
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # Hardening
+  services.openssh.enable = true;
+  services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};
+  services.fstrim.enable = true;
+  services.smartd = {{ enable = true; autodetect = true; }};
+  services.btrfs.autoScrub = {{ enable = true; interval = "monthly"; fileSystems = [ "/home" ]; }};
+  zramSwap = {{ enable = true; algorithm = "zstd"; }};
+  boot.kernel.sysctl."vm.swappiness" = 60;
+
+  # User
+  users.users.{hostname} = {{
+    isNormalUser = true;
+    extraGroups = [ "wheel" "video" "networkmanager" ];
+    initialPassword = "changeme";
+  }};
+
+  environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs ];
+  system.stateVersion = "24.11";
+}}
+NIXCONF
+
+# Step 7: Create swap file on fast drive
 echo "STAGE: Configuring swap..."
-mkdir -p /mnt/swap
-truncate -s 0 /mnt/swap/swapfile
-chattr +C /mnt/swap/swapfile 2>/dev/null || true
 fallocate -l 64G /mnt/swap/swapfile
 chmod 600 /mnt/swap/swapfile
 mkswap /mnt/swap/swapfile
 
+# Step 8: Install
+echo "STAGE: Installing NixOS..."
+echo "This may take several minutes..."
+nixos-install --no-root-passwd 2>&1 | tail -5
+
+# Step 9: Verify
+echo "STAGE: Verifying installation..."
+ls /mnt/nix/store | wc -l | xargs -I{{}} echo "  {{}} store paths installed"
+ls /mnt/boot/EFI/BOOT/BOOTX64.EFI && echo "  Bootloader: OK" || echo "  Bootloader: MISSING"
+
+echo ""
 echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete ==="
+echo "Reboot the machine: sudo reboot"
+echo "Login as: {hostname} / changeme"
 echo "COMPLETE"
 "#,
                 fast = msg.fast_disk,
                 standard = msg.standard_disk,
                 hostname = hostname,
-                flake_content = msg.flake_nix.replace('\'', "'\"'\"'"),
-                disko_content = msg.disko_nix.replace('\'', "'\"'\"'"),
-                hw_content = msg.hardware_nix.replace('\'', "'\"'\"'"),
             )
         }
 
@@ -807,7 +950,129 @@ async fn handle_connection(
                     }
                 }
 
-                // Execute the install script
+                // Execute the install script in background, tail the log for streaming
+                // This works around async-ssh2-tokio's blocking execute():
+                // The script runs with output redirected to a log file,
+                // while we poll the log file for new lines.
+                let _ = client
+                    .execute("bash /tmp/symthaea-install.sh > /tmp/symthaea-install.log 2>&1 &")
+                    .await;
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::output("Installation started. Streaming output...", "stdout")
+                            .to_json(),
+                    ))
+                    .await;
+
+                // Poll the log file for new output
+                let mut last_lines = 0u64;
+                let mut complete = false;
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+                    let tail_result = client
+                        .execute(&format!(
+                            "wc -l < /tmp/symthaea-install.log 2>/dev/null && tail -n +{} /tmp/symthaea-install.log 2>/dev/null",
+                            last_lines + 1
+                        ))
+                        .await;
+
+                    match tail_result {
+                        Ok(result) if result.exit_status == 0 => {
+                            let lines: Vec<&str> = result.stdout.lines().collect();
+                            if let Some(first) = lines.first() {
+                                if let Ok(total) = first.trim().parse::<u64>() {
+                                    // Process new lines (skip the count line)
+                                    for line in &lines[1..] {
+                                        if line.trim().is_empty() {
+                                            continue;
+                                        }
+
+                                        // Parse STAGE: markers
+                                        if line.starts_with("STAGE: ") {
+                                            let stage_text = &line[7..];
+                                            let stage = if stage_text.contains("Prepar") || stage_text.contains("environment") {
+                                                NixosAnywhereStage::Connecting
+                                            } else if stage_text.contains("Partition") {
+                                                NixosAnywhereStage::Partitioning
+                                            } else if stage_text.contains("Format") || stage_text.contains("btrfs") || stage_text.contains("subvol") {
+                                                NixosAnywhereStage::Partitioning
+                                            } else if stage_text.contains("Mount") {
+                                                NixosAnywhereStage::Partitioning
+                                            } else if stage_text.contains("Generat") || stage_text.contains("config") {
+                                                NixosAnywhereStage::Configuring
+                                            } else if stage_text.contains("Install") {
+                                                NixosAnywhereStage::Installing
+                                            } else if stage_text.contains("swap") || stage_text.contains("Verif") {
+                                                NixosAnywhereStage::Configuring
+                                            } else if stage_text.contains("FirstBreath") {
+                                                NixosAnywhereStage::Complete
+                                            } else {
+                                                NixosAnywhereStage::Installing
+                                            };
+
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::progress(&stage).to_json(),
+                                                ))
+                                                .await;
+                                        }
+
+                                        if let Some(stage) = parse_stage(line) {
+                                            let _ = ws_tx
+                                                .send(Message::Text(
+                                                    RelayMessage::progress(&stage).to_json(),
+                                                ))
+                                                .await;
+                                        }
+
+                                        let _ = ws_tx
+                                            .send(Message::Text(
+                                                RelayMessage::output(line, "stdout").to_json(),
+                                            ))
+                                            .await;
+
+                                        if line.contains("COMPLETE") {
+                                            complete = true;
+                                        }
+                                    }
+                                    last_lines = total;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    if complete {
+                        break;
+                    }
+
+                    // Check if the install script is still running
+                    if let Ok(check) = client.execute("pgrep -f symthaea-install.sh").await {
+                        if check.exit_status != 0 && last_lines > 0 {
+                            // Script finished but no COMPLETE marker — check exit code
+                            if let Ok(exit_check) = client.execute("tail -1 /tmp/symthaea-install.log").await {
+                                let _ = ws_tx
+                                    .send(Message::Text(
+                                        RelayMessage::output(&exit_check.stdout, "stdout").to_json(),
+                                    ))
+                                    .await;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                let exit_code = if complete { 0 } else { 1 };
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::exit(exit_code).to_json(),
+                    ))
+                    .await;
+
+                // LEGACY: The old blocking path (kept for reference)
+                // This is what we replaced with the log-polling approach above.
+                if false {
                 match client.execute("bash /tmp/symthaea-install.sh 2>&1").await {
                     Ok(result) => {
                         for line in result.stdout.lines().chain(result.stderr.lines()) {
@@ -873,6 +1138,7 @@ async fn handle_connection(
                             .await;
                     }
                 }
+                } // end if false (legacy blocking path)
             }
 
             "disconnect" => {

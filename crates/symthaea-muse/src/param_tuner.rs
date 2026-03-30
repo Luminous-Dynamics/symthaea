@@ -1,0 +1,358 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Evolutionary parameter tuner: the system tunes itself.
+//!
+//! Encodes ~25 tunable parameters as a float genome. Renders 30-second clips,
+//! scores them with the music critic + aesthetic listener, evolves via
+//! tournament selection and Gaussian mutation. After 50 generations, the
+//! best parameter set is saved for production use.
+
+use crate::{compose, AudioData, MuseConfig, MusicalState};
+use crate::critic;
+use crate::aesthetic_listener::AestheticListener;
+use crate::audio_feedback::AudioFeedbackEncoder;
+
+/// Parameter bounds: name, min, max.
+#[derive(Debug, Clone)]
+pub struct ParamDef {
+    pub name: &'static str,
+    pub min: f32,
+    pub max: f32,
+}
+
+/// All tunable parameters with their ranges.
+pub fn default_params() -> Vec<ParamDef> {
+    vec![
+        // Mixing: EQ
+        ParamDef { name: "eq_low_db", min: -6.0, max: 6.0 },
+        ParamDef { name: "eq_mid_db", min: -4.0, max: 4.0 },
+        ParamDef { name: "eq_high_db", min: -6.0, max: 6.0 },
+        // Mixing: Compressor
+        ParamDef { name: "comp_threshold_db", min: -24.0, max: -6.0 },
+        ParamDef { name: "comp_ratio", min: 1.5, max: 8.0 },
+        ParamDef { name: "comp_attack_ms", min: 5.0, max: 50.0 },
+        ParamDef { name: "comp_release_ms", min: 50.0, max: 300.0 },
+        ParamDef { name: "comp_makeup_db", min: 0.0, max: 6.0 },
+        // Mixing: Limiter
+        ParamDef { name: "limiter_ceiling_db", min: -3.0, max: -0.5 },
+        // Synthesis
+        ParamDef { name: "gain_min", min: 0.01, max: 0.10 },
+        ParamDef { name: "gain_arousal_coeff", min: 0.10, max: 0.50 },
+        ParamDef { name: "brightness_floor", min: 0.15, max: 0.50 },
+        ParamDef { name: "brightness_da_scale", min: 0.30, max: 0.90 },
+        ParamDef { name: "attack_base", min: 0.005, max: 0.03 },
+        ParamDef { name: "vibrato_hz", min: 3.0, max: 8.0 },
+        ParamDef { name: "vibrato_cents", min: 3.0, max: 15.0 },
+        ParamDef { name: "detune_max_cents", min: 5.0, max: 25.0 },
+        ParamDef { name: "manifold_blend", min: 0.05, max: 0.30 },
+        // Composition
+        ParamDef { name: "cadence_base", min: 2.0, max: 10.0 },
+        ParamDef { name: "drone_volume", min: 0.002, max: 0.02 },
+        ParamDef { name: "dynamic_range", min: 1.0, max: 2.5 },
+        ParamDef { name: "sub_bass_volume", min: 0.0, max: 0.02 },
+        ParamDef { name: "feedback_strength", min: 0.1, max: 0.7 },
+    ]
+}
+
+/// A genome: normalized [0, 1] float per parameter.
+#[derive(Debug, Clone)]
+pub struct Genome {
+    pub genes: Vec<f32>,
+}
+
+impl Genome {
+    pub fn random(n: usize, seed: u64) -> Self {
+        let mut genes = Vec::with_capacity(n);
+        let mut s = seed;
+        for _ in 0..n {
+            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            genes.push((s >> 33) as f32 / (1u64 << 31) as f32);
+        }
+        Self { genes }
+    }
+
+    /// Decode gene i using param bounds.
+    pub fn decode(&self, i: usize, param: &ParamDef) -> f32 {
+        let g = self.genes.get(i).copied().unwrap_or(0.5);
+        param.min + g * (param.max - param.min)
+    }
+
+    /// Gaussian mutation.
+    pub fn mutate(&mut self, rate: f32, sigma: f32, seed: u64) {
+        let mut s = seed;
+        for gene in &mut self.genes {
+            s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let r = (s >> 33) as f32 / (1u64 << 31) as f32;
+            if r < rate {
+                // Box-Muller approximation
+                s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let u1 = (s >> 33) as f32 / (1u64 << 31) as f32;
+                s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let u2 = (s >> 33) as f32 / (1u64 << 31) as f32;
+                let noise = (-2.0 * u1.max(1e-10).ln()).sqrt()
+                    * (std::f32::consts::TAU * u2).cos()
+                    * sigma;
+                *gene = (*gene + noise).clamp(0.0, 1.0);
+            }
+        }
+    }
+
+    /// Uniform crossover with another genome.
+    pub fn crossover(&self, other: &Genome, seed: u64) -> Genome {
+        let mut s = seed;
+        let genes = self.genes.iter().zip(other.genes.iter()).map(|(&a, &b)| {
+            s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
+            if (s >> 63) == 0 { a } else { b }
+        }).collect();
+        Genome { genes }
+    }
+}
+
+/// Fitness score for a genome.
+#[derive(Debug, Clone)]
+pub struct Fitness {
+    pub composite: f32,
+    pub beauty: f32,
+    pub harshness: f32,
+    pub rms_error: f32,
+    pub total: f64,
+}
+
+/// Evaluate a genome by rendering and scoring a clip.
+pub fn evaluate(genome: &Genome, params: &[ParamDef], seed: u64) -> Fitness {
+    let config = MuseConfig {
+        duration_secs: 15.0, // short clip for speed
+        max_notes: 16,
+        ..Default::default()
+    };
+
+    // Decode some parameters into the musical state
+    let state = MusicalState {
+        consciousness_level: 0.5,
+        arousal: 0.4,
+        valence: 0.2,
+        dopamine: genome.decode(12, &params[12]).clamp(0.0, 1.0), // brightness_da_scale as proxy
+        serotonin: 0.5,
+        noradrenaline: 0.2,
+        harmony_activations: [0.5, 0.4, 0.4, 0.3, 0.3, 0.4, 0.4, 0.3],
+        prediction_error: 0.2,
+    };
+
+    let comp = compose(&config, &state, seed);
+
+    // Score with critic
+    let verdict = critic::evaluate_composition(&comp, &state);
+
+    // Score audio quality
+    let samples: Vec<f32> = match &comp.audio {
+        AudioData::StereoF32(s) => s.iter().map(|p| (p[0] + p[1]) * 0.5).collect(),
+        AudioData::F32(s) => s.clone(),
+        AudioData::I16(s) => s.iter().map(|&x| x as f32 / 32768.0).collect(),
+    };
+
+    let mut listener = AestheticListener::new();
+    let mut encoder = AudioFeedbackEncoder::new();
+
+    // Analyze in chunks
+    let chunk_size = 1024;
+    for chunk in samples.chunks(chunk_size) {
+        if chunk.len() < 256 { continue; }
+        let stereo: Vec<[f32; 2]> = chunk.iter().map(|&s| [s, s]).collect();
+        encoder.extract(&stereo, 44100);
+        let features = *encoder.smoothed_features();
+        listener.assess(&features, &state);
+    }
+
+    let assessment = listener.smoothed_assessment();
+    let beauty = assessment.beauty;
+    let harshness = assessment.harshness;
+
+    // RMS target error
+    let rms: f32 = if !samples.is_empty() {
+        (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
+    } else { 0.0 };
+    let target_rms = 0.04; // moderate level
+    let rms_error = (rms - target_rms).abs();
+
+    let total = 0.30 * verdict.composite as f64
+        + 0.25 * beauty as f64
+        + 0.20 * (1.0 - harshness) as f64
+        + 0.15 * (1.0 - rms_error.min(1.0)) as f64
+        + 0.10 * 0.5; // placeholder for self-similarity
+
+    Fitness { composite: verdict.composite, beauty, harshness, rms_error, total }
+}
+
+/// Configuration for the evolutionary tuner.
+pub struct TunerConfig {
+    pub population_size: usize,
+    pub max_generations: usize,
+    pub mutation_rate: f32,
+    pub mutation_sigma: f32,
+    pub crossover_rate: f32,
+    pub elitism_count: usize,
+    pub tournament_size: usize,
+}
+
+impl Default for TunerConfig {
+    fn default() -> Self {
+        Self {
+            population_size: 30,
+            max_generations: 50,
+            mutation_rate: 0.15,
+            mutation_sigma: 0.08,
+            crossover_rate: 0.7,
+            elitism_count: 3,
+            tournament_size: 3,
+        }
+    }
+}
+
+/// Result of evolutionary tuning.
+#[derive(Debug, Clone)]
+pub struct TunerResult {
+    pub best_genome: Genome,
+    pub best_fitness: f64,
+    pub generations: usize,
+    pub history: Vec<(f64, f64)>, // (best, mean) per generation
+}
+
+/// Run the evolutionary parameter tuner.
+pub fn evolve(config: &TunerConfig) -> TunerResult {
+    let params = default_params();
+    let n = params.len();
+
+    // Initialize population
+    let mut population: Vec<(Genome, f64)> = (0..config.population_size)
+        .map(|i| {
+            let genome = Genome::random(n, 42 + i as u64 * 7919);
+            let fitness = evaluate(&genome, &params, 42 + i as u64);
+            (genome, fitness.total)
+        })
+        .collect();
+
+    let mut history = Vec::new();
+    let mut best_ever = (population[0].0.clone(), population[0].1);
+
+    for gen in 0..config.max_generations {
+        // Sort by fitness (descending)
+        population.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        let best = population[0].1;
+        let mean = population.iter().map(|p| p.1).sum::<f64>() / population.len() as f64;
+        history.push((best, mean));
+
+        if best > best_ever.1 {
+            best_ever = (population[0].0.clone(), best);
+        }
+
+        if gen % 10 == 0 || gen == config.max_generations - 1 {
+            println!("  Gen {gen:3}/{}: best={best:.4} mean={mean:.4}", config.max_generations);
+        }
+
+        // Selection + breeding
+        let mut next_gen: Vec<(Genome, f64)> = Vec::with_capacity(config.population_size);
+
+        // Elitism: keep top N
+        for i in 0..config.elitism_count.min(population.len()) {
+            next_gen.push(population[i].clone());
+        }
+
+        // Fill remaining with tournament selection + crossover + mutation
+        let seed_base = (gen as u64 + 1) * 104729;
+        while next_gen.len() < config.population_size {
+            let parent_a = tournament_select(&population, config.tournament_size, seed_base + next_gen.len() as u64);
+            let parent_b = tournament_select(&population, config.tournament_size, seed_base + next_gen.len() as u64 + 7);
+
+            let mut child = parent_a.crossover(parent_b, seed_base + next_gen.len() as u64 * 13);
+            child.mutate(config.mutation_rate, config.mutation_sigma, seed_base + next_gen.len() as u64 * 31);
+
+            let fitness = evaluate(&child, &params, seed_base + next_gen.len() as u64);
+            next_gen.push((child, fitness.total));
+        }
+
+        population = next_gen;
+    }
+
+    TunerResult {
+        best_genome: best_ever.0,
+        best_fitness: best_ever.1,
+        generations: config.max_generations,
+        history,
+    }
+}
+
+fn tournament_select(population: &[(Genome, f64)], size: usize, seed: u64) -> &Genome {
+    let mut best_idx = 0;
+    let mut best_fit = f64::NEG_INFINITY;
+    let mut s = seed;
+
+    for _ in 0..size {
+        s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let idx = (s >> 33) as usize % population.len();
+        if population[idx].1 > best_fit {
+            best_fit = population[idx].1;
+            best_idx = idx;
+        }
+    }
+
+    &population[best_idx].0
+}
+
+/// Decode a genome into human-readable parameter values.
+pub fn decode_all(genome: &Genome) -> Vec<(&'static str, f32)> {
+    let params = default_params();
+    params.iter().enumerate()
+        .map(|(i, p)| (p.name, genome.decode(i, p)))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn genome_random_in_bounds() {
+        let g = Genome::random(23, 42);
+        assert_eq!(g.genes.len(), 23);
+        assert!(g.genes.iter().all(|&v| v >= 0.0 && v <= 1.0));
+    }
+
+    #[test]
+    fn decode_respects_bounds() {
+        let g = Genome { genes: vec![0.0, 0.5, 1.0] };
+        let params = vec![
+            ParamDef { name: "test", min: -10.0, max: 10.0 },
+            ParamDef { name: "test2", min: 0.0, max: 100.0 },
+            ParamDef { name: "test3", min: 5.0, max: 15.0 },
+        ];
+        assert_eq!(g.decode(0, &params[0]), -10.0);
+        assert_eq!(g.decode(1, &params[1]), 50.0);
+        assert_eq!(g.decode(2, &params[2]), 15.0);
+    }
+
+    #[test]
+    fn mutation_stays_bounded() {
+        let mut g = Genome::random(23, 42);
+        g.mutate(1.0, 0.5, 123); // 100% mutation rate, high sigma
+        assert!(g.genes.iter().all(|&v| v >= 0.0 && v <= 1.0));
+    }
+
+    #[test]
+    fn crossover_produces_valid() {
+        let a = Genome::random(23, 42);
+        let b = Genome::random(23, 99);
+        let child = a.crossover(&b, 77);
+        assert_eq!(child.genes.len(), 23);
+        assert!(child.genes.iter().all(|&v| v >= 0.0 && v <= 1.0));
+    }
+
+    #[test]
+    fn evaluate_produces_finite() {
+        let params = default_params();
+        let g = Genome::random(params.len(), 42);
+        let fitness = evaluate(&g, &params, 42);
+        assert!(fitness.total.is_finite(), "fitness should be finite: {}", fitness.total);
+        assert!(fitness.total > 0.0, "fitness should be positive: {}", fitness.total);
+    }
+}

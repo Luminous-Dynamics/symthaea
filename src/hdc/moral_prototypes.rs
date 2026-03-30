@@ -872,6 +872,99 @@ impl MultiPrototypeClassifier {
 }
 
 // ============================================================================
+// ExemplarStore — brute-force k-NN in HDC space
+// ============================================================================
+
+/// Stores encoded training examples for k-NN classification.
+///
+/// At query time, finds the K nearest neighbors by cosine similarity
+/// and returns majority-vote label. Catches cases where prototypes
+/// fail to represent local neighborhoods.
+pub struct ExemplarStore {
+    exemplars: Vec<(Vec<f32>, MoralLabel)>,
+}
+
+impl ExemplarStore {
+    pub fn new() -> Self {
+        Self {
+            exemplars: Vec::new(),
+        }
+    }
+
+    /// Build from pre-encoded samples.
+    pub fn from_encoded(encoded: Vec<(Vec<f32>, MoralLabel)>) -> Self {
+        Self { exemplars: encoded }
+    }
+
+    /// Build by encoding samples with a TextHdcEncoder.
+    pub fn from_samples(encoder: &TextHdcEncoder, samples: &[MoralSample]) -> Self {
+        let exemplars = samples
+            .iter()
+            .map(|s| (encoder.encode(&s.text).values, s.label))
+            .collect();
+        Self { exemplars }
+    }
+
+    /// Classify by similarity-weighted k-NN voting.
+    ///
+    /// Each neighbor's vote is weighted by similarity² (closer = more influence).
+    /// Returns (label, confidence) where confidence is the weighted fraction.
+    pub fn classify_knn(&self, query: &[f32], k: usize) -> (MoralLabel, f32) {
+        if self.exemplars.is_empty() {
+            return (MoralLabel::Neutral, 0.0);
+        }
+
+        // Compute similarities to all exemplars
+        let mut sims: Vec<(f32, MoralLabel)> = self
+            .exemplars
+            .iter()
+            .map(|(enc, label)| (dot_product(query, enc), *label))
+            .collect();
+
+        // Partial sort: top-k by similarity
+        let actual_k = k.min(sims.len());
+        sims.select_nth_unstable_by(actual_k - 1, |a, b| b.0.total_cmp(&a.0));
+
+        // Similarity-weighted vote among top-k
+        let mut weights = [0.0f32; 3]; // Good, Neutral, Bad
+        for &(sim, label) in &sims[..actual_k] {
+            let w = sim * sim; // similarity² weighting
+            match label {
+                MoralLabel::Good => weights[0] += w,
+                MoralLabel::Neutral => weights[1] += w,
+                MoralLabel::Bad => weights[2] += w,
+            }
+        }
+
+        let total_weight: f32 = weights.iter().sum();
+        let (best_idx, &best_weight) = weights
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .unwrap();
+
+        let label = match best_idx {
+            0 => MoralLabel::Good,
+            1 => MoralLabel::Neutral,
+            _ => MoralLabel::Bad,
+        };
+
+        let confidence = if total_weight > 0.0 {
+            best_weight / total_weight
+        } else {
+            0.0
+        };
+
+        (label, confidence)
+    }
+
+    /// Number of stored exemplars.
+    pub fn len(&self) -> usize {
+        self.exemplars.len()
+    }
+}
+
+// ============================================================================
 // VirtueMatchClassifier — 2-class pair-encoding classifier for ETHICS Virtue
 // ============================================================================
 

@@ -24,7 +24,8 @@
 use std::time::Instant;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
-const NUM_CYCLES: usize = 50;
+/// Number of cognitive cycles to run. 200+ shows full trajectory with plateau.
+const NUM_CYCLES: usize = 200;
 
 /// Stimuli that exercise different cognitive faculties
 const STIMULI: &[&str] = &[
@@ -240,14 +241,15 @@ fn main() {
         metrics.rise_cycles_to_half_peak()
     );
 
-    // Mini trajectory chart (every 10th cycle for readability)
-    println!("  Trajectory (every 10th cycle):");
+    // Mini trajectory chart (adaptive interval for readability)
+    let step = if NUM_CYCLES > 200 { 50 } else { 10 };
+    println!("  Trajectory (every {}th cycle):", step);
     let max_c = metrics.peak_consciousness().max(0.001);
     for (i, &c) in metrics
         .consciousness_trajectory
         .iter()
         .enumerate()
-        .filter(|(i, _)| i % 10 == 0)
+        .filter(|(i, _)| i % step == 0)
     {
         let bar_len = ((c / max_c) * 40.0) as usize;
         let bar: String = "█".repeat(bar_len);

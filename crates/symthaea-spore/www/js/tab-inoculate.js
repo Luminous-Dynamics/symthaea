@@ -363,7 +363,12 @@
       btn.textContent = 'Evaluating...';
       evalStatus.textContent = 'Connecting to eval service...';
 
-      var evalUrls = ['http://localhost:8090/api/v1/eval', 'https://eval.luminousdynamics.io/api/v1/eval'];
+      var customEval = localStorage.getItem('symthaea-eval-url');
+      var evalUrls = customEval ? [customEval] : [
+        'http://localhost:8090/api/v1/eval',
+        'http://' + window.location.hostname + ':8090/api/v1/eval',
+        'https://eval.luminousdynamics.io/api/v1/eval'
+      ];
       var hwContent = '';
       try {
         hwContent = await window.send('generateHardwareNix', { hardwareJson: hardwareJson });
@@ -556,7 +561,13 @@
       window.addNarration('Initiating Sovereign Birth ceremony for ' + host + '...');
 
       // Connect to SSH relay via WebSocket
-      var relayUrls = ['ws://localhost:8091', 'wss://relay.luminousdynamics.io'];
+      // Relay URLs: check localStorage override, then try common ports, then remote
+      var customRelay = localStorage.getItem('symthaea-relay-url');
+      var relayUrls = customRelay ? [customRelay] : [
+        'ws://localhost:8091', 'ws://localhost:8093',
+        'ws://' + window.location.hostname + ':8091',
+        'wss://relay.luminousdynamics.io'
+      ];
       var ws = null;
 
       for (var i = 0; i < relayUrls.length; i++) {
@@ -631,17 +642,28 @@
           case 'progress':
             updateProgress(msg.stage || msg.message, msg.percentage || 0, msg.phase);
             appendTerminal('>> Stage: ' + (msg.stage || msg.message), 'var(--solar-gold)');
+            // Drive the ceremony conductor
+            if (window.ceremony && window.ceremony.isActive()) {
+              window.ceremony.progress(msg.stage || msg.message, msg.percentage || 0);
+            }
             break;
 
           case 'exit':
             if (msg.code === 0) {
               appendTerminal('Installation complete!', 'var(--leaf-green)');
               updateProgress('Complete', 100, 'FirstBreath');
-              sshStatus.textContent = 'Sovereign Birth complete. The machine draws its first breath.';
+              // Let the ceremony handle the FirstBreath sequence
+              if (window.ceremony && window.ceremony.isActive()) {
+                window.ceremony.progress('Complete', 100);
+              } else {
+                sshStatus.textContent = 'Sovereign Birth complete. The machine draws its first breath.';
+                sshStatus.style.color = 'var(--solar-gold)';
+                window.addNarration('The machine draws its first breath. It is sovereign.', true);
+              }
+              sshStatus.textContent = 'Reboot the target machine to complete the Sovereign Birth.';
               sshStatus.style.color = 'var(--solar-gold)';
-              window.addNarration('The machine draws its first breath. It is sovereign.', true);
               // Browser TTS narration
-              if (window.speechSynthesis) {
+              if (window.speechSynthesis && !window.ceremony) {
                 var utt = new SpeechSynthesisUtterance('The machine draws its first breath. It is sovereign.');
                 utt.rate = 0.85; utt.pitch = 0.9;
                 window.speechSynthesis.speak(utt);
@@ -858,6 +880,11 @@
         this.disabled = false;
         this.textContent = 'Deploy to ' + diskName;
         return;
+      }
+
+      // Start the ceremony
+      if (window.ceremony) {
+        window.ceremony.start();
       }
 
       // Send fully automated install command

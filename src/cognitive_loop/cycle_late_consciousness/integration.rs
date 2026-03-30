@@ -28,18 +28,7 @@ impl CognitiveLoopService {
         let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
-                    let mut activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
-                    // Warm-start: spontaneous baseline activation during early cycles
-                    // when PE is necessarily high (untrained system). Decays over 50 cycles.
-                    // Science: Raichle (2001) — resting-state default mode provides
-                    // spontaneous workspace activation before learned predictions emerge.
-                    // 0.6 guarantees GWT entry (threshold 0.5) and approaches ignition
-                    // (threshold 0.65) in the first cycles.
-                    if self.stats.total_cycles < 50 {
-                        let warmup_boost =
-                            0.6 * (1.0 - self.stats.total_cycles as f64 / 50.0);
-                        activation = (activation + warmup_boost).min(1.0);
-                    }
+                    let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
                         "cognitive_loop",
@@ -47,18 +36,6 @@ impl CognitiveLoopService {
                         vec![ctx.hv16_cached],
                         vec!["encoder".to_string()],
                     );
-                    // Submit memory retrieval as competing strategy (default mode network).
-                    // GWT requires coalition competition for ignition (Dehaene 2011).
-                    // Memory activation = prediction confidence (familiar → stronger retrieval).
-                    let memory_activation =
-                        (self.prediction_confidence * 0.8 + 0.1).clamp(0.0, 1.0);
-                    gwt.submit_strategy(
-                        "memory_retrieval",
-                        memory_activation,
-                        vec![ctx.hv16_cached],
-                        vec!["memory".to_string()],
-                    );
-
                     // If previous cycle's subsystems requested broadcast, boost salience
                     if self.carryover.gwt_broadcast_occurred {
                         gwt.submit_strategy(
