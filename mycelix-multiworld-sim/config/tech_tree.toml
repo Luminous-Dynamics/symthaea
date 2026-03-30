@@ -1,0 +1,144 @@
+# Technology Tree for Mycelix Multiworld Simulator
+#
+# Each milestone has:
+#   earliest_tick / latest_tick — window when it can first/last occur
+#   base_probability — monthly probability of achievement (when prerequisites met)
+#   prerequisite_sectors — [[sector_id, min_level], ...] required tech levels
+#   prerequisite_milestones — other milestones that must be achieved first
+#   effects — what unlocks when this milestone is achieved
+#
+# Sector IDs: 0=engineering, 1=agriculture, 2=medicine, 3=governance,
+#             4=science, 5=education, 6=art, 7=logistics
+
+[milestones.ntp_demonstration]
+name = "NTP Demonstration"
+earliest_tick = 24      # Year 2
+latest_tick = 60        # Year 5
+base_probability = 0.02 # 2%/month
+prerequisite_sectors = [[0, 1.5]]  # Engineering >= 1.5
+effects = { propulsion_unlock = true }
+
+[milestones.fission_surface_power]
+name = "Fission Surface Power"
+earliest_tick = 36      # Year 3
+latest_tick = 120       # Year 10
+base_probability = 0.025
+prerequisite_sectors = [[0, 1.5]]
+effects = { power_multiplier = 2.0 }
+
+[milestones.fusion_demo]
+name = "Fusion Demo"
+earliest_tick = 120     # Year 10
+latest_tick = 240       # Year 20
+base_probability = 0.004
+prerequisite_sectors = [[0, 2.5], [4, 2.0]]
+prerequisite_milestones = ["fission_surface_power"]
+effects = { power_multiplier = 3.0 }
+
+[milestones.fusion_grid]
+name = "Fusion Grid Scale"
+earliest_tick = 300     # Year 25
+latest_tick = 600       # Year 50
+base_probability = 0.0015
+prerequisite_milestones = ["fusion_demo"]
+effects = { power_multiplier = 5.0 }
+
+[milestones.lcf_breakthrough]
+name = "LCF Breakthrough"
+earliest_tick = 480     # Year 40
+latest_tick = 1200      # Year 100
+base_probability = 0.005
+prerequisite_sectors = [[0, 3.0], [4, 3.0]]
+prerequisite_milestones = ["fusion_demo"]
+effects = { power_multiplier = 10.0, propulsion_unlock = true }
+# Note: When fusion_bridge is active, this probability is overridden
+# by the Gamow rate calculation from spark-engine physics.
+
+[milestones.manufacturing_breakthrough]
+name = "Manufacturing Breakthrough"
+earliest_tick = 360     # Year 30
+latest_tick = 720       # Year 60
+base_probability = 0.002
+prerequisite_sectors = [[0, 2.5]]
+effects = { resource_efficiency = 3.0 }
+
+[milestones.radiation_hardening]
+name = "Radiation Hardening"
+earliest_tick = 120     # Year 10
+latest_tick = 600       # Year 50
+base_probability = 0.006
+prerequisite_sectors = [[0, 2.0], [4, 1.5]]
+effects = { radiation_protection = 0.5 }
+
+[milestones.cryogenic_materials]
+name = "Cryogenic Materials"
+earliest_tick = 240     # Year 20
+latest_tick = 960       # Year 80
+base_probability = 0.0012
+prerequisite_sectors = [[0, 2.5], [4, 2.0]]
+effects = { titan_operations = true }
+
+[milestones.closed_loop_eclss]
+name = "Closed-Loop ECLSS"
+earliest_tick = 360     # Year 30
+latest_tick = 1200      # Year 100
+base_probability = 0.00008
+prerequisite_sectors = [[0, 3.0], [1, 2.5], [2, 2.0]]
+effects = { eclss_reliability = 10.0 }
+
+[milestones.adr_capability]
+name = "Active Debris Removal"
+earliest_tick = 600     # Year 50
+latest_tick = 2400      # Year 200
+base_probability = 0.0005
+prerequisite_sectors = [[0, 3.0]]
+prerequisite_milestones = ["manufacturing_breakthrough"]
+effects = { kessler_mitigation = true }
+
+[milestones.bioregenerative_agriculture]
+name = "Bioregenerative Agriculture"
+earliest_tick = 480     # Year 40
+latest_tick = 1800      # Year 150
+base_probability = 0.00003
+prerequisite_sectors = [[1, 3.0], [4, 2.5]]
+effects = { food_production = 5.0 }
+
+[milestones.fusion_drive]
+name = "Fusion Drive"
+earliest_tick = 1200    # Year 100
+latest_tick = 4800      # Year 400
+base_probability = 0.0002
+prerequisite_milestones = ["fusion_grid", "lcf_breakthrough"]
+effects = { interplanetary_speed = 10.0 }
+
+[milestones.quantum_communications]
+name = "Quantum Communications"
+earliest_tick = 2400    # Year 200
+latest_tick = 7200      # Year 600
+base_probability = 0.00008
+prerequisite_sectors = [[4, 4.0]]
+effects = { communication_speed = 100.0 }
+
+[milestones.genetic_engineering]
+name = "Genetic Engineering"
+earliest_tick = 1200    # Year 100
+latest_tick = 6000      # Year 500
+base_probability = 0.0001
+prerequisite_sectors = [[2, 3.5], [4, 3.0]]
+effects = { health_bonus = 0.3 }
+
+[milestones.terraforming_precursor]
+name = "Terraforming Precursor"
+earliest_tick = 3600    # Year 300
+latest_tick = 9600      # Year 800
+base_probability = 0.00005
+prerequisite_milestones = ["bioregenerative_agriculture", "genetic_engineering"]
+effects = { terraforming_capable = true }
+
+[milestones.interstellar_probe]
+name = "Interstellar Probe"
+earliest_tick = 6000    # Year 500
+latest_tick = 12000     # Year 1000
+base_probability = 0.00003
+prerequisite_milestones = ["fusion_drive", "quantum_communications"]
+effects = { interstellar_capable = true }

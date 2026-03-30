@@ -159,6 +159,23 @@ impl LiveMetrics {
         )
     }
 
+    /// Append this metric as a single JSON line to a JSONL file.
+    ///
+    /// JSONL (JSON Lines) format: one JSON object per line.
+    /// Ingestible by: `pd.read_json('file.jsonl', lines=True)` in Python,
+    /// `d3.json()` per line in D3.js, or any line-oriented JSON parser.
+    pub fn append_jsonl(&self, path: &std::path::Path) -> std::io::Result<()> {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        let json = serde_json::to_string(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        writeln!(file, "{}", json)?;
+        Ok(())
+    }
+
     /// Risk level: 0=green, 1=yellow, 2=red based on aggregate threat.
     pub fn risk_level(&self) -> u8 {
         let total_risk = self.p_civil_war + self.p_secession + self.p_carrington + self.p_kessler;
@@ -236,6 +253,40 @@ mod tests {
         assert!(line.contains("Yr"));
         assert!(line.contains("CVS"));
         assert!(line.contains("Toggles"));
+    }
+
+    #[test]
+    fn jsonl_append_creates_valid_output() {
+        let policy = PolicyConfig::default();
+        let path = std::path::Path::new("/tmp/test_metrics.jsonl");
+        let _ = std::fs::remove_file(path); // Clean up
+
+        // Write 3 ticks
+        for tick in 0..3 {
+            let m = LiveMetrics::compute(
+                tick * 12, &policy, None, 0.7, 1000 + tick as usize * 10,
+                0.3, 0.25, 0.15, 0.8, false, 1.0,
+            );
+            m.append_jsonl(path).expect("Should write JSONL");
+        }
+
+        // Verify: 3 lines, each valid JSON
+        let content = std::fs::read_to_string(path).expect("Should read file");
+        let lines: Vec<&str> = content.trim().split('\n').collect();
+        assert_eq!(lines.len(), 3, "Should have 3 lines");
+        for line in &lines {
+            let _: serde_json::Value = serde_json::from_str(line)
+                .expect("Each line should be valid JSON");
+        }
+
+        // Verify first line has expected fields
+        let first: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert!(first.get("tick").is_some());
+        assert!(first.get("cvs").is_some());
+        assert!(first.get("p_civil_war").is_some());
+        assert!(first.get("active_toggles").is_some());
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

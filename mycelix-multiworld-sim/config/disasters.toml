@@ -1,0 +1,194 @@
+# Disaster Configuration for Mycelix Multiworld Simulator
+# All probabilities are per-tick (1 tick = 1 month).
+#
+# Sources:
+# - NASA BVAD 2018 for ECLSS MTBF values
+# - NOAA/SWPC for solar event frequencies
+# - ISS operational data for infrastructure failure rates
+# - Turchin (2003, 2009) for civilization dynamics
+#
+# To disable a category: set enabled = false
+# To adjust severity: change probability and severity_range
+
+# ============================================================================
+# SOLAR WEATHER
+# ============================================================================
+[solar]
+enabled = true
+
+[solar.m_class_flare]
+probability = 0.05
+# M-class: common, low impact. ~60/year during solar max.
+
+[solar.x_class_flare]
+probability = 0.01
+# X-class: significant, damages unshielded electronics.
+
+[solar.carrington_event]
+probability = 0.00058
+# Carrington-class CME: ~1 per 150 years. Devastating.
+# May 2024: lesser event knocked out GPS tractors across US Midwest.
+
+[solar.major_spe]
+probability = 0.0035
+# Solar Proton Event: high radiation dose to unshielded crew.
+
+[solar.solar_minimum_onset]
+probability = 0.0076
+# Start of solar minimum: reduced power from solar panels.
+
+# ============================================================================
+# IMPACT EVENTS
+# ============================================================================
+[impact]
+enabled = true
+
+[impact.small_meteorite]
+probability = 8.3e-7
+# ~1 per 100,000 years. Localized damage.
+
+[impact.large_meteorite]
+probability = 8.3e-8
+# ~1 per 1,000,000 years. Regional devastation.
+
+# ============================================================================
+# PLANETARY ENVIRONMENT
+# ============================================================================
+[planetary]
+enabled = true
+
+[planetary.mars_global_dust]
+probability = 0.0038
+# Mars global dust storm: ~1 per 3 Mars years.
+# Blocks solar panels for weeks, reduces visibility.
+
+[planetary.mars_regional_dust]
+probability = 0.05
+# Regional dust devils: frequent but manageable.
+
+[planetary.damaging_moonquake]
+probability = 0.004
+# Shallow moonquakes: ISS-calibrated frequency × 5% damage probability.
+
+[planetary.europa_radiation_surge]
+probability = 0.02
+# Jupiter magnetosphere radiation burst.
+
+[planetary.europa_tidal_quake]
+probability = 0.03
+# Tidal flexing-induced seismic event.
+
+[planetary.europa_ice_instability]
+probability = 0.001
+# Ice shell instability: rare but catastrophic.
+
+[planetary.titan_heating_failure]
+probability = 0.015
+# Cryogenic environment: heating systems fail at 2× thermal rate.
+
+[planetary.titan_methane_storm]
+probability = 0.005
+# Methane weather event.
+
+[planetary.mega_quake]
+probability = 0.001
+# Earth magnitude 8+ earthquake.
+
+[planetary.supervolcano]
+probability = 0.000001
+# VEI-8 eruption: ~1 per 100,000 years.
+
+[planetary.magnetic_excursion]
+probability = 0.00001
+# Geomagnetic excursion: temporary field weakening.
+
+# ============================================================================
+# ECLSS (Environmental Control & Life Support System)
+# ============================================================================
+[eclss]
+enabled = true
+
+[eclss.o2_generator_failure]
+probability = 0.0056
+# MTBF: ~15 years (NASA BVAD Table 4.1.1)
+
+[eclss.water_recycler_failure]
+probability = 0.0042
+# MTBF: ~20 years (NASA BVAD Table 4.2.2)
+
+[eclss.co2_scrubber_failure]
+probability = 0.0069
+# MTBF: ~12 years (NASA BVAD Table 4.1.2)
+
+[eclss.thermal_control_failure]
+probability = 0.0083
+# MTBF: ~10 years
+
+[eclss.power_system_failure]
+probability = 0.0119
+# MTBF: ~7 years
+
+[eclss.hydroponic_failure]
+probability = 0.0208
+# MTBF: ~4 years (bioregeneration is fragile)
+
+# ============================================================================
+# PSYCHOLOGICAL
+# ============================================================================
+[psychological]
+enabled = true
+
+[psychological.winter_over_syndrome]
+probability = 0.016
+# Antarctic winter-over data: ~16% prevalence over deployment.
+
+[psychological.interpersonal_conflict]
+probability = 0.02
+# Confinement stress, personality clashes.
+
+[psychological.cognitive_impairment]
+probability = 0.005
+# Radiation, sleep disruption, CO2 accumulation.
+
+[psychological.cohesion_collapse]
+probability = 0.002
+# Team cohesion breakdown: rare but mission-ending.
+
+[psychological.psychotic_break]
+probability = 0.001
+# Individual psychiatric emergency.
+
+[psychological.authority_challenge]
+probability = 0.003
+# Challenge to mission leadership.
+
+# ============================================================================
+# TECHNOLOGY
+# ============================================================================
+[technology]
+enabled = true
+# Tech events are milestone-based, not probability-based.
+# See tech_tree.toml for the research tree.
+
+# ============================================================================
+# CIVILIZATION DYNAMICS
+# ============================================================================
+[civilization]
+enabled = true
+
+[civilization.tainter_complexity]
+# Triggered when infrastructure > 0.8 AND innovation stagnant.
+# Represents diminishing returns on complexity investment.
+threshold_infrastructure = 0.8
+stagnation_window_ticks = 60
+
+[civilization.turchin_elite_overproduction]
+# Triggered by Turchin secular cycle state machine (cliodynamics.rs).
+# See config/policy.toml for turchin_cycles_enabled toggle.
+psi_threshold = 0.8
+stability_crisis_threshold = 0.3
+
+[civilization.kessler_cascade]
+probability = 0.05
+# Orbital debris cascade. Blocks LEO access for 5-10 years.
+# Triggered by governance collapse + manufacturing capability.
