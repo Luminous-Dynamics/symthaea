@@ -50,6 +50,7 @@ pub mod cohort;
 pub mod engine_v2;
 pub mod projects;
 pub mod supply_chain;
+pub mod symtropy_bridge;
 pub mod report;
 pub mod resontia;
 pub mod spaceport;
