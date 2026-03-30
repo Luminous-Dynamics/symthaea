@@ -6,6 +6,6 @@ license = "AGPL-3.0-or-later"
 description = "Shared Leptos components for the Mycelix ecosystem"
 
 [dependencies]
-leptos = { version = "0.7" }
+leptos = { version = "0.8" }
 serde = { version = "1", features = ["derive"] }
 mycelix-leptos-client = { path = "../mycelix-leptos-client", default-features = false }

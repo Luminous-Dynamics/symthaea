@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Mycelix Portal — the Consciousness Orb.
 
-use leptos::prelude::*;
-
 mod app;
 mod background;
 mod identity;
+mod pages;
 
 fn main() {
     console_error_panic_hook::set_once();

@@ -16,6 +16,7 @@ pub enum Tab {
     Experiments,
     Dreams,
     Inoculate,
+    Trends,
 }
 
 #[component]
@@ -106,6 +107,48 @@ pub fn App() -> impl IntoView {
                                 }
                             }
                         }
+                        // Factcheck telemetry from Broca→Mycelix bridge
+                        if let Ok(fc) = js_sys::Reflect::get(&result, &"factcheck".into()) {
+                            if !fc.is_undefined() && !fc.is_null() {
+                                if let Ok(v) = js_sys::Reflect::get(&fc, &"accuracy".into()) {
+                                    if let Some(a) = v.as_f64() {
+                                        state.factcheck_accuracy.set(a as f32);
+                                    }
+                                }
+                                if let Ok(v) = js_sys::Reflect::get(&fc, &"verified".into()) {
+                                    if let Some(n) = v.as_f64() {
+                                        state.factcheck_verified.set(n as u32);
+                                    }
+                                }
+                                if let Ok(v) = js_sys::Reflect::get(&fc, &"suppressed".into()) {
+                                    if let Some(n) = v.as_f64() {
+                                        state.factcheck_suppressed.set(n as u32);
+                                    }
+                                }
+                                if let Ok(v) = js_sys::Reflect::get(&fc, &"pending".into()) {
+                                    if let Some(n) = v.as_f64() {
+                                        state.factcheck_pending.set(n as u32);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Accumulate trend data (cap at 600 points = ~30s at 20Hz)
+                        let phi = state.consciousness_level.get();
+                        state.trend_consciousness.update(|v| {
+                            v.push(phi);
+                            if v.len() > 600 {
+                                v.remove(0);
+                            }
+                        });
+                        let ha = state.harmony_alignment.get();
+                        state.trend_harmony.update(|v| {
+                            v.push(ha);
+                            if v.len() > 600 {
+                                v.remove(0);
+                            }
+                        });
+
                         state.cycle_count.update(|c| *c += 1);
                     }
                 }
@@ -197,6 +240,7 @@ pub fn App() -> impl IntoView {
             <TabButton tab=Tab::Experiments label="Experiments" active=active_tab set_active=set_active_tab />
             <TabButton tab=Tab::Dreams label="Dreams" active=active_tab set_active=set_active_tab />
             <TabButton tab=Tab::Inoculate label="Inoculate" active=active_tab set_active=set_active_tab />
+            <TabButton tab=Tab::Trends label="Trends" active=active_tab set_active=set_active_tab />
         </nav>
 
         <main class="tab-content" style="display: block;">
@@ -214,6 +258,9 @@ pub fn App() -> impl IntoView {
             </Show>
             <Show when=move || active_tab.get() == Tab::Inoculate>
                 <pages::inoculate::InoculatePage />
+            </Show>
+            <Show when=move || active_tab.get() == Tab::Trends>
+                <pages::trends::TrendsPage />
             </Show>
         </main>
 

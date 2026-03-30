@@ -10,9 +10,9 @@ license = "AGPL-3.0-or-later"
 description = "Leptos CSR frontend for Mycelix EduNet — pilot for ecosystem-wide Leptos migration"
 
 [dependencies]
-leptos = { version = "0.7", features = ["csr"] }
-leptos_router = "0.7"
-leptos_meta = "0.7"
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+leptos_meta = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rmp-serde = "1"
@@ -25,6 +25,10 @@ gloo-timers = { version = "0.3", features = ["futures"] }
 
 # Shared types from the edunet backend
 edunet-core = { path = "../../crates/edunet-core", default-features = false }
+
+# Shared Holochain transport for Leptos apps
+mycelix-leptos-client = { path = "../../../crates/mycelix-leptos-client", features = ["browser"] }
+send_wrapper = "0.6"
 
 [profile.release]
 opt-level = "z"

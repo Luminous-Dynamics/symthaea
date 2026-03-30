@@ -72,7 +72,7 @@ pub fn CoursesPage() -> impl IntoView {
             <Suspense fallback=move || view! { <CoursesLoading /> }>
                 {move || {
                     courses.get().map(|data| {
-                        let data: Vec<Course> = (*data).clone();
+                        let data: Vec<Course> = data.clone();
                         view! {
                             <div class="course-grid">
                                 {data.into_iter().map(|course| {

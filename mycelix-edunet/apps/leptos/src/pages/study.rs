@@ -15,6 +15,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
 use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus};
+use crate::games;
+use crate::social_proof;
 
 // ============================================================
 // Lesson data types (from generated JSON)
@@ -105,18 +107,14 @@ async fn fetch_lesson(node_id: &str) -> Result<NodeContent, String> {
     let id_lower = node_id.to_lowercase();
     let filename = format!("{}.json", id_lower);
 
-    // Determine subject-grade dir
-    let subject_dir = if id_lower.contains("mathematics") {
-        if id_lower.contains("gr9") { "math-9" }
-        else if id_lower.contains("gr10") { "math-10" }
-        else if id_lower.contains("gr11") { "math-11" }
-        else { "math-12" }
-    } else if id_lower.contains("naturalsciences") {
-        "natsci-9"
+    // Determine subject-grade dir by extracting grade number
+    let grade_num = (1..=12).rev().find(|g| id_lower.contains(&format!("gr{}", g))).unwrap_or(12);
+    let subject_dir = if id_lower.contains("naturalsciences") {
+        format!("natsci-{}", grade_num)
+    } else if id_lower.contains("physicalsciences") {
+        format!("physics-{}", grade_num)
     } else {
-        if id_lower.contains("gr10") { "physics-10" }
-        else if id_lower.contains("gr11") { "physics-11" }
-        else { "physics-12" }
+        format!("math-{}", grade_num)
     };
 
     let url = format!("/caps/generated/{}/{}", subject_dir, filename);
@@ -199,6 +197,20 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                         </span>
                     })}
                 </div>
+
+                // NSC exam insight
+                {social_proof::exam_insight(&node_id).map(|insight| {
+                    let pct = insight.percentage_struggled;
+                    let error = insight.common_error;
+                    let tip = insight.examiner_tip;
+                    view! {
+                        <div style="margin-top: 0.75rem; padding: 0.6rem 0.75rem; border-left: 3px solid var(--info); background: rgba(59, 130, 246, 0.05); border-radius: 0 6px 6px 0; font-size: 0.8rem; line-height: 1.5">
+                            <span style="color: var(--info); font-weight: 600">"NSC 2025: "</span>
+                            <span style="color: var(--text-secondary)">{pct}"% of candidates found this challenging. "</span>
+                            <span style="color: var(--text-tertiary); font-style: italic">{tip}</span>
+                        </div>
+                    }
+                })}
             </div>
 
             // Status
@@ -254,6 +266,16 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                     on:click=move |_| set_active_tab.set("practice")>"Practice"</button>
                 <button class=move || if active_tab.get() == "pitfalls" { "caps-tab active" } else { "caps-tab" }
                     on:click=move |_| set_active_tab.set("pitfalls")>"Pitfalls"</button>
+                {if games::has_game(&node_id_for_status) {
+                    view! {
+                        <button class=move || if active_tab.get() == "explore" { "caps-tab active" } else { "caps-tab" }
+                            on:click=move |_| set_active_tab.set("explore")
+                            style="color: var(--success)"
+                        >"Explore"</button>
+                    }.into_any()
+                } else {
+                    view! { <span></span> }.into_any()
+                }}
             </div>
 
             // Content
@@ -266,7 +288,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
             }>
                 {move || {
                     lesson_resource.get().map(|result| {
-                        match &*result {
+                        match &result {
                             Ok(content) => {
                                 let lesson = content.lesson.clone();
                                 let explanation = lesson.explanation.clone();
@@ -420,12 +442,18 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                             }.into_any()
                                         }}
                                     </div>
+
+                                    // Explore tab (game)
+                                    <div style=move || if active_tab.get() == "explore" { "display: block" } else { "display: none" }>
+                                        <games::GameContainer node_id=node_id.clone() />
+                                    </div>
                                 }.into_any()
                             }
-                            Err(ref e) => {
+                            Err(e) => {
+                                let err_msg = e.clone();
                                 view! {
                                     <div class="caps-detail">
-                                        <p style="color: var(--text-secondary)">"Could not load lesson content: "{e.clone()}</p>
+                                        <p style="color: var(--text-secondary)">"Could not load lesson content: "{err_msg}</p>
                                         <p style="color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.85rem">
                                             {description.clone()}
                                         </p>

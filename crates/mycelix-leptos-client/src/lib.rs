@@ -49,6 +49,7 @@
 pub mod error;
 pub mod types;
 pub mod transport;
+pub mod mock;
 #[cfg(feature = "browser")]
 pub mod browser;
 #[cfg(feature = "tauri")]
@@ -60,6 +61,7 @@ pub use client::HolochainClient;
 pub use error::ClientError;
 pub use transport::HolochainTransport;
 pub use types::{ConnectConfig, ConnectionStatus, ZomeCallRequest, ZomeCallResponse, encode, decode};
+pub use mock::MockTransport;
 
 #[cfg(feature = "browser")]
 pub use browser::BrowserWsTransport;

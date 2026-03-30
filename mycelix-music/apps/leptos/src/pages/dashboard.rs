@@ -18,10 +18,10 @@ pub fn DashboardPage() -> impl IntoView {
             <h1>"Artist Dashboard"</h1>
 
             <div class="stats-grid">
-                <StatCard label="Total Plays" value=move || total_plays.get().to_string() />
-                <StatCard label="Total Earnings" value=move || format!("{} wei", total_earnings.get()) />
-                <StatCard label="Unsettled Plays" value=move || unsettled_plays.get().to_string() />
-                <StatCard label="Trust Score" value=move || format!("{}/1000", trust_score.get()) />
+                <StatCard label="Total Plays" value=total_plays.get().to_string() />
+                <StatCard label="Total Earnings" value=format!("{} wei", total_earnings.get()) />
+                <StatCard label="Unsettled Plays" value=unsettled_plays.get().to_string() />
+                <StatCard label="Trust Score" value=format!("{}/1000", trust_score.get()) />
             </div>
 
             <section class="settlement-section">

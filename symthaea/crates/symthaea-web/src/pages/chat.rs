@@ -9,6 +9,7 @@ use crate::components::glyph_display::GlyphDisplay;
 use crate::components::harmony_radar::HarmonyRadar;
 use crate::components::neuro_bars::NeuroBars;
 use crate::components::phi_meter::PhiMeter;
+use crate::components::factcheck_status::FactcheckStatus;
 use crate::components::workspace_viz::WorkspaceViz;
 use crate::state::AppState;
 use crate::worker::EngineWorker;
@@ -331,6 +332,7 @@ pub fn ChatPage() -> impl IntoView {
                     <GlyphDisplay />
                 </GlassPanel>
                 <WorkspaceViz />
+                <FactcheckStatus />
             </div>
         </div>
     }

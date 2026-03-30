@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Unified Mycelix identity — one First Breath, domain keys derived lazily.
 
+#[allow(dead_code)]
 pub mod master_key;
 
 use leptos::prelude::*;
@@ -28,6 +29,7 @@ pub type TransportCell = SendWrapper<Rc<RefCell<Option<BrowserWsTransport>>>>;
 
 /// The portal-wide identity context.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct PortalIdentity {
     /// DID string (e.g., "did:mycelix:uhCAk...")
     pub did: RwSignal<Option<String>>,
@@ -127,12 +129,13 @@ impl PortalIdentity {
         fn_name: &str,
         input: &I,
     ) -> Result<O, String> {
-        let transport = self.transport.borrow();
-        let transport = match transport.as_ref() {
-            Some(t) => t.clone(),
-            None => return Err(format!("Mock mode: {role}.{zome}.{fn_name}")),
+        let transport = {
+            let guard = self.transport.borrow();
+            match guard.as_ref() {
+                Some(t) => t.clone(),
+                None => return Err(format!("Mock mode: {role}.{zome}.{fn_name}")),
+            }
         };
-        drop(self.transport.borrow());
 
         let payload = encode(input).map_err(|e| format!("Encode: {e}"))?;
         let bytes = transport
@@ -143,6 +146,7 @@ impl PortalIdentity {
     }
 
     /// Derive a domain-specific key from the master.
+    #[allow(dead_code)]
     /// Returns the 32-byte key if the vault is unlocked.
     pub fn domain_key(&self, domain_context: &[u8]) -> Option<[u8; 32]> {
         if self.vault.get() != VaultState::Unlocked {

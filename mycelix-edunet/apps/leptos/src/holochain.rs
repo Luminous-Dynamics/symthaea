@@ -5,33 +5,35 @@
 //! Holochain conductor context for Leptos CSR.
 //!
 //! Provides a [`HolochainCtx`] via Leptos context that all pages can use
-//! to call zome functions. Initially uses mock data, with the real
-//! [`BrowserWsTransport`](mycelix_leptos_client::BrowserWsTransport) available
-//! when a conductor is running.
+//! to call zome functions. Attempts a real connection to the conductor
+//! via [`BrowserWsTransport`]; falls back to mock mode if unavailable.
 
 use leptos::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
+use std::cell::RefCell;
+use std::rc::Rc;
+use send_wrapper::SendWrapper;
 use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::spawn_local;
+
+use mycelix_leptos_client::{
+    BrowserWsTransport, ConnectConfig, HolochainTransport,
+    encode, decode,
+};
 
 // ---------------------------------------------------------------------------
-// Connection status (UI-facing, simpler than the transport-level enum)
+// Connection status (UI-facing)
 // ---------------------------------------------------------------------------
 
-/// Connection status for the UI status indicator.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConnectionStatus {
-    /// No connection attempt has been made.
     Disconnected,
-    /// Currently trying to connect to the conductor.
     Connecting,
-    /// Successfully connected — zome calls go to a real conductor.
     Connected,
-    /// Running with mock data (no conductor available).
     Mock,
 }
 
 impl ConnectionStatus {
-    /// CSS class name for the status badge.
     pub fn css_class(&self) -> &'static str {
         match self {
             Self::Disconnected => "status-disconnected",
@@ -41,7 +43,6 @@ impl ConnectionStatus {
         }
     }
 
-    /// Human-readable label.
     pub fn label(&self) -> &'static str {
         match self {
             Self::Disconnected => "Disconnected",
@@ -56,44 +57,51 @@ impl ConnectionStatus {
 // Holochain context
 // ---------------------------------------------------------------------------
 
+/// Shared transport storage wrapped in `SendWrapper` to satisfy Leptos's
+/// `Send + Sync` context bounds. SAFETY: WASM is single-threaded.
+type TransportCell = SendWrapper<Rc<RefCell<Option<BrowserWsTransport>>>>;
+
 /// The Holochain client context shared across the app via Leptos context.
-///
-/// All pages access this through [`use_holochain()`]. Zome calls return
-/// mock data when no conductor is available, allowing the UI to be
-/// developed and tested independently.
 #[derive(Clone)]
 pub struct HolochainCtx {
-    /// Reactive connection status signal (read half).
     pub status: ReadSignal<ConnectionStatus>,
-    /// Write half — used internally and by the connect/disconnect methods.
     set_status: WriteSignal<ConnectionStatus>,
+    transport: TransportCell,
 }
 
 impl HolochainCtx {
     /// Call a zome function and decode the result.
     ///
-    /// When connected to a real conductor this will serialize `input` as
-    /// MessagePack, send it over WebSocket, and decode the response.
-    ///
-    /// In mock mode this returns `Err` so callers can fall back to mock data.
+    /// When connected, serializes `input` as MessagePack, calls over WebSocket,
+    /// and decodes the response. In mock mode returns `Err` for fallback.
     pub async fn call_zome<I: Serialize, O: DeserializeOwned>(
         &self,
         zome: &str,
         fn_name: &str,
-        _input: &I,
+        input: &I,
     ) -> Result<O, String> {
-        // TODO: Wire to real conductor via BrowserWsTransport
-        //
-        // When ready:
-        // 1. Store an Rc<HolochainClient<BrowserWsTransport>> in this struct
-        // 2. Call self.client.call_zome(zome, fn_name, input).await
-        // 3. Map ClientError to String
-        //
-        // For now, every call returns an error so the UI falls back to mock data.
-        Err(format!("Mock mode: {}.{} — no conductor connected", zome, fn_name))
+        let transport = self.transport.borrow();
+        let transport = match transport.as_ref() {
+            Some(t) => t.clone(),
+            None => {
+                return Err(format!(
+                    "Mock mode: {}.{} — no conductor connected",
+                    zome, fn_name
+                ));
+            }
+        };
+        drop(self.transport.borrow()); // release borrow before async
+
+        let payload = encode(input).map_err(|e| format!("Encode error: {e}"))?;
+
+        let response_bytes = transport
+            .call_zome("edunet", zome, fn_name, payload)
+            .await
+            .map_err(|e| format!("Zome call {}.{} failed: {e}", zome, fn_name))?;
+
+        decode(&response_bytes).map_err(|e| format!("Decode error: {e}"))
     }
 
-    /// Whether the context is in mock mode (no conductor).
     pub fn is_mock(&self) -> bool {
         self.status.get_untracked() == ConnectionStatus::Mock
     }
@@ -103,64 +111,79 @@ impl HolochainCtx {
 // Provider component
 // ---------------------------------------------------------------------------
 
-/// Read `window.__HC_STATUS` set by the inline JS bridge in `index.html`.
-fn read_js_conductor_status() -> ConnectionStatus {
-    let window = match web_sys::window() {
-        Some(w) => w,
-        None => return ConnectionStatus::Mock,
-    };
-    let val = js_sys::Reflect::get(&window, &JsValue::from_str("__HC_STATUS"))
-        .ok()
-        .and_then(|v| v.as_string())
-        .unwrap_or_else(|| "mock".to_string());
-    match val.as_str() {
-        "connected" => ConnectionStatus::Connected,
-        "connecting" => ConnectionStatus::Connecting,
-        "disconnected" => ConnectionStatus::Disconnected,
-        _ => ConnectionStatus::Mock,
-    }
+const CONDUCTOR_URL: &str = "ws://localhost:8888";
+
+fn conductor_url() -> String {
+    web_sys::window()
+        .and_then(|w| {
+            js_sys::Reflect::get(&w, &JsValue::from_str("__HC_CONDUCTOR_URL"))
+                .ok()
+                .and_then(|v| v.as_string())
+        })
+        .unwrap_or_else(|| CONDUCTOR_URL.to_string())
+}
+
+fn auth_token() -> Option<String> {
+    web_sys::window().and_then(|w| {
+        js_sys::Reflect::get(&w, &JsValue::from_str("__HC_AUTH_TOKEN"))
+            .ok()
+            .and_then(|v| v.as_string())
+    })
 }
 
 /// Wraps children with a [`HolochainCtx`] in Leptos context.
 ///
-/// Place this around the `<Router>` in `App` so every page can call
-/// [`use_holochain()`].
-///
-/// On mount, checks the `window.__HC_STATUS` value set by the inline JS
-/// bridge in `index.html`. If a Holochain conductor was detected on
-/// `ws://localhost:8888`, the status will be `Connected`; otherwise `Mock`.
+/// On mount, attempts to connect to the Holochain conductor. If the
+/// conductor is not available, falls back to mock mode.
 #[component]
 pub fn HolochainProvider(children: Children) -> impl IntoView {
-    // Start with whatever the JS bridge has already determined (it runs
-    // synchronously before Trunk injects the WASM bundle).
-    let initial = read_js_conductor_status();
-    let (status, set_status) = signal(initial);
-
-    // The JS probe has a 3 s timeout, so it may still be in "connecting"
-    // state when the WASM app mounts.  Re-check after a short delay.
-    if status.get_untracked() == ConnectionStatus::Connecting {
-        set_timeout(
-            move || {
-                let resolved = read_js_conductor_status();
-                set_status.set(resolved);
-                web_sys::console::log_1(
-                    &format!("[EduNet] Conductor status resolved: {:?}", resolved).into(),
-                );
-            },
-            std::time::Duration::from_millis(3500),
-        );
-    } else {
-        web_sys::console::log_1(
-            &format!("[EduNet] Conductor status: {:?}", initial).into(),
-        );
-    }
+    let (status, set_status) = signal(ConnectionStatus::Connecting);
+    let transport: TransportCell = SendWrapper::new(Rc::new(RefCell::new(None)));
 
     let ctx = HolochainCtx {
         status,
         set_status,
+        transport: transport.clone(),
     };
 
     provide_context(ctx);
+
+    // Attempt connection asynchronously
+    let transport_for_connect = transport.clone();
+    spawn_local(async move {
+        let url = conductor_url();
+        let token = auth_token();
+        web_sys::console::log_1(
+            &format!("[EduNet] Connecting to conductor at {url}...").into(),
+        );
+
+        let ws_transport = BrowserWsTransport::new();
+        let config = ConnectConfig {
+            url,
+            app_id: "edunet".to_string(),
+            auth_token: token.map(|s| s.into_bytes()),
+        };
+
+        match ws_transport.connect(config).await {
+            Ok(()) => {
+                web_sys::console::log_1(
+                    &"[EduNet] Connected to conductor!".into(),
+                );
+                *transport_for_connect.borrow_mut() = Some(ws_transport);
+                set_status.set(ConnectionStatus::Connected);
+            }
+            Err(e) => {
+                web_sys::console::log_1(
+                    &format!(
+                        "[EduNet] Could not connect: {e}. Running in mock mode."
+                    )
+                    .into(),
+                );
+                set_status.set(ConnectionStatus::Mock);
+            }
+        }
+    });
+
     children()
 }
 
@@ -168,22 +191,14 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
 // Hook
 // ---------------------------------------------------------------------------
 
-/// Retrieve the [`HolochainCtx`] from the nearest ancestor `HolochainProvider`.
-///
-/// # Panics
-///
-/// Panics if called outside a `HolochainProvider` subtree.
 pub fn use_holochain() -> HolochainCtx {
     expect_context::<HolochainCtx>()
 }
 
 // ---------------------------------------------------------------------------
-// Connection status badge (reusable component)
+// Connection status badge
 // ---------------------------------------------------------------------------
 
-/// Small badge showing the current conductor connection status.
-///
-/// Renders a colored dot + label. Intended for the navbar.
 #[component]
 pub fn ConnectionBadge() -> impl IntoView {
     let ctx = use_holochain();

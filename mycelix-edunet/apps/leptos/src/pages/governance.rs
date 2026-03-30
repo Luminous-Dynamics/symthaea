@@ -183,7 +183,7 @@ pub fn GovernancePage() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     proposals.get().map(|data| {
-                        let data: Vec<ProposalView> = (*data).clone();
+                        let data: Vec<ProposalView> = data.clone();
                         let selected_val = selected.get();
 
                         if let Some(idx) = selected_val {

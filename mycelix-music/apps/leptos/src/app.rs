@@ -8,6 +8,7 @@ use leptos_router::{
     path,
 };
 
+use mycelix_leptos_client::MockTransport;
 use mycelix_leptos_core::{ConnectionStatusIndicator, HolochainProvider};
 
 use crate::components::Nav;
@@ -38,7 +39,7 @@ pub fn App() -> impl IntoView {
     provide_context(player.clone());
 
     view! {
-        <HolochainProvider>
+        <HolochainProvider transport=MockTransport::new()>
             <Router>
                 <Nav />
                 <main class="main-content">
@@ -49,6 +50,7 @@ pub fn App() -> impl IntoView {
                         <Route path=path!("/dashboard") view=DashboardPage />
                         <Route path=path!("/upload") view=UploadPage />
                         <Route path=path!("/gallery") view=GalleryPage />
+                        <Route path=path!("/consciousness") view=ConsciousnessPage />
                     </Routes>
                 </main>
                 <Player />

@@ -10,6 +10,7 @@ use portal_domain_trait::ConsciousnessTier;
 
 use crate::background::HomeostasisBackground;
 use crate::identity::{ConductorStatus, PortalIdentity, VaultState};
+use crate::pages::DomainContent;
 
 /// Experiential phenotype — how you perceive your consciousness.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -64,7 +65,7 @@ pub struct OrbitalDomain {
 pub struct PortalEvent {
     pub from_domain: &'static str,
     pub description: String,
-    pub energy: f64, // How much this event affects the orb
+    pub _energy: f64,
 }
 
 #[component]
@@ -105,12 +106,12 @@ pub fn App() -> impl IntoView {
         PortalEvent {
             from_domain: "health",
             description: "FL gradient contributed to diabetes study".into(),
-            energy: 0.05,
+            _energy: 0.05,
         },
         PortalEvent {
             from_domain: "health",
             description: "$42 metabolic yield from research".into(),
-            energy: 0.03,
+            _energy: 0.03,
         },
     ]);
 
@@ -170,10 +171,10 @@ pub fn App() -> impl IntoView {
     let consciousness = identity.consciousness_score;
     let vault = identity.vault;
 
-    let no_vault = move || vault.get() == VaultState::NoVault;
-    let has_vault = move || vault.get() != VaultState::NoVault;
-    let is_orbital = move || active_domain.get().is_none();
-    let is_zoomed = move || active_domain.get().is_some();
+    let _no_vault = move || vault.get() == VaultState::NoVault;
+    let _has_vault = move || vault.get() != VaultState::NoVault;
+    let _is_orbital = move || active_domain.get().is_none();
+    let _is_zoomed = move || active_domain.get().is_some();
 
     let conductor = identity.conductor_status;
 
@@ -434,12 +435,7 @@ pub fn App() -> impl IntoView {
                                     <span class="stat-label">"Tier"</span>
                                 </div>
                             </div>
-                            <div class="domain-placeholder">
-                                <p>"Connect a Holochain conductor to load live data from the "
-                                    {domain_data.as_ref().map(|d| d.name).unwrap_or("")}
-                                    " cluster."
-                                </p>
-                            </div>
+                            <DomainContent domain_id=domain_id.clone() />
                         </div>
                     }.into_any()
                 }
@@ -483,7 +479,7 @@ fn play_domain_tone(domain_id: &str) {
 
 /// Play a rising tone on First Breath using Web Audio API.
 fn play_breath_tone() {
-    let window = match web_sys::window() {
+    let _window = match web_sys::window() {
         Some(w) => w,
         None => return,
     };

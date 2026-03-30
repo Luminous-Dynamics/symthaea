@@ -173,6 +173,8 @@ fn mock_activity() -> Vec<ActivityEvent> {
 
 #[component]
 pub fn DashboardPage() -> impl IntoView {
+    let progress = use_progress();
+
     view! {
         <div class="dashboard">
             <h2>"Dashboard"</h2>
@@ -186,19 +188,65 @@ pub fn DashboardPage() -> impl IntoView {
             // Mirror mode cognitive state display
             <CognitiveStateMirror />
 
+            // Start Session — links to highest priority topic
+            {move || {
+                let p = progress.get();
+                let graph = caps_graph();
+
+                // Find best topic: highest exam weight, not mastered, prerequisites met
+                let mut best: Option<(String, String, u16)> = None;
+                for n in &graph.nodes {
+                    if p.get(&n.id).status == ProgressStatus::Mastered { continue; }
+                    let weight = n.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
+                    let prereqs_met = graph.prereqs_for(&n.id).iter().all(|pid| {
+                        p.get(pid).status == ProgressStatus::Mastered
+                    });
+                    if prereqs_met {
+                        if best.is_none() || weight > best.as_ref().unwrap().2 {
+                            best = Some((n.id.clone(), n.title.clone(), weight));
+                        }
+                    }
+                }
+
+                if let Some((id, title, marks)) = best {
+                    let href = format!("/study/{}", id);
+                    view! {
+                        <a href=href style="display: block; padding: 1.25rem; background: linear-gradient(135deg, var(--primary), var(--info)); border-radius: 12px; text-decoration: none; color: var(--text-on-primary); margin: 1rem 0; transition: transform 0.15s">
+                            <div style="display: flex; justify-content: space-between; align-items: center">
+                                <div>
+                                    <div style="font-size: 0.8rem; opacity: 0.8">"Recommended next"</div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; margin-top: 0.25rem">{title}</div>
+                                </div>
+                                <div style="text-align: right">
+                                    {if marks > 0 {
+                                        view! { <div style="font-size: 0.9rem; font-weight: 600">{marks}"m"</div> }.into_any()
+                                    } else {
+                                        view! { <span></span> }.into_any()
+                                    }}
+                                    <div style="font-size: 1.2rem; margin-top: 0.25rem">"Start \u{2192}"</div>
+                                </div>
+                            </div>
+                        </a>
+                    }.into_any()
+                } else {
+                    view! {
+                        <div style="padding: 1.25rem; background: var(--surface); border-radius: 12px; text-align: center; margin: 1rem 0; color: var(--success); font-weight: 600">
+                            "All available topics mastered!"
+                        </div>
+                    }.into_any()
+                }
+            }}
+
             // Quick actions
-            <div style="display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap">
-                <a href="/skill-map" class="feature-card" style="flex: 1; min-width: 200px; text-align: center; padding: 1rem">
-                    <div style="font-size: 1.5rem">"\u{1f4d0}"</div>
-                    <div style="font-weight: 600">"Skill Map"</div>
+            <div style="display: flex; gap: 0.75rem; margin: 0.5rem 0 1rem; flex-wrap: wrap">
+                <a href="/skill-map" class="feature-card" style="flex: 1; min-width: 140px; text-align: center; padding: 0.75rem">
+                    <div style="font-weight: 600; font-size: 0.85rem">"Constellation"</div>
                 </a>
-                <a href="/review" class="feature-card" style="flex: 1; min-width: 200px; text-align: center; padding: 1rem">
-                    <div style="font-size: 1.5rem">"\u{1f4dd}"</div>
-                    <div style="font-weight: 600">"Review Cards"</div>
+                <a href="/review" class="feature-card" style="flex: 1; min-width: 140px; text-align: center; padding: 0.75rem">
+                    <div style="font-weight: 600; font-size: 0.85rem">"Review Cards"</div>
                 </a>
-                <a href="/exam-prep" class="feature-card" style="flex: 1; min-width: 200px; text-align: center; padding: 1rem">
-                    <div style="font-size: 1.5rem">"\u{1f3af}"</div>
-                    <div style="font-weight: 600">"Exam Prep"</div>
+                <a href="/exam-prep" class="feature-card" style="flex: 1; min-width: 140px; text-align: center; padding: 0.75rem">
+                    <div style="font-weight: 600; font-size: 0.85rem">"Exam Prep"</div>
                 </a>
             </div>
 
@@ -532,7 +580,7 @@ fn XpLevelCard() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     stats.get().map(|s| {
-                        let s: LearnerStats = (*s).clone();
+                        let s: LearnerStats = s.clone();
                         let progress_pct = if s.xp_to_next_level > 0 {
                             (s.xp_in_current_level as f64 / s.xp_to_next_level as f64 * 100.0).min(100.0)
                         } else {
@@ -584,7 +632,7 @@ fn StreakCard() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     streak.get().map(|s| {
-                        let s: StreakInfo = (*s).clone();
+                        let s: StreakInfo = s.clone();
                         view! {
                             <div class="stat-big">
                                 <span class="streak-count">{s.current_days} " days"</span>
@@ -635,7 +683,7 @@ fn DueReviewsCard() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     reviews.get().map(|r| {
-                        let r: DueReviews = (*r).clone();
+                        let r: DueReviews = r.clone();
                         view! {
                             <div class="stat-big">
                                 <span class="due-count">{r.total_due}</span>
@@ -678,7 +726,7 @@ fn SkillsCard() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     skills.get().map(|data| {
-                        let data: Vec<SkillMastery> = (*data).clone();
+                        let data: Vec<SkillMastery> = data.clone();
                         view! {
                             <div class="skills-list">
                                 {data.into_iter().map(|skill| {
@@ -738,7 +786,7 @@ fn RecommendationsSection() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     recs.get().map(|data| {
-                        let data: Vec<Recommendation> = (*data).clone();
+                        let data: Vec<Recommendation> = data.clone();
                         view! {
                             <div class="rec-grid">
                                 {data.into_iter().map(|rec| {
@@ -790,7 +838,7 @@ fn RecentActivitySection() -> impl IntoView {
             <Suspense fallback=move || view! { <CardLoading /> }>
                 {move || {
                     activity.get().map(|data| {
-                        let data: Vec<ActivityEvent> = (*data).clone();
+                        let data: Vec<ActivityEvent> = data.clone();
                         view! {
                             <ul class="activity-feed">
                                 {data.into_iter().map(|event| {

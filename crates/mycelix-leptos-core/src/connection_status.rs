@@ -48,8 +48,12 @@ impl std::fmt::Display for ConnectionState {
 /// * `state` — A reactive signal providing the current [`ConnectionState`].
 #[component]
 pub fn ConnectionStatusIndicator(
-    state: ReadSignal<ConnectionState>,
+    #[prop(optional)] state: Option<ReadSignal<ConnectionState>>,
 ) -> impl IntoView {
+    let state = state.unwrap_or_else(|| {
+        // Default to MockMode when no state signal provided
+        signal(ConnectionState::MockMode).0
+    });
     let dot_color = move || match state.get() {
         ConnectionState::Connected => "#22c55e",   // green-500
         ConnectionState::Connecting => "#eab308",   // yellow-500

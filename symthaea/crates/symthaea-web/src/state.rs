@@ -34,6 +34,16 @@ pub struct AppState {
     pub harmony_scores: RwSignal<[f32; 8]>,
     /// Dominant harmony name
     pub dominant_harmony: RwSignal<String>,
+    /// Factcheck bridge metrics (Broca→Mycelix knowledge verification)
+    pub factcheck_accuracy: RwSignal<f32>,
+    pub factcheck_verified: RwSignal<u32>,
+    pub factcheck_suppressed: RwSignal<u32>,
+    pub factcheck_pending: RwSignal<u32>,
+    /// QOL trend data (rolling buffers fed by broadcast handler)
+    pub trend_consciousness: RwSignal<Vec<f32>>,
+    pub trend_harmony: RwSignal<Vec<f32>>,
+    /// Active wellbeing profile
+    pub wellbeing_profile: RwSignal<String>,
 }
 
 impl AppState {
@@ -59,6 +69,13 @@ impl AppState {
             fep_mode: RwSignal::new("exploring".to_string()),
             harmony_scores: RwSignal::new([0.5; 8]),
             dominant_harmony: RwSignal::new("Resonant Coherence".to_string()),
+            factcheck_accuracy: RwSignal::new(0.95),
+            factcheck_verified: RwSignal::new(0),
+            factcheck_suppressed: RwSignal::new(0),
+            factcheck_pending: RwSignal::new(0),
+            trend_consciousness: RwSignal::new(Vec::new()),
+            trend_harmony: RwSignal::new(Vec::new()),
+            wellbeing_profile: RwSignal::new("Default".to_string()),
         }
     }
 }

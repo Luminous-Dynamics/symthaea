@@ -101,6 +101,7 @@ impl Default for Inner {
 /// The current implementation does not auto-reconnect. If the WebSocket
 /// closes, subsequent `call_zome` calls will return [`ClientError::NotConnected`].
 /// Call [`connect`](BrowserWsTransport::connect) again to re-establish.
+#[derive(Clone)]
 pub struct BrowserWsTransport {
     inner: Rc<RefCell<Inner>>,
 }

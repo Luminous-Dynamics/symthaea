@@ -40,7 +40,7 @@ pub fn SongCard(song: Song) -> impl IntoView {
             <div class="song-card-header">
                 <button class="btn-play" on:click=play>"▶"</button>
                 <div class="song-info">
-                    <h3 class="song-title">{&song.title}</h3>
+                    <h3 class="song-title">{song.title.clone()}</h3>
                     <span class="song-duration">{song.duration_display()}</span>
                 </div>
             </div>
