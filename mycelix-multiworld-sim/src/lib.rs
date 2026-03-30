@@ -3946,3 +3946,5 @@ pub mod fusion_bridge;
 pub mod cliodynamics;
 pub mod live_metrics;
 pub mod config_loader;
+pub mod stoichiometry;
+pub mod relativistic_dht;
