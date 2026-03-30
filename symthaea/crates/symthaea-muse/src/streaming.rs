@@ -898,17 +898,18 @@ impl StreamingSynth {
                     );
                 }
 
-                // Prevent repeated notes: if same as previous, pick a different chord/scale tone
+                // Prevent repeated notes: if same as previous, step to adjacent scale tone
                 if let Some(prev) = self.prev_note_freq {
-                    let ratio = note.frequency / prev;
-                    if (ratio - 1.0).abs() < 0.02 {
-                        // Same note — pick a neighbor from scale tones
+                    if (note.frequency / prev - 1.0).abs() < 0.03 {
                         if let Some(idx) = scale_tones.iter()
-                            .position(|&f| (f - note.frequency).abs() < note.frequency * 0.03)
+                            .enumerate()
+                            .min_by(|(_, a), (_, b)| ((**a - prev).abs()).partial_cmp(&((**b - prev).abs())).unwrap())
+                            .map(|(i, _)| i)
                         {
-                            // Move up or down in scale (alternate direction)
-                            let direction = if self.note_counter % 2 == 0 { 1 } else { -1 };
-                            let new_idx = (idx as i32 + direction).clamp(0, scale_tones.len() as i32 - 1) as usize;
+                            // Low arousal = descend (natural wind-down). Otherwise mostly ascend.
+                            let dir = if self.state.arousal < 0.3 { -1 } else if self.note_counter % 3 != 0 { 1 } else { -1 };
+                            let step = if self.note_counter % 5 == 0 { 2 } else { 1 };
+                            let new_idx = (idx as i32 + dir * step).clamp(0, scale_tones.len() as i32 - 1) as usize;
                             note.frequency = scale_tones[new_idx];
                         }
                     }
