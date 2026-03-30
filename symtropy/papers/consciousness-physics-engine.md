@@ -1,4 +1,4 @@
-# Consciousness as a Physical Force: Emergent Cooperation in a Thermodynamic Game Engine
+# Resource-Pressure-Driven Clustering in Agents with Information-Processing Costs: A Consciousness-Inspired Physics Engine
 
 **Tristan Stoltz**
 Luminous Dynamics
@@ -147,29 +147,40 @@ Solo survival is viable for approximately 4 minutes. Cooperation extends this to
 
 **Measurement:** Average distance to nearest neighbor (clustering), cooperation ticks, survival count.
 
-### 5.2 Results
+### 5.2 Ablation Study
 
-| Metric | Enforced | Free |
-|--------|----------|------|
-| **Avg clustering** | **3.0** | 15.1 |
-| Alive at end | 4.3 | 12.0 |
-| Cooperation ticks | 5000 | 0 |
-| Avg energy | 104.7 J | 400.0 J |
+To disentangle which mechanisms produce clustering, we tested 6 conditions (12 agents, 5000 ticks, 5 random seeds, 2 energy wells):
 
-**Enforced agents cluster 80.3% more tightly than free agents** (3.0 vs 15.1 average distance to nearest neighbor).
+| Condition | Clustering | Survival | Collapse% | Interpretation |
+|-----------|-----------|----------|-----------|----------------|
+| FREE (control) | 15.1 | 5000 | 0% | Baseline: random drift |
+| ENERGY_ONLY | 15.1 | 5000 | 0% | Costs alone don't cluster |
+| E+OFFLOAD | 15.1 | 5000 | 0% | Offloading alone doesn't cluster |
+| E+GRADIENT | **1.8** | 1867 | **72%** | Gradient clusters tightly but agents collapse |
+| E+OFF+RAND | 15.1 | 5000 | 0% | Offloading + random movement = baseline |
+| **FULL** | **13.5** | 3736 | 45% | Gradient + offloading = sustainable clustering |
+
+**Key findings:**
+1. The FEP gradient is the **clustering engine** — it alone reduces nearest-neighbor distance from 15.1 to 1.8 (88% tighter). But without cost reduction, 72% of agents collapse from energy depletion.
+2. Epistemic offloading is the **survival engine** — it keeps all agents alive (319.9J vs 226.7J) but does not cause spatial clustering.
+3. **Neither alone is sufficient.** Gradient without offloading = cluster and die. Offloading without gradient = survive but scatter.
+4. **Together (FULL) they produce sustainable resource-pressure-driven clustering** — moderate clustering (13.5), real selection pressure (45% collapse), viable energy (148.7J).
+5. Random movement + offloading (E+OFF+RAND) produces **zero clustering** — identical to baseline. Directed movement toward low-cost zones is necessary.
 
 ### 5.3 Interpretation
 
-Agents under thermodynamic enforcement naturally seek resonant partners because being near them reduces processing costs (epistemic offloading refunds 50% of maintenance cost). This behavior emerges from gradient descent on the free energy landscape — agents move in the direction that reduces their predicted future energy expenditure.
+We describe this result as *resource-pressure-driven clustering* rather than "emergent cooperation" in the stronger sense. The clustering metric (nearest-neighbor distance) demonstrates that agents under thermodynamic pressure move toward low-cost zones, which happen to be near resonant partners. Whether this constitutes "cooperation" in the richer sense (coordinated action, mutual benefit, shared planning) requires additional metrics.
 
-The 4.3/12 survival rate indicates genuine selection pressure — not all agents survive, and survival correlates with proximity to resonant partners and energy wells.
+Supporting evidence for cooperation beyond simple clustering:
+- **Well sharing events**: The FULL condition produces 2,178 ticks where 2+ agents share an energy well, compared to 9,000 in ENERGY_ONLY (where all agents survive longer and therefore overlap more often at wells). This suggests the FULL condition agents are more selective about well access.
+- **Survival benefit of proximity**: In E+GRADIENT (no offloading), 72% collapse despite tight clustering. In FULL (with offloading), only 45% collapse at moderate clustering. Offloading provides a measurable survival benefit to clustered agents.
 
 ### 5.4 Self-Tuning Validation
 
 Automated parameter sweeps across 7 maintenance cost values (0.03–0.35 J/tick) confirmed:
 - At low maintenance (0.03): all agents survive with 474J remaining (no pressure)
 - At high maintenance (0.35): agents retain only 18.7J after 3000 ticks (near collapse)
-- The cooperation mechanic correctly extends survival but does not make it infinite
+- The cost-reduction mechanism correctly extends survival but does not make it infinite
 
 ---
 
@@ -248,11 +259,13 @@ This aligns with Friston's (2019) connection between variational and Helmholtz f
 
 ## 9. Conclusion
 
-We demonstrated that consciousness, when treated as a thermodynamic quantity with real energy costs, produces emergent cooperation through free energy minimization. Agents cluster 80% more tightly under thermodynamic enforcement — not because they are programmed to cooperate, but because the physics makes cooperation the lowest-energy strategy.
+We demonstrated that agents with energy-costly information processing, when driven by free energy gradient descent under resource scarcity, exhibit resource-pressure-driven spatial clustering. Ablation analysis shows this requires both directed movement (the clustering mechanism) and epistemic offloading (the survival mechanism) — neither alone is sufficient.
 
-The Symtropy engine provides an open-source platform for studying the physical consequences of consciousness. Its N-dimensional physics, five-channel consciousness coupling, and thermodynamic enforcement create a simulation where the question "what if consciousness were a physical force?" can be answered experimentally.
+We frame Φ operationally as a "consciousness-inspired integration control variable" rather than claiming direct access to phenomenal consciousness. The five coupling channels provide a concrete, testable model for how such a variable could modulate physics, and the thermodynamic enforcement ensures the dynamics respect conservation laws.
 
-The answer, so far: cooperation.
+The Symtropy engine provides an open-source platform for studying physical consequences of information-processing costs under the IIT and FEP frameworks. Its N-dimensional physics, five-channel coupling, and strict energy conservation create a simulation where the question "what happens when maintaining integrated information is thermodynamically expensive?" can be answered experimentally.
+
+Our results suggest that, in agents where integrated-state maintenance is energy-costly, resource pressure makes proximity to resonant peers an advantageous strategy. Whether this extends to richer notions of cooperation — coordinated action, mutual planning, social structure — remains an open question for future work with learned policies and larger populations.
 
 ---
 
