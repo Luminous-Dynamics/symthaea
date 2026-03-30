@@ -63,6 +63,10 @@ struct CelestialBody {
     y_offset: f32,      // vertical offset
     ambient: f32,       // minimum light level (Sun = 1.0, others < 1.0)
     is_sun: bool,       // Sun uses emissive shader, not lit
+    // PBR material properties
+    roughness: f32,     // 0.0 = mirror, 1.0 = fully rough
+    metalness: f32,     // 0.0 = dielectric, 1.0 = metal
+    emission: f32,      // 0.0 = none, 2.0+ = bright glow
 }
 
 struct BloomFbo {
@@ -208,35 +212,41 @@ impl GlobeRenderer {
 
         // Load planet textures and create celestial bodies
         let bodies = vec![
-            CelestialBody {
+            CelestialBody { // Sun: self-luminous plasma
                 texture: texture::load_texture(&gl, "assets/globe-textures/sun.jpg")?,
                 distance: 20.0, radius: 0.6, orbit_speed: 0.02, orbit_offset: 0.0,
                 y_offset: 2.0, ambient: 1.0, is_sun: true,
+                roughness: 1.0, metalness: 0.0, emission: 3.0,
             },
-            CelestialBody {
+            CelestialBody { // Moon: rough regolith, no atmosphere
                 texture: texture::load_texture(&gl, "assets/globe-textures/moon.jpg")?,
                 distance: 3.5, radius: 0.15, orbit_speed: 0.05, orbit_offset: 0.0,
-                y_offset: 0.0, ambient: 0.06, is_sun: false,
+                y_offset: 0.0, ambient: 0.08, is_sun: false,
+                roughness: 0.95, metalness: 0.0, emission: 0.0,
             },
-            CelestialBody {
+            CelestialBody { // Venus: thick atmosphere, very reflective
                 texture: texture::load_texture(&gl, "assets/globe-textures/venus.jpg")?,
                 distance: 8.0, radius: 0.12, orbit_speed: 0.015, orbit_offset: 1.2,
-                y_offset: 0.5, ambient: 0.05, is_sun: false,
+                y_offset: 0.5, ambient: 0.1, is_sun: false,
+                roughness: 0.3, metalness: 0.0, emission: 0.0,
             },
-            CelestialBody {
+            CelestialBody { // Mars: dusty iron oxide, moderate roughness
                 texture: texture::load_texture(&gl, "assets/globe-textures/mars.jpg")?,
                 distance: 12.0, radius: 0.10, orbit_speed: 0.01, orbit_offset: 2.5,
-                y_offset: -0.8, ambient: 0.04, is_sun: false,
+                y_offset: -0.8, ambient: 0.06, is_sun: false,
+                roughness: 0.8, metalness: 0.1, emission: 0.0,
             },
-            CelestialBody {
+            CelestialBody { // Jupiter: gas giant, smooth cloud tops
                 texture: texture::load_texture(&gl, "assets/globe-textures/jupiter.jpg")?,
                 distance: 25.0, radius: 0.35, orbit_speed: 0.005, orbit_offset: 4.0,
-                y_offset: -1.5, ambient: 0.03, is_sun: false,
+                y_offset: -1.5, ambient: 0.05, is_sun: false,
+                roughness: 0.4, metalness: 0.0, emission: 0.0,
             },
-            CelestialBody {
+            CelestialBody { // Saturn: gas giant with smooth cloud bands
                 texture: texture::load_texture(&gl, "assets/globe-textures/saturn.jpg")?,
                 distance: 35.0, radius: 0.30, orbit_speed: 0.003, orbit_offset: 5.5,
-                y_offset: 1.0, ambient: 0.03, is_sun: false,
+                y_offset: 1.0, ambient: 0.04, is_sun: false,
+                roughness: 0.35, metalness: 0.0, emission: 0.0,
             },
         ];
 
@@ -551,9 +561,15 @@ impl GlobeRenderer {
                 let loc = gl.get_uniform_location(&self.programs.textured_body, "u_body_radius");
                 gl.uniform1f(loc.as_ref(), body.radius);
                 let loc = gl.get_uniform_location(&self.programs.textured_body, "u_sun_direction");
-                gl.uniform3f(loc.as_ref(), 0.0, 0.0, 1.0); // self-lit
+                gl.uniform3f(loc.as_ref(), 0.0, 0.0, 1.0);
                 let loc = gl.get_uniform_location(&self.programs.textured_body, "u_ambient");
-                gl.uniform1f(loc.as_ref(), 1.0); // fully lit
+                gl.uniform1f(loc.as_ref(), 1.0);
+                let loc = gl.get_uniform_location(&self.programs.textured_body, "u_roughness");
+                gl.uniform1f(loc.as_ref(), body.roughness);
+                let loc = gl.get_uniform_location(&self.programs.textured_body, "u_metalness");
+                gl.uniform1f(loc.as_ref(), body.metalness);
+                let loc = gl.get_uniform_location(&self.programs.textured_body, "u_emission");
+                gl.uniform1f(loc.as_ref(), body.emission);
 
                 gl.active_texture(GL::TEXTURE0);
                 gl.bind_texture(GL::TEXTURE_2D, Some(&body.texture));
@@ -596,6 +612,12 @@ impl GlobeRenderer {
                 gl.uniform3f(loc.as_ref(), sun_dir[0], sun_dir[1], sun_dir[2]);
                 let loc = gl.get_uniform_location(&self.programs.textured_body, "u_ambient");
                 gl.uniform1f(loc.as_ref(), body.ambient);
+                let loc = gl.get_uniform_location(&self.programs.textured_body, "u_roughness");
+                gl.uniform1f(loc.as_ref(), body.roughness);
+                let loc = gl.get_uniform_location(&self.programs.textured_body, "u_metalness");
+                gl.uniform1f(loc.as_ref(), body.metalness);
+                let loc = gl.get_uniform_location(&self.programs.textured_body, "u_emission");
+                gl.uniform1f(loc.as_ref(), body.emission);
 
                 gl.active_texture(GL::TEXTURE0);
                 gl.bind_texture(GL::TEXTURE_2D, Some(&body.texture));

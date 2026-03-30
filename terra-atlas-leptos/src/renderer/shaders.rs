@@ -1059,12 +1059,18 @@ void main() {
 "#;
 
 /// Photorealistic textured body shader — used for Moon and planets
+/// PBR Celestial Body Shader — Cook-Torrance BRDF
+/// Supports: self-luminous bodies (Sun), photo-mapped bodies (Moon, planets)
+/// Material properties via uniforms: roughness, metalness, emission
 pub const TEXTURED_BODY_FRAG: &str = r#"#version 300 es
 precision highp float;
 
 uniform sampler2D u_body_texture;
 uniform vec3 u_sun_direction;
-uniform float u_ambient;  // 1.0 = self-lit (Sun), < 1.0 = needs directional light
+uniform float u_ambient;     // base ambient (1.0 = self-lit Sun)
+uniform float u_roughness;   // 0.0 = mirror, 1.0 = fully rough
+uniform float u_metalness;   // 0.0 = dielectric, 1.0 = metal
+uniform float u_emission;    // emission multiplier (0.0 = none, 2.0 = bright)
 
 in vec3 v_normal;
 in vec3 v_view_position;
@@ -1072,32 +1078,95 @@ in vec2 v_uv;
 
 out vec4 frag_color;
 
-void main() {
-    vec3 n = normalize(v_normal);
-    vec3 tex = texture(u_body_texture, v_uv).rgb;
-    vec3 view_dir = normalize(v_view_position);
+// ── PBR Functions ──
 
+const float PI = 3.14159265;
+
+// GGX/Trowbridge-Reitz Normal Distribution Function
+float distribution_ggx(float NdotH, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float denom = NdotH * NdotH * (a2 - 1.0) + 1.0;
+    return a2 / (PI * denom * denom + 0.0001);
+}
+
+// Schlick-GGX Geometry Function
+float geometry_schlick(float NdotV, float roughness) {
+    float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+    return NdotV / (NdotV * (1.0 - k) + k + 0.0001);
+}
+
+// Smith's method for combined geometry
+float geometry_smith(float NdotV, float NdotL, float roughness) {
+    return geometry_schlick(NdotV, roughness) * geometry_schlick(NdotL, roughness);
+}
+
+// Fresnel-Schlick approximation
+vec3 fresnel_schlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+void main() {
+    vec3 N = normalize(v_normal);
+    vec3 V = normalize(v_view_position);
+    vec3 L = normalize(u_sun_direction);
+    vec3 H = normalize(V + L);
+
+    vec3 albedo = texture(u_body_texture, v_uv).rgb;
+
+    // ── Self-luminous body (Sun) ──
     if (u_ambient >= 0.99) {
-        // Self-luminous body (Sun): texture IS the light source
-        frag_color = vec4(tex * 2.0, 1.0);
+        frag_color = vec4(albedo * max(u_emission, 2.0), 1.0);
         return;
     }
 
-    // Photo-based textures already have lighting baked in.
-    // Apply subtle directional shading to suggest Sun position
-    // without double-lighting.
-    float sun_facing = dot(n, u_sun_direction) * 0.5 + 0.5; // 0.0-1.0
-    float shade = 0.4 + sun_facing * 0.6; // never darker than 40%
+    // ── PBR Cook-Torrance BRDF ──
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotH = max(dot(N, H), 0.0);
+    float HdotV = max(dot(H, V), 0.0);
 
-    // Specular highlight on shiny bodies
-    vec3 half_vec = normalize(u_sun_direction + view_dir);
-    float spec = pow(max(dot(n, half_vec), 0.0), 32.0) * 0.15;
+    // F0: reflectance at normal incidence
+    // Dielectric ~0.04, metallic = albedo color
+    vec3 F0 = mix(vec3(0.04), albedo, u_metalness);
 
-    // Rim: subtle atmospheric edge
-    float rim = 1.0 - max(dot(n, view_dir), 0.0);
-    vec3 rim_color = vec3(0.08, 0.10, 0.14) * pow(rim, 4.0) * 0.15;
+    // Distribution, Geometry, Fresnel
+    float D = distribution_ggx(NdotH, u_roughness);
+    float G = geometry_smith(NdotV, NdotL, u_roughness);
+    vec3 F = fresnel_schlick(HdotV, F0);
 
-    vec3 color = tex * shade + vec3(spec) + rim_color;
+    // Specular BRDF
+    vec3 specular = (D * G * F) / (4.0 * NdotV * NdotL + 0.0001);
+
+    // Energy conservation: diffuse = what's NOT reflected
+    vec3 kD = (1.0 - F) * (1.0 - u_metalness);
+
+    // Lambertian diffuse
+    vec3 diffuse = kD * albedo / PI;
+
+    // Direct light contribution
+    vec3 sun_color = vec3(1.0, 0.97, 0.9) * 3.0; // bright sun
+    vec3 Lo = (diffuse + specular) * sun_color * NdotL;
+
+    // Ambient: hemisphere lighting (sky blue top, ground bounce bottom)
+    float sky_factor = N.y * 0.5 + 0.5;
+    vec3 ambient_color = mix(
+        vec3(0.02, 0.015, 0.01),  // ground bounce (warm)
+        vec3(0.01, 0.015, 0.03),  // sky light (cool blue)
+        sky_factor
+    );
+    // For photo textures: blend with texture to preserve baked detail
+    vec3 ambient = ambient_color * albedo * (0.3 + u_ambient * 0.7);
+
+    // Emission (for bodies with internal glow)
+    vec3 emissive = albedo * u_emission;
+
+    // Rim: subtle limb glow (atmosphere hint for planets with atmosphere)
+    float rim = 1.0 - NdotV;
+    vec3 rim_glow = vec3(0.05, 0.07, 0.12) * pow(rim, 4.0) * 0.1;
+
+    vec3 color = Lo + ambient + emissive + rim_glow;
+
     frag_color = vec4(color, 1.0);
 }
 "#;
