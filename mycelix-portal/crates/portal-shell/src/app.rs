@@ -318,6 +318,24 @@ pub fn App() -> impl IntoView {
                                     <span class="orb-tier">{move || tier.get().label()}</span>
                                 </div>
                             </div>
+                            // SVG connections — mycelial tendrils from orb to each node
+                            <svg class="orbital-connections" viewBox="-250 -250 500 500" aria-hidden="true">
+                                {domains.iter().map(|d| {
+                                    let radius = 180.0;
+                                    let x = radius * d.angle.cos();
+                                    let y = radius * d.angle.sin();
+                                    let opacity = if d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked()) {
+                                        0.15 + d.activity * 0.3
+                                    } else { 0.03 };
+                                    view! {
+                                        <line x1="0" y1="0" x2=x.to_string() y2=y.to_string()
+                                            stroke=d.glow stroke-width="1" opacity=opacity.to_string()
+                                            stroke-dasharray="4 8" />
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </svg>
+
+                            // Domain nodes — positioned by computed angle
                             <div class="orbital-ring">
                                 {domains.iter().map(|d| {
                                     let id = d.id;
@@ -328,10 +346,17 @@ pub fn App() -> impl IntoView {
                                     let activity = d.activity;
                                     let name = d.name;
                                     let accessible = d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked());
+                                    // Compute position with JS-compatible math
+                                    let radius = 180.0;
+                                    let x = radius * angle.cos();
+                                    let y = radius * angle.sin();
                                     view! {
                                         <button
                                             class=move || if accessible { "orbital-node accessible" } else { "orbital-node locked" }
-                                            style=format!("--node-angle: {:.2}rad; --node-color: {}; --node-glow: {}; --node-activity: {:.2};", angle, color, glow, activity)
+                                            style=format!(
+                                                "left: calc(50% + {:.0}px - 30px); top: calc(50% + {:.0}px - 20px); --node-color: {}; --node-glow: {}; --node-activity: {:.2};",
+                                                x, y, color, glow, activity
+                                            )
                                             disabled=!accessible
                                             on:click=move |_| { if accessible { active_domain.set(Some(id.to_string())); } }
                                             aria-label=format!("{}", name)

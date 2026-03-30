@@ -246,6 +246,38 @@ body {
     justify-content: center;
 }
 
+/* Mycelial connections SVG */
+.orbital-connections {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 500px;
+    height: 500px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+    animation: connections-rotate 120s linear infinite;
+}
+
+@keyframes connections-rotate {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.orbital-ring {
+    animation: orbit-rotate 120s linear infinite;
+}
+
+@keyframes orbit-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes orbit-counter-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(-360deg); }
+}
+
 .orbital-node {
     position: absolute;
     display: flex;
@@ -258,10 +290,8 @@ body {
     padding: 0.5rem;
     transition: transform 0.3s, opacity 0.3s;
 
-    /* Position on the orbital ring using CSS custom properties */
-    --orbit-radius: min(35vw, 35vh, 220px);
-    left: calc(50% + cos(var(--node-angle)) * var(--orbit-radius) - 30px);
-    top: calc(50% + sin(var(--node-angle)) * var(--orbit-radius) - 20px);
+    /* Counter-rotate text so it stays readable while ring orbits */
+    animation: orbit-counter-rotate 120s linear infinite;
 }
 
 .orbital-node:hover:not(:disabled) {
