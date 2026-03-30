@@ -87,10 +87,10 @@ fn parse_genre() -> Genre {
                 let (lo, hi) = g.tempo_range();
                 let tempo = (lo + hi) / 2.0;
 
-                let midi_path = dir.join(format!("song_{}.mid", slug(g.name())));
+                let midi_path = dir().join(format!("song_{}.mid", slug(g.name())));
                 midi_export::export_midi(&comp.notes, tempo, 4, 4, &midi_path).ok();
 
-                let wav_path = dir.join(format!("song_{}.wav", slug(g.name())));
+                let wav_path = dir().join(format!("song_{}.wav", slug(g.name())));
                 write_wav(&wav_path, &comp.audio, 44100);
                 println!("  {} notes → {} + {}", comp.notes.len(), midi_path.display(), wav_path.display());
             }
