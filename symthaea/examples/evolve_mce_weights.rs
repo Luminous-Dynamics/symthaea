@@ -212,7 +212,8 @@ fn main() {
             let child = if rng.gen_bool(0.5) {
                 Genome::crossover(a, b, &mut rng).mutate(&mut rng)
             } else { a.mutate(&mut rng) };
-            next.push((child, evaluate_fitness(&child)));
+            let f = evaluate_fitness(&child);
+            next.push((child, f));
         }
         pop = next;
         if gen % 10 == 0 || gen == NUM_GENERATIONS {
