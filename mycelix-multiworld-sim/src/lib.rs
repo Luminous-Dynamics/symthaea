@@ -1558,7 +1558,7 @@ impl MultiWorldSimulator {
             // Mars surpassing Earth (11,644 vs 10,859 in v8) is THE political event.
             if world.location != "Earth" && pop > 5000.0
                 && world.resources.self_sufficiency() > 0.7
-                && tick % 120 == 0 // Check every 10 years
+                && tick % 600 == 0 // Check every 50 years (was 10 — too spammy)
             {
                 // Cultural distance from Earth (use individualism as proxy)
                 let cultural_dist = (world.culture.individualism - 0.5).abs()

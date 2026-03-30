@@ -315,11 +315,11 @@ impl NarrativeEngine {
             .collect();
         self.prev_cvs = cvs;
 
-        // Trim to most significant 100 events
-        if self.events.len() > 120 {
+        // Trim to most significant 200 events (raised from 100 for richer chronicles)
+        if self.events.len() > 250 {
             self.events.sort_by(|a, b| b.severity.cmp(&a.severity)
                 .then_with(|| b.tick.cmp(&a.tick)));
-            self.events.truncate(100);
+            self.events.truncate(200);
         }
     }
 
@@ -335,20 +335,43 @@ impl NarrativeEngine {
 
             // Determine severity and narrative content from CivEvent markers
             let (severity, crisis, response, outcome) = if desc.contains("PROJECT COMPLETE") {
-                (2,
-                 desc.clone(),
-                 "Construction crews celebrated as the structure came online".into(),
-                 "Colony capability expanded — new possibilities opened".to_string())
+                let response = if desc.contains("Fission Reactor") {
+                    "The hum of the reactor filled the habitat — power at last"
+                } else if desc.contains("Greenhouse") {
+                    "Fresh green growth under artificial light — the colony could feed itself"
+                } else if desc.contains("Habitat Expansion") {
+                    "New modules pressurized — families moved in within days"
+                } else if desc.contains("Medical") {
+                    "The colony's first surgery suite opened — no more improvised medicine"
+                } else if desc.contains("Centrifuge") {
+                    "The centrifuge spun up — children could be born here now"
+                } else if desc.contains("Fabrication") {
+                    "Local manufacturing online — the supply chain dependency loosened"
+                } else if desc.contains("Water Extraction") {
+                    "Water flowed from local extraction — the colony drank its own land"
+                } else if desc.contains("Radiation Shelter") {
+                    "The shelter doors sealed — Jupiter's wrath could be weathered"
+                } else {
+                    "Construction crews celebrated as the structure came online"
+                };
+                let outcome = if desc.contains("Centrifuge") {
+                    "Reproduction became possible — the colony's future secured"
+                } else if desc.contains("Fission") {
+                    "Energy independence achieved — everything else became possible"
+                } else {
+                    "Colony capability expanded — a step closer to self-sufficiency"
+                };
+                (2, desc.clone(), response.to_string(), outcome.to_string())
             } else if desc.contains("INDEPENDENCE MOVEMENT") {
                 (3,
                  desc.clone(),
                  "Political assemblies debated sovereignty with unprecedented fervor".into(),
-                 "The relationship between colony and homeworld would never be the same".to_string())
+                 "The relationship between colony and homeworld entered a new chapter".to_string())
             } else if desc.contains("EXPLORATION SUCCESS") {
                 (2,
                  desc.clone(),
-                 "Survey teams returned with samples and data".into(),
-                 "New resources mapped — the colony's future brightened".to_string())
+                 "Survey teams returned with samples and data that would reshape the colony's future".into(),
+                 "New resources mapped — the frontier expanded".to_string())
             } else if desc.contains("DUNBAR TRANSITION") {
                 (2,
                  desc.clone(),
