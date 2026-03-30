@@ -75,7 +75,7 @@ pub fn start_simulated_life() {
         });
 
         toasts.push(
-            format!("{from_name} \u{2192} {to_name}: \u{201c}{msg}\u{201d}"),
+            format!("{from_name} → {to_name}: “{msg}”"),
             "gratitude",
         );
     });

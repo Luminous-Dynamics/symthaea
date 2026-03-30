@@ -45,7 +45,7 @@ impl ConnectionStatus {
     pub fn label(&self) -> &'static str {
         match self {
             Self::Disconnected => "Disconnected",
-            Self::Connecting => "Connecting\u{2026}",
+            Self::Connecting => "Connecting…",
             Self::Connected => "Connected",
             Self::Mock => "Mock",
         }
@@ -79,7 +79,7 @@ impl HolochainCtx {
             Some(t) => t.clone(),
             None => {
                 return Err(format!(
-                    "Mock mode: {zome}.{fn_name} \u{2014} no conductor connected"
+                    "Mock mode: {zome}.{fn_name} — no conductor connected"
                 ));
             }
         };
@@ -142,7 +142,7 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
         let url = conductor_url();
         let token = auth_token();
         web_sys::console::log_1(
-            &format!("[Hearth] Connecting to conductor at {url}\u{2026}").into(),
+            &format!("[Hearth] Connecting to conductor at {url}…").into(),
         );
 
         let ws_transport = BrowserWsTransport::new();

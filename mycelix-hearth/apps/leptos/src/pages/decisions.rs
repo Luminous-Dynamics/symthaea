@@ -141,7 +141,7 @@ pub fn DecisionsPage() -> impl IntoView {
                                                     >
                                                         {can_select.then(|| view! {
                                                             <span class="option-radio">
-                                                                {if is_selected { " {25c9}" } else { " {25cb}" }}
+                                                                {if is_selected { "{25c9}" } else { "{25cb}" }}
                                                             </span>
                                                         })}
                                                         <span class="option-text">{opt_text}</span>

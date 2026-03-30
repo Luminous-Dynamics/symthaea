@@ -101,7 +101,7 @@ pub fn StoriesPage() -> impl IntoView {
                         <textarea
                             id="story-content"
                             rows="5"
-                            placeholder="tell it in your own words\u{2026}"
+                            placeholder="tell it in your own words…"
                             prop:value=move || story_content.get()
                             on:input=move |ev| {
                                 use wasm_bindgen::JsCast;
@@ -120,7 +120,7 @@ pub fn StoriesPage() -> impl IntoView {
                 let stories = hearth.stories.get();
 
                 if stories.is_empty() {
-                    view! { <div class="empty-state">"every family has an origin story. what\u{2019}s yours?"</div> }.into_any()
+                    view! { <div class="empty-state">"every family has an origin story. what’s yours?"</div> }.into_any()
                 } else {
                     view! {
                         <div class="story-list" role="list" aria-label="family stories">

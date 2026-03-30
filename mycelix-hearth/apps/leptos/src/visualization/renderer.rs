@@ -292,7 +292,7 @@ fn render_frame(ctx: &web_sys::CanvasRenderingContext2d, state: &VisualizationSt
         ctx.set_font("14px Inter, sans-serif");
         ctx.set_text_align("center");
         ctx.set_text_baseline("middle");
-        let _ = ctx.fill_text("the web is forming\u{2026}", w / 2.0, h / 2.0);
+        let _ = ctx.fill_text("the web is forming…", w / 2.0, h / 2.0);
         return;
     }
 

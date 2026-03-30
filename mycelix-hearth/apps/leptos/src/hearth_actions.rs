@@ -86,7 +86,7 @@ pub fn tend_bond(bond_hash: String) {
                 }
                 Err(e) => {
                     web_sys::console::log_1(&format!("tend_bond failed: {e}").into());
-                    toasts.push("couldn\u{2019}t tend that bond right now", "bond");
+                    toasts.push("couldn’t tend that bond right now", "bond");
                 }
             }
         });
@@ -122,7 +122,7 @@ pub fn express_gratitude(to_agent: String, message: String) {
         });
 
         toasts.push(
-            format!("{from_name} \u{2192} {to_name}: \u{201c}{msg_preview}\u{201d}"),
+            format!("{from_name} → {to_name}: “{msg_preview}”"),
             "gratitude",
         );
     } else {

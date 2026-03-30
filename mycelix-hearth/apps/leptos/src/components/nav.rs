@@ -71,7 +71,7 @@ fn ThemeSwitcher() -> impl IntoView {
             class="theme-cycle-btn"
             title=move || {
                 let t = theme_state.current.get();
-                format!("{} \u{2014} click to change", t.description())
+                format!("{} — click to change", t.description())
             }
             on:click=move |_| {
                 let next = theme_state.current.get().next();
