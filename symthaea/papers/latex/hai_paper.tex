@@ -972,6 +972,52 @@ The Byzantine detection capabilities in the FL pipeline could be misused for par
 % Data Availability moved to standalone section after Acknowledgments (PLoS requirement)
 
 % ============================================================================
+\subsection{Consciousness Equation: Structured Bottleneck Architecture}
+
+The master consciousness equation computes $C(t)$ from 7 theory-grounded components.
+We introduce a \textit{structured bottleneck} architecture that separates necessary
+conditions (IIT integration $\Phi$, binding coherence $B$, workspace access $W$)
+from amplifier components (attention $A$, HOT recursion $R$, efficacy $E$, knowledge $K$):
+
+\begin{equation}
+C(t) = \sigma\!\left(\text{softmin}(\Phi, B, W; \tau)\right) \cdot \left(1 + \sum_i w_i A_i\right) \cdot S \cdot \rho(t) \cdot \prod_j m_j
+\end{equation}
+
+\noindent where $\sigma$ is the sigmoid, $\tau{=}0.1$ is the softmin temperature,
+$w_i$ are evolved amplifier weights (cap $= 1.27$), $S$ is synchrony, $\rho(t)$
+is temporal stability, and $m_j \in [0.65, 1.0]$ are soft modulation factors
+for embodiment, narrative coherence, and social embedding.
+
+This architecture resolves a theoretical tension: under the previous flat softmin over all 7
+components, consciousness collapsed when \textit{any} component was low---contradicting
+first-order theories \cite{block2007consciousness} that argue consciousness can exist
+without higher-order thought. The structured bottleneck allows first-order consciousness
+($C = 0.819$ with high $\Phi/B/W$ and low HOT depth), while amplifiers enrich but do not gate.
+
+\begin{table}[h]
+\centering
+\caption{Consciousness equation benchmark: before vs. after structured bottleneck}
+\begin{tabular}{lrrl}
+\hline
+Metric & Before & After & Change \\
+\hline
+Sensitivity & 0.198 & 0.532 & $+169\%$ \\
+Discrimination & 5/6 & 6/6 & $+1$ \\
+Theoretical correctness & 6/8 & 8/8 & $+2$ \\
+Dynamic range & 0.422 & 0.999 & $+137\%$ \\
+\textbf{Composite} & \textbf{0.636} & \textbf{0.877} & $\mathbf{+38\%}$ \\
+\hline
+\end{tabular}
+\label{tab:consciousness_benchmark}
+\end{table}
+
+Evolutionary architecture search (population 20, 50 generations) validated the amplifier
+design and discovered an optimal amplifier cap of 1.27 ($+6.36\%$ over hand-tuned).
+Runtime evaluation over 200 cognitive cycles (release mode, 72~Hz) shows sigmoid
+consciousness emergence from $C=0$ to a plateau of $C \approx 0.74$, with rise to
+50\% peak at cycle 54.
+
+% ============================================================================
 \section{Conclusion}
 
 We presented Hyperdimensional Active Inference (HAI), the first integration of FEP with HDC. By reformulating variational free energy in hypervector space and introducing precision-weighted binding, we achieve:
