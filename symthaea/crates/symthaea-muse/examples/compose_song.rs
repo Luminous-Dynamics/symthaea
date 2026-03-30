@@ -93,34 +93,46 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
         if chunk_rms > 0.02 && (midi_notes.is_empty() ||
             chunk_time - midi_notes.last().map(|n| n.start_time).unwrap_or(-1.0) > 0.15)
         {
-            // Estimate pitch from zero crossings
-            let zcr = chunk.windows(2)
-                .filter(|w| w[0][0] * w[1][0] < 0.0)
+            // Estimate pitch from zero crossings (mono left channel)
+            let mono: Vec<f32> = chunk.iter().map(|s| s[0]).collect();
+            let zcr = mono.windows(2)
+                .filter(|w| w[0] * w[1] < 0.0)
                 .count();
-            let est_freq = (zcr as f32 * sample_rate as f32 / chunk.len() as f32 / 2.0)
-                .clamp(60.0, 2000.0);
+            let est_freq = if zcr > 2 {
+                (zcr as f32 * sample_rate as f32 / mono.len() as f32 / 2.0)
+                    .clamp(130.0, 1000.0) // C3 to C6 — musical range only
+            } else {
+                // Default to a note based on consciousness state
+                261.63 * (1.0 + state.consciousness_level * 0.5) // C4-ish
+            };
 
             midi_notes.push(Note {
                 frequency: est_freq,
                 start_time: chunk_time,
-                duration: 0.3 + state.serotonin * 0.5, // longer in mellow genres
-                velocity: (chunk_rms * 5.0).clamp(0.1, 1.0),
+                duration: 0.2 + state.serotonin * 0.4,
+                velocity: (chunk_rms * 4.0).clamp(0.15, 0.95),
             });
         }
 
-        // Natural state evolution (gentle, genre-appropriate)
-        state.consciousness_level += 0.0001;
+        // Natural state evolution — clear arc: build → peak at 60% → fade
         if progress < 0.6 {
-            state.arousal += 0.00005;
+            // Build phase: rising energy
+            state.consciousness_level += 0.0002;
+            state.arousal += 0.0001;
+            state.dopamine += 0.00005;
+        } else if progress < 0.8 {
+            // Sustain/transition: hold then start fading
+            state.arousal -= 0.0002;
+            state.dopamine -= 0.0001;
         } else {
-            state.arousal -= 0.0001;
+            // Fade: clear wind-down
+            state.consciousness_level -= 0.0004;
+            state.arousal -= 0.0003;
+            state.dopamine -= 0.0002;
+            state.serotonin += 0.0001; // warmer as it fades
+            state.harmony_activations[7] += 0.0004; // stillness rising
         }
-        state.valence += 0.00003;
-
-        if progress > 0.8 {
-            state.harmony_activations[7] += 0.0002;
-            state.consciousness_level -= 0.0002;
-        }
+        state.valence += 0.00002;
 
         // Clamp
         state.consciousness_level = state.consciousness_level.clamp(0.05, 0.95);
