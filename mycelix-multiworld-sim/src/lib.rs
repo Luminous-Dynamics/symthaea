@@ -1424,7 +1424,9 @@ impl MultiWorldSimulator {
             // Each robot takes ~6 months to build. Workshop can build 1 at a time.
             // Robot type selected by colony need (agriculture humanoid first,
             // then manipulators, then drones for exploration).
-            if has_manufacturing && tick % 6 == 0 // Check every 6 months
+            let has_fab_workshop = world.project_manager
+                .has_completed(projects::ProjectBlueprint::FabricationWorkshop);
+            if has_fab_workshop && tick % 6 == 0 // Check every 6 months
                 && world.fleet.total_units() < (pop as usize / 50).max(2) // 1 robot per 50 people
             {
                 // Choose robot type by need
