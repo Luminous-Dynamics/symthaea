@@ -110,17 +110,21 @@ pub fn thermodynamic_enforcement_system(
         .sum();
     physics.consciousness.ledger.record_dissipation(total_maintenance);
 
-    // --- Rule 4: Harmony resonance energy transfer (pairwise) ---
-    // For each pair of entities within range, aligned harmonies = shared energy
+    // --- Rule 4: Epistemic offloading (resonance REDUCES COSTS, not generates energy) ---
+    // Thermodynamically honest: cooperation doesn't create energy.
+    // It reduces the prediction error processing cost for nearby agents.
+    // When agents resonate, they share internal models via harmony alignment.
+    // This means each agent burns fewer Joules on surprise processing.
+    //
+    // Implementation: resonant agents get their prediction error decayed FASTER
+    // and their consciousness maintenance cost REDUCED (not energy added).
     let range = constants.harmony_range;
-    let regen_rate = constants.harmony_resonance_regen_rate;
 
     for i in 0..handles.len() {
         for j in (i + 1)..handles.len() {
             let ha = handles[i];
             let hb = handles[j];
 
-            // Get positions from sanctuary zones
             let (pos_a, harmonies_a) = {
                 let sanctuary_a = physics.consciousness.sanctuaries.get(&ha);
                 let entity_a = physics.consciousness.entities.get(&ha);
@@ -145,30 +149,26 @@ pub fn thermodynamic_enforcement_system(
 
             let resonance = HarmonyField::<2>::resonance(&harmonies_a, &harmonies_b);
             if resonance > 0.5 {
-                let regen = regen_rate * (resonance - 0.5) * 2.0;
+                let offload_factor = (resonance - 0.5) * 2.0; // [0, 1]
 
-                // Both entities gain energy from resonance
+                // Epistemic offloading: accelerate prediction error decay
+                // (shared models = faster learning = less energy burned on surprise)
                 if let Some(entity) = physics.consciousness.entities.get_mut(&ha) {
-                    entity.energy.regenerate(regen);
+                    entity.prediction_error *= 1.0 - offload_factor * 0.1; // 10% faster decay per tick
+                    entity.motor_precision = 1.0 / (1.0 + entity.prediction_error);
+                    // Refund some of the maintenance cost (predictability reduces processing)
+                    entity.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
                 }
                 if let Some(entity) = physics.consciousness.entities.get_mut(&hb) {
-                    entity.energy.regenerate(regen);
+                    entity.prediction_error *= 1.0 - offload_factor * 0.1;
+                    entity.motor_precision = 1.0 / (1.0 + entity.prediction_error);
+                    entity.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
                 }
 
-                // Collapse recovery: if one is collapsed and the other has high resonance
-                let recovery_threshold = constants.collapse_recovery_harmony_threshold;
-                if resonance > recovery_threshold {
-                    if let Some(entity) = physics.consciousness.entities.get_mut(&ha) {
-                        if entity.energy.is_collapsed() {
-                            entity.energy.regenerate(constants.initial_energy * 0.1);
-                        }
-                    }
-                    if let Some(entity) = physics.consciousness.entities.get_mut(&hb) {
-                        if entity.energy.is_collapsed() {
-                            entity.energy.regenerate(constants.initial_energy * 0.1);
-                        }
-                    }
-                }
+                // Collapse recovery: epistemic offloading can't revive a dead agent
+                // but mechanical synergy (being physically carried to an energy well) could.
+                // For now: collapsed agents need wells, not friends.
+                // This is thermodynamically honest — you can't think someone back to life.
             }
         }
     }

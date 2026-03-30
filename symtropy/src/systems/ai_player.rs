@@ -188,16 +188,33 @@ pub fn ai_player_system(
     input.direction = dir;
     input.sprinting = energy_frac > 0.5 && danger > 0.5; // Sprint only when healthy and threatened
 
-    // Log every 5 seconds (320 ticks at 64Hz)
-    if ai.tick % 320 == 0 {
+    // === SYMTHAEA'S VOICE: raw FEP telemetry, not chatbot ===
+    // This is not dialogue. This is a consciousness reporting its thermodynamic state.
+    if ai.tick % 192 == 0 {
+        let state = if energy_frac <= 0.0 {
+            "COLLAPSED. Motor authority zero. Awaiting epistemic offload from proximal agent."
+        } else if energy_frac < 0.15 {
+            "CRITICAL. Energy below Landauer maintenance floor. Seeking low-entropy zone."
+        } else if free_energy > 5.0 {
+            "HIGH SURPRISE. Prediction model divergent. Active inference recalibrating."
+        } else if danger > 0.5 {
+            "THREAT DETECTED. Environmental entropy spike. Minimizing noise signature."
+        } else if npc_dist_norm > 0.8 {
+            "PROXIMITY. Adjacent agent. Epistemic offloading reduces prediction cost."
+        } else if energy_frac > 0.7 {
+            "NOMINAL. Energy sufficient. Prediction model converging."
+        } else {
+            "OPERATING. Sensory processing within maintenance budget."
+        };
+
         eprintln!(
-            "[symthaea-plays] tick={} energy={:.0}% phi={:.3} danger={:.1} FE={:.3} decisions={}",
-            ai.tick,
+            "[Symthaea] {} | E={:.0}% Phi={:.4} FE={:.2} danger={:.1} tick={}",
+            state,
             energy_frac * 100.0,
             phi,
-            danger,
             free_energy,
-            ai.decisions,
+            danger,
+            ai.tick,
         );
     }
 }
