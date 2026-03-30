@@ -20,7 +20,7 @@ use bevy::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
 
-use crate::components::{CrewNpc, Player};
+use crate::components::{CrewNpc, Player, Tile};
 use crate::resources::{PhysicsWorldRes, TileGrid};
 use symtropy_render_bridge::PhysicsBody;
 
@@ -63,7 +63,7 @@ pub fn living_dungeon_system(
     physics: Res<PhysicsWorldRes>,
     mut tile_grid: Option<ResMut<TileGrid>>,
     agents: Query<(&PhysicsBody, &Transform), Or<(With<Player>, With<CrewNpc>)>>,
-    mut tile_sprites: Query<(&Transform, &mut Sprite), Without<Player>>,
+    mut tile_sprites: Query<(&Tile, &mut Sprite)>,
 ) {
     breath.timer.tick(time.delta());
     if !breath.timer.just_finished() {
@@ -206,7 +206,21 @@ pub fn living_dungeon_system(
         }
     }
 
+    // Sync tile sprites to match grid state (make breathing VISIBLE)
     if changes > 0 {
+        for (tile, mut sprite) in &mut tile_sprites {
+            let walkable = grid.cells.get(&(tile.grid_x, tile.grid_y)).copied().unwrap_or(false);
+            let expected_color = if walkable {
+                Color::srgb(0.22, 0.22, 0.30) // floor — dark blue-gray
+            } else {
+                Color::srgb(0.45, 0.35, 0.25) // wall — brown
+            };
+            // Only update if changed (avoid unnecessary writes)
+            if tile.walkable != walkable {
+                sprite.color = expected_color;
+            }
+        }
+
         eprintln!(
             "[living-dungeon] Breath #{}: Φ={:.3}, {} tiles changed",
             breath.breath_count, collective_phi, changes

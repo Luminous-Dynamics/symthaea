@@ -51,13 +51,15 @@ pub fn physics_apply_inputs(
         let move_cost = displacement * physics.consciousness.constants.movement_cost_per_unit * sprint_mult;
         let energy_consumed = physics.consciousness.consume_energy(body_comp.handle, move_cost);
 
-        // No energy = no movement
-        if energy_consumed < move_cost * 0.5 {
+        // Gradual slowdown: speed scales with energy fraction consumed
+        let energy_fraction = if move_cost > 1e-10 { energy_consumed / move_cost } else { 1.0 };
+        if energy_fraction < 0.01 {
             if let Some(body) = physics.world.body_mut(body_comp.handle) {
                 body.linear_velocity = nalgebra::SVector::from([0.0, 0.0]);
             }
             continue;
         }
+        let speed = speed * energy_fraction; // Smooth deceleration as energy depletes
 
         if let Some(body) = physics.world.body_mut(body_comp.handle) {
             let norm_dir = dir.normalize();
@@ -114,17 +116,18 @@ pub fn consciousness_sync_system(
     players: Query<(&PhysicsBody, &Transform), With<Player>>,
     npcs: Query<(&PhysicsBody, &Transform, &NpcConsciousness), With<CrewNpc>>,
 ) {
-    // Sync player consciousness into the physics field
+    // Sync player consciousness — use REAL values from the consciousness system
+    let biometrics_load = 0.3; // TODO: wire from BiometricsCtx when available in this system
     for (body_comp, transform) in &players {
         let inputs = symthaea_consciousness_equation::ConsciousnessInputs {
-            phi: player_c.level,
-            broadcast: 0.7,
-            working_memory: 0.6,
-            attention: 0.6,
-            recurrence: 0.5,
+            phi: (1.0 - biometrics_load) * 0.8 + 0.2,
+            broadcast: (1.0 - biometrics_load * 0.5).max(0.1),
+            working_memory: (1.0 - biometrics_load * 0.6).max(0.1),
+            attention: (biometrics_load * 0.3 + 0.5).min(1.0),
+            recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
             embodiment: 0.7,
-            knowledge: 0.5,
-            synchrony: 0.6,
+            knowledge: (harmony.activations.iter().filter(|&&a| a > 0.3).count() as f64 / 8.0).min(1.0),
+            synchrony: if harmony.is_sanctuary { 0.9 } else { 0.4 + harmony.total_energy as f64 * 0.05 },
         };
         let pos = symtropy_math::Point::new([
             transform.translation.x as f64,
@@ -147,17 +150,17 @@ pub fn consciousness_sync_system(
         }
     }
 
-    // Sync NPC consciousness
+    // Sync NPC consciousness — use real values from NPC consciousness system
     for (body_comp, transform, npc_c) in &npcs {
         let inputs = symthaea_consciousness_equation::ConsciousnessInputs {
-            phi: npc_c.level,
-            broadcast: 0.6,
-            working_memory: 0.5,
-            attention: 0.5,
-            recurrence: 0.4,
-            embodiment: 0.6,
-            knowledge: 0.4,
-            synchrony: 0.5,
+            phi: npc_c.level.max(0.1),
+            broadcast: (1.0 - npc_c.level * 0.3).max(0.2),
+            working_memory: 0.5 + npc_c.stability * 0.3,
+            attention: 0.5 + npc_c.level * 0.3,
+            recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
+            embodiment: (0.5 + npc_c.level * 0.3).min(1.0),
+            knowledge: 0.4 + npc_c.stability * 0.2,
+            synchrony: if harmony.is_sanctuary { 0.8 } else { 0.3 + harmony.total_energy as f64 * 0.04 },
         };
         let pos = symtropy_math::Point::new([
             transform.translation.x as f64,

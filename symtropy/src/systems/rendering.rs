@@ -214,6 +214,7 @@ pub fn setup_world(
 
     // Energy Wells — spatial life sources at room centers
     let well_constants = &physics_world.consciousness.constants;
+    let mut well_count = 0u32;
     for (i, &(cx, cy)) in dungeon.room_centers.iter().enumerate() {
         // Place wells at every other room, skip player/core rooms
         if i % 2 != 0 {
@@ -243,8 +244,9 @@ pub fn setup_world(
                 5000.0,
             ),
         ));
+        well_count += 1;
     }
-    eprintln!("[symtropy] Energy wells placed");
+    eprintln!("[symtropy] Energy wells placed: {well_count}");
 
     // HUD
     commands.spawn((
