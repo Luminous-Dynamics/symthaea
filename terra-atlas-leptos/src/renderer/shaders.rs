@@ -1064,7 +1064,7 @@ precision highp float;
 
 uniform sampler2D u_body_texture;
 uniform vec3 u_sun_direction;
-uniform float u_ambient;  // minimum light level
+uniform float u_ambient;  // 1.0 = self-lit (Sun), < 1.0 = needs directional light
 
 in vec3 v_normal;
 in vec3 v_view_position;
@@ -1075,17 +1075,29 @@ out vec4 frag_color;
 void main() {
     vec3 n = normalize(v_normal);
     vec3 tex = texture(u_body_texture, v_uv).rgb;
-
-    // Directional sunlight
-    float diffuse = max(dot(n, u_sun_direction), 0.0);
-    float light = u_ambient + diffuse * (1.0 - u_ambient);
-
-    // Subtle rim highlight
     vec3 view_dir = normalize(v_view_position);
-    float rim = 1.0 - max(dot(n, view_dir), 0.0);
-    vec3 rim_color = vec3(0.1, 0.12, 0.15) * pow(rim, 4.0) * 0.2;
 
-    vec3 color = tex * light + rim_color;
+    if (u_ambient >= 0.99) {
+        // Self-luminous body (Sun): texture IS the light source
+        frag_color = vec4(tex * 2.0, 1.0);
+        return;
+    }
+
+    // Photo-based textures already have lighting baked in.
+    // Apply subtle directional shading to suggest Sun position
+    // without double-lighting.
+    float sun_facing = dot(n, u_sun_direction) * 0.5 + 0.5; // 0.0-1.0
+    float shade = 0.4 + sun_facing * 0.6; // never darker than 40%
+
+    // Specular highlight on shiny bodies
+    vec3 half_vec = normalize(u_sun_direction + view_dir);
+    float spec = pow(max(dot(n, half_vec), 0.0), 32.0) * 0.15;
+
+    // Rim: subtle atmospheric edge
+    float rim = 1.0 - max(dot(n, view_dir), 0.0);
+    vec3 rim_color = vec3(0.08, 0.10, 0.14) * pow(rim, 4.0) * 0.15;
+
+    vec3 color = tex * shade + vec3(spec) + rim_color;
     frag_color = vec4(color, 1.0);
 }
 "#;
