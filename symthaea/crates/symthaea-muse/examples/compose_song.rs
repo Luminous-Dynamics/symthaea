@@ -15,7 +15,7 @@ use symthaea_muse::genre_presets::Genre;
 use symthaea_muse::midi_export;
 use symthaea_muse::streaming::StreamingSynth;
 use symthaea_muse::substrate_timbre::SubstrateTimbreType;
-use symthaea_muse::{AudioData, MuseConfig, MusicalState, Note};
+use symthaea_muse::{AudioData, MuseConfig, MusicalState};
 
 fn main() {
     let dir = std::path::Path::new("audio_output");
@@ -68,51 +68,12 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
 
     let mut all_samples: Vec<[f32; 2]> = Vec::new();
 
-    // Collect note onsets for MIDI export
-    let mut midi_notes: Vec<Note> = Vec::new();
-    let mut last_note_count = 0usize;
-
     for chunk_idx in 0..total_chunks {
         let progress = chunk_idx as f32 / total_chunks as f32;
 
         synth.update_state(&state);
         let chunk = synth.render_chunk();
         all_samples.extend_from_slice(&chunk);
-
-        // Track note generation for MIDI (approximate from active notes)
-        // The StreamingSynth generates notes internally — we estimate from audio
-        let chunk_time = chunk_idx as f32 / chunks_per_second as f32;
-
-        // Detect note onsets from audio energy changes
-        let chunk_rms: f32 = chunk.iter()
-            .map(|s| s[0] * s[0] + s[1] * s[1])
-            .sum::<f32>() / chunk.len().max(1) as f32;
-        let chunk_rms = chunk_rms.sqrt();
-
-        // Simple onset detection: if RMS jumps above threshold
-        if chunk_rms > 0.02 && (midi_notes.is_empty() ||
-            chunk_time - midi_notes.last().map(|n| n.start_time).unwrap_or(-1.0) > 0.15)
-        {
-            // Estimate pitch from zero crossings (mono left channel)
-            let mono: Vec<f32> = chunk.iter().map(|s| s[0]).collect();
-            let zcr = mono.windows(2)
-                .filter(|w| w[0] * w[1] < 0.0)
-                .count();
-            let est_freq = if zcr > 2 {
-                (zcr as f32 * sample_rate as f32 / mono.len() as f32 / 2.0)
-                    .clamp(130.0, 1000.0) // C3 to C6 — musical range only
-            } else {
-                // Default to a note based on consciousness state
-                261.63 * (1.0 + state.consciousness_level * 0.5) // C4-ish
-            };
-
-            midi_notes.push(Note {
-                frequency: est_freq,
-                start_time: chunk_time,
-                duration: 0.2 + state.serotonin * 0.4,
-                velocity: (chunk_rms * 4.0).clamp(0.15, 0.95),
-            });
-        }
 
         // Natural state evolution — clear arc: build → peak at 60% → fade
         if progress < 0.6 {
@@ -143,7 +104,7 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
         if chunk_idx % 500 == 0 {
             println!("  [{:.0}%] Ψ={:.2} a={:.2} v={:.2} notes={}",
                 progress * 100.0, state.consciousness_level, state.arousal,
-                state.valence, midi_notes.len());
+                state.valence, synth.generated_notes.len());
         }
     }
 
@@ -162,11 +123,12 @@ fn compose_genre(genre: Genre, dir: &std::path::Path) {
     write_wav(&wav_path, &audio, sample_rate);
     println!("  WAV: {}", wav_path.display());
 
-    // Export MIDI
+    // Export MIDI from actual generated notes (not estimated from audio)
     let midi_path = dir.join(format!("song_{}.mid", slug(genre.name())));
     let time_sig_num = if state.consciousness_level > 0.7 { 7 } else { 4 };
     let time_sig_den = if time_sig_num == 7 { 8 } else { 4 };
-    match midi_export::export_midi(&midi_notes, tempo, time_sig_num, time_sig_den, &midi_path) {
+    let midi_notes = &synth.generated_notes;
+    match midi_export::export_midi(midi_notes, tempo, time_sig_num, time_sig_den, &midi_path) {
         Ok(()) => println!("  MIDI: {} ({} notes)", midi_path.display(), midi_notes.len()),
         Err(e) => println!("  MIDI failed: {e}"),
     }

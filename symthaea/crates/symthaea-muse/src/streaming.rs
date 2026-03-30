@@ -131,6 +131,8 @@ pub struct StreamingSynth {
     active_notes: Vec<ActiveNote>,
     state: MusicalState,
     config: MuseConfig,
+    /// Collected notes for MIDI export (actual generated notes, not estimated).
+    pub generated_notes: Vec<crate::Note>,
     sample_rate: u32,
     chunk_samples: usize,
     total_samples_rendered: u64,
@@ -220,6 +222,7 @@ impl StreamingSynth {
         let chunk_samples = ((DEFAULT_CHUNK_MS as f32 / 1000.0) * sample_rate as f32) as usize;
         let chunk_samples = chunk_samples.max(MIN_CHUNK_SAMPLES);
         Self {
+            generated_notes: Vec::new(),
             muse_stream: MuseStream::new(42, config.clone()),
             active_notes: Vec::with_capacity(MAX_ACTIVE_NOTES),
             state: MusicalState::default(),
@@ -940,9 +943,17 @@ impl StreamingSynth {
             let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
             performance::humanize(&mut note, beat_pos, phrase_pos, self.note_counter);
 
-            // Record note for motif memory + creative journal + density regulator
+            // Record note for motif memory + creative journal + density regulator + MIDI export
             self.motif.record_note(note);
             self.density.record_onset(self.total_samples_rendered as f32 / self.sample_rate as f32);
+
+            // Collect for MIDI export (actual frequency, not estimated from audio)
+            self.generated_notes.push(crate::Note {
+                frequency: note.frequency,
+                start_time: self.total_samples_rendered as f32 / self.sample_rate as f32,
+                duration: note.duration,
+                velocity: note.velocity,
+            });
             self.prev_note_freq = Some(note.frequency);
 
             // When a phrase completes, evaluate it for creative journal + form memory
