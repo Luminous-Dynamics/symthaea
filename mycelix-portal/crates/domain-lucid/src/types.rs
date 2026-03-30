@@ -109,3 +109,15 @@ pub struct ConsciousnessSnapshot {
     pub complexity: f64,
     pub timestamp: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn thought_roundtrip() {
+        let t = Thought { id: "t-1".into(), content: "test".into(), thought_type: ThoughtType::Claim, confidence: 0.8, tags: vec!["a".into()], domain: Some("phil".into()), epistemic: EpistemicProfile { empirical: 0.5, normative: 0.3, materiality: 0.5, harmonic: 0.5 }, author_did: "did:t".into(), created_at: 0, updated_at: 0 };
+        let bytes = rmp_serde::to_vec_named(&t).unwrap();
+        let decoded: Thought = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.thought_type, ThoughtType::Claim);
+    }
+}

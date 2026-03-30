@@ -193,3 +193,15 @@ pub struct Waypoint { pub lat: f64, pub lon: f64, pub label: Option<String> }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum TransportMode { Driving, Cycling, Walking, Transit, Mixed, Flying, Water, Rail, Micromobility, Autonomous }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn aid_request_roundtrip() {
+        let req = AidRequest { id: "ar-1".into(), requester_did: "did:t".into(), request_type: AidRequestType::Food, description: "test".into(), urgency: Urgency::High, location: None, amount_needed: Some(100), fulfilled_amount: 0, status: AidRequestStatus::Open, created_at: 0 };
+        let bytes = rmp_serde::to_vec_named(&req).unwrap();
+        let decoded: AidRequest = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.urgency, Urgency::High);
+    }
+}

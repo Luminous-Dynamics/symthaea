@@ -66,3 +66,15 @@ pub struct Milestone {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum MilestoneType { Birth, FirstStep, FirstWord, School, Graduation, Marriage, Career, Retirement, Memorial, Custom }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn kinship_bond_roundtrip() {
+        let bond = KinshipBond { id: "kb-1".into(), from_did: "a".into(), to_did: "b".into(), bond_type: BondType::Partner, strength: 0.9, created_at: 0 };
+        let bytes = rmp_serde::to_vec_named(&bond).unwrap();
+        let decoded: KinshipBond = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.bond_type, BondType::Partner);
+    }
+}

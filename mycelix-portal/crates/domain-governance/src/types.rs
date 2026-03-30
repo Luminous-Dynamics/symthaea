@@ -324,4 +324,46 @@ mod tests {
         assert!(!ProposalStatus::Active.is_terminal());
         assert!(!ProposalStatus::Draft.is_terminal());
     }
+
+    #[test]
+    fn voting_days_all_types() {
+        assert_eq!(ProposalType::Standard.voting_days(), 7);
+        assert_eq!(ProposalType::Emergency.voting_days(), 1);
+        assert_eq!(ProposalType::Constitutional.voting_days(), 30);
+        assert_eq!(ProposalType::Funding.voting_days(), 14);
+        assert_eq!(ProposalType::Parameter.voting_days(), 14);
+    }
+
+    #[test]
+    fn phi_weight_zero_phi_gives_zero() {
+        let w = PhiWeight { phi_score: 0.0, k_trust: 1.0, stake_weight: 1.0, participation_score: 1.0, domain_reputation: 1.0 };
+        assert_eq!(w.combined(), 0.0);
+    }
+
+    #[test]
+    fn phi_weight_max_bounded() {
+        let w = PhiWeight { phi_score: 1.0, k_trust: 1.0, stake_weight: 1.0, participation_score: 1.0, domain_reputation: 1.0 };
+        assert!(w.combined() <= 2.0, "combined {} > 2.0", w.combined());
+    }
+
+    #[test]
+    fn vote_tally_default_not_approved() {
+        let t = VoteTally::default();
+        assert_eq!(t.votes_for, 0);
+        assert_eq!(t.votes_against, 0);
+        assert!(!t.approved);
+        assert!(!t.quorum_reached);
+    }
+
+    #[test]
+    fn all_status_labels_nonempty() {
+        let statuses = [
+            ProposalStatus::Draft, ProposalStatus::Active, ProposalStatus::Ended,
+            ProposalStatus::Approved, ProposalStatus::Signed, ProposalStatus::Rejected,
+            ProposalStatus::Executed, ProposalStatus::Cancelled, ProposalStatus::Failed,
+        ];
+        for s in &statuses {
+            assert!(!s.label().is_empty(), "{:?} has empty label", s);
+        }
+    }
 }

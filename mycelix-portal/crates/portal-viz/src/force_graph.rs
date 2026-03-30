@@ -38,15 +38,16 @@ pub struct GraphEdge {
     pub color: Option<String>,
 }
 
-// Internal physics state
-struct PhysicsNode {
+// Internal physics state (pub(crate) for testing)
+#[derive(Clone)]
+pub(crate) struct PhysicsNode {
     x: f64,
     y: f64,
     vx: f64,
     vy: f64,
 }
 
-fn force_step(
+pub(crate) fn force_step(
     nodes: &mut [PhysicsNode],
     edges: &[(usize, usize, f64)],
     cx: f64,
@@ -249,5 +250,65 @@ pub fn ForceGraph(
                 }
             }).collect::<Vec<_>>()}
         </svg>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(x: f64, y: f64) -> PhysicsNode {
+        PhysicsNode { x, y, vx: 0.0, vy: 0.0 }
+    }
+
+    #[test]
+    fn two_connected_nodes_converge() {
+        let mut nodes = vec![node(0.0, 0.0), node(100.0, 0.0)];
+        let edges = vec![(0, 1, 1.0)];
+        for _ in 0..200 {
+            force_step(&mut nodes, &edges, 50.0, 0.0, 3000.0, 0.004);
+        }
+        // After 200 iterations, nodes should be near equilibrium
+        let dist = ((nodes[0].x - nodes[1].x).powi(2) + (nodes[0].y - nodes[1].y).powi(2)).sqrt();
+        assert!(dist > 10.0, "nodes too close: {dist}");
+        assert!(dist < 200.0, "nodes too far: {dist}");
+    }
+
+    #[test]
+    fn triangle_stabilizes() {
+        let mut nodes = vec![node(0.0, 0.0), node(100.0, 0.0), node(50.0, 87.0)];
+        let edges = vec![(0, 1, 1.0), (1, 2, 1.0), (0, 2, 1.0)];
+        for _ in 0..200 {
+            force_step(&mut nodes, &edges, 50.0, 30.0, 3000.0, 0.004);
+        }
+        // All velocities should be near zero (stable)
+        for n in &nodes {
+            assert!(n.vx.abs() < 1.0, "vx not stable: {}", n.vx);
+            assert!(n.vy.abs() < 1.0, "vy not stable: {}", n.vy);
+        }
+    }
+
+    #[test]
+    fn single_node_stays_centered() {
+        let mut nodes = vec![node(50.0, 50.0)];
+        let edges = vec![];
+        for _ in 0..100 {
+            force_step(&mut nodes, &edges, 50.0, 50.0, 3000.0, 0.004);
+        }
+        assert!((nodes[0].x - 50.0).abs() < 5.0);
+        assert!((nodes[0].y - 50.0).abs() < 5.0);
+    }
+
+    #[test]
+    fn nodes_stay_bounded() {
+        let mut nodes = vec![node(0.0, 0.0), node(1000.0, 1000.0), node(-500.0, 500.0)];
+        let edges = vec![(0, 1, 0.5), (1, 2, 0.5)];
+        for _ in 0..500 {
+            force_step(&mut nodes, &edges, 250.0, 250.0, 3000.0, 0.004);
+        }
+        for n in &nodes {
+            assert!(n.x.abs() < 2000.0, "x out of bounds: {}", n.x);
+            assert!(n.y.abs() < 2000.0, "y out of bounds: {}", n.y);
+        }
     }
 }

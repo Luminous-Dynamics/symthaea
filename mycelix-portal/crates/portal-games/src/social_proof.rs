@@ -13,3 +13,23 @@ pub fn wise_error_message(_topic: &str, attempts: u32, _is_hard: bool) -> String
         _ => "You've shown incredible persistence. Consider reviewing the hints.".into(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn messages_escalate() {
+        let m0 = wise_error_message("math", 0, false);
+        let m7 = wise_error_message("math", 7, false);
+        assert_ne!(m0, m7);
+    }
+
+    #[test]
+    fn all_messages_nonempty() {
+        for attempts in 0..=10 {
+            let msg = wise_error_message("test", attempts, false);
+            assert!(!msg.is_empty(), "empty at attempt {attempts}");
+        }
+    }
+}

@@ -183,4 +183,44 @@ mod tests {
         assert!((mat[0][0] - 1.0).abs() < 1e-6);
         assert!(mat[0][1].abs() < 1e-6);
     }
+
+    #[test]
+    fn test_cosine_similarity_empty() {
+        assert_eq!(cosine_similarity(&[], &[]), 0.0);
+        assert_eq!(cosine_similarity(&[1.0], &[]), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_opposite() {
+        let a = vec![1.0, 0.0];
+        let b = vec![-1.0, 0.0];
+        assert!((cosine_similarity(&a, &b) + 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_top_k_exceeds_corpus() {
+        let corpus = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let query = vec![1.0, 0.0];
+        let top = top_k_similar(&query, &corpus, 10);
+        assert_eq!(top.len(), 2); // k > corpus, returns all
+    }
+
+    #[test]
+    fn test_similarity_matrix_symmetric() {
+        let embs = vec![vec![1.0, 0.5], vec![0.3, 0.9], vec![0.7, 0.2]];
+        let mat = similarity_matrix(&embs);
+        for i in 0..3 {
+            for j in 0..3 {
+                assert!((mat[i][j] - mat[j][i]).abs() < 1e-6, "not symmetric at [{i}][{j}]");
+            }
+        }
+    }
+
+    #[test]
+    fn test_encoder_different_texts_differ() {
+        let enc = SentenceEncoder::new(32);
+        let a = enc.encode("consciousness");
+        let b = enc.encode("banana");
+        assert_ne!(a, b);
+    }
 }

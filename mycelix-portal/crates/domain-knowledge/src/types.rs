@@ -73,3 +73,15 @@ pub struct PredictionMarket {
     pub volume: u64,
     pub resolved: Option<bool>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn claim_roundtrip() {
+        let c = Claim { id: "c-1".into(), author_did: "did:t".into(), statement: "test claim".into(), domain: "science".into(), evidence: vec![], credibility: 0.8, status: ClaimStatus::Verified, created_at: 0 };
+        let bytes = rmp_serde::to_vec_named(&c).unwrap();
+        let decoded: Claim = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.status, ClaimStatus::Verified);
+    }
+}

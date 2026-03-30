@@ -129,3 +129,16 @@ pub struct MemberMycelState {
     pub active_months: u32,
     pub is_apprentice: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn payment_roundtrip() {
+        let p = Payment { id: "p-1".into(), from_did: "a".into(), to_did: "b".into(), amount: 500, fee: 5, currency: "SAP".into(), payment_type: PaymentType::Direct, status: TransferStatus::Completed, memo: None, created: 0, completed: Some(100) };
+        let bytes = rmp_serde::to_vec_named(&p).unwrap();
+        let decoded: Payment = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.amount, 500);
+        assert_eq!(decoded.status, TransferStatus::Completed);
+    }
+}

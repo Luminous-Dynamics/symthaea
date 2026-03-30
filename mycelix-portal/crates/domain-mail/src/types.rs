@@ -42,3 +42,16 @@ pub struct ComposeInput {
     pub subject: String,
     pub body: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn inbox_summary_roundtrip() {
+        let inbox = InboxSummary { unread_count: 5, total_count: 100, recent_threads: vec![], trust_health: TrustHealth { trusted_contacts: 50, quarantined: 2, introductions_pending: 1, average_trust_score: 0.75 } };
+        let bytes = rmp_serde::to_vec_named(&inbox).unwrap();
+        let decoded: InboxSummary = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.unread_count, 5);
+        assert_eq!(decoded.trust_health.trusted_contacts, 50);
+    }
+}

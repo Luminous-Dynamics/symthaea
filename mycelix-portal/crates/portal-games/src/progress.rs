@@ -41,3 +41,22 @@ pub fn provide_progress_store() -> (ReadSignal<ProgressStore>, WriteSignal<Progr
     provide_context(write);
     (read, write)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_store_default_empty() {
+        let store = ProgressStore::default();
+        assert!(store.nodes.is_empty());
+    }
+
+    #[test]
+    fn node_progress_default_values() {
+        let np = NodeProgress::default();
+        assert_eq!(np.status, ProgressStatus::NotStarted);
+        assert_eq!(np.mastery_permille, 0);
+        assert_eq!(np.attempts, 0);
+    }
+}

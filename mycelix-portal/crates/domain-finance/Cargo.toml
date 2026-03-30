@@ -8,3 +8,6 @@ description = "Finance domain module for Mycelix Portal — payments, treasury, 
 [dependencies]
 portal-domain-trait = { path = "../portal-domain-trait" }
 serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rmp-serde = "1"

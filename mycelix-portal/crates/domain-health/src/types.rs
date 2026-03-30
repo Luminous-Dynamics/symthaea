@@ -87,3 +87,22 @@ pub struct AccessEvent {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum AccessEventType { DataAccess, FlContribution, DividendPayout, ConsentChange, BreakGlass }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn health_record_roundtrip() {
+        let rec = HealthRecord {
+            id: "hr-1".into(), patient_did: "did:test".into(),
+            record_type: RecordType::LabResult,
+            encrypted_payload: vec![1, 2, 3],
+            metadata: RecordMetadata { provider_did: Some("did:doc".into()), facility: None, date_of_service: 1000, sensitivity: SensitivityLevel::Normal },
+            created_at: 1000,
+        };
+        let bytes = rmp_serde::to_vec_named(&rec).unwrap();
+        let decoded: HealthRecord = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.id, "hr-1");
+        assert_eq!(decoded.record_type, RecordType::LabResult);
+    }
+}

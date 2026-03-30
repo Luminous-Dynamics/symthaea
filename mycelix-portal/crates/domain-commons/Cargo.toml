@@ -8,3 +8,6 @@ description = "Commons domain module for Mycelix Portal — property, housing, c
 [dependencies]
 portal-domain-trait = { path = "../portal-domain-trait" }
 serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rmp-serde = "1"
