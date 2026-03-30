@@ -472,6 +472,32 @@ pub struct DisasterEffects {
 }
 
 impl DisasterEffects {
+    /// Fix 10: Apply continuous time phase scaling to disaster effects.
+    ///
+    /// `event_phase` is in [0.0, 1.0) representing the point in the
+    /// colony's rotation/day-cycle when the event hits.
+    ///
+    /// - Day-side (phase < 0.5): full damage
+    /// - Night-side (phase >= 0.5): 30% damage for solar events (shielded by body)
+    /// - Night shift (phase >= 0.75): slower response → 1.2× infrastructure damage
+    ///
+    /// `is_solar` indicates whether this is a solar/radiation event.
+    pub fn apply_event_phase(&mut self, event_phase: f64, is_solar: bool) {
+        if is_solar && event_phase >= 0.5 {
+            // Night-side: solar events do only 30% damage
+            self.population_loss_fraction *= 0.3;
+            self.electronics_damage *= 0.3;
+            self.consciousness_shock *= 0.3;
+            self.solar_power_penalty *= 0.3;
+        }
+
+        if event_phase >= 0.75 {
+            // Night shift: slower emergency response → more infrastructure damage
+            self.infrastructure_damage *= 1.2;
+            self.resource_production_penalty *= 1.1;
+        }
+    }
+
     /// Combine two effect sets (additive, clamped).
     pub fn merge(&mut self, other: &DisasterEffects) {
         self.population_loss_fraction =
@@ -2497,7 +2523,9 @@ mod tests {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         }
     }
 
@@ -2891,6 +2919,62 @@ mod tests {
         assert!(
             engine.micrometeorite_damage > initial,
             "Micrometeorite damage should accumulate"
+        );
+    }
+
+    #[test]
+    fn test_day_side_solar_does_more_damage() {
+        // Fix 10: Continuous Time Phase
+        let mut day_effects = DisasterEffects {
+            population_loss_fraction: 0.1,
+            infrastructure_damage: 0.2,
+            resource_production_penalty: 0.1,
+            solar_power_penalty: 0.5,
+            consciousness_shock: 0.1,
+            allostatic_load_increase: 0.0,
+            electronics_damage: 0.3,
+            morale_impact: -0.2,
+        };
+        let mut night_effects = day_effects.clone();
+
+        // Day-side (phase 0.2): full damage
+        day_effects.apply_event_phase(0.2, true);
+        // Night-side (phase 0.7): reduced solar damage
+        night_effects.apply_event_phase(0.7, true);
+
+        assert!(
+            day_effects.electronics_damage > night_effects.electronics_damage,
+            "Day-side solar should do more electronics damage: {} vs {}",
+            day_effects.electronics_damage, night_effects.electronics_damage
+        );
+        assert!(
+            day_effects.population_loss_fraction > night_effects.population_loss_fraction,
+            "Day-side solar should cause more casualties: {} vs {}",
+            day_effects.population_loss_fraction, night_effects.population_loss_fraction
+        );
+    }
+
+    #[test]
+    fn test_night_shift_slower_response() {
+        // Fix 10: Night shift increases infrastructure damage
+        let mut effects = DisasterEffects {
+            population_loss_fraction: 0.0,
+            infrastructure_damage: 0.2,
+            resource_production_penalty: 0.1,
+            solar_power_penalty: 0.0,
+            consciousness_shock: 0.0,
+            allostatic_load_increase: 0.0,
+            electronics_damage: 0.0,
+            morale_impact: 0.0,
+        };
+
+        let base_infra = effects.infrastructure_damage;
+        effects.apply_event_phase(0.8, false); // Night shift, non-solar
+
+        assert!(
+            effects.infrastructure_damage > base_infra,
+            "Night shift should amplify infra damage: {} vs {}",
+            effects.infrastructure_damage, base_infra
         );
     }
 }

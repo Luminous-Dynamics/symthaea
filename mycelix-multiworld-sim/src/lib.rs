@@ -29,6 +29,7 @@ pub mod agent;
 pub mod config;
 pub mod consciousness;
 pub mod consciousness_epidemiology;
+pub mod disaster_cascade;
 pub mod disasters;
 pub mod earth_regions;
 pub mod interplanetary_consciousness;
@@ -50,6 +51,7 @@ pub mod cohort;
 pub mod engine_v2;
 pub mod habitat;
 pub mod projects;
+pub mod robotics;
 pub mod supply_chain;
 pub mod symtropy_bridge;
 pub mod report;
@@ -289,7 +291,9 @@ impl MultiWorldSimulator {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: habitat::HabitatComplex::default_surface_colony(&seed.location),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
             };
 
             // Hybrid Earth: skip individual agent creation for Earth;
@@ -431,7 +435,9 @@ impl MultiWorldSimulator {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: habitat::HabitatComplex::default_surface_colony(&location),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         };
 
         for _ in 0..population {
@@ -1355,6 +1361,29 @@ impl MultiWorldSimulator {
                 0.44 * (1.0 - 0.0013_f64).powf(age) // 440W decaying
             };
             world.power_generation_kw = solar_kw + nuclear_kw;
+
+            // === JOULE TAX: Robotic fleet power allocation ===
+            // Robots consume power AFTER human needs. Surplus power feeds the fleet.
+            // If insufficient, robots lose Phi → enter safe-mode → humans must take over.
+            let surplus_kw = (world.power_generation_kw - world.power_demand_kw).max(0.0);
+            let (robot_draw_kw, robot_labor, brownouts) =
+                world.fleet.tick_power_allocation(surplus_kw, 730.0);
+            world.power_demand_kw += robot_draw_kw;
+
+            // Brownout events
+            if brownouts > 0 {
+                self.events.push(CivEvent::new(
+                    tick, Some(world.id), CivEventType::EmergencyDeclared,
+                    format!("{}: BROWNOUT CASCADE — {} robots entered safe-mode. \
+                        Power deficit forces human labor in hazardous modules. \
+                        Fleet operational: {:.0}%",
+                        world.name, brownouts,
+                        world.fleet.operational_fraction() * 100.0),
+                ));
+            }
+
+            // Robot labor offsets human maintenance requirements
+            let robot_maintenance_offset = robot_labor * 0.5; // Each robot-hour = 0.5 human maintenance hours
 
             // === B: AUTOMATION LEVEL ===
             // Grows with engineering + manufacturing tech. Reduces labor requirements.
@@ -3650,7 +3679,9 @@ impl Default for World {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         }
     }
 }

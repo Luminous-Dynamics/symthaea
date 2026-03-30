@@ -645,7 +645,9 @@ impl InterWorldEngine {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         };
 
         // Establish trade route with parent (assume Moon-Earth-class delay).
@@ -799,7 +801,9 @@ mod tests {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         };
         for i in 0..n {
             let birth_tick = 0; // born at tick 0, so at TEST_TICK they are 30 years old

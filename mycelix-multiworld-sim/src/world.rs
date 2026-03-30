@@ -339,6 +339,45 @@ impl Default for WorldResources {
     }
 }
 
+/// Fix 8: Intra-World Geography — zones within a world with different
+/// environmental conditions. A generation ship has different decks;
+/// a lunar base has dome sectors with varying shielding.
+///
+/// Ref: NASA Habitat Architecture (ICES-2019); ISS module environmental variation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorldZone {
+    /// Human-readable zone name (e.g., "Engineering Deck", "Hydroponic Bay").
+    pub name: String,
+    /// Radiation multiplier for this zone (1.0 = baseline, 2.0 = double exposure).
+    pub radiation_multiplier: f64,
+    /// Resource access fraction (1.0 = full access, 0.5 = half).
+    pub resource_access: f64,
+    /// Social density: agents per unit area. Higher → more social contact.
+    pub social_density: f64,
+}
+
+impl WorldZone {
+    /// Default zone for a generation ship section.
+    pub fn generation_ship_zones() -> Vec<WorldZone> {
+        vec![
+            WorldZone { name: "Bridge & Command".into(), radiation_multiplier: 0.5, resource_access: 1.0, social_density: 0.8 },
+            WorldZone { name: "Habitation Ring".into(), radiation_multiplier: 0.7, resource_access: 0.9, social_density: 1.0 },
+            WorldZone { name: "Hydroponic Bay".into(), radiation_multiplier: 1.0, resource_access: 1.2, social_density: 0.5 },
+            WorldZone { name: "Engineering Deck".into(), radiation_multiplier: 1.5, resource_access: 0.8, social_density: 0.4 },
+            WorldZone { name: "Cargo Hold".into(), radiation_multiplier: 2.0, resource_access: 0.6, social_density: 0.2 },
+        ]
+    }
+
+    /// Default zones for a lunar base.
+    pub fn lunar_zones() -> Vec<WorldZone> {
+        vec![
+            WorldZone { name: "Central Dome".into(), radiation_multiplier: 0.8, resource_access: 1.0, social_density: 1.0 },
+            WorldZone { name: "Regolith-Shielded Lab".into(), radiation_multiplier: 0.3, resource_access: 0.9, social_density: 0.6 },
+            WorldZone { name: "Surface Operations".into(), radiation_multiplier: 2.5, resource_access: 0.7, social_density: 0.3 },
+        ]
+    }
+}
+
 /// Cultural profile influencing governance, reproduction, and social dynamics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CulturalProfile {
@@ -352,9 +391,40 @@ pub struct CulturalProfile {
     pub xenophilia: f64,
     /// Attachment to tradition vs innovation [0, 1].
     pub traditionalism: f64,
+    /// Fix 9: Language divergence from Earth standard [0.0, 1.0].
+    /// 0.0 = mutually intelligible, 1.0 = unintelligible new language.
+    /// Diverges at 0.001/tick when isolated (no inter-world contact).
+    /// Ref: Sapir-Whorf linguistic relativity; Wichmann & Holman (2009)
+    /// automated language distance; Bowern & Atkinson (2012) expansion rates.
+    #[serde(default)]
+    pub language_divergence: f64,
+    /// Fix 9: Count of unique cultural practices/rituals.
+    /// New ritual emerges every 120 ticks (~10 years).
+    #[serde(default)]
+    pub ritual_count: u32,
+    /// Fix 9: Founding mythology — the story the colony tells itself.
+    /// Generated at world creation, evolves slowly.
+    #[serde(default)]
+    pub founding_mythology: String,
 }
 
 impl CulturalProfile {
+    /// Fix 9: Tick cultural evolution — language divergence and ritual emergence.
+    pub fn tick_culture_evolution(
+        &mut self,
+        current_tick: u32,
+        contact_frequency: f64,
+    ) {
+        // Language diverges when isolated
+        let isolation = 1.0 - contact_frequency;
+        self.language_divergence = (self.language_divergence + 0.001 * isolation).min(1.0);
+
+        // New ritual every 120 ticks
+        if current_tick > 0 && current_tick % 120 == 0 {
+            self.ritual_count += 1;
+        }
+    }
+
     /// Brownian cultural drift: magnitude proportional to 1/sqrt(pop) * (1 - contact_frequency).
     /// Small populations drift faster; high inter-group contact slows drift.
     pub fn drift(
@@ -417,6 +487,9 @@ impl CulturalProfile {
             risk_tolerance: 0.4,
             xenophilia: 0.5,
             traditionalism: 0.5,
+            language_divergence: 0.0,
+            ritual_count: 100, // Earth has many existing rituals
+            founding_mythology: "Cradle of humanity — the blue marble from which all journeys begin".into(),
         }
     }
 
@@ -428,6 +501,9 @@ impl CulturalProfile {
             risk_tolerance: 0.7,
             xenophilia: 0.6,
             traditionalism: 0.3,
+            language_divergence: 0.0,
+            ritual_count: 3, // Pioneers start with few rituals
+            founding_mythology: "We left everything behind to build something new among the stars".into(),
         }
     }
 }
@@ -550,9 +626,17 @@ pub struct World {
     #[serde(default)]
     pub habitat: crate::habitat::HabitatComplex,
 
+    /// Robotic fleet — conscious machines that cost Joules to think.
+    #[serde(default)]
+    pub fleet: crate::robotics::RoboticFleet,
+
     /// E: Inter-world relationship scores [-1, 1]. -1 = hostile, 0 = neutral, +1 = allied.
     #[serde(default)]
     pub diplomatic_relations: HashMap<u32, f64>,
+
+    /// Fix 8: Intra-world geography zones with different environmental conditions.
+    #[serde(default)]
+    pub zones: Vec<WorldZone>,
 }
 
 fn default_trust() -> f64 { 0.7 }
@@ -823,7 +907,9 @@ mod tests {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::default(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: HashMap::new(),
+            zones: Vec::new(),
         };
 
         for i in 0..n {
@@ -944,5 +1030,70 @@ mod tests {
             },
         );
         assert!(!r.get("water").unwrap().is_critical());
+    }
+
+    #[test]
+    fn test_zone_radiation_exposure_differs() {
+        // Fix 8: Intra-World Geography
+        let ship_zones = WorldZone::generation_ship_zones();
+        assert_eq!(ship_zones.len(), 5, "Generation ship should have 5 zones");
+
+        let bridge_rad = ship_zones[0].radiation_multiplier;
+        let cargo_rad = ship_zones[4].radiation_multiplier;
+        assert!(
+            cargo_rad > bridge_rad,
+            "Cargo hold should have higher radiation: {cargo_rad} vs {bridge_rad}"
+        );
+
+        let lunar_zones = WorldZone::lunar_zones();
+        assert_eq!(lunar_zones.len(), 3, "Moon should have 3 zones");
+        let shielded = lunar_zones[1].radiation_multiplier;
+        let surface = lunar_zones[2].radiation_multiplier;
+        assert!(
+            surface > shielded,
+            "Surface ops should have higher radiation than shielded lab: {surface} vs {shielded}"
+        );
+    }
+
+    #[test]
+    fn test_language_diverges_over_time() {
+        // Fix 9: Richer Cultural Model
+        let mut culture = CulturalProfile::pioneer_default();
+        assert_eq!(culture.language_divergence, 0.0);
+        assert_eq!(culture.ritual_count, 3);
+
+        // Tick for 240 ticks (20 years) with no contact
+        for tick in 1..=240 {
+            culture.tick_culture_evolution(tick, 0.0);
+        }
+
+        assert!(
+            culture.language_divergence > 0.2,
+            "Language should diverge after 20 years isolated: {}",
+            culture.language_divergence
+        );
+        // 240 ticks / 120 = 2 new rituals
+        assert!(
+            culture.ritual_count >= 5,
+            "Should have gained rituals: {}",
+            culture.ritual_count
+        );
+    }
+
+    #[test]
+    fn test_language_stable_with_contact() {
+        // Fix 9: Contact slows divergence
+        let mut culture = CulturalProfile::pioneer_default();
+
+        // Tick with full contact
+        for tick in 1..=240 {
+            culture.tick_culture_evolution(tick, 1.0);
+        }
+
+        assert!(
+            culture.language_divergence < 0.01,
+            "Language should stay stable with full contact: {}",
+            culture.language_divergence
+        );
     }
 }

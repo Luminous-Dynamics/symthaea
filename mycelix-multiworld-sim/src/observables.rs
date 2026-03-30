@@ -365,7 +365,9 @@ mod tests {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         };
         for i in 0..pop {
             let agent = CivAgent {

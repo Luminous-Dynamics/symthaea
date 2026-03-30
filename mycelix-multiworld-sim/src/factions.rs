@@ -16,6 +16,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::agent::CivAgent;
 use crate::config::PolicyConfig;
 use crate::events::{CivEvent, CivEventType};
 use crate::stochastic::StochasticEngine;
@@ -512,6 +513,69 @@ impl FactionEngine {
         }
     }
 
+    /// Fix 4: Directed civil war between the two largest opposing factions.
+    ///
+    /// Deaths are concentrated among faction members. The winning faction
+    /// (larger) gains control, and the losing faction is disbanded.
+    /// Returns (deaths, infrastructure_damage).
+    ///
+    /// Ref: Turchin (2003) "Historical Dynamics" — elite competition model.
+    pub fn directed_civil_war(
+        &mut self,
+        world_id: u32,
+        agents: &mut [CivAgent],
+        severity: f64,
+        rng: &mut StochasticEngine,
+    ) -> (usize, f64) {
+        // Find two largest factions in this world
+        let mut world_factions: Vec<(u32, usize)> = self.factions
+            .iter()
+            .filter(|f| f.world_id == world_id)
+            .map(|f| (f.id, f.member_count))
+            .collect();
+        world_factions.sort_by(|a, b| b.1.cmp(&a.1));
+
+        if world_factions.len() < 2 {
+            return (0, 0.0);
+        }
+
+        let winner_id = world_factions[0].0;
+        let loser_id = world_factions[1].0;
+
+        let mut deaths = 0usize;
+        let death_prob = severity * 0.1; // 10% of severity → death probability for combatants
+
+        // Kill faction members probabilistically (losers 2× more likely)
+        for agent in agents.iter_mut().filter(|a| a.is_alive()) {
+            let p = if agent.faction_id == Some(loser_id) {
+                death_prob * 2.0
+            } else if agent.faction_id == Some(winner_id) {
+                death_prob
+            } else {
+                death_prob * 0.1 // civilian collateral
+            };
+
+            if rng.bernoulli(p.min(0.5)) {
+                agent.death_tick = Some(u32::MAX); // mark for death processing by caller
+                deaths += 1;
+            }
+        }
+
+        // Infrastructure damage proportional to severity
+        let infra_damage = severity * 0.2;
+
+        // Disband losing faction
+        self.factions.retain(|f| f.id != loser_id);
+        for agent in agents.iter_mut() {
+            if agent.faction_id == Some(loser_id) {
+                agent.faction_id = None;
+                agent.trauma_level = (agent.trauma_level + 0.3).min(1.0);
+            }
+        }
+
+        (deaths, infra_damage)
+    }
+
     /// Get civil unrest for a specific world.
     pub fn world_unrest(&self, world_id: u32) -> f64 {
         self.civil_unrest.get(&world_id).copied().unwrap_or(0.0)
@@ -597,7 +661,9 @@ mod tests {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         };
         for i in 0..pop {
             let agent = CivAgent {
@@ -840,6 +906,45 @@ mod tests {
         assert!(
             final_trauma > 0.0,
             "Trauma should increase after conflict resolution"
+        );
+    }
+
+    #[test]
+    fn test_directed_civil_war_casualties() {
+        // Fix 4: Factional Warfare
+        let mut engine = FactionEngine::new();
+        engine.factions.push(Faction {
+            id: 1, name: "Big".into(), ideology: [0.0; 4],
+            founding_tick: 0, member_count: 60, strength: 0.5, world_id: 0,
+        });
+        engine.factions.push(Faction {
+            id: 2, name: "Small".into(), ideology: [1.0; 4],
+            founding_tick: 0, member_count: 30, strength: 0.3, world_id: 0,
+        });
+
+        let mut agents: Vec<CivAgent> = (0..100).map(|i| {
+            CivAgent {
+                id: i as u64, birth_tick: 0, death_tick: None,
+                sex: if i % 2 == 0 { BiologicalSex::Female } else { BiologicalSex::Male },
+                world_id: 0, health: 0.9, skills: SkillVector::new(),
+                education_level: 0.3, consciousness: ConsciousnessState::nascent(),
+                partner_id: None, children_ids: vec![],
+                is_immigrant: false, needs: crate::needs::PsychologicalNeeds::new(),
+                tend_balance: 0.0, parent_ids: None,
+                faction_id: if i < 60 { Some(1) } else if i < 90 { Some(2) } else { None },
+                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0,
+            }
+        }).collect();
+
+        let mut rng = StochasticEngine::new(42);
+        let (deaths, damage) = engine.directed_civil_war(0, &mut agents, 0.8, &mut rng);
+
+        assert!(deaths > 0, "Civil war should cause casualties");
+        assert!(damage > 0.0, "Civil war should damage infrastructure");
+        // Losing faction should be disbanded
+        assert!(
+            !engine.factions.iter().any(|f| f.id == 2),
+            "Losing faction should be disbanded"
         );
     }
 

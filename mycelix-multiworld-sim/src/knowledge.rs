@@ -180,6 +180,39 @@ impl CriticalSystemCoverage {
     }
 }
 
+/// Compute world tech levels from agent skills (Fix 1: Embodied Knowledge).
+///
+/// For each sector, the tech level is the mean skill of the top 10% of
+/// specialists. This ensures that when top specialists die, the tech
+/// level drops — knowledge was embodied in those people.
+pub fn compute_world_tech_levels(agents: &[crate::agent::CivAgent]) -> [f64; NUM_SECTORS] {
+    let mut levels = [1.0; NUM_SECTORS]; // baseline 1.0
+
+    for sector in 0..NUM_SECTORS {
+        let mut skills: Vec<f64> = agents
+            .iter()
+            .filter(|a| a.is_alive())
+            .map(|a| a.skills.as_slice()[sector])
+            .collect();
+
+        if skills.is_empty() {
+            continue;
+        }
+
+        // Sort descending
+        skills.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Top 10% (minimum 1 agent)
+        let top_n = (skills.len() / 10).max(1);
+        let top_mean: f64 = skills[..top_n].iter().sum::<f64>() / top_n as f64;
+
+        // Map skill [0,1] to tech level [1.0, 5.0]
+        levels[sector] = 1.0 + top_mean * 4.0;
+    }
+
+    levels
+}
+
 impl WorldKnowledge {
     /// Create a new knowledge system at baseline technology.
     pub fn new() -> Self {
@@ -456,6 +489,19 @@ impl WorldKnowledge {
         self.technology_levels.iter().sum::<f64>() / NUM_SECTORS as f64
     }
 
+    /// Sync technology levels from agent skill distribution (Fix 1: Embodied Knowledge).
+    ///
+    /// Tech level per sector = mean of top 10% specialists in that sector.
+    /// When a specialist dies, tech level drops because knowledge was embodied.
+    /// Ref: Henrich (2004) — Tasmania lost canoe-building when specialists died.
+    pub fn sync_from_agents(&mut self, agents: &[crate::agent::CivAgent]) {
+        let new_levels = compute_world_tech_levels(agents);
+        for i in 0..NUM_SECTORS {
+            // Blend: 70% agent-derived, 30% accumulated (documents, tools, etc.)
+            self.technology_levels[i] = 0.7 * new_levels[i] + 0.3 * self.technology_levels[i];
+        }
+    }
+
     /// Sector with the highest technology level. Returns (index, value).
     pub fn max_tech_sector(&self) -> (usize, f64) {
         self.technology_levels
@@ -582,7 +628,9 @@ mod tests {
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
             habitat: crate::habitat::HabitatComplex::default(),
+            fleet: crate::robotics::RoboticFleet::default(),
             diplomatic_relations: std::collections::HashMap::new(),
+            zones: Vec::new(),
         }
     }
 
@@ -737,5 +785,35 @@ mod tests {
         // Cultural distance = 1.0 -> zero absorption
         receiver.receive_diffusion(&sender, 1.0, 1.0);
         assert_eq!(receiver.diffusion_received, 0.0);
+    }
+
+    #[test]
+    fn test_killing_top_engineers_drops_tech_level() {
+        // Fix 1: Embodied Knowledge test
+        let mut knowledge = WorldKnowledge::new();
+        let world = make_world_with_researchers(5, 20);
+
+        // Compute initial tech levels from agents with high skills
+        let mut agents_with_engineers = world.agents.clone();
+        // Give some agents high engineering skill
+        for a in agents_with_engineers.iter_mut().take(5) {
+            a.skills.learn(0, 0.8); // engineering
+        }
+
+        knowledge.sync_from_agents(&agents_with_engineers);
+        let tech_before = knowledge.technology_levels[0];
+
+        // "Kill" the top engineers
+        for a in agents_with_engineers.iter_mut().take(5) {
+            a.death_tick = Some(TEST_TICK);
+        }
+
+        knowledge.sync_from_agents(&agents_with_engineers);
+        let tech_after = knowledge.technology_levels[0];
+
+        assert!(
+            tech_after < tech_before,
+            "Killing top engineers should drop tech level: {tech_after} vs {tech_before}"
+        );
     }
 }
