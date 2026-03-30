@@ -192,7 +192,7 @@ impl GlobeRenderer {
         let (cloud_vao, cloud_index_count) = Self::create_sphere_vao(&gl, 64, 64, 1.02)?;
 
         // Core sphere (radius 0.6, inside the globe — visible through translucent ocean)
-        let (core_vao, core_index_count) = Self::create_sphere_vao(&gl, 32, 32, 0.6)?;
+        let (core_vao, core_index_count) = Self::create_sphere_vao(&gl, 32, 32, 0.25)?;
 
         // Fullscreen quad VAO for bloom/background passes
         let fullscreen_vao = Self::create_fullscreen_quad_vao(&gl)?;

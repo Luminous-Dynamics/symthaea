@@ -149,79 +149,49 @@ void main() {
     float PI = 3.14159265;
 
     // ═══════════════════════════════════════════════════════════
-    // PLANETARY CORE CUTAWAY
+    // PLANETARY CORE CUTAWAY — clean hemisphere slice
     // ═══════════════════════════════════════════════════════════
     if (u_show_core > 0.5) {
-        // Clip: discard the front-right hemisphere to reveal interior
-        if (v_world_normal.x > -0.02 && v_world_normal.z > -0.02) {
-            // This fragment is on the cutaway face — render interior layers
+        // Clean vertical cut: discard the front half (z > 0)
+        if (v_world_normal.z > 0.01) {
+            // On the cut face: render geological cross-section
+            // Use distance from center (y and x) as radial depth
             vec3 n = normalize(v_world_normal);
-            float depth = length(n); // always 1.0 for sphere surface, but we use UV for depth simulation
+            float r = length(n.xy); // radial distance on the cut face
 
-            // Simulate depth into the planet using the cut face position
-            float radial = length(vec2(v_world_normal.x, v_world_normal.z));
-            float y_pos = v_world_normal.y;
-
-            // Concentric layers based on radial distance from center
-            // Earth radius = 6371 km, normalized to 1.0
-            float r = length(v_world_normal);
-
-            // Layer boundaries (normalized to Earth radius = 1.0)
-            // Inner core: 0 - 0.19 (1220/6371)
-            // Outer core: 0.19 - 0.54 (3480/6371)
-            // Lower mantle: 0.54 - 0.89 (5670/6371)
-            // Upper mantle: 0.89 - 0.995
-            // Crust: 0.995 - 1.0
-
-            // Use angular position as proxy for radial depth in cutaway view
-            float fake_depth = 1.0 - length(vec2(n.x + 0.5, n.z + 0.5)) * 0.7;
-            fake_depth = clamp(fake_depth, 0.0, 1.0);
-
-            vec3 core_color;
-            float convection = 0.0;
-
-            if (fake_depth < 0.19) {
-                // Inner core: solid iron — bright yellow-white, hot
-                core_color = vec3(1.0, 0.9, 0.5);
-                // Crystalline structure hint
-                float crystal = sin(n.x * 30.0) * sin(n.y * 30.0) * sin(n.z * 30.0);
-                core_color += vec3(0.1) * crystal;
-            } else if (fake_depth < 0.54) {
-                // Outer core: liquid iron — orange-red, convecting
-                float outer_t = (fake_depth - 0.19) / 0.35;
-                core_color = mix(vec3(1.0, 0.7, 0.2), vec3(0.9, 0.4, 0.1), outer_t);
-                // Animated convection currents
-                convection = snoise(vec3(n.xy * 4.0, u_time * 0.3)) * 0.15;
-                core_color += vec3(convection, convection * 0.5, 0.0);
-            } else if (fake_depth < 0.89) {
-                // Lower mantle: dark red-orange, slow convection
-                float mantle_t = (fake_depth - 0.54) / 0.35;
-                core_color = mix(vec3(0.7, 0.25, 0.05), vec3(0.4, 0.12, 0.03), mantle_t);
+            // Layer colors (geological cross-section, inside → outside)
+            vec3 layer_color;
+            if (r < 0.19) {
+                // Inner core: bright golden (solid iron crystal)
+                layer_color = vec3(1.0, 0.85, 0.4);
+            } else if (r < 0.54) {
+                // Outer core: orange (liquid iron)
+                float t = (r - 0.19) / 0.35;
+                layer_color = mix(vec3(1.0, 0.7, 0.25), vec3(0.85, 0.4, 0.1), t);
+                // Animated convection
+                float conv = snoise(vec3(n.xy * 5.0, u_time * 0.2)) * 0.1;
+                layer_color += vec3(conv, conv * 0.3, 0.0);
+            } else if (r < 0.89) {
+                // Mantle: dark red to brown
+                float t = (r - 0.54) / 0.35;
+                layer_color = mix(vec3(0.6, 0.2, 0.05), vec3(0.3, 0.1, 0.03), t);
                 // Slow convection cells
-                float cell = snoise(vec3(n.xy * 2.0, u_time * 0.1));
-                float cell2 = snoise(vec3(n.yz * 3.0, u_time * 0.08));
-                convection = (cell * 0.5 + cell2 * 0.3);
-                // Convection flow lines
-                float flow = sin(n.y * 8.0 + convection * 3.0 + u_time * 0.2) * 0.5 + 0.5;
-                core_color += vec3(flow * 0.1, flow * 0.03, 0.0);
+                float conv = snoise(vec3(n.xy * 3.0, u_time * 0.1)) * 0.08;
+                layer_color += vec3(conv, conv * 0.2, 0.0);
             } else {
-                // Upper mantle + crust: dark brown transitioning to surface
-                float upper_t = (fake_depth - 0.89) / 0.11;
-                core_color = mix(vec3(0.3, 0.10, 0.03), vec3(0.15, 0.08, 0.04), upper_t);
-                // Tectonic movement hint
-                float tectonic = snoise(vec3(n.xz * 5.0, u_time * 0.05));
-                core_color += vec3(0.05, 0.02, 0.0) * max(tectonic, 0.0);
+                // Crust: thin dark shell
+                layer_color = vec3(0.15, 0.1, 0.06);
             }
 
-            // Layer boundaries: bright interface lines
-            float boundary1 = smoothstep(0.005, 0.0, abs(fake_depth - 0.19)); // inner/outer core
-            float boundary2 = smoothstep(0.005, 0.0, abs(fake_depth - 0.54)); // core/mantle
-            float boundary3 = smoothstep(0.005, 0.0, abs(fake_depth - 0.89)); // lower/upper mantle
-            core_color += vec3(1.0, 0.8, 0.3) * (boundary1 + boundary2 + boundary3) * 0.5;
+            // Sharp boundary lines between layers
+            float b1 = 1.0 - smoothstep(0.0, 0.008, abs(r - 0.19));
+            float b2 = 1.0 - smoothstep(0.0, 0.008, abs(r - 0.54));
+            float b3 = 1.0 - smoothstep(0.0, 0.008, abs(r - 0.89));
+            layer_color += vec3(1.0, 0.9, 0.5) * (b1 + b2 + b3) * 0.4;
 
-            // Emission: core glows, doesn't need external light
-            float glow = 0.5 + fake_depth * 0.5;
-            frag_color = vec4(core_color * glow, 1.0);
+            // Self-luminous: brighter toward center
+            float glow = 0.6 + (1.0 - r) * 0.6;
+            frag_color = vec4(layer_color * glow, 1.0);
             return;
         }
     }
