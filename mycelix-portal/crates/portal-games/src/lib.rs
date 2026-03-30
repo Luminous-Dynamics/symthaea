@@ -17,4 +17,4 @@ pub mod progress;
 pub mod social_proof;
 
 pub use graph_renderer::{GraphArea, GraphConfig};
-pub use progress::{ProgressStatus, use_set_progress};
+pub use progress::{ProgressStatus, ProgressStore, use_set_progress, provide_progress_store};

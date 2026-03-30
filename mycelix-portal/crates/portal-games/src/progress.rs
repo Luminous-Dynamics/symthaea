@@ -34,3 +34,10 @@ pub fn use_set_progress() -> WriteSignal<ProgressStore> {
         setter
     })
 }
+
+/// Provide the progress store in context. Call from a parent component.
+pub fn provide_progress_store() -> (ReadSignal<ProgressStore>, WriteSignal<ProgressStore>) {
+    let (read, write) = signal(ProgressStore::default());
+    provide_context(write);
+    (read, write)
+}
