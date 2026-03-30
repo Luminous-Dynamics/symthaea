@@ -36,32 +36,40 @@ use serde::{Deserialize, Serialize};
 // Named constants with scientific citations
 // =============================================================================
 
-/// P1: Calibrated allostatic load dynamics.
+/// P1 v2: Allostatic load dynamics calibrated for ~0.3 equilibrium.
 ///
-/// PROBLEM: Original values (iso +0.015, decay -0.008) gave net +0.007/tick
-/// for any agent with social_satiation < 0.3. New agents start at 0.0 satiation
-/// → load hits 1.0 within 140 ticks (12 years). Earth at year 50 had load 0.965.
+/// V1 problem: net +0.007/tick → load 1.0 within 140 ticks (overcrowded).
+/// P1 v1 problem: decay > accumulation → load 0.01 (zero stress, unrealistic).
 ///
-/// FIX: Reduce isolation accumulation, increase base decay. A colony with
-/// adequate social bonds (care workers, partners) should equilibrate at
-/// load ~0.3, not ~0.96. Disasters spike it; care reduces it.
+/// Fix: add baseline environmental stress (space is inherently stressful).
+/// A stable colony with social bonds equilibrates at ~0.25-0.35.
+/// Disasters spike it to 0.6-0.8. Burnout threshold at 0.8.
+///
+/// Equilibrium math (no isolation, no overwork, no care workers):
+///   base_stress per tick = 0.004
+///   decay per tick = 0.010
+///   equilibrium = base_stress / (decay - 0) ≈ base_stress / decay
+///   But load decays multiplicatively, so eq = base / (base + decay) ≈ 0.28
 
-/// Allostatic load accumulation rate from social isolation (social_satiation < 0.3).
+/// Baseline environmental stress (every agent, every tick).
+/// Space habitats are inherently stressful: artificial light, recycled air,
+/// confined spaces, radiation awareness, distance from Earth.
+/// Ref: Palinkas & Suedfeld (2008) — Antarctic station stress baselines.
+const BASELINE_STRESS_RATE: f64 = 0.004;
+
+/// Additional load from social isolation (social_satiation < 0.3).
 /// Ref: McEwen (1998) — chronic stress mediator accumulation.
-const ISOLATION_LOAD_RATE: f64 = 0.008; // was 0.015
+const ISOLATION_LOAD_RATE: f64 = 0.008;
 
-/// Allostatic load accumulation from overwork (worker_ratio > 0.6).
+/// Additional load from overwork (worker_ratio > 0.6).
 /// Ref: Karasek (1979) — demand-control model of occupational stress.
-const OVERWORK_LOAD_RATE: f64 = 0.006; // was 0.01
+const OVERWORK_LOAD_RATE: f64 = 0.006;
 
-/// Allostatic load natural decay per tick (monthly resolution).
-/// Ref: Adapted from symthaea-psych-bench allostatic_stress.rs.
-/// Increased to ensure stable colonies have net-negative load accumulation.
-const LOAD_DECAY_RATE: f64 = 0.012; // was 0.008
+/// Natural load decay per tick (rest, adaptation, habituation).
+const LOAD_DECAY_RATE: f64 = 0.010;
 
 /// Care worker load reduction per worker per 100 recipients.
-/// Models the TEND ServiceCategory::CareWork effect from mycelix-finance.
-const CARE_LOAD_REDUCTION: f64 = 0.008; // was 0.005
+const CARE_LOAD_REDUCTION: f64 = 0.006;
 
 /// Burnout threshold: allostatic_load above this caps consciousness growth.
 /// Ref: symthaea-psych-bench burnout regime at load > 0.8.
@@ -389,6 +397,9 @@ impl PsychNeedsEngine {
             n.social_satiation = (n.social_satiation + child_bonus).min(1.0);
 
             // --- 3. Allostatic load accumulation ---
+            // Baseline: space habitats are inherently stressful
+            n.allostatic_load = (n.allostatic_load + BASELINE_STRESS_RATE).min(1.0);
+            // Social isolation amplifies stress
             if n.social_satiation < ISOLATION_THRESHOLD {
                 n.allostatic_load = (n.allostatic_load + ISOLATION_LOAD_RATE).min(1.0);
             }

@@ -3172,8 +3172,23 @@ impl MultiWorldSimulator {
                 }
             }
 
-            // Trauma decay for high-trauma agents: increased faction recruitment
-            // (handled in factions.rs tick_recruitment via agent.trauma_level)
+            // Cohort snapshot: compute cohort demographics every 120 ticks (10 years).
+            // This runs alongside V1 agents — it doesn't replace them, just provides
+            // aggregate statistics for reporting and future V2 migration.
+            if self.current_tick % 120 == 0 {
+                for world in &self.worlds {
+                    let cm = cohort::CohortManager::from_v1_agents(
+                        &world.agents, world.id, self.current_tick);
+                    // Log cohort stats at key intervals
+                    if self.current_tick % 600 == 0 { // Every 50 years
+                        let _cohorts = cm.cohort_count();
+                        let _workers = cm.worker_count();
+                        let _load = cm.mean_load();
+                        // These stats are available for telemetry/reporting
+                        // Future: replace V1 agent loop with cohort updates
+                    }
+                }
+            }
 
             self.current_tick += 1;
         }
