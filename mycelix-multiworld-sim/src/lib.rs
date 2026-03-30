@@ -49,6 +49,7 @@ pub mod needs;
 pub mod observables;
 pub mod population;
 pub mod cohort;
+pub mod constants;
 pub mod engine_v2;
 pub mod habitat;
 pub mod projects;
