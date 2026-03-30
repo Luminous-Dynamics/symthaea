@@ -10,16 +10,26 @@ BWS requires `BWS_ACCESS_TOKEN` env var (set in ~/.zshrc). Fallback: `bw` CLI (n
 Full details: @.claude/rules/CREDENTIALS.md
 
 ### Ports
-| Port | Service |
-|------|---------|
-| 3001/3333/3338 | Weave/Core/Visualizer |
-| 5491 | Luminous Nix (EXCLUSIVE) |
-| 7777 | Sacred Bridge |
-| 7778 | Holon (Soma mobile bridge) |
-| 8090 | Symthaea Web (consciousness portal) |
-| 8091 | Terra Atlas (Leptos WebGL globe) |
-| 8092 | EduNet UI |
-| 8093 | Music UI |
+
+**Ranges**: Platform (8090-8099), Frontends (8100-8149), Conductors (82XX/83XX), Dev/Test (8400-8409)
+
+| Port | Service | Domain |
+|------|---------|--------|
+| 3001/3333/3338 | Weave/Core/Visualizer (dev) | — |
+| 5491 | Luminous Nix (EXCLUSIVE) | nix.luminousdynamics.io |
+| 7777 | Sacred Bridge | — |
+| 7778 | Holon (Soma mobile bridge) | — |
+| 8090 | Symthaea Web (eval-api) | symthaea.luminousdynamics.io |
+| 8091 | Terra Atlas (Leptos) | atlas.luminousdynamics.io |
+| 8094 | SSH Relay | — |
+| **81XX** | **Mycelix Frontends** (alphabetical) | |
+| 8107 | EduNet UI | edunet.luminousdynamics.io |
+| 8111 | Health UI | health.luminousdynamics.io |
+| 8112 | Hearth UI | hearth.luminousdynamics.io |
+| 8121 | Music UI | music.luminousdynamics.io |
+| 8124 | Portal UI | portal.mycelix.net |
+| **82XX/83XX** | **Holochain Conductors** (admin/app) | |
+| 8400-8409 | Dev/test (ad-hoc) | — |
 
 Full allocation: @.claude/rules/PORTS.md
 
@@ -42,6 +52,19 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Live**: https://atlas.luminousdynamics.io
 - **DB**: `bws get supabase-prod-url`
 - **Focus**: USACE data, SMR pipeline, investments
+
+### EduNet (Learning Platform)
+- **Live**: https://edunet.luminousdynamics.io (Cloudflare Tunnel → :8107)
+- **IPFS**: `QmcB9rh3yQzmMP6kwQtXVgrBWdyCumTE2aEAg2Pb46gDCM` (decentralized fallback)
+- **Path**: `mycelix-edunet/apps/leptos/` (Leptos 0.7 CSR WASM)
+- **Code**: 42 Rust source files, 5.6MB WASM, 19 content modules, 13 standards sources
+- **Coverage**: 2,002 curriculum nodes, 1,848 edges, 48 subjects, K-to-PhD
+- **Frameworks**: CAPS (SA Gr1-12), Common Core (US), NGSS, ACM CS2013, MIT OCW, NICE Cybersecurity, Philosophy, 12 Universal subjects
+- **Features**: SVG constellation graph, 9 interactive games (parabola, tangent, unit circle, stats, analytical geom, projectile, circuits, equilibrium, acid-base), consciousness-coupled UI, conversational onboarding, SRS flashcards, exam prep, NSC insights, mastery celebrations, PWA
+- **Deploy**: `./deploy.sh` (re-pins IPFS + updates DNS), Cloudflare Tunnel `edunet` (ID: 347ade4d)
+- **Tests**: 187 (118 ingest + 69 content-gen)
+- **Tunnel start**: `cloudflared tunnel run edunet` (needs SPA server on :8107)
+- **NixOS service**: `_infrastructure/nixos/edunet-services.nix` (add to imports, then `sudo nixos-rebuild switch`)
 
 ### Luminous Nix
 - **Path**: 11-meta-consciousness/luminous-nix/
@@ -121,7 +144,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-supplychain** | `mycelix-supplychain/` | 8 (provenance tracking) | Built |
 | **mycelix-marketplace** | `mycelix-marketplace/` | 8 (arbitration) | Built |
 | **mycelix-knowledge** | `mycelix-knowledge/` | 8 (claims, graph, query, inference, factcheck, markets, DKG, bridge) | Built |
-| **mycelix-edunet** | `mycelix-edunet/` | 10 | Built |
+| **mycelix-edunet** | `mycelix-edunet/` | 10 + Leptos CSR frontend (2,002 curriculum nodes, 58 subjects, 9 games, K-to-PhD) | Built, **LIVE** at edunet.luminousdynamics.io |
 | **mycelix-energy** | `mycelix-energy/` | 5 (projects, investments, regenerative, grid, bridge) | Built |
 | **mycelix-climate** | `mycelix-climate/` | 3 (carbon, projects, bridge) | Built |
 | **mycelix-music** | `mycelix-music/` | 5 + 14 support crates (catalog, plays, balances, trust, music-bridge) | Built, WASM verified, DNA/hApp packed |
@@ -167,6 +190,7 @@ Excluding `target/`, `node_modules/`, `venv/`, build artifacts:
 |--------|---------|
 | luminousdynamics.org | Main org |
 | atlas.luminousdynamics.io | Terra Atlas |
+| edunet.luminousdynamics.io | EduNet (Cloudflare Tunnel → :8092) |
 | nixforhumanity.org | Luminous Nix |
 | mycelix.net | Mycelix |
 
