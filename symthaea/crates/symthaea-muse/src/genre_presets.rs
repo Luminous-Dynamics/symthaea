@@ -27,6 +27,8 @@ pub enum Genre {
     ElectronicPsych,
     /// Bob Marley, Jack Johnson: reggae-influenced, warm, relaxed
     IslandGroove,
+    /// Bach, Beethoven, Chopin: formal structure, piano/strings, wide dynamics
+    Classical,
 }
 
 impl Genre {
@@ -124,6 +126,19 @@ impl Genre {
                     0.3, 0.4, 0.4, 0.3,
                 ],
             },
+            Self::Classical => MusicalState {
+                consciousness_level: 0.65,
+                arousal: 0.35,              // moderate, controlled
+                valence: 0.15,              // slightly melancholy (minor key feel)
+                dopamine: 0.3,              // not flashy
+                serotonin: 0.55,            // warm
+                noradrenaline: 0.15,
+                prediction_error: 0.25,     // structured, some surprise
+                harmony_activations: [
+                    0.6, 0.4, 0.3, 0.2,    // good coherence
+                    0.3, 0.4, 0.5, 0.3,    // moderate progression
+                ],
+            },
             Self::IslandGroove => MusicalState {
                 consciousness_level: 0.4,
                 arousal: 0.35,
@@ -150,6 +165,7 @@ impl Genre {
             Self::AmbientContemplative => (55.0, 75.0),
             Self::ClassicRock => (100.0, 150.0),
             Self::ElectronicPsych => (100.0, 130.0),
+            Self::Classical => (72.0, 120.0),
             Self::IslandGroove => (70.0, 95.0),
         }
     }
@@ -164,6 +180,7 @@ impl Genre {
             Self::AmbientContemplative => 420.0,   // 7 min
             Self::ClassicRock => 270.0,            // 4.5 min
             Self::ElectronicPsych => 360.0,        // 6 min
+            Self::Classical => 300.0,               // 5 min
             Self::IslandGroove => 240.0,           // 4 min
         }
     }
@@ -172,7 +189,7 @@ impl Genre {
         &[
             Self::ProgMetal, Self::Jazz, Self::ProgressiveAtmospheric,
             Self::FunkGroove, Self::AmbientContemplative, Self::ClassicRock,
-            Self::ElectronicPsych, Self::IslandGroove,
+            Self::ElectronicPsych, Self::IslandGroove, Self::Classical,
         ]
     }
 
@@ -185,6 +202,7 @@ impl Genre {
             Self::AmbientContemplative => "Ambient Contemplative",
             Self::ClassicRock => "Classic Rock",
             Self::ElectronicPsych => "Electronic Psychedelic",
+            Self::Classical => "Classical",
             Self::IslandGroove => "Island Groove",
         }
     }

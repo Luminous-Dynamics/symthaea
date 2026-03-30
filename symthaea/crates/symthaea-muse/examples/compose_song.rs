@@ -175,6 +175,7 @@ fn parse_genre(dir: &std::path::Path) -> Genre {
         "rock" | "classic-rock" => Genre::ClassicRock,
         "electronic" | "psych" | "psychedelic" => Genre::ElectronicPsych,
         "island" | "reggae" | "island-groove" => Genre::IslandGroove,
+        "classical" | "bach" | "beethoven" | "chopin" => Genre::Classical,
         "all" => {
             for g in Genre::all() {
                 compose_genre(*g, dir);
