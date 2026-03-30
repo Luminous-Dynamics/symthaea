@@ -26,17 +26,22 @@ serve:
 
 # ── Test ──
 
-# Run all portal tests (lightweight, no conductor needed)
+# Run all 41 portal tests (native Rust, no WASM/browser/conductor)
 test:
-    @echo "Testing domain types..."
-    cargo test -p domain-governance --no-default-features
-    @echo "Testing portal-inference..."
+    @echo "=== Portal Test Suite (41 tests) ==="
+    @echo "--- Inference (11 tests) ---"
     cargo test -p portal-inference --no-default-features
-    @echo "Testing wire protocol..."
-    cargo test -p mycelix-leptos-client --manifest-path ../crates/mycelix-leptos-client/Cargo.toml
-    @echo "Testing conductor integration types..."
+    @echo "--- Governance types (10 tests) ---"
+    cargo test -p domain-governance
+    @echo "--- Conductor integration (5 tests) ---"
     cargo test --test conductor_integration
-    @echo "All tests passed!"
+    @echo "--- Force graph physics (4 tests) ---"
+    cargo test -p portal-viz --lib
+    @echo "--- Games progress + social proof (4 tests) ---"
+    cargo test -p portal-games --lib -- social_proof progress
+    @echo "--- Domain roundtrips (7 tests) ---"
+    cargo test -p domain-health -p domain-commons -p domain-finance -p domain-hearth -p domain-knowledge -p domain-lucid -p domain-mail
+    @echo "=== All 41 tests passed! ==="
 
 # Run just the wire protocol tests
 test-wire:
