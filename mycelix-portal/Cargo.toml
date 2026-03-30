@@ -60,6 +60,7 @@ sha2 = "0.10"
 hmac = "0.12"
 portal-domain-trait = { path = "crates/portal-domain-trait" }
 portal-viz = { path = "crates/portal-viz" }
+portal-games = { path = "crates/portal-games" }
 domain-health = { path = "crates/domain-health", optional = true }
 domain-governance = { path = "crates/domain-governance", optional = true }
 domain-commons = { path = "crates/domain-commons", optional = true }
