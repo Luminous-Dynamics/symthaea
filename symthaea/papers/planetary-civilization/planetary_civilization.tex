@@ -564,7 +564,11 @@ The most unexpected discovery is that scheduled maintenance and contemplative sl
 
 We do not claim to have proven that consciousness is the correct basis for political legitimacy. What we have shown is that a specific, reproducible, integration-gated governance architecture---one that rewards meta-awareness, care, epistemic humility, and value alignment---outperforms its ungated counterpart by 5.9\% CVS and nearly triples collective integration under identical disaster conditions. Whether this architecture captures something essential about consciousness, or merely operationalizes good governance traits through a novel mechanism, remains an open and important question.
 
-The civilization survived 1,000 years. It grew to 57,048 people across 5 worlds. It weathered Carrington events, ECLSS cascades, epidemics, and constitutional crises. And the single most important thing it learned was to rest.
+Recent extensions add 10 realism mechanisms: embodied knowledge (tech levels derived from individual specialist skills), death consequences (orphan trauma, partner grief, community mourning), supply-demand price formation, faction-directed warfare, developmental consciousness (earned over years, not computed), causal disaster chains (Carrington $\rightarrow$ power $\rightarrow$ thermal $\rightarrow$ O$_2$), genetic inheritance, intra-world geography, quantitative cultural evolution, and continuous-time event phasing. Under these conditions, the simulator produces its first civil war at 300 years (Turchin secular cycle: 9 phase transitions, 1 civil war, persistent trauma of 0.181). The civilization survived, but it bled---confirming that consciousness-gated governance does not prevent conflict, but prevents conflict from becoming extinction.
+
+A generation ship launched at year 500 arrives at Proxima Centauri after 85 years with 667 colonists (33\% population growth), 92\% hull integrity, and cultural speciation at year 50 of transit. Humanity becomes interstellar.
+
+The civilization survived 1,000 years. It grew to 57,048 people across 5 worlds. It weathered Carrington events, ECLSS cascades, epidemics, civil wars, and constitutional crises. And the single most important thing it learned was to rest.
 
 % ============================================================================
 % Code & Data Availability
@@ -572,7 +576,7 @@ The civilization survived 1,000 years. It grew to 57,048 people across 5 worlds.
 
 \section*{Code \& Data Availability}
 
-The simulation code (\texttt{mycelix-multiworld-sim}), planetary resource catalog (97 resources), 40-event disaster engine, 12-region hybrid Earth model, and all analysis binaries are available in the Luminous Dynamics monorepo. The simulator comprises $\sim$45,000 lines of Rust with 240+ unit tests, 15 resilience and realism mechanisms, a configurable technology tree, and empirical calibration from 12 scientific domains. Simulations can be reproduced with any reported seed at 150, 300, 777, or 1,000-year horizons. A 1,000-year disaster run completes in $\sim$60 minutes on a single core in release mode.
+The simulation code (\texttt{mycelix-multiworld-sim}), planetary resource catalog (97 resources), 40-event disaster engine, 12-region hybrid Earth model, Turchin cliodynamics module, generation ship, and all analysis binaries are available in the Luminous Dynamics monorepo. The simulator comprises $\sim$48,000 lines of Rust with 300+ unit tests, 25 configurable toggle parameters (TOML-based), 10 realism mechanisms, causal disaster chains, faction-directed warfare, and empirical calibration from 12 scientific domains. Configuration via \texttt{config/disasters.toml} and \texttt{config/tech\_tree.toml}; telemetry output as JSONL (one JSON line per tick, directly ingestible by Python/Jupyter). Simulations can be reproduced with any reported seed at 150, 300, 777, or 1,000-year horizons, with A/B comparison between integration-gated and legacy governance via the \texttt{ab\_experiment} binary.
 
 % ============================================================================
 % Acknowledgments
