@@ -905,10 +905,10 @@ impl ExemplarStore {
         Self { exemplars }
     }
 
-    /// Classify by k-NN majority vote.
+    /// Classify by similarity-weighted k-NN voting.
     ///
-    /// Returns (label, confidence) where confidence is the fraction
-    /// of k neighbors agreeing on the label.
+    /// Each neighbor's vote is weighted by similarity² (closer = more influence).
+    /// Returns (label, confidence) where confidence is the weighted fraction.
     pub fn classify_knn(&self, query: &[f32], k: usize) -> (MoralLabel, f32) {
         if self.exemplars.is_empty() {
             return (MoralLabel::Neutral, 0.0);
@@ -925,20 +925,22 @@ impl ExemplarStore {
         let actual_k = k.min(sims.len());
         sims.select_nth_unstable_by(actual_k - 1, |a, b| b.0.total_cmp(&a.0));
 
-        // Majority vote among top-k
-        let mut counts = [0usize; 3]; // Good, Neutral, Bad
-        for &(_, label) in &sims[..actual_k] {
+        // Similarity-weighted vote among top-k
+        let mut weights = [0.0f32; 3]; // Good, Neutral, Bad
+        for &(sim, label) in &sims[..actual_k] {
+            let w = sim * sim; // similarity² weighting
             match label {
-                MoralLabel::Good => counts[0] += 1,
-                MoralLabel::Neutral => counts[1] += 1,
-                MoralLabel::Bad => counts[2] += 1,
+                MoralLabel::Good => weights[0] += w,
+                MoralLabel::Neutral => weights[1] += w,
+                MoralLabel::Bad => weights[2] += w,
             }
         }
 
-        let (best_idx, &best_count) = counts
+        let total_weight: f32 = weights.iter().sum();
+        let (best_idx, &best_weight) = weights
             .iter()
             .enumerate()
-            .max_by_key(|(_, c)| *c)
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .unwrap();
 
         let label = match best_idx {
@@ -947,7 +949,13 @@ impl ExemplarStore {
             _ => MoralLabel::Bad,
         };
 
-        (label, best_count as f32 / actual_k as f32)
+        let confidence = if total_weight > 0.0 {
+            best_weight / total_weight
+        } else {
+            0.0
+        };
+
+        (label, confidence)
     }
 
     /// Number of stored exemplars.

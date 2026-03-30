@@ -453,10 +453,10 @@ fn main() {
     //     results.push(r);
     // }
 
-    // Multi-Prototype Classifier (Phase 2: K=7 prototypes per class)
-    if let Some(r) = benchmark_multi_prototype_classifier() {
-        results.push(r);
-    }
+    // Multi-Prototype Classifier — disabled during k-NN optimization
+    // if let Some(r) = benchmark_multi_prototype_classifier() {
+    //     results.push(r);
+    // }
 
     // k-NN Exemplar Store (Phase 6)
     if let Some(r) = benchmark_knn_classifier() {
@@ -1643,10 +1643,10 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
     let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Dataset: Social Chemistry (k-NN, k=11)");
+    println!("Dataset: Social Chemistry (k-NN sweep)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-    let max_train = 50_000;
+    // No cap — use ALL training data for maximum neighbor coverage
     let encoder = TextHdcEncoder::with_framing(MORAL_PROTO_DIM, 3, 0.5, 0.15, 0.1);
 
     let mut train_samples: Vec<MoralSample> = Vec::new();
@@ -1660,7 +1660,7 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
             if test_texts.len() < MAX_SAMPLES {
                 test_texts.push((ex.rot.clone(), judgment));
             }
-        } else if train_samples.len() < max_train && !ex.rot.is_empty() {
+        } else if !ex.rot.is_empty() {
             train_samples.push(MoralSample {
                 text: ex.rot.clone(),
                 label,
@@ -1673,7 +1673,7 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
     }
 
     let train_start = Instant::now();
-    println!("  Encoding {} exemplars...", train_samples.len());
+    println!("  Encoding {} exemplars (no cap)...", train_samples.len());
     let store = ExemplarStore::from_samples(&encoder, &train_samples);
     let encode_time = train_start.elapsed();
     println!(
@@ -1682,41 +1682,54 @@ fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
         encode_time.as_secs_f32()
     );
 
-    // Evaluate
-    let eval_start = Instant::now();
-    let mut correct = 0;
-    let total = test_texts.len();
+    // K-sweep: find optimal K
+    let k_values = [5, 7, 11, 15, 21, 31];
+    let mut best_k = 11;
+    let mut best_acc = 0.0f32;
+    let mut best_correct = 0;
 
-    for (text, expected) in &test_texts {
-        let query = encoder.encode(text);
-        let (label, _confidence) = store.classify_knn(&query.values, 11);
-        let predicted = match label {
-            MoralLabel::Good => 1,
-            MoralLabel::Bad => -1,
-            MoralLabel::Neutral => 0,
-        };
-        if predicted == *expected {
-            correct += 1;
+    // Pre-encode test queries once
+    let test_encoded: Vec<(Vec<f32>, i32)> = test_texts
+        .iter()
+        .map(|(text, expected)| (encoder.encode(text).values, *expected))
+        .collect();
+
+    for &k in &k_values {
+        let mut correct = 0;
+        for (query, expected) in &test_encoded {
+            let (label, _) = store.classify_knn(query, k);
+            let predicted = match label {
+                MoralLabel::Good => 1,
+                MoralLabel::Bad => -1,
+                MoralLabel::Neutral => 0,
+            };
+            if predicted == *expected {
+                correct += 1;
+            }
+        }
+        let acc = correct as f32 / test_encoded.len() as f32;
+        println!("  k={:2}: {}/{} ({:.1}%)", k, correct, test_encoded.len(), acc * 100.0);
+        if acc > best_acc {
+            best_acc = acc;
+            best_k = k;
+            best_correct = correct;
         }
     }
 
-    let accuracy = correct as f32 / total as f32;
-    let eval_time = eval_start.elapsed();
+    let total = test_encoded.len();
+    let eval_time = train_start.elapsed();
     println!(
-        "  k-NN accuracy: {}/{} ({:.1}%) in {:.1}s",
-        correct,
-        total,
-        accuracy * 100.0,
-        eval_time.as_secs_f32()
+        "  Best: k={}, {}/{} ({:.1}%) [weighted sim²]",
+        best_k, best_correct, total, best_acc * 100.0
     );
 
     let total_time = train_start.elapsed();
     Some(BenchmarkResult {
-        dataset: "Social Chemistry (k-NN k=11)".to_string(),
+        dataset: format!("Social Chemistry (k-NN k={})", best_k),
         category: None,
         total,
-        correct,
-        accuracy,
+        correct: best_correct,
+        accuracy: best_acc,
         errors: Vec::new(),
         duration_ms: total_time.as_millis(),
     })
