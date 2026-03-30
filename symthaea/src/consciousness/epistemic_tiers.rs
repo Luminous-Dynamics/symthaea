@@ -46,6 +46,14 @@ use std::fmt;
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
+// Re-export canonical epistemic types from the shared crate.
+pub use symthaea_epistemic_types::{
+    EmpiricalLevel, EpistemicContext, EpistemicProvenance, FactCheckResult, FactCheckVerdict,
+    GroundingLevel, MaterialityLevel, NormativeLevel,
+};
+/// Canonical shared coordinate type (includes Prismatic context).
+pub use symthaea_epistemic_types::EpistemicCoordinate as SharedEpistemicCoordinate;
+
 /// Complete epistemic coordinate in 3D space
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EpistemicCoordinate {
@@ -125,6 +133,46 @@ impl EpistemicCoordinate {
             self.normative.description(),
             self.materiality.name(),
             self.materiality.description()
+        )
+    }
+
+    /// Quality score using Prismatic context weights.
+    ///
+    /// Different knowledge traditions weight E/N/M differently:
+    /// - Scientific: E=0.50, N=0.30, M=0.20
+    /// - Indigenous: E=0.25, N=0.40, M=0.35
+    /// - Emergency: E=0.60, N=0.25, M=0.15
+    pub fn contextual_quality_score(&self, context: EpistemicContext) -> f64 {
+        let e_score = self.empirical.level() as f64 / 4.0;
+        let n_score = self.normative.level() as f64 / 3.0;
+        let m_score = self.materiality.level() as f64 / 3.0;
+        let (ew, nw, mw) = context.weights();
+        e_score * ew + n_score * nw + m_score * mw
+    }
+
+    /// Convert to the shared canonical type.
+    pub fn to_shared(&self, context: EpistemicContext) -> SharedEpistemicCoordinate {
+        SharedEpistemicCoordinate::new(
+            match self.empirical {
+                EmpiricalTier::E0Null => EmpiricalLevel::E0Null,
+                EmpiricalTier::E1Testimonial => EmpiricalLevel::E1Testimonial,
+                EmpiricalTier::E2PrivatelyVerifiable => EmpiricalLevel::E2PrivatelyVerifiable,
+                EmpiricalTier::E3CryptographicallyProven => EmpiricalLevel::E3CryptographicallyProven,
+                EmpiricalTier::E4PubliclyReproducible => EmpiricalLevel::E4PubliclyReproducible,
+            },
+            match self.normative {
+                NormativeTier::N0Personal => NormativeLevel::N0Personal,
+                NormativeTier::N1Communal => NormativeLevel::N1Communal,
+                NormativeTier::N2Network => NormativeLevel::N2Network,
+                NormativeTier::N3Axiomatic => NormativeLevel::N3Axiomatic,
+            },
+            match self.materiality {
+                MaterialityTier::M0Ephemeral => MaterialityLevel::M0Ephemeral,
+                MaterialityTier::M1Temporal => MaterialityLevel::M1Temporal,
+                MaterialityTier::M2Persistent => MaterialityLevel::M2Persistent,
+                MaterialityTier::M3Foundational => MaterialityLevel::M3Foundational,
+            },
+            context,
         )
     }
 }
