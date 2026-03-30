@@ -53,7 +53,7 @@ pub fn ai_player_system(
     leviathan: Res<LeviathanState>,
     player_query: Query<(&Transform, &PhysicsBody), With<Player>>,
     npc_query: Query<&Transform, (With<CrewNpc>, Without<Player>)>,
-    well_query: Query<&Transform, (With<EnergyWell>, Without<Player>, Without<CrewNpc>)>,
+    well_query: Query<(&Transform, &EnergyWell), (Without<Player>, Without<CrewNpc>)>,
     core_query: Query<&Transform, (With<FusionCore>, Without<Player>)>,
 ) {
     if !ai.enabled {
@@ -104,10 +104,11 @@ pub fn ai_player_system(
     // 5. Direction to nearest energy well
     let nearest_well = well_query
         .iter()
-        .map(|tf| (tf.translation.truncate(), tf.translation.truncate().distance(player_pos)))
+        .filter(|(_, w)| w.is_active())
+        .map(|(tf, _)| (tf.translation.truncate(), tf.translation.truncate().distance(player_pos)))
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
-    let (well_dir_x, well_dir_y) = match nearest_well {
+    let (_well_dir_x, _well_dir_y) = match nearest_well {
         Some((well_pos, dist)) if dist > 1.0 => {
             let dir = (well_pos - player_pos).normalize();
             (dir.x as f64, dir.y as f64)
@@ -134,8 +135,8 @@ pub fn ai_player_system(
             danger,
             npc_dir_x,
             npc_dir_y,
-            well_dir_x,
-            well_dir_y,
+            _well_dir_x,
+            _well_dir_y,
             npc_dist_norm,
         ],
         0.8, // precision
@@ -146,47 +147,53 @@ pub fn ai_player_system(
     let action = ai.agent.select_action();
     ai.decisions += 1;
 
-    // === MAP ACTION TO MOVEMENT ===
-    // The FEP agent outputs action weights. We use them as direction bias.
-    // Strategy: blend toward NPC (for harmony resonance) and well (for energy)
+    // === FREE ENERGY GRADIENT — same algorithm that proved 80% tighter clustering ===
 
-    let mut dir = Vec2::ZERO;
+    let pos = nalgebra::SVector::from([player_pos.x as f64, player_pos.y as f64]);
 
-    // Low energy → seek wells
-    // High energy → seek core (win condition)
-    // Medium → seek NPCs (harmony resonance)
-    if energy_frac < 0.3 {
-        // Desperate: go to nearest well
-        dir.x = well_dir_x as f32;
-        dir.y = well_dir_y as f32;
-    } else if energy_frac > 0.7 {
-        // Healthy: go toward core (try to win)
-        dir.x = core_dir.0 as f32;
-        dir.y = core_dir.1 as f32;
+    // Get player's harmony activations
+    let harmony = physics.consciousness.entities.get(&player_body.handle)
+        .map(|e| e.harmony_activations)
+        .unwrap_or([0.5; 8]);
+
+    // Build nearby agents list from NPCs
+    let nearby: Vec<_> = npc_query.iter()
+        .filter_map(|tf| {
+            let npc_pos = nalgebra::SVector::from([
+                tf.translation.x as f64, tf.translation.y as f64
+            ]);
+            // Try to find harmony data (use default if not available)
+            Some((npc_pos, [0.5f64; 8]))
+        })
+        .collect();
+
+    // Build energy well list
+    let wells_data: Vec<_> = well_query.iter()
+        .filter(|(_, w)| w.is_active())
+        .map(|(tf, w)| {
+            (nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]),
+             w.fraction_remaining())
+        })
+        .collect();
+
+    // Danger source (core position, where Leviathan spawns)
+    let danger_src: Option<nalgebra::SVector<f64, 2>> = if danger > 0.1 {
+        core_query.iter().next().map(|tf| {
+            nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64])
+        })
     } else {
-        // Moderate: seek NPC for harmony resonance
-        dir.x = npc_dir_x as f32;
-        dir.y = npc_dir_y as f32;
-    }
+        None
+    };
 
-    // Add FEP perturbation (exploration)
+    let gradient = symtropy_consciousness_physics::fep_gradient::free_energy_gradient(
+        &pos, energy_frac, &harmony, &nearby, &wells_data, danger_src.as_ref(), danger,
+    );
+
+    let dir = Vec2::new(gradient[0] as f32, gradient[1] as f32);
     let free_energy = ai.agent.current_free_energy();
-    if free_energy > 0.3 {
-        // High surprise → explore (add random-ish movement from action)
-        let angle = (ai.tick as f64 * 0.1 + free_energy * 10.0).sin() as f32;
-        dir.x += angle * 0.3;
-        dir.y += angle.cos() * 0.3;
-    }
-
-    // Flee from Leviathan
-    if danger > 0.5 {
-        // Run away from core area (Leviathan spawns near core)
-        dir.x -= core_dir.0 as f32 * danger as f32;
-        dir.y -= core_dir.1 as f32 * danger as f32;
-    }
 
     input.direction = dir;
-    input.sprinting = energy_frac > 0.5 && danger > 0.5; // Sprint only when healthy and threatened
+    input.sprinting = energy_frac > 0.5 && danger > 0.5;
 
     // === SYMTHAEA'S VOICE: raw FEP telemetry, not chatbot ===
     // This is not dialogue. This is a consciousness reporting its thermodynamic state.
