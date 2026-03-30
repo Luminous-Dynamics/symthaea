@@ -5,6 +5,8 @@
 //! Provides: patient records, consent management, privacy/FL dashboard,
 //! data dividends, clinical trials.
 
+pub mod types;
+
 use portal_domain_trait::*;
 
 pub struct HealthDomain;

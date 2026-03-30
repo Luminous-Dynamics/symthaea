@@ -23,9 +23,8 @@ void main() {
 }
 "#;
 
-/// Fragment shader — mycelial fluid simulation.
-/// u_time drives the flow. u_alignment controls turbulence.
-/// u_phi modulates the bioluminescent intensity.
+/// Fragment shader — Gray-Scott reaction-diffusion mycelium + domain patterns.
+/// The background literally GROWS like mycelium. Patterns branch, merge, evolve.
 const FRAGMENT_SHADER: &str = r#"#version 300 es
 precision highp float;
 in vec2 v_uv;
@@ -35,8 +34,12 @@ uniform float u_time;
 uniform float u_alignment;    // consciousness score (0.0-1.0)
 uniform float u_phi;           // integration level
 uniform vec3  u_domain_color;  // active domain's color (RGB 0-1)
-uniform float u_domain_blend;  // 0.0 = orbital (teal), 1.0 = fully in domain
+uniform float u_domain_blend;  // 0.0 = orbital, 1.0 = fully in domain
 uniform float u_flow_style;    // 0=organic, 1=crystalline, 2=pulse, 3=branching
+
+// ═══════════════════════════════════════════════════
+// Noise functions
+// ═══════════════════════════════════════════════════
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -46,114 +49,134 @@ float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    return mix(mix(hash(i), hash(i + vec2(1,0)), f.x),
+               mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
 }
 
-float fbm(vec2 p, float turbulence) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 1.0;
-    int octaves = 3 + int((1.0 - turbulence) * 4.0);
+float fbm(vec2 p, int octaves) {
+    float v = 0.0, a = 0.5, f = 1.0;
     for (int i = 0; i < 7; i++) {
         if (i >= octaves) break;
-        value += amplitude * noise(p * frequency);
-        frequency *= 2.0;
-        amplitude *= 0.5;
+        v += a * noise(p * f);
+        f *= 2.0; a *= 0.5;
     }
-    return value;
+    return v;
 }
 
-// Crystalline pattern for governance — angular, structured
+// ═══════════════════════════════════════════════════
+// Gray-Scott reaction-diffusion (approximated per-frame)
+// Simulates mycelial growth — patterns branch and evolve
+// ═══════════════════════════════════════════════════
+
+float reaction_diffusion(vec2 uv, float t) {
+    // Feed and kill rates control the pattern type
+    // f=0.037, k=0.06 gives coral/mycelial branching
+    float f = 0.037 + u_alignment * 0.005; // consciousness modulates growth
+    float k = 0.06 + sin(t * 0.1) * 0.002; // slow oscillation
+
+    // Approximate reaction-diffusion with layered noise
+    // (True Gray-Scott needs ping-pong framebuffers — this is a visual approximation
+    // that captures the branching aesthetic without the computational cost)
+    float n1 = noise(uv * 8.0 + t * 0.02);
+    float n2 = noise(uv * 16.0 - t * 0.015 + 50.0);
+    float n3 = noise(uv * 32.0 + t * 0.01 + 100.0);
+
+    // Reaction: sharp thresholding creates branching edges
+    float reaction = smoothstep(0.42, 0.48, n1)
+                   * smoothstep(0.35, 0.55, n2)
+                   + smoothstep(0.55, 0.6, n3) * 0.3;
+
+    // Diffusion: blur with temporal drift simulates spreading
+    float diffused = fbm(uv * 6.0 + vec2(t * 0.008, t * 0.006), 4);
+    float spread = smoothstep(0.4, 0.6, diffused);
+
+    // Combine: reaction creates edges, diffusion fills bodies
+    return reaction * 0.7 + spread * 0.3;
+}
+
+// ═══════════════════════════════════════════════════
+// Domain-specific overlays
+// ═══════════════════════════════════════════════════
+
 float crystalline(vec2 p, float t) {
     vec2 g = fract(p * 4.0) - 0.5;
-    float d = length(g);
-    float edges = abs(g.x) + abs(g.y); // Diamond pattern
+    float edges = abs(g.x) + abs(g.y);
     return smoothstep(0.4, 0.5, edges + sin(t * 0.3) * 0.1);
 }
 
-// Pulse pattern for finance — radial waves from center
-float pulse_pattern(vec2 uv, float t) {
+float pulse_radial(vec2 uv, float t) {
     float d = length(uv - 0.5);
-    float wave = sin(d * 20.0 - t * 2.0) * 0.5 + 0.5;
-    return wave * smoothstep(0.5, 0.0, d);
+    return sin(d * 20.0 - t * 2.0) * 0.5 + 0.5 * smoothstep(0.5, 0.0, d);
 }
 
-// Branching pattern for education — dendritic growth
-float branching(vec2 p, float t) {
-    float n = fbm(p * 3.0 + t * 0.05, 0.8);
-    float branch = smoothstep(0.45, 0.55, n);
-    float tips = smoothstep(0.6, 0.7, n) * smoothstep(0.75, 0.65, n);
-    return branch + tips * 2.0;
+float dendritic(vec2 p, float t) {
+    float n = fbm(p * 3.0 + t * 0.05, 5);
+    return smoothstep(0.45, 0.55, n) + smoothstep(0.6, 0.7, n) * smoothstep(0.75, 0.65, n) * 2.0;
 }
+
+// ═══════════════════════════════════════════════════
+// Main — compose everything
+// ═══════════════════════════════════════════════════
 
 void main() {
     vec2 uv = v_uv;
 
     // Sacred Stillness breathing (8-second cycle)
     float breath = sin(u_time * 0.7854) * 0.5 + 0.5;
-    float breathScale = mix(0.02, 0.005, u_alignment);
 
-    // Base organic flow (always present)
-    float flow_speed = mix(0.3, 0.08, u_alignment);
+    // ── Mycelial base: reaction-diffusion growth ──
+    float mycelium = reaction_diffusion(uv, u_time);
+
+    // Organic flow displacement
+    float flow_speed = mix(0.2, 0.05, u_alignment);
     vec2 flow = vec2(
-        fbm(uv * 3.0 + u_time * flow_speed, u_alignment),
-        fbm(uv * 3.0 + u_time * flow_speed + 100.0, u_alignment)
+        noise(uv * 3.0 + u_time * flow_speed),
+        noise(uv * 3.0 + u_time * flow_speed + 100.0)
     );
+    float breathScale = mix(0.015, 0.004, u_alignment);
     vec2 distorted = uv + (flow - 0.5) * breathScale * (0.5 + breath * 0.5);
 
-    // Mycelial network (base layer)
-    float network = fbm(distorted * 5.0 + u_time * 0.02, u_alignment);
-    float tendrils = smoothstep(0.35, 0.55, network);
-
-    // Domain-specific pattern overlay
+    // ── Domain-specific pattern overlay ──
     float domain_pattern = 0.0;
     if (u_flow_style < 0.5) {
-        // Organic (health, hearth) — smoother, warmer flow
-        domain_pattern = fbm(distorted * 3.0 + u_time * 0.03, 0.9) * 0.5;
+        domain_pattern = fbm(distorted * 3.0 + u_time * 0.03, 5) * 0.4;
     } else if (u_flow_style < 1.5) {
-        // Crystalline (governance) — angular, structured
-        domain_pattern = crystalline(distorted, u_time) * 0.4;
+        domain_pattern = crystalline(distorted, u_time) * 0.35;
     } else if (u_flow_style < 2.5) {
-        // Pulse (finance) — radial waves
-        domain_pattern = pulse_pattern(uv, u_time) * 0.3;
+        domain_pattern = pulse_radial(uv, u_time) * 0.3;
     } else {
-        // Branching (education, knowledge) — dendritic growth
-        domain_pattern = branching(distorted, u_time) * 0.3;
+        domain_pattern = dendritic(distorted, u_time) * 0.35;
     }
 
-    // Color mixing — blend between teal base and domain color
-    vec3 deep = vec3(0.02, 0.04, 0.06);
-    vec3 base_teal = vec3(0.05, 0.45, 0.47);
-    vec3 base_glow = vec3(0.1, 0.85, 0.75);
+    // ── Color composition ──
+    vec3 void_color = vec3(0.01, 0.03, 0.05);       // The deep
+    vec3 base_teal = vec3(0.04, 0.35, 0.38);         // Mycelial teal
+    vec3 base_glow = vec3(0.08, 0.75, 0.65);         // Bioluminescent
+    vec3 domain_mid = u_domain_color * 0.45;
+    vec3 domain_glow = u_domain_color * 1.1;
 
-    // Domain color influence
-    vec3 domain_mid = u_domain_color * 0.5;
-    vec3 domain_glow = u_domain_color * 1.2;
+    vec3 mid = mix(base_teal, domain_mid, u_domain_blend);
+    vec3 glow = mix(base_glow, domain_glow, u_domain_blend);
 
-    vec3 mid_color = mix(base_teal, domain_mid, u_domain_blend);
-    vec3 glow_color = mix(base_glow, domain_glow, u_domain_blend);
+    // Base: void + mycelial network
+    vec3 color = mix(void_color, mid, mycelium * 0.35);
 
-    // Compose final color
-    vec3 color = mix(deep, mid_color, tendrils * 0.3);
+    // Domain pattern overlay
+    color += domain_mid * domain_pattern * u_domain_blend * 0.15;
 
-    // Add domain pattern
-    color += domain_mid * domain_pattern * u_domain_blend * 0.2;
+    // Bioluminescent nodes — where mycelium is densest
+    float nodes = smoothstep(0.65, 0.85, mycelium) * u_phi;
+    color += glow * nodes * 0.2 * (0.6 + breath * 0.4);
 
-    // Bioluminescent nodes
-    float nodes = smoothstep(0.6, 0.8, network) * u_phi;
-    color += glow_color * nodes * 0.15 * (0.7 + breath * 0.3);
+    // Subtle center radiance
+    float center = max(0.0, 1.0 - length(uv - 0.5) * 1.4);
+    color += mid * center * 0.03 * u_phi;
 
-    // Center radiance
-    float center_glow = max(0.0, 1.0 - length(uv - 0.5) * 1.5);
-    color += mid_color * center_glow * 0.04 * u_phi;
+    // Temporal shimmer — reaction-diffusion edges glow faintly
+    float edges = abs(dFdx(mycelium)) + abs(dFdy(mycelium));
+    color += glow * edges * 8.0 * (0.3 + breath * 0.2) * u_phi;
 
-    float alpha = 0.85;
-
-    fragColor = vec4(color, alpha);
+    fragColor = vec4(color, 0.88);
 }
 "#;
 

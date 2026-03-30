@@ -1,9 +1,9 @@
 [package]
-name = "domain-health"
+name = "domain-finance"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Health domain module for Mycelix Portal"
+description = "Finance domain module for Mycelix Portal — payments, treasury, staking, recognition"
 
 [dependencies]
 portal-domain-trait = { path = "../portal-domain-trait" }

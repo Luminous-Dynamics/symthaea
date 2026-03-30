@@ -13,6 +13,36 @@
     --bio-cyan: #06D6C8;
     --orb-core: #0D7377;
     --orb-glow: rgba(6, 214, 200, 0.3);
+
+    /* Consciousness channels — updated from WebSocket telemetry */
+    --phi: 0.5;
+    --arousal: 0.3;
+    --breath-rate: 8s;
+}
+
+/* Bioluminescent glow system — triple shadow on all interactive elements */
+.phenotype-card,
+.orbital-node.accessible,
+.stream-domain-chip,
+.garden-plot.alive,
+.pulse-vital,
+.domain-card:not(.locked),
+.first-breath-cta {
+    box-shadow:
+        0 0 1px rgba(6, 214, 200, 0.2),
+        0 0 8px rgba(6, 214, 200, 0.08),
+        0 0 30px rgba(6, 214, 200, 0.03);
+    transition: box-shadow 0.3s, transform 0.3s;
+}
+
+.phenotype-card:hover,
+.stream-domain-chip:hover,
+.domain-card:not(.locked):hover,
+.first-breath-cta:hover {
+    box-shadow:
+        0 0 1px rgba(6, 214, 200, 0.4),
+        0 0 12px rgba(6, 214, 200, 0.15),
+        0 0 40px rgba(6, 214, 200, 0.06);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -743,6 +773,32 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   Sovereignty Badge
+   ═══════════════════════════════════════════ */
+
+.sovereignty-badge {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    background: rgba(4, 10, 12, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(5, 150, 105, 0.2);
+    border-radius: 999px;
+    font-size: 0.6rem;
+    letter-spacing: 0.03em;
+    color: #059669;
+}
+
+.sovereignty-shield {
+    font-size: 0.8rem;
+}
+
+/* ═══════════════════════════════════════════
    Conductor Status Badge
    ═══════════════════════════════════════════ */
 
@@ -786,9 +842,24 @@ body {
 
 :focus-visible { outline: 2px solid var(--bio-cyan); outline-offset: 2px; }
 
+/* Screen reader only — hidden but accessible */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
+    }
+    .homeostasis-bg { opacity: 0; }
+    .portal-universe {
+        background: radial-gradient(ellipse at 50% 50%, #0A1416 0%, #030808 100%);
     }
 }

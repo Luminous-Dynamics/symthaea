@@ -181,7 +181,13 @@ pub fn App() -> impl IntoView {
         <div class="portal-universe">
             <HomeostasisBackground />
 
-            // Conductor status badge
+            // Sovereignty badge (top-left)
+            <div class="sovereignty-badge">
+                <span class="sovereignty-shield">"◈"</span>
+                <span class="sovereignty-count">"0 leaks"</span>
+            </div>
+
+            // Conductor status badge (top-right)
             <div class="conductor-badge">
                 <span class=move || match conductor.get() {
                     ConductorStatus::Connected => "conductor-dot connected",
@@ -290,7 +296,7 @@ pub fn App() -> impl IntoView {
                                             class=move || if accessible { "garden-plot alive" } else { "garden-plot dormant" }
                                             style=format!("--plot-color: {}; --plot-glow: {}; --plot-height: {:.0}%;", d.color, d.glow, activity * 100.0)
                                             disabled=!accessible
-                                            on:click=move |_| { if accessible { active_domain.set(Some(id.to_string())); } }
+                                            on:click=move |_| { if accessible { play_domain_tone(id); active_domain.set(Some(id.to_string())); } }
                                         >
                                             <div class="plot-growth" />
                                             <span class="plot-name">{d.bio_name}</span>
@@ -374,7 +380,7 @@ pub fn App() -> impl IntoView {
                                                 x, y, color, glow, activity
                                             )
                                             disabled=!accessible
-                                            on:click=move |_| { if accessible { active_domain.set(Some(id.to_string())); } }
+                                            on:click=move |_| { if accessible { play_domain_tone(id); active_domain.set(Some(id.to_string())); } }
                                             aria-label=format!("{}", name)
                                         >
                                             <span class="node-dot" />
@@ -440,6 +446,39 @@ pub fn App() -> impl IntoView {
             }}
         </div>
     }
+}
+
+/// Play a domain entry tone — pitch based on domain character.
+fn play_domain_tone(domain_id: &str) {
+    let freq = match domain_id {
+        "health" => 262.0,     // C4 — grounded, organic
+        "governance" => 330.0, // E4 — structured, clear
+        "finance" => 392.0,    // G4 — active, energetic
+        "edunet" => 349.0,     // F4 — growing, warm
+        "commons" => 294.0,    // D4 — communal, solid
+        "hearth" => 277.0,     // C#4 — intimate, warm
+        "knowledge" => 440.0,  // A4 — resonant, bright
+        "space" => 220.0,      // A3 — vast, deep
+        _ => 330.0,
+    };
+    let script = format!(r#"
+        (function() {{
+            try {{
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime({freq}, ctx.currentTime);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 0.3);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 1.5);
+            }} catch(e) {{}}
+        }})()
+    "#);
+    let _ = js_sys::eval(&script);
 }
 
 /// Play a rising tone on First Breath using Web Audio API.
