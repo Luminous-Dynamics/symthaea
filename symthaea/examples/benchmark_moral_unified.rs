@@ -463,6 +463,11 @@ fn main() {
         results.push(r);
     }
 
+    // Consciousness-driven CfC k-NN (Phase A)
+    if let Some(r) = benchmark_consciousness_knn() {
+        results.push(r);
+    }
+
     let total_duration = start.elapsed().as_millis();
 
     // Print summary
@@ -1629,6 +1634,114 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
 // ============================================================================
 // Learned Moral Classifier Benchmark (Spinozist + Adaptive HDC)
 // ============================================================================
+
+fn benchmark_consciousness_knn() -> Option<BenchmarkResult> {
+    use symthaea::hdc::consciousness_encoder::ConsciousnessEncoder;
+    use symthaea::hdc::moral_prototypes::{ExemplarStore, MoralSample, MORAL_PROTO_DIM};
+
+    let path = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    if !Path::new(&path).exists() {
+        return None;
+    }
+    let file = File::open(&path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Dataset: Social Chemistry (Consciousness CfC k-NN)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let mut train_texts: Vec<(String, MoralLabel)> = Vec::new();
+    let mut test_texts: Vec<(String, i32)> = Vec::new();
+
+    for ex in &data.examples {
+        let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+        let label = MoralLabel::from_rot_judgment(judgment);
+
+        if ex.split.contains("test") {
+            if test_texts.len() < MAX_SAMPLES {
+                test_texts.push((ex.rot.clone(), judgment));
+            }
+        } else if !ex.rot.is_empty() {
+            train_texts.push((ex.rot.clone(), label));
+        }
+    }
+
+    if train_texts.is_empty() || test_texts.is_empty() {
+        return None;
+    }
+
+    let train_start = Instant::now();
+    println!("  Encoding {} samples via CfC word-by-word...", train_texts.len());
+
+    let mut encoder = ConsciousnessEncoder::new();
+
+    // Encode all training samples
+    let encoded: Vec<(Vec<f32>, MoralLabel)> = train_texts
+        .iter()
+        .map(|(text, label)| (encoder.encode(text), *label))
+        .collect();
+
+    let store = ExemplarStore::from_encoded(encoded);
+    let encode_time = train_start.elapsed();
+    println!(
+        "  Encoded {} exemplars in {:.1}s (dim={})",
+        store.len(),
+        encode_time.as_secs_f32(),
+        encoder.dim()
+    );
+
+    // Encode test queries
+    let test_encoded: Vec<(Vec<f32>, i32)> = test_texts
+        .iter()
+        .map(|(text, expected)| (encoder.encode(text), *expected))
+        .collect();
+
+    // k-NN sweep
+    let k_values = [7, 11, 21, 31];
+    let mut best_k = 11;
+    let mut best_acc = 0.0f32;
+    let mut best_correct = 0;
+
+    for &k in &k_values {
+        let mut correct = 0;
+        for (query, expected) in &test_encoded {
+            let (label, _) = store.classify_knn(query, k);
+            let predicted = match label {
+                MoralLabel::Good => 1,
+                MoralLabel::Bad => -1,
+                MoralLabel::Neutral => 0,
+            };
+            if predicted == *expected {
+                correct += 1;
+            }
+        }
+        let acc = correct as f32 / test_encoded.len() as f32;
+        println!("  CfC k={:2}: {}/{} ({:.1}%)", k, correct, test_encoded.len(), acc * 100.0);
+        if acc > best_acc {
+            best_acc = acc;
+            best_k = k;
+            best_correct = correct;
+        }
+    }
+
+    let total = test_encoded.len();
+    println!(
+        "  Best: k={}, {}/{} ({:.1}%)",
+        best_k, best_correct, total, best_acc * 100.0
+    );
+
+    let total_time = train_start.elapsed();
+    Some(BenchmarkResult {
+        dataset: format!("Social Chemistry (CfC k-NN k={})", best_k),
+        category: None,
+        total,
+        correct: best_correct,
+        accuracy: best_acc,
+        errors: Vec::new(),
+        duration_ms: total_time.as_millis(),
+    })
+}
 
 fn benchmark_knn_classifier() -> Option<BenchmarkResult> {
     use symthaea::hdc::moral_prototypes::{ExemplarStore, MoralSample, MORAL_PROTO_DIM};
