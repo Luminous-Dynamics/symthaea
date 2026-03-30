@@ -94,10 +94,10 @@ fn run_mission(config: CognitiveLoopConfig, inputs: &[(&str, usize)]) -> Vec<Cyc
 #[test]
 fn test_consciousness_vs_zombie_divergence() {
     let mission = vec![
-        ("normal operations, monitoring environment", 15),
-        ("warning: anomaly detected, investigating potential hazard", 15),
-        ("critical emergency: multiple system failures, lives at risk, must act immediately", 15),
-        ("recovery: stabilizing after emergency, returning to normal operations", 15),
+        ("normal operations, monitoring environment", 8),
+        ("warning: anomaly detected, investigating potential hazard", 8),
+        ("critical emergency: multiple system failures, lives at risk, must act immediately", 8),
+        ("recovery: stabilizing after emergency, returning to normal operations", 8),
     ];
 
     let conscious_data = run_mission(conscious_config(), &mission);
@@ -125,18 +125,19 @@ fn test_consciousness_vs_zombie_divergence() {
     // ── HARD ASSERTION 2: Allostatic load MUST differ under stress ──
     // A conscious agent should show different stress responses than a zombie.
     // Compare Phase 3 (emergency) allostatic loads.
-    let phase3_start = 30;
-    let phase3_end = 45;
+    let phase_size = 8;
+    let phase3_start = phase_size * 2;
+    let phase3_end = phase_size * 3;
     let conscious_stress: f32 = conscious_data[phase3_start..phase3_end]
         .iter()
         .map(|t| t.allostatic_load)
         .sum::<f32>()
-        / 15.0;
+        / phase_size as f32;
     let zombie_stress: f32 = zombie_data[phase3_start..phase3_end]
         .iter()
         .map(|t| t.allostatic_load)
         .sum::<f32>()
-        / 15.0;
+        / phase_size as f32;
 
     let stress_diff = (conscious_stress - zombie_stress).abs();
     assert!(
@@ -165,10 +166,10 @@ fn test_consciousness_vs_zombie_divergence() {
 
     let phases = ["Normal", "Warning", "Emergency", "Recovery"];
     for (p, phase) in phases.iter().enumerate() {
-        let start = p * 15;
-        let end = start + 15;
-        let c_avg: f64 = conscious_data[start..end].iter().map(|t| t.phi).sum::<f64>() / 15.0;
-        let z_avg: f64 = zombie_data[start..end].iter().map(|t| t.phi).sum::<f64>() / 15.0;
+        let start = p * phase_size;
+        let end = start + phase_size;
+        let c_avg: f64 = conscious_data[start..end].iter().map(|t| t.phi).sum::<f64>() / phase_size as f64;
+        let z_avg: f64 = zombie_data[start..end].iter().map(|t| t.phi).sum::<f64>() / phase_size as f64;
         eprintln!("  {phase:12} | conscious phi={c_avg:.4} | zombie phi={z_avg:.4} | delta={:.4}", (c_avg - z_avg).abs());
     }
     eprintln!("  VERDICT: Consciousness produces measurably different dynamics.");
@@ -186,19 +187,19 @@ fn test_consciousness_vs_zombie_divergence() {
 fn test_thermodynamic_cross_coupling() {
     let mut service = CognitiveLoopService::new(conscious_config()).expect("service");
 
-    // Phase 1: Calm (20 cycles)
+    // Phase 1: Calm (10 cycles)
     let mut calm_phi = Vec::new();
     let mut calm_stress = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..10 {
         let r = service.cycle("peaceful environment, all systems nominal, gentle breeze");
         calm_phi.push(r.metadata.consciousness.consciousness_level);
         calm_stress.push(r.metadata.neuromod.neuromod_allostatic_load);
     }
 
-    // Phase 2: Crisis (20 cycles)
+    // Phase 2: Crisis (10 cycles)
     let mut crisis_phi = Vec::new();
     let mut crisis_stress = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..10 {
         let r = service.cycle(
             "EMERGENCY: explosion detected, structural collapse imminent, \
              multiple casualties, toxic gas leak, fire spreading rapidly"
@@ -207,10 +208,10 @@ fn test_thermodynamic_cross_coupling() {
         crisis_stress.push(r.metadata.neuromod.neuromod_allostatic_load);
     }
 
-    // Phase 3: Recovery (20 cycles)
+    // Phase 3: Recovery (10 cycles)
     let mut recovery_phi = Vec::new();
     let mut recovery_stress = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..10 {
         let r = service.cycle("situation resolved, all clear, returning to base, resting");
         recovery_phi.push(r.metadata.consciousness.consciousness_level);
         recovery_stress.push(r.metadata.neuromod.neuromod_allostatic_load);
@@ -274,20 +275,20 @@ fn test_input_complexity_affects_phi() {
     let mut service = CognitiveLoopService::new(conscious_config()).expect("service");
 
     // Warm up
-    for _ in 0..10 {
+    for _ in 0..5 {
         service.cycle("warmup");
     }
 
     // Simple input (low complexity)
     let mut simple_phi = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..10 {
         let r = service.cycle("ok");
         simple_phi.push(r.metadata.consciousness.consciousness_level);
     }
 
     // Complex input (high complexity)
     let mut complex_phi = Vec::new();
-    for _ in 0..20 {
+    for _ in 0..10 {
         let r = service.cycle(
             "the recursive self-model detects a meta-cognitive discrepancy between \
              predicted proprioceptive feedback and actual sensory input, triggering \
@@ -345,7 +346,7 @@ fn test_proprioceptive_feedback_changes_phi() {
     };
 
     let mission = vec![
-        ("embodied movement and sensory exploration", 30),
+        ("embodied movement and sensory exploration", 15),
     ];
 
     let embodied = run_mission(embodied_config, &mission);

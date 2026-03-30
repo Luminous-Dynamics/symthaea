@@ -803,6 +803,10 @@ name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
 
 [[test]]
+name = "breaking_points_embodied"
+required-features = ["humanoid"]
+
+[[test]]
 name = "kessler_cascade_scenario"
 required-features = ["humanoid", "manipulator"]
 
