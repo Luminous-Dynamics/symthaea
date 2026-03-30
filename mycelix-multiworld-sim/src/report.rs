@@ -62,6 +62,9 @@ pub struct CivilizationReport {
     pub first_constitution_tick: Option<u32>,
     pub first_trade_tick: Option<u32>,
     pub constitutional_crises: usize,
+    pub civil_wars: usize,
+    pub secessions: usize,
+    pub turchin_transitions: usize,
     pub epidemics: usize,
     pub breakthroughs: usize,
     pub worlds_founded: usize,
@@ -197,6 +200,9 @@ impl CivilizationReport {
             "  Constitutional crises: {}\n",
             self.constitutional_crises
         ));
+        s.push_str(&format!("  Civil wars: {}\n", self.civil_wars));
+        s.push_str(&format!("  Secessions: {}\n", self.secessions));
+        s.push_str(&format!("  Turchin transitions: {}\n", self.turchin_transitions));
         s.push_str(&format!("  Epidemics: {}\n", self.epidemics));
         s.push_str(&format!("  Breakthroughs: {}\n", self.breakthroughs));
         s.push_str(&format!("  Worlds founded: {}\n", self.worlds_founded));
@@ -266,6 +272,18 @@ FACTION ANALYSIS:
             .iter()
             .filter(|e| e.event_type == CivEventType::ConstitutionalAmendment)
             .count();
+        let civil_wars = events
+            .iter()
+            .filter(|e| e.description.contains("CIVIL WAR"))
+            .count();
+        let secessions = events
+            .iter()
+            .filter(|e| e.description.contains("SECESSION"))
+            .count();
+        let turchin_transitions = events
+            .iter()
+            .filter(|e| e.description.contains("Turchin cycle"))
+            .count();
         let epidemics = events
             .iter()
             .filter(|e| e.event_type == CivEventType::EpidemicStart)
@@ -319,6 +337,9 @@ FACTION ANALYSIS:
             first_constitution_tick,
             first_trade_tick,
             constitutional_crises,
+            civil_wars,
+            secessions,
+            turchin_transitions,
             epidemics,
             breakthroughs,
             worlds_founded,

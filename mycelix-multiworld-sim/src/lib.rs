@@ -1617,8 +1617,9 @@ impl MultiWorldSimulator {
             if pop > 100.0 && world.infrastructure_level > 0.5
                 && tick % 120 == 0 // Check every 10 years
             {
-                let exploration_prob = (world.knowledge.technology_levels[4] - 1.0) * 0.05; // science-driven
-                if exploration_prob > 0.0 && self.rng.bernoulli(exploration_prob.min(0.2)) {
+                // Base 3% + science bonus. Fires even at starting science level.
+                let exploration_prob = 0.03 + (world.knowledge.technology_levels[4] - 1.0).max(0.0) * 0.05;
+                if self.rng.bernoulli(exploration_prob.min(0.25)) {
                     world.explorations_completed += 1;
                     // Discovery boosts knowledge and resources
                     world.knowledge.technology_levels[4] += 0.1; // science boost
@@ -3153,15 +3154,32 @@ impl MultiWorldSimulator {
                     let pop = world.population();
                     if pop == 0 { continue; }
 
-                    // Compute elite fraction (Steward + Guardian tiers)
-                    let elite_count = world.agents.iter()
-                        .filter(|a| a.death_tick.is_none() && a.consciousness.phi() >= 0.6)
+                    // Compute elite fraction: top 20% by consciousness + skills
+                    // In the real sim, agents with phi >= 0.6 are rare.
+                    // Elite = those whose economic influence (skills + education) puts
+                    // them in the top quintile — they compete for governance positions.
+                    let alive: Vec<&agent::CivAgent> = world.agents.iter()
+                        .filter(|a| a.death_tick.is_none())
+                        .collect();
+                    let elite_threshold = if alive.len() >= 10 {
+                        let mut skill_scores: Vec<f64> = alive.iter()
+                            .map(|a| a.skills.total() + a.education_level * 2.0)
+                            .collect();
+                        skill_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+                        let top_20_idx = (skill_scores.len() as f64 * 0.20) as usize;
+                        skill_scores.get(top_20_idx).copied().unwrap_or(0.0)
+                    } else {
+                        f64::MAX // Too few people for elite dynamics
+                    };
+                    let elite_count = alive.iter()
+                        .filter(|a| a.skills.total() + a.education_level * 2.0 >= elite_threshold)
                         .count();
                     let elite_fraction = elite_count as f64 / pop.max(1) as f64;
 
                     // Compute non-elite mean phi and prediction error proxy
-                    let non_elites: Vec<&agent::CivAgent> = world.agents.iter()
-                        .filter(|a| a.death_tick.is_none() && a.consciousness.phi() < 0.6)
+                    let non_elites: Vec<&agent::CivAgent> = alive.iter()
+                        .filter(|a| a.skills.total() + a.education_level * 2.0 < elite_threshold)
+                        .copied()
                         .collect();
                     let non_elite_mean_phi = if non_elites.is_empty() { 0.5 } else {
                         non_elites.iter().map(|a| a.consciousness.phi()).sum::<f64>() / non_elites.len() as f64
