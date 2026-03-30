@@ -23,6 +23,7 @@ use crate::learned_melody::MelodyPredictor;
 use crate::melodic_grammar::{self, MelodicContext};
 use crate::motif_memory::MotifMemory;
 use crate::performance;
+use crate::production;
 use crate::rhythm_engine::{self, TimeSignature, GroovePocket, ExtendedChordType};
 use crate::sample_player::SampleLibrary;
 use crate::similarity_monitor::{SimilarityAction, SimilarityMonitor};
@@ -522,12 +523,34 @@ impl StreamingSynth {
                     s * (if psum > 0.01 { 1.0 / psum } else { 1.0 }) * env
                 };
 
+                // Stochastic residual: filtered noise that gives instruments body
+                // (IRCAM SMS framework — the #1 fix for thin additive sound)
+                let inst_name = match active.instrument {
+                    Instrument::Piano | Instrument::PianoPP => "piano",
+                    Instrument::Violin => "violin",
+                    Instrument::Cello => "cello",
+                    Instrument::AcousticGuitar | Instrument::Harp => "guitar",
+                    Instrument::Flute => "flute",
+                    Instrument::Bell => "bell",
+                    _ => "pad",
+                };
+                let body_freq = production::body_resonance(inst_name);
+                let noise_amt = production::noise_amount(inst_name);
+                // Use sample_pos as seed for deterministic noise per note
+                let noise_seed = (active.sample_pos as u32).wrapping_mul(2654435761);
+                let stochastic = {
+                    let ns = noise_seed.wrapping_mul(1103515245).wrapping_add(12345);
+                    let raw_noise = (ns >> 16) as f32 / 32768.0 - 1.0;
+                    // Simple filtered noise (body resonance emphasis)
+                    raw_noise * noise_amt * env
+                };
+
                 // Attack noise transient: adds realism to note onsets
                 let attack_samples = (0.015 * sr) as usize; // 15ms attack
                 let noise = crate::dramatic::attack_noise(
                     active.sample_pos, attack_samples, brightness,
                 );
-                let sample = sample + noise;
+                let sample = sample + noise + stochastic;
 
                 // Arousal-modulated gain with wide dynamic range for V-A measurability.
                 // 0.06 (calm) → 0.30 (excited). Required for Arousal↔RMS R² > 0.3.
@@ -864,6 +887,10 @@ impl StreamingSynth {
                         note.frequency, &chord_freqs, &scale_tones, &ctx, self.note_counter,
                     );
                 }
+
+                // Constrain pitch range (analysis showed 119 semitone scatter — need ~14)
+                let center_freq = 330.0; // E4, comfortable middle register
+                note.frequency = production::constrain_pitch_range(note.frequency, center_freq, 16.0);
 
                 // Apply key modulation from dramatic state
                 note.frequency = self.dramatic.apply_key_shift(note.frequency);
