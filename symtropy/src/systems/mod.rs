@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Game systems for Symtropy.
 
+pub mod ai_player;
 pub mod audio;
 pub mod consciousness;
 pub mod engine_physics;

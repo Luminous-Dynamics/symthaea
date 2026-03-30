@@ -40,8 +40,9 @@ fn main() {
         ..default()
     };
 
-    // --autostart flag: skip menu, go straight to gameplay
+    // CLI flags
     let autostart = std::env::args().any(|a| a == "--autostart");
+    let ai_player = std::env::args().any(|a| a == "--ai-player");
 
     let mut app = App::new();
     app.add_plugins(
@@ -64,11 +65,22 @@ fn main() {
         .add_plugins(SymtropyPlugin)
         .add_systems(Startup, log_renderer_info);
 
-    if autostart {
+    if autostart || ai_player {
         eprintln!("[symtropy] --autostart: skipping menu, starting game immediately");
         app.add_systems(Startup, |mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
             next.set(crate::resources::GamePhase::Loading);
         });
+    }
+
+    if ai_player {
+        eprintln!("[symtropy] --ai-player: Symthaea is playing the game");
+        let mut ai = crate::systems::ai_player::AiPlayer::new();
+        ai.enabled = true;
+        app.insert_resource(ai);
+        app.add_systems(Update, crate::systems::ai_player::ai_player_system
+            .run_if(bevy::prelude::in_state(crate::resources::GamePhase::Playing)));
+    } else {
+        app.insert_resource(crate::systems::ai_player::AiPlayer::new());
     }
 
     app.run();
