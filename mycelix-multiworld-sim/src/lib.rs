@@ -283,6 +283,7 @@ impl MultiWorldSimulator {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            fertility_multiplier: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
@@ -422,6 +423,7 @@ impl MultiWorldSimulator {
             mortality_beta_mult: 1.0,
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
+            fertility_multiplier: 1.0,
             ecosystem_balance: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
@@ -1548,8 +1550,17 @@ impl MultiWorldSimulator {
                 let has_centrifuge = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
                 let has_gene_therapy = self.disaster_engine.tech_tree.is_achieved("Genetic Engineering");
                 world.reproduction_viable = gravity >= 0.38 || has_centrifuge
-                    || (has_gene_therapy && gravity >= 0.13); // Gene therapy makes 0.13g+ marginally viable
-                // Mars is borderline (0.38g) — viable but with health risks
+                    || (has_gene_therapy && gravity >= 0.13);
+                // Low-gravity fertility penalty (Wakayama 2023, Lyons 2026).
+                // JAXA: mouse embryo survival <30% in microgravity vs >60% at 1g.
+                // No partial-g data exists — this is extrapolated conservatively.
+                // fertility_mult = clamp(gravity / 0.5, 0.3, 1.0)
+                // Mars (0.38g) → 0.76, Moon (0.17g) → 0.34, centrifuge → 1.0
+                world.fertility_multiplier = if has_centrifuge {
+                    1.0
+                } else {
+                    (gravity / 0.5_f64).clamp(0.3_f64, 1.0_f64)
+                };
             }
 
             // === #7: SEALED ECOSYSTEM BALANCE ===
@@ -2816,23 +2827,31 @@ impl MultiWorldSimulator {
                     }
                     config::BirthPolicy::Natural => 1.0,
                 };
+                let fert_mult = world.fertility_multiplier;
                 PopulationEngine::tick_pair_bonding(
                     &mut world,
                     &mut self.rng,
                     self.current_tick,
-                    self.config.policy.pair_bond_rate * birth_mult,
+                    self.config.policy.pair_bond_rate * birth_mult * fert_mult,
                 );
                 // Accumulate radiation dose per agent based on location.
-                // ISS: ~12 mSv/month. Mars: ~6 mSv/month. Europa (shielded): ~4 mSv/month.
-                // Moon: ~10 mSv/month. Earth: ~0.2 mSv/month (background).
+                // Updated with MSL/RAD measured data (Hassler 2014, Zeitlin 2013).
+                // Mars: 0.67 mSv/day = ~20 mSv/month (was 6 — 3.3x undercount!)
+                // Moon: ~15 mSv/month unshielded (Cucinotta 2014)
+                // NASA career limit: 600 mSv (NASA-STD-3001 Rev C, 2022)
+                // A Mars colonist hits the 600 mSv limit in ~2.5 years unshielded.
+                // Radiation shelters reduce exposure by assumed 60-80%.
+                let has_rad_shelter = world.project_manager
+                    .has_completed(projects::ProjectBlueprint::RadiationShelter);
+                let shelter_factor = if has_rad_shelter { 0.3 } else { 1.0 };
                 let dose_per_tick_sv = match world.location.as_str() {
                     "Earth" => 0.0002,   // 0.2 mSv/month (natural background)
-                    "Moon" => 0.010,     // 10 mSv/month (no magnetosphere)
-                    "Mars" => 0.006,     // 6 mSv/month (thin atmosphere)
-                    "Europa" => 0.004,   // 4 mSv/month (under ice shielding)
-                    "Titan" => 0.00004,  // 0.04 mSv/month (atmosphere + magnetosphere)
+                    "Moon" => 0.015,     // 15 mSv/month (no magnetosphere, Cucinotta 2014)
+                    "Mars" => 0.020,     // 20 mSv/month (Hassler 2014, MSL/RAD)
+                    "Europa" => 0.005,   // 5 mSv/month (under ice, Jupiter magnetosphere)
+                    "Titan" => 0.00005,  // 0.05 mSv/month (thick N2 atmosphere)
                     _ => 0.005,
-                };
+                } * shelter_factor;
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.cumulative_dose_sv += dose_per_tick_sv;
                 }
@@ -3607,6 +3626,7 @@ impl Default for World {
             mortality_alpha_mult: 1.0,
             mortality_beta_mult: 1.0,
             mortality_lambda_mult: 1.0,
+            fertility_multiplier: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
             automation_level: 0.0,

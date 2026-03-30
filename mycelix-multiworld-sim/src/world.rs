@@ -527,6 +527,12 @@ pub struct World {
     #[serde(default = "default_one")]
     pub ecosystem_balance: f64,
 
+    /// Low-gravity fertility penalty [0.3, 1.0].
+    /// Mars (0.38g) → 0.76, Moon (0.17g) → 0.34. Centrifuge → 1.0.
+    /// Ref: Wakayama 2023 (JAXA), Lyons 2026 (Adelaide).
+    #[serde(default = "default_one")]
+    pub fertility_multiplier: f64,
+
     /// B: Automation level [0, 1]. Reduces human labor requirements.
     /// At 0.8, a colony of 200 can maintain infrastructure requiring 2000 workers.
     #[serde(default)]
@@ -808,6 +814,7 @@ mod tests {
             mortality_lambda_mult: 1.0,
             reproduction_viable: true,
             ecosystem_balance: 1.0,
+            fertility_multiplier: 1.0,
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::default(),

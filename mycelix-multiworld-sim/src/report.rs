@@ -437,6 +437,9 @@ mod tests {
             total_disasters: 42,
             carrington_events: 0,
             tech_milestones_achieved: 3,
+            civil_wars: 0,
+            secessions: 0,
+            turchin_transitions: 0,
         }
     }
 
