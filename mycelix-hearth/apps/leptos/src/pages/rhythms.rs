@@ -12,8 +12,8 @@ pub fn RhythmsPage() -> impl IntoView {
 
     view! {
         <div class="page rhythms-page">
-            <h1 class="page-title">"Rhythms & Presence"</h1>
-            <p class="page-subtitle">"Daily routines and who is home"</p>
+            <h1 class="page-title">"rhythms & presence"</h1>
+            <p class="page-subtitle">"daily routines and who is home"</p>
 
             // Presence strip
             <section>

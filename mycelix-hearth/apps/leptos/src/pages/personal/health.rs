@@ -7,8 +7,8 @@ use leptos::prelude::*;
 pub fn HealthPage() -> impl IntoView {
     view! {
         <div class="page health-page">
-            <h1 class="page-title">"Health Vault"</h1>
-            <p class="page-subtitle">"Your sovereign health records"</p>
+            <h1 class="page-title">"health vault"</h1>
+            <p class="page-subtitle">"your sovereign health records"</p>
 
             <div class="vault-notice">
                 <p>"Health records are encrypted on your source chain."</p>

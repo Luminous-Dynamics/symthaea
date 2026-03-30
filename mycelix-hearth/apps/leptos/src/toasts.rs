@@ -76,7 +76,7 @@ pub fn ToastContainer() -> impl IntoView {
     let state = use_toasts();
 
     view! {
-        <div class="toast-container">
+        <div class="toast-container" role="status" aria-live="polite" aria-label="notifications">
             {move || {
                 state.toasts.get().iter().map(|t| {
                     let msg = t.message.clone();

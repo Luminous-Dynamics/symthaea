@@ -7,8 +7,8 @@ use leptos::prelude::*;
 pub fn DisclosurePage() -> impl IntoView {
     view! {
         <div class="page disclosure-page">
-            <h1 class="page-title">"Disclosure Settings"</h1>
-            <p class="page-subtitle">"Control what you share across clusters"</p>
+            <h1 class="page-title">"disclosure settings"</h1>
+            <p class="page-subtitle">"control what you share across clusters"</p>
 
             <div class="disclosure-info">
                 <p>"Your personal data lives on your source chain. Other clusters can only see what you explicitly allow."</p>

@@ -215,6 +215,8 @@ pub fn KinshipCanvas() -> impl IntoView {
             width=CANVAS_W as u32
             height=CANVAS_H as u32
             class="kinship-canvas"
+            role="img"
+            aria-label="kinship web — family members as nodes connected by bonds of varying strength"
         />
     }
 }

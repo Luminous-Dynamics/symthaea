@@ -12,8 +12,8 @@ pub fn AutonomyPage() -> impl IntoView {
 
     view! {
         <div class="page autonomy-page">
-            <h1 class="page-title">"Autonomy"</h1>
-            <p class="page-subtitle">"Graduated independence and capability growth"</p>
+            <h1 class="page-title">"autonomy"</h1>
+            <p class="page-subtitle">"graduated independence and capability growth"</p>
 
             // Guardian-only: approve capability requests
             <TierGate min_tier=TrustTier::Elevated action_label="manage autonomy profiles">

@@ -10,8 +10,8 @@ pub fn MilestonesPage() -> impl IntoView {
 
     view! {
         <div class="page milestones-page">
-            <h1 class="page-title">"Milestones"</h1>
-            <p class="page-subtitle">"Life events and liminal transitions"</p>
+            <h1 class="page-title">"milestones"</h1>
+            <p class="page-subtitle">"life events and liminal transitions"</p>
 
             {move || {
                 let members = hearth.members.get();

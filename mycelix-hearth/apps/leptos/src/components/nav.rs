@@ -17,8 +17,8 @@ pub fn Nav() -> impl IntoView {
     let show_emergency = move || consciousness.tier.get() >= TrustTier::Observer;
 
     view! {
-        <nav class="navbar">
-            <A href="/" attr:class="logo">"hearth"</A>
+        <nav class="navbar" role="navigation" aria-label="main navigation">
+            <A href="/" attr:class="logo" attr:aria-label="hearth home">"hearth"</A>
 
             <div class="nav-links">
                 <A href="/kinship">"bonds"</A>

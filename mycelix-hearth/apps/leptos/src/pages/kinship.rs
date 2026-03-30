@@ -34,8 +34,8 @@ pub fn KinshipPage() -> impl IntoView {
 
     view! {
         <div class="page kinship-page">
-            <h1 class="page-title">"Bonds"</h1>
-            <p class="page-subtitle">"The living web of your relationships"</p>
+            <h1 class="page-title">"bonds"</h1>
+            <p class="page-subtitle">"the living web of your relationships"</p>
 
             // Kinship web visualization
             <div class="viz-container">
@@ -87,31 +87,9 @@ pub fn KinshipPage() -> impl IntoView {
                 </div>
             })}
 
-            // Members
+            // Bonds first — the most important interactive element
             <section>
-                <h2>"Family Members"</h2>
-                {move || hearth.members.get().iter().map(|m| {
-                    let name = m.display_name.clone();
-                    let role_label = m.role.label().to_string();
-                    let is_guardian = m.role.is_guardian();
-                    let status = if m.status == MembershipStatus::Invited { " (invited)" } else { "" };
-                    view! {
-                        <div class="member-card">
-                            <div class="member-info">
-                                <span class="member-name">{name}{status}</span>
-                                <span class="member-role">{role_label}</span>
-                            </div>
-                            {is_guardian.then(|| view! {
-                                <span class="guardian-badge">"Guardian"</span>
-                            })}
-                        </div>
-                    }
-                }).collect_view()}
-            </section>
-
-            // Bonds with strength bars + tend button
-            <section>
-                <h2>"Bond Health"</h2>
+                <h2>"bond health"</h2>
                 {move || {
                     let members = hearth.members.get();
                     hearth.bonds.get().iter().map(|b| {
@@ -159,6 +137,28 @@ pub fn KinshipPage() -> impl IntoView {
                         }
                     }).collect_view()
                 }}
+            </section>
+
+            // Members below bonds
+            <section>
+                <h2>"family"</h2>
+                {move || hearth.members.get().iter().map(|m| {
+                    let name = m.display_name.clone();
+                    let role_label = m.role.label().to_string();
+                    let is_guardian = m.role.is_guardian();
+                    let status = if m.status == MembershipStatus::Invited { " (invited)" } else { "" };
+                    view! {
+                        <div class="member-card" role="listitem">
+                            <div class="member-info">
+                                <span class="member-name">{name}{status}</span>
+                                <span class="member-role">{role_label}</span>
+                            </div>
+                            {is_guardian.then(|| view! {
+                                <span class="guardian-badge">"guardian"</span>
+                            })}
+                        </div>
+                    }
+                }).collect_view()}
             </section>
         </div>
     }

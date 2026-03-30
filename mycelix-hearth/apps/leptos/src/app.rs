@@ -52,9 +52,10 @@ fn AppInner() -> impl IntoView {
 
     view! {
         <Router>
+            <a href="#main-content" class="skip-to-content">"skip to content"</a>
             <Nav />
             <DevPanel />
-            <main class="main-content heartbeat">
+            <main id="main-content" class="main-content heartbeat" role="main" aria-label="hearth content">
                 <Routes fallback=|| view! { <p class="not-found">"you\u{2019}ve wandered off the path"</p> }>
                     <Route path=path!("/") view=HomePage />
                     <Route path=path!("/kinship") view=KinshipPage />
