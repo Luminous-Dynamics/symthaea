@@ -546,6 +546,10 @@ pub struct World {
     #[serde(default)]
     pub project_manager: crate::projects::ProjectManager,
 
+    /// Modular habitat geometry — radiation and psychology per volume.
+    #[serde(default)]
+    pub habitat: crate::habitat::HabitatComplex,
+
     /// E: Inter-world relationship scores [-1, 1]. -1 = hostile, 0 = neutral, +1 = allied.
     #[serde(default)]
     pub diplomatic_relations: HashMap<u32, f64>,
@@ -818,6 +822,7 @@ mod tests {
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::default(),
+            habitat: crate::habitat::HabitatComplex::default(),
             diplomatic_relations: HashMap::new(),
         };
 

@@ -48,6 +48,7 @@ pub mod observables;
 pub mod population;
 pub mod cohort;
 pub mod engine_v2;
+pub mod habitat;
 pub mod projects;
 pub mod supply_chain;
 pub mod symtropy_bridge;
@@ -287,6 +288,7 @@ impl MultiWorldSimulator {
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
+            habitat: habitat::HabitatComplex::default_surface_colony(&seed.location),
             diplomatic_relations: std::collections::HashMap::new(),
             };
 
@@ -428,6 +430,7 @@ impl MultiWorldSimulator {
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
+            habitat: habitat::HabitatComplex::default_surface_colony(&location),
             diplomatic_relations: std::collections::HashMap::new(),
         };
 
@@ -2841,19 +2844,33 @@ impl MultiWorldSimulator {
                 // NASA career limit: 600 mSv (NASA-STD-3001 Rev C, 2022)
                 // A Mars colonist hits the 600 mSv limit in ~2.5 years unshielded.
                 // Radiation shelters reduce exposure by assumed 60-80%.
-                let has_rad_shelter = world.project_manager
-                    .has_completed(projects::ProjectBlueprint::RadiationShelter);
-                let shelter_factor = if has_rad_shelter { 0.3 } else { 1.0 };
-                let dose_per_tick_sv = match world.location.as_str() {
+                // Modular habitat-aware radiation dose.
+                // Ambient dose depends on location (Hassler 2014, Cucinotta 2014).
+                // Actual dose depends on which module the agent works in.
+                let ambient_dose_sv = match world.location.as_str() {
                     "Earth" => 0.0002,   // 0.2 mSv/month (natural background)
-                    "Moon" => 0.015,     // 15 mSv/month (no magnetosphere, Cucinotta 2014)
+                    "Moon" => 0.015,     // 15 mSv/month (Cucinotta 2014)
                     "Mars" => 0.020,     // 20 mSv/month (Hassler 2014, MSL/RAD)
-                    "Europa" => 0.005,   // 5 mSv/month (under ice, Jupiter magnetosphere)
+                    "Europa" => 0.005,   // 5 mSv/month (under ice)
                     "Titan" => 0.00005,  // 0.05 mSv/month (thick N2 atmosphere)
                     _ => 0.005,
-                } * shelter_factor;
-                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                    agent.cumulative_dose_sv += dose_per_tick_sv;
+                };
+                if world.habitat.modules.is_empty() {
+                    // No habitat modules yet — flat dose for everyone
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        agent.cumulative_dose_sv += ambient_dose_sv;
+                    }
+                } else {
+                    // Per-agent dose based on profession → module assignment
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        let sector = agent.skills.strongest_index();
+                        let dose_frac = world.habitat.agent_dose_fraction(sector);
+                        agent.cumulative_dose_sv += ambient_dose_sv * dose_frac;
+                        // Habitat psychology affects allostatic load
+                        let psych_mod = world.habitat.agent_psych_modifier(sector);
+                        agent.needs.allostatic_load =
+                            (agent.needs.allostatic_load + psych_mod).clamp(0.0, 1.0);
+                    }
                 }
                 let dem_events =
                     PopulationEngine::tick_demographics(&mut world, &mut self.rng, self.current_tick);
@@ -3632,6 +3649,7 @@ impl Default for World {
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
+            habitat: habitat::HabitatComplex::default(),
             diplomatic_relations: std::collections::HashMap::new(),
         }
     }

@@ -596,6 +596,7 @@ mod tests {
             automation_level: 0.0,
             explorations_completed: 0,
             project_manager: crate::projects::ProjectManager::new(),
+            habitat: crate::habitat::HabitatComplex::default(),
             diplomatic_relations: std::collections::HashMap::new(),
         };
         for i in 0..pop {
