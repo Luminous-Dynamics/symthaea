@@ -32,10 +32,12 @@ in vec2 v_uv;
 out vec4 fragColor;
 
 uniform float u_time;
-uniform float u_alignment;   // 0.0 = turbulent (sick), 1.0 = smooth (healthy)
-uniform float u_phi;          // consciousness integration level
+uniform float u_alignment;    // consciousness score (0.0-1.0)
+uniform float u_phi;           // integration level
+uniform vec3  u_domain_color;  // active domain's color (RGB 0-1)
+uniform float u_domain_blend;  // 0.0 = orbital (teal), 1.0 = fully in domain
+uniform float u_flow_style;    // 0=organic, 1=crystalline, 2=pulse, 3=branching
 
-// Simplex-like noise for organic flow
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -43,7 +45,7 @@ float hash(vec2 p) {
 float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f); // smoothstep
+    f = f * f * (3.0 - 2.0 * f);
     float a = hash(i);
     float b = hash(i + vec2(1.0, 0.0));
     float c = hash(i + vec2(0.0, 1.0));
@@ -55,7 +57,6 @@ float fbm(vec2 p, float turbulence) {
     float value = 0.0;
     float amplitude = 0.5;
     float frequency = 1.0;
-    // More octaves = more turbulence when sick
     int octaves = 3 + int((1.0 - turbulence) * 4.0);
     for (int i = 0; i < 7; i++) {
         if (i >= octaves) break;
@@ -66,45 +67,90 @@ float fbm(vec2 p, float turbulence) {
     return value;
 }
 
+// Crystalline pattern for governance — angular, structured
+float crystalline(vec2 p, float t) {
+    vec2 g = fract(p * 4.0) - 0.5;
+    float d = length(g);
+    float edges = abs(g.x) + abs(g.y); // Diamond pattern
+    return smoothstep(0.4, 0.5, edges + sin(t * 0.3) * 0.1);
+}
+
+// Pulse pattern for finance — radial waves from center
+float pulse_pattern(vec2 uv, float t) {
+    float d = length(uv - 0.5);
+    float wave = sin(d * 20.0 - t * 2.0) * 0.5 + 0.5;
+    return wave * smoothstep(0.5, 0.0, d);
+}
+
+// Branching pattern for education — dendritic growth
+float branching(vec2 p, float t) {
+    float n = fbm(p * 3.0 + t * 0.05, 0.8);
+    float branch = smoothstep(0.45, 0.55, n);
+    float tips = smoothstep(0.6, 0.7, n) * smoothstep(0.75, 0.65, n);
+    return branch + tips * 2.0;
+}
+
 void main() {
     vec2 uv = v_uv;
 
-    // Sacred Stillness cycle: 8 seconds (0.125 Hz)
-    float breath = sin(u_time * 0.7854) * 0.5 + 0.5; // 2*PI/8 = 0.7854
-    float breathScale = mix(0.02, 0.005, u_alignment); // Sick = large movement
+    // Sacred Stillness breathing (8-second cycle)
+    float breath = sin(u_time * 0.7854) * 0.5 + 0.5;
+    float breathScale = mix(0.02, 0.005, u_alignment);
 
-    // Mycelial flow field
-    float flow_speed = mix(0.3, 0.08, u_alignment); // Healthy = slow, calm drift
+    // Base organic flow (always present)
+    float flow_speed = mix(0.3, 0.08, u_alignment);
     vec2 flow = vec2(
         fbm(uv * 3.0 + u_time * flow_speed, u_alignment),
         fbm(uv * 3.0 + u_time * flow_speed + 100.0, u_alignment)
     );
-
-    // Distort UV by flow (organic movement)
     vec2 distorted = uv + (flow - 0.5) * breathScale * (0.5 + breath * 0.5);
 
-    // Mycelial network pattern — branching tendrils
+    // Mycelial network (base layer)
     float network = fbm(distorted * 5.0 + u_time * 0.02, u_alignment);
     float tendrils = smoothstep(0.35, 0.55, network);
 
-    // Base color: deep teal ocean with mycelial glow
-    vec3 deep = vec3(0.02, 0.06, 0.08);           // Ocean deep
-    vec3 teal = vec3(0.05, 0.45, 0.47);            // Primary teal
-    vec3 bioluminescent = vec3(0.1, 0.85, 0.75);   // Mycelial glow
+    // Domain-specific pattern overlay
+    float domain_pattern = 0.0;
+    if (u_flow_style < 0.5) {
+        // Organic (health, hearth) — smoother, warmer flow
+        domain_pattern = fbm(distorted * 3.0 + u_time * 0.03, 0.9) * 0.5;
+    } else if (u_flow_style < 1.5) {
+        // Crystalline (governance) — angular, structured
+        domain_pattern = crystalline(distorted, u_time) * 0.4;
+    } else if (u_flow_style < 2.5) {
+        // Pulse (finance) — radial waves
+        domain_pattern = pulse_pattern(uv, u_time) * 0.3;
+    } else {
+        // Branching (education, knowledge) — dendritic growth
+        domain_pattern = branching(distorted, u_time) * 0.3;
+    }
 
-    // Mix based on network density and health
-    vec3 color = mix(deep, teal, tendrils * 0.3);
+    // Color mixing — blend between teal base and domain color
+    vec3 deep = vec3(0.02, 0.04, 0.06);
+    vec3 base_teal = vec3(0.05, 0.45, 0.47);
+    vec3 base_glow = vec3(0.1, 0.85, 0.75);
 
-    // Bioluminescent nodes — brighter where mycelial network converges
+    // Domain color influence
+    vec3 domain_mid = u_domain_color * 0.5;
+    vec3 domain_glow = u_domain_color * 1.2;
+
+    vec3 mid_color = mix(base_teal, domain_mid, u_domain_blend);
+    vec3 glow_color = mix(base_glow, domain_glow, u_domain_blend);
+
+    // Compose final color
+    vec3 color = mix(deep, mid_color, tendrils * 0.3);
+
+    // Add domain pattern
+    color += domain_mid * domain_pattern * u_domain_blend * 0.2;
+
+    // Bioluminescent nodes
     float nodes = smoothstep(0.6, 0.8, network) * u_phi;
-    color += bioluminescent * nodes * 0.15 * (0.7 + breath * 0.3);
+    color += glow_color * nodes * 0.15 * (0.7 + breath * 0.3);
 
-    // Subtle phi-driven radiance at center
-    float center_glow = 1.0 - length(uv - 0.5) * 1.5;
-    center_glow = max(0.0, center_glow);
-    color += teal * center_glow * 0.03 * u_phi;
+    // Center radiance
+    float center_glow = max(0.0, 1.0 - length(uv - 0.5) * 1.5);
+    color += mid_color * center_glow * 0.04 * u_phi;
 
-    // Overall opacity — subtle background, never distracting
     float alpha = 0.85;
 
     fragColor = vec4(color, alpha);
@@ -172,6 +218,9 @@ pub fn HomeostasisBackground() -> impl IntoView {
         let u_time = gl.get_uniform_location(&program, "u_time");
         let u_alignment = gl.get_uniform_location(&program, "u_alignment");
         let u_phi = gl.get_uniform_location(&program, "u_phi");
+        let u_domain_color = gl.get_uniform_location(&program, "u_domain_color");
+        let u_domain_blend = gl.get_uniform_location(&program, "u_domain_blend");
+        let u_flow_style = gl.get_uniform_location(&program, "u_flow_style");
 
         // Animation loop with cancellation support
         let gl = std::rc::Rc::new(gl);
@@ -179,6 +228,12 @@ pub fn HomeostasisBackground() -> impl IntoView {
         let u_time = std::rc::Rc::new(u_time);
         let u_alignment = std::rc::Rc::new(u_alignment);
         let u_phi = std::rc::Rc::new(u_phi);
+        let u_domain_color = std::rc::Rc::new(u_domain_color);
+        let u_domain_blend = std::rc::Rc::new(u_domain_blend);
+        let u_flow_style = std::rc::Rc::new(u_flow_style);
+
+        // Read active domain from context for background color shifts
+        let active_domain = use_context::<RwSignal<Option<String>>>;
         let canvas_rc = std::rc::Rc::new(canvas);
 
         let perf = window.performance().unwrap();
@@ -214,6 +269,9 @@ pub fn HomeostasisBackground() -> impl IntoView {
         let ut = u_time.clone();
         let ua = u_alignment.clone();
         let up = u_phi.clone();
+        let udc = u_domain_color.clone();
+        let udb = u_domain_blend.clone();
+        let ufs = u_flow_style.clone();
         let running2 = running.clone();
 
         *g.borrow_mut() = Some(Closure::new(move || {
@@ -223,10 +281,34 @@ pub fn HomeostasisBackground() -> impl IntoView {
             let score = identity.consciousness_score.get();
             let elapsed = (perf.now() - start) / 1000.0;
 
+            // Determine active domain color and flow style
+            let (r, g, b, blend, style) = if let Some(active) = active_domain() {
+                if let Some(domain_id) = active.get() {
+                    match domain_id.as_str() {
+                        "health"     => (0.05, 0.45, 0.47, 1.0, 0.0), // organic
+                        "governance" => (0.49, 0.23, 0.93, 1.0, 1.0), // crystalline
+                        "finance"    => (0.85, 0.47, 0.02, 1.0, 2.0), // pulse
+                        "edunet"     => (0.15, 0.39, 0.92, 1.0, 3.0), // branching
+                        "commons"    => (0.02, 0.59, 0.41, 1.0, 0.0), // organic
+                        "hearth"     => (0.86, 0.15, 0.47, 1.0, 0.0), // organic
+                        "knowledge"  => (0.03, 0.57, 0.70, 1.0, 3.0), // branching
+                        "space"      => (0.31, 0.27, 0.90, 1.0, 1.0), // crystalline
+                        _            => (0.05, 0.45, 0.47, 0.0, 0.0),
+                    }
+                } else {
+                    (0.05, 0.45, 0.47, 0.0, 0.0) // orbital view — default teal
+                }
+            } else {
+                (0.05, 0.45, 0.47, 0.0, 0.0)
+            };
+
             gl2.use_program(Some(&program2));
             gl2.uniform1f(ut.as_ref().as_ref(), elapsed as f32);
             gl2.uniform1f(ua.as_ref().as_ref(), score as f32);
             gl2.uniform1f(up.as_ref().as_ref(), (score * 0.7) as f32);
+            gl2.uniform3f(udc.as_ref().as_ref(), r as f32, g as f32, b as f32);
+            gl2.uniform1f(udb.as_ref().as_ref(), blend as f32);
+            gl2.uniform1f(ufs.as_ref().as_ref(), style as f32);
 
             gl2.draw_arrays(GL::TRIANGLES, 0, 6);
 
