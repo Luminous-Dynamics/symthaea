@@ -892,9 +892,23 @@ impl StreamingSynth {
                     );
                 }
 
-                // Constrain pitch range (analysis showed 119 semitone scatter — need ~14)
-                // Center on A4 (440Hz) — comfortable singing range
-                // Allow 20 semitones (just over 1.5 octaves each direction)
+                // Prevent repeated notes: if same as previous, pick a different chord/scale tone
+                if let Some(prev) = self.prev_note_freq {
+                    let ratio = note.frequency / prev;
+                    if (ratio - 1.0).abs() < 0.02 {
+                        // Same note — pick a neighbor from scale tones
+                        if let Some(idx) = scale_tones.iter()
+                            .position(|&f| (f - note.frequency).abs() < note.frequency * 0.03)
+                        {
+                            // Move up or down in scale (alternate direction)
+                            let direction = if self.note_counter % 2 == 0 { 1 } else { -1 };
+                            let new_idx = (idx as i32 + direction).clamp(0, scale_tones.len() as i32 - 1) as usize;
+                            note.frequency = scale_tones[new_idx];
+                        }
+                    }
+                }
+
+                // Constrain pitch range
                 note.frequency = production::constrain_pitch_range(note.frequency, 440.0, 20.0);
 
                 // Apply key modulation from dramatic state
