@@ -20,7 +20,7 @@ CSS_CONTENT=$(cat "$CSS_FILE")
 
 # Read JS files in order
 JS_CONTENT=""
-for f in app.js charts.js tab-chat.js tab-topology.js tab-experiments.js tab-dreams.js tab-inoculate.js; do
+for f in app.js charts.js tab-chat.js tab-topology.js tab-experiments.js tab-dreams.js tab-inoculate.js consciousness-music.js ceremony.js; do
   JS_FILE="$SCRIPT_DIR/js/$f"
   if [ ! -f "$JS_FILE" ]; then
     echo "ERROR: js/$f not found" >&2

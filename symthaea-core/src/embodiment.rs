@@ -63,6 +63,11 @@ pub struct EmbodimentResult {
     pub success: bool,
     pub prediction_error: f32,
     pub safety_level: MotorSafetyLevel,
+    /// Epistemic grounding level: 0=Sensorimotor, 1=Temporal, 2=Social.
+    /// Uses u8 to keep symthaea-core free of epistemic-types dependency.
+    pub epistemic_grounding: u8,
+    /// Observation confidence derived from prediction error (low error = high confidence).
+    pub observation_confidence: f32,
 }
 
 // ── Embodiment Telemetry ───────────────────────────────────────────────────
@@ -76,6 +81,37 @@ pub struct EmbodimentTelemetry {
     pub safety_level: String,
     pub platform: String,
     pub num_actuators: usize,
+    /// Human-readable epistemic grounding level (e.g. "Sensorimotor", "Temporal", "Social").
+    pub epistemic_grounding: String,
+    /// Observation confidence derived from prediction error.
+    pub observation_confidence: f32,
+}
+
+// ── Epistemic Grounding Constants ─────────────────────────────────────────
+
+/// Sensorimotor grounding: direct physical sensor data.
+pub const GROUNDING_SENSORIMOTOR: u8 = 0;
+/// Temporal grounding: derived from temporal patterns / prediction.
+pub const GROUNDING_TEMPORAL: u8 = 1;
+/// Social grounding: derived from social/swarm interaction.
+pub const GROUNDING_SOCIAL: u8 = 2;
+
+/// Convert a grounding level u8 to a human-readable string.
+pub fn grounding_label(level: u8) -> &'static str {
+    match level {
+        0 => "Sensorimotor",
+        1 => "Temporal",
+        2 => "Social",
+        _ => "Unknown",
+    }
+}
+
+/// Compute observation confidence from prediction error.
+///
+/// Low prediction error implies high confidence in the observation.
+/// Returns a value in \[0.0, 1.0\].
+pub fn grounding_from_prediction_error(prediction_error: f32) -> f32 {
+    1.0 - prediction_error.clamp(0.0, 1.0)
 }
 
 // ── Embodiment Platform ────────────────────────────────────────────────────
@@ -166,5 +202,26 @@ mod tests {
         assert!(MotorSafetyLevel::Green < MotorSafetyLevel::Yellow);
         assert!(MotorSafetyLevel::Yellow < MotorSafetyLevel::Orange);
         assert!(MotorSafetyLevel::Orange < MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_grounding_from_prediction_error() {
+        // Zero error = full confidence
+        assert!((grounding_from_prediction_error(0.0) - 1.0).abs() < f32::EPSILON);
+        // Full error = zero confidence
+        assert!((grounding_from_prediction_error(1.0) - 0.0).abs() < f32::EPSILON);
+        // Mid-range
+        assert!((grounding_from_prediction_error(0.3) - 0.7).abs() < 1e-6);
+        // Clamping: values outside [0,1] are clamped
+        assert!((grounding_from_prediction_error(-0.5) - 1.0).abs() < f32::EPSILON);
+        assert!((grounding_from_prediction_error(1.5) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_grounding_labels() {
+        assert_eq!(grounding_label(GROUNDING_SENSORIMOTOR), "Sensorimotor");
+        assert_eq!(grounding_label(GROUNDING_TEMPORAL), "Temporal");
+        assert_eq!(grounding_label(GROUNDING_SOCIAL), "Social");
+        assert_eq!(grounding_label(42), "Unknown");
     }
 }

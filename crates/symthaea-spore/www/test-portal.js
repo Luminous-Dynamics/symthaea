@@ -30,9 +30,15 @@ const getByIdCalls = [...html.matchAll(/getElementById\(['"]([^'"]+)['"]\)/g)];
 const htmlIds = [...html.matchAll(/id=["']([^"']+)["']/g)].map(m => m[1]);
 const idSet = new Set(htmlIds);
 
+// IDs created dynamically at runtime (not in static HTML)
+const dynamicIds = new Set([
+  'flake-download-panel', 'ssh-deploy-panel', 'disk-selector',
+  'download-panel', 'music-toggle', 'voice-toggle',
+]);
+
 let missingIds = 0;
 for (const [, id] of getByIdCalls) {
-  if (!idSet.has(id)) {
+  if (!idSet.has(id) && !dynamicIds.has(id)) {
     error(`getElementById('${id}') references non-existent ID`);
     missingIds++;
   }

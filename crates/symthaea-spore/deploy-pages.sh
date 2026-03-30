@@ -47,6 +47,9 @@ cp "$WWW_DIR/spore-worker.js" "$DEPLOY_DIR/"
 cp "$WWW_DIR/sonic.js" "$DEPLOY_DIR/" 2>/dev/null || true
 cp "$WWW_DIR/glyphs.js" "$DEPLOY_DIR/" 2>/dev/null || true
 cp "$WWW_DIR/sw.js" "$DEPLOY_DIR/" 2>/dev/null || true
+# AudioWorklet must be a separate file (loaded by audioContext.audioWorklet.addModule)
+mkdir -p "$DEPLOY_DIR/js"
+cp "$WWW_DIR/js/consciousness-audio-worklet.js" "$DEPLOY_DIR/js/" 2>/dev/null || true
 cp "$WWW_DIR/smoke-test.mjs" "$DEPLOY_DIR/"
 mkdir -p "$DEPLOY_DIR/pkg"
 cp "$PKG_DIR/symthaea_spore_bg.wasm" "$DEPLOY_DIR/pkg/"

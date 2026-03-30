@@ -59,6 +59,7 @@ pub mod secure_boot;
 pub mod sovereign;
 pub mod topology;
 pub mod wellbeing_profiles;
+pub mod app_migration;
 pub mod daily_ritual;
 
 pub mod hardware_probe;

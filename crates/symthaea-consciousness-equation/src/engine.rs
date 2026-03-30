@@ -146,13 +146,16 @@ impl MasterConsciousnessEquation {
         // M, N, Soc are already included in the weighted_sum via their component weights.
         // As raw multiplicatives they double-count AND cause catastrophic attenuation when
         // a factor is low (e.g., Soc=0.35 in non-social context → 65% permanent haircut).
-        // Convert to soft modulations: map [0,1] → [0.5, 1.0] so low values attenuate
-        // gently rather than crushing consciousness.
+        // Convert to soft modulations: map [0,1] → [0.65, 1.0] so low values attenuate
+        // gently rather than crushing consciousness. Floor raised from 0.5→0.65:
+        // three moderate factors at 0.5 used to give 0.75³=0.42 (58% loss).
+        // With 0.65 floor: 0.825³=0.56 (44% loss) — still meaningful but not punitive.
         // Science: Modular consciousness theories (Baars 2005) — subsystem deficits
-        // reduce but don't eliminate consciousness.
-        let m_mod = 0.5 + 0.5 * m;
-        let n_mod = 0.5 + 0.5 * n;
-        let soc_mod = 0.5 + 0.5 * soc;
+        // reduce but don't eliminate consciousness. Consciousness can exist without
+        // rich social embedding or narrative (dreamless sleep, infant consciousness).
+        let m_mod = 0.65 + 0.35 * m;
+        let n_mod = 0.65 + 0.35 * n;
+        let soc_mod = 0.65 + 0.35 * soc;
         let consciousness_level = sigmoid_bottleneck
             * weighted_sum
             * inputs.synchrony

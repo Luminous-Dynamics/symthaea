@@ -291,9 +291,13 @@ impl HierarchicalFreeEnergy {
         intero_factor: f64,
         blanket_factor: f64,
     ) {
+        let decay = self.config.precision_decay;
+        // Pre-computed base precisions: decay^0=1.0, decay^1, decay^2, decay^3
+        // Avoids repeated powi() on the hot path.
+        let mut base = 1.0_f64;
         for level in &mut self.levels {
-            let base = self.config.precision_decay.powi(level.level as i32);
             level.update_precision_dynamic(base, phi_factor, intero_factor, blanket_factor);
+            base *= decay;
         }
     }
 

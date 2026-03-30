@@ -395,6 +395,9 @@ pub mod spinozist_geometry;
 /// Learned Moral Classifier — Spinozist features + adaptive HDC classification.
 pub mod learned_moral_classifier;
 
+/// Consciousness-driven text encoder — CfC word-by-word temporal dynamics.
+pub mod consciousness_encoder;
+
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 

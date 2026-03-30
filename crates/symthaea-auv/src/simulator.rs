@@ -20,16 +20,51 @@ pub struct SimpleAuvSimulator {
     hydro_config: HydrodynamicConfig,
     thruster_state: [f64; NUM_ACTUATORS],
     external_force: [f64; 3],
+    /// Energy reservoir (joules). Depletes with thrust.
+    /// When exhausted, thrusters produce zero force (drift mode).
+    energy_remaining_j: f64,
+    /// Total energy consumed (joules, monotonically increasing).
+    energy_consumed_j: f64,
+    /// Energy capacity (joules). Default: 500 kJ (~14 hours at cruise).
+    energy_capacity_j: f64,
 }
 
 impl SimpleAuvSimulator {
     pub fn new() -> Self {
+        let capacity = 500_000.0; // 500 kJ — typical small AUV battery
         Self {
             state: AuvState::neutral_buoyancy(10.0),
             hydro_config: HydrodynamicConfig::default(),
             thruster_state: [0.0; NUM_ACTUATORS],
             external_force: [0.0; 3],
+            energy_remaining_j: capacity,
+            energy_consumed_j: 0.0,
+            energy_capacity_j: capacity,
         }
+    }
+
+    /// Create with a custom energy budget (joules).
+    pub fn with_energy_budget(energy_j: f64) -> Self {
+        let mut sim = Self::new();
+        sim.energy_capacity_j = energy_j;
+        sim.energy_remaining_j = energy_j;
+        sim
+    }
+
+    /// Remaining energy as fraction [0, 1].
+    pub fn energy_fraction(&self) -> f64 {
+        if self.energy_capacity_j <= 0.0 { return 0.0; }
+        (self.energy_remaining_j / self.energy_capacity_j).clamp(0.0, 1.0)
+    }
+
+    /// Total energy consumed (joules).
+    pub fn energy_consumed(&self) -> f64 {
+        self.energy_consumed_j
+    }
+
+    /// Whether the battery is exhausted.
+    pub fn energy_exhausted(&self) -> bool {
+        self.energy_remaining_j <= 0.0
     }
 }
 
@@ -39,9 +74,27 @@ impl Default for SimpleAuvSimulator {
 
 impl AuvPhysicsSimulator for SimpleAuvSimulator {
     fn step(&mut self, cmd: &AuvCommand, dt: f64) {
+        // Energy-gated thruster commands: if battery exhausted, no thrust
+        let effective_cmd = if self.energy_remaining_j > 0.0 {
+            cmd.clone()
+        } else {
+            AuvCommand::zero() // Drift mode
+        };
+
         let (thrust_force, thrust_moment) = hydrodynamics::thruster_forces(
-            &self.hydro_config, &mut self.thruster_state, &cmd.thrusters, dt,
+            &self.hydro_config, &mut self.thruster_state, &effective_cmd.thrusters, dt,
         );
+
+        // Energy depletion: P = Σ(F_i²) / η (power proportional to force²)
+        // Efficiency η = 0.4 (typical electric thruster)
+        // Energy = Power × dt
+        let thrust_power: f64 = self.thruster_state.iter()
+            .map(|f| f * f)
+            .sum::<f64>() / 0.4;
+        let energy_this_step = thrust_power * dt;
+        self.energy_consumed_j += energy_this_step;
+        self.energy_remaining_j = (self.energy_remaining_j - energy_this_step).max(0.0);
+
         let hydro = hydrodynamics::compute_forces(
             &self.hydro_config, &self.state.linear_velocity, &self.state.angular_velocity, self.state.depth,
         );
@@ -123,6 +176,8 @@ impl AuvPhysicsSimulator for SimpleAuvSimulator {
         self.state = AuvState::neutral_buoyancy(depth);
         self.thruster_state = [0.0; NUM_ACTUATORS];
         self.external_force = [0.0; 3];
+        self.energy_remaining_j = self.energy_capacity_j;
+        self.energy_consumed_j = 0.0;
     }
 
     fn apply_external_force(&mut self, force: [f64; 3]) {

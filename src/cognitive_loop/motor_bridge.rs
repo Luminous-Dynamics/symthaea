@@ -32,7 +32,8 @@ use crate::humanoid::{
 // single Rust type across the entire workspace — no more E0308 mismatches.
 
 pub use symthaea_core::embodiment::{
-    EmbodimentBridge, EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
+    grounding_from_prediction_error, grounding_label, EmbodimentBridge, EmbodimentPlatform,
+    EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 
 // ── Humanoid implementation ─────────────────────────────────────────────────
@@ -217,6 +218,8 @@ impl EmbodimentBridge for MotorBridge {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
 
@@ -269,6 +272,8 @@ impl EmbodimentBridge for MotorBridge {
             safety_level: format!("{:?}", self.current_safety),
             platform: "humanoid".to_string(),
             num_actuators: 21,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
         }
     }
 }

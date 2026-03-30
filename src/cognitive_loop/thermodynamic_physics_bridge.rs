@@ -120,6 +120,26 @@ pub struct ThermodynamicPhysicsBridge {
     /// to maximize entropy production while building internal order.
     /// Only active when `england_dissipation` feature is enabled.
     pub england_exploration_boost: bool,
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Epistemic Free Energy (arXiv 2601.17607)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Epistemic free energy: F = E[loss] - T*H[beliefs].
+    /// Positive = beliefs are costly relative to entropy; negative = beliefs are cheap.
+    /// Science: Thermodynamic Theory of Learning (Still et al., arXiv 2601.17607).
+    #[cfg(feature = "epistemic")]
+    pub epistemic_free_energy: f64,
+
+    /// Epistemic speed limit violation: ESL = W2^2 / (T * sigma).
+    /// >1.0 means beliefs moved faster than thermodynamically permitted — suspicious.
+    /// Science: T * sigma >= W_2(q_0, q_1)^2 (arXiv 2601.17607).
+    #[cfg(feature = "epistemic")]
+    pub epistemic_speed_limit_violation: f64,
+
+    /// Wasserstein-2 proxy: how far beliefs moved this cycle (|belief_delta|).
+    #[cfg(feature = "epistemic")]
+    pub belief_wasserstein_distance: f64,
 }
 
 impl Default for ThermodynamicPhysicsBridge {
@@ -143,6 +163,12 @@ impl Default for ThermodynamicPhysicsBridge {
             prev_entropy_production: 0.0,
             prev_order_parameter: 0.5,
             england_exploration_boost: false,
+            #[cfg(feature = "epistemic")]
+            epistemic_free_energy: 0.0,
+            #[cfg(feature = "epistemic")]
+            epistemic_speed_limit_violation: 0.0,
+            #[cfg(feature = "epistemic")]
+            belief_wasserstein_distance: 0.0,
         }
     }
 }
@@ -322,6 +348,64 @@ impl ThermodynamicPhysicsBridge {
 
         self.prev_order_parameter = order_parameter;
         self.prev_entropy_production = entropy_production_rate;
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Epistemic Free Energy (arXiv 2601.17607)
+        // ═══════════════════════════════════════════════════════════════════
+        #[cfg(feature = "epistemic")]
+        {
+            // Use prediction_error as a proxy for belief_delta: high PE means
+            // the model's beliefs shifted significantly this cycle.
+            let belief_delta = prediction_error as f64;
+            self.compute_epistemic_thermodynamics(
+                effective_temperature,
+                entropy_production_rate,
+                belief_delta,
+            );
+        }
+    }
+
+    /// Compute epistemic thermodynamic metrics for this cycle.
+    ///
+    /// # Arguments
+    /// - `effective_temperature` — system effective temperature (k_B_eff units)
+    /// - `entropy_production` — entropy production rate this cycle
+    /// - `belief_delta` — how far beliefs moved this cycle (Wasserstein-2 proxy)
+    ///
+    /// # Science
+    ///
+    /// The Thermodynamic Theory of Learning (arXiv 2601.17607) establishes that
+    /// learning has an intrinsic thermodynamic cost. The Epistemic Speed Limit
+    /// (ESL) bounds how fast beliefs can change:
+    ///
+    ///   T * sigma >= W_2(q_0, q_1)^2
+    ///
+    /// where T is temperature, sigma is entropy production, and W_2 is the
+    /// Wasserstein-2 distance between consecutive belief distributions.
+    /// Violation (ESL > 1.0) indicates beliefs changed faster than
+    /// thermodynamically permitted — a red flag for hallucination or instability.
+    #[cfg(feature = "epistemic")]
+    pub(crate) fn compute_epistemic_thermodynamics(
+        &mut self,
+        effective_temperature: f64,
+        entropy_production: f64,
+        belief_delta: f64,
+    ) {
+        let t_eff = effective_temperature.max(0.01);
+        let sigma = entropy_production.max(0.001);
+
+        // F = E[loss] - T * H[beliefs]
+        // We use |belief_delta| as proxy for expected loss and sigma as proxy for
+        // belief entropy (higher entropy production ≈ higher belief entropy).
+        self.epistemic_free_energy = belief_delta.abs() - t_eff * sigma;
+
+        // W_2 proxy: absolute belief displacement
+        self.belief_wasserstein_distance = belief_delta.abs();
+
+        // ESL violation = W_2^2 / (T * sigma)
+        // >1.0 means beliefs moved faster than the thermodynamic bound allows
+        self.epistemic_speed_limit_violation =
+            self.belief_wasserstein_distance.powi(2) / (t_eff * sigma);
     }
 
     /// Compute Onsager reciprocal relation asymmetry from transport history.
@@ -469,6 +553,60 @@ mod tests {
         }
         // Covariance of identical inputs = 0 variance → asymmetry = 0
         assert!(b.onsager_asymmetry < 0.01);
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_free_energy_computation() {
+        let mut b = make_bridge();
+        // belief_delta=0.5, temperature=0.5, entropy_production=0.1
+        b.compute_epistemic_thermodynamics(0.5, 0.1, 0.5);
+
+        // F = |0.5| - 0.5 * 0.1 = 0.5 - 0.05 = 0.45
+        assert!(
+            (b.epistemic_free_energy - 0.45).abs() < 1e-9,
+            "expected 0.45, got {}",
+            b.epistemic_free_energy
+        );
+
+        // W2 = |0.5| = 0.5
+        assert!((b.belief_wasserstein_distance - 0.5).abs() < 1e-9);
+
+        // ESL = 0.5^2 / (0.5 * 0.1) = 0.25 / 0.05 = 5.0
+        assert!(
+            (b.epistemic_speed_limit_violation - 5.0).abs() < 1e-9,
+            "expected ESL 5.0, got {}",
+            b.epistemic_speed_limit_violation
+        );
+        // ESL > 1.0 → beliefs moved too fast
+        assert!(b.epistemic_speed_limit_violation > 1.0);
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_speed_limit_respects_temperature() {
+        let mut b = make_bridge();
+
+        // High temperature + high entropy production → ESL low (thermodynamically affordable)
+        b.compute_epistemic_thermodynamics(2.0, 1.0, 0.3);
+        let esl_hot = b.epistemic_speed_limit_violation;
+        // ESL = 0.3^2 / (2.0 * 1.0) = 0.09 / 2.0 = 0.045
+        assert!(esl_hot < 1.0, "hot system should allow fast belief change, got ESL={esl_hot}");
+
+        // Low temperature + low entropy production → ESL high (thermodynamically expensive)
+        b.compute_epistemic_thermodynamics(0.05, 0.01, 0.3);
+        let esl_cold = b.epistemic_speed_limit_violation;
+        // ESL = 0.09 / (0.05 * 0.01) = 0.09 / 0.0005 = 180.0
+        assert!(esl_cold > 1.0, "cold system should flag fast belief change, got ESL={esl_cold}");
+        assert!(esl_cold > esl_hot, "cold ESL should exceed hot ESL");
+
+        // Zero belief delta → ESL = 0
+        b.compute_epistemic_thermodynamics(0.5, 0.1, 0.0);
+        assert!(
+            b.epistemic_speed_limit_violation.abs() < 1e-12,
+            "zero belief delta → zero ESL"
+        );
+        assert!(b.epistemic_free_energy < 0.0, "zero loss - positive T*H should be negative");
     }
 
     #[test]

@@ -11,7 +11,10 @@ use crate::encoder::ManipulatorHdcEncoder;
 use crate::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use crate::types::ManipulatorConfig;
 
-pub use symthaea_core::embodiment::{EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel};
+pub use symthaea_core::embodiment::{
+    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
+    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+};
 
 /// Manipulator embodiment bridge.
 pub struct ManipulatorEmbodiment {
@@ -87,6 +90,8 @@ impl ManipulatorEmbodiment {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
 
@@ -124,6 +129,8 @@ impl ManipulatorEmbodiment {
             safety_level: format!("{:?}", self.current_safety),
             platform: "manipulator".to_string(),
             num_actuators: 8,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
         }
     }
 }

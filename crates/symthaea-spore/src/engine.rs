@@ -2199,6 +2199,15 @@ impl SporeEngine {
         self.evaluate_harmony_alignment(self.last_consciousness)
     }
 
+    /// Eight Harmonies scores as JSON array [RC, PSF, IW, IP, UI, SR, EP, SS].
+    pub fn harmony_scores_json(&self) -> String {
+        let scores: Vec<f32> = symthaea_harmonies::Harmony::all()
+            .iter()
+            .map(|h| self.harmony_score(h, self.last_consciousness))
+            .collect();
+        serde_json::to_string(&scores).unwrap_or_else(|_| "[]".to_string())
+    }
+
     /// Human-readable consciousness report with epistemic honesty.
     pub fn consciousness_report(&self) -> String {
         let status = self.build_epistemic_status();

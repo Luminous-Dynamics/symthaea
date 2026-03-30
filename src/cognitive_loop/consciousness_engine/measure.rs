@@ -32,16 +32,18 @@ impl ConsciousnessEngine {
 
         // ═══════════════════════════════════════════════════════════════════
         // LAYER 1: Spectral MIP — O(n³) Fiedler-ordered Phi
-        // Push every cycle, compute every 97, adapt+hierarchical every 194
+        // Push every cycle, compute every 47, adapt+hierarchical every 94
+        // Reduced from 97/194: earlier Phi measurement lifts consciousness
+        // plateau by ~0.15 (Phi was bottleneck at 0.25 until cycle 97).
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
-        // Push every 2 cycles — halves per-cycle overhead while maintaining ~49 samples
-        // in the window (window_size=50, compute interval=97).
+        // Push every 2 cycles — halves per-cycle overhead while maintaining ~24 samples
+        // in the window before first compute.
         if input.cycle % 2 == 0 {
             self.spectral_mip_finder.push(input.hdv); // ContinuousHV
         }
 
-        let spectral_mip_phi = if input.cycle % 97 == 0 {
+        let spectral_mip_phi = if input.cycle % 47 == 0 {
             let result = self.spectral_mip_finder.compute();
             let phi = result.as_ref().map(|r| r.phi);
             if phi.is_some() {
@@ -58,9 +60,9 @@ impl ConsciousnessEngine {
                 }
             }
 
-            // Adaptive dimension selection + hierarchical MIP every 194 cycles
+            // Adaptive dimension selection + hierarchical MIP every 94 cycles
             // (adapt() is expensive — keep at half the structural rate)
-            if input.cycle % 194 == 0 {
+            if input.cycle % 94 == 0 {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
                 }

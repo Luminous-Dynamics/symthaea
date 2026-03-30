@@ -123,6 +123,9 @@ pub enum ThreatSignalKind {
     CartelAttack,
     /// Systematic oppression pattern in governance.
     GovernanceOppression,
+    /// Epistemic threat: uncalibrated confidence, dogmatic certainty,
+    /// or systematic resistance to evidence update.
+    EpistemicThreat,
 }
 
 impl ThreatSignalKind {
@@ -138,6 +141,7 @@ impl ThreatSignalKind {
             Self::ConsciousnessManipulation => 0.6,
             Self::CartelAttack => 0.7,
             Self::GovernanceOppression => 0.6,
+            Self::EpistemicThreat => 0.5,
         }
     }
 }

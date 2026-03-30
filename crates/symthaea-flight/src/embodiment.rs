@@ -11,7 +11,10 @@ use crate::encoder::QuadrotorHdcEncoder;
 use crate::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 use crate::types::FlightConfig;
 
-pub use symthaea_core::embodiment::{EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel};
+pub use symthaea_core::embodiment::{
+    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
+    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+};
 
 /// Quadrotor embodiment bridge.
 pub struct FlightEmbodiment {
@@ -99,6 +102,8 @@ impl FlightEmbodiment {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
 
@@ -136,6 +141,8 @@ impl FlightEmbodiment {
             safety_level: format!("{:?}", self.current_safety),
             platform: "quadrotor".to_string(),
             num_actuators: 4,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
         }
     }
 }

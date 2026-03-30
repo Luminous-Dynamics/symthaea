@@ -9,7 +9,10 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
-pub use symthaea_core::embodiment::{EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel};
+pub use symthaea_core::embodiment::{
+    grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
+    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+};
 
 use crate::controller::HelicopterController;
 use crate::encoder::HelicopterHdcEncoder;
@@ -105,6 +108,8 @@ impl HelicopterEmbodiment {
             success,
             prediction_error: pred_error,
             safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pred_error),
         }
     }
 
@@ -141,6 +146,8 @@ impl HelicopterEmbodiment {
             safety_level: format!("{:?}", self.current_safety),
             platform: "helicopter".to_string(),
             num_actuators: 6,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
         }
     }
 }
