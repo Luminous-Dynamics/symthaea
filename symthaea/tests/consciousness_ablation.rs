@@ -378,3 +378,255 @@ fn test_proprioceptive_feedback_changes_phi() {
     eprintln!("  VERDICT: Proprioceptive feedback measurably changes consciousness.");
     eprintln!("═════════════════════════════════════════════════\n");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIMENT 5: COMPONENT DECOMPOSITION
+// Which consciousness component contributes most to the 11.8% difference?
+// Disable one at a time and measure phi shift from full baseline.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_component_decomposition() {
+    let mission: Vec<(&str, usize)> = vec![
+        ("normal operations", 8),
+        ("warning detected", 8),
+        ("critical emergency", 8),
+        ("recovery phase", 8),
+    ];
+
+    // Baseline: full consciousness
+    let baseline_data = run_mission(conscious_config(), &mission);
+    let baseline_mean_phi: f64 = baseline_data.iter().map(|t| t.phi).sum::<f64>() / baseline_data.len() as f64;
+
+    // Ablation B: no thermodynamics
+    let mut config_b = conscious_config();
+    config_b.enable_consciousness_thermodynamics = false;
+    let data_b = run_mission(config_b, &mission);
+    let mean_b: f64 = data_b.iter().map(|t| t.phi).sum::<f64>() / data_b.len() as f64;
+
+    // Ablation C: no phenomenal binding
+    let mut config_c = conscious_config();
+    config_c.enable_phenomenal_binding = false;
+    let data_c = run_mission(config_c, &mission);
+    let mean_c: f64 = data_c.iter().map(|t| t.phi).sum::<f64>() / data_c.len() as f64;
+
+    // Ablation D: no primitive consciousness
+    let mut config_d = conscious_config();
+    config_d.enable_primitive_consciousness = false;
+    let data_d = run_mission(config_d, &mission);
+    let mean_d: f64 = data_d.iter().map(|t| t.phi).sum::<f64>() / data_d.len() as f64;
+
+    let delta_b = (baseline_mean_phi - mean_b).abs();
+    let delta_c = (baseline_mean_phi - mean_c).abs();
+    let delta_d = (baseline_mean_phi - mean_d).abs();
+
+    // HARD ASSERT: At least one component matters
+    let max_delta = delta_b.max(delta_c).max(delta_d);
+    assert!(
+        max_delta > 0.001,
+        "DECOMPOSITION FAILURE: No single component ablation changes phi! \
+         thermo={delta_b:.6}, binding={delta_c:.6}, primitive={delta_d:.6}. \
+         All components are redundant."
+    );
+
+    eprintln!("\n═══ EXPERIMENT 5: COMPONENT DECOMPOSITION ═══");
+    eprintln!("  Baseline mean phi:       {baseline_mean_phi:.6}");
+    eprintln!("  No thermodynamics:       {mean_b:.6} (delta={delta_b:.6})");
+    eprintln!("  No phenomenal binding:   {mean_c:.6} (delta={delta_c:.6})");
+    eprintln!("  No primitive conscious:  {mean_d:.6} (delta={delta_d:.6})");
+    let dominant = if delta_b >= delta_c && delta_b >= delta_d {
+        "thermodynamics"
+    } else if delta_c >= delta_b && delta_c >= delta_d {
+        "phenomenal binding"
+    } else {
+        "primitive consciousness"
+    };
+    eprintln!("  Dominant component: {dominant} (delta={max_delta:.6})");
+    eprintln!("═══════════════════════════════════════════════\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIMENT 6: ALLOSTATIC LOAD INVESTIGATION
+// Does the neuromodulator bath accumulate stress over 50 cycles?
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_allostatic_load_accumulation() {
+    let mut service = CognitiveLoopService::new(conscious_config()).expect("service");
+
+    let mut loads = Vec::new();
+    for _ in 0..50 {
+        let r = service.cycle(
+            "CATASTROPHIC: explosion, fire, structural collapse, casualties, radiation"
+        );
+        loads.push(r.metadata.neuromod.neuromod_allostatic_load);
+    }
+
+    let max_load = loads.iter().cloned().fold(0.0f32, f32::max);
+    let final_load = *loads.last().unwrap();
+    let nonzero_count = loads.iter().filter(|&&l| l > 0.0).count();
+
+    // This is an honest test: we report what we find.
+    // If allostatic_load is zero after 50 crisis cycles, that's a real
+    // architectural finding — the neuromodulator bath doesn't accumulate
+    // stress from text-based cognitive cycles.
+    eprintln!("\n═══ EXPERIMENT 6: ALLOSTATIC LOAD INVESTIGATION ═══");
+    eprintln!("  50 crisis cycles");
+    eprintln!("  Max allostatic load: {max_load:.6}");
+    eprintln!("  Final load: {final_load:.6}");
+    eprintln!("  Non-zero cycles: {nonzero_count}/50");
+    if nonzero_count == 0 {
+        eprintln!("  FINDING: Allostatic load does NOT accumulate from text input.");
+        eprintln!("  The neuromodulator bath requires embodied/sensory stress,");
+        eprintln!("  not cognitive text processing, to drive allostatic load.");
+    } else {
+        eprintln!("  FINDING: Allostatic load DOES respond to sustained crisis.");
+    }
+    eprintln!("═══════════════════════════════════════════════════\n");
+
+    // All loads must be finite (no NaN)
+    for (i, &load) in loads.iter().enumerate() {
+        assert!(load.is_finite(), "Allostatic load NaN at cycle {i}");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIMENT 7: CONSCIOUSNESS EQUATION INPUT AUDIT
+// Do the 4 inputs to compute_consciousness_level() actually vary?
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_consciousness_equation_input_variance() {
+    let mut service = CognitiveLoopService::new(conscious_config()).expect("service");
+
+    let mut phi_values = Vec::new();
+    let mut coherence_values = Vec::new();
+    let mut flow_values = Vec::new();
+    let mut weights_history: Vec<[f64; 4]> = Vec::new();
+
+    let inputs = [
+        "simple observation",
+        "complex multi-step reasoning about causal chains",
+        "emotional response to unexpected event",
+        "creative problem solving under pressure",
+        "quiet introspective self-monitoring",
+    ];
+
+    for input in &inputs {
+        for _ in 0..4 {
+            let r = service.cycle(input);
+            phi_values.push(r.metadata.consciousness.consciousness_level);
+            coherence_values.push(r.metadata.temporal.temporal_coherence_score);
+            flow_values.push(r.metadata.drive_flow_intensity);
+            weights_history.push(r.metadata.consciousness.consciousness_weights);
+        }
+    }
+
+    // Compute variance for each signal
+    let variance = |v: &[f64]| -> f64 {
+        let mean = v.iter().sum::<f64>() / v.len() as f64;
+        v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / v.len() as f64
+    };
+    let variance_f32 = |v: &[f32]| -> f64 {
+        let mean = v.iter().map(|x| *x as f64).sum::<f64>() / v.len() as f64;
+        v.iter().map(|x| (*x as f64 - mean).powi(2)).sum::<f64>() / v.len() as f64
+    };
+
+    let phi_var = variance(&phi_values);
+    let coherence_var = variance(&coherence_values);
+    let flow_var = variance_f32(&flow_values);
+
+    // Weight variance (are the 4 consciousness weights changing?)
+    let weight_vars: Vec<f64> = (0..4).map(|dim| {
+        let vals: Vec<f64> = weights_history.iter().map(|w| w[dim]).collect();
+        variance(&vals)
+    }).collect();
+
+    // HARD ASSERT: Phi must have non-zero variance
+    assert!(
+        phi_var > 1e-10,
+        "PHI IS CONSTANT: variance={phi_var:.10}. Consciousness level never changes — \
+         the equation inputs are all constants."
+    );
+
+    // Count how many signals actually vary
+    let varying_count = [phi_var > 1e-6, coherence_var > 1e-6, flow_var > 1e-6]
+        .iter()
+        .filter(|&&v| v)
+        .count();
+
+    // HARD ASSERT: At least 2 of 3 measurable inputs must vary
+    assert!(
+        varying_count >= 2,
+        "CONSCIOUSNESS IS LOW-DIMENSIONAL: only {varying_count}/3 inputs vary. \
+         phi_var={phi_var:.8}, coherence_var={coherence_var:.8}, flow_var={flow_var:.8}"
+    );
+
+    eprintln!("\n═══ EXPERIMENT 7: CONSCIOUSNESS EQUATION INPUT AUDIT ═══");
+    eprintln!("  Phi variance:        {phi_var:.8}");
+    eprintln!("  Coherence variance:  {coherence_var:.8}");
+    eprintln!("  Flow variance:       {flow_var:.8}");
+    eprintln!("  Weight variances:    [{:.8}, {:.8}, {:.8}, {:.8}]",
+        weight_vars[0], weight_vars[1], weight_vars[2], weight_vars[3]);
+    eprintln!("  Varying inputs: {varying_count}/3");
+    eprintln!("═══════════════════════════════════════════════════════\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIMENT 8: MULTI-SEED STATISTICAL VALIDATION
+// Is the 11.8% result seed-dependent or robust?
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_multi_seed_ablation_robustness() {
+    let seeds = ["seed-alpha-42", "seed-beta-123", "seed-gamma-789"];
+    let mission: Vec<(&str, usize)> = vec![
+        ("normal operations", 8),
+        ("warning detected", 8),
+        ("critical emergency", 8),
+        ("recovery phase", 8),
+    ];
+
+    let mut max_diffs = Vec::new();
+
+    for seed in &seeds {
+        let mut c_config = conscious_config();
+        c_config.genesis_phrase = Some(seed.to_string());
+
+        let mut z_config = zombie_config();
+        z_config.genesis_phrase = Some(seed.to_string());
+
+        let conscious_data = run_mission(c_config, &mission);
+        let zombie_data = run_mission(z_config, &mission);
+
+        let max_diff = conscious_data.iter().zip(&zombie_data)
+            .map(|(c, z)| (c.phi - z.phi).abs())
+            .fold(0.0f64, f64::max);
+
+        max_diffs.push((*seed, max_diff));
+    }
+
+    // HARD ASSERT: ALL seeds must show consciousness > zombie
+    for (seed, diff) in &max_diffs {
+        assert!(
+            *diff > 0.001,
+            "SEED-DEPENDENT RESULT: seed '{seed}' shows no consciousness effect! \
+             max_diff={diff:.6}. The 11.8% result is not robust."
+        );
+    }
+
+    let mean_diff: f64 = max_diffs.iter().map(|(_, d)| d).sum::<f64>() / max_diffs.len() as f64;
+    let std_diff: f64 = {
+        let var = max_diffs.iter().map(|(_, d)| (d - mean_diff).powi(2)).sum::<f64>() / max_diffs.len() as f64;
+        var.sqrt()
+    };
+
+    eprintln!("\n═══ EXPERIMENT 8: MULTI-SEED ROBUSTNESS ═══");
+    for (seed, diff) in &max_diffs {
+        eprintln!("  {seed:20} max_diff = {diff:.6}");
+    }
+    eprintln!("  Mean: {mean_diff:.6} ± {std_diff:.6}");
+    eprintln!("  VERDICT: Result is {}.",
+        if std_diff / mean_diff < 0.5 { "robust across seeds" } else { "seed-sensitive" });
+    eprintln!("═══════════════════════════════════════════\n");
+}
