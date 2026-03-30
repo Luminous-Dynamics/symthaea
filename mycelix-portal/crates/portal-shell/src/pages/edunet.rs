@@ -11,10 +11,27 @@ use portal_games::progress::provide_progress_store;
 #[derive(Clone, Copy, PartialEq)]
 enum EduView { Dashboard, Games, Review, SkillMap, Credentials }
 
+#[derive(Clone)]
+struct EduState {
+    level: RwSignal<u32>,
+    xp: RwSignal<u64>,
+    streak: RwSignal<u32>,
+    mastery_pct: RwSignal<u32>,
+    due_cards: RwSignal<u32>,
+}
+
+impl EduState {
+    fn new() -> Self {
+        Self { level: RwSignal::new(7), xp: RwSignal::new(4280), streak: RwSignal::new(12), mastery_pct: RwSignal::new(68), due_cards: RwSignal::new(18) }
+    }
+}
+
 #[component]
 pub fn EdunetOverview() -> impl IntoView {
     let (active_view, set_active_view) = signal(EduView::Dashboard);
     let (_progress_read, _progress_write) = provide_progress_store();
+    let state = EduState::new();
+    provide_context(state.clone());
 
     view! {
         <div class="edunet-content">
@@ -35,22 +52,22 @@ pub fn EdunetOverview() -> impl IntoView {
                 <div class="commons-stats-grid">
                     <div class="thought-card">
                         <div class="thought-type" style="color: #2563EB">"LEVEL"</div>
-                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">"7"</p>
-                        <p style="font-size: 0.7rem; color: var(--text-muted)">"4,280 XP total"</p>
+                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">{move || state.level.get().to_string()}</p>
+                        <p style="font-size: 0.7rem; color: var(--text-muted)">{move || format!("{} XP total", state.xp.get())}</p>
                     </div>
                     <div class="thought-card">
                         <div class="thought-type" style="color: #60A5FA">"STREAK"</div>
-                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">"12d"</p>
-                        <p style="font-size: 0.7rem; color: var(--text-muted)">"1.5x bonus active"</p>
+                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">{move || format!("{}d", state.streak.get())}</p>
+                        <p style="font-size: 0.7rem; color: var(--text-muted)">{move || if state.streak.get() >= 7 { "1.5x bonus active" } else { "Keep going!" }}</p>
                     </div>
                     <div class="thought-card">
                         <div class="thought-type" style="color: #f59e0b">"DUE"</div>
-                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">"18"</p>
+                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">{move || state.due_cards.get().to_string()}</p>
                         <p style="font-size: 0.7rem; color: var(--text-muted)">"Cards to review"</p>
                     </div>
                     <div class="thought-card">
                         <div class="thought-type" style="color: #22c55e">"MASTERY"</div>
-                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">"68%"</p>
+                        <p class="thought-content" style="font-size: 1.8rem; font-weight: 700">{move || format!("{}%", state.mastery_pct.get())}</p>
                         <p style="font-size: 0.7rem; color: var(--text-muted)">"CAPS curriculum"</p>
                     </div>
                 </div>
