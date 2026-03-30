@@ -3399,14 +3399,14 @@ impl MultiWorldSimulator {
                 }
             }
 
-            // Trauma decay: 0.003/tick ≈ 0.036/year. Full trauma (1.0) takes
-            // ~28 years to fully decay. Ref: PTSD recovery timelines (Kessler 1995).
-            // Care workers accelerate recovery.
+            // Trauma decay: 0.001/tick ≈ 0.012/year. Full trauma (1.0) takes
+            // ~83 years to fully decay. Ref: PTSD recovery timelines (Kessler 1995).
+            // Care workers accelerate recovery. Slower decay = trauma persists meaningfully.
             for world in &mut self.worlds {
                 let care_ratio = world.agents.iter()
                     .filter(|a| a.is_alive() && a.skills.strongest() == "medicine")
                     .count() as f64 / world.population().max(1) as f64;
-                let decay = 0.003 + care_ratio * 0.002; // Care helps recovery
+                let decay = 0.001 + care_ratio * 0.003; // Care helps significantly
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.trauma_level = (agent.trauma_level - decay).max(0.0);
                 }

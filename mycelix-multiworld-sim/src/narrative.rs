@@ -399,12 +399,23 @@ impl NarrativeEngine {
                 desc.split(':').next().unwrap_or("Unknown").to_string()
             });
 
+            // Generate named characters for significant events
+            let character = if severity >= 2 {
+                let world_name = event.world_id.map(|_|
+                    desc.split(':').next().unwrap_or("Colony")).unwrap_or("Colony");
+                let role = if desc.contains("PROJECT") { "engineer" }
+                    else if desc.contains("EXPLORATION") { "scientist" }
+                    else if desc.contains("INDEPENDENCE") { "leader" }
+                    else { "citizen" };
+                Some(generate_character_name(world_name, role, (year / 25.0) as u16))
+            } else { None };
+
             self.events.push(NarrativeEvent {
                 tick, year, world,
                 crisis, response, outcome,
                 severity,
                 joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
-                character: None,
+                character,
             });
         }
     }
