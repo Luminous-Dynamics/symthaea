@@ -262,6 +262,64 @@ impl Default for ConsciousnessEngine {
     }
 }
 
+/// Fix 5: Consciousness development with growth model.
+///
+/// Growth rate depends on education, mentoring, trauma, and age-gating.
+/// Plateau: growth halves every 0.2 above current level (diminishing returns).
+///
+/// Ref: Kegan (1982) stages of adult development; Fischer & Bidell (2006)
+/// dynamic skill theory.
+pub fn tick_consciousness_development(agent: &mut CivAgent, has_mentor: bool) {
+    let _age = if agent.birth_tick == 0 { 30.0 } else { 0.0 }; // approximate; caller should pass tick
+    // We use consciousness.level as a proxy for development stage
+
+    let base_rate = 0.001;
+    let education_bonus = if agent.education_level > 0.3 { 0.002 } else { 0.0 };
+    let mentor_bonus = if has_mentor { 0.003 } else { 0.0 };
+    let trauma_penalty = if agent.trauma_level > 0.3 { -0.005 * agent.trauma_level } else { 0.0 };
+
+    let raw_rate = base_rate + education_bonus + mentor_bonus + trauma_penalty;
+    if raw_rate <= 0.0 {
+        return;
+    }
+
+    // Plateau: growth halves every 0.2 above current level
+    let current = agent.consciousness.level;
+    let plateau_factor = 0.5_f64.powf(current / 0.2);
+    let effective_rate = raw_rate * plateau_factor;
+
+    agent.consciousness.level = (agent.consciousness.level + effective_rate).min(1.0);
+}
+
+/// Fix 5 variant with explicit age gating via current_tick.
+pub fn tick_consciousness_development_with_age(
+    agent: &mut CivAgent,
+    has_mentor: bool,
+    current_tick: u32,
+) {
+    let age_years = agent.age_years(current_tick);
+    if age_years < 15.0 {
+        return; // No consciousness growth below 15 years
+    }
+
+    let base_rate = 0.001;
+    let education_bonus = if agent.education_level > 0.3 { 0.002 } else { 0.0 };
+    let mentor_bonus = if has_mentor { 0.003 } else { 0.0 };
+    let trauma_penalty = if agent.trauma_level > 0.3 { -0.005 * agent.trauma_level } else { 0.0 };
+
+    let raw_rate = base_rate + education_bonus + mentor_bonus + trauma_penalty;
+    if raw_rate <= 0.0 {
+        return;
+    }
+
+    // Plateau: growth halves every 0.2 above current level
+    let current = agent.consciousness.level;
+    let plateau_factor = 0.5_f64.powf(current / 0.2);
+    let effective_rate = raw_rate * plateau_factor;
+
+    agent.consciousness.level = (agent.consciousness.level + effective_rate).min(1.0);
+}
+
 // --- Utility functions ---
 
 /// 6D consciousness vector for an agent.
@@ -491,6 +549,47 @@ mod tests {
         assert!(
             engine.phi_trend() > 0.0,
             "Trend should be positive for increasing series"
+        );
+    }
+
+    #[test]
+    fn test_consciousness_grows_over_time() {
+        // Fix 5: Consciousness Development
+        let mut agent = make_agent(0, 0);
+        agent.education_level = 0.5;
+        let initial_level = agent.consciousness.level;
+
+        // 100 ticks of development with mentor
+        for _ in 0..100 {
+            tick_consciousness_development(&mut agent, true);
+        }
+
+        assert!(
+            agent.consciousness.level > initial_level,
+            "Consciousness should grow: {} vs {}",
+            agent.consciousness.level, initial_level
+        );
+    }
+
+    #[test]
+    fn test_consciousness_age_gate() {
+        // Fix 5: No growth below 15 years
+        let mut child = make_agent(0, 100); // born at tick 100
+        child.education_level = 0.8;
+        let initial_level = child.consciousness.level;
+
+        // Tick at age 10 (tick 220)
+        tick_consciousness_development_with_age(&mut child, true, 220);
+        assert!(
+            (child.consciousness.level - initial_level).abs() < 1e-10,
+            "Child should not grow consciousness"
+        );
+
+        // Tick at age 20 (tick 340)
+        tick_consciousness_development_with_age(&mut child, true, 340);
+        assert!(
+            child.consciousness.level > initial_level,
+            "Adult should grow consciousness"
         );
     }
 

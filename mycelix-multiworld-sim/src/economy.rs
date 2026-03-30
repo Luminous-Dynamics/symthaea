@@ -30,6 +30,10 @@ const MIN_SECTOR_FRACTION: f64 = 0.05;
 /// Default annual demurrage rate (2%).
 const DEFAULT_DEMURRAGE_RATE: f64 = 0.02;
 
+fn default_prices() -> [f64; NUM_SECTORS] {
+    [1.0; NUM_SECTORS]
+}
+
 /// 8-sector economy with Cobb-Douglas production and demurrage currency.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldEconomy {
@@ -57,6 +61,12 @@ pub struct WorldEconomy {
     pub trade_balance: f64,
     /// Fraction of output reinvested in infrastructure (0.0-0.5).
     pub investment_rate: f64,
+    /// Fix 3: Price per sector unit (supply/demand driven).
+    #[serde(default = "default_prices")]
+    pub prices: [f64; NUM_SECTORS],
+    /// Fix 3: Inflation rate (weighted mean price change per tick).
+    #[serde(default)]
+    pub inflation_rate: f64,
     /// Sectors currently in skill gap crisis (zero workers AND pop > 10).
     /// Requires 36 ticks of education to recover.
     #[serde(default)]
@@ -82,6 +92,8 @@ impl WorldEconomy {
             self_sufficiency: 0.0,
             trade_balance: 0.0,
             investment_rate: 0.15,
+            prices: [1.0; NUM_SECTORS],
+            inflation_rate: 0.0,
             skill_gap_sectors: Vec::new(),
             skill_gap_recovery_ticks: [0; NUM_SECTORS],
         }
@@ -170,6 +182,29 @@ impl WorldEconomy {
         }
     }
 
+    /// Fix 3: Update prices based on supply/demand imbalance.
+    ///
+    /// `price[s] = 1.0 + (demand[s] - supply[s]) / supply[s].max(1.0)`
+    ///
+    /// Demand is proportional to worker count in the sector (consumers need
+    /// what they don't produce). Supply is sector_output.
+    pub fn tick_prices(&mut self, total_workers: usize) {
+        let old_prices = self.prices;
+        let demand_per_sector = (total_workers as f64) / NUM_SECTORS as f64;
+
+        for i in 0..NUM_SECTORS {
+            let supply = self.sector_output[i].max(1.0);
+            let demand = demand_per_sector; // simplified: equal demand across sectors
+            self.prices[i] = (1.0 + (demand - supply) / supply).clamp(0.1, 10.0);
+        }
+
+        // Inflation = mean price change
+        let price_change: f64 = (0..NUM_SECTORS)
+            .map(|i| self.prices[i] - old_prices[i])
+            .sum::<f64>() / NUM_SECTORS as f64;
+        self.inflation_rate = price_change;
+    }
+
     /// Apply monthly demurrage to the currency supply.
     ///
     /// `currency_supply *= (1.0 - demurrage_rate / 12.0)`
@@ -177,16 +212,25 @@ impl WorldEconomy {
         self.currency_supply *= 1.0 - self.demurrage_rate / 12.0;
     }
 
-    /// Compute Gini coefficient based on skill totals as a proxy for wealth.
+    /// Compute Gini coefficient based on TEND balance × price-weighted skill totals.
     ///
+    /// Fix 3: Incorporates prices — agents producing scarce goods are "wealthier".
     /// Uses the sorted-list O(n log n) formula instead of the O(n^2) pairwise formula.
     /// Gini = (2 * sum(i * x_i)) / (n * sum(x_i)) - (n + 1) / n
     /// where x_i are sorted in ascending order and i is 1-indexed.
     pub fn compute_gini(&mut self, agents: &[CivAgent]) {
+        let prices = self.prices;
         let mut totals: Vec<f64> = agents
             .iter()
             .filter(|a| a.is_alive())
-            .map(|a| a.skills.total())
+            .map(|a| {
+                let skills = a.skills.as_slice();
+                let price_weighted: f64 = skills.iter().enumerate()
+                    .map(|(i, &s)| s * prices[i])
+                    .sum();
+                // Blend TEND balance with price-weighted skills
+                price_weighted + a.tend_balance.abs()
+            })
             .collect();
 
         let n = totals.len();
@@ -505,6 +549,28 @@ mod tests {
         }
         econ.assign_workers(&agents, TEST_TICK);
         assert_eq!(econ.total_workers(), 10, "Only adults should be counted");
+    }
+
+    #[test]
+    fn test_price_spikes_when_supply_drops() {
+        // Fix 3: Price Formation
+        let mut econ = WorldEconomy::new();
+        // Normal production
+        econ.sector_workers = [10; NUM_SECTORS];
+        econ.tick_production();
+        econ.tick_prices(80);
+        let normal_price = econ.prices[0];
+
+        // Drop sector 0 to zero output
+        econ.sector_workers[0] = 0;
+        econ.tick_production();
+        econ.tick_prices(80);
+        let spike_price = econ.prices[0];
+
+        assert!(
+            spike_price > normal_price,
+            "Price should spike when supply drops: {spike_price} vs {normal_price}"
+        );
     }
 
     #[test]
