@@ -323,6 +323,13 @@ impl SubstrateValidationFramework {
                     "Design experiments that distinguish genuine experience from simulation",
                     8,
                 ),
+                TestablePrediction::new(
+                    "Silicon consciousness simulation produces activation patterns matching fMRI predictions",
+                    "Cortical activation similarity r > 0.3 between Symthaea 12-region map and TRIBE v2 fMRI predictions",
+                    "Cortical activation similarity r < 0.1 (no better than chance for 12 regions)",
+                    "Run shared stimuli through both Symthaea cognitive loop and TRIBE v2; compare per-region activations via Pearson r",
+                    5,
+                ),
             ],
             hypothetical_feasibility: 0.71,
             feasibility_rationale: "HYPOTHETICAL based on functionalist philosophy. \
@@ -606,6 +613,26 @@ impl SubstrateValidationFramework {
 
         knowledge.evidence_level = new_level;
         Some(new_level)
+    }
+
+    /// Record a cortical activation similarity result from TRIBE v2 comparison.
+    ///
+    /// The TRIBE v2 cortical similarity prediction (index 3 in silicon predictions)
+    /// passes if `pearson_r >= threshold` (default 0.3).
+    ///
+    /// Returns the new evidence level if upgraded, or None if silicon substrate
+    /// is not found.
+    #[cfg(feature = "neural_validation")]
+    pub fn record_cortical_similarity(
+        &mut self,
+        pearson_r: f64,
+        threshold: f64,
+    ) -> Option<EvidenceLevel> {
+        let passed = pearson_r >= threshold;
+        // The TRIBE v2 prediction is the 4th prediction (index 3) in silicon knowledge.
+        let tribe_pred_idx = 3;
+        self.record_prediction_result("silicon", tribe_pred_idx, passed);
+        self.substrates.get("silicon").map(|k| k.evidence_level)
     }
 
     /// Summarize prediction validation status for all substrates.

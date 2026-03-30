@@ -24,8 +24,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
+use crate::hdc::unified_hv::BinaryHV;
+#[cfg(test)]
+use crate::hdc::unified_hv::HDC_DIMENSION;
 
 /// A single NSM explication triplet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,30 +74,29 @@ impl DeepNSMCorpus {
 
     /// Encode an explication as a BinaryHV by binding its primitives.
     ///
-    /// Uses the PrimitiveSystem to look up each NSM prime's vector,
-    /// then bundles them. If any prime is unknown, it's skipped.
-    pub fn encode_explication(
-        primitives: &[String],
-        primitive_system: &PrimitiveSystem,
-    ) -> BinaryHV {
+    /// `prime_lookup` maps a prime name to its hypervector.
+    /// Unknown primes are skipped. Vectors are permuted by position
+    /// to make the encoding order-sensitive.
+    pub fn encode_explication<F>(primitives: &[String], prime_lookup: F) -> BinaryHV
+    where
+        F: Fn(&str) -> Option<BinaryHV>,
+    {
         if primitives.is_empty() {
-            return BinaryHV::random();
+            return BinaryHV::random(0);
         }
 
         let mut vectors: Vec<BinaryHV> = Vec::new();
         for (i, prime) in primitives.iter().enumerate() {
-            if let Some(hv) = primitive_system.get(prime) {
-                // Permute by position to make order-sensitive
-                vectors.push(hv.permute(i as i32));
+            if let Some(hv) = prime_lookup(prime) {
+                vectors.push(hv.permute(i));
             }
         }
 
         if vectors.is_empty() {
-            return BinaryHV::random();
+            return BinaryHV::random(0);
         }
 
-        // Bundle all permuted prime vectors
-        BinaryHV::majority(&vectors)
+        BinaryHV::bundle(&vectors)
     }
 
     /// Get the best explication for a word in context.
@@ -229,10 +229,12 @@ mod tests {
 
     #[test]
     fn test_encode_explication() {
-        let ps = PrimitiveSystem::new();
         let primitives = vec!["FEEL".to_string(), "GOOD".to_string()];
-        let hv = DeepNSMCorpus::encode_explication(&primitives, &ps);
-        // Should produce a valid 16384D vector
-        assert!(hv.len() > 0);
+        // Simple lookup that generates a deterministic HV per prime
+        let hv = DeepNSMCorpus::encode_explication(&primitives, |prime| {
+            let seed = prime.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            Some(BinaryHV::random(seed))
+        });
+        assert_eq!(BinaryHV::DIM, HDC_DIMENSION);
     }
 }

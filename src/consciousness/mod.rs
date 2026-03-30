@@ -215,6 +215,8 @@ pub mod multi_objective_evolution;
 pub mod negation_detector;
 pub mod pac;
 pub mod synthetic_states;
+#[cfg(feature = "epistemic")]
+pub mod sacred_stillness;
 
 // ============================================================================
 // Reasoning engine subsystems (cfg-gated)

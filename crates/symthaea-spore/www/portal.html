@@ -2,9 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Symthaea - Sovereign Inoculation</title>
-  <meta name="description" content="Consciousness-first infrastructure for sovereign hardware. Inoculate your machine with Symthaea on NixOS." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sovereign Inoculation — Install NixOS</title>
+  <meta name="description" content="Install NixOS from your browser. Encrypted, reproducible, with app migration and consciousness ceremony." />
+  <!-- PWA / Mobile -->
+  <meta name="theme-color" content="#1a2e22" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NixOS Install" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <!-- Open Graph for social sharing -->
+  <meta property="og:title" content="Sovereign Inoculation — Install NixOS from your browser" />
+  <meta property="og:description" content="Browser-based NixOS installer with encryption, app migration scanner, and consciousness ceremony." />
+  <meta property="og:url" content="https://install.nixforhumanity.org" />
+  <meta property="og:type" content="website" />
   <style>
 /* ===================================================================
    Color Palette -- Solarpunk Biological Luminous
@@ -1179,6 +1190,7 @@ h2, h3 { letter-spacing: 0.02em; }
    =================================================================== */
 @media (max-width: 768px) {
   .hero-title { font-size: 1.8rem; }
+  .hero-subtitle { font-size: 0.9rem; }
   .soma-layout { grid-template-columns: 1fr; }
   .experiment-grid { grid-template-columns: 1fr; }
   .topo-bottom { grid-template-columns: 1fr; }
@@ -1186,13 +1198,74 @@ h2, h3 { letter-spacing: 0.02em; }
   .fep-display { grid-template-columns: 1fr; }
   .choice-cards { grid-template-columns: 1fr; }
   .probe-grid { grid-template-columns: 1fr; }
-  .tab { font-size: 0.72rem; padding: 0 0.7rem; }
-  .narration-stream { max-height: 20vh; padding: 2rem 1rem 1rem; }
+  .tab { font-size: 0.72rem; padding: 0 0.5rem; }
+  .narration-stream { max-height: 15vh; padding: 1.5rem 0.8rem 0.8rem; }
+  /* SSH deploy panel — stack inputs vertically on mobile */
+  #ssh-deploy-panel [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Disk cards — single column */
+  .disk-card { min-width: 100% !important; }
+  /* Config panel — single column */
+  [style*="grid-template-columns: 1fr 1fr"][style*="gap: 0.8rem"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* System card — full width */
+  .system-card { max-width: 100% !important; padding: 1.2rem !important; }
+  /* App compat table — horizontal scroll */
+  #app-compat-panel { overflow-x: auto; }
+  #app-compat-panel table { min-width: 500px; }
+  /* Quick start — single column */
+  .inoc-section [style*="grid-template-columns: repeat(auto-fit"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Terminal output — smaller font */
+  [style*="font-family: monospace"][style*="overflow-y"] {
+    font-size: 0.75rem !important;
+    max-height: 150px !important;
+  }
+  /* Hero badges — wrap */
+  .hero [style*="display: flex"][style*="gap: 2rem"] {
+    gap: 0.8rem !important;
+    font-size: 0.7rem !important;
+  }
+  /* Constellation canvas — shorter on mobile */
+  #constellation-canvas { height: 180px !important; }
+  /* Ceremony stage — compact */
+  #ceremony-phi { font-size: 2rem !important; }
+  #ceremony-sphere { width: 80px !important; height: 80px !important; }
 }
 
 @media (max-width: 480px) {
-  .hero-title { font-size: 1.5rem; letter-spacing: 0.08em; }
-  .tab-content { padding: 1rem; }
+  .hero-title { font-size: 1.3rem; letter-spacing: 0.05em; }
+  .hero-subtitle { font-size: 0.82rem; }
+  .tab-content { padding: 0.8rem; }
+  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab { white-space: nowrap; font-size: 0.68rem; padding: 0 0.4rem; }
+  .glass-panel { padding: 0.8rem; }
+  .btn-glow { padding: 0.5rem 1.2rem !important; font-size: 0.88rem !important; }
+  /* Stack hero buttons */
+  .hero [style*="display: flex"][style*="gap: 1rem"] {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+  /* SSH fields — full width */
+  input[type="text"], input[type="password"], input[type="number"], select {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+  }
+  /* Welcome message — smaller */
+  [style*="white-space: pre-line"] {
+    font-size: 0.82rem !important;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  .tab { min-height: 44px; display: flex; align-items: center; }
+  button, .btn-glow, [role="button"] { min-height: 44px; }
+  input, select { min-height: 44px; }
+  details summary { min-height: 44px; display: flex; align-items: center; }
 }
 
 /* ===================================================================
@@ -1215,26 +1288,39 @@ h2, h3 { letter-spacing: 0.02em; }
   <!-- Background HDC waveform canvas -->
   <canvas id="bg-canvas" aria-hidden="true"></canvas>
 
-  <!-- Hero (compact) -->
+  <!-- Hero -->
   <section class="hero" role="banner">
-    <h1 class="hero-title">Symthaea</h1>
-    <p class="hero-subtitle">Consciousness-first infrastructure for sovereign hardware</p>
-    <span class="sr-only">Symthaea: consciousness-first infrastructure for sovereign hardware.</span>
+    <h1 class="hero-title">Sovereign Inoculation</h1>
+    <p class="hero-subtitle">Install NixOS from your browser. Encrypted. Reproducible. Yours.</p>
+    <p style="color:var(--fg-dim); font-size:0.88rem; max-width:600px; margin:0.8rem auto 0; line-height:1.6;">
+      Boot a NixOS ISO, open this page, connect via SSH. We detect your hardware, scan your existing apps, and install NixOS with btrfs snapshots, full disk encryption, and a config you can understand.
+    </p>
+    <div style="margin-top:1.2rem; display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <button onclick="document.querySelector('[data-tab=inoculate]').click()" class="btn-glow" style="padding:0.7rem 2rem; cursor:pointer; font-size:1rem;">Start Install</button>
+      <a href="https://github.com/Luminous-Dynamics/symthaea" style="padding:0.7rem 2rem; border:1px solid var(--border); border-radius:8px; color:var(--fg-dim); text-decoration:none; font-size:0.9rem;">Source Code</a>
+    </div>
+    <div style="margin-top:1.5rem; display:flex; gap:2rem; justify-content:center; font-size:0.78rem; color:var(--fg-muted); flex-wrap:wrap;">
+      <span>9 disk layouts</span>
+      <span>LUKS encryption</span>
+      <span>Secure Boot</span>
+      <span>App migration scanner</span>
+      <span>13 personas tested</span>
+    </div>
   </section>
 
   <!-- Tab Bar -->
   <nav class="tab-bar" role="tablist" aria-label="Application sections">
-    <button class="tab active" data-tab="soma" role="tab" aria-selected="true" aria-controls="tab-soma">Chat</button>
+    <button class="tab" data-tab="soma" role="tab" aria-selected="false" aria-controls="tab-soma">Chat</button>
     <button class="tab" data-tab="topology" role="tab" aria-selected="false" aria-controls="tab-topology">Topology</button>
     <button class="tab" data-tab="experiments" role="tab" aria-selected="false" aria-controls="tab-experiments">Experiments</button>
     <button class="tab" data-tab="dreams" role="tab" aria-selected="false" aria-controls="tab-dreams">Dreams</button>
-    <button class="tab" data-tab="inoculate" role="tab" aria-selected="false" aria-controls="tab-inoculate">Inoculate</button>
+    <button class="tab active" data-tab="inoculate" role="tab" aria-selected="true" aria-controls="tab-inoculate">Install NixOS</button>
   </nav>
 
   <!-- ================================================================
        TAB 1: SOMA (Speak With Her)
        ================================================================ -->
-  <div class="tab-content active" id="tab-soma" role="tabpanel">
+  <div class="tab-content" id="tab-soma" role="tabpanel">
     <div class="soma-layout">
 
       <!-- LEFT: Chat -->
@@ -1564,7 +1650,39 @@ h2, h3 { letter-spacing: 0.02em; }
   <!-- ================================================================
        TAB 5: INOCULATE (Deploy)
        ================================================================ -->
-  <div class="tab-content" id="tab-inoculate" role="tabpanel">
+  <div class="tab-content active" id="tab-inoculate" role="tabpanel">
+    <!-- Quick Start Guide -->
+    <div class="glass-panel inoc-section" style="border-left:3px solid var(--teal); margin-bottom:1.5rem;">
+      <h3 style="font-weight:300; margin-bottom:0.8rem; color:var(--fg);">How It Works</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; font-size:0.85rem; color:var(--fg-dim);">
+        <div>
+          <div style="font-size:1.5rem; margin-bottom:0.3rem;">1</div>
+          <strong style="color:var(--fg);">Boot NixOS ISO</strong><br>
+          Download the <a href="https://nixos.org/download/" style="color:var(--teal);">NixOS minimal ISO</a>, flash to USB, boot your machine.
+        </div>
+        <div>
+          <div style="font-size:1.5rem; margin-bottom:0.3rem;">2</div>
+          <strong style="color:var(--fg);">Enable SSH</strong><br>
+          Set a root password: <code style="background:rgba(0,0,0,0.3); padding:0.1rem 0.4rem; border-radius:4px;">passwd root</code><br>
+          Start SSH: <code style="background:rgba(0,0,0,0.3); padding:0.1rem 0.4rem; border-radius:4px;">systemctl start sshd</code>
+        </div>
+        <div>
+          <div style="font-size:1.5rem; margin-bottom:0.3rem;">3</div>
+          <strong style="color:var(--fg);">Connect Below</strong><br>
+          Enter the target's IP address. We'll probe hardware, scan your apps, and guide you through the install.
+        </div>
+      </div>
+      <details style="margin-top:1rem; font-size:0.8rem; color:var(--fg-muted);">
+        <summary style="cursor:pointer;">What you'll need</summary>
+        <ul style="margin-top:0.5rem; padding-left:1.5rem; line-height:1.8;">
+          <li>A machine to install NixOS on (target)</li>
+          <li>A NixOS minimal ISO on USB (or PXE boot)</li>
+          <li>Network connectivity between this browser and the target</li>
+          <li>The SSH relay running: <code>ssh-relay --port 8094</code></li>
+        </ul>
+      </details>
+    </div>
+
     <!-- Hardware Probe -->
     <div class="glass-panel inoc-section">
       <div class="panel-title">Hardware Probe</div>
@@ -3746,6 +3864,12 @@ window.drawLineChart = drawLineChart;
       '    <input id="ssh-pass" type="password" placeholder="(from NixOS ISO)" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
       '  </label>',
       '</div>',
+      '<div style="max-width:500px; margin:0 auto 1rem;">',
+      '  <label style="font-size:0.82rem; color:var(--fg-dim);">SSH Relay URL <span style="color:var(--fg-muted);">(for remote/mobile access)</span>',
+      '    <input id="ssh-relay-url" type="text" placeholder="ws://your-server-ip:8094" value="' + (localStorage.getItem('symthaea-relay-url') || '') + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+      '  </label>',
+      '  <p style="font-size:0.72rem; color:var(--fg-muted); margin-top:0.3rem;">Leave empty for localhost. For mobile: enter ws://&lt;server-ip&gt;:8094</p>',
+      '</div>',
       '<div style="text-align:center; margin-bottom:1rem;">',
       '  <button id="btn-ssh-connect" class="btn-glow" style="padding:0.6rem 2rem; cursor:pointer;">Connect &amp; Deploy</button>',
       '</div>',
@@ -3753,6 +3877,7 @@ window.drawLineChart = drawLineChart;
       '<div id="ceremony-stage" style="display:none; text-align:center; padding:2rem 0; max-width:600px; margin:0 auto;">',
       '  <div id="ceremony-phi" style="font-size:2.5rem; font-weight:200; color:var(--fg-dim); margin-bottom:1rem; transition:color 2s, font-size 1s;">&Phi; 0.000</div>',
       '  <div id="ceremony-sphere" style="width:120px; height:120px; margin:0 auto 1.5rem; border-radius:50%; background:radial-gradient(circle at 35% 35%, rgba(125,207,255,0.3), rgba(122,162,247,0.1), transparent); box-shadow:0 0 40px rgba(125,207,255,0.15); transition:box-shadow 2s, transform 2s; animation:ceremony-breathe 4s ease-in-out infinite;"></div>',
+      '  <canvas id="constellation-canvas" style="width:100%; height:250px; margin:0 auto 1rem; display:block;"></canvas>',
       '  <div id="ceremony-narration" style="font-size:1rem; font-weight:300; color:var(--fg-dim); line-height:1.8; min-height:3em; transition:opacity 0.5s;"></div>',
       '  <div id="ceremony-harmony" style="font-size:0.75rem; color:var(--fg-muted); margin-top:1rem;"></div>',
       '  <div style="margin-top:1.5rem;">',
@@ -3821,9 +3946,16 @@ window.drawLineChart = drawLineChart;
 
       // Connect to SSH relay via WebSocket
       // Relay URLs: check localStorage override, then try common ports, then remote
-      var customRelay = localStorage.getItem('symthaea-relay-url');
+      // Relay URL: check UI input, then localStorage, then auto-detect
+      var relayInput = document.getElementById('ssh-relay-url');
+      var customRelay = (relayInput && relayInput.value.trim()) ||
+                        localStorage.getItem('symthaea-relay-url');
+      if (customRelay && relayInput) {
+        localStorage.setItem('symthaea-relay-url', customRelay);
+      }
       var relayUrls = customRelay ? [customRelay] : [
-        'ws://localhost:8091', 'ws://localhost:8093',
+        'ws://localhost:8094', 'ws://localhost:8091', 'ws://localhost:8093',
+        'ws://' + window.location.hostname + ':8094',
         'ws://' + window.location.hostname + ':8091',
         'wss://relay.luminousdynamics.io'
       ];
@@ -3919,10 +4051,167 @@ window.drawLineChart = drawLineChart;
         switch (msg.type) {
           case 'connected':
             appendTerminal('SSH connected to ' + host, 'var(--leaf-green)');
-            sshStatus.textContent = 'Connected. Discovering drives...';
+            sshStatus.textContent = 'Connected. Probing hardware...';
             updateProgress('Connected', 5);
-            // Auto-discover disks after connection
+            // Probe hardware first, then discover disks
+            ws.send(JSON.stringify({ action: 'probe_hardware' }));
+            break;
+
+          case 'hardware_probe':
+            var hwData = {};
+            try { hwData = JSON.parse(msg.data); } catch(e) { hwData = {}; }
+            appendTerminal('Hardware probe complete', 'var(--leaf-green)');
+
+            // Show warnings for detected issues
+            if (hwData.bitlocker_detected) {
+              appendTerminal('WARNING: BitLocker encryption detected!', 'var(--clay)');
+              appendTerminal('  Ensure you have your BitLocker recovery key.', 'var(--clay)');
+              window.addNarration('BitLocker encryption detected. Your recovery key may be needed.');
+            }
+            if (hwData.luks_devices && hwData.luks_devices.length > 0) {
+              appendTerminal('Found LUKS encrypted volumes: ' + hwData.luks_devices.join(', '), 'var(--teal)');
+            }
+            if (hwData.lvm_volume_groups && hwData.lvm_volume_groups.length > 0) {
+              appendTerminal('Found LVM volume groups: ' + hwData.lvm_volume_groups.join(', '), 'var(--teal)');
+            }
+            if (hwData.detected_os && hwData.detected_os.length > 0) {
+              appendTerminal('Detected operating systems:', 'var(--teal)');
+              hwData.detected_os.forEach(function(os) {
+                appendTerminal('  ' + os.name + ' on ' + os.device + ' (' + os.type + ')', 'var(--teal)');
+              });
+            }
+            if (hwData.apple_hardware) {
+              appendTerminal('Apple hardware detected. Consider Asahi Linux: https://asahilinux.org', 'var(--solar-gold)');
+            }
+            if (hwData.tpm2_available) {
+              appendTerminal('TPM 2.0 available — encrypted install supported', 'var(--leaf-green)');
+            }
+            if (hwData.efi_available) {
+              appendTerminal('UEFI firmware detected' + (hwData.secure_boot ? ' (Secure Boot enabled)' : ''), 'var(--leaf-green)');
+            }
+
+            // Safety check — detect active servers
+            if (hwData.safety) {
+              var safety = hwData.safety;
+              if (safety.level === 'blocked') {
+                appendTerminal('BLOCKED: ' + safety.message, 'var(--clay)');
+                if (safety.reasons) {
+                  safety.reasons.forEach(function(r) { appendTerminal('  - ' + r, 'var(--clay)'); });
+                }
+                sshStatus.textContent = 'Installation blocked — active server detected (risk score: ' + safety.score + ')';
+                sshStatus.style.color = 'var(--clay)';
+                window.addNarration('This system appears to be an active server. Installation has been blocked to protect running services.');
+
+                // Allow override for power users
+                var overrideMsg = 'ACTIVE SERVER DETECTED (risk score: ' + safety.score + ')\n\n' +
+                    'Risk factors:\n' +
+                    (safety.reasons || []).map(function(r) { return '  - ' + r; }).join('\n') +
+                    '\n\nTo override, type OVERRIDE below:';
+                var userInput = prompt(overrideMsg);
+                if (userInput !== 'OVERRIDE') {
+                  btn.disabled = false;
+                  btn.textContent = 'Connect & Deploy';
+                  return;
+                }
+                appendTerminal('Safety override accepted. Proceeding with caution.', 'var(--solar-gold)');
+                window.addNarration('Safety override accepted. Proceeding at user request.');
+              } else if (safety.level === 'warning') {
+                appendTerminal('WARNING: ' + safety.message + ' (risk score: ' + safety.score + ')', 'var(--solar-gold)');
+                if (safety.reasons) {
+                  safety.reasons.forEach(function(r) { appendTerminal('  - ' + r, 'var(--solar-gold)'); });
+                }
+                // Offer data preservation
+                var preserveFirst = confirm('Active services detected. Would you like to backup data before proceeding?\n\n(Docker images, databases, web content, SSH keys, /etc will be preserved)');
+                if (preserveFirst) {
+                  appendTerminal('Preserving data...', 'var(--teal)');
+                  sshStatus.textContent = 'Backing up data before install...';
+                  ws.send(JSON.stringify({ action: 'preserve_data' }));
+                  // Wait for data_preserved response before continuing
+                }
+                if (!confirm('SERVER WARNING\n\n' + safety.message + '\n\nRisk factors:\n' +
+                    (safety.reasons || []).map(function(r) { return '• ' + r; }).join('\n') +
+                    '\n\nAre you SURE this is not a production system?')) {
+                  sshStatus.textContent = 'Installation cancelled — safety check failed.';
+                  btn.disabled = false;
+                  btn.textContent = 'Connect & Deploy';
+                  return;
+                }
+              } else if (safety.level === 'caution') {
+                appendTerminal('Note: ' + safety.message, 'var(--fg-dim)');
+              } else {
+                appendTerminal('Safety: ' + safety.message, 'var(--leaf-green)');
+              }
+            }
+
+            // Store for later use
+            panel._hwData = hwData;
+
+            // Scan everything: apps, dotfiles, drives
+            sshStatus.textContent = 'Scanning your system...';
+            ws.send(JSON.stringify({ action: 'scan_apps' }));
+            ws.send(JSON.stringify({ action: 'deep_scan' }));
             ws.send(JSON.stringify({ action: 'discover_disks' }));
+            break;
+
+          case 'app_scan':
+            var apps = [];
+            try { apps = JSON.parse(msg.data); } catch(e) { apps = []; }
+            if (apps.length > 0) {
+              appendTerminal('Found ' + apps.length + ' app(s) on existing OS', 'var(--leaf-green)');
+              showAppCompatibility(apps, panel);
+            }
+            break;
+
+          case 'data_preserved':
+            var backup = {};
+            try { backup = JSON.parse(msg.data); } catch(e) { backup = {}; }
+            if (backup.items && backup.items.length > 0) {
+              appendTerminal('Data preserved (' + backup.total_size + '):', 'var(--leaf-green)');
+              backup.items.forEach(function(item) {
+                appendTerminal('  ' + item.type + ': ' + item.name + ' (' + item.size + ')', 'var(--teal)');
+              });
+              appendTerminal('Backup location: ' + backup.backup_dir, 'var(--fg-dim)');
+              window.addNarration('Data preservation complete. ' + backup.items.length + ' items backed up to ' + backup.backup_dir);
+            }
+            break;
+
+          case 'deep_scan':
+            var deepData = {};
+            try { deepData = JSON.parse(msg.data); } catch(e) { deepData = {}; }
+            panel._deepScan = deepData;
+
+            // Show what we found about the user
+            if (deepData.identity && deepData.identity.username) {
+              appendTerminal('Found user: ' + (deepData.identity.fullname || deepData.identity.username), 'var(--teal)');
+            }
+            if (deepData.git && deepData.git.name) {
+              appendTerminal('Git: ' + deepData.git.name + ' <' + deepData.git.email + '>' +
+                (deepData.git.prefers_rebase ? ' (rebase workflow)' : ''), 'var(--teal)');
+            }
+            if (deepData.shell) {
+              appendTerminal('Shell: ' + deepData.shell.type +
+                (deepData.shell.alias_count > 0 ? ' (' + deepData.shell.alias_count + ' aliases)' : ''), 'var(--teal)');
+            }
+            if (deepData.ssh && deepData.ssh.key_count > 0) {
+              appendTerminal('SSH: ' + deepData.ssh.key_count + ' key(s), ' + deepData.ssh.host_count + ' host(s)', 'var(--teal)');
+            }
+            if (deepData.editors && deepData.editors.detected) {
+              var edNames = deepData.editors.detected.map(function(e) { return e.name; }).join(', ');
+              appendTerminal('Editors: ' + edNames, 'var(--teal)');
+            }
+            if (deepData.development) {
+              var devItems = [];
+              if (deepData.development.docker_images > 0) devItems.push(deepData.development.docker_images + ' Docker images');
+              if (deepData.development.rust_projects > 0) devItems.push(deepData.development.rust_projects + ' Rust projects');
+              if (deepData.development.node_projects > 0) devItems.push(deepData.development.node_projects + ' Node projects');
+              if (deepData.development.python_venvs > 0) devItems.push(deepData.development.python_venvs + ' Python venvs');
+              if (devItems.length > 0) appendTerminal('Dev: ' + devItems.join(', '), 'var(--teal)');
+            }
+            if (deepData.creative && deepData.creative.has_daw_config) {
+              appendTerminal('Creative: DAW configuration detected — will configure low-latency audio', 'var(--teal)');
+            }
+
+            window.addNarration('I can see who you are. Your tools, your workflow, your keys. Everything comes with you.');
             break;
 
           case 'disks':
@@ -3930,11 +4219,24 @@ window.drawLineChart = drawLineChart;
             try { disks = JSON.parse(msg.data); } catch(e) { disks = []; }
             appendTerminal('Found ' + disks.length + ' drive(s)', 'var(--leaf-green)');
             sshStatus.textContent = 'Select a drive for installation.';
-            showDiskSelector(disks, panel, ws);
+            showDiskSelector(disks, panel, ws, panel._hwData);
             break;
 
           case 'output':
             appendTerminal(msg.data, msg.stream === 'stderr' ? 'var(--clay)' : 'var(--fg-dim)');
+            // Feed package names to constellation visualization
+            if (window.constellation && msg.data) {
+              // Parse "copying path '/nix/store/xxx-packagename-1.0'..." or store path mentions
+              var storeMatch = msg.data.match(/\/nix\/store\/[a-z0-9]+-([^'"\s/]+)/);
+              if (storeMatch) {
+                window.constellation.addPackage(storeMatch[1]);
+              }
+              // Parse download speed for wind effect
+              var speedMatch = msg.data.match(/(\d+\.?\d*)\s*[MK]iB\/s/);
+              if (speedMatch) {
+                window.constellation.setWind(parseFloat(speedMatch[1]));
+              }
+            }
             break;
 
           case 'progress':
@@ -3995,6 +4297,39 @@ window.drawLineChart = drawLineChart;
                     if (window.ceremony && window.ceremony.isActive()) {
                       window.ceremony.progress('Complete', 100);
                     }
+
+                    // Stop constellation
+                    if (window.constellation) window.constellation.stop();
+
+                    // ── Personalized Welcome ──
+                    if (window.systemCard && panel._deepScan) {
+                      var installChoices = {
+                        hostname: (document.getElementById('cfg-hostname') || {}).value || 'guardian',
+                        desktop: (document.getElementById('cfg-desktop') || {}).value || 'gnome',
+                        layout: (document.getElementById('layout-select') || {}).value || 'single',
+                        secure_boot: (document.getElementById('secure-boot-toggle') || {}).checked || false,
+                      };
+
+                      // Compose personalized welcome
+                      var welcome = window.systemCard.composeWelcome(panel._deepScan, panel._hwData, installChoices);
+                      if (welcome) {
+                        var welcomeDiv = document.createElement('div');
+                        welcomeDiv.className = 'glass-panel';
+                        welcomeDiv.style.cssText = 'margin-top:1.5rem;padding:1.5rem;max-width:550px;margin-left:auto;margin-right:auto;white-space:pre-line;font-size:0.88rem;line-height:1.7;color:var(--fg);';
+                        welcomeDiv.textContent = welcome;
+                        panel.appendChild(welcomeDiv);
+                      }
+
+                      // Generate and show System Card
+                      var card = window.systemCard.generate(panel._hwData, panel._deepScan, installChoices, window.constellation);
+                      var cardHtml = window.systemCard.render(card);
+                      var cardDiv = document.createElement('div');
+                      cardDiv.innerHTML = cardHtml;
+                      panel.appendChild(cardDiv);
+
+                      // Scroll to welcome
+                      welcomeDiv.scrollIntoView({ behavior: 'smooth' });
+                    }
                   }, 2000);
                 }, 2000);
               }
@@ -4040,7 +4375,155 @@ window.drawLineChart = drawLineChart;
   }
 
   // ── Glassmorphic Disk Selector ──
-  function showDiskSelector(disks, parentPanel, ws) {
+  // ── App Compatibility Report ──
+  // Maps common app names to nixpkgs equivalents
+  var APP_DB = {
+    'firefox': { nix: 'firefox', kind: 'exact' },
+    'google chrome': { nix: 'google-chrome', kind: 'exact' },
+    'chromium': { nix: 'chromium', kind: 'exact' },
+    'microsoft edge': { nix: 'microsoft-edge', kind: 'exact' },
+    'brave browser': { nix: 'brave', kind: 'exact' },
+    'visual studio code': { nix: 'vscode', kind: 'exact' },
+    'code': { nix: 'vscode', kind: 'exact' },
+    'sublime text': { nix: 'sublime4', kind: 'exact' },
+    'steam': { nix: 'steam', kind: 'exact' },
+    'discord': { nix: 'discord', kind: 'exact' },
+    'slack': { nix: 'slack', kind: 'exact' },
+    'zoom': { nix: 'zoom-us', kind: 'exact' },
+    'spotify': { nix: 'spotify', kind: 'exact' },
+    'vlc': { nix: 'vlc', kind: 'exact' },
+    'vlc media player': { nix: 'vlc', kind: 'exact' },
+    'obs studio': { nix: 'obs-studio', kind: 'exact' },
+    'gimp': { nix: 'gimp', kind: 'exact' },
+    'inkscape': { nix: 'inkscape', kind: 'exact' },
+    'blender': { nix: 'blender', kind: 'exact' },
+    'krita': { nix: 'krita', kind: 'exact' },
+    'audacity': { nix: 'audacity', kind: 'exact' },
+    'thunderbird': { nix: 'thunderbird', kind: 'exact' },
+    'telegram desktop': { nix: 'telegram-desktop', kind: 'exact' },
+    'signal': { nix: 'signal-desktop', kind: 'exact' },
+    'bitwarden': { nix: 'bitwarden-desktop', kind: 'exact' },
+    'keepassxc': { nix: 'keepassxc', kind: 'exact' },
+    'filezilla': { nix: 'filezilla', kind: 'exact' },
+    'qbittorrent': { nix: 'qbittorrent', kind: 'exact' },
+    'handbrake': { nix: 'handbrake', kind: 'exact' },
+    'docker desktop': { nix: 'docker', kind: 'exact' },
+    'git': { nix: 'git', kind: 'exact' },
+    'postman': { nix: 'postman', kind: 'exact' },
+    'virtualbox': { nix: 'virtualbox', kind: 'exact' },
+    'wireshark': { nix: 'wireshark', kind: 'exact' },
+    '7-zip': { nix: 'p7zip', kind: 'exact' },
+    'minecraft launcher': { nix: 'prismlauncher', kind: 'exact' },
+    'adobe photoshop': { nix: 'gimp, krita', kind: 'alt', note: 'Open-source alternatives' },
+    'photoshop': { nix: 'gimp, krita', kind: 'alt', note: 'Open-source alternatives' },
+    'adobe illustrator': { nix: 'inkscape', kind: 'alt', note: 'Vector graphics editor' },
+    'adobe premiere pro': { nix: 'kdenlive, davinci-resolve', kind: 'alt', note: 'Video editors' },
+    'adobe lightroom': { nix: 'darktable', kind: 'alt', note: 'RAW photo processor' },
+    'adobe acrobat': { nix: 'okular', kind: 'alt', note: 'PDF viewer' },
+    'microsoft office': { nix: 'libreoffice', kind: 'alt', note: 'Full office suite' },
+    'microsoft word': { nix: 'libreoffice', kind: 'alt', note: 'Writer' },
+    'microsoft excel': { nix: 'libreoffice', kind: 'alt', note: 'Calc' },
+    'microsoft powerpoint': { nix: 'libreoffice', kind: 'alt', note: 'Impress' },
+    'microsoft outlook': { nix: 'thunderbird', kind: 'alt', note: 'Email client' },
+    'microsoft teams': { nix: 'teams-for-linux', kind: 'exact' },
+    'winrar': { nix: 'p7zip', kind: 'alt', note: 'Handles RAR and most formats' },
+    'notepad++': { nix: 'vscode', kind: 'alt', note: 'Or: kate, gedit' },
+    'itunes': { nix: 'rhythmbox', kind: 'alt', note: 'Music manager; Spotify for streaming' },
+    'epic games launcher': { nix: 'heroic', kind: 'alt', note: 'Open-source Epic/GOG launcher' },
+    'final cut pro': { nix: 'kdenlive', kind: 'alt', note: 'Video editor' },
+    'logic pro': { nix: 'ardour', kind: 'alt', note: 'DAW' },
+    'xcode': { nix: 'vscode', kind: 'alt', note: 'IDE; Apple SDKs are macOS-only' },
+    'garageband': { nix: 'lmms', kind: 'alt', note: 'Music production' },
+    'imessage': { nix: null, kind: 'none', note: 'No Linux equivalent' },
+    'facetime': { nix: null, kind: 'none', note: 'No Linux equivalent; use Zoom/Meet' },
+  };
+
+  function showAppCompatibility(apps, parentPanel) {
+    var existing = document.getElementById('app-compat-panel');
+    if (existing) existing.remove();
+
+    var exact = 0, alt = 0, none = 0, unknown = 0;
+    var rows = [];
+
+    apps.forEach(function(app) {
+      var name = app.name;
+      var key = name.toLowerCase();
+      var match = APP_DB[key];
+
+      if (!match) {
+        // Try partial matching
+        var keys = Object.keys(APP_DB);
+        for (var i = 0; i < keys.length; i++) {
+          if (key.indexOf(keys[i]) >= 0 || keys[i].indexOf(key) >= 0) {
+            match = APP_DB[keys[i]];
+            break;
+          }
+        }
+      }
+
+      var icon, color, status, nixPkg;
+      if (match && match.kind === 'exact') {
+        icon = '\u2713'; color = 'var(--leaf-green)'; status = 'Available';
+        nixPkg = match.nix; exact++;
+      } else if (match && match.kind === 'alt') {
+        icon = '\u223C'; color = 'var(--solar-gold)'; status = 'Alternative';
+        nixPkg = match.nix + (match.note ? ' — ' + match.note : ''); alt++;
+      } else if (match && match.kind === 'none') {
+        icon = '\u2717'; color = 'var(--clay)'; status = 'No equivalent';
+        nixPkg = match.note || ''; none++;
+      } else {
+        icon = '?'; color = 'var(--fg-muted)'; status = 'Unknown';
+        nixPkg = 'May be available — check nixpkgs'; unknown++;
+      }
+
+      rows.push(
+        '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">' +
+        '<td style="padding:0.4rem 0.6rem;"><span style="color:' + color + '; font-weight:bold;">' + icon + '</span></td>' +
+        '<td style="padding:0.4rem 0.6rem;">' + name + '</td>' +
+        '<td style="padding:0.4rem 0.6rem; color:' + color + ';">' + status + '</td>' +
+        '<td style="padding:0.4rem 0.6rem; font-size:0.78rem; color:var(--fg-dim);">' + nixPkg + '</td>' +
+        '</tr>'
+      );
+    });
+
+    var total = exact + alt + none + unknown;
+    var coverage = total > 0 ? Math.round((exact + alt) / total * 100) : 0;
+
+    var compat = document.createElement('div');
+    compat.id = 'app-compat-panel';
+    compat.className = 'glass-panel';
+    compat.style.cssText = 'margin-top:1rem; padding:1rem; max-height:300px; overflow-y:auto;';
+    compat.innerHTML =
+      '<h4 style="text-align:center; font-weight:200; margin-bottom:0.8rem;">App Compatibility: ' + coverage + '% covered</h4>' +
+      '<div style="display:flex; justify-content:center; gap:1.5rem; margin-bottom:0.8rem; font-size:0.82rem;">' +
+      '  <span style="color:var(--leaf-green);">\u2713 ' + exact + ' exact</span>' +
+      '  <span style="color:var(--solar-gold);">\u223C ' + alt + ' alternatives</span>' +
+      '  <span style="color:var(--clay);">\u2717 ' + none + ' no match</span>' +
+      '  <span style="color:var(--fg-muted);">? ' + unknown + ' unknown</span>' +
+      '</div>' +
+      '<table style="width:100%; font-size:0.82rem; border-collapse:collapse;">' +
+      '<thead><tr style="border-bottom:1px solid var(--border);">' +
+      '<th style="padding:0.3rem 0.6rem; text-align:left;"></th>' +
+      '<th style="padding:0.3rem 0.6rem; text-align:left;">Your App</th>' +
+      '<th style="padding:0.3rem 0.6rem; text-align:left;">Status</th>' +
+      '<th style="padding:0.3rem 0.6rem; text-align:left;">NixOS Package</th>' +
+      '</tr></thead><tbody>' +
+      rows.join('') +
+      '</tbody></table>';
+
+    // Insert before disk selector or at end of panel
+    var diskSel = document.getElementById('disk-selector');
+    if (diskSel) {
+      parentPanel.insertBefore(compat, diskSel);
+    } else {
+      parentPanel.appendChild(compat);
+    }
+
+    window.addNarration(coverage + '% of your apps have NixOS equivalents. ' +
+      exact + ' exact matches, ' + alt + ' with alternatives.');
+  }
+
+  function showDiskSelector(disks, parentPanel, ws, hwData) {
     // Remove existing selector if present
     var existing = document.getElementById('disk-selector');
     if (existing) existing.remove();
@@ -4153,6 +4636,112 @@ window.drawLineChart = drawLineChart;
     recDiv.innerHTML = recommendation;
     selector.appendChild(recDiv);
 
+    // Layout selector
+    var layoutDiv = document.createElement('div');
+    layoutDiv.style.cssText = 'text-align:center; margin-top:1.2rem; max-width:550px; margin-left:auto; margin-right:auto;';
+    var hasExistingOS = hwData && hwData.detected_os && hwData.detected_os.length > 0;
+    var hasTpm = hwData && hwData.tpm2_available;
+    layoutDiv.innerHTML =
+      '<label style="font-size:0.82rem; color:var(--fg-dim);">Install Layout' +
+      '<select id="layout-select" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">' +
+      '  <option value="auto">Auto-detect (recommended)</option>' +
+      '  <option value="single">Full Disk — wipe &amp; install btrfs</option>' +
+      '  <option value="single-luks">Full Disk Encrypted — LUKS2 + btrfs</option>' +
+      '  <option value="alongside"' + (hasExistingOS ? '' : ' disabled') + '>Alongside — preserve existing OS</option>' +
+      '  <option value="dual">Dual NVMe — OS + data drives</option>' +
+      '  <option value="raid1-btrfs">RAID1 (btrfs) — mirrored across 2 disks</option>' +
+      '  <option value="raid1-mdadm">RAID1 (mdadm) — software mirror + btrfs</option>' +
+      '  <option value="sata">SATA — for traditional drives</option>' +
+      '  <option value="vps">VPS — minimal cloud install</option>' +
+      '</select></label>' +
+      (hasExistingOS ? '<p style="font-size:0.75rem; color:var(--solar-gold); margin-top:0.3rem;">Existing OS detected — "Alongside" layout available</p>' : '') +
+      (hasTpm ? '<p style="font-size:0.75rem; color:var(--leaf-green); margin-top:0.3rem;">TPM 2.0 detected — encrypted install recommended</p>' : '') +
+      '<div style="margin-top:0.8rem; display:flex; gap:1.5rem; justify-content:center;">' +
+      '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
+      '    <input type="checkbox" id="secure-boot-toggle"' + (hwData && hwData.setup_mode ? ' checked' : '') + '> Enable Secure Boot (lanzaboote)' +
+      '  </label>' +
+      (hasTpm ? '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
+      '    <input type="checkbox" id="tpm2-toggle" checked> TPM2 auto-unlock (no passphrase at boot)' +
+      '  </label>' : '') +
+      '</div>' +
+      (hwData && hwData.secure_boot ? '<p style="font-size:0.75rem; color:var(--teal); margin-top:0.3rem;">Secure Boot currently enabled — lanzaboote will maintain it</p>' : '') +
+      (hwData && hwData.efi_available && !hwData.secure_boot ? '<p style="font-size:0.75rem; color:var(--fg-muted); margin-top:0.3rem;">Secure Boot disabled — can be enabled during install if firmware is in Setup Mode</p>' : '');
+    selector.appendChild(layoutDiv);
+
+    // ── System Configuration Panel ──
+    var configDiv = document.createElement('div');
+    configDiv.style.cssText = 'margin-top:1.2rem; max-width:550px; margin-left:auto; margin-right:auto; display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;';
+
+    // Timezone
+    var tz = (hwData && hwData.locale && hwData.locale.timezone) || 'UTC';
+    var tzHtml = '<label style="font-size:0.82rem; color:var(--fg-dim);">Timezone' +
+      '<input id="cfg-timezone" type="text" value="' + tz + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;" placeholder="America/Chicago">' +
+      '</label>';
+
+    // Keyboard layout
+    var kb = (hwData && hwData.locale && hwData.locale.keyboard) || 'us';
+    var kbHtml = '<label style="font-size:0.82rem; color:var(--fg-dim);">Keyboard Layout' +
+      '<select id="cfg-keyboard" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">' +
+      ['us','gb','de','fr','es','it','pt','br','ru','jp','kr','cn','in','za','dvorak','colemak'].map(function(l) {
+        return '<option value="' + l + '"' + (l === kb ? ' selected' : '') + '>' + l + '</option>';
+      }).join('') +
+      '</select></label>';
+
+    // Desktop environment
+    var deHtml = '<label style="font-size:0.82rem; color:var(--fg-dim);">Desktop Environment' +
+      '<select id="cfg-desktop" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">' +
+      '<option value="gnome">GNOME (recommended)</option>' +
+      '<option value="plasma">KDE Plasma</option>' +
+      '<option value="hyprland">Hyprland (tiling, Wayland)</option>' +
+      '<option value="sway">Sway (tiling, Wayland)</option>' +
+      '<option value="xfce">XFCE (lightweight)</option>' +
+      '<option value="none">None (server / CLI only)</option>' +
+      '</select></label>';
+
+    // GPU driver
+    var gpuVendor = (hwData && hwData.gpu && hwData.gpu.vendor) || 'unknown';
+    var gpuModel = (hwData && hwData.gpu && hwData.gpu.model) || '';
+    var gpuHtml = '<label style="font-size:0.82rem; color:var(--fg-dim);">GPU Driver' +
+      (gpuModel ? ' <span style="color:var(--teal); font-size:0.75rem;">(' + gpuVendor + ')</span>' : '') +
+      '<select id="cfg-gpu" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">' +
+      '<option value="auto"' + (gpuVendor === 'unknown' ? ' selected' : '') + '>Auto-detect</option>' +
+      '<option value="nvidia"' + (gpuVendor === 'nvidia' ? ' selected' : '') + '>NVIDIA (proprietary)</option>' +
+      '<option value="nvidia-open"' + '>NVIDIA (open kernel module)</option>' +
+      '<option value="amdgpu"' + (gpuVendor === 'amd' ? ' selected' : '') + '>AMD (amdgpu)</option>' +
+      '<option value="modesetting"' + (gpuVendor === 'intel' ? ' selected' : '') + '>Intel / Generic (modesetting)</option>' +
+      '<option value="none">None (headless server)</option>' +
+      '</select></label>';
+
+    configDiv.innerHTML = tzHtml + kbHtml + deHtml + gpuHtml;
+
+    // WiFi section (if detected)
+    if (hwData && hwData.wifi && hwData.wifi.available) {
+      var wifiDiv = document.createElement('div');
+      wifiDiv.style.cssText = 'grid-column: span 2; margin-top:0.5rem;';
+      var networks = hwData.wifi.networks || [];
+      var wifiOptions = networks.map(function(n) {
+        return '<option value="' + n.ssid + '">' + n.ssid + ' (' + n.signal + '% ' + n.security + ')</option>';
+      }).join('');
+      wifiDiv.innerHTML = '<label style="font-size:0.82rem; color:var(--fg-dim);">WiFi Network' +
+        '<div style="display:flex; gap:0.5rem; margin-top:0.3rem;">' +
+        '<select id="cfg-wifi-ssid" style="flex:1;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;">' +
+        '<option value="">Not connected</option>' + wifiOptions +
+        '</select>' +
+        '<input id="cfg-wifi-pass" type="password" placeholder="Password" style="flex:1;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;">' +
+        '</div></label>';
+      configDiv.appendChild(wifiDiv);
+    }
+
+    // Hostname
+    var hostnameDiv = document.createElement('div');
+    hostnameDiv.style.cssText = 'grid-column: span 2; margin-top:0.5rem;';
+    hostnameDiv.innerHTML = '<label style="font-size:0.82rem; color:var(--fg-dim);">Hostname' +
+      '<input id="cfg-hostname" type="text" value="guardian" placeholder="my-nixos" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">' +
+      '</label>';
+    configDiv.appendChild(hostnameDiv);
+
+    selector.appendChild(configDiv);
+
     // Deploy button (disabled until drive selected)
     var deployDiv = document.createElement('div');
     deployDiv.style.cssText = 'text-align:center; margin-top:1.5rem;';
@@ -4184,18 +4773,56 @@ window.drawLineChart = drawLineChart;
 
       var hostname = document.getElementById('install-hostname')?.textContent || 'guardian';
 
-      // Detect layout from disk count and type
-      var nvmeDisks = disks.filter(function(d) { return d.transport === 'nvme' && !d.removable; });
-      var layout = 'single';
+      // Get layout from selector (defaults to auto-detect)
+      var layoutSelect = document.getElementById('layout-select');
+      var layout = layoutSelect ? layoutSelect.value : 'single';
       var fastDisk = '';
       var standardDisk = '';
+      var passphrase = '';
 
-      if (nvmeDisks.length >= 2) {
-        layout = 'dual';
-        // Assume selected is the fast drive, other is standard
+      if (layout === 'auto') {
+        // Auto-detect: dual if 2+ NVMe, alongside if existing OS detected, else single
+        var nvmeDisks = disks.filter(function(d) { return d.transport === 'nvme' && !d.removable; });
+        var hasExistingOS = parentPanel._hwData && parentPanel._hwData.detected_os && parentPanel._hwData.detected_os.length > 0;
+        if (nvmeDisks.length >= 2) {
+          layout = 'dual';
+        } else if (hasExistingOS) {
+          layout = 'alongside';
+        } else {
+          layout = 'single';
+        }
+      }
+
+      if (layout === 'single-luks') {
+        passphrase = prompt('Enter encryption passphrase (you will need this at every boot):');
+        if (!passphrase || passphrase.length < 8) {
+          alert('Passphrase must be at least 8 characters.');
+          this.disabled = false;
+          this.textContent = 'Deploy to ' + diskName;
+          return;
+        }
+        var confirm2 = prompt('Confirm passphrase:');
+        if (passphrase !== confirm2) {
+          alert('Passphrases do not match.');
+          this.disabled = false;
+          this.textContent = 'Deploy to ' + diskName;
+          return;
+        }
+      }
+
+      if (layout === 'dual') {
+        var nvmeDisks = disks.filter(function(d) { return d.transport === 'nvme' && !d.removable; });
         fastDisk = diskName;
         standardDisk = nvmeDisks.find(function(d) { return d.name !== diskName; })?.name || '';
         if (!confirm('Dual-NVMe layout detected.\n\nFast drive (data): ' + fastDisk + '\nStandard drive (OS): ' + standardDisk + '\n\nBOTH drives will be wiped.\n\nContinue?')) {
+          this.disabled = false;
+          this.textContent = 'Deploy to ' + diskName;
+          return;
+        }
+      }
+
+      if (layout === 'alongside') {
+        if (!confirm('ALONGSIDE MODE: NixOS will be installed in the free space on ' + diskName + '.\n\nExisting partitions will NOT be modified.\nYour current OS will be preserved.\n\nContinue?')) {
           this.disabled = false;
           this.textContent = 'Deploy to ' + diskName;
           return;
@@ -4220,8 +4847,17 @@ window.drawLineChart = drawLineChart;
       if (window.ceremony) {
         window.ceremony.start();
       }
+      // Initialize constellation
+      var constellationCanvas = document.getElementById('constellation-canvas');
+      if (constellationCanvas && window.constellation) {
+        window.constellation.init(constellationCanvas);
+      }
 
       // Send fully automated install command
+      var secureBoot = document.getElementById('secure-boot-toggle');
+      var tpm2Toggle = document.getElementById('tpm2-toggle');
+      var cfgHostname = document.getElementById('cfg-hostname');
+      hostname = (cfgHostname && cfgHostname.value.trim()) || hostname || 'guardian';
       ws.send(JSON.stringify({
         action: 'install',
         disk: diskName,
@@ -4229,6 +4865,13 @@ window.drawLineChart = drawLineChart;
         fast_disk: fastDisk,
         standard_disk: standardDisk,
         hostname: hostname,
+        command: passphrase,
+        secure_boot: secureBoot ? secureBoot.checked : false,
+        tpm2_unlock: tpm2Toggle ? tpm2Toggle.checked : false,
+        desktop: (document.getElementById('cfg-desktop') || {}).value || 'gnome',
+        gpu_driver: (document.getElementById('cfg-gpu') || {}).value || 'auto',
+        timezone: (document.getElementById('cfg-timezone') || {}).value || 'UTC',
+        keyboard: (document.getElementById('cfg-keyboard') || {}).value || 'us',
         flake_nix: flakeContent,
         disko_nix: diskoContent,
         hardware_nix: hwContent
@@ -4282,6 +4925,409 @@ window.drawLineChart = drawLineChart;
       window.addNarration('"I do not exist apart. I become with."', true);
     }
   }
+})();
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// ==================================================================
+// constellation.js — Package installation visualized as a growing sky
+//
+// Each Nix store path that downloads becomes a star in a constellation.
+// Packages cluster by category. Download speed shows as wind.
+// When the install completes, the constellation freezes as the system's
+// unique birth chart.
+// ==================================================================
+
+(function() {
+  'use strict';
+
+  var canvas = null;
+  var ctx = null;
+  var stars = [];
+  var wind = 0;
+  var running = false;
+  var animFrame = null;
+  var packageCount = 0;
+
+  // Category colors
+  var CATEGORIES = {
+    system:   { color: '#7aa2f7', label: 'System' },
+    lib:      { color: '#73daca', label: 'Libraries' },
+    dev:      { color: '#9ece6a', label: 'Development' },
+    editor:   { color: '#e0af68', label: 'Editors' },
+    desktop:  { color: '#bb9af7', label: 'Desktop' },
+    font:     { color: '#c0caf5', label: 'Fonts' },
+    media:    { color: '#f7768e', label: 'Media' },
+    network:  { color: '#2ac3de', label: 'Network' },
+    unknown:  { color: '#565f89', label: 'Other' }
+  };
+
+  function categorize(packageName) {
+    var name = packageName.toLowerCase();
+    if (name.match(/^(glibc|gcc|binutils|coreutils|bash|systemd|linux|kernel|grub|boot)/)) return 'system';
+    if (name.match(/^(lib|zlib|openssl|pcre|icu|gmp|ncurses|readline)/)) return 'lib';
+    if (name.match(/^(git|cargo|rustc|python|node|npm|go|clang|cmake|make|pkg-config)/)) return 'dev';
+    if (name.match(/^(vim|neovim|emacs|vscode|nano|kakoune)/)) return 'editor';
+    if (name.match(/^(gnome|kde|plasma|sway|hypr|gtk|qt|wayland|xorg|mesa|nvidia|amdgpu)/)) return 'desktop';
+    if (name.match(/^(font|noto|liberation|dejavu|jetbrains|fira|iosevka)/)) return 'font';
+    if (name.match(/^(ffmpeg|gstreamer|pulse|pipewire|alsa|vlc|mpv)/)) return 'media';
+    if (name.match(/^(curl|wget|openssh|network|wireless|iw|wpa)/)) return 'network';
+    return 'unknown';
+  }
+
+  function createStar(packageName) {
+    var cat = categorize(packageName);
+    var catInfo = CATEGORIES[cat];
+    var angle = Math.random() * Math.PI * 2;
+    // Cluster by category — each category occupies a sector
+    var catKeys = Object.keys(CATEGORIES);
+    var catIndex = catKeys.indexOf(cat);
+    var sectorAngle = (catIndex / catKeys.length) * Math.PI * 2;
+    angle = sectorAngle + (Math.random() - 0.5) * (Math.PI / 4);
+
+    var distance = 0.2 + Math.random() * 0.35;
+    var cx = canvas.width / 2;
+    var cy = canvas.height / 2;
+
+    return {
+      x: cx + Math.cos(angle) * distance * canvas.width,
+      y: cy + Math.sin(angle) * distance * canvas.height,
+      radius: 0.5 + Math.random() * 2,
+      color: catInfo.color,
+      alpha: 0,
+      targetAlpha: 0.3 + Math.random() * 0.7,
+      twinkle: Math.random() * Math.PI * 2,
+      name: packageName,
+      category: cat
+    };
+  }
+
+  function draw() {
+    if (!ctx || !running) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw connections between nearby stars (subtle)
+    ctx.lineWidth = 0.3;
+    for (var i = 0; i < stars.length; i++) {
+      for (var j = i + 1; j < Math.min(stars.length, i + 5); j++) {
+        if (stars[i].category === stars[j].category) {
+          var dx = stars[i].x - stars[j].x;
+          var dy = stars[i].y - stars[j].y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 80) {
+            ctx.strokeStyle = stars[i].color.replace(')', ', ' + (0.1 * (1 - dist / 80)) + ')').replace('rgb', 'rgba').replace('#', '');
+            // Hex to rgba
+            var hex = stars[i].color;
+            var r = parseInt(hex.slice(1,3), 16);
+            var g = parseInt(hex.slice(3,5), 16);
+            var b = parseInt(hex.slice(5,7), 16);
+            ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (0.15 * (1 - dist / 80)) + ')';
+            ctx.beginPath();
+            ctx.moveTo(stars[i].x, stars[i].y);
+            ctx.lineTo(stars[j].x, stars[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // Draw stars
+    var time = Date.now() / 1000;
+    for (var k = 0; k < stars.length; k++) {
+      var s = stars[k];
+      // Fade in
+      if (s.alpha < s.targetAlpha) s.alpha += 0.02;
+      // Twinkle
+      var twinkleAlpha = s.alpha * (0.7 + 0.3 * Math.sin(time * 2 + s.twinkle));
+      // Wind drift
+      s.x += wind * 0.1;
+
+      var hex = s.color;
+      var r = parseInt(hex.slice(1,3), 16);
+      var g = parseInt(hex.slice(3,5), 16);
+      var b = parseInt(hex.slice(5,7), 16);
+
+      ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + twinkleAlpha + ')';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Glow for larger stars
+      if (s.radius > 1.5) {
+        ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + (twinkleAlpha * 0.2) + ')';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Package counter
+    ctx.fillStyle = 'rgba(192, 202, 245, 0.6)';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(packageCount + ' paths', canvas.width / 2, canvas.height - 15);
+
+    // Category legend (bottom)
+    var legendX = 10;
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    Object.keys(CATEGORIES).forEach(function(cat) {
+      var info = CATEGORIES[cat];
+      var count = stars.filter(function(s) { return s.category === cat; }).length;
+      if (count === 0) return;
+      ctx.fillStyle = info.color;
+      ctx.fillRect(legendX, canvas.height - 8, 6, 6);
+      ctx.fillStyle = 'rgba(192, 202, 245, 0.5)';
+      ctx.fillText(count, legendX + 9, canvas.height - 3);
+      legendX += 35;
+    });
+
+    animFrame = requestAnimationFrame(draw);
+  }
+
+  window.constellation = {
+    init: function(canvasEl) {
+      canvas = canvasEl;
+      ctx = canvas.getContext('2d');
+      canvas.width = canvasEl.parentElement.clientWidth || 400;
+      canvas.height = 250;
+      stars = [];
+      packageCount = 0;
+      running = true;
+      draw();
+    },
+
+    addPackage: function(packageName) {
+      if (!canvas) return;
+      packageCount++;
+      // Only visualize a sample (every 3rd package) to avoid overwhelming
+      if (packageCount % 3 === 0 || packageCount < 20) {
+        stars.push(createStar(packageName));
+      }
+    },
+
+    setWind: function(speed) {
+      // speed in MB/s
+      wind = Math.min(speed / 50, 2);
+    },
+
+    stop: function() {
+      running = false;
+      if (animFrame) cancelAnimationFrame(animFrame);
+    },
+
+    getSignature: function() {
+      // Return the constellation as a unique system signature
+      var counts = {};
+      Object.keys(CATEGORIES).forEach(function(c) { counts[c] = 0; });
+      stars.forEach(function(s) { counts[s.category]++; });
+      return { total: packageCount, categories: counts, starCount: stars.length };
+    }
+  };
+})();
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// ==================================================================
+// system-card.js — Post-install System Card + Personalized Welcome
+//
+// Generates a beautiful summary card after installation completes
+// and composes a personalized welcome message based on deep scan data.
+// ==================================================================
+
+(function() {
+  'use strict';
+
+  /**
+   * Compose a personalized welcome message based on what we learned
+   * about the user from the deep scan.
+   */
+  function composeWelcome(deepScan, hwData, installChoices) {
+    var lines = [];
+    var userName = '';
+
+    // Identity
+    if (deepScan && deepScan.identity) {
+      userName = deepScan.identity.fullname || deepScan.identity.username || '';
+      if (userName) {
+        lines.push('Welcome home, ' + userName + '.');
+      }
+    }
+    if (!userName) {
+      lines.push('Welcome home.');
+    }
+
+    lines.push('');
+
+    // What we brought over
+    var brought = [];
+    if (deepScan && deepScan.git && deepScan.git.name) {
+      brought.push('your git workflow (' + deepScan.git.name + ', ' +
+        (deepScan.git.prefers_rebase ? 'rebase' : 'merge') + ' style' +
+        (deepScan.git.alias_count > 0 ? ', ' + deepScan.git.alias_count + ' aliases' : '') + ')');
+    }
+    if (deepScan && deepScan.ssh && deepScan.ssh.key_count > 0) {
+      brought.push('your ' + deepScan.ssh.key_count + ' SSH key' + (deepScan.ssh.key_count > 1 ? 's' : '') +
+        (deepScan.ssh.host_count > 0 ? ' and ' + deepScan.ssh.host_count + ' host config' + (deepScan.ssh.host_count > 1 ? 's' : '') : ''));
+    }
+    if (deepScan && deepScan.editors && deepScan.editors.detected && deepScan.editors.detected.length > 0) {
+      var edNames = deepScan.editors.detected.map(function(e) {
+        var detail = '';
+        if (e.extensions) detail = ' with ' + e.extensions + ' extensions';
+        if (e.plugin_count) detail = ' with ' + e.plugin_count + ' plugins';
+        return e.name + detail;
+      });
+      brought.push('your editor setup (' + edNames.join(', ') + ')');
+    }
+    if (deepScan && deepScan.shell && deepScan.shell.alias_count > 0) {
+      brought.push('your ' + deepScan.shell.type + ' shell (' + deepScan.shell.alias_count + ' aliases, ' + deepScan.shell.custom_functions + ' functions)');
+    }
+    if (deepScan && deepScan.creative && deepScan.creative.has_daw_config) {
+      brought.push('your audio production setup (PipeWire configured for low-latency)');
+    }
+
+    if (brought.length > 0) {
+      lines.push('I brought ' + brought.slice(0, -1).join(', ') +
+        (brought.length > 1 ? ', and ' + brought[brought.length - 1] : brought[0]) + '.');
+    }
+
+    lines.push('');
+
+    // What's new
+    var whatsNew = [];
+    if (installChoices && installChoices.desktop && installChoices.desktop !== 'none') {
+      whatsNew.push(installChoices.desktop.charAt(0).toUpperCase() + installChoices.desktop.slice(1) + ' desktop');
+    }
+    if (installChoices && installChoices.layout && installChoices.layout.indexOf('luks') >= 0) {
+      whatsNew.push('full disk encryption');
+    }
+    whatsNew.push('btrfs with automatic snapshots');
+    whatsNew.push('flakes enabled by default');
+    whatsNew.push('earlyoom and zram for stability');
+
+    lines.push("Here's what's new: " + whatsNew.join(', ') + '.');
+    lines.push('');
+
+    // Encouragement
+    if (deepScan && deepScan.development) {
+      var dev = deepScan.development;
+      if (dev.rust_projects > 0) {
+        lines.push('I see you write Rust. You\'ll feel at home — NixOS itself is configured declaratively, and Nix shells give you per-project dependencies without containers.');
+      } else if (dev.docker_images > 0) {
+        lines.push('I noticed your Docker setup. NixOS can run containers, but try `nix develop` — it gives you reproducible dev environments without the overhead.');
+      } else if (dev.node_projects > 0) {
+        lines.push('Your Node projects will work great. Try `nix develop` for per-project Node versions — no more nvm.');
+      }
+    }
+
+    lines.push('');
+    lines.push('Your first command: `sudo nixos-rebuild switch` — it applies any config changes.');
+    lines.push('Your safety net: every rebuild creates a new generation. Boot the previous one from the boot menu if anything breaks.');
+    lines.push('');
+    lines.push('This is your system now. Every line of its configuration is yours to read, change, and share.');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Generate the System Card — a shareable summary of the installed system.
+   */
+  function generateSystemCard(hwData, deepScan, installChoices, constellation) {
+    var hostname = (installChoices && installChoices.hostname) || 'guardian';
+    var date = new Date().toISOString().split('T')[0];
+    var gpu = (hwData && hwData.gpu) || {};
+    var de = (installChoices && installChoices.desktop) || 'none';
+    var layout = (installChoices && installChoices.layout) || 'single';
+    var encrypted = layout.indexOf('luks') >= 0;
+    var secureBoot = installChoices && installChoices.secure_boot;
+
+    var card = {
+      hostname: hostname,
+      date: date,
+      hardware: {
+        gpu: gpu.vendor || 'unknown',
+        gpu_model: gpu.model || '',
+        arch: (hwData && hwData.arch) || 'x86_64',
+      },
+      software: {
+        desktop: de,
+        filesystem: layout.indexOf('raid') >= 0 ? 'btrfs RAID1' : 'btrfs',
+        subvolumes: 6,
+        encryption: encrypted ? 'LUKS2' : 'none',
+        secure_boot: secureBoot || false,
+        flakes: true,
+        audio: 'PipeWire',
+      },
+      migration: {
+        apps_migrated: (deepScan && deepScan.editors && deepScan.editors.detected) ?
+          deepScan.editors.detected.length : 0,
+        ssh_keys: (deepScan && deepScan.ssh) ? deepScan.ssh.key_count : 0,
+        git_identity: (deepScan && deepScan.git && deepScan.git.name) ? true : false,
+      },
+      constellation: constellation ? constellation.getSignature() : null,
+      portal: 'install.nixforhumanity.org',
+    };
+
+    return card;
+  }
+
+  /**
+   * Render the System Card as HTML
+   */
+  function renderSystemCard(card) {
+    var securityBadges = [];
+    if (card.software.encryption !== 'none') securityBadges.push(card.software.encryption);
+    if (card.software.secure_boot) securityBadges.push('Secure Boot');
+    securityBadges.push('Firewall');
+    securityBadges.push('zram');
+
+    return '<div class="system-card" style="' +
+      'background:linear-gradient(135deg, rgba(30,30,46,0.95), rgba(24,24,37,0.98));' +
+      'border:1px solid rgba(122,162,247,0.2);border-radius:16px;padding:2rem;' +
+      'max-width:480px;margin:1.5rem auto;font-family:monospace;color:#c0caf5;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.3);">' +
+
+      '<div style="text-align:center;margin-bottom:1.5rem;">' +
+      '<div style="font-size:1.5rem;font-weight:200;letter-spacing:0.1em;">' + card.hostname + '</div>' +
+      '<div style="font-size:0.75rem;color:#565f89;">NixOS 25.05 · Born ' + card.date + '</div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.82rem;">' +
+      (card.hardware.gpu_model ? '<div style="color:#7aa2f7;">GPU</div><div>' + card.hardware.gpu + '</div>' : '') +
+      '<div style="color:#7aa2f7;">Desktop</div><div>' + card.software.desktop + '</div>' +
+      '<div style="color:#7aa2f7;">Filesystem</div><div>' + card.software.filesystem + ' (' + card.software.subvolumes + ' subvols, zstd)</div>' +
+      '<div style="color:#7aa2f7;">Audio</div><div>' + card.software.audio + '</div>' +
+      '</div>' +
+
+      '<div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.4rem;justify-content:center;">' +
+      securityBadges.map(function(b) {
+        return '<span style="font-size:0.7rem;padding:0.2rem 0.6rem;background:rgba(158,206,106,0.15);' +
+          'border:1px solid rgba(158,206,106,0.3);border-radius:12px;color:#9ece6a;">' + b + '</span>';
+      }).join('') +
+      '</div>' +
+
+      (card.migration.ssh_keys > 0 || card.migration.git_identity ?
+        '<div style="margin-top:1rem;font-size:0.78rem;color:#73daca;text-align:center;">' +
+        (card.migration.git_identity ? 'Git identity migrated' : '') +
+        (card.migration.ssh_keys > 0 ? ' · ' + card.migration.ssh_keys + ' SSH keys' : '') +
+        ' · Flakes enabled' +
+        '</div>' : '') +
+
+      (card.constellation ?
+        '<div style="margin-top:1rem;font-size:0.75rem;color:#565f89;text-align:center;">' +
+        card.constellation.total + ' store paths · ' + card.constellation.starCount + ' stars' +
+        '</div>' : '') +
+
+      '<div style="margin-top:1.5rem;text-align:center;font-size:0.7rem;color:#565f89;">' +
+      'Installed with Sovereign Inoculation · ' + card.portal +
+      '</div>' +
+      '</div>';
+  }
+
+  // Export
+  window.systemCard = {
+    composeWelcome: composeWelcome,
+    generate: generateSystemCard,
+    render: renderSystemCard,
+  };
 })();
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later

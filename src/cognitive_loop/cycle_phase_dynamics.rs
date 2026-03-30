@@ -4748,6 +4748,26 @@ impl CognitiveLoopService {
                     }
                 },
             };
+
+            // ── Epistemic: Sacred Stillness modulates confidence ──
+            // If generating about a domain with known unknowns, reduce confidence
+            // to encourage hedged/careful language (epistemic humility).
+            #[cfg(feature = "epistemic")]
+            let signals = {
+                let mut s = signals;
+                if let Some(ref ku) = self.known_unknowns {
+                    // Use knowledge context to detect domain
+                    for fact in &s.knowledge_context {
+                        let domain = crate::knowledge::claim_priority::ClaimPrioritizer::infer_domain(fact);
+                        let modifier = ku.modulate_confidence(&domain) as f32;
+                        if modifier < 1.0 {
+                            s.epistemic_confidence *= modifier;
+                        }
+                    }
+                }
+                s
+            };
+
             if let Some(mut result) = broca.generate(signals) {
                 if !result.text.is_empty() {
                     #[cfg(feature = "therapeutic")]
@@ -4766,9 +4786,28 @@ impl CognitiveLoopService {
                 // ── Factcheck bridge: extract claims from Broca output ──
                 #[cfg(all(feature = "mycelix", feature = "ssm_language"))]
                 if let Some(ref broca_text) = self.language_comm.last_broca_text {
-                    let _modulation = self
+                    // Epistemic: prioritize claims before submitting for validation.
+                    // High-stakes domains (health, safety) checked first; low-priority skipped.
+                    #[cfg(feature = "epistemic")]
+                    let broca_text_for_factcheck = {
+                        use crate::knowledge::claim_priority::ClaimPrioritizer;
+                        let claims = super::broca_factcheck::BrocaFactcheckBridge::extract_claims(broca_text);
+                        if !claims.is_empty() {
+                            let prioritizer = ClaimPrioritizer::new(Default::default());
+                            let prioritized = prioritizer.prioritize(&claims);
+                            let top_claims: Vec<String> = prioritized.into_iter().map(|p| p.claim).collect();
+                            self.factcheck_bridge.submit_for_verification(&top_claims);
+                        }
+                        // Process pending verdicts from previous cycle
+                        let modulation = self.factcheck_bridge.process_verdicts(cycle_num);
+                        modulation
+                    };
+                    #[cfg(not(feature = "epistemic"))]
+                    let broca_text_for_factcheck = self
                         .factcheck_bridge
                         .on_broca_generation(broca_text, cycle_num);
+
+                    let _modulation = broca_text_for_factcheck;
                     // If factcheck says suppress, clear the output
                     if _modulation.suppress {
                         self.language_comm.last_broca_text = None;

@@ -472,6 +472,7 @@ pub fn generate_pulse_html(
     write_reasoning_pane(&mut html, &current.reasoning);
     write_dream_pane(&mut html, &current.dream);
     write_immune_pane(&mut html, &current.immune);
+    write_cortical_pane(&mut html, &current.cortical_activations);
     write_sovereign_pane(&mut html, &current.sovereign);
     write_neuroevolution_pane(&mut html, &current.neuroevolution);
     write_fabrication_pane(&mut html, &current.fabrication);
@@ -3460,6 +3461,109 @@ fn write_immune_pane(html: &mut String, immune: &super::ImmuneInfo) {
         },
         emergency = immune.emergency_cycles,
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 21: Cortical Activation Heatmap
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_cortical_pane(html: &mut String, activations: &[(String, f32)]) {
+    if activations.is_empty() {
+        return; // neural_validation feature not enabled
+    }
+
+    // 12-region brain heatmap as a 3x4 grid with color intensity.
+    let brain = "\u{1f9e0}"; // brain emoji
+    html.push_str(&format!(
+        r##"<div class="pane" style="grid-column: span 2;">
+<h2>{brain} Cortical Activation Map</h2>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0;">
+"##
+    ));
+
+    // Sort regions in a neuroscience-meaningful layout:
+    // Row 1 (frontal): Prefrontal, Executive, Motor, Language
+    // Row 2 (parietal/temporal): Sensory, Integration, Auditory, Social
+    // Row 3 (occipital/limbic): Visual, Memory, Emotional, Creative
+    let layout_order = [
+        "Prefrontal", "Executive", "Motor", "Language",
+        "Sensory", "Integration", "Auditory", "Social",
+        "Visual", "Memory", "Emotional", "Creative",
+    ];
+
+    for region_name in layout_order {
+        let val = activations
+            .iter()
+            .find(|(n, _)| n == region_name)
+            .map(|(_, v)| *v)
+            .unwrap_or(0.0);
+
+        // Color: green (low) → amber (mid) → red (high) for activation intensity.
+        let (r, g, b) = activation_color(val);
+        let label_short = match region_name {
+            "Prefrontal" => "PFC",
+            "Executive" => "EXC",
+            "Motor" => "MOT",
+            "Language" => "LNG",
+            "Sensory" => "SEN",
+            "Integration" => "INT",
+            "Auditory" => "AUD",
+            "Social" => "SOC",
+            "Visual" => "VIS",
+            "Memory" => "MEM",
+            "Emotional" => "EMO",
+            "Creative" => "CRE",
+            _ => &region_name[..3],
+        };
+
+        html.push_str(&format!(
+            r#"<div style="background:rgba({r},{g},{b},0.25);border:1px solid rgba({r},{g},{b},0.6);border-radius:6px;padding:4px;text-align:center;font-size:0.75em;" title="{region_name}: {val:.3}">
+<div style="font-weight:bold;color:rgb({r},{g},{b});">{label_short}</div>
+<div style="font-size:1.4em;color:rgb({r},{g},{b});">{val:.2}</div>
+</div>
+"#
+        ));
+    }
+
+    html.push_str("</div>\n");
+
+    // Summary bar: mean activation across all regions.
+    let mean: f32 = activations.iter().map(|(_, v)| v).sum::<f32>() / activations.len().max(1) as f32;
+    let max_region = activations
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(n, v)| format!("{n}: {v:.3}"))
+        .unwrap_or_default();
+
+    html.push_str(&format!(
+        r#"<div style="font-size:0.8em;color:#8a9a8a;margin-top:4px;">
+Mean activation: <span style="color:#a8c090;">{mean:.3}</span> | Peak: <span style="color:#e8c547;">{max_region}</span>
+</div>
+</div>
+"#
+    ));
+}
+
+/// Map activation [0,1] to RGB color (teal→amber→coral).
+fn activation_color(val: f32) -> (u8, u8, u8) {
+    let v = val.clamp(0.0, 1.0);
+    if v < 0.5 {
+        // Teal (106,176,152) → Amber (232,197,71)
+        let t = v * 2.0;
+        (
+            (106.0 + t * 126.0) as u8,
+            (176.0 + t * 21.0) as u8,
+            (152.0 - t * 81.0) as u8,
+        )
+    } else {
+        // Amber (232,197,71) → Coral (199,107,90)
+        let t = (v - 0.5) * 2.0;
+        (
+            (232.0 - t * 33.0) as u8,
+            (197.0 - t * 90.0) as u8,
+            (71.0 + t * 19.0) as u8,
+        )
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

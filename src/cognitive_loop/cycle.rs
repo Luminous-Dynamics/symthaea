@@ -575,6 +575,16 @@ impl CognitiveLoopService {
                 &local_kinds,
                 &local_kinds, // bootstrap: local = swarm until peer sharing wired
             );
+
+            // ── Epistemic: echo chamber risk detection ──
+            // High individual Phi + low collective Phi = epistemic fragmentation.
+            #[cfg(feature = "epistemic")]
+            {
+                let individual_phi = feedback.consciousness.consciousness_level;
+                let collective_phi = feedback.consciousness.consciousness_level; // TODO: wire real collective phi from governance
+                self.collective_immune_state
+                    .compute_echo_chamber_risk(individual_phi, collective_phi);
+            }
         }
 
         // ── FHE Collective Wisdom: encrypt & contribute local state ──────

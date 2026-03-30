@@ -1838,6 +1838,14 @@ pub struct CycleMetadata {
     /// Consecutive falling confidence cycles.
     #[serde(default)]
     pub reasoning_falling_streak: u32,
+
+    // ── Neural Validation Telemetry ─────────────────────────────────────
+    /// Per-region cortical activation map (12 regions, 0.0–1.0).
+    /// Populated from live subsystem states when `neural_validation` feature enabled.
+    /// Used for comparison against TRIBE v2 fMRI predictions.
+    #[cfg(feature = "neural_validation")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cortical_activation: Option<symthaea_core::hdc::cortical_activation::CorticalActivationMap>,
 }
 
 /// Therapeutic subsystem telemetry for CycleMetadata.

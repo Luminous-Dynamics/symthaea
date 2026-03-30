@@ -34,6 +34,11 @@ const idSet = new Set(htmlIds);
 const dynamicIds = new Set([
   'flake-download-panel', 'ssh-deploy-panel', 'disk-selector',
   'download-panel', 'music-toggle', 'voice-toggle',
+  'app-compat-panel', 'layout-select', 'install-hostname',
+  'secure-boot-toggle', 'tpm2-toggle',
+  'cfg-timezone', 'cfg-keyboard', 'cfg-desktop', 'cfg-gpu',
+  'cfg-wifi-ssid', 'cfg-wifi-pass', 'cfg-hostname',
+  'constellation-canvas',
 ]);
 
 let missingIds = 0;

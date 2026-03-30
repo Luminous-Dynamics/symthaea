@@ -240,7 +240,7 @@ pub fn build_mapping_db() -> HashMap<String, Vec<NixAlternative>> {
     alt(&mut db, "garageband", "lmms", "LMMS", "Music production; also: ardour");
     alt(&mut db, "final cut pro", "kdenlive", "Kdenlive", "Video editor; also: davinci-resolve");
     alt(&mut db, "xcode", "vscode", "VS Code", "IDE; platform SDKs are macOS-only");
-    exact(&mut db, "homebrew", "nix", "Nix", "NixOS IS the package manager");
+    alt(&mut db, "homebrew", "nix", "Nix", "NixOS IS the package manager");
 
     db
 }

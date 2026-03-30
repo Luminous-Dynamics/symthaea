@@ -131,5 +131,7 @@ lance = ["dep:tokio"]                         # Long-Term Memory: multimodal sto
 duck = ["dep:duckdb"]                        # Epistemic Auditor: analytics/Phi stats
 complex_cfc = []                             # Complex-valued CfC neuron with native oscillation
 _scaling_study = []                          # Gate for scaling_study_demo example
+epistemic = []                               # Epistemic substrate profiles and knowledge validation
+neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)

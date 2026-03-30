@@ -686,7 +686,7 @@ impl TextHdcEncoder {
     }
 
     /// Hash a word to a deterministic HV using its bytes as a seed.
-    fn hash_word(&self, word: &str) -> ContinuousHV {
+    pub fn hash_word(&self, word: &str) -> ContinuousHV {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();

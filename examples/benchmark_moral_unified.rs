@@ -453,20 +453,20 @@ fn main() {
     //     results.push(r);
     // }
 
-    // Multi-Prototype Classifier — disabled during k-NN optimization
-    // if let Some(r) = benchmark_multi_prototype_classifier() {
-    //     results.push(r);
-    // }
-
-    // k-NN Exemplar Store (Phase 6)
-    if let Some(r) = benchmark_knn_classifier() {
-        results.push(r);
-    }
-
-    // Consciousness-driven CfC k-NN (Phase A)
+    // Consciousness-driven CfC k-NN (Phase A) — run FIRST (fastest)
     if let Some(r) = benchmark_consciousness_knn() {
         results.push(r);
     }
+
+    // k-NN Exemplar Store — disabled to save time (77.8% baseline established)
+    // if let Some(r) = benchmark_knn_classifier() {
+    //     results.push(r);
+    // }
+
+    // Multi-Prototype Classifier — disabled to save time (71.6% baseline established)
+    // if let Some(r) = benchmark_multi_prototype_classifier() {
+    //     results.push(r);
+    // }
 
     let total_duration = start.elapsed().as_millis();
 

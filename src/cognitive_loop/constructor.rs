@@ -1100,6 +1100,8 @@ impl CognitiveLoopService {
                 MasterConsciousnessEquation::default(),
             ),
             substrate_manager,
+            #[cfg(feature = "neural_validation")]
+            cortical_history: std::collections::VecDeque::with_capacity(1000),
             // physics_integration moved to feature_integ manager
             convergence_cycle: 0,
             governance_consciousness_lag: std::collections::VecDeque::with_capacity(
@@ -1172,6 +1174,8 @@ impl CognitiveLoopService {
             governance_mgr: super::managers::GovernanceManager::default(),
             #[cfg(feature = "mycelix")]
             factcheck_bridge: super::broca_factcheck::BrocaFactcheckBridge::new(),
+            #[cfg(feature = "epistemic")]
+            known_unknowns: Some(crate::consciousness::sacred_stillness::KnownUnknowns::new()),
             swarm_manager: super::managers::SwarmManager::default(),
             #[cfg(feature = "muse")]
             muse_manager: super::managers::MuseManager::new(),

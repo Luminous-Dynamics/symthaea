@@ -237,8 +237,11 @@ pub struct ConsciousnessSnapshot {
 }
 
 impl ConsciousnessSnapshot {
-    /// Compute overall consciousness level from components
-    pub(super) fn compute_consciousness_level(
+    /// Compute overall consciousness level from components.
+    ///
+    /// Modality-agnostic: accepts inputs from ANY source (text, sensors, body).
+    /// Used by both `cycle(text)` and `cycle_with_hv(hv)` paths.
+    pub fn compute_consciousness_level(
         prediction_confidence: f32,
         temporal_coherence: f32,
         flow_intensity: f32,

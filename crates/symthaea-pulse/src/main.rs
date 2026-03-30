@@ -750,6 +750,9 @@ pub struct PulseSnapshot {
     pub dream: DreamInfo,
     #[serde(default)]
     pub immune: ImmuneInfo,
+    /// Per-region cortical activation levels (12 regions, 0.0-1.0).
+    #[serde(default)]
+    pub cortical_activations: Vec<(String, f32)>,
     #[serde(default)]
     pub sovereign: SovereignInfo,
     #[serde(default)]
@@ -1727,6 +1730,12 @@ fn main() -> Result<()> {
             immune_response_active: m.immune_response_active,
             emergency_cycles: m.immune_emergency_cycles,
         },
+        #[cfg(feature = "neural_validation")]
+        cortical_activations: m.cortical_activation.as_ref().map(|cam| {
+            cam.activations.iter().map(|(r, v)| (r.as_str().to_string(), *v)).collect()
+        }).unwrap_or_default(),
+        #[cfg(not(feature = "neural_validation"))]
+        cortical_activations: Vec::new(),
         sovereign: SovereignInfo {
             time_quality: match m.sovereign_time_quality {
                 0 => "Authoritative".into(),

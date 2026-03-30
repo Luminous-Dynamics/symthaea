@@ -1,0 +1,14 @@
+=== A/B EXPERIMENT RESULTS ===
+Seed: 42 | Duration: 300 years
+
+Symthaea (default):  CVS 0.728 | Pop 25,424 | Phi 0.174 | Wars 1 | Turchin 9 | SURVIVED
+Legacy (no gating):  CVS 0.699 | Pop 13,153 | Phi 0.059 | Wars 0 | Turchin 9 | SURVIVED
+Utopia (ceiling):    CVS 0.726 | Pop 14,490 | Phi 0.282 | Wars 0 | Turchin 0 | SURVIVED
+
+KEY FINDINGS:
+- Symthaea outperforms Legacy by 4.1% CVS (0.728 vs 0.699)
+- Symthaea nearly doubles population (25K vs 13K)
+- Symthaea triples collective Phi (0.174 vs 0.059)
+- Symthaea BEATS Utopia in CVS (0.728 vs 0.726)
+- Adversity + good governance > comfort without it
+- The thermodynamic value of consciousness integration: +0.029 CVS, +12K people, 3x Phi

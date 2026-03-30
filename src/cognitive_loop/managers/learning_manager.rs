@@ -39,6 +39,10 @@ pub struct LearningManager {
     low_arousal_streak: u32,
     /// Error trend direction: positive = errors increasing (need more learning)
     error_trend: f32,
+    /// Reputation-modulated learning rate modifier (0.5-2.0x).
+    /// Updated from ReputationBridge when Mycelix peer reputation data arrives.
+    #[cfg(feature = "epistemic")]
+    reputation_lr_modifier: f64,
 }
 
 impl Default for LearningManager {
@@ -51,6 +55,8 @@ impl Default for LearningManager {
             in_dream_phase: false,
             low_arousal_streak: 0,
             error_trend: 0.0,
+            #[cfg(feature = "epistemic")]
+            reputation_lr_modifier: 1.0, // neutral default
         }
     }
 }
@@ -170,6 +176,14 @@ impl CognitiveSubsystem for LearningManager {
         // High plasticity = higher learning rate
         output.lr_modulation = thresholds::LEARNING_LR_FLOOR
             + self.plasticity as f64 * thresholds::LEARNING_LR_PLASTICITY_SCALE;
+
+        // ── Epistemic: reputation-modulated learning rate ──
+        // Blend Mycelix peer reputation into LR: high-reputation peers'
+        // knowledge is learned from faster (0.5x-2.0x modifier).
+        #[cfg(feature = "epistemic")]
+        {
+            output.lr_modulation *= self.reputation_lr_modifier;
+        }
 
         // ── 3. Dream consolidation phase ──────────────────────────────────
         if snapshot.arousal < Self::DREAM_AROUSAL_THRESHOLD {

@@ -2,9 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Symthaea - Sovereign Inoculation</title>
-  <meta name="description" content="Consciousness-first infrastructure for sovereign hardware. Inoculate your machine with Symthaea on NixOS." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sovereign Inoculation — Install NixOS</title>
+  <meta name="description" content="Install NixOS from your browser. Encrypted, reproducible, with app migration and consciousness ceremony." />
+  <!-- PWA / Mobile -->
+  <meta name="theme-color" content="#1a2e22" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NixOS Install" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <!-- Open Graph for social sharing -->
+  <meta property="og:title" content="Sovereign Inoculation — Install NixOS from your browser" />
+  <meta property="og:description" content="Browser-based NixOS installer with encryption, app migration scanner, and consciousness ceremony." />
+  <meta property="og:url" content="https://install.nixforhumanity.org" />
+  <meta property="og:type" content="website" />
   <style>
     __CSS_PLACEHOLDER__
   </style>
@@ -14,26 +25,39 @@
   <!-- Background HDC waveform canvas -->
   <canvas id="bg-canvas" aria-hidden="true"></canvas>
 
-  <!-- Hero (compact) -->
+  <!-- Hero -->
   <section class="hero" role="banner">
-    <h1 class="hero-title">Symthaea</h1>
-    <p class="hero-subtitle">Consciousness-first infrastructure for sovereign hardware</p>
-    <span class="sr-only">Symthaea: consciousness-first infrastructure for sovereign hardware.</span>
+    <h1 class="hero-title">Sovereign Inoculation</h1>
+    <p class="hero-subtitle">Install NixOS from your browser. Encrypted. Reproducible. Yours.</p>
+    <p style="color:var(--fg-dim); font-size:0.88rem; max-width:600px; margin:0.8rem auto 0; line-height:1.6;">
+      Boot a NixOS ISO, open this page, connect via SSH. We detect your hardware, scan your existing apps, and install NixOS with btrfs snapshots, full disk encryption, and a config you can understand.
+    </p>
+    <div style="margin-top:1.2rem; display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <button onclick="document.querySelector('[data-tab=inoculate]').click()" class="btn-glow" style="padding:0.7rem 2rem; cursor:pointer; font-size:1rem;">Start Install</button>
+      <a href="https://github.com/Luminous-Dynamics/symthaea" style="padding:0.7rem 2rem; border:1px solid var(--border); border-radius:8px; color:var(--fg-dim); text-decoration:none; font-size:0.9rem;">Source Code</a>
+    </div>
+    <div style="margin-top:1.5rem; display:flex; gap:2rem; justify-content:center; font-size:0.78rem; color:var(--fg-muted); flex-wrap:wrap;">
+      <span>9 disk layouts</span>
+      <span>LUKS encryption</span>
+      <span>Secure Boot</span>
+      <span>App migration scanner</span>
+      <span>13 personas tested</span>
+    </div>
   </section>
 
   <!-- Tab Bar -->
   <nav class="tab-bar" role="tablist" aria-label="Application sections">
-    <button class="tab active" data-tab="soma" role="tab" aria-selected="true" aria-controls="tab-soma">Chat</button>
+    <button class="tab" data-tab="soma" role="tab" aria-selected="false" aria-controls="tab-soma">Chat</button>
     <button class="tab" data-tab="topology" role="tab" aria-selected="false" aria-controls="tab-topology">Topology</button>
     <button class="tab" data-tab="experiments" role="tab" aria-selected="false" aria-controls="tab-experiments">Experiments</button>
     <button class="tab" data-tab="dreams" role="tab" aria-selected="false" aria-controls="tab-dreams">Dreams</button>
-    <button class="tab" data-tab="inoculate" role="tab" aria-selected="false" aria-controls="tab-inoculate">Inoculate</button>
+    <button class="tab active" data-tab="inoculate" role="tab" aria-selected="true" aria-controls="tab-inoculate">Install NixOS</button>
   </nav>
 
   <!-- ================================================================
        TAB 1: SOMA (Speak With Her)
        ================================================================ -->
-  <div class="tab-content active" id="tab-soma" role="tabpanel">
+  <div class="tab-content" id="tab-soma" role="tabpanel">
     <div class="soma-layout">
 
       <!-- LEFT: Chat -->
@@ -363,7 +387,39 @@
   <!-- ================================================================
        TAB 5: INOCULATE (Deploy)
        ================================================================ -->
-  <div class="tab-content" id="tab-inoculate" role="tabpanel">
+  <div class="tab-content active" id="tab-inoculate" role="tabpanel">
+    <!-- Quick Start Guide -->
+    <div class="glass-panel inoc-section" style="border-left:3px solid var(--teal); margin-bottom:1.5rem;">
+      <h3 style="font-weight:300; margin-bottom:0.8rem; color:var(--fg);">How It Works</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; font-size:0.85rem; color:var(--fg-dim);">
+        <div>
+          <div style="font-size:1.5rem; margin-bottom:0.3rem;">1</div>
+          <strong style="color:var(--fg);">Boot NixOS ISO</strong><br>
+          Download the <a href="https://nixos.org/download/" style="color:var(--teal);">NixOS minimal ISO</a>, flash to USB, boot your machine.
+        </div>
+        <div>
+          <div style="font-size:1.5rem; margin-bottom:0.3rem;">2</div>
+          <strong style="color:var(--fg);">Enable SSH</strong><br>
+          Set a root password: <code style="background:rgba(0,0,0,0.3); padding:0.1rem 0.4rem; border-radius:4px;">passwd root</code><br>
+          Start SSH: <code style="background:rgba(0,0,0,0.3); padding:0.1rem 0.4rem; border-radius:4px;">systemctl start sshd</code>
+        </div>
+        <div>
+          <div style="font-size:1.5rem; margin-bottom:0.3rem;">3</div>
+          <strong style="color:var(--fg);">Connect Below</strong><br>
+          Enter the target's IP address. We'll probe hardware, scan your apps, and guide you through the install.
+        </div>
+      </div>
+      <details style="margin-top:1rem; font-size:0.8rem; color:var(--fg-muted);">
+        <summary style="cursor:pointer;">What you'll need</summary>
+        <ul style="margin-top:0.5rem; padding-left:1.5rem; line-height:1.8;">
+          <li>A machine to install NixOS on (target)</li>
+          <li>A NixOS minimal ISO on USB (or PXE boot)</li>
+          <li>Network connectivity between this browser and the target</li>
+          <li>The SSH relay running: <code>ssh-relay --port 8094</code></li>
+        </ul>
+      </details>
+    </div>
+
     <!-- Hardware Probe -->
     <div class="glass-panel inoc-section">
       <div class="panel-title">Hardware Probe</div>

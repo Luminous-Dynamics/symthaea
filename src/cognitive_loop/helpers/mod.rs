@@ -378,6 +378,31 @@ impl CognitiveLoopService {
         self.update_stats(prediction_error, cycle_start.elapsed());
         self.stats.temporal_coherence = coherence;
 
+        // 10b. Modality-agnostic consciousness computation.
+        // The consciousness equation blends whatever inputs are available:
+        // - temporal_coherence: FRESH (just computed from CfC tau convergence)
+        // - prediction_confidence: from prior cycles (delayed but valid)
+        // - flow_intensity: from flow state tracker (updated if conditions met)
+        // - pattern_confidence: from temporal classifier (available)
+        // This makes consciousness measurement modality-agnostic: the same
+        // equation works for text, raw sensors, proprioception, or any mix.
+        // Science: IIT predicts consciousness = integrated information across
+        // modules, regardless of the modality producing that information.
+        let pattern_confidence = self
+            .language_comm
+            .voice_coherence
+            .temporal
+            .classify_state()
+            .1;
+        let consciousness_level =
+            super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
+                self.prediction_confidence as f32,
+                coherence,
+                self.behavior.flow_state.intensity,
+                pattern_confidence,
+            ) as f64;
+        self.carryover.history.consciousness_level = consciousness_level;
+
         // 11. Buffer PsiAttestation record if enabled (mirrors cycle.rs step 10h.0)
         // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
@@ -411,6 +436,10 @@ impl CognitiveLoopService {
                     self.config.cfc_config.learning_rate
                 } else {
                     0.0
+                },
+                consciousness: super::types::telemetry::ConsciousnessLevelMetrics {
+                    consciousness_level,
+                    ..Default::default()
                 },
                 ..super::CycleMetadata::default()
             },

@@ -140,6 +140,12 @@ pub struct ThermodynamicPhysicsBridge {
     /// Wasserstein-2 proxy: how far beliefs moved this cycle (|belief_delta|).
     #[cfg(feature = "epistemic")]
     pub belief_wasserstein_distance: f64,
+
+    /// Total energy budget available per cycle (effective joules).
+    /// Constrains how many epistemic operations (claim validations, memory writes)
+    /// can be performed. Default 1.0 (arbitrary units).
+    #[cfg(feature = "epistemic")]
+    pub total_energy_budget: f64,
 }
 
 impl Default for ThermodynamicPhysicsBridge {
@@ -169,6 +175,8 @@ impl Default for ThermodynamicPhysicsBridge {
             epistemic_speed_limit_violation: 0.0,
             #[cfg(feature = "epistemic")]
             belief_wasserstein_distance: 0.0,
+            #[cfg(feature = "epistemic")]
+            total_energy_budget: 1.0,
         }
     }
 }
@@ -408,6 +416,43 @@ impl ThermodynamicPhysicsBridge {
             self.belief_wasserstein_distance.powi(2) / (t_eff * sigma);
     }
 
+    /// Compute the maximum number of knowledge claims that can be validated
+    /// this cycle given the available energy budget.
+    ///
+    /// Available energy = total budget - memory Landauer cost - attention erasure cost.
+    /// Each claim validation costs approximately one Landauer bit erasure at the
+    /// current effective temperature: k_B_eff * T * ln(2).
+    ///
+    /// Returns 0 when energy is exhausted or temperature is negligible.
+    ///
+    /// # Science
+    ///
+    /// Landauer (1961) — each irreversible bit operation (claim evaluation)
+    /// dissipates at least k_B * T * ln(2) energy. This bounds epistemic
+    /// throughput by thermodynamic cost.
+    #[cfg(feature = "epistemic")]
+    pub fn epistemic_energy_budget(&self) -> usize {
+        let available = (self.total_energy_budget
+            - self.memory_landauer_cost
+            - self.attention_erasure_cost)
+            .max(0.0);
+        // Cost per claim = k_B_eff * T_eff * ln(2)
+        let k_eff = thresholds::K_CONSCIOUSNESS_BOLTZMANN;
+        // Use Carnot T_cold as floor to avoid division issues when actual_efficiency is 0
+        let t_eff = if self.carnot_efficiency > 0.01 {
+            // Recover T_hot from Carnot: η = 1 - T_cold/T_hot → T_hot = T_cold / (1 - η)
+            thresholds::THERMO_CARNOT_T_COLD / (1.0 - self.carnot_efficiency)
+        } else {
+            thresholds::THERMO_CARNOT_T_COLD
+        }
+        .max(0.01);
+        let cost_per_claim = k_eff * t_eff * std::f64::consts::LN_2;
+        if cost_per_claim <= 0.0 {
+            return 0;
+        }
+        (available / cost_per_claim).floor() as usize
+    }
+
     /// Compute Onsager reciprocal relation asymmetry from transport history.
     /// Returns max |L_ij - L_ji| across all pairs.
     fn compute_onsager_asymmetry(&self) -> f64 {
@@ -626,5 +671,33 @@ mod tests {
         assert!(b.attention_demon_bits.is_finite());
         assert!(b.carnot_efficiency.is_finite());
         assert!(b.efficiency_ratio.is_finite());
+    }
+
+    #[cfg(feature = "epistemic")]
+    #[test]
+    fn test_epistemic_energy_budget() {
+        let mut b = make_bridge();
+        // After compute, memory_landauer_cost and attention_erasure_cost are populated
+        b.compute(0.5, 50.0, 0.5, 0.3, 0.5, 0.1, 0.5, 1e-10, 0.5, 0.5, &default_regime());
+
+        // With default total_energy_budget=1.0, we should get a positive claim budget
+        let budget = b.epistemic_energy_budget();
+        assert!(budget > 0, "should be able to validate at least one claim, got {budget}");
+
+        // Exhausted budget → 0 claims
+        b.total_energy_budget = 0.0;
+        assert_eq!(
+            b.epistemic_energy_budget(),
+            0,
+            "zero energy budget should yield zero claims"
+        );
+
+        // Large budget → many claims
+        b.total_energy_budget = 1e6;
+        let large_budget = b.epistemic_energy_budget();
+        assert!(
+            large_budget > budget,
+            "larger energy budget should allow more claims: {large_budget} vs {budget}"
+        );
     }
 }
