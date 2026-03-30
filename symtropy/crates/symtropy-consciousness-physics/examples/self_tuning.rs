@@ -76,7 +76,7 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
 
     for i in 0..AGENTS {
         let angle = (i as f64) * std::f64::consts::TAU / AGENTS as f64;
-        let radius = 15.0 + next_rng(&mut rng_state) * 10.0;
+        let radius = 40.0 + next_rng(&mut rng_state) * 30.0; // Spread out — not all within harmony range
         let x = angle.cos() * radius;
         let y = angle.sin() * radius;
 
@@ -124,10 +124,25 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
             }
         }
 
-        // Harmony resonance
+        // Epistemic offloading (thermodynamically honest — reduces costs, doesn't generate energy)
+        // Only agents WITHIN RANGE benefit (not all pairs)
         for i in 0..handles.len() {
             for j in (i + 1)..handles.len() {
                 let (ha, hb) = (handles[i], handles[j]);
+
+                // Check spatial proximity via physics body positions
+                let dist = {
+                    let ba = world.body(ha);
+                    let bb = world.body(hb);
+                    match (ba, bb) {
+                        (Some(a), Some(b)) => a.position().distance(b.position()),
+                        _ => continue,
+                    }
+                };
+                if dist > constants.harmony_range {
+                    continue; // Too far apart — no epistemic offloading
+                }
+
                 let (harm_a, harm_b) = {
                     let ea = consciousness.entities.get(&ha);
                     let eb = consciousness.entities.get(&hb);
@@ -138,19 +153,19 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
                 };
                 let resonance = HarmonyField::<2>::resonance(&harm_a, &harm_b);
                 if resonance > 0.5 {
-                    let regen = constants.harmony_resonance_regen_rate * (resonance - 0.5) * 2.0;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(regen); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(regen); }
-                    cooperation_events += 1;
-
-                    if resonance > constants.collapse_recovery_harmony_threshold {
-                        if consciousness.entities.get(&ha).map(|e| e.energy.is_collapsed()).unwrap_or(false) {
-                            if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(50.0); }
-                        }
-                        if consciousness.entities.get(&hb).map(|e| e.energy.is_collapsed()).unwrap_or(false) {
-                            if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(50.0); }
-                        }
+                    let offload_factor = (resonance - 0.5) * 2.0;
+                    // Epistemic offloading: faster prediction error decay + maintenance refund
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.prediction_error *= 1.0 - offload_factor * 0.1;
+                        e.motor_precision = 1.0 / (1.0 + e.prediction_error);
+                        e.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
                     }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.prediction_error *= 1.0 - offload_factor * 0.1;
+                        e.motor_precision = 1.0 / (1.0 + e.prediction_error);
+                        e.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
+                    }
+                    cooperation_events += 1;
                 }
             }
         }
