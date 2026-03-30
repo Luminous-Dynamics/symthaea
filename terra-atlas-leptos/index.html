@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terra Atlas — Luminous Dynamics</title>
+    <link data-trunk rel="css" href="style/main.css" />
+    <link data-trunk rel="copy-dir" href="assets" />
+    <link data-trunk rel="rust" data-wasm-opt="z" />
+    <style>
+        /* Loading screen — plays while WASM loads */
+        #loading-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #030712;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 1.5s ease, transform 1s ease;
+            overflow: hidden;
+        }
+        #loading-screen.fade-out {
+            opacity: 0;
+            transform: scale(1.5);
+            pointer-events: none;
+        }
+        #loading-screen.hidden { display: none; }
+
+        /* Sacred geometry animation */
+        .sacred-container {
+            width: 200px; height: 200px;
+            position: relative;
+            margin-bottom: 40px;
+        }
+        .sacred-circle {
+            position: absolute;
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 50%;
+            animation: draw-circle 2s ease forwards;
+            opacity: 0;
+        }
+        @keyframes draw-circle {
+            0% { opacity: 0; transform: scale(0); border-color: rgba(0, 255, 136, 0); }
+            50% { opacity: 1; border-color: rgba(0, 255, 136, 0.4); }
+            100% { opacity: 1; transform: scale(1); border-color: rgba(0, 255, 136, 0.15); }
+        }
+        .sc-0 { width: 120px; height: 120px; top: 40px; left: 40px; animation-delay: 0s; }
+        .sc-1 { width: 120px; height: 120px; top: 40px; left: 100px; animation-delay: 0.2s; }
+        .sc-2 { width: 120px; height: 120px; top: 40px; left: -20px; animation-delay: 0.4s; }
+        .sc-3 { width: 120px; height: 120px; top: -12px; left: 70px; animation-delay: 0.6s; }
+        .sc-4 { width: 120px; height: 120px; top: -12px; left: 10px; animation-delay: 0.8s; }
+        .sc-5 { width: 120px; height: 120px; top: 92px; left: 70px; animation-delay: 1.0s; }
+        .sc-6 { width: 120px; height: 120px; top: 92px; left: 10px; animation-delay: 1.2s; }
+
+        /* Center consciousness bloom */
+        .consciousness-bloom {
+            position: absolute;
+            width: 20px; height: 20px;
+            top: 90px; left: 90px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.8) 0%, rgba(0, 255, 136, 0.3) 50%, transparent 70%);
+            animation: bloom-pulse 2s ease-in-out infinite, bloom-appear 1.5s ease forwards;
+            opacity: 0;
+            animation-delay: 1.5s, 1.5s;
+        }
+        @keyframes bloom-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); }
+            50% { transform: scale(1.3); box-shadow: 0 0 40px rgba(255, 215, 0, 0.5); }
+        }
+        @keyframes bloom-appear {
+            from { opacity: 0; transform: scale(0); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Title animation */
+        .loading-title {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 28px;
+            font-weight: 200;
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            color: rgba(0, 255, 136, 0);
+            animation: title-reveal 2s ease forwards;
+            animation-delay: 2s;
+            margin-bottom: 8px;
+        }
+        @keyframes title-reveal {
+            0% { color: rgba(0, 255, 136, 0); letter-spacing: 20px; }
+            50% { color: rgba(0, 255, 136, 0.9); text-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
+            100% { color: rgba(0, 255, 136, 0.7); letter-spacing: 12px; text-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
+        }
+
+        .loading-subtitle {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 10px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(0, 221, 255, 0);
+            animation: subtitle-reveal 1.5s ease forwards;
+            animation-delay: 3s;
+            margin-bottom: 40px;
+        }
+        @keyframes subtitle-reveal {
+            from { color: rgba(0, 221, 255, 0); }
+            to { color: rgba(0, 221, 255, 0.4); }
+        }
+
+        /* Harmony sequence */
+        .harmony-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: harmony-appear 0.5s ease forwards;
+            animation-delay: 2.5s;
+        }
+        .harmony-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            animation: harmony-pulse 8s ease-in-out infinite;
+        }
+        .hd-1 { background: #667eea; animation-delay: 0s; }
+        .hd-2 { background: #E91E63; animation-delay: 1s; }
+        .hd-3 { background: #00897B; animation-delay: 2s; }
+        .hd-4 { background: #FFD700; animation-delay: 3s; }
+        .hd-5 { background: #00ddff; animation-delay: 4s; }
+        .hd-6 { background: #7c3aed; animation-delay: 5s; }
+        .hd-7 { background: #3b82f6; animation-delay: 6s; }
+        .hd-8 { background: #1a1a2e; animation-delay: 7s; border: 1px solid rgba(255,255,255,0.1); }
+        @keyframes harmony-pulse {
+            0%, 87.5%, 100% { transform: scale(1); opacity: 0.4; }
+            6.25% { transform: scale(2); opacity: 1; box-shadow: 0 0 10px currentColor; }
+            12.5% { transform: scale(1); opacity: 0.4; }
+        }
+        @keyframes harmony-appear { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Progress bar */
+        .loading-progress {
+            width: 200px;
+            height: 2px;
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 1px;
+            overflow: hidden;
+            opacity: 0;
+            animation: harmony-appear 0.5s ease forwards;
+            animation-delay: 3.5s;
+        }
+        .loading-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, rgba(0, 255, 136, 0.8), rgba(0, 221, 255, 0.8));
+            border-radius: 1px;
+            animation: progress-fill 4s ease-in-out forwards;
+            animation-delay: 3.5s;
+            width: 0%;
+        }
+        @keyframes progress-fill {
+            0% { width: 0%; }
+            20% { width: 15%; }
+            40% { width: 35%; }
+            60% { width: 60%; }
+            80% { width: 85%; }
+            100% { width: 100%; }
+        }
+
+        .loading-status {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 9px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(0, 221, 255, 0.3);
+            margin-top: 12px;
+            opacity: 0;
+            animation: harmony-appear 0.5s ease forwards;
+            animation-delay: 3.5s;
+        }
+
+        /* Background stars during loading */
+        .loading-stars {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.3), transparent),
+                        radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,0.2), transparent),
+                        radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.15), transparent),
+                        radial-gradient(1px 1px at 60% 50%, rgba(255,255,255,0.25), transparent),
+                        radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.2), transparent),
+                        radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.15), transparent),
+                        radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.3), transparent),
+                        radial-gradient(1px 1px at 30% 90%, rgba(255,255,255,0.2), transparent),
+                        radial-gradient(1px 1px at 70% 40%, rgba(255,255,255,0.15), transparent),
+                        radial-gradient(1px 1px at 15% 55%, rgba(255,255,255,0.25), transparent);
+            animation: stars-twinkle 4s ease-in-out infinite;
+        }
+        @keyframes stars-twinkle {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading screen (pure HTML/CSS, plays while WASM loads) -->
+    <div id="loading-screen">
+        <div class="loading-stars"></div>
+
+        <!-- Seed of Life sacred geometry -->
+        <div class="sacred-container">
+            <div class="sacred-circle sc-0"></div>
+            <div class="sacred-circle sc-1"></div>
+            <div class="sacred-circle sc-2"></div>
+            <div class="sacred-circle sc-3"></div>
+            <div class="sacred-circle sc-4"></div>
+            <div class="sacred-circle sc-5"></div>
+            <div class="sacred-circle sc-6"></div>
+            <div class="consciousness-bloom"></div>
+        </div>
+
+        <div class="loading-title">Terra Atlas</div>
+        <div class="loading-subtitle">Symthaea Planetary Coordination Layer</div>
+
+        <!-- Eight Harmonies sequence -->
+        <div class="harmony-bar">
+            <div class="harmony-dot hd-1"></div>
+            <div class="harmony-dot hd-2"></div>
+            <div class="harmony-dot hd-3"></div>
+            <div class="harmony-dot hd-4"></div>
+            <div class="harmony-dot hd-5"></div>
+            <div class="harmony-dot hd-6"></div>
+            <div class="harmony-dot hd-7"></div>
+            <div class="harmony-dot hd-8"></div>
+        </div>
+
+        <!-- Consciousness coherence progress bar -->
+        <div class="loading-progress">
+            <div class="loading-progress-bar"></div>
+        </div>
+        <div class="loading-status">Initializing planetary coordination...</div>
+    </div>
+
+    <div id="app"></div>
+
+    <script>
+        function hideLoading() {
+            const loading = document.getElementById('loading-screen');
+            if (loading && !loading.classList.contains('fade-out')) {
+                loading.classList.add('fade-out');
+                setTimeout(() => loading.classList.add('hidden'), 1500);
+            }
+        }
+
+        // Method 1: Watch for canvas element appearing
+        const observer = new MutationObserver(() => {
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+                observer.disconnect();
+                setTimeout(hideLoading, 800);
+            }
+        });
+        const app = document.getElementById('app');
+        if (app) {
+            observer.observe(app, { childList: true, subtree: true });
+        }
+
+        // Method 2: Listen for any child added to #app (Leptos mounts components)
+        const observer2 = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                if (m.addedNodes.length > 0) {
+                    observer2.disconnect();
+                    setTimeout(hideLoading, 1200);
+                    break;
+                }
+            }
+        });
+        if (app) {
+            observer2.observe(app, { childList: true });
+        }
+
+        // Method 3: Fallback timeout — hide after 8 seconds no matter what
+        setTimeout(hideLoading, 8000);
+    </script>
+</body>
+</html>

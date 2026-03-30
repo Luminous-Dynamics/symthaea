@@ -1,0 +1,14 @@
+[
+  {"id": "RV001", "name": "Ethiopian Highlands Vault", "lat": 9.145, "lon": 40.49, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL001"},
+  {"id": "RV002", "name": "Kenya Rift Valley Vault", "lat": -0.789, "lon": 36.832, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL002"},
+  {"id": "RV003", "name": "Ecuadorian Andes Vault", "lat": -1.831, "lon": -78.183, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL003"},
+  {"id": "RV004", "name": "Iceland Highlands Vault", "lat": 64.963, "lon": -19.021, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL004"},
+  {"id": "RV005", "name": "Japanese Alps Vault", "lat": 36.289, "lon": 137.648, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL005"},
+  {"id": "RV006", "name": "New Zealand Southern Alps Vault", "lat": -43.59, "lon": 170.14, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL006"},
+  {"id": "RV007", "name": "Chilean Patagonia Vault", "lat": -48.77, "lon": -72.33, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL007"},
+  {"id": "RV008", "name": "Norwegian Fjords Vault", "lat": 61.47, "lon": 6.83, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL008"},
+  {"id": "RV009", "name": "Caucasus Mountains Vault", "lat": 42.44, "lon": 44.55, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL009"},
+  {"id": "RV010", "name": "Himalayan Foothills Vault", "lat": 28.20, "lon": 85.32, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL010"},
+  {"id": "RV011", "name": "Borneo Highlands Vault", "lat": 1.03, "lon": 110.33, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL011"},
+  {"id": "RV012", "name": "Tasmania Vault", "lat": -42.05, "lon": 146.50, "capacity_people": 50000, "heat_rejection_mw": 10.0, "blast_doors": 8, "status": "Planned", "terra_lumina_id": "TL012"}
+]

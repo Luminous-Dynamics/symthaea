@@ -1,0 +1,14 @@
+[
+  {"id": "CP001", "name": "Great Green Wall", "lat": 14.0, "lon": 10.0, "type": "reforestation", "status": "active", "co2_offset_mt": 25.0, "country": "Sahel Region"},
+  {"id": "CP002", "name": "Amazon Restoration Project", "lat": -3.0, "lon": -60.0, "type": "reforestation", "status": "active", "co2_offset_mt": 40.0, "country": "Brazil"},
+  {"id": "CP003", "name": "Sahara Solar Initiative", "lat": 25.0, "lon": 5.0, "type": "solar", "status": "planned", "co2_offset_mt": 15.0, "country": "Algeria"},
+  {"id": "CP004", "name": "Nordic Carbon Capture", "lat": 62.0, "lon": 15.0, "type": "carbon_capture", "status": "active", "co2_offset_mt": 8.0, "country": "Norway"},
+  {"id": "CP005", "name": "Australian Kelp Farming", "lat": -37.0, "lon": 145.0, "type": "ocean", "status": "pilot", "co2_offset_mt": 3.0, "country": "Australia"},
+  {"id": "CP006", "name": "Congo Basin Conservation", "lat": 0.0, "lon": 22.0, "type": "conservation", "status": "active", "co2_offset_mt": 35.0, "country": "DRC"},
+  {"id": "CP007", "name": "Patagonia Wind Farm", "lat": -50.0, "lon": -70.0, "type": "wind", "status": "construction", "co2_offset_mt": 6.0, "country": "Argentina"},
+  {"id": "CP008", "name": "Borneo Mangrove Restoration", "lat": 1.5, "lon": 110.0, "type": "ocean", "status": "active", "co2_offset_mt": 5.0, "country": "Malaysia"},
+  {"id": "CP009", "name": "Indian Ocean Seaweed Farm", "lat": -8.0, "lon": 55.0, "type": "ocean", "status": "pilot", "co2_offset_mt": 2.0, "country": "Seychelles"},
+  {"id": "CP010", "name": "Gobi Desert DAC", "lat": 43.0, "lon": 105.0, "type": "carbon_capture", "status": "planned", "co2_offset_mt": 12.0, "country": "Mongolia"},
+  {"id": "CP011", "name": "Scottish Peatland Restoration", "lat": 57.0, "lon": -4.0, "type": "conservation", "status": "active", "co2_offset_mt": 4.0, "country": "UK"},
+  {"id": "CP012", "name": "Cascadia Biochar", "lat": 47.0, "lon": -122.0, "type": "carbon_capture", "status": "active", "co2_offset_mt": 3.5, "country": "US"}
+]

@@ -1,0 +1,14 @@
+[
+  {"from": "East Asia", "from_lat": 35.0, "from_lon": 105.0, "to": "North America", "to_lat": 40.0, "to_lon": -100.0, "mode": "Maritime", "goods": ["electronics", "semiconductors"], "capacity": 0.9},
+  {"from": "East Asia", "from_lat": 35.0, "from_lon": 105.0, "to": "Europe", "to_lat": 50.0, "to_lon": 10.0, "mode": "Maritime", "goods": ["manufacturing", "rare earths"], "capacity": 0.85},
+  {"from": "Sub-Saharan Africa", "from_lat": -5.0, "from_lon": 25.0, "to": "East Asia", "to_lat": 35.0, "to_lon": 105.0, "mode": "Maritime", "goods": ["rare earths", "minerals"], "capacity": 0.7},
+  {"from": "Central Asia", "from_lat": 42.0, "from_lon": 65.0, "to": "East Asia", "to_lat": 35.0, "to_lon": 105.0, "mode": "Land", "goods": ["energy", "minerals"], "capacity": 0.6},
+  {"from": "MENA", "from_lat": 28.0, "from_lon": 38.0, "to": "South Asia", "to_lat": 22.0, "to_lon": 78.0, "mode": "Maritime", "goods": ["energy", "petrochemicals"], "capacity": 0.8},
+  {"from": "MENA", "from_lat": 28.0, "from_lon": 38.0, "to": "East Asia", "to_lat": 35.0, "to_lon": 105.0, "mode": "Maritime", "goods": ["energy", "LNG"], "capacity": 0.75},
+  {"from": "North America", "from_lat": 40.0, "from_lon": -100.0, "to": "Latin America", "to_lat": -10.0, "to_lon": -60.0, "mode": "Land", "goods": ["technology", "agriculture"], "capacity": 0.65},
+  {"from": "Europe", "from_lat": 50.0, "from_lon": 10.0, "to": "North America", "to_lat": 40.0, "to_lon": -100.0, "mode": "Air", "goods": ["pharma", "precision engineering"], "capacity": 0.7},
+  {"from": "Oceania", "from_lat": -25.0, "from_lon": 140.0, "to": "Latin America", "to_lat": -10.0, "to_lon": -60.0, "mode": "Maritime", "goods": ["agriculture", "minerals"], "capacity": 0.5},
+  {"from": "South Asia", "from_lat": 22.0, "from_lon": 78.0, "to": "North America", "to_lat": 40.0, "to_lon": -100.0, "mode": "Air", "goods": ["IT services", "pharma"], "capacity": 0.6},
+  {"from": "Southeast Asia", "from_lat": 5.0, "from_lon": 110.0, "to": "East Asia", "to_lat": 35.0, "to_lon": 105.0, "mode": "Maritime", "goods": ["agriculture", "electronics"], "capacity": 0.7},
+  {"from": "Latin America", "from_lat": -10.0, "from_lon": -60.0, "to": "Europe", "to_lat": 50.0, "to_lon": 10.0, "mode": "Maritime", "goods": ["agriculture", "lithium"], "capacity": 0.55}
+]

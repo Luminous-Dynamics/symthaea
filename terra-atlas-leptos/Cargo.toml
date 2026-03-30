@@ -1,0 +1,53 @@
+[package]
+name = "terra-atlas-leptos"
+version = "0.1.0"
+edition = "2021"
+description = "Leptos WebGL globe for Terra Atlas — energy infrastructure, Resontia vaults, maglev corridors"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+leptos_meta = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+gloo-timers = { version = "0.3", features = ["futures"] }
+console_error_panic_hook = "0.1"
+console_log = "1"
+log = "0.4"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlCanvasElement",
+    "HtmlImageElement",
+    "WebGl2RenderingContext",
+    "WebGlProgram",
+    "WebGlShader",
+    "WebGlBuffer",
+    "WebGlTexture",
+    "WebGlUniformLocation",
+    "WebGlVertexArrayObject",
+    "WebGlFramebuffer",
+    "WebGlRenderbuffer",
+    "MouseEvent",
+    "WheelEvent",
+    "TouchEvent",
+    "TouchList",
+    "Touch",
+    "KeyboardEvent",
+    "Performance",
+    "console",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

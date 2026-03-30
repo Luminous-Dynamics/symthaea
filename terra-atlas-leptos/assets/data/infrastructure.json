@@ -1,0 +1,29 @@
+{
+  "emergency_shelters": [
+    {"name": "FEMA Region IV Hub", "lat": 33.75, "lon": -84.39, "capacity": 5000, "type": "hurricane"},
+    {"name": "Tokyo Disaster Center", "lat": 35.68, "lon": 139.69, "capacity": 10000, "type": "earthquake"},
+    {"name": "Mumbai Flood Response", "lat": 19.08, "lon": 72.88, "capacity": 8000, "type": "flood"},
+    {"name": "Nairobi Emergency Hub", "lat": -1.29, "lon": 36.82, "capacity": 3000, "type": "multi"},
+    {"name": "São Paulo Relief Center", "lat": -23.55, "lon": -46.63, "capacity": 6000, "type": "flood"},
+    {"name": "Manila Typhoon Shelter", "lat": 14.60, "lon": 120.98, "capacity": 12000, "type": "typhoon"},
+    {"name": "Berlin Climate Refuge", "lat": 52.52, "lon": 13.41, "capacity": 4000, "type": "heat"},
+    {"name": "Cairo Crisis Center", "lat": 30.04, "lon": 31.24, "capacity": 3500, "type": "multi"}
+  ],
+  "health_facilities": [
+    {"name": "WHO Geneva HQ", "lat": 46.23, "lon": 6.13, "type": "headquarters", "beds": 0},
+    {"name": "Johns Hopkins Hospital", "lat": 39.30, "lon": -76.59, "type": "research_hospital", "beds": 1100},
+    {"name": "Karolinska Institute", "lat": 59.35, "lon": 18.03, "type": "research_hospital", "beds": 800},
+    {"name": "Apollo Hospitals Chennai", "lat": 13.01, "lon": 80.22, "type": "hospital", "beds": 700},
+    {"name": "Kenyatta Hospital", "lat": -1.30, "lon": 36.81, "type": "hospital", "beds": 1800},
+    {"name": "Charité Berlin", "lat": 52.53, "lon": 13.38, "type": "research_hospital", "beds": 3000},
+    {"name": "Peking Union Hospital", "lat": 39.91, "lon": 116.42, "type": "research_hospital", "beds": 2000},
+    {"name": "Hospital Sírio-Libanês", "lat": -23.56, "lon": -46.65, "type": "hospital", "beds": 500}
+  ],
+  "robotics_dispatch": [
+    {"name": "Antarctic AUV Station", "lat": -77.85, "lon": 166.67, "type": "auv", "units": 4},
+    {"name": "Pacific SAR Base", "lat": 21.31, "lon": -157.86, "type": "helicopter", "units": 6},
+    {"name": "Mediterranean Patrol", "lat": 35.90, "lon": 14.51, "type": "auv", "units": 3},
+    {"name": "Arctic Monitoring", "lat": 78.22, "lon": 15.63, "type": "flight", "units": 8},
+    {"name": "Indian Ocean Watch", "lat": -4.68, "lon": 55.49, "type": "auv", "units": 2}
+  ]
+}

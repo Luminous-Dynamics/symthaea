@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "zomes/atlas-sites/integrity",
+    "zomes/atlas-sites/coordinator",
+    "zomes/atlas-infrastructure/integrity",
+    "zomes/atlas-infrastructure/coordinator",
+    "zomes/atlas-bridge/integrity",
+    "zomes/atlas-bridge/coordinator",
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_serialized_bytes = "0.0.56"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+getrandom_03 = { package = "getrandom", version = "=0.3.2" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

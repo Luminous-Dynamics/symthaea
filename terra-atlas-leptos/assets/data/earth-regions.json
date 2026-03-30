@@ -1,0 +1,14 @@
+[
+  {"name": "East Asia", "lat": 35.0, "lon": 105.0, "population_m": 1580, "gdp_per_capita": 18500, "education_index": 0.78, "phi_mean": 0.42, "climate_vulnerability": 0.35, "infrastructure": 0.75, "spaceport": false},
+  {"name": "South Asia", "lat": 22.0, "lon": 78.0, "population_m": 1950, "gdp_per_capita": 7200, "education_index": 0.55, "phi_mean": 0.38, "climate_vulnerability": 0.65, "infrastructure": 0.45, "spaceport": false},
+  {"name": "Southeast Asia", "lat": 5.0, "lon": 110.0, "population_m": 680, "gdp_per_capita": 12500, "education_index": 0.65, "phi_mean": 0.40, "climate_vulnerability": 0.55, "infrastructure": 0.55, "spaceport": false},
+  {"name": "Sub-Saharan Africa", "lat": -5.0, "lon": 25.0, "population_m": 1250, "gdp_per_capita": 3800, "education_index": 0.42, "phi_mean": 0.35, "climate_vulnerability": 0.72, "infrastructure": 0.30, "spaceport": false},
+  {"name": "MENA", "lat": 28.0, "lon": 38.0, "population_m": 420, "gdp_per_capita": 15000, "education_index": 0.62, "phi_mean": 0.39, "climate_vulnerability": 0.50, "infrastructure": 0.60, "spaceport": false},
+  {"name": "Europe", "lat": 50.0, "lon": 10.0, "population_m": 450, "gdp_per_capita": 42000, "education_index": 0.88, "phi_mean": 0.48, "climate_vulnerability": 0.25, "infrastructure": 0.90, "spaceport": false},
+  {"name": "North America", "lat": 40.0, "lon": -100.0, "population_m": 380, "gdp_per_capita": 55000, "education_index": 0.90, "phi_mean": 0.46, "climate_vulnerability": 0.30, "infrastructure": 0.88, "spaceport": true},
+  {"name": "Latin America", "lat": -10.0, "lon": -60.0, "population_m": 660, "gdp_per_capita": 12000, "education_index": 0.68, "phi_mean": 0.40, "climate_vulnerability": 0.48, "infrastructure": 0.55, "spaceport": true},
+  {"name": "Central Asia", "lat": 42.0, "lon": 65.0, "population_m": 80, "gdp_per_capita": 10000, "education_index": 0.72, "phi_mean": 0.38, "climate_vulnerability": 0.40, "infrastructure": 0.50, "spaceport": true},
+  {"name": "Oceania", "lat": -25.0, "lon": 140.0, "population_m": 45, "gdp_per_capita": 48000, "education_index": 0.92, "phi_mean": 0.47, "climate_vulnerability": 0.35, "infrastructure": 0.85, "spaceport": false},
+  {"name": "Russia/CIS", "lat": 60.0, "lon": 90.0, "population_m": 220, "gdp_per_capita": 14000, "education_index": 0.82, "phi_mean": 0.41, "climate_vulnerability": 0.38, "infrastructure": 0.65, "spaceport": true},
+  {"name": "Caribbean/Islands", "lat": 18.0, "lon": -70.0, "population_m": 45, "gdp_per_capita": 9000, "education_index": 0.65, "phi_mean": 0.37, "climate_vulnerability": 0.80, "infrastructure": 0.45, "spaceport": false}
+]
