@@ -4,8 +4,10 @@
 //! # Multi-Channel Sensory Consciousness Tests
 //!
 //! These tests feed raw sensory hypervectors — not text strings — into the
-//! cognitive loop via `cycle_with_hv()`. This exercises ALL 4 consciousness
-//! equation inputs:
+//! cognitive loop via `cycle_with_hv()`. This exercises the behavioral
+//! consciousness proxy (4-input weighted average). Note: the full
+//! ConsciousnessEngine (SpectralMIP Phi) only runs in `cycle(text)` mode.
+//! The proxy exercises these 4 inputs:
 //!
 //! - **prediction_confidence** (0.30 weight): from multi-scale prediction matching
 //! - **temporal_coherence** (0.25 weight): from CfC tau convergence

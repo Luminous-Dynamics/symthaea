@@ -1,6 +1,14 @@
 # Testing Guide
 
-Comprehensive test infrastructure for the Luminous Dynamics monorepo. 275+ tests across 22 files, covering unit tests, property-based invariants, adversarial fuzzing, mission scenarios, cross-domain integration, determinism verification, and performance benchmarks.
+Comprehensive test infrastructure for the Luminous Dynamics monorepo. 320+ tests across 32 files, covering unit tests, property-based invariants, adversarial fuzzing, extreme mission scenarios, consciousness ablation, multi-seed robustness, sensory consciousness, and performance benchmarks.
+
+## Key Finding (Experiment 9)
+
+Symthaea has TWO consciousness measurement systems:
+- **Behavioral proxy** (`compute_consciousness_level`): 4-input weighted average, used for motor safety gating. Mean ~0.36 in text mode.
+- **SpectralMIP Phi** (ConsciousnessEngine): O(n³) IIT approximation, validated r=0.9998 vs exact Phi. Produces Φ=5-9, active on 54% of cycles.
+
+All ablation tests measure the proxy. Experiment 9 confirmed the engine is active and producing real integrated information values.
 
 ## Quick Start
 
