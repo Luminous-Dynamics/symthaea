@@ -169,14 +169,25 @@ impl FactionEngine {
             let gini = world.economy.gini_coefficient;
             let stability = world.infrastructure_level.min(1.0); // proxy for governance stability
 
-            // Emergence condition: Gini > 0.3 OR stability < 0.7
-            let can_emerge = gini > 0.3 || stability < 0.7;
+            // Bug fix #3: Broader faction emergence conditions.
+            // Original: Gini > 0.3 OR stability < 0.7 — too strict.
+            // Added: mean trauma > 0.1, population > 1000, or independence pressure.
+            let mean_trauma = {
+                let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+                if living.is_empty() { 0.0 } else {
+                    living.iter().map(|a| a.trauma_level).sum::<f64>() / living.len() as f64
+                }
+            };
+            let can_emerge = gini > 0.3
+                || stability < 0.7
+                || mean_trauma > 0.1
+                || (world.population() > 1000 && world.trust_level < 0.5);
             if !can_emerge {
                 continue;
             }
 
-            // 0.5% chance per tick when conditions are met, amplified by stress
-            let emergence_prob = 0.005 * (1.0 + 3.0 * stress_boost);
+            // Base 0.5% + stress + trauma boost
+            let emergence_prob = 0.005 * (1.0 + 3.0 * stress_boost + 2.0 * mean_trauma);
             if !rng.bernoulli(emergence_prob.min(0.5)) {
                 continue;
             }

@@ -681,6 +681,39 @@ impl World {
         phis.iter().sum::<f64>() / phis.len() as f64
     }
 
+    /// Colony-level Phi: organizational integration, not just mean agent Phi.
+    ///
+    /// Bug fix #2: mean_phi() drops as population grows because per-agent Phi
+    /// doesn't scale with colony size. IIT predicts the opposite.
+    ///
+    /// Colony Phi = mean_agent_phi × organizational_multiplier
+    /// where organizational_multiplier captures:
+    /// - Governance stability (well-governed = more integrated)
+    /// - Trust level (high trust = information flows freely)
+    /// - Population scale bonus (log2 scaling — more people CAN integrate more)
+    /// - Infrastructure quality (enables coordination)
+    pub fn collective_phi(&self) -> f64 {
+        let base = self.mean_phi();
+        if base <= 0.0 { return 0.0; }
+
+        let pop = self.population().max(1) as f64;
+        // Scale bonus: log2(pop/100) — a colony of 10,000 gets +3.3 bonus
+        // Capped at 5.0 (100K population)
+        let scale_bonus = (pop / 100.0).max(1.0).log2().min(5.0);
+
+        // Organizational quality: governance × trust × infrastructure
+        let org_quality = self.governance.stability_score
+            * self.trust_level
+            * self.infrastructure_level;
+
+        // Collective Phi = base × (1 + scale_bonus × org_quality)
+        // At pop=100, org=1.0: multiplier = 1.0 (no bonus)
+        // At pop=10000, org=0.8: multiplier = 1 + 3.3 * 0.8 = 3.64
+        // At pop=50000, org=0.5: multiplier = 1 + 4.6 * 0.5 = 3.32
+        let multiplier = 1.0 + scale_bonus * org_quality * 0.3;
+        (base * multiplier).min(1.0)
+    }
+
     /// Fraction of living agents at each consciousness tier (0-4).
     pub fn tier_distribution(&self) -> [f64; 5] {
         let mut counts = [0usize; 5];

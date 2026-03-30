@@ -136,7 +136,7 @@ impl EpochSnapshot {
         let mean_phi = if worlds.is_empty() {
             0.0
         } else {
-            worlds.iter().map(|w| w.mean_phi()).sum::<f64>() / world_count as f64
+            worlds.iter().map(|w| w.collective_phi()).sum::<f64>() / world_count as f64
         };
 
         // Genetic diversity: focus on off-Earth populations (Earth's genetics aren't

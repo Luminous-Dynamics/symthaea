@@ -2313,11 +2313,20 @@ impl MultiWorldSimulator {
                                 let j = (self.rng.next_u64() as usize) % (i + 1);
                                 living_ids.swap(i, j);
                             }
+                            // O(1) kill lookup + survivor trauma
+                            let kill_map: std::collections::HashMap<u64, usize> = world.agents.iter()
+                                .enumerate().map(|(i, a)| (a.id, i)).collect();
                             for &kill_id in living_ids.iter().take(to_kill) {
-                                if let Some(agent) =
-                                    world.agents.iter_mut().find(|a| a.id == kill_id)
-                                {
-                                    agent.death_tick = Some(self.current_tick);
+                                if let Some(&idx) = kill_map.get(&kill_id) {
+                                    world.agents[idx].death_tick = Some(self.current_tick);
+                                }
+                            }
+                            // Survivor trauma: witnessing deaths
+                            if to_kill > 0 {
+                                let survivors = world.agents.iter().filter(|a| a.is_alive()).count().max(1);
+                                let trauma_from_deaths = (to_kill as f64 / survivors as f64).min(0.3);
+                                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                                    agent.trauma_level = (agent.trauma_level + trauma_from_deaths).min(1.0);
                                 }
                             }
                         }
@@ -2415,6 +2424,19 @@ impl MultiWorldSimulator {
                             agent.needs.engagement = (agent.needs.engagement
                                 + morale)
                                 .clamp(0.0, 1.0);
+                        }
+                    }
+
+                    // Bug fix #1: Disasters cause trauma.
+                    // Severity scales with consciousness_shock + load_increase.
+                    // Trauma accumulates (doesn't reset) — ref: Van der Kolk (2014).
+                    let trauma_inc = (effects.consciousness_shock * 0.5
+                        + effects.allostatic_load_increase * 0.3
+                        + effects.morale_impact.abs() * 0.2)
+                        * cascade_mult;
+                    if trauma_inc > 0.01 {
+                        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                            agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
                         }
                     }
                 }
@@ -3170,6 +3192,14 @@ impl MultiWorldSimulator {
                     world.agents.retain(|a| {
                         a.death_tick.map_or(true, |dt| dt >= cutoff)
                     });
+                }
+            }
+
+            // Trauma decay: 0.002/tick ≈ 0.024/year. Full trauma (1.0) takes
+            // ~40 years to fully decay. Ref: PTSD recovery timelines (Kessler 1995).
+            for world in &mut self.worlds {
+                for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                    agent.trauma_level = (agent.trauma_level - 0.002).max(0.0);
                 }
             }
 
