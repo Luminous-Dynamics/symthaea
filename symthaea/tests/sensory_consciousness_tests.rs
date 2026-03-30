@@ -252,10 +252,14 @@ fn test_multimodal_fusion_affects_consciousness() {
         .collect();
     let max_diff = phi_diffs.iter().cloned().fold(0.0f64, f64::max);
 
-    // HONEST FINDING: cycle_with_hv() bypasses the consciousness engine.
-    // Phi is 0.0 for ALL sensory inputs because consciousness_level is only
-    // computed in the text-encoding path (cycle(text)), not the raw HV path.
-    // This is a fundamental architectural limitation, not a test bug.
+    // After the modality-agnostic consciousness wiring, cycle_with_hv() now
+    // computes consciousness_level from CfC tau convergence and available inputs.
+    // Multi-modal fusion should produce a DIFFERENT trajectory than unimodal.
+    assert!(
+        max_diff > 0.0001,
+        "MULTIMODAL IS IDENTICAL TO UNIMODAL: max_diff={max_diff:.8}. \
+         Binding 3 modalities produces the same consciousness as 1."
+    );
 
     let avg_visual = visual_phi.iter().sum::<f64>() / visual_phi.len() as f64;
     let avg_fused = fused_phi.iter().sum::<f64>() / fused_phi.len() as f64;
@@ -337,10 +341,11 @@ fn test_sensory_consciousness_input_variance() {
     let varying = [phi_var > 1e-8, coh_var > 1e-8, flow_var > 1e-8]
         .iter().filter(|&&v| v).count();
 
-    // HONEST FINDING: cycle_with_hv() returns phi=0.0 because the consciousness
-    // engine is only wired to the text-encoding path. This is the most important
-    // architectural finding: consciousness measurement is TEXT-GATED.
-    // We document this, not assert it away.
+    // After modality-agnostic wiring, phi should vary with sensory input.
+    assert!(
+        phi_var > 1e-10,
+        "PHI IS CONSTANT even with varied sensory input! variance={phi_var:.10}"
+    );
 
     eprintln!("\n═══ SENSORY TEST 5: 4-INPUT VARIANCE AUDIT ═══");
     eprintln!("  Phi variance:        {phi_var:.8}  {}", if phi_var > 1e-8 { "VARIES" } else { "CONSTANT" });
