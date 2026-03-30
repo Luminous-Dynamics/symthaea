@@ -1,31 +1,36 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Progress tracking interface for educational games.
-//!
-//! Games call `use_set_progress()` when a student completes a challenge.
-//! The portal (or EduNet) provides the actual implementation via context.
+//! Progress tracking for educational games.
+//! Compatible with EduNet's curriculum system.
 
 use leptos::prelude::*;
+use std::collections::HashMap;
 
-/// Progress status for a curriculum node.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum ProgressStatus {
+    #[default]
     NotStarted,
     Studying,
     Mastered,
 }
 
-/// Set progress for a curriculum node. Retrieved from Leptos context.
-///
-/// In the portal, this updates the domain-edunet state store.
-/// In standalone EduNet, this updates the curriculum signals.
-/// If no provider is in context, this is a no-op.
-pub fn use_set_progress() -> impl Fn(&str, u32, ProgressStatus) {
-    // Try to get a progress setter from context; no-op if absent
-    let setter = use_context::<WriteSignal<Vec<(String, u32, ProgressStatus)>>>();
-    move |node_id: &str, mastery: u32, status: ProgressStatus| {
-        if let Some(set) = setter {
-            set.update(|v| v.push((node_id.to_string(), mastery, status)));
-        }
-    }
+#[derive(Clone, Debug, Default)]
+pub struct NodeProgress {
+    pub mastery_permille: u32,
+    pub status: ProgressStatus,
+    pub attempts: u32,
+    pub correct: u32,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ProgressStore {
+    pub nodes: HashMap<String, NodeProgress>,
+}
+
+/// Get the writable progress store. Games call `set_progress.update(|p| ...)`.
+pub fn use_set_progress() -> WriteSignal<ProgressStore> {
+    use_context::<WriteSignal<ProgressStore>>().unwrap_or_else(|| {
+        let (_, setter) = signal(ProgressStore::default());
+        setter
+    })
 }
