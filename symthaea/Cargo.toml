@@ -796,6 +796,10 @@ name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
 
 [[test]]
+name = "kessler_cascade_scenario"
+required-features = ["humanoid", "manipulator"]
+
+[[test]]
 name = "robotics_scenarios"
 required-features = ["humanoid"]
 
