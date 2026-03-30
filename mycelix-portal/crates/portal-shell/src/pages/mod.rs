@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Domain page components — rendered when the user zooms into a domain.
 
+pub mod admin;
 pub mod commons;
 pub mod edunet;
 pub mod finance;
@@ -10,6 +11,7 @@ pub mod health;
 pub mod hearth;
 pub mod knowledge;
 pub mod lucid;
+pub mod mail;
 
 use leptos::prelude::*;
 
@@ -25,6 +27,8 @@ pub fn DomainContent(domain_id: String) -> impl IntoView {
         "edunet" => view! { <edunet::EdunetOverview /> }.into_any(),
         "hearth" => view! { <hearth::HearthOverview /> }.into_any(),
         "knowledge" => view! { <knowledge::KnowledgeOverview /> }.into_any(),
+        "mail" => view! { <mail::MailOverview /> }.into_any(),
+        "admin" => view! { <admin::AdminOverview /> }.into_any(),
         _ => view! {
             <div class="domain-coming-soon">
                 <p class="coming-soon-text">

@@ -267,3 +267,61 @@ pub struct ProposalSummary {
     pub tally: VoteTally,
     pub my_vote: Option<VoteChoice>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn roundtrip<T: Serialize + for<'de> Deserialize<'de> + std::fmt::Debug>(val: &T) {
+        let bytes = rmp_serde::to_vec_named(val).expect("encode");
+        let _decoded: T = rmp_serde::from_slice(&bytes).expect("decode");
+    }
+
+    #[test]
+    fn proposal_roundtrip() {
+        roundtrip(&Proposal {
+            id: "MIP-001".into(), title: "Test".into(), description: "Desc".into(),
+            proposal_type: ProposalType::Standard, author: "did:test".into(),
+            status: ProposalStatus::Active, actions: "[]".into(),
+            discussion_url: None, voting_starts: 0, voting_ends: 0,
+            created: 0, updated: 0, version: 1,
+        });
+    }
+
+    #[test]
+    fn vote_roundtrip() {
+        roundtrip(&Vote {
+            id: "v1".into(), proposal_id: "MIP-001".into(), voter: "did:test".into(),
+            choice: VoteChoice::For, weight: 1.5, reason: Some("agree".into()),
+            delegated: false, delegator: None,
+            phi_weight: PhiWeight { phi_score: 0.7, k_trust: 0.8, stake_weight: 0.5, participation_score: 0.6, domain_reputation: 0.4 },
+            timestamp: 1000,
+        });
+    }
+
+    #[test]
+    fn council_roundtrip() {
+        roundtrip(&Council {
+            id: "c1".into(), name: "Root".into(), purpose: "Top level".into(),
+            council_type: CouncilType::Root, parent_council_id: None,
+            phi_threshold: 0.4, quorum: 0.5, supermajority: 0.67,
+            status: CouncilStatus::Active, created_at: 0,
+        });
+    }
+
+    #[test]
+    fn phi_weight_combined() {
+        let w = PhiWeight { phi_score: 0.8, k_trust: 1.0, stake_weight: 0.5, participation_score: 0.6, domain_reputation: 0.4 };
+        let combined = w.combined();
+        assert!(combined > 0.0);
+        assert!(combined < 10.0);
+    }
+
+    #[test]
+    fn proposal_status_is_terminal() {
+        assert!(ProposalStatus::Executed.is_terminal());
+        assert!(ProposalStatus::Rejected.is_terminal());
+        assert!(!ProposalStatus::Active.is_terminal());
+        assert!(!ProposalStatus::Draft.is_terminal());
+    }
+}

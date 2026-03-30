@@ -195,6 +195,9 @@ pub fn LucidOverview() -> impl IntoView {
                 <button class="domain-nav-btn">"Reasoning"</button>
             </div>
 
+            // Create thought form
+            <CreateThoughtForm />
+
             // Relationship graph
             <div class="lucid-graph-container">
                 <h3 class="section-title">"Thought Network"</h3>
@@ -256,6 +259,126 @@ pub fn LucidOverview() -> impl IntoView {
                     height=160.0
                 />
             </div>
+        </div>
+    }
+}
+
+/// Form to create a new thought in the LUCID knowledge graph.
+#[component]
+fn CreateThoughtForm() -> impl IntoView {
+    let identity = use_context::<PortalIdentity>().expect("PortalIdentity");
+    let (content, set_content) = signal(String::new());
+    let (thought_type, set_thought_type) = signal("Observation".to_string());
+    let (confidence, set_confidence) = signal(0.7_f64);
+    let (tags_input, set_tags) = signal(String::new());
+    let (submitted, set_submitted) = signal(false);
+    let (expanded, set_expanded) = signal(false);
+
+    let on_submit = move |ev: web_sys::SubmitEvent| {
+        ev.prevent_default();
+        let c = content.get();
+        if c.trim().is_empty() { return; }
+
+        let identity = identity.clone();
+        let tt = thought_type.get();
+        let conf = confidence.get();
+        let tags: Vec<String> = tags_input.get().split(',')
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .collect();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let input = CreateThoughtInput {
+                content: c.trim().to_string(),
+                thought_type: match tt.as_str() {
+                    "Claim" => ThoughtType::Claim,
+                    "Hypothesis" => ThoughtType::Hypothesis,
+                    "Critique" => ThoughtType::Critique,
+                    "Question" => ThoughtType::Question,
+                    "Reflection" => ThoughtType::Reflection,
+                    "Synthesis" => ThoughtType::Synthesis,
+                    _ => ThoughtType::Observation,
+                },
+                confidence: conf,
+                tags,
+                domain: None,
+                epistemic: EpistemicProfile { empirical: 0.5, normative: 0.3, materiality: 0.5, harmonic: 0.5 },
+            };
+            match identity.call_zome::<CreateThoughtInput, serde_json::Value>(
+                "lucid", "lucid", "create_thought", &input
+            ).await {
+                Ok(_) => {
+                    set_submitted.set(true);
+                    set_content.set(String::new());
+                    set_tags.set(String::new());
+                }
+                Err(e) => {
+                    if e.contains("Mock mode") {
+                        set_submitted.set(true);
+                        set_content.set(String::new());
+                    }
+                    web_sys::console::log_1(&format!("[LUCID] create_thought: {e}").into());
+                }
+            }
+        });
+    };
+
+    view! {
+        <div class="create-thought-section">
+            <button
+                class="domain-nav-btn"
+                on:click=move |_| set_expanded.update(|e| *e = !*e)
+            >
+                {move || if expanded.get() { "- Close" } else { "+ New Thought" }}
+            </button>
+
+            <Show when=move || expanded.get()>
+                <form class="thought-form" on:submit=on_submit>
+                    <textarea
+                        class="form-textarea"
+                        placeholder="What are you thinking?..."
+                        rows="3"
+                        prop:value=move || content.get()
+                        on:input=move |ev| set_content.set(event_target_value(&ev))
+                    />
+                    <div class="form-row">
+                        <select
+                            class="form-select"
+                            on:change=move |ev| set_thought_type.set(event_target_value(&ev))
+                        >
+                            <option value="Observation">"Observation"</option>
+                            <option value="Claim">"Claim"</option>
+                            <option value="Hypothesis">"Hypothesis"</option>
+                            <option value="Question">"Question"</option>
+                            <option value="Critique">"Critique"</option>
+                            <option value="Reflection">"Reflection"</option>
+                            <option value="Synthesis">"Synthesis"</option>
+                        </select>
+                        <div class="confidence-slider">
+                            <span class="form-label">"Confidence: " {move || format!("{:.0}%", confidence.get() * 100.0)}</span>
+                            <input type="range" min="0" max="1" step="0.05"
+                                prop:value=move || confidence.get().to_string()
+                                on:input=move |ev| {
+                                    if let Ok(v) = event_target_value(&ev).parse::<f64>() {
+                                        set_confidence.set(v);
+                                    }
+                                }
+                            />
+                        </div>
+                    </div>
+                    <input
+                        type="text"
+                        class="form-input"
+                        placeholder="Tags (comma-separated)..."
+                        prop:value=move || tags_input.get()
+                        on:input=move |ev| set_tags.set(event_target_value(&ev))
+                    />
+                    <button type="submit" class="form-submit">"Submit Thought"</button>
+                    <Show when=move || submitted.get()>
+                        <p class="form-success">"Thought added to the knowledge graph!"</p>
+                    </Show>
+                </form>
+            </Show>
         </div>
     }
 }

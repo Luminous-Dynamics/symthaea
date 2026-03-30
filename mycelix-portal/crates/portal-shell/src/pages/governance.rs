@@ -196,6 +196,9 @@ pub fn GovernanceOverview() -> impl IntoView {
                 }).collect::<Vec<_>>() }}
             </div>
 
+            // Create proposal form
+            <CreateProposalForm />
+
             // Participation chart
             <div class="governance-chart">
                 <h3 class="chart-title">"Participation by Type"</h3>
@@ -211,6 +214,106 @@ pub fn GovernanceOverview() -> impl IntoView {
                     height=180.0
                 />
             </div>
+        </div>
+    }
+}
+
+/// Form to create a new governance proposal.
+#[component]
+fn CreateProposalForm() -> impl IntoView {
+    let identity = use_context::<PortalIdentity>().expect("PortalIdentity");
+    let (title, set_title) = signal(String::new());
+    let (description, set_description) = signal(String::new());
+    let (proposal_type, set_proposal_type) = signal("Standard".to_string());
+    let (submitted, set_submitted) = signal(false);
+    let (error_msg, set_error) = signal(None::<String>);
+    let (expanded, set_expanded) = signal(false);
+
+    let on_submit = move |ev: web_sys::SubmitEvent| {
+        ev.prevent_default();
+        let t = title.get();
+        let d = description.get();
+        if t.trim().is_empty() || d.trim().is_empty() {
+            set_error.set(Some("Title and description required".into()));
+            return;
+        }
+        set_error.set(None);
+
+        let identity = identity.clone();
+        let pt = proposal_type.get();
+        wasm_bindgen_futures::spawn_local(async move {
+            let input = serde_json::json!({
+                "title": t.trim(),
+                "description": d.trim(),
+                "proposal_type": pt,
+            });
+            match identity.call_zome::<serde_json::Value, serde_json::Value>(
+                "governance", "proposals", "create_proposal", &input
+            ).await {
+                Ok(_) => {
+                    set_submitted.set(true);
+                    set_title.set(String::new());
+                    set_description.set(String::new());
+                }
+                Err(e) => {
+                    if e.contains("Mock mode") {
+                        set_submitted.set(true);
+                        set_title.set(String::new());
+                        set_description.set(String::new());
+                    } else {
+                        set_error.set(Some(e));
+                    }
+                }
+            }
+        });
+    };
+
+    view! {
+        <div class="create-proposal-section">
+            <button
+                class="domain-nav-btn"
+                on:click=move |_| set_expanded.update(|e| *e = !*e)
+            >
+                {move || if expanded.get() { "- Close" } else { "+ New Proposal" }}
+            </button>
+
+            <Show when=move || expanded.get()>
+                <form class="proposal-form" on:submit=on_submit>
+                    <input
+                        type="text"
+                        class="form-input"
+                        placeholder="Proposal title..."
+                        prop:value=move || title.get()
+                        on:input=move |ev| set_title.set(event_target_value(&ev))
+                    />
+                    <textarea
+                        class="form-textarea"
+                        placeholder="Describe what you're proposing and why..."
+                        rows="4"
+                        prop:value=move || description.get()
+                        on:input=move |ev| set_description.set(event_target_value(&ev))
+                    />
+                    <div class="form-row">
+                        <select
+                            class="form-select"
+                            on:change=move |ev| set_proposal_type.set(event_target_value(&ev))
+                        >
+                            <option value="Standard">"Standard (7 days)"</option>
+                            <option value="Emergency">"Emergency (24 hours)"</option>
+                            <option value="Constitutional">"Constitutional (30 days)"</option>
+                            <option value="Funding">"Funding Request (14 days)"</option>
+                            <option value="Parameter">"Parameter Change (14 days)"</option>
+                        </select>
+                        <button type="submit" class="form-submit">"Submit Proposal"</button>
+                    </div>
+                    {move || error_msg.get().map(|e| view! {
+                        <p class="form-error">{e}</p>
+                    })}
+                    <Show when=move || submitted.get()>
+                        <p class="form-success">"Proposal submitted!"</p>
+                    </Show>
+                </form>
+            </Show>
         </div>
     }
 }
