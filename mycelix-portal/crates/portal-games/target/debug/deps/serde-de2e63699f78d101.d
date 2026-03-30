@@ -1,0 +1,14 @@
+/srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/deps/serde-de2e63699f78d101.d: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/build/serde-e7a050b9e0345179/out/private.rs
+
+/srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/deps/libserde-de2e63699f78d101.rlib: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/build/serde-e7a050b9e0345179/out/private.rs
+
+/srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/deps/libserde-de2e63699f78d101.rmeta: /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/build/serde-e7a050b9e0345179/out/private.rs
+
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/tstoltz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/build/serde-e7a050b9e0345179/out/private.rs:
+
+# env-dep:OUT_DIR=/srv/luminous-dynamics/mycelix-portal/crates/portal-games/target/debug/build/serde-e7a050b9e0345179/out
