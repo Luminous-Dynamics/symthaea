@@ -626,6 +626,7 @@ pub mod rhythm_engine;
 pub mod sample_player;
 pub mod similarity_monitor;
 pub mod state_smoother;
+pub mod taste_bench;
 pub mod binaural;
 pub mod collaborative;
 pub mod consciousness_reverb;
