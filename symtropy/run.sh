@@ -30,11 +30,13 @@ else
     echo "[symtropy] Using default backend"
 fi
 
-# Feature flags
+# Feature flags and game args
 FEATURES=""
+GAME_ARGS=""
 for arg in "$@"; do
     case "$arg" in
         --mycelix) FEATURES="--features mycelix" ;;
+        --autostart) GAME_ARGS="$GAME_ARGS --autostart" ;;
     esac
 done
 
@@ -61,4 +63,4 @@ if [[ -n "$FEATURES" ]]; then
 fi
 export RUST_LOG="${RUST_LOG:-warn,symtropy=info}"
 export RUST_BACKTRACE=1
-exec "$BIN" "$@"
+exec "$BIN" $GAME_ARGS

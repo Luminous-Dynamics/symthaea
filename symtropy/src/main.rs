@@ -40,8 +40,11 @@ fn main() {
         ..default()
     };
 
-    App::new()
-        .add_plugins(
+    // --autostart flag: skip menu, go straight to gameplay
+    let autostart = std::env::args().any(|a| a == "--autostart");
+
+    let mut app = App::new();
+    app.add_plugins(
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
@@ -59,8 +62,16 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .add_plugins(SymtropyPlugin)
-        .add_systems(Startup, log_renderer_info)
-        .run();
+        .add_systems(Startup, log_renderer_info);
+
+    if autostart {
+        eprintln!("[symtropy] --autostart: skipping menu, starting game immediately");
+        app.add_systems(Startup, |mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
+            next.set(crate::resources::GamePhase::Loading);
+        });
+    }
+
+    app.run();
 
     eprintln!("[symtropy] Clean exit.");
 }
