@@ -28,7 +28,25 @@ impl CognitiveLoopService {
         let (gwt_broadcast, gwt_coalition_size, gwt_activation) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
-                    let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    // GWT activation via multi-source salience (not just 1-PE).
+                    // Science: Dehaene & Changeux (2011) — workspace ignition requires
+                    // convergent bottom-up salience from multiple sources.
+                    // Pure (1-PE) fails for text cognition where PE ≈ 0.9 inherently.
+                    //
+                    // Salience = max(prediction_match, coherence, novelty, confidence)
+                    // max() ensures any strong signal can drive workspace entry.
+                    let prediction_match = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    let coherence_salience = ctx.coherence as f64;
+                    // Novelty: high PE + high curiosity = salient novel content
+                    let novelty_salience = (ctx.prediction_error as f64
+                        * self.behavior.curiosity_drive.curiosity as f64)
+                        .clamp(0.0, 1.0);
+                    let confidence_salience = self.prediction_confidence;
+                    let activation = prediction_match
+                        .max(coherence_salience)
+                        .max(novelty_salience)
+                        .max(confidence_salience)
+                        .clamp(0.0, 1.0);
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
                         "cognitive_loop",
@@ -1122,6 +1140,32 @@ impl CognitiveLoopService {
             // Scale learning signal by consciousness quality (gradual, not on/off)
             // This complements the binary consciousness_awake gate with continuous modulation
             self.fep.learning_signal *= (0.5_f32 + level as f32 * 0.5_f32).clamp(0.5_f32, 1.0_f32);
+
+            // CONSCIOUSNESS→BEHAVIOR: Three behavioral feedback loops
+            // Science: Baars (2005) — consciousness enables flexible, context-sensitive behavior.
+
+            // 1. High consciousness → tighter exploration (exploit what you know)
+            //    Low consciousness → broader exploration (you don't know enough)
+            //    Science: Dehaene (2014) — conscious access narrows behavioral repertoire
+            //    to contextually appropriate actions.
+            if level > 0.5 {
+                let focus_factor = ((level - 0.5) * 0.1) as f32; // max 0.05
+                self.behavior.adaptive_behavior.exploration_factor *= 1.0 - focus_factor;
+            } else if level < 0.2 && self.stats.total_cycles > 30 {
+                let explore_nudge = ((0.2 - level) * 0.05) as f32; // max 0.01
+                self.behavior.adaptive_behavior.exploration_factor =
+                    (self.behavior.adaptive_behavior.exploration_factor + explore_nudge).min(1.0);
+            }
+
+            // 2. High consciousness → curiosity satisfied (learning occurred)
+            //    Low consciousness → curiosity grows (drive to understand)
+            //    Science: Friston (2010) — curiosity IS expected free energy reduction.
+            if level > 0.6 {
+                self.behavior.curiosity_drive.curiosity *= 0.98; // gentle satisfaction
+            } else if level < 0.15 {
+                self.behavior.curiosity_drive.curiosity =
+                    (self.behavior.curiosity_drive.curiosity * 1.01).min(1.0); // grow
+            }
 
             // NARRATIVE WIRING: Feed prediction-horizon data as future scenarios.
             // The prediction system already computes multi-scale horizons — these

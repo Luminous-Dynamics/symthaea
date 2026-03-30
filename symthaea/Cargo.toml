@@ -680,6 +680,7 @@ default-mind = [
     "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
     "unified_precision",      # Dynamic HFE precision (Parr 2019). Fixed: 46 Hz (was 1.1 Hz)
     "england_dissipation",    # England exploration + Prigogine-England tension resolution
+    "interoceptive_inference", # Body-state prediction modulates precision + blanket (Seth 2021)
 ]
 
 
