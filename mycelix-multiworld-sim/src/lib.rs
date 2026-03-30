@@ -43,6 +43,7 @@ pub mod governance;
 pub mod harmony;
 pub mod interworld;
 pub mod knowledge;
+pub mod mycelix_bridge;
 pub mod narrative;
 pub mod needs;
 pub mod observables;
