@@ -1,0 +1,75 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Trunk
+        run: |
+          if ! command -v trunk &> /dev/null; then
+            cargo install trunk --locked
+          fi
+
+      - name: Install wasm-opt v125+
+        run: |
+          # Install latest wasm-opt that supports bulk memory operations
+          npm install -g binaryen@latest
+          which wasm-opt && wasm-opt --version
+
+      - name: Build
+        run: |
+          # Replace trunk's stale cached wasm-opt with the system one
+          mkdir -p ~/.cache/trunk/wasm-opt-version_125/bin/
+          cp $(which wasm-opt) ~/.cache/trunk/wasm-opt-version_125/bin/wasm-opt
+          # Remove old cached version
+          rm -rf ~/.cache/trunk/wasm-opt-version_123
+          # Build release (trunk will use our wasm-opt)
+          trunk build --release --no-sri
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

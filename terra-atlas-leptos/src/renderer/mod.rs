@@ -173,7 +173,7 @@ impl GlobeRenderer {
             bloom_composite: compile_program(&gl, shaders::FULLSCREEN_VERT, shaders::BLOOM_COMPOSITE_FRAG)?,
         };
 
-        log::info!("All 15 shader programs compiled successfully");
+        log::info!("All 18 shader programs compiled successfully");
 
         // Generate and upload geometry
         let (earth_vao, earth_index_count) = Self::create_sphere_vao(&gl, 128, 128, 1.0)?;
