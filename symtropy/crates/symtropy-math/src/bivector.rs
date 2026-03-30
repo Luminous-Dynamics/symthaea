@@ -4,9 +4,9 @@
 use nalgebra::{SMatrix, SVector};
 
 /// Maximum supported dimension for bivectors.
-/// D=4 → 6 components, D=5 → 10, D=6 → 15.
-/// We cap at 6 (sufficient for 2D/3D/4D game physics).
-const MAX_BIVECTOR_COMPONENTS: usize = 6;
+/// D=4 → 6, D=5 → 10, D=6 → 15, D=7 → 21, D=8 → 28, D=9 → 36.
+/// Supports up to 9D physics for dimensional sweep experiments.
+const MAX_BIVECTOR_COMPONENTS: usize = 36;
 
 /// A bivector in D-dimensional space (grade-2 element of the geometric algebra).
 ///
@@ -23,11 +23,11 @@ pub struct Bivector<const D: usize> {
     components: [f64; MAX_BIVECTOR_COMPONENTS],
 }
 
-// Compile-time assertion: D must be ≤ 4 (6 bivector components max)
-const fn _assert_d_le_4<const D: usize>() {
+// Compile-time assertion: D must be ≤ 9 (36 bivector components max)
+const fn _assert_d_le_9<const D: usize>() {
     assert!(
         D * (D - 1) / 2 <= MAX_BIVECTOR_COMPONENTS,
-        "Bivector supports D <= 4 (max 6 components)"
+        "Bivector supports D <= 9 (max 36 components)"
     );
 }
 
@@ -40,7 +40,7 @@ impl<const D: usize> Bivector<D> {
     /// Zero bivector.
     #[inline]
     pub fn zero() -> Self {
-        _assert_d_le_4::<D>();
+        _assert_d_le_9::<D>();
         Self {
             components: [0.0; MAX_BIVECTOR_COMPONENTS],
         }

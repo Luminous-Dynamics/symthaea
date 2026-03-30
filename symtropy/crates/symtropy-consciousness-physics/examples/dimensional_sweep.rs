@@ -44,8 +44,13 @@ fn run_at_dimension(dim: usize, with_drift: bool, seed: u64) -> DimResult {
         2 => run_dim::<2>(with_drift, seed),
         3 => run_dim::<3>(with_drift, seed),
         4 => run_dim::<4>(with_drift, seed),
+        5 => run_dim::<5>(with_drift, seed),
+        6 => run_dim::<6>(with_drift, seed),
+        7 => run_dim::<7>(with_drift, seed),
+        8 => run_dim::<8>(with_drift, seed),
+        9 => run_dim::<9>(with_drift, seed),
         _ => {
-            eprintln!("  D={} not supported (Bivector max D=4)", dim);
+            eprintln!("  D={} not supported (max D=9)", dim);
             DimResult::default()
         }
     }
@@ -251,13 +256,13 @@ fn run_dim<const D: usize>(with_drift: bool, seed: u64) -> DimResult {
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║  DIMENSIONAL SWEEP: How does physics change from 2D to 4D?  ║");
+    println!("║  DIMENSIONAL SWEEP: How does physics change from 2D to 9D?  ║");
     println!("╚═══════════════════════════════════════════════════════════════╝\n");
     println!("{} agents + {} drifters, {} ticks, {} seeds per condition\n",
         AGENTS, DRIFTERS, TICKS, SEEDS);
 
-    // Supported dimensions (Bivector<D> max D=4)
-    let dimensions = [2, 3, 4];
+    // Full dimensional sweep: 2D through 9D
+    let dimensions = [2, 3, 4, 5, 6, 7, 8, 9];
 
     println!("{:<6} {:<8} {:<10} {:<10} {:<8} {:<10} {:<10} {:<10}",
         "D", "Cond", "PredErr", "MaxPE", "Alive", "Energy", "Cluster", "DarkE");
