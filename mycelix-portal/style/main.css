@@ -303,6 +303,265 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   Phenotype Selection — "How do you see yourself?"
+   ═══════════════════════════════════════════ */
+
+.phenotype-selection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.phenotype-question {
+    font-size: 1.3rem;
+    font-weight: 300;
+    color: var(--bio-cyan);
+    letter-spacing: 0.05em;
+    margin-bottom: 2.5rem;
+}
+
+.phenotype-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    max-width: 500px;
+    width: 90%;
+}
+
+.phenotype-card {
+    background: rgba(14, 28, 32, 0.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    transition: border-color 0.3s, transform 0.2s;
+    text-align: center;
+}
+
+.phenotype-card:hover {
+    border-color: var(--bio-cyan);
+    transform: scale(1.03);
+}
+
+.phenotype-preview {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    position: relative;
+}
+
+/* Orb preview */
+.phenotype-preview.orb {
+    background: radial-gradient(circle, var(--bio-cyan) 30%, transparent 70%);
+    box-shadow: 0 0 20px var(--orb-glow);
+}
+
+/* Stream preview */
+.phenotype-preview.stream {
+    border-radius: 4px;
+    background: linear-gradient(180deg, transparent 0%, var(--bio-cyan) 50%, transparent 100%);
+    opacity: 0.6;
+    animation: stream-flow 2s linear infinite;
+}
+@keyframes stream-flow {
+    from { background-position: 0 -48px; }
+    to { background-position: 0 48px; }
+}
+
+/* Garden preview */
+.phenotype-preview.garden {
+    border-radius: 8px;
+    background: linear-gradient(0deg, #059669 0%, #34D399 40%, transparent 70%);
+    opacity: 0.6;
+}
+
+/* Pulse preview */
+.phenotype-preview.pulse {
+    background: transparent;
+    border: 2px solid var(--bio-cyan);
+    animation: pulse-preview 1.5s ease-in-out infinite;
+}
+@keyframes pulse-preview {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.15); opacity: 0.8; }
+}
+
+.phenotype-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.phenotype-desc {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.phenotype-switch {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    z-index: 20;
+}
+.phenotype-switch:hover { border-color: var(--bio-cyan); color: var(--bio-cyan); }
+.orb-switch { bottom: auto; top: 1.5rem; }
+
+/* ═══════════════════════════════════════════
+   Stream Phenotype — consciousness as a river
+   ═══════════════════════════════════════════ */
+
+.stream-view {
+    width: 100%; height: 100%; padding: 2rem;
+    display: flex; flex-direction: column; align-items: center;
+}
+
+.stream-header {
+    display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;
+}
+
+.stream-timeline {
+    flex: 1; width: 100%; max-width: 500px;
+    display: flex; flex-direction: column; gap: 0.75rem;
+    overflow-y: auto; padding: 1rem 0;
+}
+
+.stream-event-card {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 0.75rem; background: rgba(14, 28, 32, 0.6);
+    border-left: 2px solid var(--bio-cyan); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.stream-event-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--bio-cyan); flex-shrink: 0; margin-top: 4px;
+}
+
+.stream-event-text { font-size: 0.85rem; color: var(--text-primary); }
+.stream-event-domain { font-size: 0.65rem; color: var(--text-muted); display: block; margin-top: 2px; }
+
+.stream-domains {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    justify-content: center; padding: 1rem 0;
+}
+
+.stream-domain-chip {
+    background: none; border: 1px solid; padding: 0.4rem 0.8rem;
+    border-radius: 999px; color: var(--text-secondary); font-size: 0.75rem;
+    cursor: pointer;
+}
+.stream-domain-chip:hover { background: rgba(255,255,255,0.03); }
+
+/* ═══════════════════════════════════════════
+   Garden Phenotype — consciousness as a garden
+   ═══════════════════════════════════════════ */
+
+.garden-view {
+    width: 100%; height: 100%; padding: 2rem;
+    display: flex; flex-direction: column; align-items: center;
+}
+
+.garden-header {
+    display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;
+}
+
+.garden-plots {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem; max-width: 600px; width: 100%;
+}
+
+.garden-plot {
+    aspect-ratio: 1; border-radius: var(--radius);
+    background: rgba(14, 28, 32, 0.6); border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-end; padding: 0.5rem; cursor: pointer;
+    position: relative; overflow: hidden;
+    transition: border-color 0.3s;
+}
+
+.garden-plot.alive:hover { border-color: var(--plot-color); }
+.garden-plot.dormant { opacity: 0.15; cursor: default; }
+
+.plot-growth {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: var(--plot-height);
+    background: linear-gradient(0deg, var(--plot-color), var(--plot-glow));
+    opacity: 0.3; border-radius: 0 0 var(--radius) var(--radius);
+    transition: height 0.5s;
+}
+
+.garden-plot.alive:hover .plot-growth { opacity: 0.5; }
+
+.plot-name {
+    font-size: 0.6rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-muted);
+    z-index: 1; position: relative;
+}
+
+/* ═══════════════════════════════════════════
+   Pulse Phenotype — consciousness as a heartbeat
+   ═══════════════════════════════════════════ */
+
+.pulse-view {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+}
+
+.pulse-center {
+    position: relative; margin-bottom: 3rem;
+}
+
+.pulse-beat {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: var(--bio-cyan); opacity: 0.15;
+    animation: heartbeat 1.2s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+    0% { transform: scale(1); opacity: 0.15; }
+    15% { transform: scale(1.3); opacity: 0.4; }
+    30% { transform: scale(1); opacity: 0.15; }
+    45% { transform: scale(1.15); opacity: 0.3; }
+    60%, 100% { transform: scale(1); opacity: 0.15; }
+}
+
+.pulse-score {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem; font-weight: 600; color: var(--bio-cyan);
+}
+
+.pulse-vitals {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    align-items: center; margin-bottom: 2rem;
+}
+
+.pulse-vital {
+    background: none; border: none; cursor: pointer;
+    display: flex; gap: 1rem; align-items: center;
+    padding: 0.5rem 1rem; font-size: 0.85rem;
+    transition: opacity 0.15s;
+}
+.pulse-vital:hover { opacity: 0.7; }
+
+.vital-name { color: inherit; }
+.vital-activity { color: var(--text-muted); font-size: 0.75rem; }
+
+/* ═══════════════════════════════════════════
    Domain View — zoomed into a specific domain
    ═══════════════════════════════════════════ */
 

@@ -10,6 +10,39 @@ use portal_domain_trait::ConsciousnessTier;
 
 use crate::identity::{PortalIdentity, VaultState};
 
+/// Experiential phenotype — how you perceive your consciousness.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Phenotype {
+    /// Spatial: consciousness as sphere with orbiting domains
+    Orb,
+    /// Chronological: consciousness as a river of events
+    Stream,
+    /// Categorical: consciousness as a living garden
+    Garden,
+    /// Minimal: consciousness as a heartbeat
+    Pulse,
+}
+
+impl Phenotype {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Orb => "Orb",
+            Self::Stream => "Stream",
+            Self::Garden => "Garden",
+            Self::Pulse => "Pulse",
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Orb => "See yourself as a sphere of consciousness with domains orbiting around you",
+            Self::Stream => "Experience your data as a flowing river of events through time",
+            Self::Garden => "Tend your domains like plots in a living garden",
+            Self::Pulse => "Just the heartbeat — minimal, focused, fast",
+        }
+    }
+}
+
 /// A domain node orbiting the consciousness orb.
 #[derive(Clone, Debug)]
 pub struct OrbitalDomain {
@@ -38,9 +71,10 @@ pub fn App() -> impl IntoView {
     let identity = PortalIdentity::new();
     provide_context(identity.clone());
 
-    // Active (zoomed-in) domain — None means orbital view
     let active_domain: RwSignal<Option<String>> = RwSignal::new(None);
+    let phenotype: RwSignal<Option<Phenotype>> = RwSignal::new(None);
     provide_context(active_domain);
+    provide_context(phenotype);
 
     // Event stream — cross-domain energy flowing to the orb
     let events: RwSignal<Vec<PortalEvent>> = RwSignal::new(vec![
@@ -121,6 +155,7 @@ pub fn App() -> impl IntoView {
         <div class="portal-universe">
             {move || {
                 if vault.get() == VaultState::NoVault {
+                    // FIRST BREATH — seed waiting
                     view! {
                         <div class="first-breath-universe">
                             <div class="first-breath-seed-container">
@@ -138,8 +173,112 @@ pub fn App() -> impl IntoView {
                             }>"Breathe"</button>
                         </div>
                     }.into_any()
-                } else if active_domain.get().is_none() {
+                } else if phenotype.get().is_none() {
+                    // PHENOTYPE SELECTION — "How do you see yourself?"
                     view! {
+                        <div class="phenotype-selection">
+                            <h1 class="phenotype-question">"How do you see yourself?"</h1>
+                            <div class="phenotype-grid">
+                                {[Phenotype::Orb, Phenotype::Stream, Phenotype::Garden, Phenotype::Pulse]
+                                    .iter().map(|p| {
+                                    let p = *p;
+                                    view! {
+                                        <button class="phenotype-card" on:click=move |_| phenotype.set(Some(p))>
+                                            <div class=format!("phenotype-preview {}", p.label().to_lowercase()) />
+                                            <span class="phenotype-name">{p.label()}</span>
+                                            <span class="phenotype-desc">{p.description()}</span>
+                                        </button>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        </div>
+                    }.into_any()
+                } else if active_domain.get().is_none() {
+                    // MAIN VIEW — rendered according to phenotype
+                    let ph = phenotype.get().unwrap_or(Phenotype::Orb);
+                    match ph {
+                    Phenotype::Stream => view! {
+                        <div class="stream-view">
+                            <div class="stream-header">
+                                <span class="orb-score">{format!("{:.0}%", consciousness.get() * 100.0)}</span>
+                                <span class="orb-tier">{tier.get().label()}</span>
+                                <button class="phenotype-switch" on:click=move |_| phenotype.set(None)>"Switch View"</button>
+                            </div>
+                            <div class="stream-timeline">
+                                {events.get().iter().map(|e| {
+                                    view! {
+                                        <div class="stream-event-card">
+                                            <div class="stream-event-dot" />
+                                            <div class="stream-event-body">
+                                                <span class="stream-event-text">{e.description.clone()}</span>
+                                                <span class="stream-event-domain">{e.from_domain}</span>
+                                            </div>
+                                        </div>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                            <div class="stream-domains">
+                                {domains.iter().filter(|d| d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked())).map(|d| {
+                                    let id = d.id;
+                                    view! {
+                                        <button class="stream-domain-chip" style=format!("border-color: {}", d.color)
+                                            on:click=move |_| { active_domain.set(Some(id.to_string())); }>
+                                            {d.bio_name}
+                                        </button>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        </div>
+                    }.into_any(),
+                    Phenotype::Garden => view! {
+                        <div class="garden-view">
+                            <div class="garden-header">
+                                <span class="orb-score">{format!("{:.0}%", consciousness.get() * 100.0)}</span>
+                                <span class="orb-tier">{tier.get().label()}</span>
+                                <button class="phenotype-switch" on:click=move |_| phenotype.set(None)>"Switch View"</button>
+                            </div>
+                            <div class="garden-plots">
+                                {domains.iter().map(|d| {
+                                    let id = d.id;
+                                    let accessible = d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked());
+                                    let activity = d.activity;
+                                    view! {
+                                        <button
+                                            class=move || if accessible { "garden-plot alive" } else { "garden-plot dormant" }
+                                            style=format!("--plot-color: {}; --plot-glow: {}; --plot-height: {:.0}%;", d.color, d.glow, activity * 100.0)
+                                            disabled=!accessible
+                                            on:click=move |_| { if accessible { active_domain.set(Some(id.to_string())); } }
+                                        >
+                                            <div class="plot-growth" />
+                                            <span class="plot-name">{d.bio_name}</span>
+                                        </button>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        </div>
+                    }.into_any(),
+                    Phenotype::Pulse => view! {
+                        <div class="pulse-view">
+                            <div class="pulse-center">
+                                <div class="pulse-beat" />
+                                <span class="pulse-score">{format!("{:.0}%", consciousness.get() * 100.0)}</span>
+                            </div>
+                            <div class="pulse-vitals">
+                                {domains.iter().filter(|d| d.activity > 0.3 && d.min_tier <= ConsciousnessTier::from_score(consciousness.get_untracked())).map(|d| {
+                                    let id = d.id;
+                                    view! {
+                                        <button class="pulse-vital" style=format!("color: {}", d.glow)
+                                            on:click=move |_| { active_domain.set(Some(id.to_string())); }>
+                                            <span class="vital-name">{d.bio_name}</span>
+                                            <span class="vital-activity">{format!("{:.0}%", d.activity * 100.0)}</span>
+                                        </button>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                            <button class="phenotype-switch" on:click=move |_| phenotype.set(None)>"Switch View"</button>
+                        </div>
+                    }.into_any(),
+                    _ => view! {
                         <div class="orbital-view">
                             <div class="consciousness-orb">
                                 <div class="orb-core" />
@@ -186,8 +325,10 @@ pub fn App() -> impl IntoView {
                                     }
                                 }).collect::<Vec<_>>()}
                             </div>
+                            <button class="phenotype-switch orb-switch" on:click=move |_| phenotype.set(None)>"Switch View"</button>
                         </div>
-                    }.into_any()
+                    }.into_any(),
+                    } // end match
                 } else {
                     view! {
                         <div class="domain-view">
