@@ -329,6 +329,38 @@ mod tests {
     }
 
     #[test]
+    fn constants_default_survival_times() {
+        // Verify the calibration math from the plan
+        let c = ThermodynamicConstants::default();
+        let ticks_per_sec = 64.0;
+
+        // Idle survival: energy / maintenance_per_tick
+        let idle_ticks = c.initial_energy / c.consciousness_maintenance_per_tick;
+        let idle_seconds = idle_ticks / ticks_per_sec;
+        assert!(idle_seconds > 150.0, "idle survival {idle_seconds}s should be > 150s");
+        assert!(idle_seconds < 250.0, "idle survival {idle_seconds}s should be < 250s");
+
+        // Walking survival: energy / (maintenance + movement_cost * speed/tick_rate)
+        let walk_speed = 100.0; // physics units/sec
+        let walk_displacement_per_tick = walk_speed / ticks_per_sec;
+        let walk_cost_per_tick = c.movement_cost_per_unit * walk_displacement_per_tick;
+        let walk_ticks = c.initial_energy / (c.consciousness_maintenance_per_tick + walk_cost_per_tick);
+        let walk_seconds = walk_ticks / ticks_per_sec;
+        assert!(walk_seconds > 100.0, "walk survival {walk_seconds}s should be > 100s");
+        assert!(walk_seconds < 200.0, "walk survival {walk_seconds}s should be < 200s");
+
+        // Sprinting: faster depletion
+        let sprint_cost_per_tick = c.movement_cost_per_unit * (200.0 / ticks_per_sec) * c.sprint_cost_multiplier;
+        let sprint_ticks = c.initial_energy / (c.consciousness_maintenance_per_tick + sprint_cost_per_tick);
+        let sprint_seconds = sprint_ticks / ticks_per_sec;
+        assert!(sprint_seconds < walk_seconds, "sprint should deplete faster than walk");
+
+        // With harmony partner: should regenerate (net positive)
+        let harmony_net = c.harmony_resonance_regen_rate - c.consciousness_maintenance_per_tick;
+        assert!(harmony_net > 0.0, "harmony regen should exceed maintenance: {harmony_net}");
+    }
+
+    #[test]
     fn energy_per_cognitive_op() {
         // Verify the constant is physically reasonable
         // Brain uses ~20W for ~10^11 synapses at ~10Hz = 10^12 ops/sec
