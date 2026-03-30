@@ -133,6 +133,12 @@ pub struct MultiWorldSimulator {
     pub generation_ship_launch_tick: u32,
     /// Whether the generation ship has been launched.
     generation_ship_launched: bool,
+    /// Per-world Turchin secular cycle state (cliodynamics).
+    pub secular_cycles: std::collections::HashMap<u32, cliodynamics::SecularCycleState>,
+    /// Disaster config loaded from TOML (or defaults).
+    pub disaster_config: config_loader::DisasterConfig,
+    /// JSONL output path for live metrics (None = disabled).
+    pub jsonl_output_path: Option<std::path::PathBuf>,
 }
 
 impl MultiWorldSimulator {
@@ -168,7 +174,17 @@ impl MultiWorldSimulator {
             generation_ship: None,
             generation_ship_launch_tick: 0,
             generation_ship_launched: false,
+            secular_cycles: std::collections::HashMap::new(),
+            disaster_config: config_loader::load_disaster_config(
+                std::path::Path::new("config/disasters.toml"),
+            ),
+            jsonl_output_path: None,
         }
+    }
+
+    /// Enable JSONL telemetry output to a file.
+    pub fn enable_jsonl_output(&mut self, path: std::path::PathBuf) {
+        self.jsonl_output_path = Some(path);
     }
 
     /// Enable interstellar mode: launch a generation ship at the specified tick.
@@ -3127,6 +3143,174 @@ impl MultiWorldSimulator {
 
             // Phase 9.5: Disasters (before emergencies — disasters can trigger emergencies)
             self.tick_disasters();
+
+            // Phase 9.6: Turchin cliodynamics — secular cycles, civil war, secession
+            if self.config.policy.turchin_cycles_enabled {
+                let world_count = self.worlds.len();
+                for i in 0..world_count {
+                    let world = &self.worlds[i];
+                    let world_id = world.id;
+                    let pop = world.population();
+                    if pop == 0 { continue; }
+
+                    // Compute elite fraction (Steward + Guardian tiers)
+                    let elite_count = world.agents.iter()
+                        .filter(|a| a.death_tick.is_none() && a.consciousness.phi() >= 0.6)
+                        .count();
+                    let elite_fraction = elite_count as f64 / pop.max(1) as f64;
+
+                    // Compute non-elite mean phi and prediction error proxy
+                    let non_elites: Vec<&agent::CivAgent> = world.agents.iter()
+                        .filter(|a| a.death_tick.is_none() && a.consciousness.phi() < 0.6)
+                        .collect();
+                    let non_elite_mean_phi = if non_elites.is_empty() { 0.5 } else {
+                        non_elites.iter().map(|a| a.consciousness.phi()).sum::<f64>() / non_elites.len() as f64
+                    };
+                    // FEP prediction error proxy: allostatic load × (1 - phi)
+                    // High stress + low consciousness = high prediction error
+                    let non_elite_prediction_error = if self.config.policy.fep_immiseration_enabled {
+                        let mean_load = if non_elites.is_empty() { 0.0 } else {
+                            non_elites.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / non_elites.len() as f64
+                        };
+                        mean_load * (1.0 - non_elite_mean_phi) * 2.0
+                    } else {
+                        0.0
+                    };
+
+                    let inputs = cliodynamics::CycleInputs {
+                        gini: world.economy.gini_coefficient,
+                        elite_fraction,
+                        governance_positions: 10 + pop / 100, // ~1 seat per 100 people
+                        population: pop,
+                        self_sufficiency: world.resources.self_sufficiency(),
+                        governance_quality: world.harmony.current_scores.iter().sum::<f64>() / 8.0,
+                        mean_allostatic_load: if non_elites.is_empty() { 0.0 } else {
+                            non_elites.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / non_elites.len() as f64
+                        },
+                        non_elite_prediction_error,
+                        non_elite_mean_phi,
+                        secession_capable: world.location != "Earth"
+                            && world.resources.self_sufficiency() > 0.7,
+                        current_tick: self.current_tick,
+                    };
+
+                    let cycle_state = self.secular_cycles
+                        .entry(world_id)
+                        .or_insert_with(cliodynamics::SecularCycleState::default);
+
+                    let cycle_events = cycle_state.tick(&inputs, self.rng.next_f64());
+
+                    // Apply cycle events to world
+                    for event in cycle_events {
+                        match event {
+                            cliodynamics::CycleEvent::CivilWar { population_loss_fraction, infrastructure_damage } => {
+                                let world = &mut self.worlds[i];
+                                let deaths = (world.population() as f64 * population_loss_fraction) as usize;
+                                // Kill random agents
+                                let mut killed = 0;
+                                for agent in &mut world.agents {
+                                    if killed >= deaths { break; }
+                                    if agent.death_tick.is_none() && self.rng.next_f64() < population_loss_fraction * 3.0 {
+                                        agent.death_tick = Some(self.current_tick);
+                                        killed += 1;
+                                    }
+                                }
+                                world.infrastructure_level = (world.infrastructure_level - infrastructure_damage).max(0.0);
+                                // Increase trauma for all survivors
+                                for agent in &mut world.agents {
+                                    if agent.death_tick.is_none() {
+                                        agent.trauma_level = (agent.trauma_level + 0.3 * population_loss_fraction).min(1.0);
+                                    }
+                                }
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(world_id),
+                                    CivEventType::EmergencyDeclared,
+                                    format!("CIVIL WAR on {} — {:.1}% casualties, {:.0}% infrastructure destroyed",
+                                        self.worlds[i].name, population_loss_fraction * 100.0, infrastructure_damage * 100.0),
+                                ));
+                            }
+                            cliodynamics::CycleEvent::Secession { .. } => {
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(world_id),
+                                    CivEventType::EmergencyDeclared,
+                                    format!("SECESSION: {} declares independence from Earth",
+                                        self.worlds[i].name),
+                                ));
+                            }
+                            cliodynamics::CycleEvent::ElitePurge { agents_affected_fraction } => {
+                                let world = &mut self.worlds[i];
+                                for agent in &mut world.agents {
+                                    if agent.death_tick.is_none()
+                                        && agent.consciousness.phi() >= 0.6
+                                        && self.rng.next_f64() < agents_affected_fraction
+                                    {
+                                        // Demote: reduce consciousness
+                                        agent.consciousness.level *= 0.5;
+                                        agent.consciousness.meta_awareness *= 0.5;
+                                    }
+                                }
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(world_id),
+                                    CivEventType::EmergencyDeclared,
+                                    format!("Elite purge on {} — {:.0}% of elites demoted",
+                                        self.worlds[i].name, agents_affected_fraction * 100.0),
+                                ));
+                            }
+                            cliodynamics::CycleEvent::PhaseTransition { from, to } => {
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(world_id),
+                                    CivEventType::TradeEstablished, // Reuse event type for phase change
+                                    format!("Turchin cycle on {}: {:?} → {:?}",
+                                        self.worlds[i].name, from, to),
+                                ));
+                            }
+                            cliodynamics::CycleEvent::Recovery => {
+                                self.events.push(CivEvent::new(
+                                    self.current_tick,
+                                    Some(world_id),
+                                    CivEventType::TradeEstablished,
+                                    format!("{} recovering from secular depression", self.worlds[i].name),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Phase 9.7: JSONL telemetry output
+            if let Some(ref path) = self.jsonl_output_path {
+                let total_pop = self.worlds.iter().map(|w| w.population()).sum();
+                let mean_phi = if self.worlds.is_empty() { 0.0 } else {
+                    self.worlds.iter().map(|w| {
+                        let alive: Vec<_> = w.agents.iter().filter(|a| a.death_tick.is_none()).collect();
+                        if alive.is_empty() { 0.0 } else {
+                            alive.iter().map(|a| a.consciousness.phi()).sum::<f64>() / alive.len() as f64
+                        }
+                    }).sum::<f64>() / self.worlds.len() as f64
+                };
+                let mean_gini = if self.worlds.is_empty() { 0.0 } else {
+                    self.worlds.iter().map(|w| w.economy.gini_coefficient).sum::<f64>() / self.worlds.len() as f64
+                };
+                let first_world_cycle = self.secular_cycles.values().next();
+                let metrics = live_metrics::LiveMetrics::compute(
+                    self.current_tick,
+                    &self.config.policy,
+                    first_world_cycle,
+                    0.0, // CVS computed later
+                    total_pop,
+                    mean_phi,
+                    mean_gini,
+                    0.0, // mean allostatic load
+                    0.0, // infrastructure mean
+                    false, // solar cycle max
+                    1.0, // kessler density
+                );
+                let _ = metrics.append_jsonl(path);
+            }
 
             // Phase 10: Emergencies
             self.tick_emergencies();
