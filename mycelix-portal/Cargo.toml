@@ -74,6 +74,9 @@ domain-admin = { path = "crates/domain-admin", optional = true }
 mycelix-leptos-client = { path = "../crates/mycelix-leptos-client", features = ["browser"] }
 send_wrapper = "0.6"
 
+[dev-dependencies]
+rmp-serde = "1"
+
 [features]
 default = ["health", "governance", "commons", "finance", "edunet", "hearth", "knowledge", "lucid", "mail", "admin"]
 health = ["dep:domain-health"]

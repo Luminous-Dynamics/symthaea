@@ -302,7 +302,9 @@ impl HabitatComplex {
     pub fn default_surface_colony(location: &str) -> Self {
         let mut complex = Self::new();
 
-        // Every colony starts with basic surface modules
+        // Early colonies are austere: sealed pressure vessels with minimal windows.
+        // "Tin cans in space" — the ISS aesthetic, not the sci-fi aesthetic.
+        // Window upgrades come later as projects (Water Window Nexus, Observation Dome).
         complex.modules.push(HabitatModule {
             name: "Primary Hab".into(),
             function: ModuleFunction::Habitation,
@@ -310,7 +312,7 @@ impl HabitatComplex {
             capacity: 200,
             occupancy: 0,
             shielding: ShieldingType::Unshielded,
-            windows: WindowType::PressureWindow,
+            windows: WindowType::Simulated, // Screens, not real windows (early colony)
             operational: true,
             construction_start: None,
             construction_duration: 0,
@@ -322,8 +324,8 @@ impl HabitatComplex {
             volume_m3: 300.0,
             capacity: 20,
             occupancy: 0,
-            shielding: ShieldingType::Unshielded, // Greenhouses need light
-            windows: WindowType::Dome,             // Full sky for crops
+            shielding: ShieldingType::Unshielded,
+            windows: WindowType::PressureWindow, // Needs some light for crops, but not a dome
             operational: true,
             construction_start: None,
             construction_duration: 0,
@@ -336,7 +338,7 @@ impl HabitatComplex {
             capacity: 30,
             occupancy: 0,
             shielding: ShieldingType::Unshielded,
-            windows: WindowType::None, // Industrial space
+            windows: WindowType::None,
             operational: true,
             construction_start: None,
             construction_duration: 0,

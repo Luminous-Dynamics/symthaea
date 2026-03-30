@@ -1399,6 +1399,34 @@ impl MultiWorldSimulator {
             // EMA toward target (slow adoption)
             world.automation_level = world.automation_level * 0.99 + auto_target * 0.01;
 
+            // Robot manufacturing: fabrication workshop produces robots gradually.
+            // Each robot takes ~6 months to build. Workshop can build 1 at a time.
+            // Robot type selected by colony need (agriculture humanoid first,
+            // then manipulators, then drones for exploration).
+            if has_manufacturing && tick % 6 == 0 // Check every 6 months
+                && world.fleet.total_units() < (pop as usize / 50).max(2) // 1 robot per 50 people
+            {
+                // Choose robot type by need
+                let platform = if world.fleet.count_operational(robotics::RobotPlatform::Humanoid) == 0 {
+                    robotics::RobotPlatform::Humanoid // First: Ag-Bay labor
+                } else if world.fleet.count_operational(robotics::RobotPlatform::Manipulator) < 2 {
+                    robotics::RobotPlatform::Manipulator // Then: workshop/maintenance
+                } else if world.fleet.count_operational(robotics::RobotPlatform::Quadrotor) == 0 {
+                    robotics::RobotPlatform::Quadrotor // Then: exploration drone
+                } else {
+                    robotics::RobotPlatform::Manipulator // Default: more maintenance capacity
+                };
+                world.fleet.deploy(platform);
+                self.events.push(CivEvent::new(
+                    tick, Some(world.id), CivEventType::EmergencyDeclared,
+                    format!("{}: ROBOT COMMISSIONED — {:?} unit #{} operational. \
+                        Fleet power demand: {:.0}W, labor offset: {:.0} hr/day",
+                        world.name, platform, world.fleet.total_units(),
+                        world.fleet.total_power_draw_w,
+                        world.fleet.total_labor_replaced / 30.0), // per day from monthly
+                ));
+            }
+
             // === #3: MAINTENANCE LABOR BUDGET ===
             // Infrastructure demands maintenance proportional to complexity.
             // Tainter (1988): diminishing returns on complexity.
@@ -1582,7 +1610,8 @@ impl MultiWorldSimulator {
                 // Genetic Engineering enables risky low-g reproduction (higher infant mortality).
                 let has_centrifuge = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
                 let has_gene_therapy = self.disaster_engine.tech_tree.is_achieved("Genetic Engineering");
-                world.reproduction_viable = gravity >= 0.38 || has_centrifuge
+                // Mars (0.38g) is borderline — use >= 0.37 to avoid float jitter
+                world.reproduction_viable = gravity >= 0.37 || has_centrifuge
                     || (has_gene_therapy && gravity >= 0.13);
                 // Low-gravity fertility penalty (Wakayama 2023, Lyons 2026).
                 // JAXA: mouse embryo survival <30% in microgravity vs >60% at 1g.
@@ -1630,27 +1659,51 @@ impl MultiWorldSimulator {
                     + (1.0 - world.trust_level) * 0.2;
 
                 if independence_pressure > 0.6 {
-                    // Independence movement forms
                     let world_name = world.name.clone();
                     let world_id = world.id;
+
+                    // Escalation: count prior independence events for this world
+                    let prior_count = self.events.iter()
+                        .filter(|e| e.world_id == Some(world_id)
+                            && e.description.contains("INDEPENDENCE"))
+                        .count();
+
+                    // Phase-based escalation
+                    let (phase, description, trust_hit, diplo_hit) = match prior_count {
+                        0 => ("PETITION", format!(
+                            "{}: INDEPENDENCE PETITION — pressure {:.0}%. \
+                            \"We respectfully request greater autonomy.\"",
+                            world_name, independence_pressure * 100.0), 0.02, 0.05),
+                        1 => ("MOVEMENT", format!(
+                            "{}: INDEPENDENCE MOVEMENT — organized political action. \
+                            Pop {}, SS {:.0}%. Assemblies debate sovereignty.",
+                            world_name, pop as usize,
+                            world.resources.self_sufficiency() * 100.0), 0.05, 0.10),
+                        2 => ("DECLARATION", format!(
+                            "{}: INDEPENDENCE DECLARATION — \"We are sovereign.\" \
+                            Pop {}, fully self-sufficient. The break is formal.",
+                            world_name, pop as usize), 0.10, 0.20),
+                        3 => ("FEDERATION PROPOSAL", format!(
+                            "{}: FEDERATION PROPOSAL — equal partnership offered to Earth. \
+                            \"Not subjects. Partners.\" Trade and defense alliance terms drafted.",
+                            world_name), 0.0, 0.05), // Federation improves relations
+                        _ => ("POLITICAL EVOLUTION", format!(
+                            "{}: sovereign governance matures. Gen {} leadership \
+                            shapes post-independence institutions.",
+                            world_name, (tick as f64 / 360.0) as u16), 0.0, 0.0),
+                    };
+
                     self.events.push(CivEvent::new(
                         tick, Some(world_id), CivEventType::ConstitutionalAmendment,
-                        format!("{}: INDEPENDENCE MOVEMENT — pressure {:.0}%. Pop {}, \
-                            self-sufficiency {:.0}%, cultural divergence {:.2}. \
-                            \"We can govern ourselves.\"",
-                            world_name, independence_pressure * 100.0,
-                            pop as usize, world.resources.self_sufficiency() * 100.0,
-                            cultural_dist),
+                        format!("INDEPENDENCE {}: {}", phase, description),
                     ));
-                    // Independence reduces trust with Earth but boosts local identity
+
                     world.narrative_identity.identification =
                         (world.narrative_identity.identification + 0.1).min(1.0);
-                    world.trust_level = (world.trust_level - 0.05).max(0.0);
-                    // P2: Independence degrades diplomatic relations with Earth
-                    // (earth_id cached before the structural realism loop)
+                    world.trust_level = (world.trust_level - trust_hit).max(0.0);
                     if let Some(eid) = earth_id_cached {
                         let rel = world.diplomatic_relations.entry(eid).or_insert(0.5);
-                        *rel = (*rel - 0.15).max(-1.0);
+                        *rel = (*rel - diplo_hit).max(-1.0);
                     }
                 }
             }
@@ -3002,6 +3055,8 @@ impl MultiWorldSimulator {
                             if let Some(mat) = world.resources.get_mut("materials") {
                                 mat.production_rate *= 1.5;
                             }
+                            // Fabrication workshop enables robot manufacturing.
+                            // Robots are built over time, not spawned instantly.
                         }
                         projects::ProjectBlueprint::WaterExtractionPlant => {
                             if let Some(w) = world.resources.get_mut("water") {
