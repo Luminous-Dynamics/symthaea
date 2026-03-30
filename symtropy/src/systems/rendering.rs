@@ -297,6 +297,7 @@ pub fn hud_system(
     player_consciousness: Res<crate::systems::consciousness::PlayerConsciousness>,
     physics: Res<PhysicsWorldRes>,
     thermo_hud: Res<crate::systems::thermodynamic::ThermodynamicHudState>,
+    dim_state: Res<crate::systems::dimension_transition::DimensionTransition>,
 ) {
     timer.0 += time.delta_secs();
     if timer.0 < 0.25 {
@@ -360,12 +361,18 @@ pub fn hud_system(
         ("Energy: --".to_string(), 1.0)
     };
 
+    let dim_str = if dim_state.transitioning() {
+        format!("{} → {} ({:.0}%)", dim_state.current.name(), dim_state.target.name(), dim_state.progress * 100.0)
+    } else {
+        format!("{} [F1-F4]", dim_state.current.name())
+    };
+
     let hud_text = format!(
-        "WASD: move | Shift: sprint | E: extract | Esc: quit\n\
+        "WASD: move | Shift: sprint | E: extract | F1-F4: dimension | Esc: quit\n\
          Stress: {:.0}%  Load: {:.0}%  Leviathan: {phase}{sanctuary}\n\
          {consciousness}  Harmony: {harm}  Fragments: {frags}/48\n\
          {energy}\n\
-         Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%",
+         Dim: {dim}  Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%",
         stress.arousal * 100.0,
         biometrics.model.allostatic_load * 100.0,
         phase = phase_str,
@@ -374,6 +381,7 @@ pub fn hud_system(
         harm = harmony_str,
         frags = collected.total(),
         energy = energy_str,
+        dim = dim_str,
         noise = leviathan.noise_accumulator,
         thresh = leviathan.threshold,
         ext = extraction * 100.0,

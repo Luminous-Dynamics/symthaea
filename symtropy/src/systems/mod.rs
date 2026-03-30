@@ -4,6 +4,7 @@
 
 pub mod ai_player;
 pub mod audio;
+pub mod dimension_transition;
 pub mod consciousness;
 pub mod engine_physics;
 pub mod phi_pcg;

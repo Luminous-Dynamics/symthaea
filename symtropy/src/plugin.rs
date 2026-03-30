@@ -31,6 +31,7 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<PhysicsWorldRes>()
             .init_resource::<PlayerInput>()
             .init_resource::<systems::thermodynamic::ThermodynamicHudState>()
+            .init_resource::<systems::dimension_transition::DimensionTransition>()
             .init_resource::<systems::living_dungeon::DungeonBreathTimer>()
             // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
             .add_systems(FixedUpdate, (
@@ -50,6 +51,8 @@ impl Plugin for SymtropyPlugin {
             .add_systems(Update, auto_start.run_if(in_state(GamePhase::Loading)))
             .add_systems(OnExit(GamePhase::Loading), systems::menu::cleanup_loading)
             .add_systems(Update, (
+                systems::dimension_transition::dimension_input_system,
+                systems::dimension_transition::dimension_transition_system,
                 systems::input::input_system, systems::player::player_movement_system,
                 systems::player::flashlight_system, systems::player::extraction_system,
                 systems::fep_behavior::fep_behavior_system, systems::fep_behavior::npc_movement_system,
