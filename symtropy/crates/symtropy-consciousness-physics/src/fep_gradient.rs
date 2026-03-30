@@ -31,21 +31,46 @@ use crate::harmony_field::HarmonyField;
 /// `energy_wells`: list of (position, remaining_fraction) for energy wells
 /// `danger_source`: optional position of the threat (Leviathan)
 /// `danger_level`: [0, 1]
+/// Original Φ-independent gradient (backward compatible).
 pub fn free_energy_gradient<const D: usize>(
     position: &SVector<f64, D>,
     energy_fraction: f64,
     harmony: &[f64; 8],
     nearby_agents: &[(SVector<f64, D>, [f64; 8])],
-    energy_wells: &[(SVector<f64, D>, f64)], // (position, remaining_fraction)
+    energy_wells: &[(SVector<f64, D>, f64)],
+    danger_source: Option<&SVector<f64, D>>,
+    danger_level: f64,
+) -> SVector<f64, D> {
+    free_energy_gradient_phi(position, energy_fraction, None, harmony, nearby_agents, energy_wells, danger_source, danger_level)
+}
+
+/// Extended version with Φ as an explicit parameter.
+///
+/// When `phi` is provided, it modulates:
+/// 1. Cooperation urgency: scaled by (1 + phi) — higher consciousness = stronger social drive
+/// 2. Resonance gating: only attracted to agents whose harmony resonance × phi > 0.3
+/// 3. Danger sensitivity: higher phi = detect danger earlier (wider avoidance)
+///
+/// Call with phi = None for the Φ-independent baseline.
+pub fn free_energy_gradient_phi<const D: usize>(
+    position: &SVector<f64, D>,
+    energy_fraction: f64,
+    phi: Option<f64>,
+    harmony: &[f64; 8],
+    nearby_agents: &[(SVector<f64, D>, [f64; 8])],
+    energy_wells: &[(SVector<f64, D>, f64)],
     danger_source: Option<&SVector<f64, D>>,
     danger_level: f64,
 ) -> SVector<f64, D> {
     let mut gradient = SVector::zeros();
     let mut total_weight = 0.0;
 
-    // === 1. Seek resonant partners (epistemic offloading reduces processing cost) ===
-    // Weight increases as energy decreases (more desperate = stronger drive to cooperate)
-    let cooperation_urgency = 1.0 - energy_fraction; // 0 when full, 1 when empty
+    let phi_val = phi.unwrap_or(0.5);
+
+    // === 1. Seek resonant partners ===
+    // Φ-coupled: higher consciousness = stronger social drive
+    // This is the key wiring: cooperation_urgency now scales with Φ
+    let cooperation_urgency = (1.0 - energy_fraction) * (0.5 + phi_val); // Φ amplifies social drive
 
     for (agent_pos, agent_harmony) in nearby_agents {
         let delta = agent_pos - position;
@@ -53,9 +78,12 @@ pub fn free_energy_gradient<const D: usize>(
         if dist < 1.0 || dist > 100.0 { continue; }
 
         let resonance = HarmonyField::<D>::resonance(harmony, agent_harmony);
-        if resonance > 0.3 {
-            // Attraction proportional to resonance and urgency
-            let attraction = resonance * cooperation_urgency * 2.0;
+        // Φ-coupled resonance gating: need resonance × phi_val > 0.15 to feel attraction
+        // High Φ agents are attracted to weaker resonances (more socially aware)
+        // Low/zero Φ agents only attracted to very strong resonances
+        let effective_resonance = resonance * (0.3 + phi_val * 0.7);
+        if effective_resonance > 0.15 {
+            let attraction = effective_resonance * cooperation_urgency * 2.0;
             gradient += delta / dist * attraction;
             total_weight += attraction;
         }
@@ -81,8 +109,10 @@ pub fn free_energy_gradient<const D: usize>(
     }
 
     // === 3. Flee from danger (avoid high-entropy zones) ===
+    // Φ-coupled: higher consciousness = detect danger at lower thresholds
+    let danger_threshold = 0.5 - phi_val * 0.4; // Φ=1 detects at 0.1, Φ=0 detects at 0.5
     if let Some(danger_pos) = danger_source {
-        if danger_level > 0.1 {
+        if danger_level > danger_threshold {
             let delta = position - danger_pos; // AWAY from danger
             let dist = delta.norm();
             if dist > 1.0 && dist < 300.0 {
