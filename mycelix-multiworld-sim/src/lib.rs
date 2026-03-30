@@ -3634,3 +3634,4 @@ pub mod maglev_network;
 pub mod generation_ship;
 pub mod fusion_bridge;
 pub mod cliodynamics;
+pub mod live_metrics;

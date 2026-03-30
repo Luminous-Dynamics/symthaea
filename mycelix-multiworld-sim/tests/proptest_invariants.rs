@@ -68,6 +68,7 @@ fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
                     trade_openness: 0.5,
                     defense_spending: 0.05,
                     exploration_investment: 0.05,
+                    ..PolicyConfig::default()
                 }
             },
         )

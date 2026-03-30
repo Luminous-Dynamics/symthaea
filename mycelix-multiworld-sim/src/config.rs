@@ -29,6 +29,8 @@ pub struct SimulationConfig {
     pub policy: PolicyConfig,
 }
 
+fn default_true() -> bool { true }
+
 /// Configurable policy knobs for A/B scenario testing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyConfig {
@@ -65,6 +67,54 @@ pub struct PolicyConfig {
     /// and off-world colonists are instantiated via the Spaceport Funnel.
     /// Default false for backward compatibility.
     pub hybrid_earth: bool,
+
+    // === REALISM TOGGLES — scientific instrument controls ===
+
+    /// Turchin secular cycles: elite overproduction → crisis → civil war.
+    /// When false, no Turchin dynamics — society is conflict-free (utopia).
+    #[serde(default = "default_true")]
+    pub turchin_cycles_enabled: bool,
+    /// FEP-coupled immiseration: prediction error drives suffering thermodynamically.
+    /// When false, immiseration uses abstract Gini only (standard Turchin).
+    #[serde(default = "default_true")]
+    pub fep_immiseration_enabled: bool,
+    /// Sacred Stillness: rest as existential infrastructure (6× rebuild multiplier).
+    /// When false, Stillness harmony has no effect on recovery rate.
+    #[serde(default = "default_true")]
+    pub sacred_stillness_enabled: bool,
+    /// Stoichiometric mass ledger for closed-loop ECLSS (generation ships only).
+    #[serde(default)]
+    pub stoichiometry_enabled: bool,
+    /// Cosmic epistemic decay: knowledge degrades from radiation + isolation.
+    #[serde(default)]
+    pub epistemic_decay_enabled: bool,
+    /// Age-structured demographics with Leslie matrix and dependency ratios.
+    #[serde(default)]
+    pub age_demographics_enabled: bool,
+
+    // === DISASTER CATEGORY TOGGLES ===
+
+    /// Solar weather events (M-class, X-class, Carrington, SPE).
+    #[serde(default = "default_true")]
+    pub disasters_solar_enabled: bool,
+    /// Impact events (micrometeorite, meteorite).
+    #[serde(default = "default_true")]
+    pub disasters_impact_enabled: bool,
+    /// Planetary environment (dust storms, moonquakes, tides).
+    #[serde(default = "default_true")]
+    pub disasters_planetary_enabled: bool,
+    /// ECLSS failures (O2, water, CO2, thermal, power, hydroponics).
+    #[serde(default = "default_true")]
+    pub disasters_eclss_enabled: bool,
+    /// Psychological events (winter-over, conflict, cognitive impairment).
+    #[serde(default = "default_true")]
+    pub disasters_psychological_enabled: bool,
+    /// Technology events (breakthroughs, regressions).
+    #[serde(default = "default_true")]
+    pub disasters_technology_enabled: bool,
+    /// Civilization dynamics (Tainter collapse, Turchin crises, Kessler).
+    #[serde(default = "default_true")]
+    pub disasters_civilization_enabled: bool,
 
     // === C: SCENARIO MODE — player/researcher policy choices ===
 
@@ -141,6 +191,19 @@ impl Default for PolicyConfig {
             hostile_guardian: false,
             disasters_enabled: true,
             hybrid_earth: false,
+            turchin_cycles_enabled: true,
+            fep_immiseration_enabled: true,
+            sacred_stillness_enabled: true,
+            stoichiometry_enabled: false,
+            epistemic_decay_enabled: false,
+            age_demographics_enabled: false,
+            disasters_solar_enabled: true,
+            disasters_impact_enabled: true,
+            disasters_planetary_enabled: true,
+            disasters_eclss_enabled: true,
+            disasters_psychological_enabled: true,
+            disasters_technology_enabled: true,
+            disasters_civilization_enabled: true,
             project_strategy: ProjectStrategy::Balanced,
             birth_policy: BirthPolicy::Natural,
             resource_priority: ResourcePriority::Balanced,
@@ -152,6 +215,29 @@ impl Default for PolicyConfig {
 }
 
 impl PolicyConfig {
+    /// Legacy mode: standard human governance WITHOUT consciousness gating or FEP.
+    /// This is the control group for proving Symthaea/Mycelix are necessary.
+    pub fn legacy_mode() -> Self {
+        Self {
+            consciousness_gating_enabled: false,
+            fep_immiseration_enabled: false,
+            sacred_stillness_enabled: false,
+            turchin_cycles_enabled: true, // Keep conflict — it's what breaks legacy
+            faction_enabled: true,
+            ..Self::default()
+        }
+    }
+
+    /// Utopia mode: all disasters and conflict disabled. The ceiling test.
+    pub fn utopia_mode() -> Self {
+        Self {
+            disasters_enabled: false,
+            turchin_cycles_enabled: false,
+            faction_enabled: false,
+            ..Self::default()
+        }
+    }
+
     /// Create a "Survival First" preset (conservative, risk-averse).
     pub fn survival_first() -> Self {
         Self {
