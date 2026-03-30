@@ -1,3 +1,6 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 {
   description = "Luminous Dynamics Monorepo - Common Development Environment";
 
@@ -130,15 +133,34 @@
             llvmPackages.libclang
             llvmPackages.clang
 
-            # LaTeX (papers — HAI, psych-bench, stewardship)
+            # LaTeX (papers — HAI, psych-bench, stewardship, ALIFE 2026)
             (texlive.combine {
               inherit (texlive)
                 scheme-medium
                 changepage
                 marvosym
                 cm-super
+                booktabs
+                natbib
+                hyperref
                 ;
             })
+
+            # Python + matplotlib (paper figures)
+            (python3.withPackages (ps: with ps; [
+              matplotlib
+              numpy
+            ]))
+
+            # Symtropy game runtime dependencies (Bevy + Vulkan + X11)
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
+            xorg.libxcb
+            libxkbcommon
+            vulkan-loader
+            libGL
           ]);
 
           shellHook = ''
@@ -153,6 +175,9 @@
             echo "  lum-stop   - Stop all services"
             echo ""
             echo "🌊 We flow with Nix!"
+
+            # Symtropy/Bevy runtime: graphics libraries on LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH="${pkgs.xorg.libX11}/lib:${pkgs.xorg.libXcursor}/lib:${pkgs.xorg.libXi}/lib:${pkgs.xorg.libXrandr}/lib:${pkgs.vulkan-loader}/lib:${pkgs.libxkbcommon}/lib:${pkgs.libGL}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
             # libclang for bindgen (sweettest / Holochain WASM builds)
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
