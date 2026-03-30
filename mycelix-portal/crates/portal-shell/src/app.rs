@@ -9,7 +9,7 @@ use leptos::prelude::*;
 use portal_domain_trait::ConsciousnessTier;
 
 use crate::background::HomeostasisBackground;
-use crate::identity::{PortalIdentity, VaultState};
+use crate::identity::{ConductorStatus, PortalIdentity, VaultState};
 
 /// Experiential phenotype — how you perceive your consciousness.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -175,9 +175,25 @@ pub fn App() -> impl IntoView {
     let is_orbital = move || active_domain.get().is_none();
     let is_zoomed = move || active_domain.get().is_some();
 
+    let conductor = identity.conductor_status;
+
     view! {
         <div class="portal-universe">
             <HomeostasisBackground />
+
+            // Conductor status badge
+            <div class="conductor-badge">
+                <span class=move || match conductor.get() {
+                    ConductorStatus::Connected => "conductor-dot connected",
+                    ConductorStatus::Connecting => "conductor-dot connecting",
+                    ConductorStatus::Mock => "conductor-dot mock",
+                } />
+                <span>{move || match conductor.get() {
+                    ConductorStatus::Connected => "Live",
+                    ConductorStatus::Connecting => "Probing",
+                    ConductorStatus::Mock => "Local",
+                }}</span>
+            </div>
             {move || {
                 if vault.get() == VaultState::NoVault {
                     // FIRST BREATH — seed waiting

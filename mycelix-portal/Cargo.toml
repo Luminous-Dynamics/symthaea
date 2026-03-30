@@ -4,7 +4,9 @@
 [workspace]
 members = [
     "crates/portal-domain-trait",
+    "crates/portal-viz",
     "crates/domain-health",
+    "crates/domain-governance",
 ]
 
 [workspace.package]
@@ -44,12 +46,14 @@ sha2 = "0.10"
 hmac = "0.12"
 portal-domain-trait = { path = "crates/portal-domain-trait" }
 domain-health = { path = "crates/domain-health", optional = true }
+domain-governance = { path = "crates/domain-governance", optional = true }
 mycelix-leptos-client = { path = "../crates/mycelix-leptos-client", features = ["browser"] }
 send_wrapper = "0.6"
 
 [features]
-default = ["health"]
+default = ["health", "governance"]
 health = ["dep:domain-health"]
+governance = ["dep:domain-governance"]
 
 [profile.release]
 opt-level = "z"

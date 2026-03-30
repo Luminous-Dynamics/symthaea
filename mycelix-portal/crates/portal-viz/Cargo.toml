@@ -1,0 +1,9 @@
+[package]
+name = "portal-viz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Reactive SVG visualization components for Mycelix Portal — replaces D3.js/Recharts"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }

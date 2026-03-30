@@ -6,6 +6,13 @@ pub mod master_key;
 
 use leptos::prelude::*;
 use portal_domain_trait::ConsciousnessTier;
+use std::cell::RefCell;
+use std::rc::Rc;
+use send_wrapper::SendWrapper;
+
+use mycelix_leptos_client::{
+    BrowserWsTransport, ConnectConfig, HolochainTransport, encode, decode,
+};
 
 /// Vault state across the entire portal.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -15,8 +22,12 @@ pub enum VaultState {
     Unlocked,
 }
 
+/// Shared Holochain transport wrapped in SendWrapper for Leptos context bounds.
+/// SAFETY: WASM is single-threaded.
+pub type TransportCell = SendWrapper<Rc<RefCell<Option<BrowserWsTransport>>>>;
+
 /// The portal-wide identity context.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PortalIdentity {
     /// DID string (e.g., "did:mycelix:uhCAk...")
     pub did: RwSignal<Option<String>>,
@@ -28,6 +39,18 @@ pub struct PortalIdentity {
     pub tier: Memo<ConsciousnessTier>,
     /// Which domain keys have been derived this session
     pub active_domains: RwSignal<Vec<String>>,
+    /// Holochain conductor connection status
+    pub conductor_status: RwSignal<ConductorStatus>,
+    /// Shared transport — `None` when in mock mode
+    pub transport: TransportCell,
+}
+
+/// Conductor connection status.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ConductorStatus {
+    Connecting,
+    Connected,
+    Mock,
 }
 
 impl PortalIdentity {
@@ -43,13 +66,80 @@ impl PortalIdentity {
             VaultState::NoVault
         };
 
+        let transport: TransportCell = SendWrapper::new(Rc::new(RefCell::new(None)));
+        let conductor_status = RwSignal::new(ConductorStatus::Connecting);
+
+        // Attempt conductor connection asynchronously
+        let transport_for_connect = transport.clone();
+        let status_signal = conductor_status;
+        wasm_bindgen_futures::spawn_local(async move {
+            let url = web_sys::window()
+                .and_then(|w| {
+                    js_sys::Reflect::get(&w, &wasm_bindgen::JsValue::from_str("__HC_CONDUCTOR_URL"))
+                        .ok()
+                        .and_then(|v| v.as_string())
+                })
+                .unwrap_or_else(|| "ws://localhost:8888".to_string());
+
+            web_sys::console::log_1(
+                &format!("[Portal] Connecting to conductor at {url}...").into(),
+            );
+
+            let ws_transport = BrowserWsTransport::new();
+            let config = ConnectConfig {
+                url,
+                app_id: "mycelix-unified".to_string(),
+                auth_token: None,
+            };
+
+            match ws_transport.connect(config).await {
+                Ok(()) => {
+                    web_sys::console::log_1(&"[Portal] Conductor connected!".into());
+                    *transport_for_connect.borrow_mut() = Some(ws_transport);
+                    status_signal.set(ConductorStatus::Connected);
+                }
+                Err(e) => {
+                    web_sys::console::log_1(
+                        &format!("[Portal] No conductor: {e}. Mock mode.").into(),
+                    );
+                    status_signal.set(ConductorStatus::Mock);
+                }
+            }
+        });
+
         Self {
             did: RwSignal::new(None),
             vault: RwSignal::new(vault),
             consciousness_score,
             tier,
             active_domains: RwSignal::new(vec![]),
+            conductor_status,
+            transport,
         }
+    }
+
+    /// Call a zome function on any cluster via the shared transport.
+    /// Returns `Err` in mock mode so callers can fall back to mock data.
+    pub async fn call_zome<I: serde::Serialize, O: serde::de::DeserializeOwned>(
+        &self,
+        role: &str,
+        zome: &str,
+        fn_name: &str,
+        input: &I,
+    ) -> Result<O, String> {
+        let transport = self.transport.borrow();
+        let transport = match transport.as_ref() {
+            Some(t) => t.clone(),
+            None => return Err(format!("Mock mode: {role}.{zome}.{fn_name}")),
+        };
+        drop(self.transport.borrow());
+
+        let payload = encode(input).map_err(|e| format!("Encode: {e}"))?;
+        let bytes = transport
+            .call_zome(role, zome, fn_name, payload)
+            .await
+            .map_err(|e| format!("{role}.{zome}.{fn_name}: {e}"))?;
+        decode(&bytes).map_err(|e| format!("Decode: {e}"))
     }
 
     /// Derive a domain-specific key from the master.

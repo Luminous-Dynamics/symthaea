@@ -314,6 +314,12 @@ body {
 
 .orbital-node.accessible:hover .node-dot {
     box-shadow: 0 0 30px var(--node-glow);
+    transform: scale(1.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.orbital-node.accessible:hover .node-name {
+    color: var(--text-primary);
 }
 
 .node-name {
@@ -499,6 +505,17 @@ body {
     display: flex; align-items: flex-start; gap: 0.75rem;
     padding: 0.75rem; background: rgba(14, 28, 32, 0.6);
     border-left: 2px solid var(--bio-cyan); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: stream-slide-in 0.4s ease-out backwards;
+}
+
+.stream-event-card:nth-child(1) { animation-delay: 0s; }
+.stream-event-card:nth-child(2) { animation-delay: 0.1s; }
+.stream-event-card:nth-child(3) { animation-delay: 0.2s; }
+.stream-event-card:nth-child(4) { animation-delay: 0.3s; }
+
+@keyframes stream-slide-in {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 .stream-event-dot {
@@ -556,10 +573,25 @@ body {
     height: var(--plot-height);
     background: linear-gradient(0deg, var(--plot-color), var(--plot-glow));
     opacity: 0.3; border-radius: 0 0 var(--radius) var(--radius);
-    transition: height 0.5s;
+    transition: height 0.5s, opacity 0.3s;
+    animation: garden-grow 1s ease-out backwards;
 }
 
-.garden-plot.alive:hover .plot-growth { opacity: 0.5; }
+.garden-plot:nth-child(1) .plot-growth { animation-delay: 0s; }
+.garden-plot:nth-child(2) .plot-growth { animation-delay: 0.1s; }
+.garden-plot:nth-child(3) .plot-growth { animation-delay: 0.15s; }
+.garden-plot:nth-child(4) .plot-growth { animation-delay: 0.2s; }
+.garden-plot:nth-child(5) .plot-growth { animation-delay: 0.25s; }
+.garden-plot:nth-child(6) .plot-growth { animation-delay: 0.3s; }
+.garden-plot:nth-child(7) .plot-growth { animation-delay: 0.35s; }
+.garden-plot:nth-child(8) .plot-growth { animation-delay: 0.4s; }
+
+@keyframes garden-grow {
+    from { height: 0; opacity: 0; }
+}
+
+.garden-plot.alive:hover .plot-growth { opacity: 0.6; height: calc(var(--plot-height) + 10%); }
+.garden-plot.alive:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
 
 .plot-name {
     font-size: 0.6rem; text-transform: uppercase;
@@ -708,6 +740,44 @@ body {
     text-align: center;
     color: var(--text-muted);
     font-size: 0.85rem;
+}
+
+/* ═══════════════════════════════════════════
+   Conductor Status Badge
+   ═══════════════════════════════════════════ */
+
+.conductor-badge {
+    position: fixed;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    background: rgba(4, 10, 12, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.6rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.conductor-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+.conductor-dot.connected { background: #059669; }
+.conductor-dot.connecting { background: #D97706; animation: badge-blink 1s infinite; }
+.conductor-dot.mock { background: var(--bio-cyan); }
+
+@keyframes badge-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 
 /* ═══════════════════════════════════════════
