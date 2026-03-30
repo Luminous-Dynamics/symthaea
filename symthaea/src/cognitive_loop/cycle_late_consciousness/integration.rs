@@ -937,8 +937,20 @@ impl CognitiveLoopService {
                 0.0
             };
             let attention_boost = ctx.peak_attention as f64 * 0.15;
+            // V2 consciousness as proxy for global access quality:
+            // If the equation detects consciousness, information IS being integrated
+            // globally — even without explicit GWT ignition events.
+            // Science: Mashour (2020) — consciousness correlates with effective
+            // connectivity, not just ignition events.
+            let v2_access_proxy = self
+                .consciousness
+                .consciousness_engine
+                .consciousness_equation_v2()
+                .map(|eq| eq.last_consciousness() * 0.15) // Soft proxy, max +0.15
+                .unwrap_or(0.0);
             let broadcast_input =
-                (ctx.coherence as f64 + gwt_boost + attention_boost).clamp(0.0, 1.0);
+                (ctx.coherence as f64 + gwt_boost + attention_boost + v2_access_proxy)
+                    .clamp(0.0, 1.0);
 
             // WM richness: prefrontal stats (~0.58) + GWT coalition quality + attention
             // + prediction confidence (knowledge content in WM).

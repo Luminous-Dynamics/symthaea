@@ -72,6 +72,7 @@ members = [
     "crates/symthaea-therapeutic",
     "crates/symthaea-hdc-store",
     "crates/symthaea-mycelix-conductor",
+    "crates/symthaea-epistemic-types",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
     # Leptos CSR web frontend — WASM target, not in default-members.
@@ -168,6 +169,8 @@ workspace = true
 [dependencies]
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "symthaea-core" }
+# Shared epistemic types (E/N/M, Prismatic context, provenance)
+symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
 
 # Symthaea Consciousness Equation - Master Consciousness Equation C(t)
 symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equation" }
@@ -548,6 +551,7 @@ swarm = ["iroh"]                            # Real-time P2P tensor streaming via
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
+epistemic = []                                                 # Epistemic integration: immune threats, thermodynamic cost, provenance tags, collective health
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
 mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh
@@ -675,6 +679,7 @@ default-mind = [
     "ctc_wiring",             # GWT entry gated by binding coherence (Fries 2015)
     "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
     "unified_precision",      # Dynamic HFE precision (Parr 2019). Fixed: 46 Hz (was 1.1 Hz)
+    "england_dissipation",    # England exploration + Prigogine-England tension resolution
 ]
 
 
@@ -687,6 +692,7 @@ symthaea-crucible = { path = "crates/symthaea-crucible" }
 symthaea-psych-bench = { path = "crates/symthaea-psych-bench" }
 symthaea-humanoid = { path = "crates/symthaea-humanoid" }
 symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
+symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 tempfile = "3.8"  # For perception tests
 
