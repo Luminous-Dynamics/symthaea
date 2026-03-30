@@ -63,6 +63,8 @@ struct Inner {
     /// Closures that must be kept alive for the WebSocket callbacks.
     /// Stored as JsValue to avoid type-parameter complexity.
     _callbacks: Vec<JsValue>,
+    /// Signal handler — called when the conductor sends a signal (not a response).
+    signal_handler: Option<Box<dyn Fn(Vec<u8>)>>,
 }
 
 impl Default for Inner {
@@ -75,6 +77,7 @@ impl Default for Inner {
             cell_map: HashMap::new(),
             agent_pub_key: None,
             _callbacks: Vec::new(),
+            signal_handler: None,
         }
     }
 }
@@ -112,6 +115,23 @@ impl BrowserWsTransport {
         Self {
             inner: Rc::new(RefCell::new(Inner::default())),
         }
+    }
+
+    /// Register a callback for Holochain signals (app signals broadcast by the conductor).
+    ///
+    /// Signals are fire-and-forget messages from the conductor that don't correspond
+    /// to any request. They carry MessagePack-encoded payloads from zome signal handlers.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// transport.set_signal_handler(|payload: Vec<u8>| {
+    ///     // Decode and route signal to the appropriate domain
+    ///     web_sys::console::log_1(&format!("Signal: {} bytes", payload.len()).into());
+    /// });
+    /// ```
+    pub fn set_signal_handler<F: Fn(Vec<u8>) + 'static>(&self, handler: F) {
+        self.inner.borrow_mut().signal_handler = Some(Box::new(handler));
     }
 
     /// Allocate the next request ID.
@@ -211,6 +231,15 @@ impl BrowserWsTransport {
                         return;
                     }
                 };
+
+                // Check if this is a signal (fire-and-forget from conductor)
+                if response.response_type == "signal" {
+                    let state = inner.borrow();
+                    if let Some(ref handler) = state.signal_handler {
+                        handler(response.data);
+                    }
+                    return;
+                }
 
                 // Resolve the pending request
                 let mut state = inner.borrow_mut();
