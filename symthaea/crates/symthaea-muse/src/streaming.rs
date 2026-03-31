@@ -186,6 +186,9 @@ pub struct StreamingSynth {
     melody_predictor: MelodyPredictor,
     /// Taste-optimized melody generator (targets benchmark directly).
     pub taste_melody: TasteMelody,
+    /// Voice synthesis bridge (feature-gated).
+    #[cfg(feature = "voice")]
+    voice_bridge: Option<crate::voice_bridge::MuseVoiceBridge>,
     /// Density regulator: section-aware note spacing.
     density: DensityRegulator,
     /// Self-similarity monitor: ensures right amount of repetition.
@@ -268,6 +271,8 @@ impl StreamingSynth {
             dramatic: DramaticState::new(),
             melody_predictor: MelodyPredictor::new(),
             taste_melody: TasteMelody::new(),
+            #[cfg(feature = "voice")]
+            voice_bridge: None,
             density: DensityRegulator::new(),
             similarity: SimilarityMonitor::new(),
             sample_lib: {
@@ -358,6 +363,12 @@ impl StreamingSynth {
     /// Set substrate type for timbre coloring.
     pub fn set_substrate(&mut self, substrate: SubstrateTimbreType) {
         self.substrate = Some(SubstrateTimbreModifier::for_substrate(substrate));
+    }
+
+    /// Enable voice synthesis (requires "voice" feature).
+    #[cfg(feature = "voice")]
+    pub fn enable_voice(&mut self) {
+        self.voice_bridge = Some(crate::voice_bridge::MuseVoiceBridge::new(self.sample_rate));
     }
 
     pub fn set_chunk_duration_ms(&mut self, ms: u32) {
@@ -661,6 +672,20 @@ impl StreamingSynth {
             if i < sub_bass.len() {
                 pair[0] += sub_bass[i];
                 pair[1] += sub_bass[i];
+            }
+        }
+
+        // ── Phase 3.8: Voice synthesis (consciousness narration over music) ──
+        #[cfg(feature = "voice")]
+        if let Some(ref mut voice) = self.voice_bridge {
+            voice.maybe_generate(&self.state);
+            let voice_chunk = voice.render_chunk(self.chunk_samples);
+            for (i, pair) in buffer.iter_mut().enumerate() {
+                if i < voice_chunk.len() {
+                    // Center-panned voice, slightly quieter than music
+                    pair[0] += voice_chunk[i] * 0.6;
+                    pair[1] += voice_chunk[i] * 0.6;
+                }
             }
         }
 

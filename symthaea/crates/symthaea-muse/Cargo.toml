@@ -15,6 +15,7 @@ hound = { workspace = true }
 flacenc = { workspace = true }
 rustfft = { workspace = true }
 midly = "0.5"
+symthaea-voice = { path = "../symthaea-voice", optional = true }
 
 # Real-time audio output (optional)
 cpal = { version = "0.17", optional = true }
@@ -26,6 +27,7 @@ serde_json = { workspace = true }
 [features]
 default = []
 muse-live = ["cpal", "ringbuf"]
+voice = ["symthaea-voice"]
 
 [[example]]
 name = "live_demo"
