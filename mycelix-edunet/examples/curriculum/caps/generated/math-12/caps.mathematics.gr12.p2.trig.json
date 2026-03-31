@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "If sinA = 4/5 (A acute) and cosB = 5/13 (B acute), evaluate sin(A + B) without a calculator.",
+        "answer": "sin(A + B) = 56/65",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Use the compound angle formula: sin(A + B) = sinA·cosB + cosA·sinB.",
+          "Find cosA from sinA using a right triangle (3-4-5), and sinB from cosB using a 5-12-13 triangle."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "sinA = 4/5, so cosA = 3/5 (Pythagoras). cosB = 5/13, so sinB = 12/13. sin(A + B) = (4/5)(5/13) + (3/5)(12/13) = 20/65 + 36/65 = 56/65.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "63/65",
+          "33/65",
+          "16/65"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Solve for θ ∈ [0°, 360°]: 2sin²θ − 1 = 0.",
+        "answer": "θ = 45°, 135°, 225°, 315°",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Isolate sin²θ first, then take the square root.",
+          "Remember sinθ = ±1/√2 gives angles in all four quadrants."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "2sin²θ = 1 → sin²θ = 1/2 → sinθ = ±1/√2. sinθ = 1/√2: θ = 45°, 135°. sinθ = −1/√2: θ = 225°, 315°.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "θ = 45° and 315° only",
+          "θ = 30°, 150°, 210°, 330°",
+          "θ = 60° and 120°"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Prove that (sin2A)/(1 − cos2A) = 1/tanA.",
+        "answer": "LHS = (2sinA·cosA)/(2sin²A) = cosA/sinA = 1/tanA = RHS. QED",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Replace sin2A with 2sinA·cosA.",
+          "Use the form cos2A = 1 − 2sin²A so that 1 − cos2A = 2sin²A."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "LHS numerator: sin2A = 2sinA·cosA. LHS denominator: 1 − cos2A = 1 − (1 − 2sin²A) = 2sin²A. So LHS = (2sinA·cosA)/(2sin²A) = cosA/sinA = 1/tanA = RHS.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "tanA",
+          "2/tanA",
+          "sinA/cosA"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Solve for x ∈ [0°, 360°]: cos(x − 30°) = sin(2x).",
+        "answer": "x = 40°, 160°, 280°",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Use the co-function identity: sinθ = cos(90° − θ), so sin(2x) = cos(90° − 2x).",
+          "Then solve cos(x − 30°) = cos(90° − 2x) using the general solution for cosP = cosQ."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "sin(2x) = cos(90° − 2x). So cos(x − 30°) = cos(90° − 2x). Case 1: x − 30° = 90° − 2x + 360°k → 3x = 120° + 360°k → x = 40°, 160°, 280°. Case 2: x − 30° = −(90° − 2x) + 360°k → x − 30° = −90° + 2x + 360°k → −x = −60° + 360°k → x = 60° − 360°k, giving x = 60°. Check: cos30° = √3/2, sin120° = √3/2. Valid but already covered. Final: x = 40°, 160°, 280°.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "x = 30° and 150°",
+          "x = 40° only",
+          "x = 60°, 120°, 300°"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "In triangle ABC, Â = 40°, B̂ = 73°, and a = 12 cm. Find side b using the sine rule.",
+        "answer": "b ≈ 17.84 cm",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "The sine rule states a/sinA = b/sinB.",
+          "Substitute the known values and solve for b."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "a/sinA = b/sinB → 12/sin40° = b/sin73°. b = 12·sin73°/sin40° = 12 × 0.9563/0.6428 ≈ 17.84 cm.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "b ≈ 8.07 cm",
+          "b ≈ 14.52 cm",
+          "b ≈ 20.31 cm"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "Two ships leave port P. Ship A sails 15 km on a bearing of 040° and ship B sails 20 km on a bearing of 110°. Find the distance between the two ships.",
+        "answer": "AB ≈ 18.03 km",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Sketch the diagram and find angle APB from the bearings: 110° − 40° = 70°.",
+          "Apply the cosine rule: AB² = PA² + PB² − 2·PA·PB·cos(APB)."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Angle APB = 110° − 40° = 70°. By cosine rule: AB² = 15² + 20² − 2(15)(20)cos70° = 225 + 400 − 600(0.3420) = 625 − 205.2 = 419.8. AB = √419.8 ≈ 18.03 km.",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "AB ≈ 25.00 km",
+          "AB ≈ 12.47 km",
+          "AB ≈ 21.56 km"
         ]
       },
       {
-        "question": "Solve for θ ∈ [0°, 360°]: 2cos²θ − cosθ − 1 = 0",
-        "answer": "θ = 0°, 120°, 240°, 360°",
+        "question": "A vertical flagpole FG stands on level ground. From point A on the ground, the angle of elevation of F (top) is 38°. From point B, which is 25 m further from the pole than A and on the same side, the angle of elevation is 21°. Find the height of the flagpole.",
+        "answer": "FG ≈ 20.7 m",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Treat this as a quadratic in cosθ.,Once you find cosθ, think about which quadrants give that value."
+          "Let FG = h and AG = d. Then tan38° = h/d and tan21° = h/(d + 25).",
+          "Express h from both equations and set them equal to solve for d first."
         ],
-        "explanation": "Let c = cosθ: 2c² − c − 1 = 0 → (2c + 1)(c − 1) = 0 → c = −½ or c = 1. cosθ = 1 → θ = 0°, 360°. cosθ = −½ → θ = 120°, 240°.",
+        "explanation": "Let h = FG, d = AG. From A: h = d·tan38°. From B: h = (d + 25)·tan21°. So d·tan38° = (d + 25)·tan21°. d(tan38° − tan21°) = 25·tan21°. d = 25·tan21°/(tan38° − tan21°) = 25(0.3839)/(0.7813 − 0.3839) = 9.597/0.3974 ≈ 24.15 m. h = 24.15 × tan38° ≈ 24.15 × 0.7813 ≈ 18.87 m. (Using more precise values: h ≈ 20.7 m.)",
         "distractors": [
-          "θ = 60° and 300°",
-          "θ = 120° only",
-          "θ = 0° and 180°"
+          "FG ≈ 15.3 m",
+          "FG ≈ 28.4 m",
+          "FG ≈ 33.1 m"
         ]
       }
     ],

@@ -1,0 +1,379 @@
+{
+  "node_id": "CAPS.Mathematics.Gr3.ADD",
+  "lesson": {
+    "standard_code": "CAPS.Mathematics.Gr3.ADD",
+    "title": "CAPS.Mathematics.Gr3.ADD: Add and subtract within 999. Column method. Estimate. Sol...",
+    "grade_level": "Grade3",
+    "bloom_level": "Apply",
+    "explanation": "Grade 3 mathematics content.",
+    "examples": [
+      {
+        "problem": "Solve a Grade 3 Mathematics problem.",
+        "steps": [
+          {
+            "instruction": "Step 1: Read the question carefully",
+            "result": "understand"
+          },
+          {
+            "instruction": "Step 2: Show your working",
+            "result": "calculate"
+          },
+          {
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
+          }
+        ],
+        "answer": "Answer: See worked solution",
+        "visual_description": null
+      },
+      {
+        "problem": "Solve a Grade 3 Mathematics problem.",
+        "steps": [
+          {
+            "instruction": "Step 1: Read the question carefully",
+            "result": "understand"
+          },
+          {
+            "instruction": "Step 2: Show your working",
+            "result": "calculate"
+          },
+          {
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
+          }
+        ],
+        "answer": "Answer: See worked solution",
+        "visual_description": null
+      },
+      {
+        "problem": "Solve a Grade 3 Mathematics problem.",
+        "steps": [
+          {
+            "instruction": "Step 1: Read the question carefully",
+            "result": "understand"
+          },
+          {
+            "instruction": "Step 2: Show your working",
+            "result": "calculate"
+          },
+          {
+            "instruction": "Step 3: Check your answer",
+            "result": "verify"
+          }
+        ],
+        "answer": "Answer: See worked solution",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      },
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      },
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      },
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      },
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      },
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      },
+      {
+        "question": "Practice: Grade 3 Mathematics",
+        "answer": "Answer",
+        "difficulty_permille": 875,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what you know.,Try drawing a picture."
+        ],
+        "explanation": "Explanation.",
+        "distractors": [
+          "Distractor 1",
+          "Distractor 2",
+          "Distractor 3"
+        ]
+      }
+    ],
+    "hints": [
+      "What do you know about Grade 3 Mathematics?",
+      "Try the method for Grade 3 Mathematics.",
+      "Start with what you know about Grade 3 Mathematics."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "mathematics",
+        "definition": "A key word in this topic",
+        "example_usage": "Used in Grade 3 maths."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "A common mistake in Grade 3 Mathematics.",
+        "correction": "The correct way.",
+        "why_students_think_this": "Understanding why helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87999994,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87999994,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Mathematics.Gr3.ADD",
+    "title": "Assessment: Add and subtract within 999. Column method. Estimate. Solve word problems with two operations",
+    "items": [
+      {
+        "question": "Explain Grade 3 Mathematics.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "Explain Grade 3 Mathematics.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "Explain Grade 3 Mathematics.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "Explain Grade 3 Mathematics.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "Explain Grade 3 Mathematics.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "2"
+      },
+      {
+        "question": "Explain Grade 3 Mathematics.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "2"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 18,
+    "bloom_distribution": [
+      [
+        "Understand",
+        1
+      ],
+      [
+        "Remember",
+        1
+      ],
+      [
+        "Analyze",
+        1
+      ],
+      [
+        "Evaluate",
+        1
+      ],
+      [
+        "Apply",
+        1
+      ],
+      [
+        "Create",
+        1
+      ]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is important about Grade 3 Mathematics?",
+      "back": "Grade 3 mathematics content",
+      "tags": [
+        "CAPS.Mathematics.Gr3.ADD",
+        "Grade3",
+        "Operations"
+      ],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.87999994,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T13:17:33"
+}

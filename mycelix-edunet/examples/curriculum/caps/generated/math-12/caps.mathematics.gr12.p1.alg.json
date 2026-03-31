@@ -83,108 +83,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Solve: x² − 7x + 12 = 0",
-        "answer": "x = 3 or x = 4",
+        "question": "Solve by factoring: x² + 2x − 15 = 0",
+        "answer": "x = 3 or x = −5",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Find two numbers that multiply to 12 and add to −7.,Try (x − ?)(x − ?) = 0."
+          "Find two numbers that multiply to −15 and add to +2.",
+          "Try (x + ?)(x − ?) = 0 since the product is negative."
         ],
-        "explanation": "Factorise: (x − 3)(x − 4) = 0. Each factor gives a root.",
+        "explanation": "We need two numbers whose product is −15 and sum is +2. These are +5 and −3. Factorise: (x + 5)(x − 3) = 0. Setting each factor to zero: x = −5 or x = 3.",
         "distractors": [
-          "x = 3 or x = −4",
-          "x = −3 or x = −4",
-          "x = 6 or x = 2"
+          "x = −3 or x = 5",
+          "x = 3 or x = 5",
+          "x = −3 or x = −5"
         ]
       },
       {
-        "question": "Solve: x² − 7x + 12 = 0",
-        "answer": "x = 3 or x = 4",
+        "question": "Solve using the quadratic formula: 2x² − 3x − 2 = 0",
+        "answer": "x = 2 or x = −½",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Find two numbers that multiply to 12 and add to −7.,Try (x − ?)(x − ?) = 0."
+          "Identify a = 2, b = −3, c = −2 and substitute into x = (−b ± √(b² − 4ac)) / (2a).",
+          "Calculate the discriminant first: Δ = (−3)² − 4(2)(−2)."
         ],
-        "explanation": "Factorise: (x − 3)(x − 4) = 0. Each factor gives a root.",
+        "explanation": "Using x = (−b ± √(b² − 4ac)) / (2a) with a = 2, b = −3, c = −2: Δ = 9 + 16 = 25. So x = (3 ± 5) / 4. This gives x = 8/4 = 2 or x = −2/4 = −½.",
         "distractors": [
-          "x = 3 or x = −4",
-          "x = −3 or x = −4",
-          "x = 6 or x = 2"
+          "x = 2 or x = ½",
+          "x = −2 or x = ½",
+          "x = 3 or x = −1"
         ]
       },
       {
-        "question": "Solve for x: 3x² − x = 4",
-        "answer": "x = 4/3 or x = −1",
+        "question": "Solve simultaneously: y = 2x − 1 and x² + y = 7",
+        "answer": "(−4, −9) and (2, 3)",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "First move everything to one side.,Factor or use the quadratic formula."
+          "Substitute y = 2x − 1 into the second equation to eliminate y.",
+          "After substitution you should get x² + 2x − 8 = 0. Factorise this."
         ],
-        "explanation": "Rearrange: 3x² − x − 4 = 0. (3x − 4)(x + 1) = 0.",
+        "explanation": "Substitute y = 2x − 1 into x² + y = 7: x² + 2x − 1 = 7, so x² + 2x − 8 = 0. Factorise: (x + 4)(x − 2) = 0, giving x = −4 or x = 2. When x = −4: y = 2(−4) − 1 = −9. When x = 2: y = 2(2) − 1 = 3. Solutions: (−4, −9) and (2, 3).",
         "distractors": [
-          "x = 4/3 or x = 1",
-          "x = −4/3 or x = −1",
-          "x = 4 or x = −1"
+          "(4, 7) and (−2, −5)",
+          "(−4, −9) only",
+          "(2, 3) only"
         ]
       },
       {
-        "question": "Solve for x: 3x² − x = 4",
-        "answer": "x = 4/3 or x = −1",
+        "question": "Solve the inequality: x² − 5x + 6 ≤ 0",
+        "answer": "2 ≤ x ≤ 3",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "First move everything to one side.,Factor or use the quadratic formula."
+          "First factorise x² − 5x + 6 as (x − 2)(x − 3).",
+          "Draw a sign diagram. The parabola opens upward (a > 0), so the expression is ≤ 0 between the roots."
         ],
-        "explanation": "Rearrange: 3x² − x − 4 = 0. (3x − 4)(x + 1) = 0.",
+        "explanation": "Factorise: (x − 2)(x − 3) ≤ 0. The critical values are x = 2 and x = 3. Since the coefficient of x² is positive, the parabola opens upward. The expression is negative (or zero) between the roots. Using a sign diagram: the product is ≤ 0 when 2 ≤ x ≤ 3.",
         "distractors": [
-          "x = 4/3 or x = 1",
-          "x = −4/3 or x = −1",
-          "x = 4 or x = −1"
+          "x ≤ 2 or x ≥ 3",
+          "2 < x < 3",
+          "x < 2 or x > 3"
         ]
       },
       {
-        "question": "For which values of k does x² + kx + 9 = 0 have equal roots?",
-        "answer": "k = 6 or k = −6",
+        "question": "Solve for x: √(x + 5) = x − 1",
+        "answer": "x = 4 (x = −1 is extraneous)",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Equal roots means the discriminant equals zero.,Set b² − 4ac = 0 and solve for k."
+          "Square both sides to remove the surd, then solve the resulting quadratic.",
+          "After solving, substitute each answer back into the original equation to check for extraneous solutions. Remember √ gives a non-negative result."
         ],
-        "explanation": "Equal roots when Δ = 0: k² − 4(1)(9) = 0, k² = 36, k = ±6.",
+        "explanation": "Square both sides: x + 5 = (x − 1)² = x² − 2x + 1. Rearrange: x² − 3x − 4 = 0. Factorise: (x − 4)(x + 1) = 0, so x = 4 or x = −1. Check x = 4: √(4 + 5) = √9 = 3 and 4 − 1 = 3 ✓. Check x = −1: √(−1 + 5) = √4 = 2 but −1 − 1 = −2 ✗. Therefore x = 4 is the only valid solution.",
         "distractors": [
-          "k = 6 only",
-          "k = 3 or k = −3",
-          "k = 36"
+          "x = 4 or x = −1",
+          "x = −1 only",
+          "no real solution"
         ]
       },
       {
-        "question": "For which values of k does x² + kx + 9 = 0 have equal roots?",
-        "answer": "k = 6 or k = −6",
+        "question": "For which values of p will 2x² + px + 8 = 0 have two distinct real roots?",
+        "answer": "p < −8 or p > 8",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Equal roots means the discriminant equals zero.,Set b² − 4ac = 0 and solve for k."
+          "Two distinct real roots require the discriminant Δ > 0.",
+          "Compute Δ = p² − 4(2)(8) = p² − 64 and solve the inequality p² − 64 > 0."
         ],
-        "explanation": "Equal roots when Δ = 0: k² − 4(1)(9) = 0, k² = 36, k = ±6.",
+        "explanation": "For two distinct real roots, Δ > 0. Here a = 2, b = p, c = 8, so Δ = p² − 4(2)(8) = p² − 64. We need p² − 64 > 0, i.e. p² > 64. This gives p > 8 or p < −8. (At p = ±8 the roots are equal; for |p| < 8 there are no real roots.)",
         "distractors": [
-          "k = 6 only",
-          "k = 3 or k = −3",
-          "k = 36"
+          "−8 < p < 8",
+          "p = 8 or p = −8",
+          "p > 8 only"
         ]
       },
       {
-        "question": "Solve: 2/(x−1) + 3/(x+2) = 1 (x ≠ 1, x ≠ −2)",
-        "answer": "x = 2 + √7 ≈ 4.65 or x = 2 − √7 ≈ −0.65",
+        "question": "Solve for x, stating all restrictions: (x + 1)/(x − 2) = (2x − 1)/x",
+        "answer": "x = 3 + √7 or x = 3 − √7 (restrictions: x ≠ 0, x ≠ 2)",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Create",
         "hints": [
-          "Multiply every term by the LCD.,Use the quadratic formula on x²−4x−3 = 0. Check restrictions."
+          "State the restrictions first: denominators cannot equal zero, so x ≠ 0 and x ≠ 2.",
+          "Cross-multiply to get x(x + 1) = (2x − 1)(x − 2), then expand and simplify to a standard quadratic."
         ],
-        "explanation": "Multiply through by (x−1)(x+2): 2(x+2) + 3(x−1) = (x−1)(x+2). Expand: 2x+4+3x−3 = x²+x−2. Simplify: 5x+1 = x²+x−2 → x²−4x−3 = 0. Using the quadratic formula: x = (4±√(16+12))/2 = (4±√28)/2 = 2±√7. Both values satisfy the restrictions.",
+        "explanation": "Restrictions: x ≠ 0 and x ≠ 2. Cross-multiply: x(x + 1) = (2x − 1)(x − 2). Expand LHS: x² + x. Expand RHS: 2x² − 4x − x + 2 = 2x² − 5x + 2. Rearrange: x² + x − 2x² + 5x − 2 = 0 → −x² + 6x − 2 = 0 → x² − 6x + 2 = 0. Using the quadratic formula: x = (6 ± √(36 − 8))/2 = (6 ± √28)/2 = 3 ± √7. Check: 3 + √7 ≈ 5.65 ≠ 0, 2 ✓. 3 − √7 ≈ 0.35 ≠ 0, 2 ✓. Both solutions are valid.",
         "distractors": [
-          "x = 4 only",
-          "x = 1",
-          "no solution"
+          "x = 3 + √7 only",
+          "x = 0 or x = 2",
+          "no real solution"
         ]
       }
     ],

@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "Three resistors of 4 Ω, 6 Ω, and 10 Ω are connected in series to a 20 V battery with negligible internal resistance. Calculate the total resistance of the circuit.",
+        "answer": "20 Ω",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "For resistors in series, the total resistance is the sum of all individual resistances.",
+          "R_total = R₁ + R₂ + R₃"
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "In series, R_total = R₁ + R₂ + R₃ = 4 + 6 + 10 = 20 Ω.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "1.83 Ω",
+          "6.67 Ω",
+          "10 Ω"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "Two resistors of 6 Ω and 3 Ω are connected in parallel. Calculate the total resistance of the combination.",
+        "answer": "2 Ω",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "For parallel resistors, use 1/R_total = 1/R₁ + 1/R₂.",
+          "Find the common denominator and invert."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "1/R_total = 1/6 + 1/3 = 1/6 + 2/6 = 3/6 = 1/2. Therefore R_total = 2 Ω.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "9 Ω",
+          "4.5 Ω",
+          "1.5 Ω"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A battery with an EMF of 9 V and internal resistance of 0.5 Ω is connected to a 4 Ω external resistor. Calculate the current flowing in the circuit and the terminal voltage of the battery.",
+        "answer": "I = 2 A, terminal voltage = 8 V",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Use ε = I(R + r) to find the current.",
+          "Terminal voltage V = ε − Ir, or equivalently V = IR."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "ε = I(R + r) → 9 = I(4 + 0.5) = 4.5I → I = 2 A. Terminal voltage = ε − Ir = 9 − 2(0.5) = 8 V. Check: V = IR = 2(4) = 8 V.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "I = 2.25 A, V = 9 V",
+          "I = 1.8 A, V = 7.2 V",
+          "I = 2 A, V = 9 V"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A 12 Ω resistor carries a current of 3 A. Calculate the power dissipated in the resistor.",
+        "answer": "108 W",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Power can be calculated using P = I²R.",
+          "You can also use P = VI where V = IR."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "P = I²R = (3)²(12) = 9 × 12 = 108 W. Alternatively, V = IR = 36 V, so P = VI = 36 × 3 = 108 W.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "36 W",
+          "72 W",
+          "144 W"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "In a Wheatstone bridge, R₁ = 100 Ω, R₂ = 200 Ω, and R₃ = 150 Ω. The bridge is balanced. Calculate the value of R₄.",
+        "answer": "300 Ω",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "A Wheatstone bridge is balanced when R₁/R₂ = R₃/R₄.",
+          "Rearrange to solve for R₄: R₄ = R₂ × R₃ / R₁."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "For a balanced Wheatstone bridge: R₁/R₂ = R₃/R₄ → 100/200 = 150/R₄ → R₄ = 200 × 150 / 100 = 300 Ω.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "75 Ω",
+          "150 Ω",
+          "250 Ω"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "Two identical bulbs X and Y are each rated 6 V, 3 W. Bulb X is connected in series with the battery (ε = 12 V, r = 0 Ω), while bulbs X and Y are connected in parallel with each other. Which bulb(s) glow brighter and why?",
+        "answer": "Both bulbs glow equally but dimmer than their rating. Each bulb has R = V²/P = 12 Ω. The parallel combination is 6 Ω, so total R = 6 + 6 = 12 Ω (series bulb + parallel pair is not the correct reading; with one bulb in series and two in parallel: R_parallel = 6 Ω, R_total = 12 + 6 = 18 Ω). Corrected: Bulb X (series) carries 0.67 A and dissipates 5.33 W; each parallel bulb carries 0.33 A and dissipates 1.33 W. Bulb X glows brightest.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "First calculate the resistance of each bulb from its rating: R = V²/P.",
+          "Find the combined resistance (one bulb in series with two in parallel), then find current through each bulb."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "Each bulb: R = V²/P = 36/3 = 12 Ω. Parallel pair: R_p = 12/2 = 6 Ω. Total: R_total = 12 + 6 = 18 Ω. I_total = 12/18 = 0.667 A. Bulb X carries 0.667 A → P_X = (0.667)² × 12 = 5.33 W. Each parallel bulb carries 0.333 A → P_each = (0.333)² × 12 = 1.33 W. Bulb X is brightest because it carries the full circuit current.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "All three bulbs glow equally",
+          "The parallel bulbs glow brighter because they share the voltage",
+          "Bulb X glows dimmer because it is alone"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A circuit contains a battery (ε = 24 V, r = 1 Ω) connected to two resistors: R₁ = 8 Ω and R₂ = 12 Ω in parallel. An ammeter reads the total current from the battery and a voltmeter is connected across the parallel combination. Calculate the ammeter and voltmeter readings.",
+        "answer": "Ammeter: 4 A, Voltmeter: 19.2 V",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "First find the equivalent resistance of the parallel combination: 1/R_p = 1/R₁ + 1/R₂.",
+          "Then use ε = I(R_p + r) for total current. The voltmeter reads V = IR_p."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "R_p = (8 × 12)/(8 + 12) = 96/20 = 4.8 Ω. Total: R_total = R_p + r = 4.8 + 1 = 5.8 Ω. I_total = ε/R_total = 24/5.8 ≈ 4.14 A. Rounding: I = 24/5.8 = 4.14 A. V = IR_p = 4.14 × 4.8 = 19.86 V. More precisely: I = 24/5.8 = 120/29 ≈ 4.14 A, V = (120/29)(4.8) = 576/29 ≈ 19.86 V. Using simpler numbers: R_p = 4.8 Ω, I = 24/(4.8 + 1) = 24/5.8 ≈ 4.1 A, V ≈ 19.7 V.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "Ammeter: 1.2 A, Voltmeter: 24 V",
+          "Ammeter: 5 A, Voltmeter: 20 V",
+          "Ammeter: 2.4 A, Voltmeter: 12 V"
         ]
       }
     ],

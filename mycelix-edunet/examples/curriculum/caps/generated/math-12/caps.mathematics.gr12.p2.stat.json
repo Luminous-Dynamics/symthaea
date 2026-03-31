@@ -91,108 +91,115 @@
     ],
     "practice_problems": [
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "Calculate the mean and standard deviation of the data set: 3, 5, 7, 7, 8, 10, 12.",
+        "answer": "Mean = 52/7 ≈ 7.43; Standard deviation σ ≈ 2.76",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "Mean = sum of all values divided by the number of values.",
+          "For standard deviation, find each (xᵢ − x̄)², sum them, divide by n, then take the square root."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "x̄ = (3+5+7+7+8+10+12)/7 = 52/7 ≈ 7.43. Squared deviations: 19.6, 5.9, 0.18, 0.18, 0.33, 6.6, 20.9. Sum ≈ 53.7. Variance = 53.7/7 ≈ 7.67. σ = √7.67 ≈ 2.77.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "Mean = 7.43; σ ≈ 7.67",
+          "Mean = 7; σ ≈ 3.00",
+          "Mean = 8; σ ≈ 2.45"
         ]
       },
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "The five-number summary for a data set is: Min = 12, Q1 = 25, Median = 34, Q3 = 48, Max = 61. Draw a box-and-whisker diagram and describe the skewness.",
+        "answer": "The box spans from 25 to 48 with a median line at 34. Whiskers extend from 12 to 61. The data is approximately symmetrical (median roughly centred in the box).",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "Mark Q1, median, and Q3 on a number line and draw the box between Q1 and Q3.",
+          "Compare the distances: median − Q1 vs Q3 − median to judge skewness."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "Median − Q1 = 34 − 25 = 9. Q3 − Median = 48 − 34 = 14. The right half of the box is slightly wider, suggesting a mild positive skew. The whiskers: left = 25 − 12 = 13, right = 61 − 48 = 13 (equal). Overall shape is close to symmetrical with slight right skew.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "Strongly left-skewed",
+          "Strongly right-skewed",
+          "Cannot determine skewness from a box plot"
         ]
       },
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "A data set has Q1 = 20, Q3 = 44. Determine whether the values 0 and 60 are outliers.",
+        "answer": "IQR = 24. Lower fence = −16, upper fence = 80. Neither 0 nor 60 is an outlier.",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "IQR = Q3 − Q1. An outlier lies below Q1 − 1.5×IQR or above Q3 + 1.5×IQR.",
+          "Calculate both fences and check each value."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "IQR = 44 − 20 = 24. Lower fence = 20 − 1.5(24) = 20 − 36 = −16. Upper fence = 44 + 1.5(24) = 44 + 36 = 80. Since 0 > −16 and 60 < 80, neither value is an outlier.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "Both are outliers",
+          "Only 0 is an outlier",
+          "Only 60 is an outlier"
         ]
       },
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "A scatter plot shows the relationship between hours studied (x) and test score (y). The correlation coefficient is r = 0.87. Interpret this value and state whether a linear model is suitable.",
+        "answer": "There is a strong positive linear correlation between hours studied and test score. A linear model is suitable because |r| is close to 1.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "The sign of r tells direction (positive/negative). The magnitude tells strength.",
+          "Generally |r| > 0.8 indicates a strong correlation."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "r = 0.87 is positive (as x increases, y increases) and close to 1 (strong relationship). Since the linear correlation is strong, a linear regression model is appropriate for predictions within the data range.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "Weak positive correlation; linear model is not suitable",
+          "Strong negative correlation; linear model is suitable",
+          "Moderate correlation; cannot draw conclusions"
         ]
       },
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "Given the data: x = {2, 4, 6, 8, 10} and y = {5, 9, 14, 18, 23}, calculate the least squares regression line ŷ = a + bx. (Use: x̄ = 6, ȳ = 13.8, Σ(xᵢ − x̄)(yᵢ − ȳ) = 72, Σ(xᵢ − x̄)² = 40.)",
+        "answer": "b = 1.8, a = 3.0; Regression line: ŷ = 3.0 + 1.8x",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "b = Σ(xᵢ − x̄)(yᵢ − ȳ) / Σ(xᵢ − x̄)².",
+          "a = ȳ − b·x̄."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "b = 72/40 = 1.8. a = 13.8 − 1.8(6) = 13.8 − 10.8 = 3.0. The regression line is ŷ = 3.0 + 1.8x.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "ŷ = 1.8 + 3.0x",
+          "ŷ = 3.0 − 1.8x",
+          "ŷ = 6.0 + 1.3x"
         ]
       },
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "Using the regression line ŷ = 3.0 + 1.8x from the previous question (data range x ∈ [2, 10]), predict the y-value when x = 7 and when x = 25. Comment on the reliability of each prediction.",
+        "answer": "When x = 7: ŷ = 3.0 + 1.8(7) = 15.6 (reliable, within data range). When x = 25: ŷ = 3.0 + 1.8(25) = 48.0 (unreliable, extrapolation far beyond data range).",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "Substitute each x-value into the equation.",
+          "Interpolation (within data range) is reliable; extrapolation (outside) is not."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "x = 7 falls within [2, 10] so the prediction ŷ = 15.6 is an interpolation and is reliable. x = 25 is far outside the data range, so ŷ = 48.0 is an extrapolation and may be very inaccurate because the linear trend may not continue.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "Both predictions are reliable",
+          "Both predictions are unreliable",
+          "x = 25 is reliable because r is strong"
         ]
       },
       {
-        "question": "A dataset has mean 45 and standard deviation 5. What percentage of data falls within one standard deviation of the mean for a normal distribution?",
-        "answer": "68%",
+        "question": "Class A scored: 65, 70, 72, 75, 78, 80, 85 (mean = 75, σ ≈ 6.16). Class B scored: 40, 55, 70, 75, 80, 95, 110 (mean = 75, σ ≈ 21.60). Both classes have the same mean. Which class performed more consistently? Justify using at least two statistical measures.",
+        "answer": "Class A performed more consistently. Both have mean 75, but Class A has σ ≈ 6.16 vs Class B's σ ≈ 21.60. Class A's range is 20 (85 − 65) vs Class B's range of 70 (110 − 40). The smaller standard deviation and range indicate less spread.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about the empirical rule (68-95-99.7 rule).,One SD from the mean covers the interval (x̄ − σ, x̄ + σ)."
+          "Consistency means less spread. Compare standard deviations.",
+          "Also compare ranges and consider whether outliers affect your conclusion."
         ],
-        "explanation": "For normal distributions: ~68% within 1 SD (40 to 50), ~95% within 2 SD, ~99.7% within 3 SD.",
+        "explanation": "Equal means (75) make direct comparison meaningful. Class A: σ ≈ 6.16, range = 20, IQR = 80 − 70 = 10. Class B: σ ≈ 21.60, range = 70, IQR = 95 − 55 = 40. All three measures of dispersion confirm Class A is far more consistent.",
         "distractors": [
-          "50%",
-          "95%",
-          "34%"
+          "Class B is more consistent because it has a wider range",
+          "They are equally consistent because the means are equal",
+          "Cannot compare because the sample sizes are equal"
         ]
       }
     ],

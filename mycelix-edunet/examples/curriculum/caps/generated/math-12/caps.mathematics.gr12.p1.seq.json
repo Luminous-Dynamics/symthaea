@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Find T₁₅ for the arithmetic sequence 5, 8, 11, 14, ...",
-        "answer": "47",
+        "question": "Find T₂₀ for the arithmetic sequence 7, 11, 15, 19, ...",
+        "answer": "83",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "What is the common difference?,Use Tₙ = a + (n−1)d with n = 15."
+          "Identify the first term a and the common difference d.",
+          "Use the formula Tₙ = a + (n − 1)d with n = 20."
         ],
-        "explanation": "a = 5, d = 3. T₁₅ = 5 + (14)(3) = 5 + 42 = 47.",
+        "explanation": "a = 7, d = 11 − 7 = 4. T₂₀ = 7 + (20 − 1)(4) = 7 + 76 = 83.",
         "distractors": [
-          "42",
-          "50",
-          "45"
+          "87",
+          "79",
+          "76"
         ]
       },
       {
-        "question": "Find T₁₅ for the arithmetic sequence 5, 8, 11, 14, ...",
-        "answer": "47",
+        "question": "Find the sum of the first 25 terms of the arithmetic series 4 + 9 + 14 + 19 + ...",
+        "answer": "1600",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "What is the common difference?,Use Tₙ = a + (n−1)d with n = 15."
+          "Identify a = 4 and d = 5.",
+          "Use Sₙ = n/2 [2a + (n − 1)d] with n = 25."
         ],
-        "explanation": "a = 5, d = 3. T₁₅ = 5 + (14)(3) = 5 + 42 = 47.",
+        "explanation": "a = 4, d = 5. S₂₅ = 25/2 [2(4) + (24)(5)] = 25/2 [8 + 120] = 25/2 × 128 = 1600.",
         "distractors": [
-          "42",
-          "50",
-          "45"
+          "1500",
+          "1650",
+          "1280"
         ]
       },
       {
-        "question": "Evaluate: Σ(k=1 to ∞) of 3·(½)ᵏ",
-        "answer": "3",
+        "question": "Find T₈ for the geometric sequence 3, 6, 12, 24, ...",
+        "answer": "384",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Write out the first few terms.,Is |r| < 1? Use S∞ = a/(1−r)."
+          "What is the common ratio r?",
+          "Use Tₙ = a \u00b7 rⁿ⁻\u00b9 with a = 3, r = 2, n = 8."
         ],
-        "explanation": "This is a GP with a = 3/2, r = 1/2. S∞ = (3/2)/(1/2) = 3.",
+        "explanation": "a = 3, r = 6/3 = 2. T₈ = 3 \u00b7 2⁷ = 3 \u00b7 128 = 384.",
         "distractors": [
-          "3/2",
-          "6",
-          "1"
+          "192",
+          "768",
+          "256"
         ]
       },
       {
-        "question": "Evaluate: Σ(k=1 to ∞) of 3·(½)ᵏ",
-        "answer": "3",
+        "question": "Find the sum of the first 10 terms of the geometric series 2 + 6 + 18 + 54 + ...",
+        "answer": "59 048",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Write out the first few terms.,Is |r| < 1? Use S∞ = a/(1−r)."
+          "Identify a = 2 and r = 3.",
+          "Use Sₙ = a(rⁿ − 1)/(r − 1) with n = 10."
         ],
-        "explanation": "This is a GP with a = 3/2, r = 1/2. S∞ = (3/2)/(1/2) = 3.",
+        "explanation": "a = 2, r = 3. S₁₀ = 2(3¹⁰ − 1)/(3 − 1) = 2(59 049 − 1)/2 = 59 048.",
         "distractors": [
-          "3/2",
-          "6",
-          "1"
+          "59 049",
+          "29 524",
+          "118 096"
         ]
       },
       {
-        "question": "Evaluate: Σ(k=1 to ∞) of 3·(½)ᵏ",
-        "answer": "3",
+        "question": "Determine whether the geometric series 24 + 8 + 8/3 + 8/9 + ... converges, and if so, find its sum to infinity.",
+        "answer": "36",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write out the first few terms.,Is |r| < 1? Use S∞ = a/(1−r)."
+          "Find r = T₂/T₁ and check whether |r| < 1.",
+          "If the series converges, use S∞ = a/(1 − r)."
         ],
-        "explanation": "This is a GP with a = 3/2, r = 1/2. S∞ = (3/2)/(1/2) = 3.",
+        "explanation": "r = 8/24 = 1/3. Since |1/3| < 1, the series converges. S∞ = 24/(1 − 1/3) = 24/(2/3) = 24 \u00d7 3/2 = 36.",
         "distractors": [
-          "3/2",
-          "6",
-          "1"
+          "27",
+          "48",
+          "32"
         ]
       },
       {
-        "question": "Evaluate: Σ(k=1 to ∞) of 3·(½)ᵏ",
-        "answer": "3",
+        "question": "Evaluate: \u03a3(k=1 to 40) (5k \u2212 3)",
+        "answer": "3 980",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write out the first few terms.,Is |r| < 1? Use S∞ = a/(1−r)."
+          "Write the first few terms to identify the type of series: when k = 1 you get 2, when k = 2 you get 7, etc.",
+          "This is an arithmetic series with a = 2 and d = 5. Use Sₙ = n/2 [2a + (n \u2212 1)d] with n = 40."
         ],
-        "explanation": "This is a GP with a = 3/2, r = 1/2. S∞ = (3/2)/(1/2) = 3.",
+        "explanation": "When k = 1: 5(1) \u2212 3 = 2. When k = 2: 5(2) \u2212 3 = 7. So a = 2, d = 5, n = 40. S₄₀ = 40/2 [2(2) + (39)(5)] = 20 [4 + 195] = 20 \u00d7 199 = 3 980.",
         "distractors": [
-          "3/2",
-          "6",
-          "1"
+          "4 100",
+          "3 900",
+          "3 800"
         ]
       },
       {
-        "question": "Evaluate: Σ(k=1 to ∞) of 3·(½)ᵏ",
-        "answer": "3",
+        "question": "A gardener plants 8 trees in the first row and increases the number of trees by 3 in each subsequent row. If there are 12 rows, how many trees are planted altogether? In another section, she plants 2 flowers in the first row and doubles the number in each subsequent row for 8 rows. How many flowers in total?",
+        "answer": "294 trees and 510 flowers",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Write out the first few terms.,Is |r| < 1? Use S∞ = a/(1−r)."
+          "The trees form an arithmetic sequence with a = 8, d = 3, n = 12. Use Sₙ = n/2 [2a + (n \u2212 1)d].",
+          "The flowers form a geometric sequence with a = 2, r = 2, n = 8. Use Sₙ = a(rⁿ \u2212 1)/(r \u2212 1)."
         ],
-        "explanation": "This is a GP with a = 3/2, r = 1/2. S∞ = (3/2)/(1/2) = 3.",
+        "explanation": "Trees: a = 8, d = 3, n = 12. S₁₂ = 12/2 [2(8) + (11)(3)] = 6 [16 + 33] = 6 \u00d7 49 = 294. Flowers: a = 2, r = 2, n = 8. S₈ = 2(2⁸ \u2212 1)/(2 \u2212 1) = 2(256 \u2212 1)/1 = 2 \u00d7 255 = 510.",
         "distractors": [
-          "3/2",
-          "6",
-          "1"
+          "294 trees and 256 flowers",
+          "288 trees and 510 flowers",
+          "294 trees and 512 flowers"
         ]
       }
     ],

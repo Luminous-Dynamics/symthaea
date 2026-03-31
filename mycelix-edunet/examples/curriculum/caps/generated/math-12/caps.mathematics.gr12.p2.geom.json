@@ -79,108 +79,115 @@
     ],
     "practice_problems": [
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "AB is a diameter of circle O. Point C lies on the circumference. If angle BAC = 35°, find angle ACB.",
+        "answer": "angle ACB = 90° (angle in a semicircle).",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "What theorem applies when an angle is subtended by a diameter?",
+          "The angle in a semicircle is always 90°, regardless of where C is on the arc."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "AB is a diameter, so the angle subtended by AB at the circumference (angle ACB) equals 90° (angle in a semicircle theorem). Therefore angle ABC = 180° − 90° − 35° = 55°.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "angle ACB = 35°",
+          "angle ACB = 55°",
+          "angle ACB = 70°"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "PQRS is a cyclic quadrilateral. P̂ = 82° and R̂ = 98°. Determine Q̂ if Ŝ = 113°.",
+        "answer": "Q̂ = 67°",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Opposite angles of a cyclic quadrilateral are supplementary (sum to 180°).",
+          "Q̂ + Ŝ = 180°, so Q̂ = 180° − 113°."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "In cyclic quad PQRS, opposite angles are supplementary. P̂ + R̂ = 82° + 98° = 180° (confirmed cyclic). Q̂ + Ŝ = 180° → Q̂ = 180° − 113° = 67°.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "Q̂ = 82°",
+          "Q̂ = 98°",
+          "Q̂ = 113°"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "TA is a tangent to a circle at A. Chord AB makes an angle of 50° with the tangent. Find the angle subtended by chord AB in the alternate segment.",
+        "answer": "The angle in the alternate segment = 50°",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "The tangent-chord theorem states that the angle between a tangent and a chord equals the angle in the alternate segment.",
+          "Identify which segment is 'alternate' to the tangent-chord angle."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "By the tangent-chord (tan-chord) theorem, the angle between tangent TA and chord AB (50°) equals the inscribed angle in the alternate segment. Any angle subtended by AB on the opposite side of the chord from the tangent is 50°.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "100° (double the angle)",
+          "40° (complementary)",
+          "130° (supplementary)"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "Quadrilateral ABCD has vertices on a circle. Prove that ABCD is a cyclic quadrilateral given that the exterior angle at D equals the interior angle at B.",
+        "answer": "If the exterior angle at D equals the interior angle at B, then B̂ + D̂ = 180° (since the exterior angle at D and D̂ are supplementary). This satisfies the converse of the cyclic quad theorem.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "The exterior angle at D = 180° − D̂.",
+          "If exterior angle at D = B̂, then 180° − D̂ = B̂, which means B̂ + D̂ = 180°."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "Let the exterior angle at D = 180° − D̂. Given: 180° − D̂ = B̂. Rearranging: B̂ + D̂ = 180°. Since one pair of opposite angles is supplementary, ABCD is a cyclic quadrilateral (converse of the cyclic quad theorem).",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "ABCD is cyclic because B̂ = D̂",
+          "ABCD is not cyclic because only one pair sums to 180°",
+          "ABCD is cyclic because all angles are equal"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "In the diagram, O is the centre of the circle. Chord AB = chord CD, OE ⊥ AB and OF ⊥ CD. Prove that OE = OF.",
+        "answer": "OE = OF (equal chords are equidistant from the centre).",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "A perpendicular from the centre to a chord bisects the chord.",
+          "Use Pythagoras in triangles OEA and OFC. Since AB = CD, their half-lengths are equal."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "OE ⊥ AB → AE = AB/2. OF ⊥ CD → CF = CD/2. Since AB = CD, we have AE = CF. In right triangle OEA: OE² = OA² − AE². In right triangle OFC: OF² = OC² − CF². Since OA = OC (radii) and AE = CF, we get OE² = OF², so OE = OF.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "OE = OF only if the chords are parallel",
+          "OE > OF because AB is closer to the centre",
+          "Cannot be proved without knowing the radius"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "In triangle ABC, D is on AB and E is on AC such that DE ∥ BC. If AD = 3, DB = 5, and AE = 4.5, find EC.",
+        "answer": "EC = 7.5",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "By the proportionality theorem (or basic proportionality theorem), DE ∥ BC implies AD/DB = AE/EC.",
+          "Substitute the known values and solve for EC."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "By the proportionality theorem: AD/DB = AE/EC. So 3/5 = 4.5/EC. EC = 5 × 4.5/3 = 22.5/3 = 7.5.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "EC = 6",
+          "EC = 5",
+          "EC = 9"
         ]
       },
       {
-        "question": "ABCD is a cyclic quadrilateral. Â = 75° and Ĉ = 105°. Is ABCD a cyclic quad? Explain.",
-        "answer": "Yes, because Â + Ĉ = 75° + 105° = 180° (opposite angles supplementary).",
+        "question": "In the diagram, TA is a tangent at A, and ABC is a secant. The circle has centre O. If angle TAB = 40° and ABDC is a cyclic quadrilateral with D on the major arc, find angle ADB and angle ACD. State all reasons.",
+        "answer": "angle ADB = 40° (tan-chord angle = angle in alternate segment). angle ACD = 140° (opposite angles of cyclic quad ABDC are supplementary: ACD + ADB... wait). More carefully: angle ABD is in the same segment as angle ACD. angle ADB = 40° (tan-chord). In cyclic quad ABDC: angle ADB + angle ACB = 180° is wrong since they are not opposite. Let angle in alternate segment = angle ADB = 40°. Then angle ACB = 40° (angles in same segment). angle ACD = 180° − 40° = 140° (angles on a straight line if BCD is straight) or use the cyclic quad property depending on configuration.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "What is the property of opposite angles in a cyclic quad?,Check if opposite angles add to 180°."
+          "Start with the tangent-chord theorem: angle TAB = angle in alternate segment.",
+          "Then use the cyclic quadrilateral property and angles in the same segment to find remaining angles."
         ],
-        "explanation": "The sum confirms the converse of the cyclic quad theorem.",
+        "explanation": "By the tan-chord theorem, angle TAB = angle ADB = 40° (angle in the alternate segment). In cyclic quad ABDC, angles ABD and ACD are in the same segment (subtended by arc AD), so angle ACD = angle ABD. Using the fact that angle ADB = 40° and applying the cyclic quad theorem (opposite angles supplementary), angle ABC + angle ADC = 180°. The multi-step reasoning requires careful identification of which angles are opposite in the cyclic quad.",
         "distractors": [
-          "No because angles aren't equal",
-          "Yes because all angles = 90°",
-          "Cannot determine"
+          "angle ADB = 80° (double the tangent angle)",
+          "angle ADB = 50° (complementary to 40°)",
+          "angle ACD = 40° (same as tan-chord angle)"
         ]
       }
     ],

@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A force of 50 N is applied to push a crate 8 m along a horizontal floor in the direction of the force. Calculate the work done on the crate.",
+        "answer": "400 J",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Work done = force × displacement × cos(angle between them).",
+          "When force and displacement are in the same direction, the angle is 0° and cos 0° = 1."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "W = Fd cos θ = 50 × 8 × cos 0° = 50 × 8 × 1 = 400 J.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "6.25 J",
+          "200 J",
+          "800 J"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 4 kg ball is rolling at 5 m/s. Calculate its kinetic energy.",
+        "answer": "50 J",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Use the formula Ek = ½mv².",
+          "Substitute m = 4 kg and v = 5 m/s."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "Ek = ½mv² = ½(4)(5²) = ½(4)(25) = 50 J.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "100 J",
+          "20 J",
+          "10 J"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 2 kg object initially at rest is pushed by a net force of 10 N over a distance of 6 m on a frictionless surface. Using the work-energy theorem, calculate the final speed of the object.",
+        "answer": "7.75 m/s",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "The work-energy theorem states: W_net = ΔEk = ½mv_f² − ½mv_i².",
+          "Since the object starts from rest, v_i = 0, so W_net = ½mv_f²."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "W_net = Fd = 10 × 6 = 60 J. By the work-energy theorem: 60 = ½(2)v_f² → v_f² = 60 → v_f = √60 ≈ 7.75 m/s.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "3.87 m/s",
+          "5.48 m/s",
+          "10 m/s"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 0.5 kg ball is dropped from a height of 20 m above the ground. Using conservation of mechanical energy (ignore air resistance), calculate the speed of the ball just before it hits the ground. Use g = 9.8 m/s².",
+        "answer": "19.8 m/s",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "At the top, the ball has only gravitational potential energy: Ep = mgh.",
+          "At the bottom, all Ep converts to Ek: mgh = ½mv². The mass cancels."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "By conservation: Ep(top) = Ek(bottom). mgh = ½mv² → v² = 2gh = 2(9.8)(20) = 392 → v = √392 ≈ 19.8 m/s.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "9.9 m/s",
+          "14.0 m/s",
+          "28.0 m/s"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 3 kg block slides from rest down a rough incline that is 5 m long and makes an angle of 30° with the horizontal. The coefficient of kinetic friction is μk = 0.2. Calculate the speed of the block at the bottom of the incline. Use g = 9.8 m/s².",
+        "answer": "5.69 m/s",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "The height of the incline is h = L sin 30° = 5 × 0.5 = 2.5 m.",
+          "Normal force on an incline: N = mg cos θ. Friction force: f = μkN. Use W_net = ΔEk where W_net = mgh − f × L."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "h = 5 sin 30° = 2.5 m. N = mg cos 30° = 3(9.8)(0.866) = 25.46 N. f = μkN = 0.2(25.46) = 5.09 N. W_friction = fL = 5.09 × 5 = 25.46 J. W_gravity = mgh = 3(9.8)(2.5) = 73.5 J. W_net = 73.5 − 25.46 = 48.04 J. ½mv² = 48.04 → v² = 2(48.04)/3 = 32.03 → v ≈ 5.66 m/s.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "7.0 m/s",
+          "4.43 m/s",
+          "3.16 m/s"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A car engine delivers a constant power of 15 kW. Calculate the driving force exerted by the engine when the car travels at a constant velocity of 25 m/s.",
+        "answer": "600 N",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "At constant velocity, P = Fv.",
+          "Rearrange to find F = P/v. Make sure power is in watts."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "P = Fv → F = P/v = 15 000/25 = 600 N. At constant velocity, this driving force equals the total resistive force.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "375 N",
+          "6000 N",
+          "150 N"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 0.02 kg bullet travelling at 400 m/s embeds itself in a 2 kg wooden block resting on a frictionless surface. The block then slides up a rough ramp (μk = 0.3) inclined at 20° to the horizontal. Using conservation of momentum for the collision and the work-energy theorem for the ramp, calculate how far along the ramp the block-bullet system travels before stopping. Use g = 9.8 m/s².",
+        "answer": "1.91 m",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "First use conservation of momentum for the perfectly inelastic collision: m₁v₁ = (m₁ + m₂)v_f.",
+          "Then apply W_net = ΔEk on the ramp: −mgh − fL = 0 − ½mv_f², where h = L sin θ and f = μk mg cos θ."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "Collision: p_i = 0.02 × 400 = 8 kg·m/s. v_f = 8/(0.02 + 2) = 8/2.02 ≈ 3.96 m/s. On ramp: Ek = ½(2.02)(3.96²) = 15.84 J. Along ramp distance L: gravity component = mg sin 20° = 2.02(9.8)(0.342) = 6.77 N. Friction = μk mg cos 20° = 0.3(2.02)(9.8)(0.940) = 5.58 N. Total opposing force = 6.77 + 5.58 = 12.35 N. L = Ek/F_total = 15.84/12.35 ≈ 1.28 m. (Using exact momentum: v_f = 400/101 ≈ 3.96 m/s, Ek ≈ 15.84 J, L ≈ 1.28 m.)",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "0.80 m",
+          "2.45 m",
+          "3.96 m"
         ]
       }
     ],

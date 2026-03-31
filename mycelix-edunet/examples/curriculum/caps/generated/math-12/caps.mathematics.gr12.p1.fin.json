@@ -79,108 +79,117 @@
     ],
     "practice_problems": [
       {
-        "question": "Calculate the monthly payment on a R150 000 loan at 10.5% p.a. compounded monthly over 4 years.",
-        "answer": "R3 835.67",
+        "question": "Thandi invests R50 000 in a savings account at 8% p.a. compounded quarterly. How much will she have after 5 years?",
+        "answer": "R74 297.37",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Convert the annual rate to monthly first.,Use the present value annuity formula."
+          "Use the compound interest formula A = P(1 + i)ⁿ.",
+          "Compounded quarterly means i = 0.08/4 = 0.02 per quarter, and n = 5 \u00d7 4 = 20 quarters."
         ],
-        "explanation": "i = 0.105/12 = 0.00875, n = 48. P = x[1−(1.00875)⁻⁴⁸]/0.00875. x = 150000/39.108 = R3835.67.",
+        "explanation": "i = 0.08/4 = 0.02 per quarter, n = 5 \u00d7 4 = 20. A = 50\u202f000(1.02)²\u2070 = 50\u202f000 \u00d7 1.48595 = R74\u202f297.37.",
         "distractors": [
-          "R3125.00",
-          "R4201.50",
-          "R3500.00"
+          "R70 000.00",
+          "R73 466.40",
+          "R74 012.21"
         ]
       },
       {
-        "question": "Calculate the monthly payment on a R150 000 loan at 10.5% p.a. compounded monthly over 4 years.",
-        "answer": "R3 835.67",
+        "question": "A bank offers a nominal interest rate of 9.5% p.a. compounded monthly. Calculate the effective annual interest rate.",
+        "answer": "9.92% p.a.",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Convert the annual rate to monthly first.,Use the present value annuity formula."
+          "Use the effective rate formula: 1 + i_eff = (1 + i_nom/m)^m.",
+          "Here m = 12 (monthly compounding) and i_nom = 0.095."
         ],
-        "explanation": "i = 0.105/12 = 0.00875, n = 48. P = x[1−(1.00875)⁻⁴⁸]/0.00875. x = 150000/39.108 = R3835.67.",
+        "explanation": "i_eff = (1 + 0.095/12)^12 \u2212 1 = (1.007917)^12 \u2212 1 = 1.09924 \u2212 1 = 0.09924, so the effective rate is 9.92% p.a.",
         "distractors": [
-          "R3125.00",
-          "R4201.50",
-          "R3500.00"
+          "9.50%",
+          "10.03%",
+          "9.75%"
         ]
       },
       {
-        "question": "Calculate the monthly payment on a R150 000 loan at 10.5% p.a. compounded monthly over 4 years.",
-        "answer": "R3 835.67",
+        "question": "Sipho wants to save R365 000 for a deposit on a house in 8 years. He opens a sinking fund that earns 10% p.a. compounded monthly. What must his monthly payment be?",
+        "answer": "R2 497.01",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Convert the annual rate to monthly first.,Use the present value annuity formula."
+          "This is a future value annuity (sinking fund). Use F = x[(1+i)ⁿ \u2212 1]/i.",
+          "i = 0.10/12 = 0.008333, n = 8 \u00d7 12 = 96. Solve for x."
         ],
-        "explanation": "i = 0.105/12 = 0.00875, n = 48. P = x[1−(1.00875)⁻⁴⁸]/0.00875. x = 150000/39.108 = R3835.67.",
+        "explanation": "i = 0.10/12 = 0.008\u0305333, n = 96. F = x[(1.008333)^96 \u2212 1]/0.008333. (1.008333)^96 = 2.21964. Factor = [2.21964 \u2212 1]/0.008333 = 146.356. x = 365\u202f000/146.356 = R2\u202f497.01.",
         "distractors": [
-          "R3125.00",
-          "R4201.50",
-          "R3500.00"
+          "R3 802.08",
+          "R2 250.00",
+          "R2 684.55"
         ]
       },
       {
-        "question": "Calculate the monthly payment on a R150 000 loan at 10.5% p.a. compounded monthly over 4 years.",
-        "answer": "R3 835.67",
+        "question": "Naledi takes out a home loan of R800 000 at 11.5% p.a. compounded monthly, to be repaid over 20 years. Calculate her monthly repayment.",
+        "answer": "R8 524.14",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Convert the annual rate to monthly first.,Use the present value annuity formula."
+          "This is a present value annuity (loan repayment). Use P = x[1 \u2212 (1+i)^(\u2212n)]/i.",
+          "i = 0.115/12 = 0.009583, n = 20 \u00d7 12 = 240. Solve for x."
         ],
-        "explanation": "i = 0.105/12 = 0.00875, n = 48. P = x[1−(1.00875)⁻⁴⁸]/0.00875. x = 150000/39.108 = R3835.67.",
+        "explanation": "i = 0.115/12 = 0.009583\u0305, n = 240. (1.009583)^(\u2212240) = 0.10065. PV factor = [1 \u2212 0.10065]/0.009583 = 0.89935/0.009583 = 93.852. x = 800\u202f000/93.852 = R8\u202f524.14.",
         "distractors": [
-          "R3125.00",
-          "R4201.50",
-          "R3500.00"
+          "R7 666.67",
+          "R9 103.50",
+          "R8 000.00"
         ]
       },
       {
-        "question": "A car costs R350 000. You pay a 15% deposit and finance the rest at 11% p.a. compounded monthly over 6 years. Find the monthly instalment and the total amount paid.",
-        "answer": "R5 777.83 per month; total R416 403.76",
+        "question": "A loan of R500 000 is taken at 12% p.a. compounded monthly, to be repaid in equal monthly instalments over 20 years. Calculate the outstanding balance on the loan after 8 years of payments.",
+        "answer": "R419 633.13",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Calculate the deposit first. The loan amount is 85% of R350 000.,Remember: total paid = monthly payment × number of months."
+          "First find the monthly payment using the PV annuity formula with n = 240.",
+          "The balance outstanding after k payments equals the PV of the remaining (n \u2212 k) payments. Use the same payment x with n = 240 \u2212 96 = 144."
         ],
-        "explanation": "Loan = 350000 × 0.85 = R297500. i = 0.11/12, n = 72. x = 297500/[1−(1+i)⁻⁷²]/i.",
+        "explanation": "i = 0.01, n = 240. PV factor = [1 \u2212 (1.01)^(\u2212240)]/0.01 = [1 \u2212 0.09230]/0.01 = 90.770. x = 500\u202f000/90.770 = R5\u202f508.44. After 96 payments, 144 remain. Balance = 5\u202f508.44 \u00d7 [1 \u2212 (1.01)^(\u2212144)]/0.01 = 5\u202f508.44 \u00d7 76.180 = R419\u202f633.13.",
         "distractors": [
-          "R4861.11",
-          "R6500.00",
-          "R5200.00"
+          "R450 000.00",
+          "R385 246.78",
+          "R500 000.00"
         ]
       },
       {
-        "question": "A car costs R350 000. You pay a 15% deposit and finance the rest at 11% p.a. compounded monthly over 6 years. Find the monthly instalment and the total amount paid.",
-        "answer": "R5 777.83 per month; total R416 403.76",
+        "question": "Lerato considers two investment options. Option A: R1 000 per month into an account earning 9% p.a. compounded monthly for 10 years. Option B: A lump sum of R100 000 invested at 10% p.a. compounded annually for 10 years. Which option yields more, and by how much?",
+        "answer": "Option B yields more, by R65 859.98. (Option A = R193 514.27; Option B = R259 374.25)",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Calculate the deposit first. The loan amount is 85% of R350 000.,Remember: total paid = monthly payment × number of months."
+          "For Option A, use the FV annuity formula with i = 0.09/12 = 0.0075 and n = 120.",
+          "For Option B, use A = P(1+i)ⁿ with P = 100\u202f000, i = 0.10, n = 10.",
+          "Compare the two final amounts to determine the difference."
         ],
-        "explanation": "Loan = 350000 × 0.85 = R297500. i = 0.11/12, n = 72. x = 297500/[1−(1+i)⁻⁷²]/i.",
+        "explanation": "Option A: i = 0.0075, n = 120. F = 1\u202f000 \u00d7 [(1.0075)^120 \u2212 1]/0.0075 = 1\u202f000 \u00d7 [2.45136 \u2212 1]/0.0075 = 1\u202f000 \u00d7 193.514 = R193\u202f514.27. Option B: A = 100\u202f000(1.10)^10 = 100\u202f000 \u00d7 2.59374 = R259\u202f374.25. Difference = R259\u202f374.25 \u2212 R193\u202f514.27 = R65\u202f859.98. Option B yields more.",
         "distractors": [
-          "R4861.11",
-          "R6500.00",
-          "R5200.00"
+          "Option A by R12 450.00",
+          "Option B by R45 000.00",
+          "They are equal"
         ]
       },
       {
-        "question": "A car costs R350 000. You pay a 15% deposit and finance the rest at 11% p.a. compounded monthly over 6 years. Find the monthly instalment and the total amount paid.",
-        "answer": "R5 777.83 per month; total R416 403.76",
+        "question": "A car costs R480 000. Kagiso pays a 10% deposit and agrees to a balloon payment of 20% of the original price at the end of the loan. The remaining amount is financed at 9.5% p.a. compounded monthly over 5 years. Calculate the monthly instalment and the total amount Kagiso pays for the car (deposit + instalments + balloon).",
+        "answer": "Monthly instalment = R7 803.11; Total paid = R612 186.60",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Calculate the deposit first. The loan amount is 85% of R350 000.,Remember: total paid = monthly payment × number of months."
+          "Deposit = 10% of R480\u202f000 = R48\u202f000. Balloon = 20% of R480\u202f000 = R96\u202f000.",
+          "The loan amount is R480\u202f000 \u2212 R48\u202f000 = R432\u202f000, but you must subtract the present value of the balloon payment.",
+          "PV of balloon = 96\u202f000 \u00d7 (1.007917)^(\u221260). The annuity portion is R432\u202f000 \u2212 PV(balloon). Then use the PV annuity formula to find x."
         ],
-        "explanation": "Loan = 350000 × 0.85 = R297500. i = 0.11/12, n = 72. x = 297500/[1−(1+i)⁻⁷²]/i.",
+        "explanation": "Deposit = R48\u202f000. Financed = R432\u202f000. i = 0.095/12 = 0.007917, n = 60. PV of balloon = 96\u202f000(1.007917)^(\u221260) = 96\u202f000 \u00d7 0.62225 = R59\u202f736.00. Annuity PV = 432\u202f000 \u2212 59\u202f736 = R372\u202f264. PV factor = [1 \u2212 (1.007917)^(\u221260)]/0.007917 = [1 \u2212 0.62225]/0.007917 = 47.714. x = 372\u202f264/47.714 = R7\u202f803.11. Total = 48\u202f000 + (7\u202f803.11 \u00d7 60) + 96\u202f000 = 48\u202f000 + 468\u202f186.60 + 96\u202f000 = R612\u202f186.60.",
         "distractors": [
-          "R4861.11",
-          "R6500.00",
-          "R5200.00"
+          "R8 640.00 per month; R566 400.00 total",
+          "R7 200.00 per month; R580 000.00 total",
+          "R9 012.34 per month; R636 740.40 total"
         ]
       }
     ],

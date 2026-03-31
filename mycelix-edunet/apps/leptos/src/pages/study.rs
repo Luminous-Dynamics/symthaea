@@ -579,6 +579,59 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                     })
                 }}
             </Suspense>
+
+            // Feedback widget — "Was this helpful?"
+            {
+                let feedback_key = format!("edunet_feedback_{}", node_id_for_status2);
+                let initial_fb = persistence::load::<String>(&feedback_key);
+                let (fb_given, set_fb_given) = signal(initial_fb.is_some());
+                let (show_text, set_show_text) = signal(false);
+                let fb_key_up = feedback_key.clone();
+                let fb_key_down = feedback_key.clone();
+                let fb_key_text = feedback_key.clone();
+
+                view! {
+                    <div style="margin-top: 2rem; padding: 1rem; border-top: 1px solid var(--border); text-align: center">
+                        {move || if fb_given.get() {
+                            view! {
+                                <p style="font-size: 0.8rem; color: var(--text-tertiary); font-style: italic">"Thanks for your feedback"</p>
+                            }.into_any()
+                        } else if show_text.get() {
+                            let fk = fb_key_text.clone();
+                            view! {
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem">"What could be better?"</p>
+                                <textarea
+                                    style="width: 100%; max-width: 400px; min-height: 60px; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.8rem; font-family: inherit; resize: vertical"
+                                    placeholder="Tell us what was confusing or missing..."
+                                    on:change=move |ev| {
+                                        let val = leptos::prelude::event_target_value(&ev);
+                                        persistence::save(&fk, &format!("feedback:{}", val));
+                                        set_fb_given.set(true);
+                                    }
+                                ></textarea>
+                            }.into_any()
+                        } else {
+                            let fk_up = fb_key_up.clone();
+                            view! {
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem">"Was this lesson helpful?"</p>
+                                <div style="display: flex; gap: 0.75rem; justify-content: center">
+                                    <button
+                                        style="padding: 0.4rem 1rem; background: var(--soil-rich); border: 1px solid var(--mastery-green); border-radius: 6px; color: var(--mastery-green); cursor: pointer; font-family: inherit; font-size: 0.85rem"
+                                        on:click=move |_| {
+                                            persistence::save(&fk_up, &"helpful".to_string());
+                                            set_fb_given.set(true);
+                                        }
+                                    >"\u{1F44D} Yes"</button>
+                                    <button
+                                        style="padding: 0.4rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); cursor: pointer; font-family: inherit; font-size: 0.85rem"
+                                        on:click=move |_| set_show_text.set(true)
+                                    >"\u{1F44E} Could be better"</button>
+                                </div>
+                            }.into_any()
+                        }}
+                    </div>
+                }
+            }
         </div>
     }.into_any()
 }

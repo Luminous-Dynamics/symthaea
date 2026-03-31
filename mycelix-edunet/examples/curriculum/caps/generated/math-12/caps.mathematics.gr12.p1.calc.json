@@ -87,108 +87,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Differentiate f(x) = 5x³ − 2x + 7.",
-        "answer": "15x² − 2",
+        "question": "Find f'(x) if f(x) = 4x⁵ − 7x² + 3.",
+        "answer": "f'(x) = 20x⁴ − 14x",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "What rule do we use for each term?,What happens to constants when differentiated?"
+          "Use the power rule: d/dx(xⁿ) = nxⁿ⁻¹.",
+          "Remember that the derivative of a constant is 0."
         ],
-        "explanation": "Apply the power rule to each term: d/dx(5x³) = 15x², d/dx(−2x) = −2, d/dx(7) = 0.",
+        "explanation": "Apply the power rule term by term: d/dx(4x⁵) = 5 × 4x⁴ = 20x⁴. d/dx(−7x²) = 2 × (−7)x¹ = −14x. d/dx(3) = 0. Therefore f'(x) = 20x⁴ − 14x.",
         "distractors": [
-          "15x³ − 2",
-          "15x² + 2",
-          "15x² − 2x"
+          "20x⁵ − 14x",
+          "20x⁴ − 14x²",
+          "20x⁴ − 7x"
         ]
       },
       {
-        "question": "Differentiate f(x) = 5x³ − 2x + 7.",
-        "answer": "15x² − 2",
+        "question": "Given g(x) = x⁴ − 8x³ + 18x² − 5x + 1, find g'(x).",
+        "answer": "g'(x) = 4x³ − 24x² + 36x − 5",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "What rule do we use for each term?,What happens to constants when differentiated?"
+          "Differentiate each term separately using the power rule.",
+          "Be careful with the signs: the coefficient of x³ is −8."
         ],
-        "explanation": "Apply the power rule to each term: d/dx(5x³) = 15x², d/dx(−2x) = −2, d/dx(7) = 0.",
+        "explanation": "d/dx(x⁴) = 4x³. d/dx(−8x³) = −24x². d/dx(18x²) = 36x. d/dx(−5x) = −5. d/dx(1) = 0. So g'(x) = 4x³ − 24x² + 36x − 5.",
         "distractors": [
-          "15x³ − 2",
-          "15x² + 2",
-          "15x² − 2x"
+          "4x³ − 24x² + 36x − 5x",
+          "4x³ − 24x² + 18x − 5",
+          "4x⁴ − 24x³ + 36x² − 5x"
         ]
       },
       {
-        "question": "Find the equation of the tangent to y = x² − 4x + 3 at the point where x = 1.",
-        "answer": "y = −2x + 2",
+        "question": "Find the equation of the tangent to the curve y = x³ − 3x + 2 at the point where x = 2.",
+        "answer": "y = 9x − 14",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "First find the y-value at x = 1.,Find the gradient using the derivative. Then use y − y₁ = m(x − x₁)."
+          "First substitute x = 2 into y to find the point of tangency.",
+          "Then find dy/dx and evaluate it at x = 2 for the gradient. Use y − y₁ = m(x − x₁)."
         ],
-        "explanation": "At x = 1: y = 1 − 4 + 3 = 0. y' = 2x − 4, so m = 2(1) − 4 = −2. Tangent: y − 0 = −2(x − 1), y = −2x + 2.",
+        "explanation": "At x = 2: y = 8 − 6 + 2 = 4, so the point is (2, 4). dy/dx = 3x² − 3. At x = 2: m = 3(4) − 3 = 9. Tangent: y − 4 = 9(x − 2) → y = 9x − 18 + 4 → y = 9x − 14.",
         "distractors": [
-          "y = −2x + 1",
-          "y = 2x − 2",
-          "y = −2x"
+          "y = 9x − 18",
+          "y = 9x − 4",
+          "y = 3x − 2"
         ]
       },
       {
-        "question": "Find the equation of the tangent to y = x² − 4x + 3 at the point where x = 1.",
-        "answer": "y = −2x + 2",
+        "question": "Determine the intervals on which f(x) = x³ − 3x² − 9x + 5 is increasing and where it is decreasing.",
+        "answer": "Increasing for x < −1 or x > 3; decreasing for −1 < x < 3",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "First find the y-value at x = 1.,Find the gradient using the derivative. Then use y − y₁ = m(x − x₁)."
+          "Find f'(x) and set it equal to zero to locate the critical points.",
+          "Use a sign diagram or test values in each interval to determine where f'(x) > 0 (increasing) and f'(x) < 0 (decreasing)."
         ],
-        "explanation": "At x = 1: y = 1 − 4 + 3 = 0. y' = 2x − 4, so m = 2(1) − 4 = −2. Tangent: y − 0 = −2(x − 1), y = −2x + 2.",
+        "explanation": "f'(x) = 3x² − 6x − 9 = 3(x² − 2x − 3) = 3(x − 3)(x + 1). Critical points: x = −1 and x = 3. Test x = −2: f'(−2) = 3(−5)(−1) = 15 > 0 (increasing). Test x = 0: f'(0) = 3(−3)(1) = −9 < 0 (decreasing). Test x = 4: f'(4) = 3(1)(5) = 15 > 0 (increasing). So f is increasing on (−∞, −1) and (3, ∞), and decreasing on (−1, 3).",
         "distractors": [
-          "y = −2x + 1",
-          "y = 2x − 2",
-          "y = −2x"
+          "Increasing for −1 < x < 3; decreasing elsewhere",
+          "Increasing for x > 3 only; decreasing for x < 3",
+          "Increasing for x < −1; decreasing for x > −1"
         ]
       },
       {
-        "question": "For f(x) = 2x³ − 9x² + 12x − 4, determine the x-values where f is increasing.",
-        "answer": "x < 1 or x > 2",
+        "question": "Find and classify the turning points of f(x) = 2x³ + 3x² − 12x + 1.",
+        "answer": "Local maximum at (−2, 21); local minimum at (1, −6)",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Find f'(x) first.,Set f'(x) = 0 to find critical points. Then test intervals."
+          "Set f'(x) = 0 to find the x-values of the turning points.",
+          "Use the second derivative test: if f''(x) < 0 it is a local maximum, if f''(x) > 0 it is a local minimum."
         ],
-        "explanation": "f'(x) = 6x² − 18x + 12 = 6(x² − 3x + 2) = 6(x−1)(x−2). f'(x) > 0 when x < 1 or x > 2.",
+        "explanation": "f'(x) = 6x² + 6x − 12 = 6(x² + x − 2) = 6(x + 2)(x − 1). Setting f'(x) = 0: x = −2 or x = 1. f''(x) = 12x + 6. At x = −2: f''(−2) = −24 + 6 = −18 < 0 → local maximum. f(−2) = 2(−8) + 3(4) − 12(−2) + 1 = −16 + 12 + 24 + 1 = 21. At x = 1: f''(1) = 12 + 6 = 18 > 0 → local minimum. f(1) = 2 + 3 − 12 + 1 = −6.",
         "distractors": [
-          "x > 2 only",
-          "1 < x < 2",
-          "x < 2"
+          "Local minimum at (−2, 21); local maximum at (1, −6)",
+          "Local maximum at (−2, 17); local minimum at (1, −8)",
+          "Local maximum at (2, −15); local minimum at (−1, 14)"
         ]
       },
       {
-        "question": "For f(x) = 2x³ − 9x² + 12x − 4, determine the x-values where f is increasing.",
-        "answer": "x < 1 or x > 2",
+        "question": "Sketch the graph of f(x) = −x³ + 3x² + 9x − 27 by finding all intercepts and turning points.",
+        "answer": "y-intercept: (0, −27). x-intercepts: x = 3 (double root) and x = −3. Local minimum at (−1, −32); local maximum at (3, 0). The curve rises from bottom-left, has a local min at (−1, −32), rises through x = −3, reaches a local max at (3, 0), then falls to bottom-right.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Find f'(x) first.,Set f'(x) = 0 to find critical points. Then test intervals."
+          "For x-intercepts, try to factorise the cubic. Check x = 3 as a possible root.",
+          "Find f'(x), set it to 0 for turning points, then use f''(x) to classify them. Note the shape of a negative cubic (starts top-left, ends bottom-right)."
         ],
-        "explanation": "f'(x) = 6x² − 18x + 12 = 6(x² − 3x + 2) = 6(x−1)(x−2). f'(x) > 0 when x < 1 or x > 2.",
+        "explanation": "y-intercept: f(0) = −27, so (0, −27). Testing x = 3: f(3) = −27 + 27 + 27 − 27 = 0 ✓. Factorising: f(x) = −(x³ − 3x² − 9x + 27) = −(x − 3)²(x + 3). x-intercepts: x = 3 (touches, double root) and x = −3 (crosses). f'(x) = −3x² + 6x + 9 = −3(x² − 2x − 3) = −3(x − 3)(x + 1). Turning points at x = −1 and x = 3. f(−1) = 1 + 3 − 9 − 27 = −32 and f(3) = 0. f''(x) = −6x + 6. f''(−1) = 12 > 0 → local min at (−1, −32). f''(3) = −12 < 0 → local max at (3, 0). Since the leading coefficient is negative, the curve goes from top-left to bottom-right.",
         "distractors": [
-          "x > 2 only",
-          "1 < x < 2",
-          "x < 2"
+          "Local max at (−1, −32) and local min at (3, 0)",
+          "x-intercepts at x = 3 only (triple root), no other intercepts",
+          "Local min at (−1, −32) and local max at (3, 8)"
         ]
       },
       {
-        "question": "A closed cylindrical can must hold 500π cm³. Find the radius that minimises the total surface area.",
-        "answer": "r = 5∛2 ≈ 6.3 cm",
+        "question": "A manufacturer makes open-top rectangular boxes from sheets of cardboard 60 cm long and 30 cm wide by cutting equal squares of side x cm from each corner and folding up the sides. Find the value of x that maximises the volume of the box, and state the maximum volume.",
+        "answer": "x = 5(3 − √3) ≈ 6.34 cm, giving a maximum volume of approximately 5196 cm³",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Create",
         "hints": [
-          "Express h in terms of r using the volume constraint.,Write SA in terms of r only, then differentiate and set equal to zero."
+          "After cutting squares of side x from each corner, the base dimensions become (60 − 2x) by (30 − 2x) and the height is x.",
+          "Write V = x(60 − 2x)(30 − 2x), expand, differentiate, and set V'(x) = 0. Use the quadratic formula. Remember to check that x is in a valid range (0 < x < 15)."
         ],
-        "explanation": "V = πr²h = 500π, so h = 500/r². SA = 2πr² + 2πrh = 2πr² + 1000π/r. dSA/dr = 4πr − 1000π/r² = 0. 4r³ = 1000, r³ = 250, r = ∛250 ≈ 6.3 cm (or exactly 5∛2). d²SA/dr² = 4π + 2000π/r³ > 0 ✓",
+        "explanation": "Dimensions: length = 60 − 2x, width = 30 − 2x, height = x. Domain: 0 < x < 15. V = x(60 − 2x)(30 − 2x) = x(1800 − 120x − 60x + 4x²) = 4x³ − 180x² + 1800x. V'(x) = 12x² − 360x + 1800 = 12(x² − 30x + 150). Using the quadratic formula: x = (30 ± √(900 − 600))/2 = (30 ± √300)/2 = 15 ± 5√3. Since 0 < x < 15, we take x = 15 − 5√3 = 5(3 − √3) ≈ 6.34 cm. V''(x) = 24x − 360. V''(6.34) ≈ 152 − 360 = −208 < 0, confirming a maximum. V(6.34) ≈ 6.34 × 47.32 × 17.32 ≈ 5196 cm³.",
         "distractors": [
-          "r = 10 cm",
-          "r = 250 cm",
-          "r = √500 cm"
+          "x = 10 cm, V = 2000 cm³",
+          "x = 7.5 cm, V = 5062.5 cm³",
+          "x = 15 − 5√3 cm, V = 4800 cm³"
         ]
       }
     ],
