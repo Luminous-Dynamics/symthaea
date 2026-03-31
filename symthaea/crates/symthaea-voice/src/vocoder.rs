@@ -159,7 +159,7 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
             reverb_idx += 1;
             let wet = dry * (1.0 - reverb_mix) + delayed * reverb_mix;
 
-            output.push(wet * 15.0); // reduced from 40 — was causing clipping/distortion
+            output.push(wet * 25.0); // balanced: audible but not harsh
         }
     }
 
