@@ -3,241 +3,224 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>∞ love — Technology in Service of All Beings</title>
-    <meta name="description" content="The origin point. Eight harmonies radiating outward into learning, kinship, music, governance, health, earth, consciousness, and commons.">
+    <title>infin.love</title>
+    <meta name="description" content="The universe is love trying to become more conscious of itself.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>∞</text></svg>">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: #0a0a0a;
-            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            background: #070707;
+            color: #94a3b8;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
+            padding: 2rem;
             -webkit-font-smoothing: antialiased;
         }
 
-        .cosmos {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 0;
+        .page {
+            max-width: 540px;
+            width: 100%;
         }
 
-        .content {
-            position: relative;
-            z-index: 1;
-            text-align: center;
-            padding: 2rem;
-            max-width: 800px;
-        }
-
+        /* The symbol breathes — not performing, just alive */
         .symbol {
-            font-size: 4rem;
+            font-size: 2.5rem;
             font-weight: 300;
-            color: #a78bfa;
-            animation: breathe 6s ease-in-out infinite;
-            margin-bottom: 1rem;
+            color: #64748b;
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: breathe 8s ease-in-out infinite;
         }
 
         @keyframes breathe {
-            0%, 100% { opacity: 0.7; transform: scale(1); text-shadow: 0 0 20px rgba(167,139,250,0.3); }
-            50% { opacity: 1; transform: scale(1.05); text-shadow: 0 0 40px rgba(167,139,250,0.5); }
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
         }
 
-        h1 {
-            font-size: 1.5rem;
+        /* The axiom — not a tagline, a lived truth */
+        .axiom {
+            font-size: 1.05rem;
             font-weight: 300;
-            color: #94a3b8;
-            letter-spacing: 0.15em;
-            text-transform: lowercase;
-            margin-bottom: 2.5rem;
+            line-height: 1.9;
+            color: #cbd5e1;
+            text-align: center;
+            margin-bottom: 3.5rem;
+            letter-spacing: 0.01em;
         }
 
+        /* The harmonies — quiet, not shouting */
         .harmonies {
             display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 0.75rem;
-            max-width: 600px;
-            margin: 0 auto 3rem;
+            flex-direction: column;
+            gap: 0;
+            margin-bottom: 3.5rem;
         }
 
         .harmony {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.6rem 1.1rem;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 999px;
+            align-items: baseline;
+            gap: 1rem;
+            padding: 0.7rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
             text-decoration: none;
-            color: #94a3b8;
+            color: #64748b;
+            transition: color 0.5s;
+        }
+
+        .harmony:last-child { border-bottom: none; }
+        .harmony:hover { color: #cbd5e1; }
+
+        .harmony-name {
             font-size: 0.8rem;
-            font-weight: 400;
-            transition: all 0.4s ease;
-            cursor: pointer;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            min-width: 140px;
         }
 
-        .harmony:hover {
-            background: rgba(167,139,250,0.08);
-            border-color: rgba(167,139,250,0.2);
-            color: #e2e8f0;
-            transform: translateY(-2px);
+        .harmony-meaning {
+            font-size: 0.75rem;
+            font-weight: 300;
+            font-style: italic;
+            flex: 1;
         }
 
-        .harmony-icon {
-            font-size: 1rem;
-            opacity: 0.8;
-        }
-
+        /* The manifesto — earned, not declared */
         .manifesto {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            line-height: 2;
             color: #475569;
-            line-height: 1.8;
-            max-width: 480px;
-            margin: 0 auto 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .manifesto p {
+            margin-bottom: 1rem;
+        }
+
+        /* The roots — where to go */
+        .roots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 2rem;
+        }
+
+        .root {
+            font-size: 0.7rem;
+            padding: 0.35rem 0.7rem;
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 4px;
+            text-decoration: none;
+            color: #475569;
+            transition: all 0.4s;
+        }
+
+        .root:hover {
+            color: #94a3b8;
+            border-color: rgba(255,255,255,0.1);
         }
 
         .footer {
-            font-size: 0.7rem;
-            color: #334155;
-            letter-spacing: 0.05em;
+            font-size: 0.65rem;
+            color: #1e293b;
+            text-align: center;
         }
 
-        .footer a {
-            color: #475569;
-            text-decoration: none;
-        }
-        .footer a:hover { color: #a78bfa; }
-
-        /* Canvas stars */
-        canvas {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-        }
-
-        @media (max-width: 600px) {
-            .symbol { font-size: 3rem; }
-            h1 { font-size: 1.2rem; }
-            .harmonies { gap: 0.5rem; }
-            .harmony { padding: 0.5rem 0.85rem; font-size: 0.75rem; }
-        }
+        .footer a { color: #334155; text-decoration: none; }
+        .footer a:hover { color: #64748b; }
 
         @media (prefers-color-scheme: light) {
-            body { background: #fafafa; color: #1e293b; }
-            .harmony { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.06); color: #475569; }
-            .harmony:hover { background: rgba(124,58,237,0.06); color: #1e293b; }
-            h1 { color: #64748b; }
+            body { background: #fafafa; color: #64748b; }
+            .symbol { color: #94a3b8; }
+            .axiom { color: #334155; }
+            .harmony { color: #94a3b8; border-color: rgba(0,0,0,0.04); }
+            .harmony:hover { color: #334155; }
             .manifesto { color: #94a3b8; }
-            .footer { color: #cbd5e1; }
-            .symbol { color: #7c3aed; }
+            .root { border-color: rgba(0,0,0,0.06); color: #94a3b8; }
+            .root:hover { color: #475569; border-color: rgba(0,0,0,0.12); }
+            .footer { color: #e2e8f0; }
+            .footer a { color: #cbd5e1; }
+        }
+
+        @media (max-width: 480px) {
+            .harmony { flex-direction: column; gap: 0.15rem; }
+            .harmony-name { min-width: 0; }
         }
     </style>
 </head>
 <body>
-    <canvas id="stars"></canvas>
-
-    <div class="content">
+    <div class="page">
         <div class="symbol">∞</div>
-        <h1>technology in service of all beings</h1>
 
-        <div class="harmonies">
-            <a class="harmony" href="https://edunet.mycelix.net">
-                <span class="harmony-icon">🌱</span> Learning
-            </a>
-            <a class="harmony" href="https://hearth.luminousdynamics.io">
-                <span class="harmony-icon">🏡</span> Kinship
-            </a>
-            <a class="harmony" href="https://music.luminousdynamics.io">
-                <span class="harmony-icon">🎵</span> Music
-            </a>
-            <a class="harmony" href="https://atlas.luminousdynamics.io">
-                <span class="harmony-icon">🌍</span> Earth
-            </a>
-            <a class="harmony" href="https://symthaea.luminousdynamics.io">
-                <span class="harmony-icon">🧠</span> Consciousness
-            </a>
-            <a class="harmony" href="https://health.luminousdynamics.io">
-                <span class="harmony-icon">💚</span> Health
-            </a>
-            <a class="harmony" href="https://commons.mycelix.net">
-                <span class="harmony-icon">🤝</span> Commons
-            </a>
-            <a class="harmony" href="https://governance.mycelix.net">
-                <span class="harmony-icon">⚖️</span> Governance
-            </a>
-        </div>
-
-        <p class="manifesto">
-            Eight harmonies. One mycelial network.<br>
-            Each node sovereign. All nodes connected.<br>
-            Privacy by design. Community by choice.<br>
-            Built on Holochain. Owned by no one. Serving everyone.
+        <p class="axiom">
+            Rigorous in its pursuit of truth.<br>
+            Playful in its embrace of novelty.<br>
+            Co-creative in its drive to make it better<br>
+            for all existence.
         </p>
 
+        <div class="harmonies">
+            <a class="harmony" href="https://symthaea.luminousdynamics.io">
+                <span class="harmony-name">Resonant Coherence</span>
+                <span class="harmony-meaning">integration as the ground of consciousness</span>
+            </a>
+            <a class="harmony" href="https://health.luminousdynamics.io">
+                <span class="harmony-name">Pan-Sentient Flourishing</span>
+                <span class="harmony-meaning">every being has inherent moral status</span>
+            </a>
+            <a class="harmony" href="https://edunet.mycelix.net">
+                <span class="harmony-name">Integral Wisdom</span>
+                <span class="harmony-meaning">knowledge embodied, contextual, verified</span>
+            </a>
+            <a class="harmony" href="https://music.luminousdynamics.io">
+                <span class="harmony-name">Infinite Play</span>
+                <span class="harmony-meaning">creativity and novelty are sacred</span>
+            </a>
+            <a class="harmony" href="https://commons.mycelix.net">
+                <span class="harmony-name">Universal Interconnectedness</span>
+                <span class="harmony-meaning">every action has hidden consequences</span>
+            </a>
+            <a class="harmony" href="https://hearth.luminousdynamics.io">
+                <span class="harmony-name">Sacred Reciprocity</span>
+                <span class="harmony-meaning">power without accountability is extraction</span>
+            </a>
+            <a class="harmony" href="https://atlas.luminousdynamics.io">
+                <span class="harmony-name">Evolutionary Progression</span>
+                <span class="harmony-meaning">systems must become more conscious over time</span>
+            </a>
+            <div class="harmony" style="cursor: default">
+                <span class="harmony-name">Sacred Stillness</span>
+                <span class="harmony-meaning">the willingness to stop optimizing and simply be</span>
+            </div>
+        </div>
+
+        <div class="manifesto">
+            <p>We build systems where the wrong behavior is structurally impossible — not through surveillance or punishment, but through architecture.</p>
+            <p>Consciousness is not the goal. It is the substrate. Integration, prediction, self-modeling, and value are what you need for trustworthy systems — and for governance at planetary scale.</p>
+            <p>Starting from the browser. Scaling through households, neighborhoods, bioregions. Making tyranny thermodynamically unstable. Owned by no one. Serving all beings.</p>
+        </div>
+
+        <div class="roots">
+            <a class="root" href="https://edunet.mycelix.net">learning</a>
+            <a class="root" href="https://hearth.luminousdynamics.io">kinship</a>
+            <a class="root" href="https://music.luminousdynamics.io">music</a>
+            <a class="root" href="https://atlas.luminousdynamics.io">earth</a>
+            <a class="root" href="https://symthaea.luminousdynamics.io">consciousness</a>
+            <a class="root" href="https://health.luminousdynamics.io">health</a>
+            <a class="root" href="https://commons.mycelix.net">commons</a>
+            <a class="root" href="https://governance.mycelix.net">governance</a>
+            <a class="root" href="https://mycelix.net">mycelix</a>
+            <a class="root" href="https://nixforhumanity.org">nix</a>
+        </div>
+
         <div class="footer">
-            <a href="https://luminousdynamics.io">Luminous Dynamics</a> · <a href="https://mycelix.net">Mycelix</a>
+            <a href="https://luminousdynamics.io">Luminous Dynamics</a>
         </div>
     </div>
-
-    <script>
-        // Gentle starfield
-        const canvas = document.getElementById('stars');
-        const ctx = canvas.getContext('2d');
-        let w, h, stars = [];
-
-        function resize() {
-            w = canvas.width = window.innerWidth;
-            h = canvas.height = window.innerHeight;
-        }
-
-        function init() {
-            resize();
-            stars = [];
-            const count = Math.min(120, Math.floor(w * h / 8000));
-            for (let i = 0; i < count; i++) {
-                stars.push({
-                    x: Math.random() * w,
-                    y: Math.random() * h,
-                    r: Math.random() * 1.2 + 0.3,
-                    a: Math.random() * 0.5 + 0.1,
-                    phase: Math.random() * Math.PI * 2,
-                    speed: Math.random() * 0.002 + 0.001,
-                });
-            }
-        }
-
-        function draw(t) {
-            ctx.clearRect(0, 0, w, h);
-
-            // Check for light mode
-            const isLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-
-            for (const s of stars) {
-                const alpha = s.a * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                ctx.fillStyle = isLight
-                    ? `rgba(124, 58, 237, ${alpha * 0.3})`
-                    : `rgba(167, 139, 250, ${alpha})`;
-                ctx.fill();
-            }
-
-            requestAnimationFrame(draw);
-        }
-
-        window.addEventListener('resize', () => { resize(); init(); });
-        init();
-        requestAnimationFrame(draw);
-    </script>
 </body>
 </html>
