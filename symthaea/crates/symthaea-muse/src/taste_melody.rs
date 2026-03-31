@@ -214,8 +214,8 @@ pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
     };
 
     let root_freq = 261.63 * 2.0f32.powf(root_semitones as f32 / 12.0); // from C4
-    let center = 440.0; // A4
-    let half_range = 12.0; // ±12 semitones from center = 24 semi total (wider for more unique pitches)
+    let center = 370.0; // F#4 (MIDI 66 — the target mean)
+    let half_range = 8.0; // ±8 semitones from center = 16 semi total (target ~14)
 
     let mut tones = Vec::new();
     // Build 4 octaves of scale, then filter to range

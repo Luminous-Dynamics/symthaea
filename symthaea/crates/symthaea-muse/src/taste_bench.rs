@@ -191,6 +191,7 @@ pub fn score(notes: &[Note], profile: &TasteProfile) -> TasteScore {
 
     let midi_pitches: Vec<u8> = notes.iter()
         .map(|n| freq_to_midi(n.frequency))
+        .filter(|&p| p >= 36 && p <= 96) // filter degenerate pitches
         .collect();
     let velocities: Vec<f32> = notes.iter().map(|n| n.velocity).collect();
     let intervals: Vec<i32> = midi_pitches.windows(2)
