@@ -8,6 +8,7 @@
 //! All math uses raw `[f32; N]` arrays to avoid dependency collisions
 //! between rendering backends (web-sys, glam/nalgebra).
 
+pub mod aesthetics;
 pub mod constants;
 pub mod data;
 pub mod economics;
