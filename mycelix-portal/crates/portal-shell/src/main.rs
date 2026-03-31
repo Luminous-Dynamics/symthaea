@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Mycelix Portal — the Consciousness Orb.
 
+pub mod ai;
 mod app;
 mod background;
 mod identity;

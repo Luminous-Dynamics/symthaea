@@ -14,10 +14,11 @@ use leptos::prelude::*;
 use domain_governance::types::*;
 use portal_viz::{VoteTallyBar, BarChart, bar_chart::Bar};
 
+use crate::ai::{AiState, ai_state_json};
 use crate::identity::{ConductorStatus, PortalIdentity};
 
 // ── Governance sub-views ──
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum GovView {
     Proposals,
     Councils,
@@ -158,9 +159,22 @@ pub fn GovernanceOverview() -> impl IntoView {
     });
 
     view! {
-        <div class="governance-content">
+        <div class="governance-content" data-domain="governance" role="region" aria-label="Governance domain">
+            // AI-readable state (updated reactively)
+            {move || {
+                let proposals = state.proposals.get();
+                let json = ai_state_json("governance", &serde_json::json!({
+                    "view": format!("{:?}", active_view.get()),
+                    "proposal_count": proposals.len(),
+                    "active_proposals": proposals.iter().filter(|p| p.proposal.status == ProposalStatus::Active).count(),
+                    "selected": state.selected_proposal.get(),
+                    "councils": state.councils.get().len(),
+                }));
+                view! { <AiState json=json /> }
+            }}
+
             // Navigation tabs
-            <div class="governance-nav">
+            <div class="governance-nav" role="tablist" aria-label="Governance sections">
                 <button class=move || if active_view.get() == GovView::Proposals { "domain-nav-btn active" } else { "domain-nav-btn" }
                     on:click=move |_| { set_active_view.set(GovView::Proposals); state.selected_proposal.set(None); }>"Proposals"</button>
                 <button class=move || if active_view.get() == GovView::Councils { "domain-nav-btn active" } else { "domain-nav-btn" }
@@ -253,7 +267,8 @@ fn ProposalList() -> impl IntoView {
                 <span style="font-size: 0.7rem; color: var(--text-muted)">
                     {move || format!("{} proposals", state.proposals.get().len())}
                 </span>
-                <button class="domain-nav-btn" on:click=move |_| state.show_create_form.update(|v| *v = !*v)>
+                <button class="domain-nav-btn" data-action="create-proposal" aria-label="Create new proposal"
+                    on:click=move |_| state.show_create_form.update(|v| *v = !*v)>
                     {move || if state.show_create_form.get() { "- Close" } else { "+ New Proposal" }}
                 </button>
             </div>
@@ -278,6 +293,10 @@ fn ProposalList() -> impl IntoView {
 
                     view! {
                         <div class="proposal-card"
+                            data-action="select-proposal"
+                            data-id=id.clone()
+                            role="button"
+                            aria-label=format!("View proposal {}", id.clone())
                             style=format!("border-left: 3px solid {s_color}; cursor: pointer;")
                             on:click=move |_| state.selected_proposal.set(Some(id_for_click.clone()))
                         >
