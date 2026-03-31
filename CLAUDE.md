@@ -23,7 +23,9 @@ Full details: @.claude/rules/CREDENTIALS.md
 | 8091 | Terra Atlas (Leptos) | atlas.luminousdynamics.io |
 | 8094 | SSH Relay | — |
 | **81XX** | **Mycelix Frontends** (alphabetical) | |
-| 8107 | EduNet UI | edunet.luminousdynamics.io |
+| 8104 | Commons UI | commons.luminousdynamics.io |
+| 8107 | EduNet UI | edunet.mycelix.net |
+| 8110 | Civic UI (Governance+Finance) | governance.luminousdynamics.io |
 | 8111 | Health UI | health.luminousdynamics.io |
 | 8112 | Hearth UI | hearth.luminousdynamics.io |
 | 8121 | Music UI | music.luminousdynamics.io |
@@ -54,7 +56,7 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Focus**: USACE data, SMR pipeline, investments
 
 ### EduNet (Learning Platform)
-- **Live**: https://edunet.luminousdynamics.io (Cloudflare Tunnel → :8107)
+- **Live**: https://edunet.mycelix.net (Cloudflare Tunnel → :8107)
 - **IPFS**: `QmcB9rh3yQzmMP6kwQtXVgrBWdyCumTE2aEAg2Pb46gDCM` (decentralized fallback)
 - **Path**: `mycelix-edunet/apps/leptos/` (Leptos 0.8 CSR WASM)
 - **Code**: ~50 Rust source files, 4.5MB WASM (wasm-opt'd, ~1MB gzipped), 19 content modules, 13 standards sources
@@ -147,7 +149,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 | **mycelix-supplychain** | `mycelix-supplychain/` | 8 (provenance tracking) | Built |
 | **mycelix-marketplace** | `mycelix-marketplace/` | 8 (arbitration) | Built |
 | **mycelix-knowledge** | `mycelix-knowledge/` | 8 (claims, graph, query, inference, factcheck, markets, DKG, bridge) | Built |
-| **mycelix-edunet** | `mycelix-edunet/` | 10 + Leptos CSR frontend (2,002 curriculum nodes, 58 subjects, 9 games, K-to-PhD) | Built, **LIVE** at edunet.luminousdynamics.io |
+| **mycelix-edunet** | `mycelix-edunet/` | 10 + Leptos CSR frontend (2,002 curriculum nodes, 58 subjects, 9 games, K-to-PhD) | Built, **LIVE** at edunet.mycelix.net |
 | **mycelix-energy** | `mycelix-energy/` | 5 (projects, investments, regenerative, grid, bridge) | Built |
 | **mycelix-climate** | `mycelix-climate/` | 3 (carbon, projects, bridge) | Built |
 | **mycelix-music** | `mycelix-music/` | 5 + 14 support crates (catalog, plays, balances, trust, music-bridge) | Built, WASM verified, DNA/hApp packed |
@@ -193,7 +195,7 @@ Excluding `target/`, `node_modules/`, `venv/`, build artifacts:
 |--------|---------|
 | luminousdynamics.org | Main org |
 | atlas.luminousdynamics.io | Terra Atlas |
-| edunet.luminousdynamics.io | EduNet (Cloudflare Tunnel → :8092) |
+| edunet.mycelix.net | EduNet (Cloudflare Tunnel → :8092) |
 | nixforhumanity.org | Luminous Nix |
 | mycelix.net | Mycelix |
 
