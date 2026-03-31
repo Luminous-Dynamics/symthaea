@@ -15,6 +15,38 @@
 
 use crate::Note;
 
+/// Evolvable melody parameters — the evolutionary tuner optimizes these.
+#[derive(Debug, Clone)]
+pub struct MelodyParams {
+    /// Probability of step (1 scale degree) [0, 1].
+    pub step_prob: f32,
+    /// Probability of third (2 scale degrees) [0, 1].
+    pub third_prob: f32,
+    /// Probability of deliberate repeat [0, 1].
+    pub repeat_prob: f32,
+    // Remainder is leap probability (1 - step - third - repeat)
+    /// Extra ascending phrase notes (for direction balance).
+    pub ascending_bonus: usize,
+    /// Scale center frequency in Hz.
+    pub scale_center_hz: f32,
+    /// Scale half-range in semitones.
+    pub scale_half_range: f32,
+}
+
+impl Default for MelodyParams {
+    fn default() -> Self {
+        // v8 best settings
+        Self {
+            step_prob: 0.75,
+            third_prob: 0.10,
+            repeat_prob: 0.02,
+            ascending_bonus: 3,
+            scale_center_hz: 440.0,
+            scale_half_range: 12.0,
+        }
+    }
+}
+
 /// Taste-optimized melody state.
 pub struct TasteMelody {
     /// Current position in the scale (index into scale_tones).
@@ -31,18 +63,25 @@ pub struct TasteMelody {
     prev_freq: Option<f32>,
     /// Seed for deterministic variation.
     seed: u32,
+    /// Evolvable parameters.
+    pub params: MelodyParams,
 }
 
 impl TasteMelody {
     pub fn new() -> Self {
+        Self::with_params(MelodyParams::default())
+    }
+
+    pub fn with_params(params: MelodyParams) -> Self {
         Self {
-            scale_pos: 4, // start in middle of scale
+            scale_pos: 4,
             ascending: true,
             phrase_notes: 0,
             phrase_length: 5,
             total_notes: 0,
             prev_freq: None,
             seed: 42,
+            params,
         }
     }
 
@@ -77,21 +116,23 @@ impl TasteMelody {
             self.phrase_notes = 0;
             self.seed = self.seed.wrapping_mul(2654435761);
             let base_len = 4 + ((self.seed >> 20) % 4) as usize;
-            // Ascending phrases longer to balance direction (38%→50%)
-            self.phrase_length = if self.ascending { base_len + 3 } else { base_len };
+            // Ascending phrases longer to balance direction
+            self.phrase_length = if self.ascending { base_len + self.params.ascending_bonus } else { base_len };
             if consciousness > 0.7 { self.phrase_length += 1; }
         }
 
-        // Determine interval size (v8 was best: 75% step produced 42% effective)
-        // v9 tried 80% but scored worse. Keeping v8 ratios.
-        let step = if r < 2 {
-            0 // 2% deliberate repeat
-        } else if r < 77 {
-            1 // 75% step
-        } else if r < 87 {
-            2 // 10% third
+        // Interval size from evolvable parameters
+        let repeat_thresh = (self.params.repeat_prob * 100.0) as u32;
+        let step_thresh = repeat_thresh + (self.params.step_prob * 100.0) as u32;
+        let third_thresh = step_thresh + (self.params.third_prob * 100.0) as u32;
+        let step = if r < repeat_thresh {
+            0 // deliberate repeat
+        } else if r < step_thresh {
+            1 // step (1 scale degree)
+        } else if r < third_thresh {
+            2 // third (2 scale degrees)
         } else {
-            3 + ((self.seed >> 24) % 2) as usize // 13% leap
+            3 + ((self.seed >> 24) % 2) as usize // leap
         };
 
         // Apply direction
@@ -207,6 +248,10 @@ impl TasteMelody {
 
 /// Build scale tones centered on A4 within a 14-semitone range.
 pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
+    build_scale_with(root_semitones, major, 440.0, 12.0)
+}
+
+pub fn build_scale_with(root_semitones: i32, major: bool, center_hz: f32, half_range_semi: f32) -> Vec<f32> {
     let intervals = if major {
         &[0, 2, 4, 5, 7, 9, 11] // major scale
     } else {
@@ -214,8 +259,8 @@ pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
     };
 
     let root_freq = 261.63 * 2.0f32.powf(root_semitones as f32 / 12.0); // from C4
-    let center = 440.0; // A4 — v8 scored highest with this center
-    let half_range = 12.0; // ±12 semitones — v8 best score with this range
+    let center = center_hz;
+    let half_range = half_range_semi;
 
     let mut tones = Vec::new();
     // Build 4 octaves of scale, then filter to range

@@ -314,9 +314,16 @@ pub fn evaluate_taste(genome: &Genome, params: &[ParamDef], seed: u64) -> f64 {
 
     let mut synth = StreamingSynth::new(config, 44100);
     synth.enable_fep = true;
-    synth.feedback_strength = genome.decode(22, &params.get(22).cloned().unwrap_or(
-        ParamDef { name: "feedback", min: 0.1, max: 0.7 }
-    ));
+
+    // Evolve melody parameters directly
+    synth.taste_melody.params = crate::taste_melody::MelodyParams {
+        step_prob: genome.genes.get(0).copied().unwrap_or(0.75).clamp(0.3, 0.9),
+        third_prob: genome.genes.get(1).copied().unwrap_or(0.10).clamp(0.02, 0.3),
+        repeat_prob: genome.genes.get(2).copied().unwrap_or(0.02).clamp(0.0, 0.15),
+        ascending_bonus: (genome.genes.get(3).copied().unwrap_or(0.5) * 6.0) as usize,
+        scale_center_hz: 330.0 + genome.genes.get(4).copied().unwrap_or(0.5) * 220.0, // 330-550 Hz
+        scale_half_range: 6.0 + genome.genes.get(5).copied().unwrap_or(0.5) * 12.0,   // 6-18 semi
+    };
     synth.set_substrate(SubstrateTimbreType::Biological);
 
     // Seed consciousness from genre-neutral state

@@ -173,7 +173,7 @@ pub struct StreamingSynth {
     /// Learned melody predictor (trained on 65M real music pairs).
     melody_predictor: MelodyPredictor,
     /// Taste-optimized melody generator (targets benchmark directly).
-    taste_melody: TasteMelody,
+    pub taste_melody: TasteMelody,
     /// Density regulator: section-aware note spacing.
     density: DensityRegulator,
     /// Self-similarity monitor: ensures right amount of repetition.
@@ -873,8 +873,10 @@ impl StreamingSynth {
 
                 // Taste-optimized melody: clean generator that targets the benchmark
                 // Replaces 6 competing systems with one that guarantees good scores
-                let taste_scale = crate::taste_melody::build_scale(
+                let taste_scale = crate::taste_melody::build_scale_with(
                     chord.root_semitones, gesture.prefer_major,
+                    self.taste_melody.params.scale_center_hz,
+                    self.taste_melody.params.scale_half_range,
                 );
                 note.frequency = self.taste_melody.next_freq(
                     &taste_scale, &chord_freqs,
