@@ -2,7 +2,7 @@
 # Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-"""Generate NSM lexicon expansions using Ollama (mistral:7b).
+"""Generate NSM lexicon expansions using Ollama (gemma3:4b).
 
 Feeds unique words from the Social Chemistry dataset through a local LLM
 with few-shot examples to produce semantic prime decompositions.
@@ -12,7 +12,7 @@ Usage:
 
 Requires:
     - Ollama running locally (port 11434)
-    - mistral:7b pulled: `ollama pull mistral:7b`
+    - gemma3:4b pulled: `ollama pull gemma3:4b`
 """
 
 import argparse
@@ -75,7 +75,7 @@ Now decompose this word:
 "{word}": """
 
 
-def query_ollama(prompt: str, model: str = "mistral:7b") -> Optional[str]:
+def query_ollama(prompt: str, model: str = "gemma3:4b") -> Optional[str]:
     payload = json.dumps({
         "model": model,
         "prompt": prompt,
@@ -190,7 +190,7 @@ def main():
     parser.add_argument("--words-file", help="File with one word per line")
     parser.add_argument("--output", default="data/nsm_lexicon_expanded.json",
                         help="Output JSON path (default: data/nsm_lexicon_expanded.json)")
-    parser.add_argument("--model", default="mistral:7b", help="Ollama model name")
+    parser.add_argument("--model", default="gemma3:4b", help="Ollama model name")
     parser.add_argument("--delay", type=float, default=0.5, help="Delay between requests (seconds)")
     args = parser.parse_args()
 
