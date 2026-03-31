@@ -124,37 +124,45 @@ impl LtcVoice {
                 let f2 = target_f2 * (1.0 - blend) + ltc_frame.f2 * blend;
                 let f3 = target_f3 * (1.0 - blend) + ltc_frame.f3 * blend;
 
+                // Continuous breath envelope — never drops to zero mid-phrase
+                let base_energy = if phoneme.ipa == " " {
+                    0.0 // only actual pauses are silent
+                } else if phoneme.is_vowel {
+                    0.8 + phoneme.stress as f32 * 0.15 // vowels are loud
+                } else {
+                    0.5 // consonants still have energy (not silent!)
+                };
+
+                // Voicing: vowels and voiced consonants are voiced
+                let voicing = if phoneme.ipa == " " {
+                    0.0
+                } else if phoneme.is_vowel || "mnŋlɹwjvzðbdɡ".contains(phoneme.ipa) {
+                    0.9
+                } else {
+                    0.1 // unvoiced consonants have minimal voicing
+                };
+
+                // F0 contour from prosody (not LTC — LTC F0 is untrained)
+                let base_f0 = 140.0 + prosody.consciousness * 60.0;
+                let stress_f0 = phoneme.stress as f32 * 25.0;
+                let declination = -progress * 30.0;
+                let phrase_f0 = base_f0 + stress_f0 + declination + prosody.valence * 20.0;
+
                 let mut frame = FormantFrame {
                     f1: f1.clamp(200.0, 1000.0),
                     f2: f2.clamp(600.0, 3000.0),
                     f3: f3.clamp(1500.0, 5000.0),
-                    b1: ltc_frame.b1.clamp(60.0, 200.0),
-                    b2: ltc_frame.b2.clamp(80.0, 250.0),
-                    b3: ltc_frame.b3.clamp(100.0, 300.0),
-                    // F0 from LTC with prosody
-                    f0: ltc_frame.f0.clamp(80.0, 300.0),
-                    energy: ltc_frame.energy,
-                    voicing: if phoneme.is_vowel || "mnŋlɹwjvzð".contains(phoneme.ipa) {
-                        0.9
-                    } else {
-                        ltc_frame.voicing
-                    },
+                    b1: 80.0 + (1.0 - prosody.consciousness) * 40.0,
+                    b2: 100.0,
+                    b3: 120.0,
+                    f0: phrase_f0.max(80.0),
+                    energy: base_energy,
+                    voicing,
                     time: frames.len() as f32 / 200.0,
                     source_type,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
                 };
-
-                // Stress boosts energy
-                if phoneme.stress > 0 {
-                    frame.energy = (frame.energy * 1.3).min(1.0);
-                }
-
-                // Silence for pauses
-                if phoneme.ipa == " " {
-                    frame.energy = 0.0;
-                    frame.voicing = 0.0;
-                }
 
                 frames.push(frame);
             }
