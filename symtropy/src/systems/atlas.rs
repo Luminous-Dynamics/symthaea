@@ -236,7 +236,7 @@ pub fn setup_globe_view(
         if brightness < 0.45 {
             continue;
         }
-        let size = 0.15 + brightness * 0.5;
+        let size = 0.06 + brightness * 0.12; // smaller — stars shouldn't be diamonds
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(
                 chunk[3] * brightness * 1.5,
@@ -602,7 +602,7 @@ pub fn draw_arcs_system(
 
     // P2P energy trades — green animated arcs between renewable sites
     let trade_sites: Vec<(f64, f64, f64)> = atlas_data.data.sites.iter()
-        .take(20) // top 20 sites for trade simulation
+        .take(8) // top 8 sites — fewer arcs = less pole convergence
         .map(|s| (s.lat, s.lon, s.capacity_mw))
         .collect();
     let trades = terra_atlas_core::energy_trading::simulate_trades(&trade_sites, t as f64);
@@ -667,8 +667,8 @@ pub fn draw_arcs_system(
     }
 
     // Supply routes — cyan arcs, dimmer
-    let supply_color = Color::linear_rgba(0.0, 0.7, 1.0, 0.6); // cyan, more visible
-    for route in &atlas_data.data.supply_routes {
+    let supply_color = Color::linear_rgba(0.0, 0.5, 0.8, 0.3); // cyan, dimmer — background layer
+    for route in atlas_data.data.supply_routes.iter().take(5) { // limit to 5 routes
         let from = geo::lat_lon_to_xyz(route.from_lat, route.from_lon, 1.0);
         let to = geo::lat_lon_to_xyz(route.to_lat, route.to_lon, 1.0);
         let dist = terra_atlas_core::geo::haversine_km(
