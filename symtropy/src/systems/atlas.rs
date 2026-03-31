@@ -77,7 +77,7 @@ pub fn setup_globe_view(
     let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(128, 128));
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let earth_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(1.0, 1.0, 1.0, 0.65), // semi-transparent
+        base_color: Color::linear_rgba(1.0, 1.0, 1.0, 0.78), // mostly visible, slight transparency
         base_color_texture: Some(earth_texture),
         perceptual_roughness: 0.3,  // slightly glossy for holographic sheen
         metallic: 0.1,
@@ -97,8 +97,8 @@ pub fn setup_globe_view(
     // Inner sphere at 0.97 radius — far enough inside to avoid z-fighting
     let grid_mesh = meshes.add(Sphere::new(0.97).mesh().uv(24, 24)); // low-poly = visible edges
     let grid_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.12), // Mycelix cyan, very faint
-        emissive: LinearRgba::new(0.0, 0.4, 0.5, 1.0),
+        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.06), // Mycelix cyan, subtle
+        emissive: LinearRgba::new(0.0, 0.2, 0.25, 1.0), // reduced — don't wash out texture
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -115,8 +115,8 @@ pub fn setup_globe_view(
     // [5] Fresnel edge glow — outer atmosphere, brighter at grazing angles
     let fresnel_mesh = meshes.add(Sphere::new(1.03).mesh().uv(48, 48));
     let fresnel_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.10), // more visible
-        emissive: LinearRgba::new(0.0, 0.5, 0.65, 1.0), // stronger edge glow
+        base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.04),
+        emissive: LinearRgba::new(0.0, 0.25, 0.35, 1.0),
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -133,8 +133,8 @@ pub fn setup_globe_view(
 
     // Second Fresnel layer — wider, softer
     let fresnel2_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.05),
-        emissive: LinearRgba::new(0.0, 0.6, 0.8, 1.0),
+        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.03),
+        emissive: LinearRgba::new(0.0, 0.4, 0.55, 1.0),
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -291,8 +291,8 @@ pub fn setup_globe_view(
             let size = terra_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.6),
-                emissive: LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0),
+                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.35),
+                emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
@@ -493,27 +493,35 @@ pub fn setup_globe_view(
 
     // ─── Solar System Bodies ────────────────────────────────────
     let bodies = terra_atlas_core::solar_system::solar_system_bodies();
-    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(32, 32));
+    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(12, 12)); // low-poly = holographic look
     for body in &bodies {
         let pos = terra_atlas_core::solar_system::body_position(body, 0.0);
         let texture: Handle<Image> = asset_server.load(format!("textures/{}", body.texture));
+        // Holographic Data Orb aesthetic — wireframe-style, not photorealistic
         let mat = if body.is_sun {
             materials.add(StandardMaterial {
-                base_color: Color::WHITE,
-                base_color_texture: Some(texture),
-                emissive: LinearRgba::new(body.emission, body.emission * 0.9, body.emission * 0.7, 1.0),
+                base_color: Color::linear_rgba(1.0, 0.7, 0.2, 0.3), // translucent amber
+                emissive: LinearRgba::new(1.0, 0.6, 0.1, 1.0),
+                alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
             })
         } else {
-            // Slight emissive so the dark side isn't pitch black
-            // (simulates ambient light from the holographic globe)
+            // Data orbs — translucent with edge glow, matching holographic globe
+            let hue = match body.name.as_str() {
+                "Moon" => [0.6, 0.7, 0.8],     // cool silver
+                "Venus" => [0.8, 0.7, 0.4],     // warm gold
+                "Mars" => [0.8, 0.3, 0.2],      // deep red
+                "Jupiter" => [0.6, 0.5, 0.3],   // brown-gold
+                "Saturn" => [0.7, 0.6, 0.4],    // pale gold
+                _ => [0.5, 0.6, 0.7],
+            };
             materials.add(StandardMaterial {
-                base_color: Color::WHITE,
-                base_color_texture: Some(texture),
-                perceptual_roughness: body.roughness,
-                metallic: body.metalness,
-                emissive: LinearRgba::new(0.02, 0.04, 0.05, 1.0), // faint teal ambient
+                base_color: Color::linear_rgba(hue[0], hue[1], hue[2], 0.25),
+                emissive: LinearRgba::new(hue[0] * 0.3, hue[1] * 0.3, hue[2] * 0.3, 1.0),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                double_sided: true,
                 ..default()
             })
         };
@@ -685,8 +693,8 @@ pub fn lod_visibility_system(
     let distance = cam_tf.translation.length();
     let lod = LodLevel::from_camera_distance(distance);
 
-    let show_surface = matches!(lod, LodLevel::Surface | LodLevel::Atmosphere);
-    let show_orbit = matches!(lod, LodLevel::Orbit);
+    let show_surface = matches!(lod, LodLevel::Surface);  // only at closest zoom
+    let show_orbit = matches!(lod, LodLevel::Orbit | LodLevel::Atmosphere); // blobs at mid AND far
 
     for mut vis in surface_markers.iter_mut() {
         *vis = if show_surface { Visibility::Visible } else { Visibility::Hidden };
