@@ -96,7 +96,8 @@ impl PortalIdentity {
                         .ok()
                         .and_then(|v| v.as_string())
                 })
-                .unwrap_or_else(|| "mycelix-health".to_string());
+                // Sandbox assigns numeric app IDs (e.g., "9999")
+                .unwrap_or_else(|| "9999".to_string());
 
             let config = ConnectConfig {
                 url,
