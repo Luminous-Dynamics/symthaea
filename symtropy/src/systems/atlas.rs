@@ -615,38 +615,45 @@ pub fn draw_arcs_system(
         }
     }
 
-    // TEND time-banking flows — Mycelix lime arcs
+    // TEND time-banking flows — Mycelix lime arcs with animated packets
     let tend_flows = terra_atlas_core::mycelix_flows::simulate_tend_flows();
-    let tend_color = Color::linear_rgba(0.486, 0.988, 0.0, 0.7); // Mycelix lime
-    for flow in &tend_flows {
+    for (fi, flow) in tend_flows.iter().enumerate() {
         let from = geo::lat_lon_to_xyz(flow.from_lat, flow.from_lon, 1.0);
         let to = geo::lat_lon_to_xyz(flow.to_lat, flow.to_lon, 1.0);
         let dist = terra_atlas_core::geo::haversine_km(flow.from_lat, flow.from_lon, flow.to_lat, flow.to_lon);
-        let peak = geo::arc_peak_height(dist) * 1.5; // higher arcs for TEND flows
+        let peak = geo::arc_peak_height(dist) * 1.5;
         let segments = 16u32;
         let arc = terra_atlas_core::geometry::generate_arc(from, to, peak, segments);
+        let packet_pos = ((t * 0.25 + fi as f32 * 0.5) % 1.0).abs();
+        let packet_seg = (packet_pos * segments as f32) as usize;
         for i in 0..segments as usize {
             let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
-            gizmos.line(a, b, tend_color);
+            let dist_to_packet = (i as f32 - packet_seg as f32).abs() / segments as f32;
+            let brightness = 0.3 + 0.7 * (-dist_to_packet * 6.0).exp();
+            gizmos.line(a, b, Color::linear_rgba(0.486 * brightness, 0.988 * brightness, 0.0, brightness * 0.7));
         }
     }
 
-    // Maglev corridors — amber arcs
-    let maglev_color = Color::linear_rgba(1.0, 0.8, 0.1, 0.9); // bright amber
-    for corridor in &atlas_data.data.maglev_corridors {
+    // Maglev corridors — amber arcs with animated data packets
+    for (ci, corridor) in atlas_data.data.maglev_corridors.iter().enumerate() {
         let from = geo::lat_lon_to_xyz(corridor.from_lat, corridor.from_lon, 1.0);
         let to = geo::lat_lon_to_xyz(corridor.to_lat, corridor.to_lon, 1.0);
         let peak = geo::arc_peak_height(corridor.distance_km);
-
-        // Draw arc as connected line segments
         let segments = 24u32;
         let arc = terra_atlas_core::geometry::generate_arc(from, to, peak, segments);
-        // arc is flat [x,y,z] * (segments+1)
+
+        // Data packet position (0.0-1.0) travels along the arc
+        let packet_pos = ((t * 0.3 + ci as f32 * 0.4) % 1.0).abs();
+        let packet_seg = (packet_pos * segments as f32) as usize;
+
         for i in 0..segments as usize {
             let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
-            gizmos.line(a, b, maglev_color);
+            // Bright pulse at packet position, dim elsewhere
+            let dist_to_packet = (i as f32 - packet_seg as f32).abs() / segments as f32;
+            let brightness = 0.4 + 0.6 * (-dist_to_packet * 8.0).exp();
+            gizmos.line(a, b, Color::linear_rgba(1.0 * brightness, 0.8 * brightness, 0.1 * brightness, brightness));
         }
     }
 
