@@ -1,7 +1,20 @@
 #import bevy_pbr::{
-    forward_io::VertexOutput,
+    pbr_fragment::pbr_input_from_standard_material,
+    pbr_functions::alpha_discard,
+}
+
+#ifdef PREPASS_PIPELINE
+#import bevy_pbr::{
+    prepass_io::{VertexOutput, FragmentOutput},
+    pbr_deferred_functions::deferred_output,
+}
+#else
+#import bevy_pbr::{
+    forward_io::{VertexOutput, FragmentOutput},
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
     mesh_view_bindings::view,
 }
+#endif
 
 struct HolographicSettings {
     fresnel_color: vec4<f32>,
@@ -15,36 +28,56 @@ struct HolographicSettings {
     _padding3: f32,
 };
 
-@group(2) @binding(100) var<uniform> settings: HolographicSettings;
+@group(#{MATERIAL_BIND_GROUP}) @binding(100)
+var<uniform> holographic: HolographicSettings;
 
 @fragment
-fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    // View direction from camera to fragment
-    let view_dir = normalize(in.world_position.xyz - view.world_position.xyz);
-    let normal = normalize(in.world_normal);
+fn fragment(
+    in: VertexOutput,
+    @builtin(front_facing) is_front: bool,
+) -> FragmentOutput {
+    // Generate standard PBR input
+    var pbr_input = pbr_input_from_standard_material(in, is_front);
+
+    // View direction
+    let world_pos = pbr_input.world_position.xyz;
+    let view_pos = view.world_position.xyz;
+    let view_dir = normalize(world_pos - view_pos);
+    let normal = pbr_input.world_normal;
 
     // === FRESNEL EFFECT ===
-    let ndotv = abs(dot(normal, -view_dir));
-    let fresnel = pow(1.0 - ndotv, settings.fresnel_power);
+    let ndotv = abs(dot(normalize(normal), -view_dir));
+    let fresnel = pow(1.0 - ndotv, holographic.fresnel_power);
 
     // === SCANLINES ===
-    let scan_pos = in.world_position.y * settings.scanline_density + settings.time * settings.scanline_speed;
+    let scan_pos = world_pos.y * holographic.scanline_density + holographic.time * holographic.scanline_speed;
     let scanline = smoothstep(0.4, 0.6, fract(scan_pos));
 
     // === NOISE ===
-    let noise_val = fract(sin(dot(in.world_position.xz, vec2<f32>(12.9898, 78.233))) * 43758.5453);
-    let noise = mix(0.85, 1.0, noise_val);
+    let noise = fract(sin(dot(world_pos.xz, vec2<f32>(12.9898, 78.233))) * 43758.5453);
 
-    // === COMBINE ===
-    let base_alpha = settings.hologram_alpha * (0.3 + 0.7 * fresnel);
-    let glow = settings.fresnel_color.rgb * fresnel * 1.5;
+    // Modulate base color with holographic effects
     let scan_mod = mix(1.0, 0.7, scanline * 0.3);
+    let noise_mod = mix(0.85, 1.0, noise);
+    pbr_input.material.base_color = vec4<f32>(
+        pbr_input.material.base_color.rgb * scan_mod * noise_mod,
+        pbr_input.material.base_color.a * holographic.hologram_alpha * (0.3 + 0.7 * fresnel)
+    );
 
-    // Sample the base color from the texture (via PBR input)
-    let base_color = vec3<f32>(0.12, 0.18, 0.22) * noise * scan_mod;
+    // Add Fresnel glow to emissive
+    pbr_input.material.emissive = pbr_input.material.emissive +
+        vec4<f32>(holographic.fresnel_color.rgb * fresnel * 1.5, 0.0);
 
-    let final_color = base_color + glow;
-    let final_alpha = base_alpha * scan_mod;
+    // Alpha discard
+    pbr_input.material.base_color = alpha_discard(pbr_input.material, pbr_input.material.base_color);
 
-    return vec4<f32>(final_color * final_alpha, final_alpha);
+#ifdef PREPASS_PIPELINE
+    let out = deferred_output(in, pbr_input);
+#else
+    var out: FragmentOutput;
+    out.color = apply_pbr_lighting(pbr_input);
+    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+#endif
+
+    return out;
 }
