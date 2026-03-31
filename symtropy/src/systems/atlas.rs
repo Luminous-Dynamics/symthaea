@@ -102,7 +102,7 @@ pub fn setup_globe_view(
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let holo_globe = holo_materials.add(terra_atlas_bevy::holographic_material::HolographicMaterial {
         base: StandardMaterial {
-            base_color: Color::linear_rgba(0.15, 0.22, 0.28, 0.7),
+            base_color: Color::linear_rgba(0.20, 0.28, 0.35, 0.7), // slightly brighter — coastlines visible
             base_color_texture: Some(earth_texture),
             alpha_mode: AlphaMode::Blend,
             double_sided: true,
@@ -240,7 +240,7 @@ pub fn setup_globe_view(
     for chunk in star_data.chunks_exact(7) {
         let brightness = chunk[6];
         // Only spawn the brighter stars as entities (top ~30%)
-        if brightness < 0.45 {
+        if brightness < 0.55 { // only brightest stars — prevents edge strays
             continue;
         }
         let size = 0.06 + brightness * 0.12; // smaller — stars shouldn't be diamonds
@@ -325,8 +325,9 @@ pub fn setup_globe_view(
             let size = terra_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 0.15),
-                emissive: LinearRgba::new(c[0] * 0.1, c[1] * 0.1, c[2] * 0.1, 1.0),
+                base_color: Color::linear_rgba(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 0.08),
+                emissive: LinearRgba::new(c[0] * 0.2, c[1] * 0.2, c[2] * 0.2, 1.0),
+                // Additive blend — glows through instead of opaque disc
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
