@@ -19,6 +19,13 @@ console_error_panic_hook = "0.1"
 console_log = "1"
 log = "0.4"
 
+# Holochain live data bridge (optional — builds without conductor dependency)
+mycelix-leptos-core = { path = "../crates/mycelix-leptos-core", optional = true, features = ["browser"] }
+
+[features]
+default = []
+holochain = ["dep:mycelix-leptos-core"]
+
 [dependencies.web-sys]
 version = "0.3"
 features = [

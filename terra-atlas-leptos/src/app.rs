@@ -21,19 +21,46 @@ pub fn App() -> impl IntoView {
     let globe_state = GlobeState::new();
     let data_state = DataState::new();
 
-    // Load static data on mount
+    // Load static data immediately (always available as fallback)
     let data_for_effect = data_state.clone();
     Effect::new(move |_| {
         let loaded = static_data::load_all();
-        data_for_effect.set_all(loaded);
         log::info!(
-            "Loaded {} geothermal nodes, {} corridors, {} vaults, {} Terra Lumina sites",
-            data_for_effect.geothermal_nodes.read().len(),
-            data_for_effect.maglev_corridors.read().len(),
-            data_for_effect.resontia_vaults.read().len(),
-            data_for_effect.terra_lumina_sites.read().len(),
+            "Static data: {} sites, {} geothermal, {} corridors, {} vaults, {} fossil deposits, {} nuclear",
+            loaded.sites.len(),
+            loaded.geothermal_nodes.len(),
+            loaded.maglev_corridors.len(),
+            loaded.resontia_vaults.len(),
+            loaded.fossil_deposits.len(),
+            loaded.nuclear_sites.len(),
         );
+        data_for_effect.set_all(loaded);
     });
+
+    // When holochain feature is enabled, try to fetch live data and merge
+    #[cfg(feature = "holochain")]
+    {
+        let data_for_hc = data_state.clone();
+        Effect::new(move |_| {
+            let ds = data_for_hc.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                use crate::data::holochain;
+                // Try each data source — on success, replace static data
+                let sites = holochain::fetch_all_sites().await;
+                if !sites.is_empty() { ds.sites.set(sites); }
+                let nodes = holochain::fetch_geothermal_nodes().await;
+                if !nodes.is_empty() { ds.geothermal_nodes.set(nodes); }
+                let corridors = holochain::fetch_maglev_corridors().await;
+                if !corridors.is_empty() { ds.maglev_corridors.set(corridors); }
+                let vaults = holochain::fetch_vaults().await;
+                if !vaults.is_empty() { ds.resontia_vaults.set(vaults); }
+                let tl = holochain::fetch_terra_lumina_sites().await;
+                if !tl.is_empty() { ds.terra_lumina_sites.set(tl); }
+                let deposits = holochain::fetch_fossil_deposits().await;
+                if !deposits.is_empty() { ds.fossil_deposits.set(deposits); }
+            });
+        });
+    }
 
     // Provide state via context
     provide_context(globe_state.clone());

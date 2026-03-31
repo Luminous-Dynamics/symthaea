@@ -18,6 +18,8 @@ pub struct DataState {
     pub emergency_shelters: RwSignal<Vec<EmergencyShelter>>,
     pub health_facilities: RwSignal<Vec<HealthFacility>>,
     pub robotics_dispatch: RwSignal<Vec<RoboticsDispatch>>,
+    pub fossil_deposits: RwSignal<Vec<FossilDeposit>>,
+    pub nuclear_sites: RwSignal<Vec<NuclearSite>>,
 }
 
 impl DataState {
@@ -34,6 +36,8 @@ impl DataState {
             emergency_shelters: RwSignal::new(Vec::new()),
             health_facilities: RwSignal::new(Vec::new()),
             robotics_dispatch: RwSignal::new(Vec::new()),
+            fossil_deposits: RwSignal::new(Vec::new()),
+            nuclear_sites: RwSignal::new(Vec::new()),
         }
     }
 
@@ -49,5 +53,7 @@ impl DataState {
         self.emergency_shelters.set(data.emergency_shelters);
         self.health_facilities.set(data.health_facilities);
         self.robotics_dispatch.set(data.robotics_dispatch);
+        self.fossil_deposits.set(data.fossil_deposits);
+        self.nuclear_sites.set(data.nuclear_sites);
     }
 }
