@@ -804,6 +804,10 @@ name = "kinetic_sacrifice"
 required-features = ["flight-mujoco"]
 
 [[test]]
+name = "causal_consciousness_experiments"
+required-features = ["humanoid"]
+
+[[test]]
 name = "breaking_points_embodied"
 required-features = ["humanoid"]
 
