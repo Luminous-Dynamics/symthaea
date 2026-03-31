@@ -1,0 +1,132 @@
+{
+  "node_id": "ENG.FOUND.VOCAB",
+  "lesson": {
+    "standard_code": "ENG.FOUND.VOCAB",
+    "title": "Vocabulary Building",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "A rich vocabulary unlocks understanding. Word roots (Latin/Greek) help you decode unfamiliar words: 'bio' = life, 'graph' = write, so 'biography' = writing about a life. Prefixes change meaning: 'un-' = not, 'pre-' = before, 're-' = again. Suffixes change word type: '-tion' makes nouns (educate \u2192 education), '-ly' makes adverbs (quick \u2192 quickly). Context clues help you guess meaning from surrounding words. Academic vocabulary \u2014 words used across subjects (analyse, evaluate, contrast) \u2014 is key to success in every subject.",
+    "examples": [
+      {
+        "problem": "Apply Vocabulary Building skills",
+        "steps": [
+          {
+            "instruction": "Identify the concept",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the rule",
+            "result": "Correct usage"
+          }
+        ],
+        "answer": "See Vocabulary Building rules"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What does the prefix 'un-' mean in 'unhappy'?",
+        "answer": "not \u2014 'unhappy' means 'not happy'",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of other 'un-' words: unclear, unfair, unable"
+        ],
+        "explanation": "'un-' is the most common English prefix meaning 'not' or 'opposite of'.",
+        "distractors": [
+          "very",
+          "again",
+          "before"
+        ]
+      },
+      {
+        "question": "Use context clues: 'The scientist was meticulous \u2014 she checked every detail three times.' What does 'meticulous' mean?",
+        "answer": "Very careful and precise \u2014 the clue is 'checked every detail three times'",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What behaviour is described after the dash?"
+        ],
+        "explanation": "Context clues often follow dashes, commas, or 'meaning' words.",
+        "distractors": [
+          "Lazy",
+          "Angry",
+          "Confused"
+        ]
+      },
+      {
+        "question": "The root 'chron' means 'time'. What does 'chronological' mean?",
+        "answer": "Arranged in order of time \u2014 from earliest to latest",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think: chronicle, chronic, chronometer"
+        ],
+        "explanation": "Knowing roots helps decode new words: chron(time) + logical(arranged) = time-arranged.",
+        "distractors": [
+          "Arranged by size",
+          "Arranged by colour",
+          "Arranged randomly"
+        ]
+      },
+      {
+        "question": "Change the word 'educate' into: a) a noun, b) an adjective, c) an adverb",
+        "answer": "a) education (-tion), b) educational (-al), c) educationally (-ally)",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Use suffixes: -tion, -al, -ally"
+        ],
+        "explanation": "Suffixes change word class without changing core meaning.",
+        "distractors": [
+          "a) educater b) educative c) educately",
+          "Cannot be changed",
+          "a) educated b) educating c) educator"
+        ]
+      },
+      {
+        "question": "What is the difference between 'affect' and 'effect'?",
+        "answer": "Affect is usually a verb (to influence): 'Rain affects crops.' Effect is usually a noun (the result): 'The effect of rain on crops.'",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "A for Action (verb), E for End result (noun)"
+        ],
+        "explanation": "This is one of the most commonly confused word pairs in English.",
+        "distractors": [
+          "They mean the same thing",
+          "Affect is formal, effect is informal",
+          "Effect is the verb, affect is the noun"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Vocabulary",
+        "definition": "Key concept in Vocabulary Building",
+        "example_usage": "Used in everyday vocabulary building"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Vocabulary Building rules are just memorisation",
+        "correction": "Understanding WHY rules work helps you apply them in new situations.",
+        "why_students_think_this": "Rules seem arbitrary without context."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T20:00:00"
+}

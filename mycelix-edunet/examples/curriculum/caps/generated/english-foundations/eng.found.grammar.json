@@ -1,0 +1,132 @@
+{
+  "node_id": "ENG.FOUND.GRAMMAR",
+  "lesson": {
+    "standard_code": "ENG.FOUND.GRAMMAR",
+    "title": "Grammar Essentials",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Grammar is the structure of language \u2014 the rules that make communication clear. Nouns name things (person, place, idea). Verbs show action or state (run, is, think). Adjectives describe nouns (big, red, clever). Adverbs modify verbs (quickly, very, always). Prepositions show relationships (in, on, between). Tenses locate actions in time: past (walked), present (walk), future (will walk). Subject-verb agreement ensures clarity: 'She runs' not 'She run'. Master these and your writing becomes instantly clearer.",
+    "examples": [
+      {
+        "problem": "Apply Grammar Essentials skills",
+        "steps": [
+          {
+            "instruction": "Identify the concept",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the rule",
+            "result": "Correct usage"
+          }
+        ],
+        "answer": "See Grammar Essentials rules"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Identify the verb in: 'The dog chased the cat across the garden.'",
+        "answer": "chased",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Which word shows the action?"
+        ],
+        "explanation": "'Chased' is the action word \u2014 what the dog did.",
+        "distractors": [
+          "dog",
+          "garden",
+          "across"
+        ]
+      },
+      {
+        "question": "Choose the correct form: 'The children (is/are) playing outside.'",
+        "answer": "are \u2014 'children' is plural, so the verb must be plural too",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is 'children' singular or plural?"
+        ],
+        "explanation": "Subject-verb agreement: plural subject needs plural verb.",
+        "distractors": [
+          "is",
+          "was",
+          "been"
+        ]
+      },
+      {
+        "question": "Change to past tense: 'She writes a letter every day.'",
+        "answer": "She wrote a letter every day.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "What is the past tense of 'writes'?"
+        ],
+        "explanation": "write \u2192 wrote (irregular verb). 'Every day' stays the same.",
+        "distractors": [
+          "She writed a letter",
+          "She has write a letter",
+          "She writing a letter"
+        ]
+      },
+      {
+        "question": "Identify the adjective and the noun it describes: 'The tall building collapsed during the earthquake.'",
+        "answer": "'tall' describes 'building'",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Which word describes a quality of the building?"
+        ],
+        "explanation": "Adjectives come before the noun they modify.",
+        "distractors": [
+          "'during' describes 'earthquake'",
+          "'tall' describes 'earthquake'",
+          "There is no adjective"
+        ]
+      },
+      {
+        "question": "Rewrite using active voice: 'The cake was eaten by the children.'",
+        "answer": "The children ate the cake.",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Who did the action? Put them first."
+        ],
+        "explanation": "Active: subject does action. Passive: subject receives action. Active is usually clearer.",
+        "distractors": [
+          "The cake ate the children",
+          "Eating was done by children to cake",
+          "The children was eating cake"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Grammar",
+        "definition": "Key concept in Grammar Essentials",
+        "example_usage": "Used in everyday grammar essentials"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Grammar Essentials rules are just memorisation",
+        "correction": "Understanding WHY rules work helps you apply them in new situations.",
+        "why_students_think_this": "Rules seem arbitrary without context."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T20:00:00"
+}

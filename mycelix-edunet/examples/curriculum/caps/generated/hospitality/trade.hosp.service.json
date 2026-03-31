@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Restaurant Service & Management?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A restaurant serves 80 covers on a Friday evening. The menu has 12 mains. By 20:00, you've sold 30 portions of the most popular dish but the kitchen only prepped 35. Service continues until 22:00. How do you manage this situation without disappointing customers?",
+        "answer": "Immediate actions: (1) Communicate with the kitchen: confirm exactly how many portions remain (5). At current sales rate (~10/hour), the dish sells out by 20:30. (2) Brief the waiting staff: 'We have 5 portions of [dish] remaining. When a guest orders it and we're out, suggest [alternative 1] and [alternative 2] with enthusiasm, not apology.' Train them to say: 'That's been incredibly popular tonight -- it's just sold out. May I recommend the [alternative], which our chef is particularly proud of?' (3) Consider 86ing the dish on the POS system after the last 5 portions to prevent taking orders that can't be fulfilled. (4) Upsell alternatives proactively: if a table is still deciding, the waiter can mention the alternatives before the guest asks for the sold-out dish. Prevention for next time: (1) Review sales data: if this dish consistently sells 30+ on Fridays, prep 40-45. (2) Set a par level with a buffer (20% above average Friday sales). (3) Consider pre-booking the dish for large parties. (4) Track 'lost sales' (how many times was the dish requested after 86) to justify higher prep quantities to the kitchen.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["The guest's experience of being told 'we're sold out' depends entirely on HOW it's communicated.", "86'd items should trigger a management review: running out means lost revenue and disappointed guests."],
+        "explanation": "Managing sold-out items is a routine service challenge. The goal is to turn a potential negative ('they don't have what I want') into a positive ('the waiter recommended something even better').",
+        "distractors": ["Just tell guests the dish is unavailable and let them choose", "Keep taking orders and make the kitchen figure it out", "Remove the dish from the menu permanently"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Restaurant Service & Management in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "Calculate the break-even point for a new restaurant. Monthly fixed costs: rent R35,000, salaries R85,000, utilities R8,000, insurance R3,000, loan repayment R12,000. Average spend per cover is R180, with a 65% gross margin (after food cost). How many covers per month must you serve to break even?",
+        "answer": "Total fixed costs: R35,000 + R85,000 + R8,000 + R3,000 + R12,000 = R143,000/month. Contribution per cover: average spend R180 x 65% gross margin = R117.00 (this covers fixed costs after food cost is deducted). Break-even covers: R143,000 / R117 = 1,222 covers per month. Per day (assuming 26 operating days): 1,222 / 26 = 47 covers per day. This means: for a 60-seat restaurant, you need an average occupancy of 47/60 = 78% turnover per day, or you need 47 covers spread across lunch and dinner service. If lunch averages 15 covers and dinner averages 32 covers = 47 total = break-even. Everything above 47 covers per day contributes to PROFIT. At 60 covers/day: (60 - 47) x R117 = R1,521/day x 26 days = R39,546/month profit. Key insight: the break-even analysis shows that a restaurant must be consistently busy to survive. This is why location, marketing, and customer retention are as important as food quality.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["Break-even = fixed costs / contribution per unit. Contribution = revenue minus variable costs (food cost).", "Most SA restaurants fail in the first 2 years. Understanding break-even BEFORE opening helps set realistic expectations."],
+        "explanation": "Break-even analysis is essential for restaurant owners and managers. It quantifies exactly how busy the restaurant needs to be to survive, informing decisions about pricing, staffing, and marketing.",
+        "distractors": ["Break-even means the restaurant is profitable", "Just divide total costs by selling price", "Variable costs don't affect break-even"]
+      },
+      {
+        "question": "A table of 6 has ordered. One guest has a severe nut allergy. They order the steak with a sauce that contains cashews. Describe the correct allergen management procedure.",
+        "answer": "Procedure: (1) The waiter MUST inform the guest: 'The [sauce name] contains cashew nuts. Given your allergy, I strongly recommend an alternative sauce. May I suggest the peppercorn or mushroom sauce, which are nut-free?' Never assume the guest knows the ingredients. (2) If the guest chooses an alternative: communicate the allergy clearly to the kitchen via the POS system (ALLERGY flag) and verbally to the expeditor/chef. Write 'NUT ALLERGY' prominently on the order ticket. (3) Kitchen protocol: the chef must verify all ingredients in the chosen sauce (check labels for hidden nuts, e.g., 'may contain traces of tree nuts'). Prepare the dish using clean equipment -- not utensils or surfaces that have contacted nut-containing sauces. (4) Service protocol: the waiter confirms the correct dish with the chef before serving. Present the dish to the guest and verbally confirm: 'This is your steak with peppercorn sauce -- no nuts.' (5) If there is ANY doubt about cross-contamination, inform the guest and offer an alternative. (6) Document allergies in the booking system for repeat guests. Legal context: under the Consumer Protection Act (SA), restaurants have a duty of care. A severe allergic reaction (anaphylaxis) can be fatal. Failure to manage allergens can result in criminal charges, civil liability, and closure.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "bloom_level": "Apply",
+        "hints": ["Nut allergies can be fatal. This is a life-or-death responsibility, not just a preference.", "Cross-contamination in the kitchen is the biggest risk -- a shared spoon or cutting board can transfer enough allergen to trigger anaphylaxis."],
+        "explanation": "Allergen management is a legal and ethical obligation. SA's Consumer Protection Act requires disclosure of allergens. Staff training on allergen protocols is mandatory for all food service establishments.",
+        "distractors": ["It's the guest's responsibility to know what's in the food", "Just remove the nuts from the sauce", "Cross-contamination only matters for severe allergies"]
+      },
+      {
+        "question": "A guest complains that their steak is overcooked (ordered medium-rare, received well-done). They are visibly angry. The restaurant is full. Handle this complaint using the LAST method (Listen, Apologise, Solve, Thank).",
+        "answer": "LISTEN: Approach the table calmly. Make eye contact. Let the guest explain without interrupting. 'I completely understand. You ordered medium-rare and this is clearly well-done.' Acknowledge their frustration: 'I can see this is not what you expected, and I'm sorry.' Do not make excuses. APOLOGISE: 'I sincerely apologise. This is not our standard, and you deserve better.' Take ownership -- even if it was the kitchen's error, the guest is your responsibility. Never blame the chef in front of the guest. SOLVE: 'I'd like to send this back and have the chef prepare a new steak to medium-rare for you. I'll personally ensure it's correct. While you wait, may I offer you a complimentary starter or a glass of wine?' The replacement should be expedited (kitchen priority). When it arrives, personally check the temperature before serving. THANK: 'Thank you for your patience and for letting us make this right. I hope you enjoy the rest of your evening.' After the meal, check back: 'Was everything to your satisfaction? Thank you again for your understanding.' Manager consideration: offer a discount on the meal (10-20%) or comp the replacement steak. A R200 discount costs far less than losing a customer who tells 10 people about a bad experience.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["An angry guest who is handled well often becomes a MORE loyal customer than one who never had a problem. This is called the 'service recovery paradox.'", "Never argue, blame, or make excuses. The guest doesn't care WHY the steak is wrong -- they care that you fix it."],
+        "explanation": "Complaint handling is a defining skill in hospitality. The LAST method provides a structured approach that de-escalates the situation and turns a negative into a positive.",
+        "distractors": ["Argue that the steak looks medium-rare to you", "Blame the kitchen in front of the guest", "Offer a discount without replacing the steak"]
+      },
+      {
+        "question": "Create a weekly staff roster for a 60-seat restaurant open Tuesday-Sunday (closed Monday). Lunch: 12-3pm (3 waiters needed). Dinner: 6-10pm (5 waiters needed). Saturday has both services. You have 8 waiters, each working maximum 5 shifts per week. Ensure full coverage.",
+        "answer": "Weekly shift requirements: Tue-Fri: dinner only = 5 waiters x 4 days = 20 shifts. Saturday: lunch (3) + dinner (5) = 8 shifts. Sunday: lunch only = 3 shifts. Total shifts needed: 20 + 8 + 3 = 31 shifts/week. Available: 8 waiters x 5 shifts max = 40 shifts available. Coverage is achievable with 9 shifts of slack. Sample roster: Waiter A: Tue-D, Wed-D, Thu-D, Sat-L, Sat-D (5 shifts). Waiter B: Tue-D, Wed-D, Fri-D, Sat-D, Sun-L (5 shifts). Waiter C: Thu-D, Fri-D, Sat-L, Sat-D, Sun-L (5 shifts). Waiter D: Tue-D, Wed-D, Thu-D, Fri-D, Sun-L (5 shifts). Waiter E: Tue-D, Wed-D, Fri-D, Sat-D (4 shifts). Waiter F: Thu-D, Fri-D, Sat-L, Sat-D (4 shifts). Waiter G: Tue-D, Thu-D, Sat-D (3 shifts -- part-time). Waiter H: Wed-D, Fri-D, Sat-D (3 shifts -- part-time). Key considerations: (1) Saturday needs both services -- schedule your strongest staff. (2) Rotate weekend shifts fairly. (3) Keep 1-2 waiters on call for busy nights or illness cover. (4) Basic Conditions of Employment Act: max 45 hours/week, minimum rest periods.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["Map out total shifts needed first, then allocate. Don't start with individual schedules.", "Saturday double-shift (lunch + dinner with a break) counts as 2 shifts towards the weekly maximum."],
+        "explanation": "Staff scheduling is one of the most time-consuming management tasks. Effective rostering balances coverage requirements, staff preferences, labour law compliance, and cost control.",
+        "distractors": ["Schedule all 8 waiters for every shift", "Part-time staff are unreliable -- only use full-timers", "The roster doesn't need to consider labour law"]
       }
     ],
     "key_vocabulary": [

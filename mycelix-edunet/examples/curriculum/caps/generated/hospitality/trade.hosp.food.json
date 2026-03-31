@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Food Safety & Hygiene (HACCP)?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A restaurant receives a delivery of fresh chicken at 10:00 AM. The driver's vehicle has no refrigeration, and the chicken temperature reads 12°C on arrival. The supplier invoice says it was dispatched at 08:00 AM. Should you accept this delivery? Explain your decision using the temperature danger zone principle.",
+        "answer": "REJECT the delivery. The chicken is at 12°C, which is within the temperature danger zone (5-60°C) where bacteria multiply rapidly (doubling every 20 minutes). Fresh poultry must be received at 5°C or below. At 12°C for at least 2 hours (dispatched 08:00, arrived 10:00), significant bacterial growth has occurred. Accepting this chicken risks: (1) Salmonella or Campylobacter contamination causing food poisoning in customers. (2) Violation of R638 regulations (SA food safety regulations). (3) Liability for foodborne illness outbreaks. (4) Closure by health inspectors. Procedure: (1) Record the delivery temperature on the receiving log. (2) Reject the delivery with written reason ('received at 12°C, exceeds 5°C limit'). (3) Notify the supplier immediately and request a compliant replacement delivery. (4) Document with photographs if possible. (5) If this is a repeat offence, consider changing suppliers. Never accept food that has broken the cold chain -- you cannot 're-chill' it to safety.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["The temperature danger zone is 5-60°C. Chicken must be received at ≤5°C.", "You cannot 'fix' food that has been in the danger zone too long. Bacteria are already present -- cooking kills bacteria but NOT their toxins."],
+        "explanation": "Receiving is the first Critical Control Point (CCP) in HACCP. Accepting out-of-temperature food introduces contamination into your kitchen that no amount of correct handling afterwards can eliminate.",
+        "distractors": ["Accept it and put it in the fridge quickly", "12°C is close enough -- it will cool down in the fridge", "Only reject if the chicken smells bad"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Food Safety & Hygiene (HACCP) in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "Design a HACCP plan for making a chicken mayonnaise sandwich in a deli. Identify at least three Critical Control Points (CCPs), the hazard at each, the critical limit, and the monitoring procedure.",
+        "answer": "CCP 1: Cooking the chicken. Hazard: survival of Salmonella, Campylobacter, or Listeria if chicken is undercooked. Critical limit: internal temperature ≥75°C for at least 15 seconds. Monitoring: insert a calibrated probe thermometer into the thickest part of the chicken. Record temperature and time. Corrective action: if <75°C, continue cooking and re-check. CCP 2: Cooling the cooked chicken. Hazard: bacterial growth during slow cooling (Clostridium perfringens thrives during cooling). Critical limit: cool from 60°C to 21°C within 2 hours, then from 21°C to 5°C within 4 hours (total 6 hours maximum). Monitoring: temperature checks at 2-hour intervals. Cool in shallow containers in a blast chiller or ice bath. Corrective action: if cooling is too slow, portion into smaller containers. CCP 3: Cold storage/assembly. Hazard: bacterial multiplication if sandwich components are in the danger zone during assembly. Critical limit: all components at ≤5°C; sandwiches assembled within 30 minutes of removing ingredients from the fridge; finished sandwiches stored at ≤5°C; discard if not sold within 24 hours. Monitoring: check fridge temperature twice daily (log); time stamp sandwich assembly. Corrective action: discard any product that has been in the danger zone for >2 hours cumulative.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["A CCP is a point where control is ESSENTIAL to prevent a food safety hazard. Not every step is a CCP.", "The 75°C core temperature for chicken is non-negotiable. Use a probe thermometer, not visual inspection."],
+        "explanation": "HACCP planning is a legal requirement for commercial food premises in SA (R638). Understanding how to identify CCPs and set critical limits is a core competency for food handlers and managers.",
+        "distractors": ["HACCP is only needed for large factories, not delis", "If chicken looks cooked, it's safe", "Mayonnaise kills bacteria because of the vinegar"]
+      },
+      {
+        "question": "During a routine kitchen inspection, you observe the following: (a) raw chicken stored on the top shelf of the walk-in fridge, above ready-to-eat salad, (b) a chef not wearing a hat, (c) the fridge thermometer reads 7°C, (d) colour-coded chopping boards are all being washed together. Identify each violation and the correct practice.",
+        "answer": "(a) CRITICAL violation -- cross-contamination risk. Raw chicken MUST be stored on the LOWEST shelf of the fridge, in a sealed container. Raw meat dripping onto ready-to-eat food can cause Salmonella contamination without any further cooking step to kill the bacteria. Correct: raw meat bottom, cooked meat middle, dairy/salad top. (b) MODERATE violation -- personal hygiene. Hair can fall into food, carrying Staphylococcus aureus bacteria. All food handlers must wear hair nets or hats. Also check: clean uniform, no jewellery (except plain wedding band), no nail polish, hands washed. (c) CRITICAL violation -- temperature control. The fridge must operate at ≤5°C (R638 requirement). At 7°C, bacterial growth is occurring (slowly, but it's above the safe limit). Check if the thermostat needs adjustment, the door seal is damaged, or the fridge is overpacked (blocking airflow). Corrective action: adjust thermostat, recheck in 1 hour. If still >5°C, transfer high-risk food to a working fridge. (d) MODERATE violation -- cross-contamination via boards. Colour-coded boards (red=raw meat, green=salad/veg, blue=raw fish, yellow=cooked meat, white=dairy, brown=veg) must be washed and sanitised separately, or at minimum, washed in a commercial dishwasher at 82°C. Washing by hand together in the same sink water transfers bacteria between boards.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Storage rule: raw BELOW cooked. Think 'raw on the bottom so nothing drips down onto ready-to-eat food.'", "The fridge at 7°C is a ticking clock -- every hour above 5°C allows bacterial growth that shortens the safe shelf life of all food inside."],
+        "explanation": "Kitchen inspection skills combine regulatory knowledge with practical observation. Health inspectors check exactly these items during unannounced visits.",
+        "distractors": ["Raw chicken on the top shelf is fine if it's in a container", "7°C is close enough to 5°C", "Colour-coded boards are just for organisation, not safety"]
+      },
+      {
+        "question": "A customer calls the restaurant to report that they became ill 6 hours after eating a chicken burger. Three other diners who ate the same dish are also ill (vomiting, diarrhoea). Describe the restaurant's immediate response procedure.",
+        "answer": "Immediate response: (1) Record the complaint: customer name, contact details, date/time of meal, exact dish consumed, time symptoms started, symptoms described, number of people affected. (2) Express concern and empathy (do NOT admit liability). 'I'm very sorry to hear this. Your health is our priority. I want to gather information to investigate thoroughly.' (3) Preserve evidence: immediately seal and refrigerate any remaining chicken burger ingredients, sauce, and garnish. Label with date and time. Do NOT discard anything. (4) Check records: pull the batch records for that day's chicken -- receiving temperature log, cooking temperature log, holding time. Were critical limits met? (5) Check if other complaints have been received about the same dish/same day. (6) Notify the manager and owner immediately. (7) If 2+ complaints for the same dish: pull the dish from the menu immediately until investigation is complete. (8) Report to the local Environmental Health Practitioner (municipality) -- foodborne illness outbreaks must be reported. (9) Cooperate fully with any health inspection. (10) If Salmonella or Listeria is confirmed by laboratory testing, the restaurant may face closure until the source is eliminated and re-inspection passes.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": ["PRESERVE EVIDENCE -- throwing away the ingredients destroys the ability to identify the source.", "Multiple customers ill from the same dish = likely a food safety failure, not a coincidence."],
+        "explanation": "Foodborne illness response is a management-level skill. The response must balance customer care, legal protection, public health reporting, and investigation. Poor handling can result in criminal prosecution under R638.",
+        "distractors": ["Deny any connection to the restaurant", "Discard all remaining chicken to prevent further illness", "Wait for the health inspector before doing anything"]
+      },
+      {
+        "question": "Calculate the food cost percentage for a burger that sells for R95. Ingredients: bun R4.50, 150g beef patty (beef at R120/kg), cheese R3.00, lettuce/tomato R2.50, sauce R1.50, packaging R2.00. Is this within the target range?",
+        "answer": "Beef patty cost: 150g = 0.15 kg x R120/kg = R18.00. Total ingredient cost: R4.50 + R18.00 + R3.00 + R2.50 + R1.50 + R2.00 = R31.50. Food cost percentage: (R31.50 / R95.00) x 100 = 33.2%. Target range: restaurants typically aim for 28-35% food cost (varies by category). 33.2% is within the acceptable range but on the higher end. To improve: (1) Negotiate better beef pricing with the supplier (buy in bulk). (2) Check portion control -- is the actual patty weight exactly 150g? Even 10g extra per patty adds up across hundreds of burgers. (3) Reduce waste: track how many buns, lettuce, and tomatoes are discarded daily. Waste is invisible food cost. (4) Menu engineering: pair the burger with high-margin items (drinks at 15-20% food cost, chips at 25%). A meal deal that includes a burger (33%), chips (25%), and a drink (18%) achieves a blended food cost of ~27%.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "bloom_level": "Apply",
+        "hints": ["Food cost % = (ingredient cost / selling price) x 100. Target: 28-35% for mains, 15-20% for drinks.", "The selling price must cover food cost, labour, overheads, AND profit. If food cost is 33%, that leaves 67% for everything else."],
+        "explanation": "Food costing is the foundation of restaurant profitability. A 1% improvement in food cost across the entire menu can mean the difference between profit and loss for the business.",
+        "distractors": ["33% food cost means 67% profit", "Food cost doesn't include packaging", "Just increase the price to improve the percentage"]
       }
     ],
     "key_vocabulary": [

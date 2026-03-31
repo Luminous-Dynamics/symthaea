@@ -1,0 +1,326 @@
+{
+  "node_id": "CAPS.EnglishFoundations.Reading",
+  "lesson": {
+    "standard_code": "CAPS.EnglishFoundations.Reading",
+    "title": "CAPS.EnglishFoundations.Reading: Reading Strategies",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Reading is the foundation of all learning. It involves decoding (turning written symbols into sounds and words) and comprehension (understanding meaning). Phonics is the relationship between letters and sounds: each letter or letter combination represents a sound (phoneme). For example, 'sh' makes one sound, 'th' makes another. Sight words are common words that must be recognised instantly because they do not follow regular phonics rules (e.g., 'the,' 'said,' 'was,' 'would'). Context clues help you figure out unknown words by looking at the surrounding sentence ('The cat was famished, so it ate all its food' — 'famished' must mean very hungry). Reading fluency means reading smoothly, accurately, and at an appropriate speed, with expression. Comprehension strategies include: predicting (guessing what comes next), questioning (asking yourself questions about the text), summarising (stating the main idea in your own words), visualising (making mental pictures), and making connections (linking the text to your own experience). These strategies turn passive reading into active understanding.",
+    "examples": [
+      {
+        "problem": "Use phonics to sound out the word 'strength.'",
+        "steps": [
+          {
+            "instruction": "Step 1: Break the word into sound chunks: str-eng-th",
+            "result": "three sound groups"
+          },
+          {
+            "instruction": "Step 2: Sound out each chunk: 'str' (blend three consonants), 'eng' (short e + ng blend), 'th' (one sound, tongue between teeth)",
+            "result": "individual sounds"
+          },
+          {
+            "instruction": "Step 3: Blend the chunks together smoothly: str-eng-th → strength",
+            "result": "complete word"
+          }
+        ],
+        "answer": "Answer: By breaking 'strength' into phonetic chunks (str-eng-th) and blending them, you can decode even complex words.",
+        "visual_description": null
+      },
+      {
+        "problem": "Use context clues to determine the meaning of the underlined word: 'The abandoned house was dilapidated — the roof had caved in, windows were broken, and weeds grew through the floor.'",
+        "steps": [
+          {
+            "instruction": "Step 1: Read the whole sentence. What details describe the house? Roof caved in, windows broken, weeds through floor",
+            "result": "surrounding context gathered"
+          },
+          {
+            "instruction": "Step 2: What do these details have in common? They all describe something falling apart, in terrible condition",
+            "result": "pattern identified"
+          },
+          {
+            "instruction": "Step 3: 'Dilapidated' must mean in a state of ruin or serious disrepair",
+            "result": "meaning inferred"
+          }
+        ],
+        "answer": "Answer: 'Dilapidated' means in a state of ruin or decay. The context clues (caved-in roof, broken windows, weeds) all point to something falling apart.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Match these common letter combinations to their sounds: sh, ch, th, ph, wh.",
+        "answer": "sh = 'shh' (ship, shoe). ch = 'ch' (chair, child). th = 'th' (think, the — two sounds: voiceless and voiced). ph = 'f' (phone, photo). wh = 'w' (what, when — in most accents).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Say each combination out loud to hear the sound.",
+          "Some combinations make a completely new sound (ph sounds like f)."
+        ],
+        "explanation": "These consonant digraphs (two letters making one sound) are essential for decoding English words. They appear in thousands of common words.",
+        "distractors": [
+          "ph makes the 'p' sound",
+          "th always sounds the same in every word",
+          "sh and ch make the same sound"
+        ]
+      },
+      {
+        "question": "Explain the difference between decoding and comprehension in reading.",
+        "answer": "Decoding is turning written words into spoken words (recognising letters and sounds). Comprehension is understanding what those words mean in context. You can decode a word without understanding it (e.g., reading a medical term aloud). Both skills are needed for true reading.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Decoding is about sounds and letters; comprehension is about meaning.",
+          "Think about reading a word in another language — you might pronounce it but not understand it."
+        ],
+        "explanation": "Reading requires both decoding (the 'how' of reading) and comprehension (the 'what' of reading). Struggling readers may have difficulty with either or both.",
+        "distractors": [
+          "Decoding and comprehension are the same thing",
+          "If you can say the word, you understand it",
+          "Comprehension is only important for advanced readers"
+        ]
+      },
+      {
+        "question": "Read this passage and use context clues to determine the meaning of 'reluctant': 'Thandi was reluctant to jump into the cold pool. She stood at the edge, shivering, while her friends called to her.'",
+        "answer": "'Reluctant' means unwilling or hesitant. Clues: she stood at the edge instead of jumping, she was shivering (cold = reason for hesitation), friends had to encourage her.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Look at what Thandi does (and does not do) in the sentence.",
+          "What would make someone stand at the edge instead of jumping?"
+        ],
+        "explanation": "Context clues work by inference: surrounding details (standing at the edge, shivering, needing encouragement) paint a picture that reveals the unknown word's meaning.",
+        "distractors": [
+          "Reluctant means excited",
+          "Reluctant means cold",
+          "Context clues cannot help with adjectives"
+        ]
+      },
+      {
+        "question": "Analyse why reading fluency matters for comprehension.",
+        "answer": "When reading is slow and choppy (word-by-word), all mental effort goes to decoding, leaving nothing for comprehension. Fluent reading is automatic, freeing the brain to focus on meaning. Fluency connects decoding to comprehension. Without fluency, readers understand individual words but lose the meaning of sentences and paragraphs.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about what happens when you struggle to read every word.",
+          "Consider how much brain power is left for understanding when all effort goes to decoding."
+        ],
+        "explanation": "Fluency is the bridge between decoding and comprehension. It frees cognitive resources from word recognition so they can be applied to understanding meaning.",
+        "distractors": [
+          "Fluency only matters for reading aloud, not silently",
+          "Fast reading always means better comprehension",
+          "Fluency is about speed only, not accuracy or expression"
+        ]
+      },
+      {
+        "question": "Evaluate which comprehension strategy would be most useful for a student struggling to understand a science textbook: predicting, questioning, summarising, visualising, or making connections.",
+        "answer": "Questioning is likely most useful: asking 'What is this paragraph saying? What is the main idea? What do I not understand?' forces active engagement. Summarising after each section confirms understanding. Visualising helps with processes (e.g., water cycle). The best approach combines multiple strategies, but questioning is the entry point.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about what makes textbook reading difficult (dense information, unfamiliar terms).",
+          "Which strategy forces you to actively process rather than passively read?"
+        ],
+        "explanation": "No single strategy works for everything. Questioning and summarising are particularly powerful for informational text because they force active processing of dense material.",
+        "distractors": [
+          "Just read it again more slowly",
+          "Only predicting works for science texts",
+          "Comprehension strategies are only for fiction"
+        ]
+      },
+      {
+        "question": "Create a daily reading practice plan for an adult who wants to improve their reading skills, including specific strategies and materials.",
+        "answer": "Plan: 15-20 minutes daily reading at comfortable level. Start with high-interest material (news articles, sports, stories). Week 1-2: focus on phonics patterns (list of common digraphs and blends). Ongoing: build sight word recognition (Dolch list). Practice: read aloud for fluency, then silently for comprehension. Use one comprehension strategy per session. Track progress with a reading log.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Start with material the person is interested in, not textbooks.",
+          "Include both decoding practice and comprehension practice."
+        ],
+        "explanation": "An effective reading improvement plan uses high-interest material at an appropriate level, combines decoding and comprehension practice, and builds gradually.",
+        "distractors": [
+          "Only read difficult books to challenge yourself",
+          "Reading practice should be at least 2 hours daily",
+          "Only read one type of material"
+        ]
+      }
+    ],
+    "hints": [
+      "When you encounter an unknown word, try three strategies in order: sound it out (phonics), look for familiar parts (word roots, prefixes), use context clues (surrounding sentences).",
+      "Reading aloud improves fluency. Even adults benefit from reading aloud to build automaticity.",
+      "The five comprehension strategies (predict, question, summarise, visualise, connect) are tools — use whichever fits the situation."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "phonics",
+        "definition": "The relationship between letters (graphemes) and sounds (phonemes); the system for sounding out words",
+        "example_usage": "Using phonics, you can sound out 'ch-air' to read the word 'chair.'"
+      },
+      {
+        "term": "sight words",
+        "definition": "Common words that should be recognised instantly because they appear frequently and often do not follow regular phonics rules",
+        "example_usage": "Words like 'the,' 'said,' 'was,' and 'would' are sight words that must be memorised."
+      },
+      {
+        "term": "context clues",
+        "definition": "Information in the surrounding text that helps you figure out the meaning of an unknown word",
+        "example_usage": "The context clue 'she was shivering at the edge' tells us 'reluctant' means unwilling."
+      },
+      {
+        "term": "fluency",
+        "definition": "The ability to read smoothly, accurately, and at an appropriate speed, with proper expression and phrasing",
+        "example_usage": "Fluent readers do not stop at every word — they read in meaningful phrases."
+      },
+      {
+        "term": "comprehension",
+        "definition": "Understanding the meaning of what you read, including main ideas, details, inferences, and connections",
+        "example_usage": "Reading comprehension means you can explain what a paragraph is about in your own words."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Adults feel ashamed about needing to improve basic reading skills.",
+        "correction": "Reading difficulties are extremely common and have nothing to do with intelligence. Many successful adults had reading challenges. Seeking to improve is a sign of strength and courage, not weakness. The brain can improve reading skills at any age.",
+        "why_students_think_this": "Social stigma around adult literacy. Creating a supportive, non-judgmental learning environment is essential."
+      },
+      {
+        "misconception": "People think faster reading always means better reading.",
+        "correction": "Speed without comprehension is not reading. The goal is reading at an appropriate speed for the material: novels can be read faster than textbooks. Adjusting speed to match purpose and difficulty is a sign of a skilled reader.",
+        "why_students_think_this": "Speed-reading has been overhyped. Research shows that very fast reading significantly reduces comprehension."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.EnglishFoundations.Reading",
+    "title": "Assessment: Reading Strategies",
+    "items": [
+      {
+        "question": "Name three reading comprehension strategies.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Predicting, questioning, summarising, visualising, making connections (any three).",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Active strategies that help you understand what you read"
+      },
+      {
+        "question": "Explain how context clues help a reader determine the meaning of an unknown word.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Context clues are words and phrases surrounding the unknown word that hint at its meaning. The reader looks for descriptions, examples, synonyms, antonyms, or cause-effect relationships in nearby sentences to infer the word's meaning.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Look at what the rest of the sentence tells you about the unknown word"
+      },
+      {
+        "question": "Read this sentence and use context clues to define the underlined word: 'The benevolent teacher stayed after school every day to help struggling students, even buying them lunch with her own money.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Benevolent means kind, generous, or charitable. Clues: stayed after school to help, bought lunch with own money — both show someone who is generous and caring.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "What kind of person does the things described in the sentence?"
+      },
+      {
+        "question": "Analyse why phonics alone is not sufficient for reading English fluently.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "English has many irregular spellings: 'enough' does not sound like it looks, 'colonel' is pronounced 'kernel.' About 25% of English words are irregular. Sight word recognition, context clues, and vocabulary knowledge must supplement phonics.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Think about words that do not follow the rules: 'said,' 'enough,' 'through'"
+      },
+      {
+        "question": "Evaluate which is more important for beginning readers: phonics instruction or whole-language (learning through immersion in books). Support your answer.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Research strongly supports systematic phonics instruction as essential for beginning readers (it provides decoding tools). However, phonics alone is not enough — exposure to books, vocabulary building, and comprehension strategies are also needed. The most effective approach combines phonics with rich reading experiences.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider what the research says about how children learn to read"
+      },
+      {
+        "question": "Create a set of five flash cards that teach common English digraphs (two letters making one sound), with example words for each.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "sh (ship, shoe, fish), ch (chair, child, each), th (think, the, bath), ph (phone, photo, graph), wh (what, when, whale). Each card shows the digraph, the sound it makes, and 3 example words.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Choose the most common letter combinations that make unique sounds"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are context clues?",
+      "back": "Words and information in the surrounding text that help you figure out the meaning of an unknown word.",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 125
+    },
+    {
+      "front": "What is phonics?",
+      "back": "The system linking letters (and letter combinations) to sounds. Used to sound out unfamiliar words. Example: ch = one sound, sh = one sound.",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What are sight words?",
+      "back": "Common words you must recognise instantly because they appear frequently and often break phonics rules: the, said, was, would, could, does.",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is reading fluency?",
+      "back": "Reading smoothly, accurately, and at appropriate speed with expression. Fluency frees your brain from decoding so you can focus on understanding.",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "Name five reading comprehension strategies.",
+      "back": "Predict (guess what happens next), Question (ask yourself questions), Summarise (state the main idea), Visualise (make mental pictures), Connect (link to your own experience).",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What sound does 'ph' make?",
+      "back": "The 'f' sound. Examples: phone, photo, elephant, pharmacy.",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 75
+    },
+    {
+      "front": "What is the difference between decoding and comprehension?",
+      "back": "Decoding = turning letters into sounds and words (saying the word). Comprehension = understanding what the words mean. Both are needed for reading.",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What are three things to do when you encounter an unknown word?",
+      "back": "1. Sound it out (phonics). 2. Look for familiar parts (roots, prefixes). 3. Use context clues (what does the rest of the sentence tell you?).",
+      "tags": ["CAPS.EnglishFoundations.Reading", "Adult", "English Foundations"],
+      "difficulty_permille": 150
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

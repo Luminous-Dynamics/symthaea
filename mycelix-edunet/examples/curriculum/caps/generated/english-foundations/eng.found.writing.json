@@ -1,0 +1,338 @@
+{
+  "node_id": "CAPS.EnglishFoundations.Writing",
+  "lesson": {
+    "standard_code": "CAPS.EnglishFoundations.Writing",
+    "title": "CAPS.EnglishFoundations.Writing: Writing Basics",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Writing is thinking made visible. A sentence is the basic unit of written communication: it expresses a complete thought, starts with a capital letter, and ends with a full stop (.), question mark (?), or exclamation mark (!). Every sentence needs a subject (who or what) and a verb (what they do): 'The dog (subject) barked (verb).' A paragraph is a group of related sentences about one main idea. It starts with a topic sentence (the main point), followed by supporting sentences (details, examples, explanations), and ends with a concluding sentence. Punctuation guides the reader: commas (,) separate items in lists and clauses, apostrophes (') show possession (Thandi's book) or contraction (don't = do not), quotation marks (\") show direct speech. Spelling strategies include sounding out words, breaking words into syllables, learning common patterns (e.g., i before e except after c), and using spell-check as a final tool, not a replacement for learning. Process writing has five stages: prewriting (brainstorm, plan), drafting (get ideas on paper without worrying about perfection), revising (improve content and organisation), editing (fix grammar, spelling, punctuation), and publishing (final clean copy).",
+    "examples": [
+      {
+        "problem": "Fix this sentence: 'the boy runned to the store and buyed milk bread and eggs'",
+        "steps": [
+          {
+            "instruction": "Step 1: Capital letter at start: 'The'",
+            "result": "capitalisation fixed"
+          },
+          {
+            "instruction": "Step 2: Fix irregular past tenses: 'runned' → 'ran' (run is irregular), 'buyed' → 'bought' (buy is irregular)",
+            "result": "verb forms corrected"
+          },
+          {
+            "instruction": "Step 3: Add commas for the list: 'milk, bread, and eggs'",
+            "result": "punctuation added"
+          },
+          {
+            "instruction": "Step 4: Add full stop at end",
+            "result": "sentence completed"
+          }
+        ],
+        "answer": "Answer: 'The boy ran to the store and bought milk, bread, and eggs.'",
+        "visual_description": null
+      },
+      {
+        "problem": "Write a paragraph about your neighbourhood using the topic sentence, supporting details, concluding sentence structure.",
+        "steps": [
+          {
+            "instruction": "Step 1: Topic sentence (main idea): 'My neighbourhood is a busy but friendly place.'",
+            "result": "main idea stated"
+          },
+          {
+            "instruction": "Step 2: Supporting sentence 1: 'In the morning, people greet each other on their way to work.'",
+            "result": "detail added"
+          },
+          {
+            "instruction": "Step 3: Supporting sentence 2: 'Children play in the streets after school while their parents chat over the fences.'",
+            "result": "more detail"
+          },
+          {
+            "instruction": "Step 4: Supporting sentence 3: 'On weekends, the local tuck shop becomes a meeting point for everyone.'",
+            "result": "example added"
+          },
+          {
+            "instruction": "Step 5: Concluding sentence: 'Despite the noise and activity, I would not want to live anywhere else.'",
+            "result": "paragraph closed"
+          }
+        ],
+        "answer": "Answer: A well-structured paragraph has a topic sentence, supporting details, and a concluding sentence that returns to the main idea.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Identify the subject and verb in this sentence: 'The children played in the park.'",
+        "answer": "Subject: 'The children' (who the sentence is about). Verb: 'played' (what they did).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "The subject answers: who or what is the sentence about?",
+          "The verb answers: what did they do?"
+        ],
+        "explanation": "Every complete sentence has a subject (who/what) and a verb (action/state). Finding these is the first step in understanding sentence structure.",
+        "distractors": [
+          "Subject: the park, Verb: children",
+          "Subject: played, Verb: the children",
+          "There is no subject in this sentence"
+        ]
+      },
+      {
+        "question": "Explain the difference between a sentence fragment and a complete sentence.",
+        "answer": "A complete sentence has a subject and a verb and expresses a complete thought ('The dog barked loudly.'). A fragment is missing one of these elements or does not express a complete thought ('Running down the street.' — no subject; 'The tall boy with the red hat.' — no verb).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Check: does it have a subject? Does it have a verb? Does it make sense on its own?",
+          "A fragment leaves you asking 'what about it?' or 'who did what?'"
+        ],
+        "explanation": "Fragments are the most common sentence error. Checking for subject + verb + complete thought catches most fragments.",
+        "distractors": [
+          "Short sentences are always fragments",
+          "Fragments are acceptable in formal writing",
+          "If it has a capital letter and full stop, it is a sentence"
+        ]
+      },
+      {
+        "question": "Add the correct punctuation to this sentence: 'Mandelas legacy includes the constitution the reconciliation process and the nations democratic foundations'",
+        "answer": "'Mandela's legacy includes the constitution, the reconciliation process, and the nation's democratic foundations.'",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Look for possessives (whose legacy? whose foundations?) — they need apostrophes.",
+          "Look for lists of three or more items — they need commas."
+        ],
+        "explanation": "This sentence needs two apostrophes (Mandela's = possession, nation's = possession) and two commas (separating items in a list of three).",
+        "distractors": [
+          "Mandelas' legacy includes the constitution the reconciliation process, and the nations' democratic foundations.",
+          "Mandela's legacy include's the constitution, the reconciliation process and the nation's democratic foundation's.",
+          "No punctuation is needed"
+        ]
+      },
+      {
+        "question": "Analyse this paragraph and identify the topic sentence, supporting details, and concluding sentence: 'Water is essential for life. Every cell in our body needs water to function. We lose water through breathing, sweating, and digestion. Doctors recommend drinking at least eight glasses of water per day. Without adequate water, we become dehydrated, which causes headaches, fatigue, and poor concentration. Staying hydrated is one of the simplest things you can do for your health.'",
+        "answer": "Topic sentence: 'Water is essential for life.' Supporting details: cells need water, we lose water through breathing/sweating/digestion, doctors recommend 8 glasses, dehydration causes headaches/fatigue/poor concentration. Concluding sentence: 'Staying hydrated is one of the simplest things you can do for your health.'",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "The topic sentence states the main idea (usually first).",
+          "The concluding sentence often restates the main idea differently (usually last)."
+        ],
+        "explanation": "Paragraph analysis develops the skill of identifying main ideas and supporting details, which is essential for both reading comprehension and writing.",
+        "distractors": [
+          "The topic sentence is in the middle",
+          "There is no concluding sentence",
+          "All sentences are supporting details"
+        ]
+      },
+      {
+        "question": "Evaluate which stage of process writing (prewriting, drafting, revising, editing, publishing) students skip most often and explain why skipping it hurts their writing.",
+        "answer": "Most commonly skipped: revising. Students often jump from drafting to editing (fixing grammar) without revising (improving ideas, organisation, clarity). This means the content may be well-punctuated but poorly organised or unclear. Revising addresses the big picture (does this make sense? is this in the right order?) while editing addresses details (spelling, grammar).",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about the difference between revising (improving content) and editing (fixing errors).",
+          "Which step requires the most critical thinking?"
+        ],
+        "explanation": "Revising is the most important step for improving writing quality, yet it is the most commonly skipped because it requires rethinking, not just correcting.",
+        "distractors": [
+          "Drafting is the most skipped step",
+          "Editing and revising are the same thing",
+          "Publishing is unnecessary for school work"
+        ]
+      },
+      {
+        "question": "Write a five-sentence paragraph about the importance of education, using correct punctuation, paragraph structure, and at least one example.",
+        "answer": "Paragraph should include: topic sentence (education is important because...), three supporting sentences with at least one specific example, and a concluding sentence. All sentences should be complete, correctly punctuated, and related to the main idea.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Start with your main point. Give reasons and an example. End by returning to your main point.",
+          "Check: capital letters, full stops, commas in lists, apostrophes for possession."
+        ],
+        "explanation": "Writing a structured paragraph combines all the skills covered: sentence construction, punctuation, paragraph organisation, and expressing ideas clearly.",
+        "distractors": [
+          "Just write five random sentences about education",
+          "One long sentence is the same as a paragraph",
+          "Punctuation does not matter if the ideas are good"
+        ]
+      }
+    ],
+    "hints": [
+      "Every sentence needs: a capital letter at the start, a subject (who/what), a verb (action), and end punctuation (. ? !).",
+      "A paragraph is like a sandwich: topic sentence (top bun), supporting details (filling), concluding sentence (bottom bun).",
+      "Process writing: plan first, write freely, then fix. Do not try to make it perfect on the first draft."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "sentence",
+        "definition": "A group of words that expresses a complete thought, containing at least a subject and a verb",
+        "example_usage": "'The cat sat on the mat' is a complete sentence with subject (cat) and verb (sat)."
+      },
+      {
+        "term": "paragraph",
+        "definition": "A group of related sentences about one main idea, typically starting with a topic sentence and ending with a concluding sentence",
+        "example_usage": "Each paragraph in your essay should focus on one main point."
+      },
+      {
+        "term": "topic sentence",
+        "definition": "The sentence that states the main idea of a paragraph, usually the first sentence",
+        "example_usage": "The topic sentence 'Exercise has many health benefits' tells the reader what the paragraph will discuss."
+      },
+      {
+        "term": "punctuation",
+        "definition": "Marks used in writing to separate sentences, show pauses, indicate possession, and clarify meaning (full stops, commas, apostrophes, question marks)",
+        "example_usage": "Correct punctuation changes meaning: 'Let's eat, Grandma' vs 'Let's eat Grandma!'"
+      },
+      {
+        "term": "process writing",
+        "definition": "A five-stage approach to writing: prewriting (plan), drafting (write), revising (improve), editing (correct), publishing (final version)",
+        "example_usage": "Using process writing, I brainstormed ideas before writing my first draft."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think good writers get it right on the first try.",
+        "correction": "Professional writers revise extensively. A first draft is meant to get ideas down, not to be perfect. The real writing happens in revision. Even famous authors produce multiple drafts of every work.",
+        "why_students_think_this": "They only see finished, published writing and assume it came out that way. Showing drafts and revisions demystifies the process."
+      },
+      {
+        "misconception": "Students think longer writing is always better writing.",
+        "correction": "Clear, concise writing is usually more effective than long, wordy writing. Every word should serve a purpose. 'She ran quickly' is better than 'She proceeded to move in a running motion at a fast speed.' Quality over quantity.",
+        "why_students_think_this": "Word count requirements in school encourage padding. Teaching that editing often means cutting helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.EnglishFoundations.Writing",
+    "title": "Assessment: Writing Basics",
+    "items": [
+      {
+        "question": "Name the five stages of process writing.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Prewriting (plan), Drafting (write), Revising (improve content), Editing (fix errors), Publishing (final copy).",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about the steps from first idea to final product"
+      },
+      {
+        "question": "Explain the difference between revising and editing.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Revising improves content, organisation, and clarity (big picture: Are my ideas clear? Is the order logical?). Editing fixes grammar, spelling, and punctuation (details: Are my commas correct? Are words spelled right?).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Revising = improving ideas; Editing = fixing errors"
+      },
+      {
+        "question": "Fix all errors in this sentence: 'me and my freinds goed to the shops but they was closed'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "'My friends and I went to the shops, but they were closed.'",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Check: pronoun order, spelling, past tense, subject-verb agreement, punctuation"
+      },
+      {
+        "question": "Analyse why the following paragraph is poorly structured and suggest improvements: 'I like dogs. The weather is nice today. Dogs are loyal. My favourite colour is blue. Dogs protect their owners.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Problem: sentences about weather and colour are unrelated to the main topic (dogs). No topic sentence, no logical order. Fix: remove unrelated sentences, add a topic sentence ('Dogs make the best pets'), organise supporting details logically, add a concluding sentence.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Does every sentence relate to one main idea?"
+      },
+      {
+        "question": "Evaluate the importance of punctuation by explaining how meaning changes with different punctuation in: 'A woman without her man is nothing.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "'A woman, without her, man is nothing.' vs 'A woman: without her man, is nothing.' Punctuation completely changes meaning. The first says man is nothing without the woman. The second says the woman is nothing without the man. Punctuation is not optional decoration — it determines meaning.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Try adding commas and colons in different places"
+      },
+      {
+        "question": "Write a well-structured paragraph (5-7 sentences) about a person you admire, using a topic sentence, supporting details, and a concluding sentence.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Paragraph should have: clear topic sentence naming the person and why they are admired, 3-4 supporting sentences with specific details/examples, concluding sentence. Correct punctuation, complete sentences, logical flow.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Topic sentence first, then reasons and examples, then a strong ending"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What makes a complete sentence?",
+      "back": "A subject (who/what), a verb (action), and a complete thought. Starts with a capital letter, ends with . or ? or !",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 75
+    },
+    {
+      "front": "What is a topic sentence?",
+      "back": "The sentence that states the main idea of a paragraph, usually the first sentence. All other sentences in the paragraph support it.",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 125
+    },
+    {
+      "front": "When do you use an apostrophe?",
+      "back": "Possession (Thandi's book = the book belongs to Thandi) and contractions (don't = do not, it's = it is). Never for plurals (NOT: apple's for sale).",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What are the five stages of process writing?",
+      "back": "Prewriting (brainstorm/plan), Drafting (write freely), Revising (improve ideas), Editing (fix errors), Publishing (final version).",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "When do you use a comma?",
+      "back": "In lists (bread, milk, and eggs), before conjunctions joining two sentences (I ran, but I was late), after introductory words (However, ...), and to separate extra information.",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is a paragraph?",
+      "back": "A group of related sentences about ONE main idea. Structure: topic sentence (main idea) + supporting sentences (details) + concluding sentence.",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is the difference between revising and editing?",
+      "back": "Revising = improving content and organisation (big picture). Editing = fixing grammar, spelling, and punctuation (details). Revise first, then edit.",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is a sentence fragment?",
+      "back": "An incomplete sentence missing a subject, a verb, or a complete thought. Example: 'Running down the road.' (Who was running? No subject.)",
+      "tags": ["CAPS.EnglishFoundations.Writing", "Adult", "English Foundations"],
+      "difficulty_permille": 150
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}
