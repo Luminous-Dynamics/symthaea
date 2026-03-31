@@ -349,6 +349,109 @@ pub const GOVERNANCE_LOCAL_ZOMES: &[&str] = &[
     "voting",
 ];
 
+/// Zomes allowed for local dispatch within the Cafe cluster.
+pub const CAFE_LOCAL_ZOMES: &[&str] = &[
+    "cafe_pos",
+    "cafe_inventory",
+    "cafe_roster",
+    "cafe_bridge",
+];
+
+/// Zomes allowed for local dispatch within the Atlas cluster.
+pub const ATLAS_LOCAL_ZOMES: &[&str] = &[
+    "atlas_sites",
+    "atlas_infrastructure",
+    "atlas_bridge",
+];
+
+/// Zomes allowed for local dispatch within the Attribution cluster.
+pub const ATTRIBUTION_LOCAL_ZOMES: &[&str] = &[
+    "reciprocity",
+    "registry",
+    "usage",
+];
+
+/// Zomes allowed for local dispatch within the Core cluster (0TML federated learning).
+pub const CORE_LOCAL_ZOMES: &[&str] = &[
+    "agents",
+    "bridge",
+    "dkg",
+    "epistemic_storage",
+    "federated_learning",
+    "pogq_validation",
+];
+
+/// Zomes allowed for local dispatch within the DeSci cluster (REST API modules).
+pub const DESCI_LOCAL_ZOMES: &[&str] = &[
+    "claims",
+    "query",
+    "system",
+    "trust",
+];
+
+/// Zomes allowed for local dispatch within the Mail cluster (PQC-encrypted decentralized email).
+pub const MAIL_LOCAL_ZOMES: &[&str] = &[
+    "audit",
+    "backup",
+    "capabilities",
+    "contacts",
+    "federation",
+    "keys",
+    "mail_bridge",
+    "messages",
+    "profiles",
+    "scheduler",
+    "search",
+    "sync",
+    "trust",
+];
+
+/// Zomes allowed for local dispatch within the Marketplace cluster.
+pub const MARKETPLACE_LOCAL_ZOMES: &[&str] = &[
+    "arbitration",
+    "listings",
+    "messaging",
+    "monitoring",
+    "notifications",
+    "reputation",
+    "search",
+    "security",
+    "transactions",
+];
+
+/// Zomes allowed for local dispatch within the Position cluster (GPS-without-GPS).
+pub const POSITION_LOCAL_ZOMES: &[&str] = &[
+    "anchor_registry",
+    "position_estimates",
+    "ranging",
+];
+
+/// Zomes allowed for local dispatch within the Space cluster (orbital mechanics).
+pub const SPACE_LOCAL_ZOMES: &[&str] = &[
+    "conjunctions",
+    "debris_bounties",
+    "observations",
+    "orbital_objects",
+    "traffic_control",
+];
+
+// Note: Lunar, MultiworldSim, Portal, and Workspace are either stubs,
+// pure simulations, frontends, or utility crates with no Holochain zomes.
+// They have empty local zome lists but are included in the enum for
+// routing completeness.
+
+/// Zomes allowed for local dispatch within the Lunar cluster (stub/dormant).
+pub const LUNAR_LOCAL_ZOMES: &[&str] = &[];
+
+/// Zomes allowed for local dispatch within the MultiworldSim cluster (pure simulation, no Holochain zomes).
+pub const MULTIWORLD_SIM_LOCAL_ZOMES: &[&str] = &[];
+
+/// Zomes allowed for local dispatch within the Portal cluster (Leptos frontend, no Holochain zomes).
+pub const PORTAL_LOCAL_ZOMES: &[&str] = &[];
+
+/// Zomes allowed for local dispatch within the Workspace cluster (utility crates, no direct zomes).
+pub const WORKSPACE_LOCAL_ZOMES: &[&str] = &[];
+
 // ============================================================================
 // Cross-cluster allowlists
 // ============================================================================
@@ -603,6 +706,35 @@ const HEALTH_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry"];
 /// Identity-side zomes that edunet-bridge is allowed to call cross-cluster.
 const EDUNET_TO_IDENTITY: &[&str] = &["identity_bridge", "verifiable_credential"];
 
+/// Finance-side zomes that cafe-bridge is allowed to call cross-cluster.
+const CAFE_TO_FINANCE: &[&str] = &["finance_bridge", "payments", "tend", "price_oracle"];
+
+/// Identity-side zomes that cafe-bridge is allowed to call cross-cluster.
+const CAFE_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry"];
+
+/// Cafe-side zomes that finance-bridge is allowed to call cross-cluster (payment confirmations).
+const FINANCE_TO_CAFE: &[&str] = &["cafe_bridge"];
+
+/// Cafe-side zomes that identity-bridge is allowed to call cross-cluster (credential notifications).
+const IDENTITY_TO_CAFE: &[&str] = &["cafe_bridge"];
+
+// --- Group D: Newly registered cluster routes ---
+
+/// Identity-side zomes that mail-bridge is allowed to call cross-cluster (DID resolution, trust).
+const MAIL_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry", "trust_credential"];
+
+/// Finance-side zomes that marketplace transactions are allowed to call cross-cluster (payment settlement).
+const MARKETPLACE_TO_FINANCE: &[&str] = &["finance_bridge", "payments"];
+
+/// Identity-side zomes that space observations is allowed to call cross-cluster (trust lookups).
+const SPACE_TO_IDENTITY: &[&str] = &["identity_bridge", "trust_credential"];
+
+/// Identity-side zomes that attribution is allowed to call cross-cluster (creator verification).
+const ATTRIBUTION_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry"];
+
+/// Finance-side zomes that attribution is allowed to call cross-cluster (reciprocity payments).
+const ATTRIBUTION_TO_FINANCE: &[&str] = &["finance_bridge", "payments"];
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -680,6 +812,27 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
         // Edunet outbound
         (CrossClusterRole::Edunet, CrossClusterRole::Identity) => EDUNET_TO_IDENTITY,
 
+        // Cafe outbound
+        (CrossClusterRole::Cafe, CrossClusterRole::Finance) => CAFE_TO_FINANCE,
+        (CrossClusterRole::Cafe, CrossClusterRole::Identity) => CAFE_TO_IDENTITY,
+
+        // Inbound to Cafe
+        (CrossClusterRole::Finance, CrossClusterRole::Cafe) => FINANCE_TO_CAFE,
+        (CrossClusterRole::Identity, CrossClusterRole::Cafe) => IDENTITY_TO_CAFE,
+
+        // Mail outbound
+        (CrossClusterRole::Mail, CrossClusterRole::Identity) => MAIL_TO_IDENTITY,
+
+        // Marketplace outbound
+        (CrossClusterRole::Marketplace, CrossClusterRole::Finance) => MARKETPLACE_TO_FINANCE,
+
+        // Space outbound
+        (CrossClusterRole::Space, CrossClusterRole::Identity) => SPACE_TO_IDENTITY,
+
+        // Attribution outbound
+        (CrossClusterRole::Attribution, CrossClusterRole::Identity) => ATTRIBUTION_TO_IDENTITY,
+        (CrossClusterRole::Attribution, CrossClusterRole::Finance) => ATTRIBUTION_TO_FINANCE,
+
         // No registered route (including self→self)
         _ => &[],
     }
@@ -738,6 +891,19 @@ pub const fn get_local_zomes(cluster: CrossClusterRole) -> Option<&'static [&'st
         CrossClusterRole::Identity => Some(IDENTITY_LOCAL_ZOMES),
         CrossClusterRole::Finance => Some(FINANCE_LOCAL_ZOMES),
         CrossClusterRole::Governance => Some(GOVERNANCE_LOCAL_ZOMES),
+        CrossClusterRole::Cafe => Some(CAFE_LOCAL_ZOMES),
+        CrossClusterRole::Atlas => Some(ATLAS_LOCAL_ZOMES),
+        CrossClusterRole::Attribution => Some(ATTRIBUTION_LOCAL_ZOMES),
+        CrossClusterRole::Core => Some(CORE_LOCAL_ZOMES),
+        CrossClusterRole::Desci => Some(DESCI_LOCAL_ZOMES),
+        CrossClusterRole::Mail => Some(MAIL_LOCAL_ZOMES),
+        CrossClusterRole::Marketplace => Some(MARKETPLACE_LOCAL_ZOMES),
+        CrossClusterRole::Position => Some(POSITION_LOCAL_ZOMES),
+        CrossClusterRole::Space => Some(SPACE_LOCAL_ZOMES),
+        CrossClusterRole::Lunar => Some(LUNAR_LOCAL_ZOMES),
+        CrossClusterRole::MultiworldSim => Some(MULTIWORLD_SIM_LOCAL_ZOMES),
+        CrossClusterRole::Portal => Some(PORTAL_LOCAL_ZOMES),
+        CrossClusterRole::Workspace => Some(WORKSPACE_LOCAL_ZOMES),
     }
 }
 
@@ -1014,6 +1180,18 @@ mod tests {
         assert_eq!(role_name(CrossClusterRole::Supplychain), "supplychain");
         assert_eq!(role_name(CrossClusterRole::Edunet), "edunet");
         assert_eq!(role_name(CrossClusterRole::Legacy), "legacy");
+        assert_eq!(role_name(CrossClusterRole::Atlas), "atlas");
+        assert_eq!(role_name(CrossClusterRole::Attribution), "attribution");
+        assert_eq!(role_name(CrossClusterRole::Core), "core");
+        assert_eq!(role_name(CrossClusterRole::Desci), "desci");
+        assert_eq!(role_name(CrossClusterRole::Mail), "mail");
+        assert_eq!(role_name(CrossClusterRole::Marketplace), "marketplace");
+        assert_eq!(role_name(CrossClusterRole::Position), "position");
+        assert_eq!(role_name(CrossClusterRole::Space), "space");
+        assert_eq!(role_name(CrossClusterRole::MultiworldSim), "multiworld_sim");
+        assert_eq!(role_name(CrossClusterRole::Portal), "portal");
+        assert_eq!(role_name(CrossClusterRole::Workspace), "workspace");
+        assert_eq!(role_name(CrossClusterRole::Lunar), "lunar");
     }
 
     // ---- No duplicates in any allowlist ----
@@ -1081,6 +1259,25 @@ mod tests {
             ("HEALTH_TO_PERSONAL", HEALTH_TO_PERSONAL),
             ("HEALTH_TO_IDENTITY", HEALTH_TO_IDENTITY),
             ("EDUNET_TO_IDENTITY", EDUNET_TO_IDENTITY),
+            ("CAFE_LOCAL_ZOMES", CAFE_LOCAL_ZOMES),
+            ("CAFE_TO_FINANCE", CAFE_TO_FINANCE),
+            ("CAFE_TO_IDENTITY", CAFE_TO_IDENTITY),
+            ("FINANCE_TO_CAFE", FINANCE_TO_CAFE),
+            ("IDENTITY_TO_CAFE", IDENTITY_TO_CAFE),
+            // Group D: Newly registered cluster routes
+            ("ATLAS_LOCAL_ZOMES", ATLAS_LOCAL_ZOMES),
+            ("ATTRIBUTION_LOCAL_ZOMES", ATTRIBUTION_LOCAL_ZOMES),
+            ("CORE_LOCAL_ZOMES", CORE_LOCAL_ZOMES),
+            ("DESCI_LOCAL_ZOMES", DESCI_LOCAL_ZOMES),
+            ("MAIL_LOCAL_ZOMES", MAIL_LOCAL_ZOMES),
+            ("MARKETPLACE_LOCAL_ZOMES", MARKETPLACE_LOCAL_ZOMES),
+            ("POSITION_LOCAL_ZOMES", POSITION_LOCAL_ZOMES),
+            ("SPACE_LOCAL_ZOMES", SPACE_LOCAL_ZOMES),
+            ("MAIL_TO_IDENTITY", MAIL_TO_IDENTITY),
+            ("MARKETPLACE_TO_FINANCE", MARKETPLACE_TO_FINANCE),
+            ("SPACE_TO_IDENTITY", SPACE_TO_IDENTITY),
+            ("ATTRIBUTION_TO_IDENTITY", ATTRIBUTION_TO_IDENTITY),
+            ("ATTRIBUTION_TO_FINANCE", ATTRIBUTION_TO_FINANCE),
         ];
         for (name, list) in lists {
             let mut seen = std::collections::HashSet::new();
@@ -1117,7 +1314,7 @@ mod tests {
 
     #[test]
     fn get_local_zomes_returns_expected() {
-        // All 16 clusters now have local zome lists
+        // All 29 clusters now have local zome lists
         assert_eq!(get_local_zomes(CrossClusterRole::Commons).unwrap().len(), 40);
         assert_eq!(get_local_zomes(CrossClusterRole::Civic).unwrap().len(), 17);
         assert_eq!(get_local_zomes(CrossClusterRole::Hearth).unwrap().len(), 10);
@@ -1134,6 +1331,19 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Identity).unwrap().len(), 12);
         assert_eq!(get_local_zomes(CrossClusterRole::Finance).unwrap().len(), 8);
         assert_eq!(get_local_zomes(CrossClusterRole::Governance).unwrap().len(), 8);
+        assert_eq!(get_local_zomes(CrossClusterRole::Cafe).unwrap().len(), 4);
+        assert_eq!(get_local_zomes(CrossClusterRole::Atlas).unwrap().len(), 3);
+        assert_eq!(get_local_zomes(CrossClusterRole::Attribution).unwrap().len(), 3);
+        assert_eq!(get_local_zomes(CrossClusterRole::Core).unwrap().len(), 6);
+        assert_eq!(get_local_zomes(CrossClusterRole::Desci).unwrap().len(), 4);
+        assert_eq!(get_local_zomes(CrossClusterRole::Mail).unwrap().len(), 13);
+        assert_eq!(get_local_zomes(CrossClusterRole::Marketplace).unwrap().len(), 9);
+        assert_eq!(get_local_zomes(CrossClusterRole::Position).unwrap().len(), 3);
+        assert_eq!(get_local_zomes(CrossClusterRole::Space).unwrap().len(), 5);
+        assert_eq!(get_local_zomes(CrossClusterRole::Lunar).unwrap().len(), 0);
+        assert_eq!(get_local_zomes(CrossClusterRole::MultiworldSim).unwrap().len(), 0);
+        assert_eq!(get_local_zomes(CrossClusterRole::Portal).unwrap().len(), 0);
+        assert_eq!(get_local_zomes(CrossClusterRole::Workspace).unwrap().len(), 0);
     }
 
     #[test]
@@ -1235,6 +1445,51 @@ mod tests {
         assert!(is_allowed(CrossClusterRole::Edunet, CrossClusterRole::Identity, "verifiable_credential"));
     }
 
+    // ---- New cluster route count tests ----
+
+    #[test]
+    fn mail_to_identity_count() {
+        assert_eq!(get_allowed_zomes(CrossClusterRole::Mail, CrossClusterRole::Identity).len(), 3);
+    }
+
+    #[test]
+    fn marketplace_to_finance_count() {
+        assert_eq!(get_allowed_zomes(CrossClusterRole::Marketplace, CrossClusterRole::Finance).len(), 2);
+    }
+
+    #[test]
+    fn space_to_identity_count() {
+        assert_eq!(get_allowed_zomes(CrossClusterRole::Space, CrossClusterRole::Identity).len(), 2);
+    }
+
+    #[test]
+    fn attribution_outbound_counts() {
+        assert_eq!(get_allowed_zomes(CrossClusterRole::Attribution, CrossClusterRole::Identity).len(), 2);
+        assert_eq!(get_allowed_zomes(CrossClusterRole::Attribution, CrossClusterRole::Finance).len(), 2);
+    }
+
+    // ---- is_allowed positive tests for new cluster routes ----
+
+    #[test]
+    fn is_allowed_mail_to_identity_did_registry() {
+        assert!(is_allowed(CrossClusterRole::Mail, CrossClusterRole::Identity, "did_registry"));
+    }
+
+    #[test]
+    fn is_allowed_marketplace_to_finance_payments() {
+        assert!(is_allowed(CrossClusterRole::Marketplace, CrossClusterRole::Finance, "payments"));
+    }
+
+    #[test]
+    fn is_allowed_space_to_identity_trust_credential() {
+        assert!(is_allowed(CrossClusterRole::Space, CrossClusterRole::Identity, "trust_credential"));
+    }
+
+    #[test]
+    fn is_allowed_attribution_to_identity_did_registry() {
+        assert!(is_allowed(CrossClusterRole::Attribution, CrossClusterRole::Identity, "did_registry"));
+    }
+
     // ---- Total route count ----
 
     #[test]
@@ -1247,7 +1502,9 @@ mod tests {
                 }
             }
         }
-        // 36 registered directional routes
-        assert_eq!(count, 36, "Expected 36 registered cross-cluster routes");
+        // 45 registered directional routes:
+        //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
+        //   Space→Identity, Attribution→Identity, Attribution→Finance)
+        assert_eq!(count, 45, "Expected 45 registered cross-cluster routes");
     }
 }

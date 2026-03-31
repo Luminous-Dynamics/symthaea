@@ -224,6 +224,59 @@ pub fn list_terra_lumina_sites(_: ()) -> ExternResult<Vec<Record>> {
     links_to_records(links)
 }
 
+// ─── Fossil Deposits ────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterFossilDepositInput {
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub fuel_type: String,
+    pub proven_reserves_mboe: f64,
+    pub annual_production_mboe: f64,
+    pub status: String,
+    pub country: String,
+    pub discovery_year: u32,
+}
+
+#[hdk_extern]
+pub fn register_fossil_deposit(input: RegisterFossilDepositInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let deposit = FossilDeposit {
+        name: input.name,
+        lat: input.lat,
+        lon: input.lon,
+        fuel_type: input.fuel_type.clone(),
+        proven_reserves_mboe: input.proven_reserves_mboe,
+        annual_production_mboe: input.annual_production_mboe,
+        status: input.status,
+        country: input.country,
+        discovery_year: input.discovery_year,
+        created: now,
+    };
+
+    let hash = create_entry(&EntryTypes::FossilDeposit(deposit))?;
+    create_link(anchor_hash("all_fossil_deposits")?, hash.clone(), LinkTypes::AllFossilDeposits, ())?;
+    create_link(
+        anchor_hash(&format!("fossil_type:{}", input.fuel_type))?,
+        hash.clone(),
+        LinkTypes::TypeToFossilDeposits,
+        (),
+    )?;
+
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+}
+
+#[hdk_extern]
+pub fn list_fossil_deposits(_: ()) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_fossil_deposits")?, LinkTypes::AllFossilDeposits)?,
+        GetStrategy::default(),
+    )?;
+    links_to_records(links)
+}
+
 // ─── Helper ──────────────────────────────────────────────────────
 
 fn links_to_records(links: Vec<Link>) -> ExternResult<Vec<Record>> {

@@ -21,7 +21,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 
 use crate::cdm::{
     CdmCovariance, CdmObjectData, CdmObjectMetadata, CdmRefFrame, CdmStateVector,
-    ConjunctionDataMessage, Maneuverable,
+    ConjunctionDataMessage, Maneuverable, PcMethod,
 };
 
 /// Error type for CDM parsing
@@ -37,6 +37,16 @@ pub enum CdmParseError {
     UnsupportedVersion(String),
     #[error("Empty input")]
     EmptyInput,
+    #[error("Incomplete covariance for {object}: CR_R present but missing elements: {missing}")]
+    IncompleteCovariance {
+        object: String,
+        missing: String,
+    },
+    #[error("CREATION_DATE ({creation}) is after TCA ({tca}) — CDM is malformed")]
+    CreationAfterTca {
+        creation: String,
+        tca: String,
+    },
 }
 
 /// Parse a CCSDS CDM in KVN (Keyword-Value Notation) format.
@@ -107,9 +117,18 @@ pub fn parse_cdm_kvn(input: &str) -> Result<ConjunctionDataMessage, CdmParseErro
     let relative_velocity_t = get_f64("RELATIVE_VELOCITY_T").unwrap_or(0.0);
     let relative_velocity_n = get_f64("RELATIVE_VELOCITY_N").unwrap_or(0.0);
 
+    // --- Freshness validation: CREATION_DATE must be <= TCA ---
+    if creation_date > tca {
+        return Err(CdmParseError::CreationAfterTca {
+            creation: creation_date.to_rfc3339(),
+            tca: tca.to_rfc3339(),
+        });
+    }
+
     // --- Probability ---
     let collision_probability = get_f64("COLLISION_PROBABILITY")?;
-    let collision_probability_method = get("COLLISION_PROBABILITY_METHOD")?;
+    let collision_probability_method_str = get("COLLISION_PROBABILITY_METHOD")?;
+    let collision_probability_method = PcMethod::from_str_permissive(&collision_probability_method_str);
 
     // --- Object Data ---
     let object1 = parse_object_block(&lines, "OBJECT1")?;
@@ -195,30 +214,56 @@ fn parse_object_block(
         z_dot: get_f64("Z_DOT")?,
     };
 
-    // Covariance (optional — check if CR_R exists)
-    let covariance = get_opt_f64("CR_R").map(|cr_r| CdmCovariance {
-        cr_r,
-        ct_r: get_opt_f64("CT_R").unwrap_or(0.0),
-        ct_t: get_opt_f64("CT_T").unwrap_or(0.0),
-        cn_r: get_opt_f64("CN_R").unwrap_or(0.0),
-        cn_t: get_opt_f64("CN_T").unwrap_or(0.0),
-        cn_n: get_opt_f64("CN_N").unwrap_or(0.0),
-        crdot_r: get_opt_f64("CRDOT_R").unwrap_or(0.0),
-        crdot_t: get_opt_f64("CRDOT_T").unwrap_or(0.0),
-        crdot_n: get_opt_f64("CRDOT_N").unwrap_or(0.0),
-        crdot_rdot: get_opt_f64("CRDOT_RDOT").unwrap_or(0.0),
-        ctdot_r: get_opt_f64("CTDOT_R").unwrap_or(0.0),
-        ctdot_t: get_opt_f64("CTDOT_T").unwrap_or(0.0),
-        ctdot_n: get_opt_f64("CTDOT_N").unwrap_or(0.0),
-        ctdot_rdot: get_opt_f64("CTDOT_RDOT").unwrap_or(0.0),
-        ctdot_tdot: get_opt_f64("CTDOT_TDOT").unwrap_or(0.0),
-        cndot_r: get_opt_f64("CNDOT_R").unwrap_or(0.0),
-        cndot_t: get_opt_f64("CNDOT_T").unwrap_or(0.0),
-        cndot_n: get_opt_f64("CNDOT_N").unwrap_or(0.0),
-        cndot_rdot: get_opt_f64("CNDOT_RDOT").unwrap_or(0.0),
-        cndot_tdot: get_opt_f64("CNDOT_TDOT").unwrap_or(0.0),
-        cndot_ndot: get_opt_f64("CNDOT_NDOT").unwrap_or(0.0),
-    });
+    // Covariance (optional — but if CR_R is present, all 21 elements are required
+    // per CCSDS 508.0-B-1 Section 5.2.5)
+    let covariance = if get_opt_f64("CR_R").is_some() {
+        // All 21 lower-triangular covariance elements
+        const COV_ELEMENTS: &[&str] = &[
+            "CR_R", "CT_R", "CT_T", "CN_R", "CN_T", "CN_N",
+            "CRDOT_R", "CRDOT_T", "CRDOT_N", "CRDOT_RDOT",
+            "CTDOT_R", "CTDOT_T", "CTDOT_N", "CTDOT_RDOT", "CTDOT_TDOT",
+            "CNDOT_R", "CNDOT_T", "CNDOT_N", "CNDOT_RDOT", "CNDOT_TDOT", "CNDOT_NDOT",
+        ];
+
+        let missing: Vec<&str> = COV_ELEMENTS
+            .iter()
+            .filter(|elem| get_opt_f64(elem).is_none())
+            .copied()
+            .collect();
+
+        if !missing.is_empty() {
+            return Err(CdmParseError::IncompleteCovariance {
+                object: prefix.to_string(),
+                missing: missing.join(", "),
+            });
+        }
+
+        Some(CdmCovariance {
+            cr_r: get_opt_f64("CR_R").unwrap(),
+            ct_r: get_opt_f64("CT_R").unwrap(),
+            ct_t: get_opt_f64("CT_T").unwrap(),
+            cn_r: get_opt_f64("CN_R").unwrap(),
+            cn_t: get_opt_f64("CN_T").unwrap(),
+            cn_n: get_opt_f64("CN_N").unwrap(),
+            crdot_r: get_opt_f64("CRDOT_R").unwrap(),
+            crdot_t: get_opt_f64("CRDOT_T").unwrap(),
+            crdot_n: get_opt_f64("CRDOT_N").unwrap(),
+            crdot_rdot: get_opt_f64("CRDOT_RDOT").unwrap(),
+            ctdot_r: get_opt_f64("CTDOT_R").unwrap(),
+            ctdot_t: get_opt_f64("CTDOT_T").unwrap(),
+            ctdot_n: get_opt_f64("CTDOT_N").unwrap(),
+            ctdot_rdot: get_opt_f64("CTDOT_RDOT").unwrap(),
+            ctdot_tdot: get_opt_f64("CTDOT_TDOT").unwrap(),
+            cndot_r: get_opt_f64("CNDOT_R").unwrap(),
+            cndot_t: get_opt_f64("CNDOT_T").unwrap(),
+            cndot_n: get_opt_f64("CNDOT_N").unwrap(),
+            cndot_rdot: get_opt_f64("CNDOT_RDOT").unwrap(),
+            cndot_tdot: get_opt_f64("CNDOT_TDOT").unwrap(),
+            cndot_ndot: get_opt_f64("CNDOT_NDOT").unwrap(),
+        })
+    } else {
+        None
+    };
 
     Ok(CdmObjectData {
         metadata,
@@ -354,7 +399,7 @@ OBJECT2_Z_DOT = 0.050000000 [km/s]
         assert!((cdm.miss_distance - 0.5).abs() < 0.001);
         assert!((cdm.relative_speed - 14500.0).abs() < 0.1);
         assert!((cdm.collision_probability - 1e-5).abs() < 1e-10);
-        assert_eq!(cdm.collision_probability_method, "ALFANO-2005");
+        assert_eq!(cdm.collision_probability_method, PcMethod::Alfano2005);
 
         // Object 1
         assert_eq!(cdm.object1.metadata.object_designator, "25544");
@@ -445,9 +490,92 @@ OBJECT2_Z_DOT = 0.050000000 [km/s]
 
     use chrono::{Datelike, Timelike};
 
+    /// Helper: generate all 21 covariance KVN lines for a given object prefix.
+    fn full_covariance_kvn(prefix: &str) -> String {
+        format!(
+            r#"{pfx}_CR_R = 1.0e-04 [km**2]
+{pfx}_CT_R = 2.0e-05 [km**2]
+{pfx}_CT_T = 5.0e-04 [km**2]
+{pfx}_CN_R = 1.0e-06 [km**2]
+{pfx}_CN_T = 2.0e-06 [km**2]
+{pfx}_CN_N = 3.0e-04 [km**2]
+{pfx}_CRDOT_R = 1.0e-07 [km**2/s]
+{pfx}_CRDOT_T = 2.0e-07 [km**2/s]
+{pfx}_CRDOT_N = 3.0e-07 [km**2/s]
+{pfx}_CRDOT_RDOT = 4.0e-08 [(km/s)**2]
+{pfx}_CTDOT_R = 5.0e-07 [km**2/s]
+{pfx}_CTDOT_T = 6.0e-07 [km**2/s]
+{pfx}_CTDOT_N = 7.0e-07 [km**2/s]
+{pfx}_CTDOT_RDOT = 8.0e-08 [(km/s)**2]
+{pfx}_CTDOT_TDOT = 9.0e-08 [(km/s)**2]
+{pfx}_CNDOT_R = 1.0e-07 [km**2/s]
+{pfx}_CNDOT_T = 1.1e-07 [km**2/s]
+{pfx}_CNDOT_N = 1.2e-07 [km**2/s]
+{pfx}_CNDOT_RDOT = 1.3e-08 [(km/s)**2]
+{pfx}_CNDOT_TDOT = 1.4e-08 [(km/s)**2]
+{pfx}_CNDOT_NDOT = 1.5e-08 [(km/s)**2]
+"#,
+            pfx = prefix
+        )
+    }
+
     #[test]
-    fn test_covariance_parsing() {
-        let cdm_with_cov = r#"CCSDS_CDM_VERS = 1.0
+    fn test_covariance_parsing_complete() {
+        let cdm_with_cov = format!(
+            r#"CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2024-01-15T12:00:00.000
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
+
+TCA = 2024-01-15T18:00:00.000
+MISS_DISTANCE = 1.0 [km]
+RELATIVE_SPEED = 10000.0 [m/s]
+
+COLLISION_PROBABILITY = 1.0e-06
+COLLISION_PROBABILITY_METHOD = ALFANO-2005
+
+OBJECT1_OBJECT_DESIGNATOR = 11111
+OBJECT1_OBJECT_NAME = SAT-A
+OBJECT1_REF_FRAME = EME2000
+OBJECT1_MANEUVERABLE = YES
+OBJECT1_X = 7000.0 [km]
+OBJECT1_Y = 0.0 [km]
+OBJECT1_Z = 0.0 [km]
+OBJECT1_X_DOT = 0.0 [km/s]
+OBJECT1_Y_DOT = 7.5 [km/s]
+OBJECT1_Z_DOT = 0.0 [km/s]
+{cov1}
+OBJECT2_OBJECT_DESIGNATOR = 22222
+OBJECT2_OBJECT_NAME = DEBRIS-B
+OBJECT2_REF_FRAME = EME2000
+OBJECT2_MANEUVERABLE = NO
+OBJECT2_X = 7000.5 [km]
+OBJECT2_Y = 0.0 [km]
+OBJECT2_Z = 0.0 [km]
+OBJECT2_X_DOT = 0.0 [km/s]
+OBJECT2_Y_DOT = -7.5 [km/s]
+OBJECT2_Z_DOT = 0.0 [km/s]
+"#,
+            cov1 = full_covariance_kvn("OBJECT1"),
+        );
+
+        let cdm = parse_cdm_kvn(&cdm_with_cov).unwrap();
+
+        // Object 1 should have full covariance
+        let cov1 = cdm.object1.covariance.as_ref().unwrap();
+        assert!((cov1.cr_r - 1.0e-4).abs() < 1e-10);
+        assert!((cov1.ct_r - 2.0e-5).abs() < 1e-10);
+        assert!((cov1.ct_t - 5.0e-4).abs() < 1e-10);
+        assert!((cov1.cndot_ndot - 1.5e-8).abs() < 1e-14);
+
+        // Object 2 should NOT have covariance (no CR_R)
+        assert!(cdm.object2.covariance.is_none());
+    }
+
+    #[test]
+    fn test_incomplete_covariance_rejected() {
+        // Only 3 of 21 covariance elements — must be rejected
+        let cdm_partial_cov = r#"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2024-01-15T12:00:00.000
 ORIGINATOR = TEST
 MESSAGE_ID = TEST-001
@@ -485,15 +613,87 @@ OBJECT2_Y_DOT = -7.5 [km/s]
 OBJECT2_Z_DOT = 0.0 [km/s]
 "#;
 
-        let cdm = parse_cdm_kvn(cdm_with_cov).unwrap();
+        let err = parse_cdm_kvn(cdm_partial_cov).unwrap_err();
+        match err {
+            CdmParseError::IncompleteCovariance { object, missing } => {
+                assert_eq!(object, "OBJECT1");
+                // Should list the 18 missing elements
+                assert!(missing.contains("CN_R"));
+                assert!(missing.contains("CNDOT_NDOT"));
+                assert!(!missing.contains("CR_R")); // CR_R is present
+                assert!(!missing.contains("CT_R")); // CT_R is present
+                assert!(!missing.contains("CT_T")); // CT_T is present
+            }
+            other => panic!("Expected IncompleteCovariance, got {:?}", other),
+        }
+    }
 
-        // Object 1 should have covariance
-        let cov1 = cdm.object1.covariance.as_ref().unwrap();
-        assert!((cov1.cr_r - 1.0e-4).abs() < 1e-10);
-        assert!((cov1.ct_r - 2.0e-5).abs() < 1e-10);
-        assert!((cov1.ct_t - 5.0e-4).abs() < 1e-10);
+    #[test]
+    fn test_creation_after_tca_rejected() {
+        // CREATION_DATE is 2024-01-16 but TCA is 2024-01-15 — malformed
+        let stale_cdm = r#"CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2024-01-16T12:00:00.000
+ORIGINATOR = TEST
+MESSAGE_ID = TEST-001
 
-        // Object 2 should NOT have covariance (no CR_R)
-        assert!(cdm.object2.covariance.is_none());
+TCA = 2024-01-15T18:00:00.000
+MISS_DISTANCE = 1.0 [km]
+RELATIVE_SPEED = 10000.0 [m/s]
+
+COLLISION_PROBABILITY = 1.0e-06
+COLLISION_PROBABILITY_METHOD = FOSTER-1992
+
+OBJECT1_OBJECT_DESIGNATOR = 11111
+OBJECT1_OBJECT_NAME = SAT-A
+OBJECT1_REF_FRAME = EME2000
+OBJECT1_MANEUVERABLE = YES
+OBJECT1_X = 7000.0 [km]
+OBJECT1_Y = 0.0 [km]
+OBJECT1_Z = 0.0 [km]
+OBJECT1_X_DOT = 0.0 [km/s]
+OBJECT1_Y_DOT = 7.5 [km/s]
+OBJECT1_Z_DOT = 0.0 [km/s]
+
+OBJECT2_OBJECT_DESIGNATOR = 22222
+OBJECT2_OBJECT_NAME = DEBRIS-B
+OBJECT2_REF_FRAME = EME2000
+OBJECT2_MANEUVERABLE = NO
+OBJECT2_X = 7000.5 [km]
+OBJECT2_Y = 0.0 [km]
+OBJECT2_Z = 0.0 [km]
+OBJECT2_X_DOT = 0.0 [km/s]
+OBJECT2_Y_DOT = -7.5 [km/s]
+OBJECT2_Z_DOT = 0.0 [km/s]
+"#;
+
+        let err = parse_cdm_kvn(stale_cdm).unwrap_err();
+        match err {
+            CdmParseError::CreationAfterTca { .. } => {} // expected
+            other => panic!("Expected CreationAfterTca, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_pc_method_known_variants() {
+        assert_eq!(PcMethod::from_str_permissive("ALFANO-2005"), PcMethod::Alfano2005);
+        assert_eq!(PcMethod::from_str_permissive("FOSTER-1992"), PcMethod::Foster1992);
+        assert_eq!(PcMethod::from_str_permissive("PATERA-2001"), PcMethod::Patera2001);
+        assert_eq!(PcMethod::from_str_permissive("MCKINLEY-2006"), PcMethod::McKinley2006);
+        assert_eq!(PcMethod::from_str_permissive("CHAN-2008"), PcMethod::Chan2008);
+        assert_eq!(PcMethod::from_str_permissive("MONTE-CARLO"), PcMethod::MonteCarlo);
+        assert_eq!(PcMethod::from_str_permissive("MonteCarlo"), PcMethod::MonteCarlo);
+    }
+
+    #[test]
+    fn test_pc_method_unknown_becomes_other() {
+        let m = PcMethod::from_str_permissive("CUSTOM-METHOD-2026");
+        assert_eq!(m, PcMethod::Other("CUSTOM-METHOD-2026".to_string()));
+        assert_eq!(m.to_string(), "CUSTOM-METHOD-2026");
+    }
+
+    #[test]
+    fn test_pc_method_parsed_from_cdm() {
+        let cdm = parse_cdm_kvn(SAMPLE_CDM).unwrap();
+        assert_eq!(cdm.collision_probability_method, PcMethod::Alfano2005);
     }
 }

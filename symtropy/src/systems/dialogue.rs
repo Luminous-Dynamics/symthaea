@@ -25,8 +25,36 @@ impl Default for DialogueTimer {
     fn default() -> Self { Self(0.0) }
 }
 
-/// Generate dialogue from consciousness bottleneck.
-fn bottleneck_to_dialogue(bottleneck: &str, level: f64, name: &str) -> String {
+/// Generate dialogue from consciousness bottleneck + psychological needs.
+fn bottleneck_to_dialogue(
+    bottleneck: &str,
+    level: f64,
+    name: &str,
+    needs: Option<&crate::systems::psychology::PsychologicalNeeds>,
+) -> String {
+    // Psychological needs override consciousness dialogue when extreme
+    if let Some(n) = needs {
+        if n.allostatic_load > crate::systems::psychology::BURNOUT_THRESHOLD {
+            return format!("{name}: \"I can't keep this up... everything hurts.\"");
+        }
+        if n.social_satiation < 0.15 {
+            return format!("{name}: \"Does anyone even know I'm here?\"");
+        }
+        if n.engagement < 0.2 {
+            return format!("{name}: \"...\""); // disengaged — goes silent
+        }
+        // Moderate stress flavors
+        if n.allostatic_load > 0.6 {
+            return match bottleneck {
+                "phi" => format!("{name}: \"Too much stress to think straight.\""),
+                _ => format!("{name}: \"I need a moment. Just... a moment.\""),
+            };
+        }
+        if n.social_satiation < 0.3 {
+            return format!("{name}: \"Stay close. Please.\"");
+        }
+    }
+
     if level > 0.7 {
         match bottleneck {
             "phi" => format!("{name}: \"I feel... integrated. Whole.\""),
@@ -63,7 +91,7 @@ fn bottleneck_to_dialogue(bottleneck: &str, level: f64, name: &str) -> String {
 /// Show NPC dialogue when player is nearby.
 pub fn dialogue_system(
     player: Query<&Transform, With<Player>>,
-    npcs: Query<(Entity, &Transform, &CrewNpc, Option<&NpcConsciousness>)>,
+    npcs: Query<(Entity, &Transform, &CrewNpc, Option<&NpcConsciousness>, Option<&crate::systems::psychology::PsychologicalNeeds>)>,
     mut commands: Commands,
     existing_bubbles: Query<(Entity, &SpeechBubble)>,
     mut timer: ResMut<DialogueTimer>,
@@ -83,11 +111,11 @@ pub fn dialogue_system(
 
     // Show dialogue for nearest NPC within range
     let mut closest: Option<(Entity, f32, String)> = None;
-    for (entity, npc_tf, npc, consciousness) in &npcs {
+    for (entity, npc_tf, npc, consciousness, psych) in &npcs {
         let dist = player_pos.distance(npc_tf.translation.truncate());
         if dist < 80.0 {
             let dialogue = if let Some(c) = consciousness {
-                bottleneck_to_dialogue(&c.bottleneck, c.level, &npc.name)
+                bottleneck_to_dialogue(&c.bottleneck, c.level, &npc.name, psych)
             } else {
                 format!("{}: \"...\"", npc.name)
             };
@@ -99,7 +127,7 @@ pub fn dialogue_system(
 
     if let Some((npc_entity, _, text)) = closest {
         // Find NPC position for bubble placement
-        if let Ok((_, npc_tf, _, _)) = npcs.get(npc_entity) {
+        if let Ok((_, npc_tf, _, _, _)) = npcs.get(npc_entity) {
             commands.spawn((
                 Text::new(text),
                 TextFont { font_size: 14.0, ..default() },

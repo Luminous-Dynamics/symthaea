@@ -38,6 +38,10 @@ symtropy-consciousness-physics = { path = "crates/symtropy-consciousness-physics
 symtropy-render-bridge = { path = "crates/symtropy-render-bridge" }
 symtropy-robotics-bridge = { path = "crates/symtropy-robotics-bridge" }
 
+# Terra Atlas globe view — enable with: cargo run --features atlas
+terra-atlas-bevy = { path = "../terra-atlas-bevy", optional = true }
+terra-atlas-core = { path = "../terra-atlas-core", optional = true }
+
 # Optional advanced features
 symtropy-world = { path = "crates/symtropy-world", optional = true }
 symtropy-net = { path = "crates/symtropy-net", optional = true }
@@ -52,7 +56,11 @@ default = []
 # Enable to turn the game into a direct Mycelix integration test.
 # All Mycelix modules (governance, economy, factions, FL, DKG, epistemics) activate.
 # Run headless tests: cargo run -p symtropy-sim-bridge --bin headless_test -- --ticks 300
+# Real-time consciousness-driven music synthesis (requires ALSA dev headers on Linux)
+# Enable with: cargo build --features live-audio
+live-audio = ["symthaea-muse/muse-live"]
 mycelix = ["dep:symtropy-sim-bridge", "dep:mycelix-bridge-common", "dep:mycelix-core-types"]
+atlas = ["dep:terra-atlas-bevy", "dep:terra-atlas-core"]
 world = ["dep:symtropy-world"]
 net = ["world", "dep:symtropy-net"]
 

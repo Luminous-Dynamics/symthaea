@@ -75,6 +75,14 @@ fn anchor_for_session_proposals(session_id: &str) -> ExternResult<AnyLinkableHas
     Ok(typed.path_entry_hash()?.into())
 }
 
+/// Anchor for bilateral agreements in a session (uniqueness constraint).
+fn anchor_for_session_agreements(session_id: &str) -> ExternResult<AnyLinkableHash> {
+    let path = Path::from(format!("agreements_for_session.{}", session_id));
+    let typed = path.typed(LinkTypes::SessionAgreements)?;
+    typed.ensure()?;
+    Ok(typed.path_entry_hash()?.into())
+}
+
 /// Anchor for all sessions an operator is involved in.
 fn anchor_for_operator_sessions(agent: &AgentPubKey) -> ExternResult<AnyLinkableHash> {
     let path = Path::from(format!("operator_sessions.{}", agent));
@@ -460,14 +468,51 @@ pub struct SubmitProposalInput {
 ///
 /// The agreement starts with only the primary signature. The other party
 /// must call `cosign_agreement()` to complete bilateral signing.
+///
+/// Guards:
+/// - Only one agreement per session (uniqueness via SessionAgreements anchor)
+/// - Execution deadline must be in the future
+/// - Caller must be a session participant
 #[hdk_extern]
 pub fn accept_proposal(input: AcceptProposalInput) -> ExternResult<ActionHash> {
     gate_space_operation(&requirement_for_negotiation(), "accept_proposal")?;
 
     let agent = agent_info()?.agent_initial_pubkey;
 
+    // --- Authorization: only session participants can accept proposals ---
+    verify_session_participant(&input.session_id, &agent)?;
+
+    // --- Deadline check: execution_deadline must be in the future ---
+    let now = SpaceTimestamp::now();
+    if now.micros >= input.execution_deadline.micros {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            "Execution deadline has already passed",
+        )
+        .with_context(format!(
+            "now: {}, deadline: {}",
+            now.micros, input.execution_deadline.micros
+        ))
+        .into_wasm_error());
+    }
+
+    // --- Uniqueness: only one agreement per session ---
+    let agr_anchor = anchor_for_session_agreements(&input.session_id)?;
+    let existing_links = get_links(
+        LinkQuery::try_new(agr_anchor.clone(), LinkTypes::SessionAgreements)?,
+        GetStrategy::Network,
+    )?;
+    if !existing_links.is_empty() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::AlreadySigned,
+            "An agreement already exists for this session",
+        )
+        .with_context(format!("session: {}", input.session_id))
+        .into_wasm_error());
+    }
+
     let agreement = NegotiationAgreement {
-        session_id: input.session_id,
+        session_id: input.session_id.clone(),
         accepted_proposal: input.proposal_hash,
         primary_signature: Some(agent),
         secondary_signature: None, // Other party needs to cosign
@@ -475,7 +520,17 @@ pub fn accept_proposal(input: AcceptProposalInput) -> ExternResult<ActionHash> {
         execution_deadline: input.execution_deadline,
     };
 
-    create_entry(&EntryTypes::NegotiationAgreement(agreement))
+    let action_hash = create_entry(&EntryTypes::NegotiationAgreement(agreement))?;
+
+    // Link agreement to session anchor for uniqueness tracking
+    create_link(
+        agr_anchor,
+        action_hash.clone(),
+        LinkTypes::SessionAgreements,
+        LinkTag::new(format!("agreement:{}", input.session_id)),
+    )?;
+
+    Ok(action_hash)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -518,6 +573,20 @@ pub fn cosign_agreement(input: CosignAgreementInput) -> ExternResult<ActionHash>
             )
             .into_wasm_error(),
         )?;
+
+    // --- Deadline check: execution_deadline must not have passed ---
+    let now = SpaceTimestamp::now();
+    if now.micros >= agreement.execution_deadline.micros {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            "Execution deadline has passed — agreement can no longer be cosigned",
+        )
+        .with_context(format!(
+            "now: {}, deadline: {}",
+            now.micros, agreement.execution_deadline.micros
+        ))
+        .into_wasm_error());
+    }
 
     // Check that secondary_signature is not already set
     if agreement.secondary_signature.is_some() {
@@ -1967,6 +2036,18 @@ pub fn tally_proposal(proposal_hash: ActionHash) -> ExternResult<ProposalTally> 
 
     // If finalized (Approved or Expired), update proposal status
     if final_status != MultiPartyProposalStatus::Voting {
+        // Validate state transition using the state machine
+        if !proposal.status.is_valid_transition(&final_status) {
+            return Err(SpaceError::new(
+                SpaceErrorCode::InvalidStateTransition,
+                format!(
+                    "Invalid proposal status transition: {:?} -> {:?}",
+                    proposal.status, final_status
+                ),
+            )
+            .into_wasm_error());
+        }
+
         let mut updated_proposal = proposal.clone();
         updated_proposal.status = final_status.clone();
         update_entry(proposal_hash.clone(), &updated_proposal)?;

@@ -531,4 +531,168 @@ mod tests {
         };
         assert!(matches!(error, MError::InsufficientMATL { .. }));
     }
+
+    // ─── MError Variant Coverage ────────────────────────────────────
+
+    #[test]
+    fn test_error_unauthorized() {
+        use types::MError;
+        let error = MError::Unauthorized("forbidden".into());
+        assert!(matches!(error, MError::Unauthorized(_)));
+    }
+
+    #[test]
+    fn test_error_invalid_input() {
+        use types::MError;
+        let error = MError::InvalidInput("bad field".into());
+        assert!(matches!(error, MError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn test_error_rate_limited() {
+        use types::MError;
+        let error = MError::RateLimited { retry_after: 60 };
+        match error {
+            MError::RateLimited { retry_after } => assert_eq!(retry_after, 60),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_error_internal() {
+        use types::MError;
+        let error = MError::Internal("panic".into());
+        assert!(matches!(error, MError::Internal(_)));
+    }
+
+    #[test]
+    fn test_error_all_variants_debug() {
+        use types::MError;
+        let errors: Vec<MError> = vec![
+            MError::NotFound("item".into()),
+            MError::Unauthorized("no auth".into()),
+            MError::InvalidInput("bad".into()),
+            MError::RateLimited { retry_after: 30 },
+            MError::InsufficientMATL { have: 0.3, need: 0.5 },
+            MError::Internal("oops".into()),
+        ];
+        for error in &errors {
+            let debug_str = format!("{:?}", error);
+            assert!(!debug_str.is_empty());
+        }
+    }
+
+    // ─── Bridge Constants ───────────────────────────────────────────
+
+    #[test]
+    fn test_bridge_weights_sum_to_one() {
+        let sum = bridge::LOCAL_REPUTATION_WEIGHT + bridge::CROSS_APP_REPUTATION_WEIGHT;
+        assert!((sum - 1.0).abs() < 1e-10, "weights should sum to 1.0");
+    }
+
+    #[test]
+    fn test_default_cross_app_reputation_neutral() {
+        assert_eq!(bridge::DEFAULT_CROSS_APP_REPUTATION, 0.5);
+    }
+
+    #[test]
+    fn test_bridge_zome_name() {
+        assert_eq!(bridge::BRIDGE_ZOME_NAME, "bridge");
+    }
+
+    // ─── BridgeResult Tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_bridge_result_is_success() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Success(42);
+        assert!(result.is_success());
+    }
+
+    #[test]
+    fn test_bridge_result_unavailable_not_success() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Unavailable;
+        assert!(!result.is_success());
+    }
+
+    #[test]
+    fn test_bridge_result_error_not_success() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Error("fail".into());
+        assert!(!result.is_success());
+    }
+
+    #[test]
+    fn test_bridge_result_unwrap_or_success() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Success(42);
+        assert_eq!(result.unwrap_or(0), 42);
+    }
+
+    #[test]
+    fn test_bridge_result_unwrap_or_unavailable() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Unavailable;
+        assert_eq!(result.unwrap_or(99), 99);
+    }
+
+    #[test]
+    fn test_bridge_result_unwrap_or_error() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Error("fail".into());
+        assert_eq!(result.unwrap_or(-1), -1);
+    }
+
+    #[test]
+    fn test_bridge_result_unwrap_or_else_success() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Success(42);
+        assert_eq!(result.unwrap_or_else(|| 0), 42);
+    }
+
+    #[test]
+    fn test_bridge_result_unwrap_or_else_unavailable() {
+        let result: bridge::BridgeResult<i32> = bridge::BridgeResult::Unavailable;
+        assert_eq!(result.unwrap_or_else(|| 99), 99);
+    }
+
+    // ─── CrossAppReputation Construction ────────────────────────────
+
+    #[test]
+    fn test_cross_app_reputation_construction() {
+        let rep = bridge::CrossAppReputation {
+            did: "did:holo:abc123".into(),
+            score: 0.85,
+            app_count: 5,
+            total_transactions: 150,
+            updated_at: 1700000000,
+        };
+        assert_eq!(rep.did, "did:holo:abc123");
+        assert_eq!(rep.score, 0.85);
+        assert_eq!(rep.app_count, 5);
+        assert_eq!(rep.total_transactions, 150);
+    }
+
+    // ─── ReportReputationInput Construction ─────────────────────────
+
+    #[test]
+    fn test_report_reputation_input_construction() {
+        let input = bridge::ReportReputationInput {
+            did: "did:holo:seller".into(),
+            positive: true,
+            value_cents: 5000,
+            app_id: "marketplace".into(),
+            context: Some("Successful purchase".into()),
+        };
+        assert!(input.positive);
+        assert_eq!(input.value_cents, 5000);
+        assert_eq!(input.app_id, "marketplace");
+    }
+
+    #[test]
+    fn test_report_reputation_input_negative() {
+        let input = bridge::ReportReputationInput {
+            did: "did:holo:scammer".into(),
+            positive: false,
+            value_cents: 9999,
+            app_id: "marketplace".into(),
+            context: None,
+        };
+        assert!(!input.positive);
+        assert!(input.context.is_none());
+    }
 }

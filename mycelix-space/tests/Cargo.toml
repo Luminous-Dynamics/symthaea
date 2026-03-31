@@ -71,6 +71,18 @@ path = "proptest_orbital.rs"
 name = "space_coordination_e2e"
 path = "space_coordination_e2e.rs"
 
+[[test]]
+name = "orbital_objects"
+path = "orbital_objects_tests.rs"
+
+[[test]]
+name = "observations"
+path = "observations_tests.rs"
+
+[[test]]
+name = "debris_bounties"
+path = "debris_bounties_tests.rs"
+
 # Sweettest Integration Tests (conductor-based)
 [[test]]
 name = "sweettest_integration"

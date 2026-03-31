@@ -75,12 +75,14 @@ pub fn flashlight_system(
 }
 
 /// Fusion core extraction: hold E near the core. Mouse steadiness matters.
+/// Collected fragments reduce extraction time (up to 50% faster with all 48).
 pub fn extraction_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     player_query: Query<&Transform, With<Player>>,
     mut core_query: Query<(&Transform, &mut FusionCore, &mut Sprite), Without<Player>>,
     biometrics: Res<BiometricsCtx>,
     mut noise_query: Query<&mut NoiseEmitter, With<Player>>,
+    collected: Res<super::scavenge::CollectedPrimitives>,
     time: Res<Time>,
 ) {
     let Ok(player_tf) = player_query.single() else {
@@ -101,7 +103,9 @@ pub fn extraction_system(
             let surprise = biometrics.encoder.velocity_surprise();
             let steadiness = (1.0 - surprise).max(0.1);
             let stress_penalty = 1.0 - biometrics.model.allostatic_load * 0.5;
-            let rate = 0.12 * steadiness * stress_penalty; // ~8s calm, ~25s panicked
+            // Fragments boost: up to 50% faster with all 48 collected
+            let fragment_bonus = 1.0 + (collected.total() as f32 / 48.0) * 0.5;
+            let rate = 0.12 * steadiness * stress_penalty * fragment_bonus;
 
             core.extraction_progress += rate * time.delta_secs();
 

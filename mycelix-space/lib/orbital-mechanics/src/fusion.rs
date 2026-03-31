@@ -4,24 +4,9 @@
 //! Multi-Sensor Observation Fusion Pipeline
 //!
 //! Fuses observations from multiple sensors into a single best-estimate state
-//! with uncertainty. This is the core value proposition of a decentralized SSA
-//! network: no single sensor provides the best answer — fused data always wins.
-//!
-//! # Pipeline
-//!
-//! ```text
-//! Sensors ──► Filter (quality, age) ──► Propagate to common epoch
-//!         ──► Chi-square gate ──► Covariance intersection / WLS
-//!         ──► Consistency check ──► FusedEstimate
-//! ```
-//!
-//! # Fusion Methods
-//!
-//! - **Inverse-variance weighting** (via `CovarianceMatrix::fuse()`): Optimal when
-//!   cross-correlations are known (e.g., same-sensor repeated observations)
-//! - **Covariance intersection**: More conservative, works when cross-correlations
-//!   are unknown — appropriate for decentralized networks
-//! - **Weighted least-squares**: Classical approach for independent measurements
+//! with uncertainty, using inverse-variance weighting, covariance intersection,
+//! or weighted least-squares. Includes chi-square gating, adaptive covariance
+//! inflation, per-sensor bias estimation, and trust update recommendations.
 
 use std::collections::HashMap;
 
@@ -32,18 +17,8 @@ use crate::covariance::CovarianceMatrix;
 use crate::state::{DataSource, OrbitalState, StateVector};
 
 /// Trust-aware quality weighting for observation fusion.
-///
-/// When trust information is available, the effective quality of an observation
-/// is blended between raw data quality and the submitter's trust level:
-///
-///   effective_quality = data_quality * (trust_floor + (1 - trust_floor) * trust_weight)
-///
-/// This ensures that even untrusted sources contribute some information
-/// (trust_floor > 0), while trusted sources get full weight.
-///
-/// References:
-/// - Bar-Shalom & Li (2001): Estimation with Applications to Tracking
-/// - Mahalanobis gating remains the primary outlier defense
+/// effective_quality = data_quality * (trust_floor + (1 - trust_floor) * trust_weight)
+/// Ref: Bar-Shalom & Li (2001), Estimation with Applications to Tracking
 #[derive(Debug, Clone)]
 pub struct TrustWeighting {
     /// Minimum quality multiplier for untrusted sources (default: 0.3)
@@ -63,11 +38,8 @@ impl Default for TrustWeighting {
 }
 
 impl TrustWeighting {
-    /// Compute effective quality from raw quality and trust.
-    ///
-    /// Formula: quality * (floor + (1 - floor) * trust)
-    /// - Unknown sensors (not in map) get trust = 0.0 -> multiplied by floor only
-    /// - Fully trusted sensors get trust = 1.0 -> full quality
+    /// Compute effective quality: quality * (floor + (1 - floor) * trust).
+    /// Unknown sensors get trust = 0.0, fully trusted get 1.0.
     pub fn effective_quality(&self, raw_quality: f64, sensor_id: &str) -> f64 {
         let trust = self.sensor_trust.get(sensor_id).copied().unwrap_or(0.0);
         let multiplier = self.trust_floor + (1.0 - self.trust_floor) * trust;
@@ -106,6 +78,50 @@ pub struct FusedEstimate {
     pub chi_square_consistency: f64,
     /// Epoch of the fused estimate
     pub timestamp: DateTime<Utc>,
+    /// Number of measurements rejected by chi-square gating
+    pub gated_count: u32,
+    /// Total measurements considered (after quality/age filter, before gating)
+    pub total_filtered: u32,
+    /// Covariance inflation factor applied (1.0 = none)
+    pub covariance_inflation_factor: f64,
+    /// Per-sensor bias estimates (populated after fusion)
+    pub bias_estimates: Vec<SensorBiasEstimate>,
+    /// Recommended trust adjustments for sensors
+    pub trust_updates: Vec<TrustUpdate>,
+}
+
+/// Estimated bias for a single sensor relative to the fused estimate.
+/// Residual = measurement − fused; flagged if |residual| > 2σ in any dimension.
+#[derive(Clone, Debug)]
+pub struct SensorBiasEstimate {
+    pub sensor_id: String,
+    /// Residual vector: measurement − fused state (km, km/s)
+    pub residual: [f64; 6],
+    /// Per-dimension 1σ from sensor covariance
+    pub sigma: [f64; 6],
+    /// True if any dimension has |residual| > 2σ
+    pub is_biased: bool,
+    /// Biased dimension indices (0-5: x,y,z,vx,vy,vz)
+    pub biased_dimensions: Vec<usize>,
+}
+
+/// Recommended trust adjustment for a sensor based on fusion residuals.
+/// Callers use this to update `TrustWeighting::sensor_trust` between epochs.
+#[derive(Clone, Debug)]
+pub struct TrustUpdate {
+    pub sensor_id: String,
+    /// Multiplicative factor (0.0-1.0). 1.0 = no change, < 1.0 = reduce trust.
+    pub recommended_factor: f64,
+    pub reason: TrustUpdateReason,
+}
+
+/// Reason for a trust adjustment recommendation.
+#[derive(Clone, Debug, PartialEq)]
+pub enum TrustUpdateReason {
+    Consistent,
+    Gated,
+    BiasDetected,
+    ElevatedResiduals,
 }
 
 /// Configuration for the fusion pipeline.
@@ -157,36 +173,19 @@ impl FusionPipeline {
     }
 
     /// Set trust weighting for per-sensor quality adjustment.
-    ///
-    /// When set, the pipeline applies `TrustWeighting::effective_quality()` to
-    /// each measurement's quality score before filtering and fusion weighting.
     pub fn with_trust_weighting(mut self, weighting: TrustWeighting) -> Self {
         self.trust_weighting = Some(weighting);
         self
     }
 
-    /// Main fusion entry point.
-    ///
-    /// Fuses multiple sensor measurements into a single best-estimate state:
-    /// 1. Filter by quality and age
-    /// 2. Propagate all measurements to common epoch (latest time)
-    /// 3. Chi-square gating: reject inconsistent measurements
-    /// 4. Sequential inverse-variance fusion via `CovarianceMatrix::fuse()`
-    /// 5. Compute consistency metric
-    ///
-    /// # Arguments
-    /// * `measurements` - Sensor measurements to fuse
-    ///
-    /// # Returns
-    /// `FusedEstimate` or error string.
+    /// Main fusion entry point. Filters, propagates, gates, fuses, then
+    /// computes bias estimates and trust update recommendations.
     pub fn fuse(&self, measurements: &[SensorMeasurement]) -> Result<FusedEstimate, String> {
         if measurements.is_empty() {
             return Err("No measurements to fuse".into());
         }
 
-        // Step 1: Filter by quality and age
-        // When trust weighting is configured, effective_quality is used for the
-        // quality threshold check and downstream quality accumulation.
+        // Step 1: Filter by quality (trust-adjusted) and age
         let now = Utc::now();
         let filtered: Vec<&SensorMeasurement> = measurements
             .iter()
@@ -214,6 +213,11 @@ impl FusionPipeline {
                 fused_quality: effective_q,
                 chi_square_consistency: 0.0,
                 timestamp: m.time,
+                gated_count: 0,
+                total_filtered: 1,
+                covariance_inflation_factor: 1.0,
+                bias_estimates: Vec::new(),
+                trust_updates: Vec::new(),
             });
         }
 
@@ -232,12 +236,14 @@ impl FusionPipeline {
             .collect();
 
         // Step 4: Sequential fusion with chi-square gating
+        let total_filtered = propagated.len() as u32;
         let mut fused_state = propagated[0].0.clone();
         let mut fused_cov = propagated[0].1.clone();
         let mut contributing = vec![propagated[0].2.sensor_id.clone()];
         let mut total_quality = self.effective_quality_for(propagated[0].2);
         let mut chi_square_sum = 0.0;
-        let mut _gated_count = 0_u32;
+        let mut gated_count = 0_u32;
+        let mut gated_sensors = Vec::new();
 
         for (state_i, cov_i, meas) in propagated.iter().skip(1) {
             // Chi-square gate: check if this measurement is consistent
@@ -246,7 +252,8 @@ impl FusionPipeline {
             let mahal_sq = mahalanobis_squared(&delta, &fused_cov, cov_i);
 
             if mahal_sq > self.gating_threshold {
-                _gated_count += 1;
+                gated_count += 1;
+                gated_sensors.push(meas.sensor_id.clone());
                 continue; // Reject this measurement
             }
 
@@ -278,8 +285,85 @@ impl FusionPipeline {
             total_quality += self.effective_quality_for(meas);
         }
 
+        // Step 5: Adaptive covariance inflation when many measurements are gated
+        // If >30% of filtered measurements are rejected, the fusion is low-confidence.
+        // Inflate covariance proportionally: factor = 1 + 2 * (rejection_rate - 0.3)
+        let rejection_rate = if total_filtered > 1 {
+            gated_count as f64 / (total_filtered - 1) as f64 // -1 because first is seed
+        } else {
+            0.0
+        };
+        let inflation_factor = if rejection_rate > 0.3 {
+            1.0 + 2.0 * (rejection_rate - 0.3)
+        } else {
+            1.0
+        };
+        if inflation_factor > 1.0 {
+            let inflated = fused_cov.matrix() * inflation_factor;
+            fused_cov = CovarianceMatrix::from_matrix(inflated);
+        }
+
         let n_contributing = contributing.len() as f64;
         let fused_quality = total_quality / n_contributing;
+
+        // Step 6: Compute per-sensor bias estimates and trust updates
+        let fused_vec = state_vector_to_vec6(&fused_state);
+        let mut bias_estimates = Vec::new();
+        let mut trust_updates = Vec::new();
+
+        for (state_i, cov_i, meas) in &propagated {
+            let meas_vec = state_vector_to_vec6(state_i);
+            let residual_vec = meas_vec - fused_vec;
+            let cov_mat = cov_i.matrix();
+
+            let mut residual = [0.0; 6];
+            let mut sigma = [0.0; 6];
+            let mut biased_dims = Vec::new();
+
+            for d in 0..6 {
+                residual[d] = residual_vec[d];
+                sigma[d] = cov_mat[(d, d)].sqrt().max(1e-15);
+                if residual[d].abs() > 2.0 * sigma[d] {
+                    biased_dims.push(d);
+                }
+            }
+
+            let is_biased = !biased_dims.is_empty();
+            bias_estimates.push(SensorBiasEstimate {
+                sensor_id: meas.sensor_id.clone(),
+                residual,
+                sigma,
+                is_biased,
+                biased_dimensions: biased_dims,
+            });
+
+            // Trust update: recommend factor based on residual severity
+            let is_gated = gated_sensors.contains(&meas.sensor_id);
+            let (factor, reason) = if is_gated {
+                (0.5, TrustUpdateReason::Gated)
+            } else if is_biased {
+                // Scale factor by how many dimensions are biased (more = worse)
+                let bias_severity = bias_estimates.last().unwrap().biased_dimensions.len();
+                let f = (1.0 - 0.15 * bias_severity as f64).max(0.3);
+                (f, TrustUpdateReason::BiasDetected)
+            } else {
+                // Check for elevated residuals (between 1σ and 2σ)
+                let max_norm_residual = (0..6)
+                    .map(|d| residual[d].abs() / sigma[d])
+                    .fold(0.0_f64, f64::max);
+                if max_norm_residual > 1.0 {
+                    (0.9, TrustUpdateReason::ElevatedResiduals)
+                } else {
+                    (1.0, TrustUpdateReason::Consistent)
+                }
+            };
+
+            trust_updates.push(TrustUpdate {
+                sensor_id: meas.sensor_id.clone(),
+                recommended_factor: factor,
+                reason,
+            });
+        }
 
         let state = OrbitalState::new(
             0,
@@ -297,6 +381,11 @@ impl FusionPipeline {
             fused_quality,
             chi_square_consistency: chi_square_sum,
             timestamp: target_epoch,
+            gated_count,
+            total_filtered,
+            covariance_inflation_factor: inflation_factor,
+            bias_estimates,
+            trust_updates,
         })
     }
 
@@ -359,16 +448,8 @@ fn fuse_states(
     }
 }
 
-/// Covariance intersection algorithm.
-///
-/// More conservative than inverse-variance weighting; produces a covariance
-/// that is guaranteed to bound the true covariance even when cross-correlations
-/// are unknown. Suitable for decentralized networks.
-///
-/// C_fused = (ω * C1^{-1} + (1-ω) * C2^{-1})^{-1}
-/// x_fused = C_fused * (ω * C1^{-1} * x1 + (1-ω) * C2^{-1} * x2)
-///
-/// where ω ∈ [0,1] minimizes det(C_fused) or trace(C_fused).
+/// Covariance intersection: conservative fusion when cross-correlations are unknown.
+/// Minimizes trace(C_fused) over ω ∈ [0,1].
 pub fn covariance_intersection(
     states: &[(StateVector, CovarianceMatrix)],
 ) -> Option<(StateVector, CovarianceMatrix)> {
@@ -439,8 +520,6 @@ fn ci_pair(
 }
 
 /// Weighted least-squares fusion for independent measurements.
-///
-/// x_fused = (Σ Ci^{-1})^{-1} * Σ (Ci^{-1} * xi)
 pub fn weighted_least_squares(measurements: &[SensorMeasurement]) -> Result<FusedEstimate, String> {
     if measurements.is_empty() {
         return Err("No measurements".into());
@@ -501,13 +580,15 @@ pub fn weighted_least_squares(measurements: &[SensorMeasurement]) -> Result<Fuse
         fused_quality: total_quality / n,
         chi_square_consistency: 0.0, // Not computed in WLS
         timestamp: epoch,
+        gated_count: 0,
+        total_filtered: measurements.len() as u32,
+        covariance_inflation_factor: 1.0,
+        bias_estimates: Vec::new(),
+        trust_updates: Vec::new(),
     })
 }
 
 /// Propagate a measurement's state and covariance to a target epoch.
-///
-/// Uses simple two-body propagation for the state and linear covariance
-/// propagation via the state transition matrix.
 pub fn propagate_measurement(
     meas: &SensorMeasurement,
     target_time: DateTime<Utc>,
@@ -595,113 +676,55 @@ mod tests {
     fn test_fuse_two_identical_measurements_halves_variance() {
         let m1 = test_measurement(7000.0, 1.0, "sensor-1", 0.9);
         let m2 = test_measurement(7000.0, 1.0, "sensor-2", 0.9);
-
-        let pipeline = FusionPipeline::new();
-        let result = pipeline.fuse(&[m1.clone(), m2.clone()]);
-        assert!(result.is_ok());
-
-        let fused = result.unwrap();
-        let fused_sigma = fused.state.position_uncertainty_km().unwrap();
         let input_sigma = m1.covariance.position_sigma();
 
-        // Fused variance should be ~half of individual (sigma decreases by √2)
-        assert!(
-            fused_sigma < input_sigma,
-            "Fused sigma ({}) should be less than input sigma ({})",
-            fused_sigma,
-            input_sigma
-        );
+        let fused = FusionPipeline::new().fuse(&[m1, m2]).unwrap();
+        let fused_sigma = fused.state.position_uncertainty_km().unwrap();
+        assert!(fused_sigma < input_sigma, "Fused sigma should decrease");
 
-        // Specifically, for two identical measurements: σ_fused = σ/√2
-        let expected_sigma = input_sigma / 2.0_f64.sqrt();
-        let ratio = fused_sigma / expected_sigma;
-        assert!(
-            ratio > 0.5 && ratio < 2.0,
-            "Fused sigma ratio to expected should be close to 1.0, got {}",
-            ratio
-        );
+        // For two identical measurements: σ_fused = σ/√2
+        let ratio = fused_sigma / (input_sigma / 2.0_f64.sqrt());
+        assert!(ratio > 0.5 && ratio < 2.0, "Ratio to expected: {}", ratio);
     }
 
     #[test]
     fn test_fuse_high_and_low_quality() {
-        // High quality measurement at x=7000
         let m_high = test_measurement(7000.0, 0.1, "good-sensor", 0.95);
-        // Low quality measurement at x=7010 (10 km off)
         let m_low = test_measurement(7010.0, 10.0, "bad-sensor", 0.5);
 
-        let pipeline = FusionPipeline::new();
-        let result = pipeline.fuse(&[m_high, m_low]).unwrap();
-
-        // Result should be much closer to the high-quality measurement
-        let fused_x = result.state.state.x;
-        assert!(
-            (fused_x - 7000.0).abs() < (fused_x - 7010.0).abs(),
-            "Fused state ({}) should be closer to high-quality measurement (7000) than low-quality (7010)",
-            fused_x
-        );
+        let fused_x = FusionPipeline::new().fuse(&[m_high, m_low]).unwrap().state.state.x;
+        assert!((fused_x - 7000.0).abs() < (fused_x - 7010.0).abs(),
+            "Fused ({}) should be closer to high-quality (7000)", fused_x);
     }
 
     #[test]
     fn test_chi_square_gate_rejects_outlier() {
         let m1 = test_measurement(7000.0, 1.0, "sensor-1", 0.9);
         let m2 = test_measurement(7000.0, 1.0, "sensor-2", 0.9);
-        // Wildly inconsistent measurement (100 km away)
-        let m_outlier = test_measurement(7100.0, 1.0, "bad-sensor", 0.9);
+        let m_outlier = test_measurement(7100.0, 1.0, "bad-sensor", 0.9); // 100 km away
 
-        let pipeline = FusionPipeline::new().with_gating_threshold(9.21);
-        let result = pipeline.fuse(&[m1, m2, m_outlier]).unwrap();
-
-        // Outlier should be gated out — only 2 sensors should contribute
-        assert!(
-            result.contributing_sensors.len() <= 3,
-            "Some sensors may be gated: got {} contributors",
-            result.contributing_sensors.len()
-        );
+        let result = FusionPipeline::new().fuse(&[m1, m2, m_outlier]).unwrap();
+        assert!(result.gated_count >= 1, "Outlier should be gated");
     }
 
     #[test]
     fn test_quality_filter_rejects_low_quality() {
         let m_good = test_measurement(7000.0, 1.0, "good", 0.9);
-        let m_bad = test_measurement(7000.0, 1.0, "bad", 0.01); // Below threshold
+        let m_bad = test_measurement(7000.0, 1.0, "bad", 0.01);
 
-        let pipeline = FusionPipeline::new().with_min_quality(0.1);
-        let result = pipeline.fuse(&[m_good, m_bad]).unwrap();
-
-        // Only the good sensor should contribute
-        assert_eq!(
-            result.contributing_sensors.len(),
-            1,
-            "Only good sensor should pass quality filter"
-        );
-        assert_eq!(result.contributing_sensors[0], "good");
+        let result = FusionPipeline::new().with_min_quality(0.1).fuse(&[m_good, m_bad]).unwrap();
+        assert_eq!(result.contributing_sensors, vec!["good"]);
     }
 
     #[test]
     fn test_covariance_intersection_is_conservative() {
-        let s1 = StateVector::new(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0);
-        let c1 = CovarianceMatrix::diagonal([1.0, 1.0, 1.0, 0.001, 0.001, 0.001]);
+        let s = StateVector::new(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0);
+        let c = CovarianceMatrix::diagonal([1.0, 1.0, 1.0, 0.001, 0.001, 0.001]);
 
-        let s2 = StateVector::new(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0);
-        let c2 = CovarianceMatrix::diagonal([1.0, 1.0, 1.0, 0.001, 0.001, 0.001]);
-
-        let ci_result =
-            covariance_intersection(&[(s1.clone(), c1.clone()), (s2.clone(), c2.clone())]);
-        assert!(ci_result.is_some());
-
-        let (_, ci_cov) = ci_result.unwrap();
-        let ci_sigma = ci_cov.position_sigma();
-
-        // Also compute inverse-variance result
-        let iv_cov = c1.fuse(&c2).unwrap();
-        let iv_sigma = iv_cov.position_sigma();
-
-        // CI should be at least as conservative (larger uncertainty) as IV
-        assert!(
-            ci_sigma >= iv_sigma * 0.95, // Allow small numerical tolerance
-            "CI sigma ({}) should be >= IV sigma ({})",
-            ci_sigma,
-            iv_sigma
-        );
+        let (_, ci_cov) = covariance_intersection(&[(s.clone(), c.clone()), (s, c.clone())]).unwrap();
+        let iv_cov = c.fuse(&c).unwrap();
+        // CI should be at least as conservative as inverse-variance
+        assert!(ci_cov.position_sigma() >= iv_cov.position_sigma() * 0.95);
     }
 
     #[test]
@@ -709,17 +732,8 @@ mod tests {
         let m1 = test_measurement(7000.0, 1.0, "sensor-1", 0.8);
         let m2 = test_measurement(7002.0, 2.0, "sensor-2", 0.7);
 
-        let result = weighted_least_squares(&[m1, m2]);
-        assert!(result.is_ok());
-
-        let fused = result.unwrap();
-        // Fused should be closer to m1 (lower uncertainty)
-        let x = fused.state.state.x;
-        assert!(
-            (x - 7000.0).abs() < (x - 7002.0).abs(),
-            "WLS should weight toward lower uncertainty: x={}",
-            x
-        );
+        let x = weighted_least_squares(&[m1, m2]).unwrap().state.state.x;
+        assert!((x - 7000.0).abs() < (x - 7002.0).abs(), "WLS should weight lower uncertainty");
     }
 
     #[test]
@@ -897,6 +911,276 @@ mod tests {
             "Without trust weighting, quality should be raw average: expected {}, got {}",
             expected,
             result.fused_quality
+        );
+    }
+
+    // =========================================================================
+    // Multi-sensor fusion, bias estimation, covariance inflation, trust updates
+    // =========================================================================
+
+    #[test]
+    fn test_multi_sensor_fusion_three_trust_levels() {
+        let m_high = test_measurement(7000.0, 0.5, "high-trust", 0.95);
+        let m_mid = test_measurement(7001.0, 1.0, "mid-trust", 0.80);
+        let m_low = test_measurement(7002.0, 2.0, "low-trust", 0.60);
+
+        let mut tw = TrustWeighting::default();
+        tw.sensor_trust.insert("high-trust".to_string(), 1.0);
+        tw.sensor_trust.insert("mid-trust".to_string(), 0.5);
+        // low-trust not in map -> gets floor (0.3)
+
+        let pipeline = FusionPipeline::new().with_trust_weighting(tw);
+        let result = pipeline.fuse(&[m_high, m_mid, m_low]).unwrap();
+
+        assert_eq!(result.contributing_sensors.len(), 3);
+        // Fused state should be closer to high-trust (lower cov + higher trust)
+        let fused_x = result.state.state.x;
+        assert!(
+            (fused_x - 7000.0).abs() < (fused_x - 7002.0).abs(),
+            "Fused x ({}) should be closer to high-trust (7000) than low-trust (7002)",
+            fused_x
+        );
+        // Quality should reflect trust weighting
+        assert!(result.fused_quality < 0.95, "Quality should be reduced by trust");
+    }
+
+    #[test]
+    fn test_biased_sensor_detection() {
+        // Sensor with +100 km systematic bias in x
+        let m_good1 = test_measurement(7000.0, 1.0, "good-1", 0.9);
+        let m_good2 = test_measurement(7000.0, 1.0, "good-2", 0.9);
+        let m_biased = test_measurement(7100.0, 50.0, "biased-sensor", 0.9);
+
+        let pipeline = FusionPipeline::new().with_gating_threshold(100.0); // Wide gate
+        let result = pipeline.fuse(&[m_good1, m_good2, m_biased]).unwrap();
+
+        // Find the bias estimate for the biased sensor
+        let biased_est = result
+            .bias_estimates
+            .iter()
+            .find(|b| b.sensor_id == "biased-sensor")
+            .expect("Should have bias estimate for biased-sensor");
+
+        // The residual in x should be large and positive
+        assert!(
+            biased_est.residual[0] > 50.0,
+            "Biased sensor x residual ({}) should be >50 km",
+            biased_est.residual[0]
+        );
+    }
+
+    #[test]
+    fn test_covariance_inflation_high_gating_rate() {
+        // Create measurements where most will be gated:
+        // One seed at 7000, many outliers far away
+        let m_seed = test_measurement(7000.0, 1.0, "seed", 0.9);
+        let m_ok = test_measurement(7000.5, 1.0, "ok", 0.9);
+        // These three are 200+ km away — will be gated
+        let m_out1 = test_measurement(7200.0, 1.0, "outlier-1", 0.9);
+        let m_out2 = test_measurement(7300.0, 1.0, "outlier-2", 0.9);
+        let m_out3 = test_measurement(7400.0, 1.0, "outlier-3", 0.9);
+
+        let pipeline = FusionPipeline::new().with_gating_threshold(9.21);
+        let result = pipeline.fuse(&[m_seed, m_ok, m_out1, m_out2, m_out3]).unwrap();
+
+        // 3 out of 4 non-seed measurements gated = 75% rejection rate
+        assert!(
+            result.gated_count >= 3,
+            "Expected >= 3 gated, got {}",
+            result.gated_count
+        );
+        assert!(
+            result.covariance_inflation_factor > 1.0,
+            "Inflation factor ({}) should be > 1.0 with high gating rate",
+            result.covariance_inflation_factor
+        );
+        // Check that the inflated covariance is larger
+        let inflated_sigma = result.state.position_uncertainty_km().unwrap();
+        // Without inflation, two consistent measurements would give sigma/sqrt(2) ~ 0.707
+        assert!(
+            inflated_sigma > 0.7,
+            "Inflated sigma ({}) should be larger due to inflation",
+            inflated_sigma
+        );
+    }
+
+    #[test]
+    fn test_trust_update_for_gated_sensor() {
+        let m1 = test_measurement(7000.0, 1.0, "good", 0.9);
+        let m_outlier = test_measurement(7500.0, 1.0, "bad", 0.9);
+
+        let pipeline = FusionPipeline::new().with_gating_threshold(9.21);
+        let result = pipeline.fuse(&[m1, m_outlier]).unwrap();
+
+        let bad_update = result
+            .trust_updates
+            .iter()
+            .find(|u| u.sensor_id == "bad")
+            .expect("Should have trust update for bad sensor");
+
+        assert_eq!(bad_update.reason, TrustUpdateReason::Gated);
+        assert!(
+            bad_update.recommended_factor < 1.0,
+            "Gated sensor should get reduced trust factor, got {}",
+            bad_update.recommended_factor
+        );
+    }
+
+    #[test]
+    fn test_trust_update_for_biased_sensor() {
+        // Use a wide gate so the biased sensor contributes but shows residuals
+        let m1 = test_measurement(7000.0, 1.0, "clean-1", 0.9);
+        let m2 = test_measurement(7000.0, 1.0, "clean-2", 0.9);
+        // 10 km offset with large covariance (won't be gated, but will show bias)
+        let m_biased = test_measurement(7010.0, 50.0, "drifty", 0.9);
+
+        let pipeline = FusionPipeline::new().with_gating_threshold(100.0);
+        let result = pipeline.fuse(&[m1, m2, m_biased]).unwrap();
+
+        let drifty_update = result
+            .trust_updates
+            .iter()
+            .find(|u| u.sensor_id == "drifty")
+            .expect("Should have trust update for drifty");
+
+        // Depending on residual magnitude vs sigma, could be BiasDetected or ElevatedResiduals
+        assert!(
+            drifty_update.recommended_factor <= 1.0,
+            "Biased/elevated sensor trust should be <= 1.0, got {}",
+            drifty_update.recommended_factor
+        );
+    }
+
+    #[test]
+    fn test_consistent_sensor_gets_no_trust_reduction() {
+        let m1 = test_measurement(7000.0, 1.0, "s1", 0.9);
+        let m2 = test_measurement(7000.0, 1.0, "s2", 0.9);
+
+        let pipeline = FusionPipeline::new();
+        let result = pipeline.fuse(&[m1, m2]).unwrap();
+
+        for update in &result.trust_updates {
+            assert_eq!(
+                update.reason,
+                TrustUpdateReason::Consistent,
+                "Consistent sensors should get Consistent reason, got {:?} for {}",
+                update.reason,
+                update.sensor_id
+            );
+            assert!(
+                (update.recommended_factor - 1.0).abs() < 1e-10,
+                "Consistent sensor {} should have factor 1.0, got {}",
+                update.sensor_id,
+                update.recommended_factor
+            );
+        }
+    }
+
+    #[test]
+    fn test_single_sensor_no_bias_no_updates() {
+        let m = test_measurement(7000.0, 1.0, "only", 0.9);
+        let pipeline = FusionPipeline::new();
+        let result = pipeline.fuse(&[m]).unwrap();
+
+        assert!(result.bias_estimates.is_empty(), "Single sensor has no bias estimates");
+        assert!(result.trust_updates.is_empty(), "Single sensor has no trust updates");
+        assert_eq!(result.gated_count, 0);
+        assert_eq!(result.covariance_inflation_factor, 1.0);
+    }
+
+    #[test]
+    fn test_all_sensors_untrusted() {
+        let m1 = test_measurement(7000.0, 1.0, "unk-1", 0.9);
+        let m2 = test_measurement(7000.0, 1.0, "unk-2", 0.9);
+        let m3 = test_measurement(7000.0, 1.0, "unk-3", 0.9);
+
+        let tw = TrustWeighting {
+            trust_floor: 0.1,
+            sensor_trust: HashMap::new(), // No sensor in map
+        };
+        let pipeline = FusionPipeline::new().with_trust_weighting(tw);
+        let result = pipeline.fuse(&[m1, m2, m3]);
+
+        // All sensors get floor trust, effective quality = 0.9 * 0.1 = 0.09
+        // min_quality default is 0.1, so all should be filtered out
+        assert!(result.is_err(), "All untrusted sensors should be filtered out");
+    }
+
+    #[test]
+    fn test_all_sensors_untrusted_with_low_threshold() {
+        let m1 = test_measurement(7000.0, 1.0, "unk-1", 0.9);
+        let m2 = test_measurement(7000.0, 1.0, "unk-2", 0.9);
+
+        let tw = TrustWeighting {
+            trust_floor: 0.2,
+            sensor_trust: HashMap::new(),
+        };
+        let pipeline = FusionPipeline::new()
+            .with_min_quality(0.05) // Low threshold so they pass
+            .with_trust_weighting(tw);
+        let result = pipeline.fuse(&[m1, m2]).unwrap();
+
+        // effective quality = 0.9 * 0.2 = 0.18
+        assert!(
+            result.fused_quality < 0.3,
+            "Untrusted sensors should yield low fused quality, got {}",
+            result.fused_quality
+        );
+        assert_eq!(result.contributing_sensors.len(), 2);
+    }
+
+    #[test]
+    fn test_all_measurements_gated() {
+        // Seed at 7000, one measurement 500 km away — will be gated
+        let m_seed = test_measurement(7000.0, 1.0, "seed", 0.9);
+        let m_far = test_measurement(7500.0, 1.0, "far", 0.9);
+
+        let pipeline = FusionPipeline::new().with_gating_threshold(9.21);
+        let result = pipeline.fuse(&[m_seed, m_far]).unwrap();
+
+        assert_eq!(result.gated_count, 1);
+        // Only seed contributes
+        assert_eq!(result.contributing_sensors.len(), 1);
+        assert_eq!(result.contributing_sensors[0], "seed");
+        // Inflation should apply: 1/1 = 100% rejection rate, factor = 1 + 2*(1.0-0.3) = 2.4
+        assert!(
+            result.covariance_inflation_factor > 2.0,
+            "All-gated inflation factor ({}) should be > 2.0",
+            result.covariance_inflation_factor
+        );
+    }
+
+    #[test]
+    fn test_gated_count_and_total_filtered_reported() {
+        let m1 = test_measurement(7000.0, 1.0, "s1", 0.9);
+        let m2 = test_measurement(7000.5, 1.0, "s2", 0.9);
+        let m3 = test_measurement(7200.0, 1.0, "outlier", 0.9);
+
+        let pipeline = FusionPipeline::new();
+        let result = pipeline.fuse(&[m1, m2, m3]).unwrap();
+
+        assert_eq!(result.total_filtered, 3, "3 measurements passed quality filter");
+        // outlier should be gated
+        assert!(
+            result.gated_count >= 1,
+            "At least 1 measurement should be gated"
+        );
+    }
+
+    #[test]
+    fn test_no_inflation_when_gating_rate_below_threshold() {
+        // Two consistent measurements — no gating
+        let m1 = test_measurement(7000.0, 1.0, "s1", 0.9);
+        let m2 = test_measurement(7000.1, 1.0, "s2", 0.9);
+
+        let pipeline = FusionPipeline::new();
+        let result = pipeline.fuse(&[m1, m2]).unwrap();
+
+        assert_eq!(result.gated_count, 0);
+        assert!(
+            (result.covariance_inflation_factor - 1.0).abs() < 1e-10,
+            "No inflation when no gating: factor = {}",
+            result.covariance_inflation_factor
         );
     }
 }

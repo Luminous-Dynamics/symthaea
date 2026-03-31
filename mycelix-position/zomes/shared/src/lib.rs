@@ -302,4 +302,156 @@ mod tests {
         assert!(json.contains("InvalidInput"));
         assert!(json.contains("bad data"));
     }
+
+    // ─── Additional PositionQuality Tests ───────────────────────────
+
+    #[test]
+    fn quality_zero_is_not_acceptable() {
+        let q = PositionQuality::new(0);
+        assert!(!q.is_high());
+        assert!(!q.is_acceptable());
+        assert!((q.as_f64()).abs() < 0.01);
+    }
+
+    #[test]
+    fn quality_50_is_acceptable_not_high() {
+        let q = PositionQuality::new(50);
+        assert!(!q.is_high());
+        assert!(q.is_acceptable());
+    }
+
+    #[test]
+    fn quality_79_is_acceptable_not_high() {
+        let q = PositionQuality::new(79);
+        assert!(!q.is_high());
+        assert!(q.is_acceptable());
+    }
+
+    #[test]
+    fn quality_80_is_high() {
+        let q = PositionQuality::new(80);
+        assert!(q.is_high());
+        assert!(q.is_acceptable());
+        assert!((q.as_f64() - 0.80).abs() < 0.01);
+    }
+
+    // ─── Validation Edge Cases ──────────────────────────────────────
+
+    #[test]
+    fn validate_geodetic_deep_ocean() {
+        // Mariana Trench depth is about -11,000m
+        assert!(validate_geodetic(11.35, 142.2, -11_000.0).is_ok());
+    }
+
+    #[test]
+    fn validate_geodetic_altitude_too_low() {
+        assert!(validate_geodetic(0.0, 0.0, -13_000.0).is_err());
+    }
+
+    #[test]
+    fn validate_geodetic_geostationary_orbit() {
+        // GEO orbit ~35,786 km altitude
+        assert!(validate_geodetic(0.0, 0.0, 35_786_000.0).is_ok());
+    }
+
+    #[test]
+    fn validate_range_exactly_max() {
+        assert!(validate_range(1_000_000.0, 1.0).is_ok());
+    }
+
+    #[test]
+    fn validate_range_exceeds_max() {
+        assert!(validate_range(1_000_001.0, 1.0).is_err());
+    }
+
+    #[test]
+    fn validate_node_id_exactly_256() {
+        let id = "x".repeat(256);
+        assert!(validate_node_id(&id).is_ok());
+    }
+
+    #[test]
+    fn validate_node_id_257_rejected() {
+        let id = "x".repeat(257);
+        assert!(validate_node_id(&id).is_err());
+    }
+
+    // ─── Ranging Method Serde ───────────────────────────────────────
+
+    #[test]
+    fn ranging_method_all_variants_serde() {
+        let methods = [
+            RangingMethod::UltraWideband,
+            RangingMethod::LoRaToA,
+            RangingMethod::LoRaTDoA,
+            RangingMethod::RssiPathLoss,
+            RangingMethod::WifiRtt,
+            RangingMethod::ManualSurvey,
+            RangingMethod::MeshtasticHops,
+        ];
+        for m in &methods {
+            let json = serde_json::to_string(m).unwrap();
+            let restored: RangingMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(&restored, m);
+        }
+    }
+
+    // ─── Survey Method Serde ────────────────────────────────────────
+
+    #[test]
+    fn survey_method_all_variants_serde() {
+        let methods = [
+            SurveyMethod::ProfessionalSurvey,
+            SurveyMethod::GpsFix,
+            SurveyMethod::SelfReported,
+            SurveyMethod::StewardCertified,
+            SurveyMethod::CooperativeEstimate,
+        ];
+        for m in &methods {
+            let json = serde_json::to_string(m).unwrap();
+            let restored: SurveyMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(&restored, m);
+        }
+    }
+
+    // ─── Error Types ────────────────────────────────────────────────
+
+    #[test]
+    fn position_error_all_codes_serde() {
+        let codes = [
+            PositionErrorCode::InvalidInput,
+            PositionErrorCode::InsufficientAnchors,
+            PositionErrorCode::DegenerateGeometry,
+            PositionErrorCode::Unauthorized,
+            PositionErrorCode::NotFound,
+            PositionErrorCode::ComputationFailed,
+        ];
+        for code in &codes {
+            let err = PositionError::new(code.clone(), "test");
+            let json = serde_json::to_string(&err).unwrap();
+            assert!(!json.is_empty());
+        }
+    }
+
+    #[test]
+    fn position_error_without_context() {
+        let err = PositionError::new(PositionErrorCode::NotFound, "missing");
+        assert!(err.context.is_none());
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains("NotFound"));
+    }
+
+    // ─── Constants ──────────────────────────────────────────────────
+
+    #[test]
+    fn consciousness_gating_tier_ordering() {
+        // Registration < computation < certification
+        assert!(ANCHOR_REGISTRATION_IDENTITY < POSITION_COMPUTATION_IDENTITY);
+        assert!(POSITION_COMPUTATION_IDENTITY < ANCHOR_CERTIFICATION_IDENTITY);
+    }
+
+    #[test]
+    fn range_submission_identity_matches_registration() {
+        assert_eq!(RANGE_SUBMISSION_IDENTITY, ANCHOR_REGISTRATION_IDENTITY);
+    }
 }

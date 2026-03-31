@@ -4,7 +4,10 @@
 
 pub mod ai_player;
 pub mod audio;
+pub mod consciousness_aura;
 pub mod dimension_transition;
+pub mod dimensional_leakage;
+pub mod four_d_rendering;
 pub mod consciousness;
 pub mod engine_physics;
 pub mod phi_pcg;
@@ -21,8 +24,14 @@ pub mod minimap;
 pub mod player;
 pub mod postprocess;
 pub mod procgen;
+pub mod psychology;
 pub mod rendering;
 pub mod scavenge;
+
+// Terra Atlas globe view — planetary coordination layer.
+// Enabled via `cargo build --features atlas`.
+#[cfg(feature = "atlas")]
+pub mod atlas;
 
 // Mycelix integration — physicalized cryptography.
 // Enabled via `cargo build --features mycelix`.

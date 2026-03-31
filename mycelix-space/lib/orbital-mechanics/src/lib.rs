@@ -41,6 +41,7 @@
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 
+pub mod atmosphere;
 pub mod cdm;
 pub mod cdm_parser;
 pub mod conjunction;
@@ -55,9 +56,10 @@ pub mod propagator;
 pub mod state;
 pub mod tle;
 
+pub use atmosphere::{density as atmospheric_density, drag_acceleration, estimate_lifetime, DragConfig};
 pub use cdm::{
     CdmBuilder, CdmCovariance, CdmObjectMetadata, CdmRefFrame, CdmStateVector,
-    ConjunctionDataMessage, Maneuverable,
+    ConjunctionDataMessage, Maneuverable, PcMethod, DEFAULT_HARD_BODY_RADIUS_M,
 };
 pub use cdm_parser::{parse_cdm_kvn, CdmParseError};
 pub use conjunction::{CollisionProbability, ConjunctionAssessment};

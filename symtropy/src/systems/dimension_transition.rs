@@ -156,12 +156,12 @@ pub fn dimension_input_system(
         }
     }
 
-    // W slider for 4D mode (Q/E keys)
-    if transition.target == DimensionMode::D4 {
-        if keyboard.pressed(KeyCode::KeyQ) {
+    // W slider for 4D mode ([ and ] keys)
+    if transition.target == DimensionMode::D4 || transition.current == DimensionMode::D4 {
+        if keyboard.pressed(KeyCode::BracketLeft) {
             transition.w_position = (transition.w_position - 1.0).max(-transition.w_range);
         }
-        if keyboard.pressed(KeyCode::KeyE) {
+        if keyboard.pressed(KeyCode::BracketRight) {
             transition.w_position = (transition.w_position + 1.0).min(transition.w_range);
         }
     }

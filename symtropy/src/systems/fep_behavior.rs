@@ -23,7 +23,7 @@ use symtropy_render_bridge::PhysicsBody;
 /// Uses free_energy_gradient() to compute the optimal movement direction
 /// based on energy state, nearby agents, energy wells, and danger.
 pub fn fep_behavior_system(
-    mut npcs: Query<(&mut CrewNpc, &Transform, &mut MoveTarget, &mut NoiseEmitter, &PhysicsBody), Without<Player>>,
+    mut npcs: Query<(&mut CrewNpc, &Transform, &mut MoveTarget, &mut NoiseEmitter, &PhysicsBody, Option<&crate::systems::psychology::PsychologicalNeeds>), Without<Player>>,
     player_query: Query<(&Transform, &PhysicsBody), With<Player>>,
     other_npcs: Query<(&Transform, &PhysicsBody), (With<CrewNpc>, Without<Player>)>,
     wells: Query<(&Transform, &EnergyWell)>,
@@ -80,15 +80,15 @@ pub fn fep_behavior_system(
         }
     }
 
-    for (mut npc, npc_tf, mut target, mut noise, body) in &mut npcs {
+    for (mut npc, npc_tf, mut target, mut noise, body, psych) in &mut npcs {
         let npc_pos = npc_tf.translation.truncate();
         let pos = nalgebra::SVector::from([npc_pos.x as f64, npc_pos.y as f64]);
 
         // Get this NPC's consciousness state
-        let (energy_frac, harmony, prediction_error) = physics.consciousness.entities
+        let (energy_frac, harmony, prediction_error, npc_phi) = physics.consciousness.entities
             .get(&body.handle)
-            .map(|e| (e.energy.fraction_remaining(), e.harmony_activations, e.prediction_error))
-            .unwrap_or((1.0, [0.5; 8], 0.0));
+            .map(|e| (e.energy.fraction_remaining(), e.harmony_activations, e.prediction_error, e.phi()))
+            .unwrap_or((1.0, [0.5; 8], 0.0, 0.5));
 
         // FEP perception (still feeds the internal model)
         let obs = Observation::new(
@@ -112,10 +112,12 @@ pub fn fep_behavior_system(
             .cloned()
             .collect();
 
-        // FREE ENERGY GRADIENT — the real decision maker
-        let direction = symtropy_consciousness_physics::fep_gradient::free_energy_gradient(
+        // FREE ENERGY GRADIENT — Φ-coupled: consciousness modulates social drive,
+        // resonance gating, and danger sensitivity
+        let direction = symtropy_consciousness_physics::fep_gradient::free_energy_gradient_phi(
             &pos,
             energy_frac,
+            Some(npc_phi),  // consciousness-aware behavior
             &harmony,
             &nearby,
             &well_data,
@@ -126,7 +128,14 @@ pub fn fep_behavior_system(
         // Convert gradient direction to movement target
         let dir_vec = Vec2::new(direction[0] as f32, direction[1] as f32);
 
-        if dir_vec.length_squared() > 0.01 {
+        // Psychology modifiers
+        let load = psych.map(|p| p.allostatic_load).unwrap_or(0.0);
+        let engagement = psych.map(|p| p.engagement).unwrap_or(1.0);
+
+        // Danger overrides disengagement — survival instinct
+        let effective_engagement = if danger > 0.5 { engagement.max(0.5) } else { engagement };
+
+        if dir_vec.length_squared() > 0.01 && effective_engagement > 0.15 {
             // Move in gradient direction
             let speed = if energy_frac < 0.2 {
                 90.0 // Urgent — move faster toward safety
@@ -136,19 +145,22 @@ pub fn fep_behavior_system(
                 50.0 // Normal navigation
             };
 
-            target.target = Some(npc_pos + dir_vec * 100.0); // target 100 units in gradient direction
-            target.speed = speed * (1.0 - npc.caution * 0.3);
+            // Burnout slows movement; low engagement reduces willingness to move
+            let psych_factor = (1.0 - load * 0.4) * effective_engagement;
+            target.target = Some(npc_pos + dir_vec * 100.0);
+            target.speed = speed * (1.0 - npc.caution * 0.3) * psych_factor;
             noise.level = if speed > 80.0 { 0.1 } else { 0.03 };
         } else {
-            // No gradient — rest (conserve energy)
+            // No gradient or disengaged — rest
             target.target = None;
             target.speed = 0.0;
             noise.level = 0.0;
         }
 
-        // Update caution from danger
+        // Update caution from danger + allostatic load
+        let load_caution_boost = if load > 0.6 { 0.02 } else { 0.0 };
         if danger > 0.5 {
-            npc.caution = (npc.caution + 0.05).min(1.0);
+            npc.caution = (npc.caution + 0.05 + load_caution_boost).min(1.0);
         } else {
             npc.caution = (npc.caution - 0.02).max(0.0);
         }

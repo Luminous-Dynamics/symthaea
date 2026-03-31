@@ -32,7 +32,11 @@ impl Plugin for SymtropyPlugin {
             .init_resource::<PlayerInput>()
             .init_resource::<systems::thermodynamic::ThermodynamicHudState>()
             .init_resource::<systems::dimension_transition::DimensionTransition>()
+            .init_resource::<systems::four_d_rendering::FourDProjector>()
             .init_resource::<systems::living_dungeon::DungeonBreathTimer>()
+            .init_resource::<systems::psychology::PsychologyTimer>()
+            .init_resource::<systems::consciousness_aura::ResonanceWaveTimer>()
+            .init_resource::<systems::dimensional_leakage::LeakageTimer>()
             // FixedUpdate: physics + thermodynamic enforcement at consistent 64Hz
             .add_systems(FixedUpdate, (
                 systems::engine_physics::physics_apply_inputs,
@@ -47,12 +51,17 @@ impl Plugin for SymtropyPlugin {
             .add_systems(OnEnter(GamePhase::Loading), (
                 systems::menu::setup_loading, systems::rendering::setup_world,
                 systems::minimap::setup_minimap, systems::scavenge::spawn_scavenge_items,
+                systems::four_d_rendering::spawn_four_d_secrets,
+                systems::four_d_rendering::assign_player_four_d,
+                systems::dimensional_leakage::spawn_leakage_points,
             ).chain())
             .add_systems(Update, auto_start.run_if(in_state(GamePhase::Loading)))
             .add_systems(OnExit(GamePhase::Loading), systems::menu::cleanup_loading)
             .add_systems(Update, (
                 systems::dimension_transition::dimension_input_system,
                 systems::dimension_transition::dimension_transition_system,
+                systems::four_d_rendering::four_d_projector_sync_system,
+                systems::four_d_rendering::four_d_visibility_system,
                 systems::input::input_system, systems::player::player_movement_system,
                 systems::player::flashlight_system, systems::player::extraction_system,
                 systems::fep_behavior::fep_behavior_system, systems::fep_behavior::npc_movement_system,
@@ -68,6 +77,7 @@ impl Plugin for SymtropyPlugin {
                 systems::harmonies::sanctuary_system, systems::scavenge::scavenge_pickup_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
             .add_systems(Update, (
+                systems::psychology::psychology_tick_system,
                 systems::consciousness::player_consciousness_system,
                 systems::consciousness::npc_consciousness_system,
                 systems::engine_physics::consciousness_sync_system,
@@ -77,8 +87,35 @@ impl Plugin for SymtropyPlugin {
                 systems::dialogue::dialogue_system,
                 systems::living_dungeon::living_dungeon_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
+            // Consciousness aura + resonance wave visual manifold
+            .add_systems(Update, (
+                systems::consciousness_aura::spawn_auras,
+                systems::consciousness_aura::aura_update_system,
+                systems::consciousness_aura::resonance_wave_system,
+                systems::consciousness_aura::resonance_wave_animate_system,
+                systems::consciousness_aura::consciousness_perception_gate_system,
+                systems::dimensional_leakage::dimensional_leakage_system,
+                systems::dimensional_leakage::leakage_visual_system,
+            ).chain().run_if(in_state(GamePhase::Playing)))
             // Mycelix physicalized cryptography (only when --features mycelix)
             ;
+        // Terra Atlas globe view (only when --features atlas)
+        #[cfg(feature = "atlas")]
+        {
+            app
+                .init_resource::<terra_atlas_bevy::camera::OrbitalCameraConfig>()
+                .add_systems(Update,
+                    systems::atlas::atlas_toggle_system
+                        .run_if(in_state(GamePhase::Playing)))
+                .add_systems(OnEnter(GamePhase::GlobeView), systems::atlas::setup_globe_view)
+                .add_systems(Update, (
+                    systems::atlas::globe_input_system,
+                    systems::atlas::draw_arcs_system,
+                    terra_atlas_bevy::camera::orbital_camera_system,
+                ).run_if(in_state(GamePhase::GlobeView)))
+                .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view);
+        }
+
         #[cfg(feature = "mycelix")]
         {
             use symtropy_sim_bridge::SimBridgePlugin;
@@ -98,6 +135,19 @@ impl Plugin for SymtropyPlugin {
                     systems::medical_commons::medical_commons_system,
                     systems::medical_commons::data_dividend_system,
                     systems::medical_commons::coercion_detection_system,
+                ).run_if(in_state(GamePhase::Playing)))
+                .add_systems(Update, (
+                    systems::governance::governance_proposal_system,
+                    systems::governance::governance_voting_system,
+                    systems::governance::veto_override_system,
+                    systems::governance::oppression_detection_system,
+                    systems::governance::consciousness_evolution_system,
+                    systems::economy::tend_exchange_system,
+                    systems::economy::demurrage_system,
+                    systems::economy::player_tend_interaction_system,
+                    systems::faction::faction_emergence_system,
+                    systems::faction::faction_recruitment_system,
+                    systems::faction::faction_conflict_system,
                 ).run_if(in_state(GamePhase::Playing)));
         }
         app

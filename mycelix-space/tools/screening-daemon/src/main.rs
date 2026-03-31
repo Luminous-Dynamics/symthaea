@@ -23,7 +23,9 @@ use orbital_mechanics::conjunction::ConjunctionAnalyzer;
 use orbital_mechanics::propagator::Propagator;
 use orbital_mechanics::tle::TwoLineElement;
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
 /// Conjunction screening daemon for mycelix-space
 #[derive(Parser, Debug)]
@@ -68,6 +70,22 @@ struct Args {
     /// Weights conceptually derive from consciousness tier (Guardian=1.0, Observer=0.1).
     #[arg(long)]
     priority_weights: Option<String>,
+
+    /// HTTP timeout in seconds for CelesTrak requests
+    #[arg(long, default_value = "30")]
+    http_timeout_secs: u64,
+
+    /// Max HTTP retry attempts for CelesTrak fetches
+    #[arg(long, default_value = "3")]
+    http_retries: u32,
+
+    /// Consecutive CelesTrak failures before circuit breaker opens
+    #[arg(long, default_value = "3")]
+    circuit_breaker_threshold: u64,
+
+    /// Cycles to skip when circuit breaker is open
+    #[arg(long, default_value = "5")]
+    circuit_breaker_cooldown: u64,
 
     /// Run once and exit (no daemon loop)
     #[arg(long)]
@@ -163,13 +181,148 @@ fn load_catalog(path: &str) -> Result<HashMap<u32, TwoLineElement>, Box<dyn std:
     parse_tle_catalog(&content)
 }
 
-/// Fetch TLE catalog from a CelesTrak URL (3LE format)
-async fn fetch_celestrak_catalog(url: &str) -> Result<HashMap<u32, TwoLineElement>, Box<dyn std::error::Error>> {
-    info!("Fetching TLE catalog from CelesTrak: {}", url);
-    let response = reqwest::get(url).await?.text().await?;
-    let catalog = parse_tle_catalog(&response)?;
-    info!("Fetched {} objects from CelesTrak", catalog.len());
-    Ok(catalog)
+/// Fetch TLE catalog from a CelesTrak URL (3LE format) with retry and exponential backoff.
+///
+/// Returns `Ok(catalog)` on success, `Err` after all retries exhausted.
+async fn fetch_celestrak_catalog(
+    url: &str,
+    timeout_secs: u64,
+    max_retries: u32,
+) -> Result<HashMap<u32, TwoLineElement>, Box<dyn std::error::Error>> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()?;
+
+    let mut last_err: Option<Box<dyn std::error::Error>> = None;
+
+    for attempt in 0..max_retries {
+        if attempt > 0 {
+            let backoff = std::time::Duration::from_secs(1 << (attempt - 1)); // 1s, 2s, 4s, ...
+            info!(attempt, backoff_secs = backoff.as_secs(), "Retrying CelesTrak fetch");
+            tokio::time::sleep(backoff).await;
+        }
+
+        info!(url, attempt = attempt + 1, max = max_retries, "Fetching TLE catalog from CelesTrak");
+
+        match client.get(url).send().await {
+            Ok(resp) => match resp.text().await {
+                Ok(body) => {
+                    let catalog = parse_tle_catalog(&body)?;
+                    info!(count = catalog.len(), "Fetched objects from CelesTrak");
+                    return Ok(catalog);
+                }
+                Err(e) => {
+                    warn!(attempt = attempt + 1, error = %e, "CelesTrak response body read failed");
+                    last_err = Some(Box::new(e));
+                }
+            },
+            Err(e) => {
+                warn!(attempt = attempt + 1, error = %e, "CelesTrak HTTP request failed");
+                last_err = Some(Box::new(e));
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| "All CelesTrak fetch retries exhausted".into()))
+}
+
+/// Circuit breaker state for CelesTrak fetches.
+struct CircuitBreaker {
+    consecutive_failures: u64,
+    threshold: u64,
+    cooldown_cycles: u64,
+    /// Cycles remaining while circuit is open (skip fetching).
+    skip_remaining: u64,
+}
+
+impl CircuitBreaker {
+    fn new(threshold: u64, cooldown_cycles: u64) -> Self {
+        Self {
+            consecutive_failures: 0,
+            threshold,
+            cooldown_cycles,
+            skip_remaining: 0,
+        }
+    }
+
+    /// Returns true if the circuit is open (should skip fetch).
+    fn is_open(&self) -> bool {
+        self.skip_remaining > 0
+    }
+
+    /// Call each cycle when the circuit is open to count down. Returns true
+    /// when the cooldown expires (circuit half-open, ready to retry).
+    fn tick(&mut self) -> bool {
+        if self.skip_remaining > 0 {
+            self.skip_remaining -= 1;
+            if self.skip_remaining == 0 {
+                info!(
+                    cooldown = self.cooldown_cycles,
+                    "Circuit breaker closed — resuming CelesTrak fetches"
+                );
+                return true;
+            }
+        }
+        false
+    }
+
+    fn record_success(&mut self) {
+        if self.consecutive_failures > 0 {
+            info!(
+                prev_failures = self.consecutive_failures,
+                "CelesTrak circuit breaker reset after success"
+            );
+        }
+        self.consecutive_failures = 0;
+    }
+
+    fn record_failure(&mut self) {
+        self.consecutive_failures += 1;
+        if self.consecutive_failures >= self.threshold && self.skip_remaining == 0 {
+            self.skip_remaining = self.cooldown_cycles;
+            error!(
+                failures = self.consecutive_failures,
+                cooldown = self.cooldown_cycles,
+                "Circuit breaker OPEN — disabling CelesTrak fetches"
+            );
+        }
+    }
+}
+
+/// Catalog staleness tracker.
+struct CatalogFreshness {
+    last_success: Option<std::time::Instant>,
+}
+
+impl CatalogFreshness {
+    fn new() -> Self {
+        Self { last_success: None }
+    }
+
+    fn record_success(&mut self) {
+        self.last_success = Some(std::time::Instant::now());
+    }
+
+    /// Check and log staleness warnings. Returns the age in hours if available.
+    fn check(&self) -> Option<f64> {
+        let last = self.last_success?;
+        let age = last.elapsed();
+        let hours = age.as_secs_f64() / 3600.0;
+
+        if hours > 72.0 {
+            error!(
+                age_hours = format!("{:.1}", hours),
+                "Catalog is critically stale (>72h) — screening results are unreliable"
+            );
+        } else if hours > 24.0 {
+            warn!(
+                age_hours = format!("{:.1}", hours),
+                "Catalog is stale (>24h) — consider investigating CelesTrak connectivity"
+            );
+        }
+
+        Some(hours)
+    }
 }
 
 /// Load priority weights from a JSON file.
@@ -185,6 +338,13 @@ fn load_priority_weights(path: &str) -> Result<HashMap<u32, f64>, Box<dyn std::e
         weights.insert(norad_id, value.clamp(0.0, 1.0));
     }
     Ok(weights)
+}
+
+/// Statistics from a screening run (propagation failure tracking).
+#[derive(Debug, Clone, Default)]
+struct ScreeningStats {
+    pairs_attempted: u64,
+    propagation_failures: u64,
 }
 
 /// Screen protected objects against catalog for conjunctions.
@@ -204,7 +364,8 @@ fn screen_catalog(
     miss_threshold_km: f64,
     pc_threshold: f64,
     priority_weights: &HashMap<u32, f64>,
-) -> Vec<ScreeningResult> {
+) -> (Vec<ScreeningResult>, ScreeningStats) {
+    let mut stats = ScreeningStats::default();
     let mut results = Vec::new();
     let analyzer = ConjunctionAnalyzer::new().with_screening_threshold(miss_threshold_km);
 
@@ -246,7 +407,10 @@ fn screen_catalog(
                 continue;
             }
 
+            stats.pairs_attempted += 1;
+
             let Ok(secondary_prop) = Propagator::from_tle(secondary_tle) else {
+                stats.propagation_failures += 1;
                 continue;
             };
 
@@ -338,7 +502,7 @@ fn screen_catalog(
             .partial_cmp(&a.collision_probability)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    results
+    (results, stats)
 }
 
 #[tokio::main]
@@ -358,6 +522,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("  Hours ahead: {}", args.hours_ahead);
     info!("  Pc threshold: {:.2e}", args.pc_threshold);
     info!("  Miss threshold: {} km", args.miss_threshold_km);
+    info!("  HTTP timeout: {}s, retries: {}", args.http_timeout_secs, args.http_retries);
+
+    // Graceful shutdown signal
+    let shutdown = Arc::new(AtomicBool::new(false));
+    {
+        let shutdown = Arc::clone(&shutdown);
+        tokio::spawn(async move {
+            let ctrl_c = tokio::signal::ctrl_c();
+            #[cfg(unix)]
+            let mut sigterm = tokio::signal::unix::signal(
+                tokio::signal::unix::SignalKind::terminate(),
+            )
+            .expect("failed to register SIGTERM handler");
+
+            #[cfg(unix)]
+            tokio::select! {
+                _ = ctrl_c => {},
+                _ = sigterm.recv() => {},
+            }
+            #[cfg(not(unix))]
+            ctrl_c.await.ok();
+
+            info!("Shutdown signal received — finishing current cycle");
+            shutdown.store(true, Ordering::SeqCst);
+        });
+    }
 
     // Load priority weights if provided
     let priority_weights = if let Some(ref path) = args.priority_weights {
@@ -379,17 +569,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         HashMap::new()
     };
 
+    // Circuit breaker and freshness tracking for CelesTrak
+    let mut breaker = CircuitBreaker::new(
+        args.circuit_breaker_threshold,
+        args.circuit_breaker_cooldown,
+    );
+    let mut freshness = CatalogFreshness::new();
+
     // Fetch CelesTrak catalog if URL provided (merges with file catalog)
     if let Some(ref url) = args.celestrak_url {
-        let celestrak_cat = fetch_celestrak_catalog(url).await?;
-        let new_count = celestrak_cat.len();
-        // CelesTrak entries take precedence (fresher data)
-        catalog.extend(celestrak_cat);
-        info!("Catalog now contains {} objects (merged {} from CelesTrak)", catalog.len(), new_count);
+        match fetch_celestrak_catalog(url, args.http_timeout_secs, args.http_retries).await {
+            Ok(celestrak_cat) => {
+                let new_count = celestrak_cat.len();
+                catalog.extend(celestrak_cat);
+                freshness.record_success();
+                breaker.record_success();
+                info!(
+                    total = catalog.len(),
+                    merged = new_count,
+                    "Catalog loaded (merged CelesTrak)"
+                );
+            }
+            Err(e) => {
+                warn!(error = %e, "Initial CelesTrak fetch failed — continuing with file catalog only");
+                breaker.record_failure();
+            }
+        }
     }
 
     if catalog.is_empty() {
-        info!("No catalog provided -- running with empty catalog (demo mode)");
+        info!("No catalog provided — running with empty catalog (demo mode)");
     }
 
     if args.protected_objects.is_empty() {
@@ -402,27 +611,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cycle_count: u64 = 0;
 
     loop {
-        let start = std::time::Instant::now();
+        if shutdown.load(Ordering::SeqCst) {
+            info!(
+                cycles_completed = cycle_count,
+                catalog_size = catalog.len(),
+                "Shutdown requested — exiting cleanly"
+            );
+            break;
+        }
+
+        let cycle_start = std::time::Instant::now();
         cycle_count += 1;
 
-        // Re-fetch CelesTrak catalog on refresh cycles
+        // Re-fetch CelesTrak catalog on refresh cycles (with circuit breaker)
         if let Some(ref url) = args.celestrak_url {
             if cycle_count > 1 && cycle_count % args.refresh_cycles == 1 {
-                match fetch_celestrak_catalog(url).await {
-                    Ok(fresh_cat) => {
-                        let new_count = fresh_cat.len();
-                        catalog.extend(fresh_cat);
-                        info!("Refreshed CelesTrak catalog ({} objects merged, {} total)", new_count, catalog.len());
-                    }
-                    Err(e) => {
-                        warn!("Failed to refresh CelesTrak catalog: {} (using stale data)", e);
+                if breaker.is_open() {
+                    breaker.tick();
+                    debug!(cycle = cycle_count, "CelesTrak fetch skipped (circuit breaker open)");
+                } else {
+                    let fetch_start = std::time::Instant::now();
+                    match fetch_celestrak_catalog(url, args.http_timeout_secs, args.http_retries)
+                        .await
+                    {
+                        Ok(fresh_cat) => {
+                            let new_count = fresh_cat.len();
+                            catalog.extend(fresh_cat);
+                            freshness.record_success();
+                            breaker.record_success();
+                            info!(
+                                merged = new_count,
+                                total = catalog.len(),
+                                fetch_ms = fetch_start.elapsed().as_millis() as u64,
+                                "Refreshed CelesTrak catalog"
+                            );
+                        }
+                        Err(e) => {
+                            breaker.record_failure();
+                            warn!(
+                                error = %e,
+                                consecutive_failures = breaker.consecutive_failures,
+                                "Failed to refresh CelesTrak catalog (using stale data)"
+                            );
+                        }
                     }
                 }
             }
         }
 
-        info!("Starting screening run (cycle {})...", cycle_count);
-        let results = screen_catalog(
+        // Check catalog staleness each cycle
+        if args.celestrak_url.is_some() {
+            freshness.check();
+        }
+
+        info!(cycle = cycle_count, catalog_size = catalog.len(), "Starting screening run");
+
+        let screen_start = std::time::Instant::now();
+        let (results, stats) = screen_catalog(
             &catalog,
             &args.protected_objects,
             args.hours_ahead,
@@ -430,17 +675,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             args.pc_threshold,
             &priority_weights,
         );
+        let screen_ms = screen_start.elapsed().as_millis() as u64;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        let duration_ms = cycle_start.elapsed().as_millis() as u64;
         let high_risk = results
             .iter()
             .filter(|r| r.collision_probability >= 1e-4)
             .count();
 
+        // Log screening throughput and propagation failure rate
+        info!(
+            pairs = stats.pairs_attempted,
+            screen_ms,
+            "Screened {} pairs in {}ms",
+            stats.pairs_attempted,
+            screen_ms,
+        );
+        if stats.propagation_failures > 0 {
+            let fail_rate = stats.propagation_failures as f64 / stats.pairs_attempted.max(1) as f64;
+            warn!(
+                failures = stats.propagation_failures,
+                rate = format!("{:.2}%", fail_rate * 100.0),
+                "Propagation failures this cycle"
+            );
+        }
+
         let summary = ScreeningSummary {
             timestamp: Utc::now().to_rfc3339(),
             objects_screened: args.protected_objects.len(),
-            pairs_evaluated: args.protected_objects.len() * catalog.len(),
+            pairs_evaluated: stats.pairs_attempted as usize,
             conjunctions_found: results.len(),
             high_risk_count: high_risk,
             duration_ms,
@@ -452,11 +715,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{}", serde_json::to_string_pretty(&summary)?);
             }
             _ => {
-                info!("Screening complete in {}ms", duration_ms);
-                info!("  Objects screened: {}", summary.objects_screened);
-                info!("  Pairs evaluated: {}", summary.pairs_evaluated);
-                info!("  Conjunctions found: {}", summary.conjunctions_found);
-                info!("  High risk (Pc >= 1e-4): {}", summary.high_risk_count);
+                info!(
+                    objects = summary.objects_screened,
+                    pairs = summary.pairs_evaluated,
+                    conjunctions = summary.conjunctions_found,
+                    high_risk = summary.high_risk_count,
+                    duration_ms,
+                    "Screening cycle complete"
+                );
 
                 for result in &results {
                     let marker = match result.risk_level.as_str() {
@@ -484,9 +750,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        info!("Next screening in {}s", args.interval_seconds);
-        tokio::time::sleep(tokio::time::Duration::from_secs(args.interval_seconds)).await;
+        info!(next_in_secs = args.interval_seconds, "Waiting for next cycle");
+
+        // Sleep in 1-second increments to allow prompt shutdown
+        for _ in 0..args.interval_seconds {
+            if shutdown.load(Ordering::SeqCst) {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
     }
 
+    info!(cycles_completed = cycle_count, "Screening daemon stopped");
     Ok(())
 }

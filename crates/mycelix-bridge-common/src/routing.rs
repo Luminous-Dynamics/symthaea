@@ -457,6 +457,24 @@ pub enum CrossClusterRole {
     Supplychain,
     Edunet,
     Legacy,
+    Cafe,
+    Atlas,
+    Attribution,
+    Core,
+    Desci,
+    Mail,
+    Marketplace,
+    Position,
+    Space,
+    // Non-Holochain clusters (no zomes, included for routing completeness)
+    /// Civilization simulator — pure Rust simulation, no Holochain zomes
+    MultiworldSim,
+    /// Unified Leptos frontend portal — no Holochain zomes
+    Portal,
+    /// Shared workspace utilities (FL crates, zome helpers) — no direct zomes
+    Workspace,
+    /// Lunar settlement planning — stub/dormant
+    Lunar,
 }
 
 impl CrossClusterRole {
@@ -479,6 +497,19 @@ impl CrossClusterRole {
             Self::Supplychain => "supplychain",
             Self::Edunet => "edunet",
             Self::Legacy => "legacy",
+            Self::Cafe => "cafe",
+            Self::Atlas => "atlas",
+            Self::Attribution => "attribution",
+            Self::Core => "core",
+            Self::Desci => "desci",
+            Self::Mail => "mail",
+            Self::Marketplace => "marketplace",
+            Self::Position => "position",
+            Self::Space => "space",
+            Self::MultiworldSim => "multiworld_sim",
+            Self::Portal => "portal",
+            Self::Workspace => "workspace",
+            Self::Lunar => "lunar",
         }
     }
 
@@ -500,6 +531,19 @@ impl CrossClusterRole {
         Self::Supplychain,
         Self::Edunet,
         Self::Legacy,
+        Self::Cafe,
+        Self::Atlas,
+        Self::Attribution,
+        Self::Core,
+        Self::Desci,
+        Self::Mail,
+        Self::Marketplace,
+        Self::Position,
+        Self::Space,
+        Self::MultiworldSim,
+        Self::Portal,
+        Self::Workspace,
+        Self::Lunar,
     ];
 }
 

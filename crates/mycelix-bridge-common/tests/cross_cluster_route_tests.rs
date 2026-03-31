@@ -742,8 +742,8 @@ fn total_registered_routes_is_36() {
         }
     }
     assert_eq!(
-        count, 36,
-        "Expected 36 registered routes, found {count}"
+        count, 45,
+        "Expected 45 registered routes, found {count}"
     );
 }
 
@@ -765,13 +765,13 @@ fn every_route_has_at_least_one_zome() {
     }
 }
 
-/// CrossClusterRole::ALL has exactly 16 variants.
+/// CrossClusterRole::ALL has exactly 29 variants.
 #[test]
-fn cross_cluster_role_has_16_variants() {
+fn cross_cluster_role_has_29_variants() {
     assert_eq!(
         CrossClusterRole::ALL.len(),
-        16,
-        "Expected 16 CrossClusterRole variants, found {}",
+        29,
+        "Expected 29 CrossClusterRole variants, found {}",
         CrossClusterRole::ALL.len()
     );
 }
@@ -803,10 +803,20 @@ fn get_local_zomes_returns_some_for_all_clusters() {
     }
 }
 
-/// Every local zome list is non-empty.
+/// Every Holochain-based local zome list is non-empty.
+/// Non-Holochain clusters (Lunar, MultiworldSim, Portal, Workspace) may have empty lists.
 #[test]
 fn local_zome_lists_are_nonempty() {
+    let non_holochain = [
+        CrossClusterRole::Lunar,
+        CrossClusterRole::MultiworldSim,
+        CrossClusterRole::Portal,
+        CrossClusterRole::Workspace,
+    ];
     for &role in CrossClusterRole::ALL {
+        if non_holochain.contains(&role) {
+            continue;
+        }
         if let Some(zomes) = get_local_zomes(role) {
             assert!(
                 !zomes.is_empty(),

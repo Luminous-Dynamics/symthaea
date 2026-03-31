@@ -43,6 +43,8 @@ fn main() {
     // CLI flags
     let autostart = std::env::args().any(|a| a == "--autostart");
     let ai_player = std::env::args().any(|a| a == "--ai-player");
+    #[cfg(feature = "atlas")]
+    let globe_mode = std::env::args().any(|a| a == "--globe");
 
     let mut app = App::new();
     app.add_plugins(
@@ -70,6 +72,15 @@ fn main() {
         app.add_systems(Startup, |mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
             next.set(crate::resources::GamePhase::Loading);
         });
+    }
+
+    // --globe: enter globe view from main menu (requires --features atlas)
+    #[cfg(feature = "atlas")]
+    if globe_mode {
+        eprintln!("[symtropy] --globe: entering Terra Atlas globe view from MainMenu");
+        app.add_systems(Update, (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
+            next.set(crate::resources::GamePhase::GlobeView);
+        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::MainMenu)));
     }
 
     if ai_player {

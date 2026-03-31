@@ -48,6 +48,7 @@ pub fn setup_world(
     mut commands: Commands,
     seed: Res<crate::resources::DungeonSeed>,
     mut physics_world: ResMut<crate::resources::PhysicsWorldRes>,
+    player_c: Res<crate::systems::consciousness::PlayerConsciousness>,
 ) {
     // Camera with consciousness-driven post-processing
     commands.spawn((
@@ -59,8 +60,10 @@ pub fn setup_world(
         },
     ));
 
-    // First run uses default generation; subsequent runs could use player's Φ
-    let dungeon = level_dungeon(seed.0, None);
+    // Phi-PCG: consciousness shapes the dungeon topology
+    // First run Phi≈0.5 (default); restarts use the player's actual consciousness level
+    let phi = player_c.level;
+    let dungeon = level_dungeon(seed.0, Some(phi));
     let map = &dungeon.tiles;
     let rows = map.len() as i32;
     let cols = if map.is_empty() { 0 } else { map[0].len() as i32 };
@@ -177,6 +180,7 @@ pub fn setup_world(
             NoiseEmitter::default(),
             cp,
             super::consciousness::NpcConsciousness::default(),
+            super::psychology::PsychologicalNeeds::default(),
             TendBalance::new(40),
             FactionAffiliation {
                 faction_id: None,
@@ -215,17 +219,33 @@ pub fn setup_world(
     // Energy Wells — spatial life sources at room centers
     let well_constants = &physics_world.consciousness.constants;
     let mut well_count = 0u32;
+
+    // Guarantee one well at player spawn — survival lifeline
+    commands.spawn((
+        Sprite::from_color(
+            Color::srgba(0.1, 0.8, 0.6, 0.35),
+            Vec2::splat(40.0),
+        ),
+        Transform::from_xyz(player_pos.x, player_pos.y, 1.0),
+        crate::resources::EnergyWell::new(
+            well_constants.energy_well_regen_rate,
+            64.0,
+            5000.0,
+        ),
+    ));
+    well_count += 1;
+
     for (i, &(cx, cy)) in dungeon.room_centers.iter().enumerate() {
-        // Place wells at every other room, skip player/core rooms
+        // Place wells at every other room, skip core room
         if i % 2 != 0 {
             continue;
         }
         let wx = (cx as f32 - cols as f32 / 2.0) * TILE_SIZE;
         let wy = (rows as f32 / 2.0 - cy as f32) * TILE_SIZE;
 
-        // Skip if too close to player or core
-        let near_player = (wx - player_pos.x).abs() < TILE_SIZE * 2.0
-            && (wy - player_pos.y).abs() < TILE_SIZE * 2.0;
+        // Skip if too close to player (already have spawn well) or core
+        let near_player = (wx - player_pos.x).abs() < TILE_SIZE * 3.0
+            && (wy - player_pos.y).abs() < TILE_SIZE * 3.0;
         let near_core = (wx - core_pos.x).abs() < TILE_SIZE * 2.0
             && (wy - core_pos.y).abs() < TILE_SIZE * 2.0;
         if near_player || near_core {
@@ -363,16 +383,32 @@ pub fn hud_system(
 
     let dim_str = if dim_state.transitioning() {
         format!("{} → {} ({:.0}%)", dim_state.current.name(), dim_state.target.name(), dim_state.progress * 100.0)
+    } else if dim_state.current == crate::systems::dimension_transition::DimensionMode::D4 {
+        format!("4D [F1-F4] W={:.0} [/]", dim_state.w_position)
     } else {
         format!("{} [F1-F4]", dim_state.current.name())
     };
 
+    // Contextual hint — guide new players based on current state
+    let hint = if leviathan.grace_timer > 0.0 {
+        format!(">> Safe for {:.0}s — explore and find energy wells (teal glow)", leviathan.grace_timer)
+    } else if energy_bar < 0.4 {
+        ">> LOW ENERGY — find a teal well to restore energy".to_string()
+    } else if leviathan.noise_accumulator > 5.0 {
+        ">> Stay quiet — the Leviathan is listening".to_string()
+    } else if extraction > 0.0 && extraction < 1.0 {
+        ">> Hold E near the core — stay calm to extract faster".to_string()
+    } else {
+        String::new()
+    };
+
     let hud_text = format!(
-        "WASD: move | Shift: sprint | E: extract | F1-F4: dimension | Esc: quit\n\
+        "WASD: move | Shift: sprint | E: extract | F1-F4: dimension | []: W-slide | Esc: quit\n\
          Stress: {:.0}%  Load: {:.0}%  Leviathan: {phase}{sanctuary}\n\
          {consciousness}  Harmony: {harm}  Fragments: {frags}/48\n\
          {energy}\n\
-         Dim: {dim}  Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%",
+         Dim: {dim}  Noise: {noise:.1}/{thresh:.1}  Extract: {ext:.0}%  Explored: {exp:.0}%\n\
+         {hint}",
         stress.arousal * 100.0,
         biometrics.model.allostatic_load * 100.0,
         phase = phase_str,
@@ -386,6 +422,7 @@ pub fn hud_system(
         thresh = leviathan.threshold,
         ext = extraction * 100.0,
         exp = explored.explore_percent(),
+        hint = hint,
     );
 
     for (mut text, mut color) in &mut hud {
@@ -460,6 +497,16 @@ pub fn visual_stress_system(
 }
 
 /// Camera follows player smoothly.
+///
+/// IMPORTANT: We use Camera2d (orthographic). Rotating a 2D camera makes sprites
+/// edge-on = invisible (black screen). Instead we differentiate dimension modes via:
+/// - 2D: tight zoom, top-down (default)
+/// - 2.5D: zoomed out, slight Y offset to simulate depth
+/// - 3D: further zoom, wider view reveals more dungeon
+/// - 4D: same as 3D + W-slider reveals hidden rooms (via four_d_rendering.rs)
+///
+/// True 3D rendering with perspective projection requires Camera3d + bevy_pbr.
+/// The consciousness-physics engine runs ND regardless of rendering mode.
 pub fn camera_follow_system(
     player: Query<&Transform, With<Player>>,
     mut camera: Query<&mut Transform, (With<Camera2d>, Without<Player>)>,
@@ -476,26 +523,30 @@ pub fn camera_follow_system(
     let current = cam_tf.translation.truncate();
     let smoothed = current.lerp(target, 0.08);
 
-    let pitch = dim.effective_pitch();
     let distance = dim.effective_distance();
 
-    // 2D (pitch=0): camera directly above, z=999
-    // 2.5D (pitch~0.5): camera offset backward, tilted
-    // 3D (pitch~1.0): camera significantly behind and above
-    let base_z = 999.0;
-    let z_offset = base_z * distance;
-    let y_offset = -pitch.sin() * 300.0 * distance; // Pull camera back as pitch increases
+    // Camera zoom via Z height (higher = sees more)
+    // 2D: 999 (tight), 2.5D: 1200, 3D/4D: 1600
+    let base_z = match dim.target {
+        crate::systems::dimension_transition::DimensionMode::D2 => 999.0,
+        crate::systems::dimension_transition::DimensionMode::D2Half => 1200.0,
+        crate::systems::dimension_transition::DimensionMode::D3 => 1600.0,
+        crate::systems::dimension_transition::DimensionMode::D4 => 1600.0,
+    };
+    let target_z = base_z * distance;
+
+    // Slight Y offset in 2.5D+ to simulate "looking from above and behind"
+    let y_offset = match dim.target {
+        crate::systems::dimension_transition::DimensionMode::D2 => 0.0,
+        crate::systems::dimension_transition::DimensionMode::D2Half => -60.0,
+        crate::systems::dimension_transition::DimensionMode::D3 => -120.0,
+        crate::systems::dimension_transition::DimensionMode::D4 => -120.0,
+    };
 
     cam_tf.translation.x = smoothed.x;
     cam_tf.translation.y = smoothed.y + y_offset;
-    cam_tf.translation.z = z_offset;
-
-    // Apply rotation for 2.5D/3D perspective
-    // In 2D: no rotation (looking straight down)
-    // In 2.5D/3D: tilt the camera to look at the player
-    if pitch > 0.01 {
-        cam_tf.rotation = Quat::from_rotation_x(-pitch);
-    } else {
-        cam_tf.rotation = Quat::IDENTITY;
-    }
+    // Smooth Z transition
+    cam_tf.translation.z += (target_z - cam_tf.translation.z) * 0.05;
+    // No rotation — camera always looks straight down (sprites stay visible)
+    cam_tf.rotation = Quat::IDENTITY;
 }

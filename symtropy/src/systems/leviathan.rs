@@ -28,6 +28,12 @@ pub fn leviathan_system(
 ) {
     let dt = time.delta_secs();
 
+    // Grace period — Leviathan ignores all noise at game start
+    if leviathan.grace_timer > 0.0 {
+        leviathan.grace_timer -= dt;
+        return;
+    }
+
     // Sum all noise sources
     let total_noise: f32 = noise_sources.iter().map(|n| n.level).sum();
 

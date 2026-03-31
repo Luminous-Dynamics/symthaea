@@ -97,8 +97,9 @@ pub fn player_consciousness_system(
 }
 
 /// Update NPC consciousness from game state.
+/// Burnout ceiling: allostatic_load > 0.8 caps Phi (ported from multiworld sim).
 pub fn npc_consciousness_system(
-    mut npcs: Query<(&CrewNpc, &mut NpcConsciousness)>,
+    mut npcs: Query<(&CrewNpc, &mut NpcConsciousness, Option<&crate::systems::psychology::PsychologicalNeeds>)>,
     leviathan: Res<LeviathanState>,
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
 ) {
@@ -109,13 +110,21 @@ pub fn npc_consciousness_system(
         SleepPhase::Hunting => 1.0,
     };
 
-    for (npc, mut consciousness) in &mut npcs {
-        // NPC consciousness shaped by caution and environment
+    for (npc, mut consciousness, needs) in &mut npcs {
         let caution = npc.caution as f64;
+        let load = needs.map(|n| n.allostatic_load).unwrap_or(0.0);
+
+        // Burnout degrades integration capacity
+        let burnout_penalty = if load > crate::systems::psychology::BURNOUT_THRESHOLD {
+            1.0 - ((load - crate::systems::psychology::BURNOUT_THRESHOLD) * 5.0).min(1.0) as f64
+        } else {
+            1.0
+        };
+
         let inputs = ConsciousnessInputs {
-            phi: 0.6 + (1.0 - caution) * 0.3,
+            phi: (0.6 + (1.0 - caution) * 0.3) * burnout_penalty,
             broadcast: (1.0_f64 - danger * 0.4).max(0.2),
-            working_memory: 0.5 + caution * 0.2,
+            working_memory: (0.5 + caution * 0.2) * burnout_penalty,
             attention: 0.5 + (1.0 - caution) * 0.3,
             recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
             embodiment: (1.0_f64 - danger * 0.5).max(0.2),
@@ -125,7 +134,11 @@ pub fn npc_consciousness_system(
 
         let result = consciousness.equation.compute(&inputs);
         consciousness.level = result.consciousness_level;
-        consciousness.bottleneck = result.bottleneck_name.clone();
+        consciousness.bottleneck = if load > crate::systems::psychology::BURNOUT_THRESHOLD {
+            "burnout".into()
+        } else {
+            result.bottleneck_name.clone()
+        };
         consciousness.stability = result.temporal_stability;
     }
 }

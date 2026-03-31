@@ -63,6 +63,8 @@ pub enum LinkTypes {
     OperatorSessions,
     /// Avoidance options for a session
     SessionAvoidanceOptions,
+    /// Bilateral agreements for a session (uniqueness constraint)
+    SessionAgreements,
 
     // --- Multi-party negotiation links ---
 
