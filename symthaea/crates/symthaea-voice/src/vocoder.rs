@@ -33,7 +33,9 @@ impl StableResonator {
     }
 
     fn tick(&mut self, input: f32) -> f32 {
-        let alpha = 0.005;
+        // Slower coefficient interpolation = smoother transitions = less stutter
+        // 0.002 ≈ 150ms to converge (human coarticulation range)
+        let alpha = 0.002;
         self.a1 += alpha * (self.target_a1 - self.a1);
         self.a2 += alpha * (self.target_a2 - self.a2);
         self.gain += alpha * (self.target_gain - self.gain);

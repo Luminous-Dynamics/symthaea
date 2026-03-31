@@ -16,8 +16,8 @@ pub fn phonemes_to_frames(
     let frame_rate = 200.0; // 200 frames per second (5ms per frame)
     let total_phonemes = phonemes.len() as f32;
 
-    // Base F0 from prosody: consciousness shapes register
-    let base_f0 = 140.0 + prosody.consciousness * 60.0; // 140-200 Hz
+    // Base F0: higher for clarity. Symthaea's voice sits in alto range.
+    let base_f0 = 180.0 + prosody.consciousness * 40.0; // 180-220 Hz (was 140-200)
     let f0_offset = prosody.valence * 20.0;
     let rate_factor = 0.6 + prosody.arousal * 0.8;
 
