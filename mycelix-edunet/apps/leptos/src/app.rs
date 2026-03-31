@@ -12,7 +12,9 @@ use leptos_router::{
 use crate::adaptivity_provider::AdaptivityProvider;
 use crate::consciousness::ConsciousnessProvider;
 use crate::curriculum::provide_curriculum_context;
-use crate::holochain::{ConnectionBadge, HolochainProvider};
+use mycelix_leptos_core::{
+    ConnectionBadge, HolochainProviderAuto, HolochainProviderConfig, ConnectStrategy,
+};
 use crate::learning_engine::LearningEngineProvider;
 use crate::pages::*;
 use crate::role::{provide_role_context, UserRole};
@@ -21,8 +23,16 @@ use crate::theme::{provide_theme_context, use_theme, use_set_theme};
 
 #[component]
 pub fn App() -> impl IntoView {
+    let config = HolochainProviderConfig {
+        app_id: "edunet".to_string(),
+        default_role: Some("edunet".to_string()),
+        log_prefix: "[EduNet]",
+        connect_strategy: ConnectStrategy::WebSocket,
+        status_labels: None,
+    };
+
     view! {
-        <HolochainProvider>
+        <HolochainProviderAuto config=config>
         <ConsciousnessProvider>
         <LearningEngineProvider>
         <AdaptivityProvider>
@@ -30,7 +40,7 @@ pub fn App() -> impl IntoView {
         </AdaptivityProvider>
         </LearningEngineProvider>
         </ConsciousnessProvider>
-        </HolochainProvider>
+        </HolochainProviderAuto>
     }
 }
 
@@ -41,6 +51,7 @@ fn AppInner() -> impl IntoView {
     let (_profile, _set_profile) = provide_profile_context();
     provide_curriculum_context();
     crate::study_tracker::provide_study_tracker();
+    crate::i18n::provide_i18n();
 
     // Wire consciousness signals to CSS custom properties
     crate::consciousness_ui::init_consciousness_ui();
@@ -54,6 +65,7 @@ fn AppInner() -> impl IntoView {
                 </div>
                 <crate::search::SearchBar />
                 <div class="nav-actions">
+                    <crate::i18n::LanguagePicker />
                     <ThemeToggle />
                     <ConnectionBadge />
                 </div>

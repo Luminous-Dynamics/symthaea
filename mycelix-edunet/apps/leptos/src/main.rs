@@ -13,7 +13,7 @@ mod consciousness;
 mod consciousness_ui;
 mod curriculum;
 mod games;
-mod holochain;
+mod i18n;
 mod learning_engine;
 mod pages;
 mod persistence;

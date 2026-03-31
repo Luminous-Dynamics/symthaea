@@ -510,8 +510,18 @@ fn OnboardingFlow(
                         <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--primary)">
                             "Nice to meet you, "{name_val}"."
                         </h1>
-                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem">"What grade are you in?"</p>
-                        // Primary grades (high school)
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem">"What best describes you?"</p>
+
+                        // Quick paths — most common first
+                        <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem">
+                            <button
+                                style="padding: 0.75rem 1.25rem; background: var(--surface); border: 2px solid var(--primary); border-radius: 12px; color: var(--primary); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit"
+                                on:click=move |_| { set_grade.set(16); finish_onboarding(); }
+                            >"Learn a trade"</button>
+                        </div>
+
+                        // School grades
+                        <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 0.5rem">"School student?"</p>
                         <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem">
                             {[9_u8, 10, 11, 12].into_iter().map(|g| {
                                 view! {

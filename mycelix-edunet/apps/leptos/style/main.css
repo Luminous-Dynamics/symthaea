@@ -5013,6 +5013,31 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* ===========================================================================
+   Language Picker
+   =========================================================================== */
+
+.lang-picker {
+    padding: 0.25rem 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    max-width: 90px;
+}
+
+.lang-picker:focus {
+    border-color: var(--primary);
+}
+
+@media (max-width: 768px) {
+    .lang-picker { display: none; } /* Hidden on mobile — save space */
+}
+
+/* ===========================================================================
    Focus & Accessibility
    =========================================================================== */
 
