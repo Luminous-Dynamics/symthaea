@@ -141,23 +141,22 @@ pub fn setup_globe_view(
         AtlasEntity,
     ));
 
-    // [7] Holographic projection base — flat ring below the globe
-    // Creates the "projector" effect
-    let base_mesh = meshes.add(Sphere::new(1.5).mesh().uv(48, 4)); // very flat sphere = disc-like
+    // [7] Holographic projection base — subtle dark glass disc
+    let base_mesh = meshes.add(Sphere::new(1.2).mesh().uv(32, 4));
     let base_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.5, 0.7, 0.04),
-        emissive: LinearRgba::new(0.0, 0.15, 0.2, 1.0),
+        base_color: Color::linear_rgba(0.02, 0.06, 0.08, 0.6), // dark obsidian glass
+        emissive: LinearRgba::new(0.0, 0.03, 0.04, 1.0), // very faint glow
+        perceptual_roughness: 0.1, // polished — catches reflections
+        metallic: 0.8,
         alpha_mode: AlphaMode::Blend,
-        unlit: true,
         double_sided: true,
-        cull_mode: None,
         ..default()
     });
     commands.spawn((
         Mesh3d(base_mesh),
         MeshMaterial3d(base_material),
-        Transform::from_scale(Vec3::new(1.0, 0.01, 1.0)) // flatten to disc
-            .with_translation(Vec3::new(0.0, -1.1, 0.0)),
+        Transform::from_scale(Vec3::new(1.0, 0.005, 1.0)) // thinner disc
+            .with_translation(Vec3::new(0.0, -1.15, 0.0)),
         AtlasEntity,
     ));
 
@@ -179,7 +178,7 @@ pub fn setup_globe_view(
         bevy::core_pipeline::tonemapping::Tonemapping::Reinhard,
         // [6] Bloom — makes emissive markers glow through the hologram
         bevy::post_process::bloom::Bloom {
-            intensity: 0.20,
+            intensity: 0.12, // subtle — markers glow without washing out
             ..default()
         },
         // [3] Chromatic aberration — holographic projection artifact
@@ -227,14 +226,16 @@ pub fn setup_globe_view(
     let marker_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
     let mut marker_count = 0usize;
 
-    // [6] Energy sites — holographic emissive glow
+    // [6] Energy sites — deep cybernetic palette, emissive glow
     for site in &data.sites {
         let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.008);
         let size = geo::marker_size_from_capacity(site.capacity_mw);
         let c = site.energy_type.rgb();
+        // Desaturate and deepen colors to match holographic aesthetic
+        let depth = 0.6; // pull colors toward deeper tones
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(c[0], c[1], c[2]),
-            emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
+            base_color: Color::linear_rgb(c[0] * depth, c[1] * depth, c[2] * depth),
+            emissive: LinearRgba::new(c[0] * 0.25, c[1] * 0.25, c[2] * 0.25, 1.0),
             unlit: true,
             ..default()
         });
@@ -284,7 +285,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.040)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.022)),
             DataMarker { layer: Layer::TerraLumina, name: site.name.clone() },
             TimelineLayer::Renewable,
             AtlasEntity,
@@ -305,7 +306,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.030)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.016)),
             DataMarker { layer: Layer::ResontiaVaults, name: vault.name.clone() },
             TimelineLayer::Vault(i),
             AtlasEntity,
@@ -392,7 +393,7 @@ pub fn setup_globe_view(
     for stress in &stress_data {
         let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.02);
         let c = terra_atlas_core::energy_trading::stress_color(stress.allostatic_load);
-        let size = 0.025 + stress.allostatic_load * 0.035;
+        let size = 0.015 + stress.allostatic_load * 0.020;
         // Solid marker for the stress point
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(c[0], c[1], c[2]),
@@ -408,8 +409,8 @@ pub fn setup_globe_view(
         ));
         // Translucent stress halo — larger when under more stress
         if stress.allostatic_load > 0.3 {
-            let halo_size = 0.05 + stress.allostatic_load * 0.10;
-            let alpha = stress.allostatic_load * 0.20;
+            let halo_size = 0.03 + stress.allostatic_load * 0.05;
+            let alpha = stress.allostatic_load * 0.12;
             let halo_mat = materials.add(StandardMaterial {
                 base_color: Color::linear_rgba(c[0], c[1] * 0.3, c[2] * 0.2, alpha),
                 alpha_mode: AlphaMode::Blend,
