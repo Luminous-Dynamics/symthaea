@@ -7,7 +7,7 @@
     "subject_area": "Multi-Subject",
     "domain": "Multi-Subject",
     "version": "2024",
-    "total_standards": 2036,
+    "total_standards": 2052,
     "domains": [
       "Software Design and Engineering",
       "Energy & Change",
@@ -232,7 +232,7 @@
     ],
     "created_at": "2026-03-30",
     "notes": "Merged 116 curriculum documents with 0 bridge edges. 2002 unique nodes, 1848 edges.",
-    "total_edges": 1896
+    "total_edges": 1908
   },
   "nodes": [
     {
@@ -60659,6 +60659,314 @@
       "domain": "Legal Awareness",
       "tags": [],
       "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr10.CHEM",
+      "title": "Chemistry of Life",
+      "description": "Inorganic and organic compounds, water, carbohydrates, lipids, proteins, nucleic acids. The molecular basis of life.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Molecular Biology",
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr10.CELL",
+      "title": "Cell Biology",
+      "description": "Cell structure (prokaryotic vs eukaryotic), organelles and functions, cell membrane, transport (diffusion, osmosis, active transport), cell division (mitosis).",
+      "subject_area": "Life Sciences",
+      "subdomain": "Cell Biology",
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr10.TISSUE",
+      "title": "Animal & Plant Tissues",
+      "description": "Types of animal tissue (epithelial, connective, muscle, nervous). Plant tissues (meristematic, dermal, vascular, ground). Structure-function relationships.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Histology",
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 12,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr10.BIODIV",
+      "title": "Biodiversity & Classification",
+      "description": "Five kingdom classification, binomial nomenclature, dichotomous keys, indigenous plants and animals of South Africa, conservation.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Taxonomy",
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr10.ENV",
+      "title": "Environment & Biosphere",
+      "description": "Biosphere, biomes of SA (grassland, savanna, fynbos, forest, Karoo, desert), ecosystems, food webs, nutrient cycles, human impact.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Ecology",
+      "grade_levels": [
+        "Grade10"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr11.BIODIV2",
+      "title": "Biodiversity & Classification (Advanced)",
+      "description": "Classification of microorganisms (viruses, bacteria, protists, fungi). Roles in disease and industry. Antibiotics and resistance.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Microbiology",
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr11.HIST",
+      "title": "History of Life on Earth",
+      "description": "Evidence for evolution (fossils, biogeography, comparative anatomy, molecular biology), mass extinctions, human evolution, out of Africa.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Evolution",
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 15,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr11.POP",
+      "title": "Population Ecology",
+      "description": "Population size, density, growth curves (exponential vs logistic), carrying capacity, limiting factors, human population growth.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Ecology",
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 10,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr11.PLANT",
+      "title": "Plant Physiology",
+      "description": "Photosynthesis (light and dark reactions), transpiration, gas exchange in plants, support in plants (xylem, phloem), plant hormones.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Botany",
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr11.ANIMAL",
+      "title": "Animal Nutrition & Gaseous Exchange",
+      "description": "Human digestive system, nutrients, absorption, circulatory system, heart structure, gaseous exchange in humans, breathing mechanism.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Human Biology",
+      "grade_levels": [
+        "Grade11"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr12.DNA",
+      "title": "DNA, RNA & Protein Synthesis",
+      "description": "DNA structure (Watson-Crick), replication, transcription, translation, genetic code, mRNA processing, mutations and their effects.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Molecular Genetics",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.7
+      },
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr12.GENETICS",
+      "title": "Genetics & Inheritance",
+      "description": "Meiosis, Mendelian genetics, monohybrid and dihybrid crosses, sex-linked inheritance, co-dominance, blood groups, genetic disorders, genetic engineering.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Genetics",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 25,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.7
+      },
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr12.EVOLVE",
+      "title": "Evolution by Natural Selection",
+      "description": "Darwin's theory, evidence (fossils, molecular, anatomical), natural selection, speciation (allopatric, sympatric), punctuated equilibrium, artificial selection.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Evolution",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 15,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 2,
+        "marks": 35,
+        "total_paper_marks": 150,
+        "percentage": 23.3
+      },
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr12.HUMAN",
+      "title": "Human Reproduction & Development",
+      "description": "Male and female reproductive systems, gametogenesis, menstrual cycle, fertilisation, pregnancy, birth, contraception, STIs including HIV/AIDS.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Reproduction",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 2,
+        "marks": 35,
+        "total_paper_marks": 150,
+        "percentage": 23.3
+      },
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr12.NERVOUS",
+      "title": "Human Nervous System & Endocrine System",
+      "description": "Central and peripheral nervous system, reflex arc, brain structure, sense organs (eye, ear), endocrine glands, hormones, feedback mechanisms, drug abuse.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Neuroscience",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 35,
+        "total_paper_marks": 150,
+        "percentage": 23.3
+      },
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.LifeSciences.Gr12.HOMEOSTASIS",
+      "title": "Homeostasis & Excretion",
+      "description": "Thermoregulation (ectotherms vs endotherms), osmoregulation, kidney structure and function, nephron, ADH, diabetes, dialysis.",
+      "subject_area": "Life Sciences",
+      "subdomain": "Physiology",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 35,
+        "total_paper_marks": 150,
+        "percentage": 23.3
+      },
+      "node_type": "topic",
+      "domain": "Life Sciences",
+      "tags": [],
+      "supplementary_resources": []
     }
   ],
   "edges": [
@@ -73933,6 +74241,90 @@
       "edge_type": "AppliedIn",
       "strength_permille": 800,
       "rationale": "Growing your own food is the most direct form of sustainable action."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr10.CHEM",
+      "to": "CAPS.LifeSciences.Gr10.CELL",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Chemistry of life is prerequisite for understanding cell biology."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr10.CELL",
+      "to": "CAPS.LifeSciences.Gr10.TISSUE",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Cell structure before tissue types."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr10.CELL",
+      "to": "CAPS.LifeSciences.Gr11.PLANT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Cell biology before plant physiology."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr11.HIST",
+      "to": "CAPS.LifeSciences.Gr12.EVOLVE",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "History of life before evolution theory."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr10.CHEM",
+      "to": "CAPS.LifeSciences.Gr12.DNA",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Organic chemistry before DNA structure."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr10.CELL",
+      "to": "CAPS.LifeSciences.Gr12.GENETICS",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Cell division (mitosis) before meiosis and genetics."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr11.ANIMAL",
+      "to": "CAPS.LifeSciences.Gr12.HUMAN",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Human body systems before reproduction."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr11.ANIMAL",
+      "to": "CAPS.LifeSciences.Gr12.NERVOUS",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Body systems before nervous system detail."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr12.DNA",
+      "to": "CAPS.PhysicalSciences.Gr12.P2.ORG1",
+      "edge_type": "AppliedIn",
+      "strength_permille": 750,
+      "rationale": "DNA is an organic molecule \u2014 organic chemistry gives you the language to understand its structure."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr12.EVOLVE",
+      "to": "UNI.STATISTICS.STAT.PROB",
+      "edge_type": "AppliedIn",
+      "strength_permille": 700,
+      "rationale": "Natural selection is probability in action \u2014 allele frequencies are statistical distributions."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr12.HOMEOSTASIS",
+      "to": "UNI.SYSTEMS.SYS.FEED",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "Homeostasis IS negative feedback. Thermoregulation, blood sugar, kidney function \u2014 all feedback loops."
+    },
+    {
+      "from": "CAPS.LifeSciences.Gr10.ENV",
+      "to": "UNI.SUSTAINABILITY.SUST.CLIMATE",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "Ecosystem ecology is the science behind sustainability \u2014 understanding biomes and nutrient cycles IS understanding climate impact."
     }
   ]
 }
