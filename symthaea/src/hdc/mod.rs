@@ -404,6 +404,11 @@ pub mod cognitive_moral_classifier;
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 
+/// HDC vector compression via TurboQuant (PolarQuant + QJL).
+/// Compresses 16,384D ContinuousHV from 64KB to ~10KB for storage and transmission.
+#[cfg(feature = "turbo-quant")]
+pub mod hv_compression;
+
 /// Glyph Codex: symbolic consciousness field basis vectors and registry.
 #[cfg(feature = "glyph_codex")]
 pub mod glyph_basis;

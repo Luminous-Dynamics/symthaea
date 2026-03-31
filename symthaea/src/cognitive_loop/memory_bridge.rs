@@ -31,6 +31,11 @@ pub struct EpisodicMemory {
     pub access_count: u32,
     /// Strength (0.0 to 1.0, decays over time)
     pub strength: f32,
+    /// Full HDC vector compressed via PolarQuant (when turbo-quant feature is enabled).
+    /// Stores the complete 16,384D vector at ~8x compression for high-fidelity recall.
+    #[cfg(feature = "turbo-quant")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub compressed_full_hv: Option<crate::hdc::hv_compression::CompressedHv>,
 }
 
 impl EpisodicMemory {
@@ -122,6 +127,8 @@ impl EpisodicMemoryBridge {
             phi_at_encoding: phi,
             access_count: 0,
             strength: 1.0,
+            #[cfg(feature = "turbo-quant")]
+            compressed_full_hv: None,
         };
 
         // Add to short-term
@@ -267,6 +274,25 @@ impl EpisodicMemoryBridge {
             } else {
                 break;
             }
+        }
+    }
+
+    /// Attach a compressed full HDC vector to an episodic memory.
+    ///
+    /// When the `turbo-quant` feature is enabled, this stores the complete 16,384D
+    /// ContinuousHV in compressed form (~8x smaller) alongside the 64-element sample.
+    #[cfg(feature = "turbo-quant")]
+    pub fn attach_compressed_hv(
+        &mut self,
+        memory_id: u64,
+        compressed: crate::hdc::hv_compression::CompressedHv,
+    ) {
+        if let Some(mem) = self.short_term.iter_mut().rev().find(|m| m.id == memory_id) {
+            mem.compressed_full_hv = Some(compressed);
+            return;
+        }
+        if let Some(mem) = self.long_term.iter_mut().find(|m| m.id == memory_id) {
+            mem.compressed_full_hv = Some(compressed);
         }
     }
 }

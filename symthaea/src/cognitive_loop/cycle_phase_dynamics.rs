@@ -4383,6 +4383,8 @@ impl CognitiveLoopService {
                 detected_primitives: &perception.encoding.encoding_result.detected_primitives,
                 memory_context_boost,
                 wm_importance_boost: pp_wm_importance_boost + pp_thalamic_salience,
+                #[cfg(feature = "turbo-quant")]
+                full_hdv: Some(&perception.encoding.encoding_result.hdv),
             };
 
             {

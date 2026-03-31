@@ -34,6 +34,9 @@ pub(in crate::cognitive_loop) struct EpisodicLearningContext<'a> {
     pub detected_primitives: &'a [String],
     pub memory_context_boost: f32,
     pub wm_importance_boost: f32,
+    /// Full HDC vector for PolarQuant compression into episodic memory.
+    #[cfg(feature = "turbo-quant")]
+    pub full_hdv: Option<&'a symthaea_core::hdc::unified_hv::ContinuousHV>,
 }
 
 /// Run stability regime processing (pre-parallel).
@@ -130,13 +133,23 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     {
         let hdv_sample: Vec<f32> =
             ctx.compressed_state[..64.min(ctx.compressed_state.len())].to_vec();
-        episodic_memory.encode(
+        let mem_id = episodic_memory.encode(
             ctx.input,
             hdv_sample,
             ctx.emotional_valence,
             ctx.phi,
             ctx.total_cycles,
         );
+
+        // Attach PolarQuant-compressed full HDC vector for high-fidelity recall.
+        // Reduces 64KB (16,384 x f32) to ~8KB at 4-bit quantization.
+        #[cfg(feature = "turbo-quant")]
+        if let Some(full_hv) = ctx.full_hdv {
+            if let Ok(compressor) = crate::hdc::hv_compression::HvCompressor::new(4) {
+                let compressed = compressor.compress(full_hv);
+                episodic_memory.attach_compressed_hv(mem_id, compressed);
+            }
+        }
     }
 
     // Resonator memory: store with bound attributes for factorized recall

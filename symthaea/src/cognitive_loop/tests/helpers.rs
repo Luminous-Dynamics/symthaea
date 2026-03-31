@@ -421,6 +421,8 @@ fn test_episodic_learning_context_construction() {
         detected_primitives: &prims,
         memory_context_boost: 0.1,
         wm_importance_boost: 0.2,
+        #[cfg(feature = "turbo-quant")]
+        full_hdv: None,
     };
     assert_eq!(ctx.total_cycles, 100);
     assert!(ctx.in_flow);
