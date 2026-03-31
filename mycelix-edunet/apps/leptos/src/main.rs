@@ -4,6 +4,7 @@
 
 use leptos::prelude::*;
 
+mod achievements;
 mod adaptivity_provider;
 mod app;
 mod cognitive_adaptivity;
@@ -17,8 +18,10 @@ mod learning_engine;
 mod pages;
 mod persistence;
 mod role;
+mod search;
 mod social_proof;
 mod student_profile;
+mod study_tracker;
 mod theme;
 
 fn main() {

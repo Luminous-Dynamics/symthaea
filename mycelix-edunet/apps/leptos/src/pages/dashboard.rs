@@ -179,6 +179,9 @@ pub fn DashboardPage() -> impl IntoView {
         <div class="dashboard">
             <h2>"Dashboard"</h2>
 
+            // Exam countdown + streak (real data)
+            <crate::study_tracker::ExamCountdown />
+
             // CAPS Progress Overview
             <CapsProgressCard />
 
@@ -249,6 +252,24 @@ pub fn DashboardPage() -> impl IntoView {
                     <div style="font-weight: 600; font-size: 0.85rem">"Exam Prep"</div>
                 </a>
             </div>
+
+            // Learning velocity + due cards
+            <div class="dashboard-grid">
+                <crate::study_tracker::LearningVelocity />
+                <crate::study_tracker::DueCardsQueue />
+            </div>
+
+            // Achievement milestones
+            <crate::achievements::AchievementBadges />
+
+            // Share progress
+            <ShareProgress />
+
+            // Mastery heat map
+            <MasteryHeatMap />
+
+            // Subject mastery breakdown
+            <SubjectMasteryBreakdown />
 
             <div class="dashboard-grid">
                 <SovereigntyCard />
@@ -1071,6 +1092,159 @@ fn CapsRecommendationsSection() -> impl IntoView {
                     }).collect::<Vec<_>>()
                 }}
             </div>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mastery Heat Map — visual grid of Gr12 topics colored by mastery
+// ---------------------------------------------------------------------------
+
+#[component]
+fn MasteryHeatMap() -> impl IntoView {
+    let progress = use_progress();
+
+    view! {
+        <div class="dash-section">
+            <h3>"Mastery Map"</h3>
+            {move || {
+                let p = progress.get();
+                let graph = caps_graph();
+
+                let gr12: Vec<_> = graph.nodes.iter()
+                    .filter(|n| n.grade_levels.first().map(|g| g == "Grade12").unwrap_or(false))
+                    .collect();
+
+                view! {
+                    <div class="mastery-heatmap">
+                        {gr12.iter().map(|n| {
+                            let np = p.get(&n.id);
+                            let (bg, border) = match np.status {
+                                ProgressStatus::Mastered => ("var(--mastery-green)", "var(--mastery-green)"),
+                                ProgressStatus::Studying => ("var(--mastery-yellow)", "var(--mastery-yellow)"),
+                                ProgressStatus::NotStarted => ("var(--border)", "transparent"),
+                            };
+                            let title = n.title.clone();
+                            let href = format!("/study/{}", n.id);
+                            let short: String = if title.chars().count() > 12 {
+                                title.chars().take(10).collect::<String>() + ".."
+                            } else {
+                                title.clone()
+                            };
+                            view! {
+                                <a href=href class="heatmap-cell" title=title
+                                   style=format!("background: {}; border-color: {}", bg, border)>
+                                    {short}
+                                </a>
+                            }
+                        }).collect::<Vec<_>>()}
+                    </div>
+                }
+            }}
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Subject Mastery Breakdown — real data replacing mock
+// ---------------------------------------------------------------------------
+
+#[component]
+fn ShareProgress() -> impl IntoView {
+    let progress = use_progress();
+    let tracker = crate::study_tracker::use_tracker();
+    let profile = crate::student_profile::use_profile();
+    let (copied, set_copied) = signal(false);
+
+    let share_text = Memo::new(move |_| {
+        let p = progress.get();
+        let t = tracker.get();
+        let prof = profile.get();
+        let graph = caps_graph();
+        let mastered = p.mastered_count();
+        let total = graph.nodes.len();
+        let pct = if total > 0 { mastered * 100 / total } else { 0 };
+        let streak = t.current_streak();
+        let hours = t.hours_studied();
+        let days_left = t.days_until_exam().unwrap_or(0);
+
+        let name = if prof.name.is_empty() { "A student".to_string() } else { prof.name.clone() };
+        format!(
+            "{} on EduNet:\n\u{1F331} {} topics mastered ({}% of curriculum)\n\u{1F525} {}-day study streak\n\u{23F0} {:.0} hours studied\n\u{1F3AF} {} days until exams\n\nhttps://edunet.luminousdynamics.io",
+            name, mastered, pct, streak, hours, days_left
+        )
+    });
+
+    view! {
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem">
+            <button
+                style="flex: 1; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; font-family: inherit; transition: border-color 0.2s"
+                on:click=move |_| {
+                    let text = share_text.get();
+                    if let Some(window) = web_sys::window() {
+                        let clipboard = window.navigator().clipboard();
+                        let _ = clipboard.write_text(&text);
+                        set_copied.set(true);
+                        wasm_bindgen_futures::spawn_local(async move {
+                            gloo_timers::future::sleep(std::time::Duration::from_millis(2000)).await;
+                            set_copied.set(false);
+                        });
+                    }
+                }
+            >
+                {move || if copied.get() { "\u{2714} Copied!" } else { "\u{1F4CB} Share My Progress" }}
+            </button>
+        </div>
+    }
+}
+
+#[component]
+fn SubjectMasteryBreakdown() -> impl IntoView {
+    let progress = use_progress();
+
+    view! {
+        <div class="dash-section">
+            <h3>"Subject Mastery"</h3>
+            {move || {
+                let p = progress.get();
+                let graph = caps_graph();
+
+                let mut subjects: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
+                for n in &graph.nodes {
+                    let entry = subjects.entry(n.subject_area.clone()).or_insert((0, 0));
+                    entry.0 += 1; // total
+                    if p.get(&n.id).status == ProgressStatus::Mastered {
+                        entry.1 += 1; // mastered
+                    }
+                }
+
+                let mut subject_list: Vec<_> = subjects.into_iter().collect();
+                subject_list.sort_by(|a, b| b.1.0.cmp(&a.1.0)); // sort by total nodes
+                subject_list.truncate(6); // top 6 subjects
+
+                view! {
+                    <div class="skills-list">
+                        {subject_list.iter().map(|(subject, (total, mastered))| {
+                            let pct = if *total > 0 { *mastered * 100 / *total } else { 0 };
+                            let subject = subject.clone();
+                            let total = *total;
+                            let mastered = *mastered;
+                            view! {
+                                <div class="skill-row">
+                                    <div class="skill-info">
+                                        <span class="skill-name">{subject}</span>
+                                        <span class="skill-domain">{mastered}"/"{total}" topics"</span>
+                                    </div>
+                                    <div class="skill-bar-container">
+                                        <div class="skill-bar" style=format!("width: {}%", pct)></div>
+                                    </div>
+                                    <span class="skill-pct">{pct}"%"</span>
+                                </div>
+                            }
+                        }).collect::<Vec<_>>()}
+                    </div>
+                }
+            }}
         </div>
     }
 }

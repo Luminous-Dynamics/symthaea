@@ -163,7 +163,19 @@ body {
 .nav-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
 
-main { max-width: 1200px; margin: 0 auto; padding: 2rem; overflow-x: hidden; width: 100%; }
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    overflow-x: hidden;
+    width: 100%;
+    animation: page-enter 0.3s ease-out;
+}
+
+@keyframes page-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
 
 .home { text-align: center; padding: 4rem 0; }
 .home h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
@@ -4530,7 +4542,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     animation: refuge-enter 0.5s ease-out;
 }
 
-/* Vignette overlay for refuge warmth */
+/* Subtle warmth on study page — barely perceptible, not distracting */
 .study-refuge::before {
     content: "";
     position: fixed;
@@ -4538,7 +4550,11 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     background: var(--refuge-vignette);
     pointer-events: none;
     z-index: 0;
-    opacity: 0.6;
+    opacity: 0.15;
+}
+
+@media (max-width: 768px) {
+    .study-refuge::before { display: none; } /* No vignette on mobile — screen is small enough */
 }
 
 .study-refuge > * {
@@ -4637,6 +4653,303 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* ===========================================================================
+   Pomodoro Timer (ambient, study page)
+   =========================================================================== */
+
+.pomodoro-timer {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: opacity 0.3s;
+}
+
+.pomodoro-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.pomodoro-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 2px;
+    transition: width 1s linear;
+}
+
+/* ===========================================================================
+   Exam Countdown
+   =========================================================================== */
+
+.exam-countdown {
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+/* ===========================================================================
+   Today's Plan (home page)
+   =========================================================================== */
+
+.todays-plan {
+    max-width: 700px;
+    margin: 0 auto 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.plan-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.2s;
+    font-size: 0.85rem;
+}
+
+.plan-item:hover {
+    background: var(--surface-hover);
+}
+
+.plan-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.plan-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plan-time, .plan-pct, .plan-marks {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+.plan-pct { color: var(--warning); }
+.plan-marks { color: var(--primary); }
+
+/* ===========================================================================
+   Knowledge Decay Dew (constellation)
+   =========================================================================== */
+
+.decay-dew {
+    animation: dew-pulse 4s ease-in-out infinite;
+}
+
+@keyframes dew-pulse {
+    0%, 100% { opacity: inherit; }
+    50% { opacity: 0.1; }
+}
+
+/* ===========================================================================
+   Mastery Heat Map (dashboard)
+   =========================================================================== */
+
+.mastery-heatmap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.heatmap-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    color: var(--text);
+    text-decoration: none;
+    border: 1px solid transparent;
+    opacity: 0.85;
+    transition: opacity 0.2s, transform 0.15s;
+    min-width: 60px;
+    text-align: center;
+}
+
+.heatmap-cell:hover {
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ===========================================================================
+   Mock Exam Timer Bar
+   =========================================================================== */
+
+.exam-timer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* ===========================================================================
+   Due Cards & Velocity Widgets (dashboard)
+   =========================================================================== */
+
+.due-cards-widget, .velocity-widget {
+    padding: 1.25rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.due-cards-widget:hover, .velocity-widget:hover {
+    border-color: var(--primary);
+}
+
+/* ===========================================================================
+   Search Bar (navbar)
+   =========================================================================== */
+
+.search-container {
+    position: relative;
+    transition: flex 0.3s, max-width 0.3s;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.4rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.8rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.search-input:focus {
+    border-color: var(--primary);
+}
+
+.search-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: var(--surface-hover);
+}
+
+.search-result-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.search-result-meta {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    margin-top: 0.15rem;
+}
+
+@media (max-width: 768px) {
+    .search-container {
+        display: none; /* Hidden on mobile — use bottom nav */
+    }
+}
+
+/* ===========================================================================
+   Achievements
+   =========================================================================== */
+
+.achievements-section {
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.achievements-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.achievement-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    background: var(--soil-rich);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+}
+
+.achievement-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.achievement-icon {
+    font-size: 0.9rem;
+}
+
+.achievement-title {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.achievements-empty {
+    padding: 0.75rem;
+    text-align: center;
+}
+
+/* ===========================================================================
    Focus & Accessibility
    =========================================================================== */
 
@@ -4660,42 +4973,61 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
    Mobile: Bottom Tab Navigation
    =========================================================================== */
 
+/* Mobile bottom nav — proper 5-tab bar with icons */
+.mobile-bottom-nav {
+    display: none; /* Hidden on desktop */
+}
+
 @media (max-width: 768px) {
     .navbar {
+        display: none; /* Hide desktop navbar on mobile */
+    }
+
+    .mobile-bottom-nav {
+        display: flex;
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        top: auto;
-        padding: 0.5rem 0.75rem;
-        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0));
-        gap: 0.5rem;
-        border-bottom: none;
-        border-top: 1px solid var(--border);
+        padding: 0.4rem 0;
+        padding-bottom: calc(0.4rem + env(safe-area-inset-bottom, 0));
         background: var(--bg-raised);
+        border-top: 1px solid var(--border);
         z-index: 100;
         justify-content: space-around;
     }
-    .logo { display: none; } /* hide logo in bottom nav */
-    .nav-links {
-        flex: 1;
-        justify-content: space-around;
-        gap: 0;
-    }
-    .nav-links a {
-        font-size: 0.7rem;
+
+    .bottom-tab {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 2px;
         padding: 4px 8px;
+        text-decoration: none;
+        color: var(--text-tertiary);
+        transition: color 0.2s;
+        min-width: 48px;
+        -webkit-tap-highlight-color: transparent;
     }
-    .nav-actions { gap: 0.5rem; }
-    .nav-actions .connection-badge { display: none; } /* hide mock badge on mobile */
+
+    .bottom-tab:hover, .bottom-tab.active {
+        color: var(--primary);
+    }
+
+    .bottom-tab-icon {
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+
+    .bottom-tab-label {
+        font-size: 0.6rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+    }
 
     main {
         padding: 1rem;
-        padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0)); /* space for bottom nav */
+        padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0));
         max-width: 100%;
     }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // EduNet Service Worker — offline-after-first-load
-const CACHE_NAME = 'edunet-v1';
+const CACHE_NAME = 'edunet-v2';
 const PRECACHE = [
   '/',
   '/index.html',

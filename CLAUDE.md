@@ -56,11 +56,14 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 ### EduNet (Learning Platform)
 - **Live**: https://edunet.luminousdynamics.io (Cloudflare Tunnel → :8107)
 - **IPFS**: `QmcB9rh3yQzmMP6kwQtXVgrBWdyCumTE2aEAg2Pb46gDCM` (decentralized fallback)
-- **Path**: `mycelix-edunet/apps/leptos/` (Leptos 0.7 CSR WASM)
-- **Code**: 42 Rust source files, 5.6MB WASM, 19 content modules, 13 standards sources
-- **Coverage**: 2,002 curriculum nodes, 1,848 edges, 48 subjects, K-to-PhD
+- **Path**: `mycelix-edunet/apps/leptos/` (Leptos 0.8 CSR WASM)
+- **Code**: ~50 Rust source files, 4.5MB WASM (wasm-opt'd, ~1MB gzipped), 19 content modules, 13 standards sources
+- **Coverage**: 2,002 curriculum nodes, 172 lesson JSONs, 48 subjects, K-to-PhD
 - **Frameworks**: CAPS (SA Gr1-12), Common Core (US), NGSS, ACM CS2013, MIT OCW, NICE Cybersecurity, Philosophy, 12 Universal subjects
-- **Features**: SVG constellation graph, 9 interactive games (parabola, tangent, unit circle, stats, analytical geom, projectile, circuits, equilibrium, acid-base), consciousness-coupled UI, conversational onboarding, SRS flashcards, exam prep, NSC insights, mastery celebrations, PWA
+- **Pages**: 11 (Home, Constellation, Study, Review, Dashboard, ExamPrep, MockExam, Courses, Teacher, Governance, Credentials)
+- **Games**: 12 interactive SVG (parabola, tangent, unit circle, stats, analytical geom, projectile, circuits, equilibrium, acid-base, budget simulator, password strength, fallacy detector)
+- **Learning Science**: BKT adaptive difficulty, SM-2 spaced repetition (46 cards), session orchestrator, knowledge decay (Ebbinghaus), Pomodoro timer, timed mock exams (Paper 1/2)
+- **UX**: Indlela design system (growth stages, prospect/refuge, organic scores), mobile bottom nav, search bar, 13 achievements, mastery heat map, learning velocity, exam countdown, study notes, progress sharing, smart first-visit, system theme auto-detect
 - **Deploy**: `./deploy.sh` (re-pins IPFS + updates DNS), Cloudflare Tunnel `edunet` (ID: 347ade4d)
 - **Tests**: 187 (118 ingest + 69 content-gen)
 - **Tunnel start**: `cloudflared tunnel run edunet` (needs SPA server on :8107)

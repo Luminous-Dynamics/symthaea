@@ -77,20 +77,21 @@ impl TasteMelody {
             self.phrase_notes = 0;
             self.seed = self.seed.wrapping_mul(2654435761);
             let base_len = 4 + ((self.seed >> 20) % 4) as usize;
-            // Ascending phrases slightly longer to balance direction ratio
-            self.phrase_length = if self.ascending { base_len + 2 } else { base_len };
+            // Ascending phrases longer to balance direction (38%→50%)
+            self.phrase_length = if self.ascending { base_len + 3 } else { base_len };
             if consciousness > 0.7 { self.phrase_length += 1; }
         }
 
-        // Determine interval size (tuned to benchmark targets)
-        let step = if r < 5 {
-            0 // 5% deliberate repeat (rhythmic emphasis) — target 10% but some come from chord snapping
-        } else if r < 70 {
-            1 // 65% step (1 scale degree) — target 55%, overweight to compensate for chord snaps
-        } else if r < 85 {
-            2 // 15% third (2 scale degrees) — target 15%
+        // Determine interval size (tuned from benchmark feedback)
+        // v6→v7: steps 36→55%, thirds 26→15%, repeated 26→10%
+        let step = if r < 2 {
+            0 // 2% deliberate repeat — chord snap adds ~8% more
+        } else if r < 77 {
+            1 // 75% step — produces ~55% after chord snap dilution
+        } else if r < 87 {
+            2 // 10% third
         } else {
-            3 + ((self.seed >> 24) % 2) as usize // 15% leap (3-4 degrees) — target 15%
+            3 + ((self.seed >> 24) % 2) as usize // 13% leap
         };
 
         // Apply direction
@@ -214,11 +215,11 @@ pub fn build_scale(root_semitones: i32, major: bool) -> Vec<f32> {
 
     let root_freq = 261.63 * 2.0f32.powf(root_semitones as f32 / 12.0); // from C4
     let center = 440.0; // A4
-    let half_range = 10.0; // ±10 semitones from center = 20 semi total
+    let half_range = 12.0; // ±12 semitones from center = 24 semi total (wider for more unique pitches)
 
     let mut tones = Vec::new();
-    // Build 3 octaves of scale, then filter to range
-    for octave_shift in -1..=1 {
+    // Build 4 octaves of scale, then filter to range
+    for octave_shift in -2..=1 {
         for &interval in intervals {
             let freq = root_freq * 2.0f32.powf((interval + octave_shift * 12) as f32 / 12.0);
             let distance = (freq / center).log2() * 12.0;

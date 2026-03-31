@@ -114,6 +114,8 @@ fn MentorGreeting(
     let profile = use_profile();
 
     // Personalized greeting based on time of day + student name
+    let progress = use_progress();
+
     let greeting = {
         let hour = (js_sys::Date::new_0().get_hours()) as u8;
         let name = profile.get_untracked().name;
@@ -128,6 +130,12 @@ fn MentorGreeting(
         } else {
             format!("{}, {}.", time_greeting, name)
         }
+    };
+
+    // Check if this is effectively a first visit (no progress yet)
+    let is_first_visit = {
+        let p = progress.get_untracked();
+        p.mastered_count() == 0 && p.studying_count() == 0
     };
 
     let on_practice = move |_| {
@@ -163,6 +171,45 @@ fn MentorGreeting(
                 <h1 class="mentor-hello">{greeting}</h1>
                 <p class="mentor-question">"What do you want to do today?"</p>
             </div>
+
+            // First visit guidance — warm, specific, not overwhelming
+            {if is_first_visit {
+                // Find a good first topic based on the student's grade
+                let grade = profile.get_untracked().grade;
+                let graph = caps_graph();
+                let grade_str = format!("Grade{}", grade);
+                let first_topic = graph.nodes.iter()
+                    .filter(|n| n.grade_levels.first().map(|g| g == &grade_str).unwrap_or(false))
+                    .filter(|n| n.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0) > 0)
+                    .max_by_key(|n| n.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0));
+
+                if let Some(topic) = first_topic {
+                    let href = format!("/study/{}", topic.id);
+                    let title = topic.title.clone();
+                    let marks = topic.exam_weight.as_ref().map(|w| w.marks).unwrap_or(0);
+                    view! {
+                        <div class="first-visit-guide" style="max-width: 700px; margin: 0 auto 1.5rem; padding: 1.25rem; background: var(--soil-rich); border-radius: 16px; text-align: left">
+                            <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem">
+                                "\u{1F331} Welcome to your knowledge garden"
+                            </div>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.6">
+                                "Everything starts with one seed. Here's a good first topic for Grade "{grade}":"
+                            </p>
+                            <a href=href style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--text); transition: border-color 0.2s">
+                                <span style="font-weight: 600; font-size: 0.9rem">{title}</span>
+                                <span style="font-size: 0.75rem; color: var(--primary)">{marks}"m \u{2192}"</span>
+                            </a>
+                            <p style="font-size: 0.7rem; color: var(--text-tertiary); margin-top: 0.5rem">
+                                "Or explore freely below \u{2014} there's no wrong way to start."
+                            </p>
+                        </div>
+                    }.into_any()
+                } else {
+                    view! { <span></span> }.into_any()
+                }
+            } else {
+                view! { <span></span> }.into_any()
+            }}
 
             // Session orchestrator — smart start based on current state
             {
@@ -237,7 +284,19 @@ fn MentorGreeting(
                     <span class="intention-label">"Explore freely"</span>
                     <span class="intention-hint">"Browse without tracking"</span>
                 </button>
+
+                <button class="intention-card intention-exam" on:click=move |_| {
+                    set_role.set(Some(UserRole::Student));
+                    navigate("/mock-exam", Default::default());
+                }>
+                    <span class="intention-icon">"\u{23F1}"</span>
+                    <span class="intention-label">"Mock exam"</span>
+                    <span class="intention-hint">"Practice under pressure"</span>
+                </button>
             </div>
+
+            // Today's personalized study plan
+            <crate::study_tracker::TodaysPlan />
 
             <div class="mentor-footer">
                 <p class="privacy-note">
@@ -445,8 +504,9 @@ fn OnboardingFlow(
                         <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--primary)">
                             "Nice to meet you, "{name_val}"."
                         </h1>
-                        <p style="color: var(--text-secondary); margin-bottom: 2rem">"What grade are you in?"</p>
-                        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap">
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem">"What grade are you in?"</p>
+                        // Primary grades (high school)
+                        <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem">
                             {[9_u8, 10, 11, 12].into_iter().map(|g| {
                                 view! {
                                     <button
@@ -461,6 +521,28 @@ fn OnboardingFlow(
                                 }
                             }).collect::<Vec<_>>()}
                         </div>
+                        // Earlier grades + foundations
+                        <details style="margin-top: 0.5rem; text-align: center">
+                            <summary style="font-size: 0.85rem; color: var(--text-tertiary); cursor: pointer; padding: 0.5rem">"Earlier grades or need to review basics?"</summary>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 0.75rem">
+                                {(1_u8..=8).map(|g| {
+                                    view! {
+                                        <button
+                                            style="padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; min-width: 60px; font-family: inherit"
+                                            on:click=move |_| {
+                                                set_grade.set(g);
+                                                finish_onboarding();
+                                            }
+                                        >
+                                            "Gr "{g}
+                                        </button>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                            <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.75rem">
+                                "No shame in going back to strengthen foundations. The strongest trees have the deepest roots."
+                            </p>
+                        </details>
                     </div>
                 }.into_any()
             } else {

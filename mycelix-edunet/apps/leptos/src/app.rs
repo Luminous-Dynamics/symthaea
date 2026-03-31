@@ -40,6 +40,7 @@ fn AppInner() -> impl IntoView {
     let (_theme, _set_theme) = provide_theme_context();
     let (_profile, _set_profile) = provide_profile_context();
     provide_curriculum_context();
+    crate::study_tracker::provide_study_tracker();
 
     // Wire consciousness signals to CSS custom properties
     crate::consciousness_ui::init_consciousness_ui();
@@ -51,6 +52,7 @@ fn AppInner() -> impl IntoView {
                 <div class="nav-links">
                     <RoleNav role=role />
                 </div>
+                <crate::search::SearchBar />
                 <div class="nav-actions">
                     <ThemeToggle />
                     <ConnectionBadge />
@@ -66,11 +68,13 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/skill-map") view=SkillMapPage />
                     <Route path=path!("/study/:id") view=StudyPageWrapper />
                     <Route path=path!("/exam-prep") view=ExamPrepPage />
+                    <Route path=path!("/mock-exam") view=MockExamPage />
                     <Route path=path!("/teacher") view=TeacherDashboardPage />
                     <Route path=path!("/governance") view=GovernancePage />
                     <Route path=path!("/credentials") view=CredentialsPage />
                 </Routes>
             </main>
+            <MobileBottomNav />
         </Router>
     }
 }
@@ -141,6 +145,35 @@ fn CelebrationOverlay() -> impl IntoView {
                 view! { <span></span> }.into_any()
             }
         }}
+    }
+}
+
+/// Mobile-only bottom navigation with icons — 5 main sections.
+#[component]
+fn MobileBottomNav() -> impl IntoView {
+    view! {
+        <nav class="mobile-bottom-nav" aria-label="Main navigation">
+            <a href="/" class="bottom-tab">
+                <span class="bottom-tab-icon">"\u{1F3E0}"</span>
+                <span class="bottom-tab-label">"Home"</span>
+            </a>
+            <a href="/skill-map" class="bottom-tab">
+                <span class="bottom-tab-icon">"\u{2728}"</span>
+                <span class="bottom-tab-label">"Explore"</span>
+            </a>
+            <a href="/review" class="bottom-tab">
+                <span class="bottom-tab-icon">"\u{1F4DD}"</span>
+                <span class="bottom-tab-label">"Review"</span>
+            </a>
+            <a href="/dashboard" class="bottom-tab">
+                <span class="bottom-tab-icon">"\u{1F4CA}"</span>
+                <span class="bottom-tab-label">"Progress"</span>
+            </a>
+            <a href="/exam-prep" class="bottom-tab">
+                <span class="bottom-tab-icon">"\u{1F3AF}"</span>
+                <span class="bottom-tab-label">"Exam"</span>
+            </a>
+        </nav>
     }
 }
 

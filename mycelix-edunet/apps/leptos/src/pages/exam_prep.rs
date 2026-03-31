@@ -9,14 +9,21 @@
 use leptos::prelude::*;
 
 use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus};
+use crate::student_profile::use_profile;
 
 #[component]
 pub fn ExamPrepPage() -> impl IntoView {
     let progress = use_progress();
     let set_progress = use_set_progress();
     let graph = caps_graph();
+    let profile = use_profile();
 
-    let (exam_date, set_exam_date) = signal("2026-10-26".to_string());
+    // Use exam date from student profile if available, otherwise default
+    let initial_date = {
+        let p = profile.get_untracked();
+        if p.exam_date.is_empty() { "2026-10-26".to_string() } else { p.exam_date.clone() }
+    };
+    let (exam_date, set_exam_date) = signal(initial_date);
     let (hours_per_day, set_hours_per_day) = signal(3u8);
     let (show_schedule, set_show_schedule) = signal(false);
 
@@ -63,9 +70,14 @@ pub fn ExamPrepPage() -> impl IntoView {
             </a>
 
             <h1 style="font-size: 1.5rem; margin: 1rem 0 0.5rem">"NSC Exam Preparation"</h1>
-            <p style="color: var(--text-secondary); margin-bottom: 1.5rem">
+            <p style="color: var(--text-secondary); margin-bottom: 1rem">
                 "Topics ranked by priority: exam weight \u{00D7} (1 \u{2212} mastery)"
             </p>
+
+            // Mock exam link
+            <a href="/mock-exam" style="display: block; padding: 0.75rem 1rem; background: linear-gradient(135deg, var(--primary), #6d28d9); border-radius: 10px; text-decoration: none; color: var(--text-on-primary); margin-bottom: 1.5rem; text-align: center; font-weight: 600; transition: transform 0.15s">
+                "\u{23F1} Take a Mock Exam"
+            </a>
 
             // Summary cards
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem">

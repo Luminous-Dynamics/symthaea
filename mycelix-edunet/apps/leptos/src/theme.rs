@@ -52,9 +52,18 @@ impl Theme {
 
 const THEME_KEY: &str = "edunet_theme";
 
+/// Detect system color scheme preference.
+fn system_theme() -> Theme {
+    web_sys::window()
+        .and_then(|w| w.match_media("(prefers-color-scheme: light)").ok().flatten())
+        .map(|mql| if mql.matches() { Theme::Light } else { Theme::Dark })
+        .unwrap_or(Theme::Dark)
+}
+
 /// Provide theme context. Call once at app root.
+/// Respects system preference on first visit, then uses localStorage.
 pub fn provide_theme_context() -> (ReadSignal<Theme>, WriteSignal<Theme>) {
-    let initial = persistence::load::<Theme>(THEME_KEY).unwrap_or(Theme::Dark);
+    let initial = persistence::load::<Theme>(THEME_KEY).unwrap_or_else(|| system_theme());
     let (theme, set_theme) = signal(initial);
 
     // Apply theme + time-of-day attributes to <html> reactively

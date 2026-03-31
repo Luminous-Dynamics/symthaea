@@ -17,6 +17,7 @@ use wasm_bindgen_futures::JsFuture;
 use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus, BktState};
 use crate::games;
 use crate::social_proof;
+use crate::persistence;
 
 // ============================================================
 // Lesson data types (from generated JSON)
@@ -179,6 +180,9 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
 
     view! {
         <div class="caps-skill-map study-refuge">
+            // Pomodoro timer (ambient, at top)
+            <crate::study_tracker::PomodoroTimer />
+
             // Back link — return to prospect
             <a href="/skill-map" class="refuge-back-link">
                 "\u{2190} Back to constellation"
@@ -266,6 +270,8 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                     on:click=move |_| set_active_tab.set("practice")>"Practice"</button>
                 <button class=move || if active_tab.get() == "pitfalls" { "caps-tab active" } else { "caps-tab" }
                     on:click=move |_| set_active_tab.set("pitfalls")>"Pitfalls"</button>
+                <button class=move || if active_tab.get() == "notes" { "caps-tab active" } else { "caps-tab" }
+                    on:click=move |_| set_active_tab.set("notes")>"Notes"</button>
                 {if games::has_game(&node_id_for_status) {
                     view! {
                         <button class=move || if active_tab.get() == "explore" { "caps-tab active" } else { "caps-tab" }
@@ -506,16 +512,66 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                     <div style=move || if active_tab.get() == "explore" { "display: block" } else { "display: none" }>
                                         <games::GameContainer node_id=node_id.clone() />
                                     </div>
+
+                                    // Notes tab
+                                    <div style=move || if active_tab.get() == "notes" { "display: block" } else { "display: none" }>
+                                        {
+                                            let notes_key = format!("edunet_notes_{}", node_id);
+                                            let initial_notes = persistence::load::<String>(&notes_key).unwrap_or_default();
+                                            let (notes, set_notes) = signal(initial_notes);
+                                            let notes_key_save = notes_key.clone();
+
+                                            view! {
+                                                <div class="caps-detail">
+                                                    <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-secondary)">"Your Notes"</h3>
+                                                    <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.75rem">"Write anything that helps you remember. Saved automatically."</p>
+                                                    <textarea
+                                                        style="width: 100%; min-height: 150px; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; font-family: inherit; resize: vertical; line-height: 1.6; outline: none"
+                                                        placeholder="Write your notes here..."
+                                                        prop:value=move || notes.get()
+                                                        on:input=move |ev| {
+                                                            let val = leptos::prelude::event_target_value(&ev);
+                                                            set_notes.set(val.clone());
+                                                            persistence::save(&notes_key_save, &val);
+                                                        }
+                                                    ></textarea>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
                                 }.into_any()
                             }
-                            Err(e) => {
-                                let err_msg = e.clone();
+                            Err(_e) => {
+                                let desc = description.clone();
+                                let sub = subdomain.clone();
                                 view! {
-                                    <div class="caps-detail">
-                                        <p style="color: var(--text-secondary)">"Could not load lesson content: "{err_msg}</p>
-                                        <p style="color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.85rem">
-                                            {description.clone()}
+                                    <div class="caps-detail" style="margin-top: 1rem">
+                                        <div style="padding: 0.75rem; background: var(--soil-sandy); border-radius: 8px; margin-bottom: 1rem">
+                                            <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem">
+                                                "This lesson is still growing"
+                                            </div>
+                                            <div style="font-size: 0.8rem; color: var(--text-tertiary)">
+                                                "Full content isn't available yet, but here's what we know about this topic."
+                                            </div>
+                                        </div>
+                                        <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem">"Overview"</h3>
+                                        <p style="font-size: 0.9rem; line-height: 1.7; color: var(--text-secondary)">
+                                            {desc}
                                         </p>
+                                        {if !sub.is_empty() {
+                                            view! {
+                                                <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 0.5rem">
+                                                    "Part of: "{sub}
+                                                </p>
+                                            }.into_any()
+                                        } else {
+                                            view! { <span></span> }.into_any()
+                                        }}
+                                        <div style="margin-top: 1rem">
+                                            <a href="/skill-map" style="color: var(--primary); text-decoration: none; font-size: 0.85rem">
+                                                "\u{2190} Explore related topics in the constellation"
+                                            </a>
+                                        </div>
                                     </div>
                                 }.into_any()
                             }

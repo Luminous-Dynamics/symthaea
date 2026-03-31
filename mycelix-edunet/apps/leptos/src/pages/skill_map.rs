@@ -40,6 +40,16 @@ fn community_soil(node_id: &str) -> f64 {
     0.4 + (hash % 400) as f64 / 1000.0
 }
 
+/// Knowledge decay factor (0.0 = fresh, 1.0 = very stale).
+/// Based on time since last review. Returns 0 for unstarted topics.
+fn knowledge_decay(last_reviewed: Option<f64>) -> f64 {
+    let Some(last) = last_reviewed else { return 0.0 };
+    let now = js_sys::Date::now();
+    let days_since = (now - last) / (24.0 * 60.0 * 60.0 * 1000.0);
+    // Exponential decay: 50% forgotten after 7 days (Ebbinghaus curve approximation)
+    (1.0 - (-days_since / 10.0_f64).exp()).min(1.0).max(0.0)
+}
+
 // ============================================================
 // Page component
 // ============================================================
@@ -179,18 +189,19 @@ pub fn SkillMapPage() -> impl IntoView {
 
                 let has_game_fn = crate::games::has_game;
 
-                let positions: Vec<(f64, f64, String, String, ProgressStatus, Option<u16>, bool, f64)> = nodes.iter().enumerate().map(|(i, n)| {
+                let positions: Vec<(f64, f64, String, String, ProgressStatus, Option<u16>, bool, f64, f64)> = nodes.iter().enumerate().map(|(i, n)| {
                     let row = i / cols;
                     let col = i % cols;
-                    // Stagger odd rows for organic feel
                     let x_offset = if row % 2 == 1 { spacing_x * 0.5 } else { 0.0 };
                     let x = margin + col as f64 * spacing_x + x_offset;
                     let y = margin + row as f64 * spacing_y;
-                    let status = p.get(&n.id).status;
+                    let np = p.get(&n.id);
+                    let status = np.status;
                     let marks = n.exam_weight.as_ref().map(|w| w.marks);
                     let has_game = has_game_fn(&n.id);
                     let soil = community_soil(&n.id);
-                    (x, y, n.id.clone(), n.title.clone(), status, marks, has_game, soil)
+                    let decay = knowledge_decay(np.last_reviewed);
+                    (x, y, n.id.clone(), n.title.clone(), status, marks, has_game, soil, decay)
                 }).collect();
 
                 let rows = (node_count + cols - 1) / cols;
@@ -230,9 +241,10 @@ pub fn SkillMapPage() -> impl IntoView {
                             }).collect::<Vec<_>>()}
 
                             // Nodes — organic growth stages (seed → sprout → tree)
-                            {positions.iter().map(|(x, y, id, title, status, marks, has_game, soil)| {
+                            {positions.iter().map(|(x, y, id, title, status, marks, has_game, soil, decay)| {
                                 let x = *x; let y = *y;
                                 let soil = *soil;
+                                let decay = *decay;
                                 let id_click = id.clone();
                                 let title_short: String = if title.chars().count() > 18 {
                                     title.chars().take(16).collect::<String>() + "..."
@@ -254,6 +266,20 @@ pub fn SkillMapPage() -> impl IntoView {
 
                                         // Community soil glow (Ubuntu: collective warmth)
                                         <circle cx=x cy=y r={r + 8.0} fill="var(--mastery-green)" opacity=soil_opacity class="soil-glow" />
+
+                                        // Knowledge decay dew (fading knowledge needs refreshing)
+                                        {if decay > 0.15 && *status != ProgressStatus::NotStarted {
+                                            let dew_opacity = format!("{:.2}", decay * 0.3);
+                                            let dew_r = r + 5.0 + decay * 4.0;
+                                            view! {
+                                                <circle cx=x cy=y r=dew_r fill="none"
+                                                    stroke="var(--info)" stroke-width="1.5"
+                                                    opacity=dew_opacity stroke-dasharray="3 4"
+                                                    class="decay-dew" />
+                                            }.into_any()
+                                        } else {
+                                            view! { <g></g> }.into_any()
+                                        }}
 
                                         // Root lines for mastered nodes (visible anchoring)
                                         {if *status == ProgressStatus::Mastered {
