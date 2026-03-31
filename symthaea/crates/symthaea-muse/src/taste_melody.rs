@@ -82,16 +82,16 @@ impl TasteMelody {
             if consciousness > 0.7 { self.phrase_length += 1; }
         }
 
-        // Determine interval size (tuned from benchmark v8 feedback)
-        // v8: steps 42%, thirds 25%, repeated 21%. Need steps→55%, thirds→15%
+        // Determine interval size (v8 was best: 75% step produced 42% effective)
+        // v9 tried 80% but scored worse. Keeping v8 ratios.
         let step = if r < 2 {
             0 // 2% deliberate repeat
-        } else if r < 82 {
-            1 // 80% step — need more to hit 55% after dilution
-        } else if r < 90 {
-            2 // 8% third (was 10%)
+        } else if r < 77 {
+            1 // 75% step
+        } else if r < 87 {
+            2 // 10% third
         } else {
-            3 + ((self.seed >> 24) % 2) as usize // 10% leap
+            3 + ((self.seed >> 24) % 2) as usize // 13% leap
         };
 
         // Apply direction
