@@ -24,7 +24,7 @@ pub struct KokoroConfig {
 impl Default for KokoroConfig {
     fn default() -> Self {
         Self {
-            repo_id: "hexgrad/Kokoro-82M-v1.0-ONNX".to_string(),
+            repo_id: "onnx-community/Kokoro-82M-v1.0-ONNX".to_string(),
             model_filename: "kokoro-v1.0.onnx".to_string(),
             voices_filename: "voices-v1.0.bin".to_string(),
             sample_rate: 24000,
