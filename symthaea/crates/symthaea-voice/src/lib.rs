@@ -12,6 +12,7 @@
 //!                     Consciousness State (prosody)
 //! ```
 
+pub mod cmudict;
 pub mod g2p;
 pub mod formants;
 pub mod ltc_voice;

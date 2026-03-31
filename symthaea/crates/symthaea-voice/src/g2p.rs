@@ -22,7 +22,10 @@ pub fn text_to_phonemes(text: &str) -> Vec<Phoneme> {
         let clean = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
         if clean.is_empty() { continue; }
 
-        if let Some(dict_entry) = get_dict().get(clean.as_str()) {
+        // Priority: 1) CMUdict (134K words), 2) hand-tuned dict, 3) letter fallback
+        if let Some(cmu_phonemes) = crate::cmudict::lookup(&clean) {
+            result.extend(cmu_phonemes.iter().cloned());
+        } else if let Some(dict_entry) = get_dict().get(clean.as_str()) {
             result.extend(dict_entry.iter().map(|&(ipa, v, s, d)| Phoneme {
                 ipa, is_vowel: v, stress: s, base_duration_ms: d,
             }));
