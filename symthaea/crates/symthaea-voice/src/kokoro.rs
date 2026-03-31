@@ -25,8 +25,8 @@ impl Default for KokoroConfig {
     fn default() -> Self {
         Self {
             repo_id: "onnx-community/Kokoro-82M-v1.0-ONNX".to_string(),
-            model_filename: "kokoro-v1.0.onnx".to_string(),
-            voices_filename: "voices-v1.0.bin".to_string(),
+            model_filename: "onnx/model.onnx".to_string(),
+            voices_filename: "voices/af_heart.bin".to_string(), // warm female voice
             sample_rate: 24000,
             default_voice: 0,
         }
@@ -67,10 +67,16 @@ impl KokoroEngine {
 
         let voices = match repo.get(&config.voices_filename) {
             Ok(path) => {
+                info!("Voice file at: {:?}", path);
                 let data = std::fs::read(&path).unwrap_or_default();
-                parse_voice_pack(&data)
+                let v = parse_voice_pack(&data);
+                info!("Loaded {} voice(s), embed dim={}", v.len(), v.first().map(|x| x.len()).unwrap_or(0));
+                v
             }
-            Err(_) => vec![vec![0.0f32; 256]],
+            Err(e) => {
+                warn!("Voice download failed: {}. Using zero voice.", e);
+                vec![vec![0.0f32; 256]]
+            }
         };
 
         info!("Kokoro loaded: {} voices", voices.len());
