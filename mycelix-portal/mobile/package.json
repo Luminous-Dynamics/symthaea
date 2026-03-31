@@ -1,0 +1,19 @@
+{
+  "name": "mycelix-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "cd .. && trunk build --release && npx cap sync",
+    "android": "npx cap open android",
+    "ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

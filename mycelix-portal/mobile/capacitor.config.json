@@ -1,0 +1,16 @@
+{
+  "appId": "io.luminousdynamics.mycelix",
+  "appName": "Mycelix",
+  "webDir": "../dist",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["localhost:8888"]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#030808",
+      "showSpinner": false
+    }
+  }
+}
