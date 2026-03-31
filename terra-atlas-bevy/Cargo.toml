@@ -1,0 +1,22 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "terra-atlas-bevy"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Bevy 0.18 plugin for Terra Atlas globe rendering"
+
+[dependencies]
+terra-atlas-core = { path = "../terra-atlas-core" }
+
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_asset", "bevy_core_pipeline", "bevy_render",
+    "bevy_pbr", "bevy_light", "bevy_mesh", "bevy_camera",
+    "bevy_shader", "bevy_post_process", "bevy_color",
+    "bevy_text", "bevy_ui", "bevy_ui_render",
+    "bevy_state", "bevy_winit", "bevy_log",
+    "bevy_gizmos", "bevy_gizmos_render",
+    "multi_threaded", "x11",
+    "png", "jpeg",
+] }

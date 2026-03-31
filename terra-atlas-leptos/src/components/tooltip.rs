@@ -36,6 +36,14 @@ pub fn Tooltip() -> impl IntoView {
                 format!("{}\nPop {:.0}M | GDP ${:.0}k | Φ {:.2} | Climate Risk {:.0}%",
                     r.name, r.population_m, r.gdp_per_capita / 1000.0, r.phi_mean, r.climate_vulnerability * 100.0)
             }
+            Some(HoverInfo::FossilDeposit(d)) => {
+                format!("{} ({:?})\n{:.0} Mboe reserves | {} | {}",
+                    d.name, d.fuel_type, d.proven_reserves_mboe, d.status, d.country)
+            }
+            Some(HoverInfo::NuclearSite(n)) => {
+                format!("{} ({} {})\n{:.0} MW | {} | {}",
+                    n.name, n.reactor_type.label(), n.country, n.capacity_mw, n.status, n.operator)
+            }
             None => String::new(),
         }
     };

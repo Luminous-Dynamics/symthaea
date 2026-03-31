@@ -88,15 +88,16 @@ impl Plugin for SymtropyPlugin {
                 systems::living_dungeon::living_dungeon_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
             // Consciousness aura + resonance wave visual manifold
-            .add_systems(Update, (
-                systems::consciousness_aura::spawn_auras,
-                systems::consciousness_aura::aura_update_system,
-                systems::consciousness_aura::resonance_wave_system,
-                systems::consciousness_aura::resonance_wave_animate_system,
-                systems::consciousness_aura::consciousness_perception_gate_system,
-                systems::dimensional_leakage::dimensional_leakage_system,
-                systems::dimensional_leakage::leakage_visual_system,
-            ).chain().run_if(in_state(GamePhase::Playing)))
+            // FIXME: B0001 query conflict — disabled until query filters are fixed
+            // .add_systems(Update, (
+            //     systems::consciousness_aura::spawn_auras,
+            //     systems::consciousness_aura::aura_update_system,
+            //     systems::consciousness_aura::resonance_wave_system,
+            //     systems::consciousness_aura::resonance_wave_animate_system,
+            //     systems::consciousness_aura::consciousness_perception_gate_system,
+            //     systems::dimensional_leakage::dimensional_leakage_system,
+            //     systems::dimensional_leakage::leakage_visual_system,
+            // ).chain().run_if(in_state(GamePhase::Playing)))
             // Mycelix physicalized cryptography (only when --features mycelix)
             ;
         // Terra Atlas globe view (only when --features atlas)
@@ -104,14 +105,24 @@ impl Plugin for SymtropyPlugin {
         {
             app
                 .init_resource::<terra_atlas_bevy::camera::OrbitalCameraConfig>()
+                .init_resource::<terra_atlas_bevy::timeline::TimelineState>()
+                .init_resource::<terra_atlas_bevy::selection::SelectedMarker>()
                 .add_systems(Update,
                     systems::atlas::atlas_toggle_system
                         .run_if(in_state(GamePhase::Playing)))
-                .add_systems(OnEnter(GamePhase::GlobeView), systems::atlas::setup_globe_view)
+                .add_systems(OnEnter(GamePhase::GlobeView), (
+                    systems::atlas::setup_globe_view,
+                    terra_atlas_bevy::selection::setup_selection_ui,
+                ))
                 .add_systems(Update, (
                     systems::atlas::globe_input_system,
                     systems::atlas::draw_arcs_system,
                     terra_atlas_bevy::camera::orbital_camera_system,
+                    terra_atlas_bevy::timeline::timeline_input_system,
+                    terra_atlas_bevy::timeline::timeline_autoplay_system,
+                    systems::atlas::timeline_visibility_system,
+                    terra_atlas_bevy::selection::click_select_system,
+                    terra_atlas_bevy::selection::update_selection_text,
                 ).run_if(in_state(GamePhase::GlobeView)))
                 .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view);
         }
