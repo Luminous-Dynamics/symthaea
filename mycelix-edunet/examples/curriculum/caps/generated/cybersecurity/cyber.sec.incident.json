@@ -1,0 +1,184 @@
+{
+  "node_id": "CYBER.SEC.INCIDENT",
+  "lesson": {
+    "standard_code": "CYBER.SEC.INCIDENT",
+    "title": "Incident Response",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Incident response (IR) is the organised approach to handling security breaches and cyber attacks. The NIST incident response lifecycle has four phases: Preparation (policies, tools, training), Detection and Analysis (identifying and understanding incidents), Containment, Eradication, and Recovery (stopping the attack, removing the threat, restoring systems), and Post-Incident Activity (lessons learned, improving defences). Time is critical \u2014 the faster an incident is detected and contained, the less damage it causes. In South Africa, the Cybercrimes Act (2020) requires reporting certain offences to SAPS, and POPIA requires notification of the Information Regulator and affected data subjects when personal information is compromised.",
+    "examples": [
+      {
+        "problem": "Walk through the incident response process for a phishing attack where an employee clicked a malicious link.",
+        "steps": [
+          {
+            "instruction": "Step 1: Detection: the employee reports the suspicious email to IT, or the SIEM alerts on unusual network activity from the employee's workstation.",
+            "result": "detect"
+          },
+          {
+            "instruction": "Step 2: Containment: immediately isolate the employee's workstation from the network. Reset their credentials.",
+            "result": "contain"
+          },
+          {
+            "instruction": "Step 3: Eradication: scan the workstation for malware, check for lateral movement to other systems, review email logs for others who received the same phishing email.",
+            "result": "eradicate"
+          },
+          {
+            "instruction": "Step 4: Recovery: rebuild the workstation from a clean image, restore data from backup, monitor for further compromise.",
+            "result": "recover"
+          }
+        ],
+        "answer": "Answer: Quick containment limits damage. The employee who reports the phishing should be thanked, not blamed \u2014 reporting culture is critical.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why is a post-incident review essential?",
+        "steps": [
+          {
+            "instruction": "Step 1: It identifies what went wrong (root cause), what went right (effective responses), and what needs to change.",
+            "result": "analysis"
+          },
+          {
+            "instruction": "Step 2: Without review, the same vulnerability will be exploited again.",
+            "result": "prevention"
+          },
+          {
+            "instruction": "Step 3: The review should produce specific, actionable improvements \u2014 not just a report filed and forgotten.",
+            "result": "action items"
+          }
+        ],
+        "answer": "Answer: Post-incident reviews transform security failures into security improvements. A breach is expensive \u2014 the least you can get from it is better defences.",
+        "visual_description": null
+      },
+      {
+        "problem": "What are South Africa's legal obligations when a data breach occurs?",
+        "steps": [
+          {
+            "instruction": "Step 1: POPIA (Section 22): notify the Information Regulator as soon as reasonably possible.",
+            "result": "regulator notification"
+          },
+          {
+            "instruction": "Step 2: POPIA (Section 22): notify affected data subjects (the people whose data was breached) if there is a risk to them.",
+            "result": "subject notification"
+          },
+          {
+            "instruction": "Step 3: Cybercrimes Act (Section 54): electronic communications service providers must report certain offences to SAPS within 72 hours.",
+            "result": "SAPS reporting"
+          }
+        ],
+        "answer": "Answer: SA organisations face legal obligations to report breaches promptly. Failure to notify can result in fines of up to R10 million under POPIA.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List the four phases of the NIST incident response lifecycle.",
+        "answer": "(1) Preparation: establishing IR policies, forming a team, deploying tools, and conducting training. (2) Detection and Analysis: identifying security events, determining if they are incidents, assessing severity. (3) Containment, Eradication, and Recovery: stopping the attack, removing the threat, and restoring normal operations. (4) Post-Incident Activity: lessons learned, improving defences, updating IR plans.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: prepare, detect, contain+fix, learn."
+        ],
+        "explanation": "The lifecycle is iterative \u2014 lessons from each incident feed back into preparation for the next one.",
+        "distractors": []
+      },
+      {
+        "question": "Explain why containment must balance speed with evidence preservation.",
+        "answer": "Speed is critical because every minute an attacker has access, they can steal more data, spread to more systems, and cause more damage. But hasty containment (e.g., shutting down a compromised server) can destroy forensic evidence needed to understand the attack, identify the attacker, and prevent recurrence. The balance: isolate the system from the network (stops spread) without wiping it (preserves evidence). Take forensic images of affected systems before rebuilding.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What evidence is lost if you immediately wipe and rebuild a compromised server?",
+          "How can you stop the attack without destroying evidence?"
+        ],
+        "explanation": "Network isolation is the best first containment step \u2014 it stops the attacker from communicating with the compromised system without altering the system itself.",
+        "distractors": []
+      },
+      {
+        "question": "Your company discovers that customer data (names, email addresses, ID numbers) has been accessed by an unauthorised party. Draft the notification to the Information Regulator as required by POPIA Section 22.",
+        "answer": "Notification should include: (1) Description of the incident: unauthorised access to customer database containing names, email addresses, and SA ID numbers. (2) Date of discovery: [date]. (3) Estimated date of breach: [date range]. (4) Number of affected data subjects: [number]. (5) Categories of data compromised: names (personal), email addresses (personal), ID numbers (special personal information). (6) Measures taken: database access revoked, investigation initiated, affected customers being notified. (7) Recommended protective measures for data subjects: monitor credit reports, be alert to phishing attempts using their information. (8) Contact person: [Information Officer name and details].",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "POPIA requires specific information in the notification.",
+          "Include both what happened and what you are doing about it."
+        ],
+        "explanation": "POPIA breach notification requirements are modelled on international standards (GDPR). The key elements are: what happened, who is affected, what data was exposed, what you are doing about it, and what affected people should do.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why organisations should conduct tabletop exercises (simulated incidents) and what a good exercise looks like.",
+        "answer": "Why: tabletop exercises reveal gaps in IR plans before a real incident exposes them. They test communication channels, decision-making authority, technical procedures, and coordination between teams. Studies show organisations that rehearse IR respond 50-70% faster to real incidents. A good exercise: (1) presents a realistic scenario (e.g., ransomware on a Friday afternoon), (2) involves all relevant teams (IT, legal, communications, management), (3) includes time pressure, (4) presents evolving information (like a real incident), (5) ends with a structured debrief identifying gaps. Bad exercises are overly scripted or only involve IT \u2014 real incidents affect the entire organisation.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What is the cost of discovering gaps during a real incident vs during a simulation?",
+          "Who should participate?"
+        ],
+        "explanation": "The best time to discover that your IR plan is inadequate is during a simulation, not during a real breach. Regular exercises (quarterly or biannually) build the muscle memory needed for effective response.",
+        "distractors": []
+      },
+      {
+        "question": "Design an incident response plan for a South African e-commerce business. Include team structure, escalation procedures, containment strategies, and legal compliance steps.",
+        "answer": "Plan: Team: IR Lead (CTO), Technical (senior engineer + sysadmin), Legal (external counsel), Communications (marketing manager), Management (CEO). Escalation: Severity 1 (data breach, ransomware): all team members notified immediately, CEO decides on public communication. Severity 2 (malware, unauthorised access attempt): Technical + IR Lead notified, Legal on standby. Severity 3 (policy violation, phishing attempt): Technical handles, logs incident. Containment: (1) isolate affected systems, (2) revoke compromised credentials, (3) preserve forensic evidence, (4) activate backup systems. Legal compliance: (1) notify Information Regulator within 72 hours for personal data breaches, (2) notify affected data subjects, (3) report to SAPS if criminal activity suspected (Cybercrimes Act), (4) engage forensic investigator for evidence preservation. Recovery: rebuild from clean images, restore from backups, verify integrity, monitor for recurrence. Post-incident: formal review within 1 week, update IR plan within 1 month.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Cover people, process, and technology.",
+          "Include SA-specific legal requirements."
+        ],
+        "explanation": "An IR plan must be documented, tested, and updated regularly. The worst time to figure out your IR process is during an actual incident.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The organised approach to handling security breaches and cyber attacks to minimise damage",
+      "Actions taken to prevent a security incident from spreading further",
+      "The collection and analysis of digital evidence from compromised systems"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "incident response",
+        "definition": "The organised approach to handling security breaches and cyber attacks to minimise damage",
+        "example_usage": "Our incident response plan enabled us to contain the breach within 2 hours."
+      },
+      {
+        "term": "containment",
+        "definition": "Actions taken to prevent a security incident from spreading further",
+        "example_usage": "Network isolation was the first containment step."
+      },
+      {
+        "term": "forensics",
+        "definition": "The collection and analysis of digital evidence from compromised systems",
+        "example_usage": "Digital forensics revealed that the attacker had been in the system for 3 months."
+      },
+      {
+        "term": "tabletop exercise",
+        "definition": "A simulated security incident used to test and improve incident response procedures",
+        "example_usage": "The tabletop exercise revealed that nobody knew who had authority to shut down the production server."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many organisations believe they only need to respond to incidents that result in data loss.",
+        "correction": "Any unauthorised access or attempted breach should trigger an incident response, even if no data was stolen. Attempted attacks reveal vulnerabilities and may indicate reconnaissance for a future attack. Additionally, POPIA's notification requirements are triggered by 'reasonable grounds to believe' a breach occurred, not only by confirmed data loss. Responding only to confirmed losses means missing early warning signs and violating legal obligations.",
+        "why_students_think_this": "Data loss is the most visible and dramatic outcome, so organisations naturally focus on it. But the goal of IR is to prevent loss \u2014 which means responding to indicators before loss occurs."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

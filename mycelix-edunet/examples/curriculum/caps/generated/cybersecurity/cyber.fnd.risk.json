@@ -1,0 +1,183 @@
+{
+  "node_id": "CYBER.FND.RISK",
+  "lesson": {
+    "standard_code": "CYBER.FND.RISK",
+    "title": "Risk Management",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Risk management in cybersecurity is the process of identifying, assessing, and responding to threats to an organisation's information assets. Risk is calculated as: Risk = Threat x Vulnerability x Impact. A threat is something that could cause harm (malware, insider attack, natural disaster). A vulnerability is a weakness that a threat could exploit (unpatched software, weak passwords). Impact is the damage if the threat succeeds (financial loss, data breach, reputation damage). Risk responses include: accept (low risk, not worth mitigating), mitigate (implement controls), transfer (buy insurance), or avoid (stop the risky activity). In South Africa, cybercrime costs an estimated R2.2 billion annually, making risk management essential for businesses of all sizes.",
+    "examples": [
+      {
+        "problem": "A small law firm uses an old Windows 7 computer for document storage. Assess the risk.",
+        "steps": [
+          {
+            "instruction": "Step 1: Threat: malware targeting known Windows 7 vulnerabilities (Microsoft ended support in 2020).",
+            "result": "threat"
+          },
+          {
+            "instruction": "Step 2: Vulnerability: unpatched operating system with known exploits.",
+            "result": "vulnerability"
+          },
+          {
+            "instruction": "Step 3: Impact: loss of confidential client documents, regulatory violation (POPIA), reputation damage.",
+            "result": "impact"
+          }
+        ],
+        "answer": "Answer: Risk = high threat (known exploits) x high vulnerability (no patches) x high impact (legal data) = CRITICAL. Immediate action needed: upgrade OS or isolate the machine.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare the four risk response strategies using the example of a fire in a server room.",
+        "steps": [
+          {
+            "instruction": "Step 1: Accept: for a tiny business, the cost of fire suppression may exceed the value of the servers \u2014 accept the risk.",
+            "result": "accept"
+          },
+          {
+            "instruction": "Step 2: Mitigate: install fire suppression systems, fire-resistant enclosures, and off-site backups.",
+            "result": "mitigate"
+          },
+          {
+            "instruction": "Step 3: Transfer: buy insurance that covers server replacement and data recovery costs.",
+            "result": "transfer"
+          },
+          {
+            "instruction": "Step 4: Avoid: move all services to the cloud, eliminating the on-premise server room entirely.",
+            "result": "avoid"
+          }
+        ],
+        "answer": "Answer: Each response is appropriate in different contexts. Most organisations use a combination of all four.",
+        "visual_description": null
+      },
+      {
+        "problem": "Create a simple risk matrix for a school's computer lab.",
+        "steps": [
+          {
+            "instruction": "Step 1: Low likelihood, low impact: a mouse breaks. Risk: accept.",
+            "result": "low-low"
+          },
+          {
+            "instruction": "Step 2: High likelihood, low impact: a student accidentally deletes their own file. Risk: mitigate (auto-backups).",
+            "result": "high-low"
+          },
+          {
+            "instruction": "Step 3: Low likelihood, high impact: ransomware encrypts all lab computers. Risk: mitigate (backups, antivirus, network segmentation) and transfer (cyber insurance).",
+            "result": "low-high"
+          }
+        ],
+        "answer": "Answer: A risk matrix maps likelihood against impact to prioritise which risks to address first.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define risk in cybersecurity terms and state the risk formula.",
+        "answer": "Risk is the potential for loss or damage when a threat exploits a vulnerability. Formula: Risk = Threat x Vulnerability x Impact. High risk requires all three components to be significant. Reducing any one component reduces the overall risk.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "A locked door in an area with no criminals has low risk (low threat). A weak door in a high-crime area has high risk."
+        ],
+        "explanation": "The risk formula shows that security spending should target the component that is easiest to reduce. Often, reducing vulnerability (patching) is cheaper than reducing threats or impact.",
+        "distractors": []
+      },
+      {
+        "question": "A hospital stores patient records digitally. Identify three threats, three vulnerabilities, and three potential impacts.",
+        "answer": "Threats: (1) ransomware attack, (2) disgruntled employee stealing data, (3) power failure during load shedding. Vulnerabilities: (1) staff clicking phishing emails, (2) weak access controls allowing broad data access, (3) no backup generator. Impacts: (1) inability to access patient records during emergencies (life-threatening), (2) POPIA fine and patient trust loss, (3) treatment delays.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what could go wrong, why it could happen, and what the consequences would be."
+        ],
+        "explanation": "Hospitals are high-value targets because health data is valuable on the black market and availability is literally life-critical. The SA context of load shedding adds a unique availability threat.",
+        "distractors": []
+      },
+      {
+        "question": "Your company has identified 10 cybersecurity risks. Budget allows addressing only 5. Design a prioritisation method and explain your reasoning.",
+        "answer": "Method: score each risk on a 5-point scale for likelihood (1=rare to 5=certain) and impact (1=negligible to 5=catastrophic). Risk score = likelihood x impact (range 1-25). Address the top 5 by score. For ties, prioritise risks that affect confidentiality of personal data (POPIA compliance). Reasoning: this quantitative approach prevents emotional decision-making and ensures the highest-risk items get attention first. Document residual risks (the 5 not addressed) and review quarterly.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "You cannot fix everything \u2014 the question is what to fix first.",
+          "Consider regulatory requirements."
+        ],
+        "explanation": "Risk prioritisation is essential because no organisation has unlimited security resources. A systematic approach prevents the common error of fixing visible but low-risk issues while ignoring hidden high-risk ones.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse the risk implications of load shedding for South African data centres. Consider all three CIA properties.",
+        "answer": "Confidentiality: during power transitions, security systems (access controls, cameras) may briefly fail, creating windows for physical access. Integrity: power fluctuations can corrupt data on disk if writes are interrupted (especially databases). Availability: the primary impact \u2014 services go down during outages if backup power fails. Mitigations: UPS (immediate bridge), diesel generators (medium-term), solar+battery (long-term), geographic redundancy (replicate to a data centre in a different load shedding schedule), and graceful shutdown procedures that complete pending writes before power loss.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Load shedding is uniquely South African \u2014 how does it create cyber risk?",
+          "Consider the transition period between mains and backup power."
+        ],
+        "explanation": "Load shedding is a unique SA risk factor that international frameworks do not adequately address. Local risk assessments must account for scheduled and unscheduled power disruptions.",
+        "distractors": []
+      },
+      {
+        "question": "Design a risk management plan for a startup that handles personal data (name, ID number, address) of 10,000 South African customers. Include risk identification, assessment, response, and monitoring.",
+        "answer": "Plan: (1) Identify: data breach (external hack, insider theft), system outage, POPIA non-compliance, ransomware. (2) Assess: data breach = high likelihood x high impact = critical (ID numbers are permanent \u2014 cannot be changed if breached). (3) Respond: encrypt all personal data at rest and in transit, implement MFA, conduct quarterly access reviews, maintain 3-2-1 backup strategy, appoint an Information Officer (POPIA requirement), purchase cyber insurance, conduct annual penetration testing. (4) Monitor: deploy SIEM for real-time threat detection, quarterly vulnerability scans, annual risk review, POPIA compliance audit.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "ID numbers are permanent \u2014 a breach is permanent.",
+          "POPIA requires an Information Officer and adequate security measures."
+        ],
+        "explanation": "South African ID numbers are a particularly high-value target because they cannot be changed. A breach of ID numbers affects victims permanently, unlike credit card numbers which can be replaced.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The potential for loss when a threat exploits a vulnerability, causing an impact",
+      "Any potential cause of an unwanted incident that could harm an organisation",
+      "A weakness in a system that can be exploited by a threat"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "risk",
+        "definition": "The potential for loss when a threat exploits a vulnerability, causing an impact",
+        "example_usage": "The risk of a data breach increases when vulnerabilities are left unpatched."
+      },
+      {
+        "term": "threat",
+        "definition": "Any potential cause of an unwanted incident that could harm an organisation",
+        "example_usage": "Ransomware is a significant threat to healthcare organisations."
+      },
+      {
+        "term": "vulnerability",
+        "definition": "A weakness in a system that can be exploited by a threat",
+        "example_usage": "An unpatched server is a vulnerability."
+      },
+      {
+        "term": "risk matrix",
+        "definition": "A tool that maps the likelihood and impact of risks to prioritise them",
+        "example_usage": "The risk matrix showed that ransomware was the highest priority risk."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many small businesses think they are too small to be targeted by cybercriminals.",
+        "correction": "Small businesses are actually prime targets because they typically have weaker security than large corporations but still hold valuable data (customer records, financial information). Automated attacks do not discriminate by company size \u2014 they scan the internet for vulnerabilities regardless. In SA, 60% of small businesses that suffer a major cyber attack go out of business within 6 months.",
+        "why_students_think_this": "Media coverage focuses on attacks against large corporations and governments, making small business owners feel invisible to attackers. In reality, most attacks are automated and opportunistic."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

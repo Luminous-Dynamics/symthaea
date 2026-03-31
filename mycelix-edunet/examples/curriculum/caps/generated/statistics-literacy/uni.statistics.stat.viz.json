@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.STATISTICS.STAT.VIZ",
+  "lesson": {
+    "standard_code": "UNI.STATISTICS.STAT.VIZ",
+    "title": "Data Visualisation",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Data visualisation transforms numbers into pictures that reveal patterns, trends, and outliers invisible in raw data. Good visualisations make complex data accessible; bad ones mislead. Edward Tufte identified principles: maximise the data-ink ratio (every mark should convey information), avoid chartjunk (unnecessary decoration), and show the data honestly (no truncated axes, no 3D effects that distort proportions). Common chart types include bar charts (comparing categories), line charts (trends over time), scatter plots (relationships between variables), histograms (distributions), and box plots (distribution summary). In South Africa, data visualisation is essential for understanding census data, election results, crime statistics, and economic indicators.",
+    "examples": [
+      {
+        "problem": "A bar chart shows company profits with the y-axis starting at R90 million instead of R0. Sales went from R95M to R100M. How is this misleading?",
+        "steps": [
+          {
+            "instruction": "Step 1: With y-axis from R90M to R100M, the bar for R100M appears twice the height of R95M.",
+            "result": "visual distortion"
+          },
+          {
+            "instruction": "Step 2: Starting at R0, the bars would be almost the same height \u2014 the 5% increase is modest.",
+            "result": "honest scale"
+          },
+          {
+            "instruction": "Step 3: Truncating the y-axis exaggerates small differences, making them look dramatic.",
+            "result": "technique identified"
+          }
+        ],
+        "answer": "Answer: Truncated y-axes are one of the most common ways to mislead with data visualisation. Always check where the axis starts.",
+        "visual_description": null
+      },
+      {
+        "problem": "When would you use a box plot instead of a bar chart?",
+        "steps": [
+          {
+            "instruction": "Step 1: Bar charts show single values (means, totals) per category \u2014 they hide the distribution.",
+            "result": "bar chart limitation"
+          },
+          {
+            "instruction": "Step 2: Box plots show the median, quartiles, range, and outliers \u2014 they reveal the spread and shape of the data.",
+            "result": "box plot strength"
+          },
+          {
+            "instruction": "Step 3: Use box plots when you want to compare distributions across groups, not just averages.",
+            "result": "when to use"
+          }
+        ],
+        "answer": "Answer: Box plots are superior to bar charts when the distribution of data matters, not just the central tendency.",
+        "visual_description": null
+      },
+      {
+        "problem": "Create a mental checklist for evaluating any data visualisation.",
+        "steps": [
+          {
+            "instruction": "Step 1: Does the title and labels clearly state what is being shown?",
+            "result": "clarity"
+          },
+          {
+            "instruction": "Step 2: Are the axes honestly scaled (starting from 0 for bar charts, consistent intervals)?",
+            "result": "honesty"
+          },
+          {
+            "instruction": "Step 3: Does the chart type match the data type (categorical, continuous, time series)?",
+            "result": "appropriateness"
+          }
+        ],
+        "answer": "Answer: A good visualisation is clear, honest, and appropriate for the data type.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name four common chart types and state when each is most appropriate.",
+        "answer": "Bar chart: comparing values across categories (e.g., GDP by country). Line chart: showing trends over time (e.g., temperature over a year). Scatter plot: showing relationships between two continuous variables (e.g., height vs weight). Histogram: showing the distribution of a single continuous variable (e.g., distribution of test scores).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Match the chart type to the question: comparison, trend, relationship, or distribution."
+        ],
+        "explanation": "Choosing the wrong chart type can obscure the pattern you want to show. Pie charts, for example, are rarely the best choice because humans are poor at comparing angles.",
+        "distractors": []
+      },
+      {
+        "question": "Explain three ways a data visualisation can be misleading, with an example of each.",
+        "answer": "(1) Truncated y-axis: starting above zero makes small differences look large. (2) Cherry-picking time range: showing only the period that supports your argument (e.g., stock price from the lowest to highest point). (3) Using area/volume to represent linear quantities: doubling the height and width of a figure makes it look 4x bigger (area), not 2x. (4) Unlabelled axes or missing context: a graph without units, labels, or source is uninterpretable.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what visual tricks can make data look different from reality.",
+          "Check axes, scales, and context."
+        ],
+        "explanation": "Media visualisations frequently use these techniques to support a narrative. The reader must actively evaluate whether the visual honestly represents the data.",
+        "distractors": []
+      },
+      {
+        "question": "The South African government reports that 'crime has decreased by 12%' and shows a line chart. What questions would you ask before accepting this claim?",
+        "answer": "(1) Over what time period? (12% decrease from last year or last decade?) (2) Is this total crimes or per capita? (Population growth could mask a per-capita increase.) (3) Which crime categories? (Some may have increased while others decreased.) (4) Does 'reported crime' include unreported crimes? (Many violent crimes go unreported.) (5) Are reporting methods consistent over time? (Changes in reporting practices can create artificial trends.) (6) Does the y-axis start at zero?",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Question the source, the time frame, and the methodology.",
+          "Is 'crime' one number or many categories?"
+        ],
+        "explanation": "Critical evaluation of government statistics requires asking about methodology, not just accepting the headline number. The same data can tell different stories depending on how it is framed.",
+        "distractors": []
+      },
+      {
+        "question": "Evaluate this claim: 'This pie chart shows that education spending is the government's top priority because it gets the biggest slice.' What are the limitations of pie charts?",
+        "answer": "Limitations: (1) Pie charts are hard to read \u2014 humans are poor at comparing angles and areas. (2) A pie chart with many slices becomes unreadable. (3) 'Biggest slice' does not mean 'top priority' \u2014 it might mean education is simply the most expensive service (lots of teachers, buildings). (4) The chart does not show whether education spending is adequate, whether it has increased or decreased, or how it compares to other countries. (5) Pie charts cannot show trends over time. A grouped bar chart or stacked area chart would be more informative.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Can you accurately judge the difference between a 23% and 27% slice in a pie chart?",
+          "What does 'biggest slice' actually tell you?"
+        ],
+        "explanation": "Pie charts are one of the most overused and least informative chart types. Edward Tufte and other visualisation experts recommend avoiding them in favour of bar charts, which humans can interpret more accurately.",
+        "distractors": []
+      },
+      {
+        "question": "Design a data dashboard for your school's matric results that would help the principal identify problems and track progress. Include at least 4 visualisations and explain what each reveals.",
+        "answer": "Dashboard: (1) Grouped bar chart \u2014 pass rates by subject (reveals which subjects need attention). (2) Line chart \u2014 overall pass rate trend over 5 years (reveals whether the school is improving). (3) Box plots \u2014 score distributions by subject (reveals whether the average hides a bimodal distribution with many failures). (4) Scatter plot \u2014 attendance rate vs final score (reveals correlation between attendance and achievement). (5) Heat map \u2014 scores by teacher and subject (reveals patterns in teaching effectiveness). Each visualisation answers a different question and together they provide a comprehensive picture.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Each visualisation should answer a specific question.",
+          "Think about what the principal needs to decide, then design charts that inform those decisions."
+        ],
+        "explanation": "Effective dashboards combine multiple views of the same data. The best ones are designed around decisions: what does the viewer need to know, and what action should the data trigger?",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The graphical representation of data to reveal patterns, trends, and relationships",
+      "A graph axis that does not start at zero, which can exaggerate differences",
+      "Unnecessary visual elements in a chart that do not convey information"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "data visualisation",
+        "definition": "The graphical representation of data to reveal patterns, trends, and relationships",
+        "example_usage": "A good data visualisation makes complex data accessible and actionable."
+      },
+      {
+        "term": "truncated axis",
+        "definition": "A graph axis that does not start at zero, which can exaggerate differences",
+        "example_usage": "The truncated y-axis made a 5% increase look like a doubling."
+      },
+      {
+        "term": "chartjunk",
+        "definition": "Unnecessary visual elements in a chart that do not convey information",
+        "example_usage": "Edward Tufte coined 'chartjunk' to describe decorations that distract from data."
+      },
+      {
+        "term": "data-ink ratio",
+        "definition": "The proportion of a chart's ink that represents actual data versus decoration",
+        "example_usage": "Maximising the data-ink ratio means removing everything that does not convey information."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people assume that a professional-looking visualisation is accurate.",
+        "correction": "Visual design quality and data accuracy are independent. A beautifully designed infographic can contain misleading truncated axes, cherry-picked data, and confusing scales. Conversely, a simple, ugly chart can be perfectly honest. Always evaluate the data and methodology behind a visualisation, not just its appearance.",
+        "why_students_think_this": "Professional design creates an impression of authority and trustworthiness. People associate aesthetic quality with factual accuracy, which is a cognitive shortcut that can be exploited."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,175 @@
+{
+  "node_id": "UNI.LEARNING.LEARN.INTER",
+  "lesson": {
+    "standard_code": "UNI.LEARNING.LEARN.INTER",
+    "title": "Interleaving & Variation",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Interleaving means mixing different topics or problem types during study rather than practising one type until mastery before moving to the next (blocking). Research by Rohrer and Taylor shows that interleaved practice leads to 25-76% better performance on delayed tests, even though it feels harder during practice. Variation means encountering the same concept in different contexts (different examples, different problems, different applications). Both create 'desirable difficulty' \u2014 the effort of distinguishing between problem types and adapting strategies strengthens learning and transfer. In South African maths classrooms, practising algebra, geometry, and statistics problems mixed together is more effective than doing each in separate blocks.",
+    "examples": [
+      {
+        "problem": "Compare blocked vs interleaved practice for learning three maths topics: algebra, geometry, and statistics.",
+        "steps": [
+          {
+            "instruction": "Step 1: Blocked: 20 algebra problems, then 20 geometry problems, then 20 statistics problems.",
+            "result": "blocked"
+          },
+          {
+            "instruction": "Step 2: Interleaved: mix all three \u2014 algebra, geometry, statistics, algebra, statistics, geometry... in random order.",
+            "result": "interleaved"
+          },
+          {
+            "instruction": "Step 3: During practice, blocked feels easier and interleaved feels harder. On a test a week later, interleaved scores 25-76% higher.",
+            "result": "result"
+          }
+        ],
+        "answer": "Answer: Interleaving forces you to identify which type of problem you are facing and select the right strategy \u2014 exactly what tests require.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why does variation improve transfer of learning?",
+        "steps": [
+          {
+            "instruction": "Step 1: If you learn a concept with only one example, you may memorise the example rather than understanding the concept.",
+            "result": "single example"
+          },
+          {
+            "instruction": "Step 2: Multiple varied examples highlight what the concept IS (common features) and what it is NOT (variable features).",
+            "result": "variation"
+          },
+          {
+            "instruction": "Step 3: Example: learning 'momentum' through a car crash, a billiards game, and a rocket launch reveals the general principle.",
+            "result": "transfer"
+          }
+        ],
+        "answer": "Answer: Variation builds flexible knowledge that can be applied to new situations \u2014 not just recognition of familiar examples.",
+        "visual_description": null
+      },
+      {
+        "problem": "A tennis coach has a player practise serves for 30 minutes, then volleys for 30 minutes, then backhands for 30 minutes. How would interleaving change this?",
+        "steps": [
+          {
+            "instruction": "Step 1: Interleaved: alternate between serves, volleys, and backhands in random order.",
+            "result": "interleaved practice"
+          },
+          {
+            "instruction": "Step 2: This is harder because the player must constantly switch motor programs.",
+            "result": "difficulty"
+          },
+          {
+            "instruction": "Step 3: But it better simulates real match conditions where you never know which shot comes next.",
+            "result": "transfer to performance"
+          }
+        ],
+        "answer": "Answer: Interleaving creates practice conditions that mirror performance conditions \u2014 building the ability to select and execute skills on demand.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is interleaving and how does it differ from blocked practice?",
+        "answer": "Interleaving means mixing different topics or problem types during a single study session (ABCABCABC). Blocked practice means studying one topic thoroughly before moving to the next (AAABBBCCC). Interleaving is harder during practice but produces better long-term learning and transfer.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: mixed vs separated."
+        ],
+        "explanation": "The key insight is that the difficulty of interleaving is productive \u2014 it forces discrimination between problem types, which is exactly what tests require.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the 'discrimination hypothesis' \u2014 why interleaving helps learning.",
+        "answer": "When problems are blocked, you know what strategy to use before reading the problem (because all problems in the block are the same type). When problems are interleaved, you must first identify the problem type, then select the appropriate strategy. This discrimination practice strengthens your ability to recognise problem types \u2014 a skill that is essential for exams and real-world application.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "In blocked practice, do you really learn to identify problem types?",
+          "What does a test require that blocking does not practise?"
+        ],
+        "explanation": "Blocking removes the need for the most important cognitive step: identifying what kind of problem you are facing. Interleaving puts this step back in.",
+        "distractors": []
+      },
+      {
+        "question": "Redesign your study plan for an upcoming exam to incorporate interleaving. The exam covers 4 chapters.",
+        "answer": "Instead of studying Chapter 1 on Monday, Chapter 2 on Tuesday, etc., create mixed study sessions: Monday \u2014 questions from Chapters 1, 2, 3, 4 (mixed). Tuesday \u2014 different questions from all 4 chapters. Continue mixing throughout the week. Within each session, do not group questions by chapter. Use past papers (which are naturally interleaved) as the primary study tool.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Past exam papers are naturally interleaved \u2014 use them.",
+          "Resist the urge to organise by chapter."
+        ],
+        "explanation": "The simplest way to interleave is to use past exam papers, which mix topics the way the real exam will. Creating your own mixed problem sets from different chapters is also effective.",
+        "distractors": []
+      },
+      {
+        "question": "A student complains: 'Interleaving makes me feel like I am not learning anything because it is so confusing.' Evaluate this experience.",
+        "answer": "The student's feeling is valid \u2014 interleaving does feel harder and slower during practice. Research calls this a 'stability-plasticity dilemma': conditions that produce the best performance during practice (blocking) produce the worst long-term learning, and vice versa. The confusion during interleaving is actually the learning happening \u2014 the brain is working harder to discriminate between concepts, which builds stronger, more flexible knowledge. Judge learning by test performance, not by how easy practice feels.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Is practice supposed to feel easy?",
+          "What is the relationship between effort during practice and performance on tests?"
+        ],
+        "explanation": "This is called the 'learning paradox': conditions that feel effective during practice are often less effective for learning, and conditions that feel difficult during practice are often more effective. Interleaving and spacing both demonstrate this paradox.",
+        "distractors": []
+      },
+      {
+        "question": "Create a 1-week interleaved study plan for a student preparing for a science exam covering biology (cells, ecosystems), chemistry (bonding, reactions), and physics (forces, electricity).",
+        "answer": "Each day, study for 1 hour mixing all 6 topics. Day 1: cells question, bonding question, forces question, ecosystems question, reactions question, electricity question. Day 2: different questions, different order. Days 3-5: same approach with increasing difficulty. Day 6: full practice test (naturally interleaved). Day 7: targeted review of topics that were weakest on the practice test. Key: never study one topic for more than 10 minutes before switching.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Mix at the question level, not the session level.",
+          "Use the practice test on Day 6 to identify what needs extra work."
+        ],
+        "explanation": "The 10-minute switching rule prevents falling back into blocking. It feels uncomfortable but produces superior results on the actual exam.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Mixing different topics or problem types during study rather than studying one type at a time",
+      "Studying one topic or skill type exclusively before moving to the next",
+      "The ability to apply learning from one context to a new, different context"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "interleaving",
+        "definition": "Mixing different topics or problem types during study rather than studying one type at a time",
+        "example_usage": "Interleaving maths problems from different chapters improved her exam scores."
+      },
+      {
+        "term": "blocked practice",
+        "definition": "Studying one topic or skill type exclusively before moving to the next",
+        "example_usage": "Blocked practice feels productive but produces weaker long-term retention."
+      },
+      {
+        "term": "transfer",
+        "definition": "The ability to apply learning from one context to a new, different context",
+        "example_usage": "Variation during learning improves transfer to unfamiliar problems."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students (and many teachers) believe that studying one topic until mastery before moving on is the best approach.",
+        "correction": "Blocked practice feels more productive because performance improves quickly during the practice session. But research consistently shows that interleaved practice \u2014 which feels harder and slower \u2014 produces 25-76% better performance on tests taken days or weeks later. The feeling of mastery during blocked practice is an illusion that does not transfer to test conditions where topics are mixed.",
+        "why_students_think_this": "Textbooks and curricula are organised by topic, encouraging blocked study. Practice sessions with blocked problems produce visible improvement during the session, reinforcing the belief that blocking works best."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

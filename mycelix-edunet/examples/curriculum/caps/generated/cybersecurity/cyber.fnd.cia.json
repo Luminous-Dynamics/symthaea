@@ -1,0 +1,180 @@
+{
+  "node_id": "CYBER.FND.CIA",
+  "lesson": {
+    "standard_code": "CYBER.FND.CIA",
+    "title": "CIA Triad & Security Principles",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "The CIA triad is the foundation of information security: Confidentiality (only authorised people can access data), Integrity (data is accurate and unaltered), and Availability (data and systems are accessible when needed). Every security decision balances these three properties. A bank prioritises confidentiality (protect account details) and integrity (ensure transfer amounts are correct). A hospital emergency system prioritises availability (must work 24/7). Additional principles include authentication (proving identity), authorisation (granting permissions), non-repudiation (preventing denial of actions), and defence in depth (multiple layers of security). In South Africa, where digital banking is widespread and data breaches affect millions, understanding these principles is essential.",
+    "examples": [
+      {
+        "problem": "A hacker intercepts a bank transfer and changes the recipient account number. Which part of the CIA triad is violated?",
+        "steps": [
+          {
+            "instruction": "Step 1: The data was modified in transit \u2014 the transfer amount and sender are correct but the destination is changed.",
+            "result": "identify the change"
+          },
+          {
+            "instruction": "Step 2: This is an integrity violation \u2014 the data is no longer accurate and trustworthy.",
+            "result": "classify"
+          },
+          {
+            "instruction": "Step 3: Prevention: use digital signatures and message authentication codes (MACs) to detect tampering.",
+            "result": "mitigation"
+          }
+        ],
+        "answer": "Answer: Integrity violation \u2014 the data was altered without authorisation. Digital signatures prevent this by allowing the recipient to verify that the message has not been changed.",
+        "visual_description": null
+      },
+      {
+        "problem": "A ransomware attack encrypts all files on a hospital's server. Which CIA properties are affected?",
+        "steps": [
+          {
+            "instruction": "Step 1: Availability is primarily affected \u2014 staff cannot access patient records or systems.",
+            "result": "availability"
+          },
+          {
+            "instruction": "Step 2: Confidentiality may also be compromised if the attacker exfiltrated data before encrypting.",
+            "result": "confidentiality"
+          },
+          {
+            "instruction": "Step 3: Integrity is threatened because there is no guarantee the attacker did not modify data.",
+            "result": "integrity"
+          }
+        ],
+        "answer": "Answer: Ransomware primarily attacks availability but can compromise all three CIA properties. This is why hospitals are high-value targets \u2014 availability is life-critical.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain defence in depth using the analogy of a medieval castle.",
+        "steps": [
+          {
+            "instruction": "Step 1: Moat (network perimeter): firewalls and intrusion detection systems keep attackers out.",
+            "result": "layer 1"
+          },
+          {
+            "instruction": "Step 2: Castle walls (host security): antivirus, patching, and hardened configurations protect individual systems.",
+            "result": "layer 2"
+          },
+          {
+            "instruction": "Step 3: Guards and locks (application/data security): authentication, encryption, and access controls protect the data itself.",
+            "result": "layer 3"
+          }
+        ],
+        "answer": "Answer: Defence in depth means no single security measure is relied upon \u2014 if one layer fails, others still protect the system.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the CIA triad and give one example of each property being violated.",
+        "answer": "Confidentiality: only authorised parties can access information. Violated when: a data breach exposes customer records. Integrity: information is accurate and unmodified. Violated when: a student changes their grade in the school database. Availability: systems and data are accessible when needed. Violated when: a DDoS attack takes down a government website.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "C = who can see it, I = is it accurate, A = can I access it."
+        ],
+        "explanation": "The CIA triad is the lens through which every security decision should be evaluated. Most security incidents can be classified as a failure of one or more of these properties.",
+        "distractors": []
+      },
+      {
+        "question": "A company allows employees to use personal phones for work email. Analyse the CIA risks of this policy.",
+        "answer": "Confidentiality risk: personal phones may lack encryption, could be lost/stolen, or have apps that access corporate data. Integrity risk: malware on personal devices could alter or inject false data into work systems. Availability risk: if the employee's phone breaks, they lose access to work email. Mitigations: mobile device management (MDM) software, required encryption, remote wipe capability, strong authentication (MFA).",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider each CIA property separately.",
+          "What happens if the phone is lost, hacked, or broken?"
+        ],
+        "explanation": "BYOD (Bring Your Own Device) policies create a tension between convenience and security. Every personal device is an attack surface that the organisation does not fully control.",
+        "distractors": []
+      },
+      {
+        "question": "Explain non-repudiation and give a practical example of why it matters.",
+        "answer": "Non-repudiation ensures that a party cannot deny having performed an action. Example: digital signatures on contracts \u2014 once you sign with your private key, you cannot later claim you did not sign. This matters in e-commerce (proving a customer placed an order), legal proceedings (proving a document was signed by a specific person), and audit trails (proving who made a change in a system).",
+        "difficulty_permille": 500,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about situations where someone might deny doing something.",
+          "What technology makes denial impossible?"
+        ],
+        "explanation": "Non-repudiation is built on asymmetric cryptography. Your private key is unique to you, so anything signed with it can only have come from you (assuming your key is not compromised).",
+        "distractors": []
+      },
+      {
+        "question": "A South African online retailer stores customer credit card numbers in plain text. Evaluate the security risks using the CIA triad and recommend improvements.",
+        "answer": "Confidentiality: plain text storage means anyone with database access can read card numbers. A breach exposes all customers. Integrity: without checksums or digital signatures, modifications to stored card data may go undetected. Availability: not directly affected but regulatory penalties (POPIA, PCI-DSS) could shut down the business. Improvements: encrypt card data at rest (AES-256), implement access controls (least privilege), use tokenisation (replace card numbers with tokens), log all access for auditing, comply with PCI-DSS standards.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Plain text storage of sensitive data is one of the worst security practices.",
+          "Consider legal obligations under POPIA and PCI-DSS."
+        ],
+        "explanation": "South Africa's POPIA (Protection of Personal Information Act) requires organisations to implement reasonable security measures. Storing credit cards in plain text would be a clear violation.",
+        "distractors": []
+      },
+      {
+        "question": "Design a security policy for a small South African business that addresses all three CIA properties. Include at least 6 specific measures.",
+        "answer": "Policy: Confidentiality: (1) encrypt all sensitive data at rest and in transit, (2) implement role-based access control (employees only access what they need), (3) require MFA for all systems. Integrity: (4) enable database audit logging to track all changes, (5) implement file integrity monitoring for critical system files. Availability: (6) maintain daily backups stored off-site, (7) implement UPS and generator for load shedding (SA-specific), (8) have an incident response plan with tested recovery procedures. Cross-cutting: (9) conduct annual security awareness training for all staff.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Address each CIA property with specific measures.",
+          "Consider SA-specific threats like load shedding."
+        ],
+        "explanation": "Small businesses are increasingly targeted because they often lack security expertise. A policy does not need to be complex \u2014 it needs to be implemented and followed.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The three fundamental properties of information security: Confidentiality, Integrity, and Availability",
+      "A security strategy using multiple layers of protection so that if one layer fails, others remain",
+      "Ensuring that a party cannot deny having performed an action, typically through digital signatures"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "CIA triad",
+        "definition": "The three fundamental properties of information security: Confidentiality, Integrity, and Availability",
+        "example_usage": "Every security decision should be evaluated against the CIA triad."
+      },
+      {
+        "term": "defence in depth",
+        "definition": "A security strategy using multiple layers of protection so that if one layer fails, others remain",
+        "example_usage": "Defence in depth means a firewall breach does not automatically compromise data."
+      },
+      {
+        "term": "non-repudiation",
+        "definition": "Ensuring that a party cannot deny having performed an action, typically through digital signatures",
+        "example_usage": "Digital signatures provide non-repudiation for electronic contracts."
+      },
+      {
+        "term": "authentication",
+        "definition": "The process of verifying the identity of a user, device, or system",
+        "example_usage": "Multi-factor authentication requires something you know, have, or are."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think security is only about preventing hackers from breaking in (confidentiality).",
+        "correction": "Security encompasses all three CIA properties. A system that is perfectly confidential but crashes constantly (poor availability) or allows data corruption (poor integrity) is not secure. Many real-world incidents are availability attacks (DDoS, ransomware) or integrity attacks (data tampering, SQL injection) rather than confidentiality breaches.",
+        "why_students_think_this": "Media coverage focuses on dramatic data breaches (confidentiality), creating the impression that security is only about keeping hackers out. Availability and integrity attacks get less attention but can be equally or more damaging."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

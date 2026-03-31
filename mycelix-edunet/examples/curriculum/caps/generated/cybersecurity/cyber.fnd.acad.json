@@ -1,0 +1,180 @@
+{
+  "node_id": "CYBER.FND.ACAD",
+  "lesson": {
+    "standard_code": "CYBER.FND.ACAD",
+    "title": "Academic Security Research",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Academic cybersecurity research advances the field through rigorous investigation of vulnerabilities, defences, and the human factors that affect security. Key areas include formal verification (mathematically proving that systems are secure), adversarial machine learning (attacking and defending AI systems), privacy-preserving computation (homomorphic encryption, differential privacy), and responsible disclosure (reporting vulnerabilities to vendors before publishing). Academic research has produced foundational contributions: RSA encryption, buffer overflow exploitation techniques, and the Tor anonymity network all emerged from university research. For students considering cybersecurity careers, academic research offers paths through publications, CTF competitions, and bug bounty programmes.",
+    "examples": [
+      {
+        "problem": "Explain responsible disclosure and why it matters.",
+        "steps": [
+          {
+            "instruction": "Step 1: A researcher discovers a vulnerability in a widely-used software product.",
+            "result": "discovery"
+          },
+          {
+            "instruction": "Step 2: Responsible disclosure: privately notify the vendor and give them time (typically 90 days) to fix it before publishing.",
+            "result": "responsible"
+          },
+          {
+            "instruction": "Step 3: Contrast with full disclosure: publishing immediately, which helps attackers exploit the vulnerability before a patch exists.",
+            "result": "irresponsible"
+          }
+        ],
+        "answer": "Answer: Responsible disclosure balances the public's right to know about vulnerabilities with the practical need for vendors to have time to develop and distribute patches.",
+        "visual_description": null
+      },
+      {
+        "problem": "What is a Capture The Flag (CTF) competition and how does it build security skills?",
+        "steps": [
+          {
+            "instruction": "Step 1: CTFs present security challenges: find the flag (hidden data) by exploiting vulnerabilities in provided systems.",
+            "result": "format"
+          },
+          {
+            "instruction": "Step 2: Categories include web exploitation, cryptography, reverse engineering, forensics, and binary exploitation.",
+            "result": "skills"
+          },
+          {
+            "instruction": "Step 3: CTFs build practical skills that textbooks cannot \u2014 you learn by attacking and defending real (sandboxed) systems.",
+            "result": "value"
+          }
+        ],
+        "answer": "Answer: CTFs are the primary hands-on training ground for aspiring security professionals. South African teams compete internationally.",
+        "visual_description": null
+      },
+      {
+        "problem": "How did academic research lead to the discovery of the Spectre and Meltdown CPU vulnerabilities?",
+        "steps": [
+          {
+            "instruction": "Step 1: Researchers at universities (Graz, Pennsylvania, Adelaide) and Google's Project Zero independently discovered that CPU speculative execution could leak data.",
+            "result": "academic discovery"
+          },
+          {
+            "instruction": "Step 2: The research required deep understanding of hardware architecture, side-channel analysis, and formal reasoning.",
+            "result": "academic skills"
+          },
+          {
+            "instruction": "Step 3: Responsible disclosure allowed chip manufacturers to develop mitigations before public announcement.",
+            "result": "disclosure process"
+          }
+        ],
+        "answer": "Answer: Spectre/Meltdown affected billions of devices and demonstrated the critical role of academic security research in finding vulnerabilities that industry testing missed.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is responsible disclosure and why do researchers follow it?",
+        "answer": "Responsible disclosure is the practice of privately reporting security vulnerabilities to the affected vendor and giving them a reasonable time (typically 90 days) to fix the issue before publicly disclosing it. Researchers follow it because immediate public disclosure would enable attackers to exploit the vulnerability before users can be protected. It balances transparency with harm reduction.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about who benefits from immediate public disclosure vs private notification."
+        ],
+        "explanation": "Google's Project Zero follows a strict 90-day disclosure policy. If the vendor has not patched within 90 days, the vulnerability is published regardless \u2014 this creates incentive for timely fixes.",
+        "distractors": []
+      },
+      {
+        "question": "Compare three career paths in cybersecurity: penetration testing, security engineering, and academic research. What skills does each require?",
+        "answer": "Penetration testing: offensive mindset, deep knowledge of attack techniques, proficiency with tools (Burp Suite, Metasploit, nmap), excellent reporting skills. Security engineering: defensive mindset, system architecture, secure coding, cloud security, identity management, automation. Academic research: formal reasoning, scientific method, deep specialisation in one area, academic writing, mathematics (especially for cryptography and formal verification). All three require continuous learning, ethics, and communication skills.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Each path uses security knowledge differently.",
+          "Consider which aligns with your strengths and interests."
+        ],
+        "explanation": "These paths are not mutually exclusive \u2014 many professionals move between them. Penetration testers often contribute to academic research, and researchers often consult on engineering projects.",
+        "distractors": []
+      },
+      {
+        "question": "You have found a vulnerability in a popular South African banking app. Describe the responsible disclosure process you would follow.",
+        "answer": "Process: (1) Document the vulnerability thoroughly: what it is, how to reproduce it, what data is exposed. (2) Do NOT exploit it beyond what is needed to confirm it exists. (3) Contact the bank's security team (look for security@bank.co.za or a bug bounty programme). (4) If no response within a week, try alternative channels (CISO, CTO, social media DM). (5) Provide a clear report with reproduction steps. (6) Give them 90 days to fix it. (7) Do NOT disclose publicly until the fix is deployed. (8) If the bank is unresponsive after 90 days, consider contacting CERT-SA or the Information Regulator. (9) Do NOT access, copy, or share any customer data you may have encountered.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Document everything. Contact the vendor first.",
+          "Never access more data than needed to confirm the vulnerability."
+        ],
+        "explanation": "In South Africa, the Cybercrimes Act (2020) provides some protection for good-faith security researchers, but the legal landscape is still evolving. Always document your intent and stay within ethical bounds.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse the ethical tensions in publishing offensive security research (e.g., new exploit techniques). What are the arguments for and against?",
+        "answer": "For publication: (1) enables defenders to build better protections, (2) advances the field's collective knowledge, (3) transparency about risks enables informed decisions, (4) suppressing research creates a false sense of security. Against publication: (1) provides a blueprint for attackers, (2) some vulnerabilities affect millions of people who cannot patch quickly, (3) responsible disclosure may be insufficient if the vendor ignores the issue. Resolution: most researchers publish after patches are available, omit exploit code that could be directly weaponised, and focus on defensive implications. Academic conferences (IEEE S&P, USENIX Security, CCS) have ethics review processes for offensive research.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Who benefits from the research being public?",
+          "Who could be harmed?"
+        ],
+        "explanation": "This tension is inherent in security research. The consensus is that the benefits of publication (better defences, informed public) outweigh the risks, provided responsible disclosure timelines are followed.",
+        "distractors": []
+      },
+      {
+        "question": "Design a curriculum for a 6-month cybersecurity bootcamp for South African university students with no prior security experience. Include topics, hands-on components, and career preparation.",
+        "answer": "Month 1: Foundations \u2014 CIA triad, risk management, networking basics (TCP/IP, DNS, HTTP), Linux command line. Hands-on: set up a home lab with VirtualBox. Month 2: Defensive security \u2014 firewalls, IDS, log analysis, incident response basics. Hands-on: configure pfSense firewall, analyse Wireshark captures. Month 3: Cryptography and identity \u2014 symmetric/asymmetric encryption, hashing, PKI, access control, POPIA compliance. Hands-on: implement encryption in Python, set up MFA. Month 4: Offensive security \u2014 web vulnerabilities (OWASP Top 10), network scanning, basic exploitation. Hands-on: DVWA, HackTheBox, Juice Shop. Month 5: Advanced topics \u2014 cloud security, malware analysis, security automation. Hands-on: AWS security lab, YARA rules. Month 6: Career preparation \u2014 CTF competition, build a portfolio, mock interviews, OSCP/eJPT exam preparation. Throughout: weekly CTF challenges, peer code review, presentation skills.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Progress from defence to offence \u2014 understand what you are protecting before learning to attack.",
+          "Include SA-specific topics like POPIA and load shedding resilience."
+        ],
+        "explanation": "The most effective cybersecurity education combines theory with hands-on practice. Labs, CTFs, and real-world scenarios develop skills that lectures alone cannot.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Privately reporting vulnerabilities to vendors before public announcement, giving them time to patch",
+      "Capture The Flag \u2014 a cybersecurity competition where participants solve security challenges to find hidden flags",
+      "Using mathematical proofs to demonstrate that a system meets its security specifications"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "responsible disclosure",
+        "definition": "Privately reporting vulnerabilities to vendors before public announcement, giving them time to patch",
+        "example_usage": "The researcher followed responsible disclosure, giving the company 90 days to fix the bug."
+      },
+      {
+        "term": "CTF",
+        "definition": "Capture The Flag \u2014 a cybersecurity competition where participants solve security challenges to find hidden flags",
+        "example_usage": "Winning the CTF competition required skills in cryptography, web exploitation, and reverse engineering."
+      },
+      {
+        "term": "formal verification",
+        "definition": "Using mathematical proofs to demonstrate that a system meets its security specifications",
+        "example_usage": "Formal verification of the encryption protocol proved it was free from certain classes of attacks."
+      },
+      {
+        "term": "bug bounty",
+        "definition": "A programme where organisations pay researchers for responsibly reporting security vulnerabilities",
+        "example_usage": "The bug bounty paid R50,000 for the critical vulnerability she discovered."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Some students think cybersecurity is only about hacking and breaking into systems.",
+        "correction": "Cybersecurity encompasses a vast range of disciplines: defence (security engineering, architecture, incident response), governance (risk management, compliance, policy), research (cryptography, formal methods, privacy), education (awareness training, curriculum development), and yes, offensive security (penetration testing, red teaming). Most cybersecurity professionals spend more time building and defending than attacking. The 'hacker' image, while dramatic, represents only a small portion of the field.",
+        "why_students_think_this": "Movies, TV shows, and media portrayals of cybersecurity focus almost exclusively on hacking. This creates a narrow and inaccurate picture of a field that is actually diverse, multidisciplinary, and largely defensive."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

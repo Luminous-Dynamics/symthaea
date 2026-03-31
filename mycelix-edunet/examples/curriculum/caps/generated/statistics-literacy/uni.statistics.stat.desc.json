@@ -1,0 +1,179 @@
+{
+  "node_id": "UNI.STATISTICS.STAT.DESC",
+  "lesson": {
+    "standard_code": "UNI.STATISTICS.STAT.DESC",
+    "title": "Descriptive Statistics",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Descriptive statistics summarise and describe the main features of a dataset. Measures of central tendency (mean, median, mode) describe the 'typical' value. Measures of spread (range, standard deviation, interquartile range) describe how dispersed the data is. The choice of measure matters: the mean is sensitive to outliers (a few billionaires dramatically raise the mean income), while the median is robust (it represents the middle value regardless of extremes). In South Africa, understanding why median household income is far lower than mean household income reveals the country's extreme inequality. Visual tools like histograms and box plots make distributions tangible.",
+    "examples": [
+      {
+        "problem": "The salaries (in thousands of rands per month) of 7 employees are: 8, 9, 10, 10, 11, 12, 50. Calculate the mean and median.",
+        "steps": [
+          {
+            "instruction": "Step 1: Mean = (8+9+10+10+11+12+50)/7 = 110/7 = R15,714.",
+            "result": "mean"
+          },
+          {
+            "instruction": "Step 2: Median = middle value when sorted = 10 (the 4th of 7 values).",
+            "result": "median"
+          },
+          {
+            "instruction": "Step 3: The mean (R15,714) is pulled up by the R50,000 outlier. The median (R10,000) better represents the typical salary.",
+            "result": "comparison"
+          }
+        ],
+        "answer": "Answer: Mean = R15,714, Median = R10,000. The median is more representative here because the outlier (R50,000) distorts the mean.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain standard deviation using a practical example.",
+        "steps": [
+          {
+            "instruction": "Step 1: Class A test scores: 60, 65, 70, 75, 80. Mean = 70. Scores are spread close to the mean.",
+            "result": "low SD"
+          },
+          {
+            "instruction": "Step 2: Class B test scores: 30, 50, 70, 90, 110. Mean = 70. Scores are spread far from the mean.",
+            "result": "high SD"
+          },
+          {
+            "instruction": "Step 3: Both have the same mean, but Class B has a much higher standard deviation \u2014 more variability in performance.",
+            "result": "comparison"
+          }
+        ],
+        "answer": "Answer: Standard deviation measures how far, on average, data points are from the mean. Same mean does not mean same distribution.",
+        "visual_description": null
+      },
+      {
+        "problem": "What does a histogram reveal that a mean and standard deviation cannot?",
+        "steps": [
+          {
+            "instruction": "Step 1: A histogram shows the shape of the distribution \u2014 is it symmetric, skewed, or bimodal?",
+            "result": "shape"
+          },
+          {
+            "instruction": "Step 2: Two datasets can have the same mean and SD but very different shapes.",
+            "result": "limitation of summary stats"
+          },
+          {
+            "instruction": "Step 3: Example: exam scores with a bimodal distribution (peaks at 40% and 80%) suggest two distinct groups of students.",
+            "result": "insight"
+          }
+        ],
+        "answer": "Answer: Visualisation reveals patterns in data that summary statistics alone can hide.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define mean, median, and mode. When is each most useful?",
+        "answer": "Mean: sum of values divided by count. Most useful for symmetric distributions without outliers. Median: the middle value when data is sorted. Most useful when data is skewed or has outliers (e.g., income data). Mode: the most frequent value. Most useful for categorical data (e.g., most popular colour).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Mean is affected by extremes; median is not."
+        ],
+        "explanation": "Choosing the right measure of central tendency depends on the data distribution. Reporting only the mean can be misleading for skewed data.",
+        "distractors": []
+      },
+      {
+        "question": "South Africa's mean household income is approximately R23,000/month, but the median is approximately R7,300/month. Explain what this gap reveals about income distribution.",
+        "answer": "The large gap between mean and median indicates a highly right-skewed distribution \u2014 a small number of very high earners pull the mean up dramatically while the majority earn far less. The median better represents the 'typical' household. This gap is one of the clearest statistical indicators of South Africa's extreme income inequality, one of the highest in the world (Gini coefficient ~0.63).",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Why can the mean be so much higher than the median?",
+          "What does this say about the shape of the distribution?"
+        ],
+        "explanation": "South Africa's Gini coefficient of ~0.63 makes it one of the most unequal countries in the world. The mean-median gap in income is a direct statistical reflection of this inequality.",
+        "distractors": []
+      },
+      {
+        "question": "Calculate the standard deviation of this dataset: 4, 6, 8, 10, 12.",
+        "answer": "Mean = (4+6+8+10+12)/5 = 8. Deviations: -4, -2, 0, 2, 4. Squared deviations: 16, 4, 0, 4, 16. Mean of squared deviations (variance) = 40/5 = 8. Standard deviation = sqrt(8) = 2.83.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Step by step: find mean, subtract mean from each value, square the differences, average them, take the square root."
+        ],
+        "explanation": "Standard deviation follows a mechanical process. The key insight is that squaring prevents negative deviations from cancelling positive ones.",
+        "distractors": []
+      },
+      {
+        "question": "Two schools report the same average matric pass rate of 75%. School A has a standard deviation of 5% and School B has a standard deviation of 25%. What does this tell you about the two schools?",
+        "answer": "School A (SD=5%): most subjects and students are clustered near 75% \u2014 consistent performance across the board. School B (SD=25%): some subjects/students score near 100% while others are near 50% \u2014 highly variable performance. School B may need targeted support for weaker areas, while School A may need strategies to push above 75% across the board. The same average hides very different realities.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Same mean but very different spread \u2014 what does that mean in practice?",
+          "Which school would you be more concerned about as a parent?"
+        ],
+        "explanation": "This example demonstrates why reporting only averages is insufficient. The spread of the data is equally important for understanding and decision-making.",
+        "distractors": []
+      },
+      {
+        "question": "Design a data collection and analysis project for your school: choose a question, describe how to collect data, which descriptive statistics to calculate, and what visualisation to use. Justify your choices.",
+        "answer": "Example question: 'How does commute time vary by transport mode for learners at our school?' Data collection: anonymous survey of 100 learners asking transport mode and commute time in minutes. Statistics: median commute time by mode (median because commute times are likely skewed), IQR for spread, frequency of each mode. Visualisation: side-by-side box plots comparing commute time distributions by transport mode. Justification: box plots show median, spread, and outliers simultaneously; median is robust to the long commutes some learners face.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Choose a question relevant to your community.",
+          "Match the statistics and visualisation to the data type."
+        ],
+        "explanation": "Good statistical projects start with a genuine question, collect data systematically, and choose analysis methods appropriate to the data type and distribution.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The arithmetic average \u2014 sum of all values divided by the count",
+      "The middle value when data is sorted \u2014 robust to outliers",
+      "A measure of how spread out data values are from the mean"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "mean",
+        "definition": "The arithmetic average \u2014 sum of all values divided by the count",
+        "example_usage": "The mean test score was 72%."
+      },
+      {
+        "term": "median",
+        "definition": "The middle value when data is sorted \u2014 robust to outliers",
+        "example_usage": "The median income is more representative than the mean in unequal societies."
+      },
+      {
+        "term": "standard deviation",
+        "definition": "A measure of how spread out data values are from the mean",
+        "example_usage": "A low standard deviation means data points are clustered near the mean."
+      },
+      {
+        "term": "outlier",
+        "definition": "A data value that is unusually far from the other values",
+        "example_usage": "The CEO's salary is an outlier that distorts the mean."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often assume the average (mean) represents the 'typical' value in any dataset.",
+        "correction": "The mean is only representative for symmetric distributions without outliers. For skewed data (like income, house prices, or commute times), the median is a better measure of the 'typical' value because it is not pulled by extreme values. Always ask: is this data skewed? If so, the median is more informative than the mean.",
+        "why_students_think_this": "The word 'average' is used loosely in everyday language, and people assume it always represents the most common experience. In reality, the mean can be dramatically different from what most people experience."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

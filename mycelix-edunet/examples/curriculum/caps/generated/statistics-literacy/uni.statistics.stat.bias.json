@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.STATISTICS.STAT.BIAS",
+  "lesson": {
+    "standard_code": "UNI.STATISTICS.STAT.BIAS",
+    "title": "Data Bias & Ethics",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Data bias occurs when data systematically misrepresents the population or phenomenon it claims to describe. Selection bias (who is included in the sample), survivorship bias (only seeing successes), confirmation bias (seeking data that supports existing beliefs), and measurement bias (flawed instruments or definitions) can all distort conclusions. Simpson's paradox shows that trends in subgroups can reverse when data is aggregated. In South Africa, biased data has real consequences: crime statistics that exclude unreported crimes understate violence against women; economic data that ignores the informal economy misrepresents livelihoods. Ethical data use requires transparency about methods, limitations, and the potential for harm.",
+    "examples": [
+      {
+        "problem": "Explain survivorship bias using the example of successful entrepreneurs.",
+        "steps": [
+          {
+            "instruction": "Step 1: We study successful entrepreneurs (Elon Musk, Patrice Motsepe) and identify their traits: risk-taking, dropping out, working long hours.",
+            "result": "observe successes"
+          },
+          {
+            "instruction": "Step 2: But we never study the thousands of people with the same traits who failed.",
+            "result": "missing data"
+          },
+          {
+            "instruction": "Step 3: Survivorship bias: we conclude that risk-taking causes success because we only see the survivors.",
+            "result": "bias identified"
+          }
+        ],
+        "answer": "Answer: Survivorship bias is looking only at winners and concluding that their traits caused the winning, while ignoring the many losers with the same traits.",
+        "visual_description": null
+      },
+      {
+        "problem": "Demonstrate Simpson's paradox with a simple example.",
+        "steps": [
+          {
+            "instruction": "Step 1: Hospital A: 90% success rate overall. Hospital B: 80% success rate overall. Hospital A seems better.",
+            "result": "aggregate"
+          },
+          {
+            "instruction": "Step 2: But: Hospital A treats mostly easy cases (95% success) and few hard cases (50%). Hospital B treats mostly hard cases (75%) and few easy cases (98%).",
+            "result": "subgroups"
+          },
+          {
+            "instruction": "Step 3: Hospital B is actually better at treating BOTH easy AND hard cases, but looks worse overall because it takes on harder patients.",
+            "result": "paradox"
+          }
+        ],
+        "answer": "Answer: Simpson's paradox occurs when a trend in subgroups reverses or disappears when the groups are combined. The aggregate data is misleading.",
+        "visual_description": null
+      },
+      {
+        "problem": "How can survey sampling methods introduce bias?",
+        "steps": [
+          {
+            "instruction": "Step 1: Online survey: excludes people without internet access (overrepresents urban, young, wealthy).",
+            "result": "selection bias"
+          },
+          {
+            "instruction": "Step 2: Voluntary response: people with strong opinions are more likely to respond (overrepresents extremes).",
+            "result": "response bias"
+          },
+          {
+            "instruction": "Step 3: Leading questions: 'Don't you agree that...' pushes respondents toward a particular answer.",
+            "result": "measurement bias"
+          }
+        ],
+        "answer": "Answer: Every data collection method has potential biases. Transparency about methodology is essential for honest data use.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define selection bias and give an example.",
+        "answer": "Selection bias occurs when the sample is not representative of the population, leading to conclusions that do not generalise. Example: surveying shopping mall visitors about the economy systematically excludes people who cannot afford to visit malls, people who are working during the survey, and rural residents \u2014 producing a biased picture of public sentiment.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Who is included? More importantly, who is excluded?"
+        ],
+        "explanation": "Selection bias is often invisible because you can only see who IS in your sample, not who is missing. Thinking about who is absent is a critical statistical skill.",
+        "distractors": []
+      },
+      {
+        "question": "Explain survivorship bias and give a South African example.",
+        "answer": "Survivorship bias is the error of focusing on successes (survivors) while ignoring failures that are invisible. SA example: celebrating the few township entrepreneurs who built million-rand businesses while ignoring the many who invested their savings and failed. This creates the impression that anyone can succeed with hard work, ignoring systemic barriers (access to capital, networks, infrastructure) that cause most to fail.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What do we NOT see? The failures, the dropouts, the excluded.",
+          "Why do we only hear about successes?"
+        ],
+        "explanation": "Survivorship bias is especially dangerous in policy-making. If we only study successful outcomes, we may attribute success to the wrong causes and design ineffective programmes.",
+        "distractors": []
+      },
+      {
+        "question": "A news headline says: 'Study proves coffee prevents cancer \u2014 50,000 coffee drinkers studied.' Identify three potential sources of bias in this claim.",
+        "answer": "(1) Selection bias: coffee drinkers may differ from non-drinkers in other ways (income, lifestyle, health consciousness) that actually explain lower cancer rates. (2) Confounding variables: coffee drinkers might exercise more, eat better, or have better healthcare access. (3) Publication bias: negative results (coffee has no effect) are less likely to be published, so we see a skewed set of studies. Also: correlation does not imply causation \u2014 an observational study cannot prove coffee prevents cancer.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Is this an experiment or an observation?",
+          "What other differences might exist between coffee drinkers and non-drinkers?"
+        ],
+        "explanation": "This type of health claim appears frequently in media. The critical skill is asking: was this a randomised experiment or an observational study? If observational, confounding variables make causal claims unreliable.",
+        "distractors": []
+      },
+      {
+        "question": "Explain Simpson's paradox and why it matters for policy decisions. Use a concrete example.",
+        "answer": "Simpson's paradox occurs when a trend in subgroups reverses when data is combined. Example: University X admits 40% of male and 35% of female applicants overall. But in every individual department, the female acceptance rate is higher. How? Women disproportionately apply to competitive departments (with low acceptance rates for everyone), while men apply to less competitive ones. The aggregated data suggests gender bias against women, but departmental data shows no bias \u2014 the issue is application patterns, not admissions discrimination. Policy implication: always examine subgroup data before making causal claims from aggregates.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Can the overall trend and subgroup trends point in opposite directions?",
+          "What hidden variable might explain the reversal?"
+        ],
+        "explanation": "Simpson's paradox (Berkeley admissions case, 1973) is one of the most important concepts in statistics because it shows that aggregated data can be actively misleading without disaggregation.",
+        "distractors": []
+      },
+      {
+        "question": "Design a checklist for evaluating whether a statistical claim in the news is reliable. Include at least 6 questions.",
+        "answer": "Checklist: (1) Who funded the study? (potential conflict of interest). (2) How large was the sample and how was it selected? (sample size and selection bias). (3) Was it an experiment or observation? (causation vs correlation). (4) Are confounding variables acknowledged? (alternative explanations). (5) Is the effect size reported, or only significance? (practical importance). (6) Has the result been replicated by independent researchers? (reliability). (7) Does the headline accurately reflect the study's conclusions? (media distortion). (8) Are limitations acknowledged? (honesty).",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Think about all the ways a statistical claim can be misleading.",
+          "Each question guards against a specific type of error."
+        ],
+        "explanation": "Media literacy includes statistical literacy. Most misleading health and science claims in the news fail on one or more of these checklist items.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Systematic error from a sample that does not represent the population",
+      "The error of focusing only on successes while ignoring the many failures that are not visible",
+      "A phenomenon where a trend in subgroups reverses or disappears when groups are combined"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "selection bias",
+        "definition": "Systematic error from a sample that does not represent the population",
+        "example_usage": "Online surveys suffer from selection bias because they exclude people without internet."
+      },
+      {
+        "term": "survivorship bias",
+        "definition": "The error of focusing only on successes while ignoring the many failures that are not visible",
+        "example_usage": "Studying only successful startups introduces survivorship bias."
+      },
+      {
+        "term": "Simpson's paradox",
+        "definition": "A phenomenon where a trend in subgroups reverses or disappears when groups are combined",
+        "example_usage": "Simpson's paradox showed that the university was not discriminating, despite what aggregate data suggested."
+      },
+      {
+        "term": "confounding variable",
+        "definition": "A variable that influences both the independent and dependent variables, creating a spurious association",
+        "example_usage": "Income is a confounding variable in the relationship between coffee consumption and health."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People commonly assume that a large sample size makes a study reliable.",
+        "correction": "A large sample reduces random error but does not fix systematic bias. A survey of 1 million people conducted only online is still biased toward internet users, regardless of its size. The Literary Digest poll of 1936 surveyed 2.4 million people but predicted the wrong presidential winner because its sample was drawn from telephone directories and automobile registrations \u2014 overrepresenting wealthy voters. Sample quality (representativeness) matters more than sample size.",
+        "why_students_think_this": "Larger numbers feel more impressive and trustworthy. People assume that more data automatically means better data, but bias in how data is collected persists regardless of quantity."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,180 @@
+{
+  "node_id": "CYBER.FND.CRYPTO",
+  "lesson": {
+    "standard_code": "CYBER.FND.CRYPTO",
+    "title": "Cryptography Fundamentals",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Cryptography transforms readable data (plaintext) into unreadable data (ciphertext) using mathematical algorithms and keys. Symmetric encryption uses the same key for encryption and decryption (AES-256 \u2014 fast, used for data at rest). Asymmetric encryption uses a key pair: a public key (shared openly) to encrypt and a private key (kept secret) to decrypt (RSA, ECC \u2014 slower, used for key exchange and digital signatures). Hashing produces a fixed-size fingerprint of data that cannot be reversed (SHA-256 \u2014 used for password storage and integrity verification). Together, these tools protect data confidentiality, integrity, and authentication. HTTPS, WhatsApp end-to-end encryption, and South Africa's banking systems all depend on cryptography.",
+    "examples": [
+      {
+        "problem": "Explain symmetric vs asymmetric encryption using the analogy of locks and keys.",
+        "steps": [
+          {
+            "instruction": "Step 1: Symmetric: like a padlock where you and your friend have copies of the same key. Fast, but you need a secure way to share the key.",
+            "result": "symmetric"
+          },
+          {
+            "instruction": "Step 2: Asymmetric: like a mailbox with a slot (public key) anyone can drop mail into, but only you have the key to open it (private key).",
+            "result": "asymmetric"
+          },
+          {
+            "instruction": "Step 3: In practice, HTTPS uses asymmetric encryption to securely exchange a symmetric key, then uses the symmetric key for fast data transfer.",
+            "result": "hybrid"
+          }
+        ],
+        "answer": "Answer: Modern systems use both: asymmetric for key exchange, symmetric for data encryption. This combines the security of asymmetric with the speed of symmetric.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why are passwords stored as hashes, not as encrypted text?",
+        "steps": [
+          {
+            "instruction": "Step 1: If passwords were encrypted, anyone with the decryption key could read all passwords.",
+            "result": "encryption risk"
+          },
+          {
+            "instruction": "Step 2: Hashing is one-way: you can hash a password to verify it, but you cannot reverse the hash to get the password.",
+            "result": "hashing property"
+          },
+          {
+            "instruction": "Step 3: When you log in, the system hashes your input and compares it to the stored hash \u2014 it never needs to know your actual password.",
+            "result": "verification"
+          }
+        ],
+        "answer": "Answer: Password hashing means even a database breach does not directly reveal passwords. Attackers must crack each hash individually.",
+        "visual_description": null
+      },
+      {
+        "problem": "What is end-to-end encryption and why does WhatsApp use it?",
+        "steps": [
+          {
+            "instruction": "Step 1: End-to-end encryption (E2EE) means only the sender and recipient can read the messages \u2014 not even WhatsApp's servers can decrypt them.",
+            "result": "E2EE defined"
+          },
+          {
+            "instruction": "Step 2: Each conversation generates unique encryption keys on the participants' devices.",
+            "result": "key generation"
+          },
+          {
+            "instruction": "Step 3: This protects against: server breaches, government surveillance requests to WhatsApp, and insider threats at the company.",
+            "result": "protection"
+          }
+        ],
+        "answer": "Answer: E2EE ensures that the communication channel provider cannot access the content \u2014 only the endpoints (sender and receiver) hold the keys.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define encryption, decryption, and hashing. State one use case for each.",
+        "answer": "Encryption: converting plaintext to ciphertext using a key and algorithm. Use case: protecting data in transit (HTTPS). Decryption: converting ciphertext back to plaintext using the appropriate key. Use case: reading an encrypted email. Hashing: generating a fixed-size fingerprint of data that cannot be reversed. Use case: storing passwords securely.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Encryption is reversible (with the key); hashing is not."
+        ],
+        "explanation": "The irreversibility of hashing is its key property. If you could reverse a hash, password storage would be insecure.",
+        "distractors": []
+      },
+      {
+        "question": "Explain why a 256-bit AES key is considered secure. How many possible keys exist?",
+        "answer": "A 256-bit key has 2^256 possible combinations, which is approximately 1.16 x 10^77. Even if every atom in the observable universe (~10^80) were a computer performing a billion key checks per second, it would take longer than the age of the universe to try all keys. This makes brute-force attacks practically impossible with current and foreseeable technology.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "How many combinations does 256 bits produce?",
+          "How long would brute force take?"
+        ],
+        "explanation": "The security of symmetric encryption rests on key length. AES-128 is considered secure for most purposes; AES-256 provides an additional safety margin against future advances including quantum computing.",
+        "distractors": []
+      },
+      {
+        "question": "You need to send a confidential document to a colleague. You have their public key. Describe the steps to encrypt and send the document.",
+        "answer": "Steps: (1) Generate a random symmetric key (e.g., AES-256). (2) Encrypt the document with this symmetric key (fast, handles large files). (3) Encrypt the symmetric key with your colleague's public key (only they can decrypt it with their private key). (4) Send both the encrypted document and the encrypted symmetric key. (5) Your colleague decrypts the symmetric key with their private key, then uses it to decrypt the document. This hybrid approach combines the speed of symmetric with the key distribution of asymmetric.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Why not just encrypt the whole document with the public key?",
+          "Public key encryption is too slow for large files."
+        ],
+        "explanation": "This hybrid encryption approach is exactly how HTTPS, PGP, and most secure communication protocols work. Understanding it demystifies 'secure communication.'",
+        "distractors": []
+      },
+      {
+        "question": "Analyse the security implications of quantum computing for current cryptographic systems.",
+        "answer": "Shor's algorithm (quantum) can factor large numbers exponentially faster than classical computers, threatening RSA and ECC (asymmetric) encryption. A sufficiently powerful quantum computer could break RSA-2048 in hours instead of billions of years. Symmetric encryption (AES) is less affected \u2014 Grover's algorithm halves the effective key length, so AES-256 becomes AES-128 strength (still secure). Hash functions are similarly halved but remain practical. Response: the cryptographic community is developing post-quantum cryptography (lattice-based, hash-based) that resists quantum attacks. NIST standardised CRYSTALS-Kyber and CRYSTALS-Dilithium in 2024.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Which types of encryption are vulnerable to quantum attacks?",
+          "What is the industry doing to prepare?"
+        ],
+        "explanation": "Quantum computing is a real but not immediate threat to cryptography. Current quantum computers are too small to break RSA, but the 'harvest now, decrypt later' strategy means encrypted data captured today could be decrypted by future quantum computers.",
+        "distractors": []
+      },
+      {
+        "question": "Design a secure messaging system for a small organisation. Specify which cryptographic tools you would use for confidentiality, integrity, and authentication.",
+        "answer": "System: Confidentiality: E2EE using X25519 key exchange + AES-256-GCM symmetric encryption for messages. All messages encrypted on the sender's device, decrypted only on the recipient's device. Integrity: AES-GCM provides authenticated encryption (integrity built in). Additionally, hash each message with SHA-256 for verification. Authentication: each user has an Ed25519 key pair. Digital signatures on messages prove sender identity (non-repudiation). Key verification: users can verify each other's public keys via QR code scanning (like Signal's safety numbers). Key rotation: generate new session keys periodically.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Cover all three CIA properties with specific algorithms.",
+          "Consider key management \u2014 how are keys generated, stored, and verified?"
+        ],
+        "explanation": "This design mirrors what Signal and WhatsApp actually implement. The hardest part is not the cryptography but key management \u2014 ensuring users' keys are genuine and not substituted by an attacker.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The process of converting plaintext into unreadable ciphertext using a key and algorithm",
+      "In asymmetric cryptography, the key shared openly that others use to encrypt data for you",
+      "A one-way function that produces a fixed-size fingerprint of data, used for integrity and password storage"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "encryption",
+        "definition": "The process of converting plaintext into unreadable ciphertext using a key and algorithm",
+        "example_usage": "AES-256 encryption protects the data on your phone."
+      },
+      {
+        "term": "public key",
+        "definition": "In asymmetric cryptography, the key shared openly that others use to encrypt data for you",
+        "example_usage": "Share your public key so others can send you encrypted messages."
+      },
+      {
+        "term": "hash function",
+        "definition": "A one-way function that produces a fixed-size fingerprint of data, used for integrity and password storage",
+        "example_usage": "SHA-256 produces a 256-bit hash regardless of input size."
+      },
+      {
+        "term": "digital signature",
+        "definition": "A cryptographic mechanism that proves the authenticity and integrity of a message using the sender's private key",
+        "example_usage": "The digital signature confirmed the document had not been tampered with."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think encryption makes them 'unhackable' or completely secure.",
+        "correction": "Encryption protects data in transit and at rest, but it does not protect against all threats. If your device is compromised with malware, the attacker can read data before it is encrypted or after it is decrypted. Weak passwords, social engineering, and poor key management can all bypass encryption. Encryption is one layer of defence in depth, not a complete security solution.",
+        "why_students_think_this": "The marketing around 'military-grade encryption' creates the impression that encryption alone provides total security. In practice, most breaches exploit human factors (phishing, weak passwords) rather than breaking encryption."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

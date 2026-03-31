@@ -1,0 +1,175 @@
+{
+  "node_id": "UNI.LEARNING.LEARN.SLEEP",
+  "lesson": {
+    "standard_code": "UNI.LEARNING.LEARN.SLEEP",
+    "title": "Sleep & Learning",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Sleep is not merely rest \u2014 it is an active period of memory consolidation, neural maintenance, and learning. During sleep, the brain replays experiences from the day, transferring information from the hippocampus (short-term storage) to the cortex (long-term storage). Different sleep stages serve different functions: slow-wave sleep (SWS) consolidates declarative memories (facts, events), while REM sleep consolidates procedural and emotional memories. Studies show that sleeping after learning improves retention by 20-40% compared to staying awake for the same period. Even a 20-minute nap can significantly boost learning. For South African students, who often face early school start times and demanding schedules, understanding sleep's role in learning can improve academic outcomes with zero additional study time.",
+    "examples": [
+      {
+        "problem": "A student studies vocabulary until midnight, then wakes at 5am for school. Another studies until 10pm and sleeps until 6am. Who will remember more on the test?",
+        "steps": [
+          {
+            "instruction": "Step 1: The midnight student: 5 hours of sleep, less time for memory consolidation, higher cortisol from sleep deprivation.",
+            "result": "sleep-deprived"
+          },
+          {
+            "instruction": "Step 2: The 10pm student: 8 hours of sleep, full cycles of SWS and REM for consolidation, lower stress hormones.",
+            "result": "well-rested"
+          },
+          {
+            "instruction": "Step 3: The well-rested student will typically outperform the sleep-deprived student, despite studying 2 fewer hours.",
+            "result": "outcome"
+          }
+        ],
+        "answer": "Answer: Studying an extra 2 hours at the cost of 3 hours of sleep is a net negative for learning. Sleep is when the brain processes what you studied.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how napping can improve learning, using NASA research.",
+        "steps": [
+          {
+            "instruction": "Step 1: NASA found that a 26-minute nap improved pilot performance by 34% and alertness by 54%.",
+            "result": "NASA finding"
+          },
+          {
+            "instruction": "Step 2: Short naps (20-30 min) boost alertness and working memory without causing sleep inertia.",
+            "result": "mechanism"
+          },
+          {
+            "instruction": "Step 3: A nap after studying is particularly effective because it initiates consolidation of recently learned material.",
+            "result": "study application"
+          }
+        ],
+        "answer": "Answer: Strategic napping is a legitimate productivity and learning tool, not a sign of laziness.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why do students often have 'aha' moments about problems after sleeping on them?",
+        "steps": [
+          {
+            "instruction": "Step 1: During sleep, the brain continues processing unsolved problems, making new connections between ideas.",
+            "result": "offline processing"
+          },
+          {
+            "instruction": "Step 2: REM sleep is particularly important for creative insight \u2014 the brain forms novel associations.",
+            "result": "REM creativity"
+          },
+          {
+            "instruction": "Step 3: This is why 'sleeping on it' before making important decisions often leads to better outcomes.",
+            "result": "practical application"
+          }
+        ],
+        "answer": "Answer: The advice to 'sleep on it' has a neuroscientific basis \u2014 the sleeping brain solves problems that the waking brain could not.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "How many hours of sleep do teenagers need, and why is this different from adults?",
+        "answer": "Teenagers need 8-10 hours of sleep per night (National Sleep Foundation). This is more than adults (7-9 hours) because adolescent brains are undergoing significant development \u2014 pruning neural connections, strengthening important pathways, and producing hormones. Additionally, teenagers' circadian rhythms shift later (melatonin release delays), making them naturally inclined to fall asleep later and wake later. Early school start times fight this biology.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about why teenagers naturally stay up late and struggle to wake up early."
+        ],
+        "explanation": "The American Academy of Pediatrics has recommended that middle and high schools start no earlier than 8:30am to align with adolescent sleep biology.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the role of slow-wave sleep (SWS) and REM sleep in memory consolidation.",
+        "answer": "Slow-wave sleep (deep sleep, early in the night) consolidates declarative memories \u2014 facts, vocabulary, concepts. The hippocampus 'replays' the day's learning to the cortex for long-term storage. REM sleep (later in the night, during dream periods) consolidates procedural memories (skills, motor learning) and emotional memories. It also facilitates creative connections between ideas. A full night's sleep cycles through both stages multiple times, which is why truncating sleep disproportionately cuts REM (which occurs mostly in the last 2-3 hours).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What happens in the brain during different sleep stages?",
+          "Why is the last 2 hours of sleep important?"
+        ],
+        "explanation": "This is why cramming until 3am and waking at 6am is particularly harmful \u2014 it eliminates the REM-rich sleep cycles that consolidate and integrate learning.",
+        "distractors": []
+      },
+      {
+        "question": "Design an optimal study-and-sleep schedule for exam week that maximises both study time and sleep quality.",
+        "answer": "Schedule: 6:30am: wake. 7-8am: review yesterday's material (spaced retrieval). 8am-3pm: school. 3-4pm: exercise (improves sleep quality). 4-6pm: focused study (hardest material first). 6-7pm: dinner and break. 7-8:30pm: lighter study or review. 9pm: screen off (blue light blocks melatonin). 9:30pm: relaxation (reading, stretching). 10pm: sleep. Total: 8.5 hours sleep + 4.5 hours focused study. This beats studying until midnight with 5 hours sleep.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Prioritise sleep over extra study hours.",
+          "Screens before bed reduce sleep quality."
+        ],
+        "explanation": "This schedule protects 8.5 hours of sleep while providing 4.5 hours of focused study. The well-rested brain will learn more efficiently than a sleep-deprived brain grinding through extra hours.",
+        "distractors": []
+      },
+      {
+        "question": "Evaluate the common student practice of 'all-nighters' before exams. Use evidence about sleep and memory.",
+        "answer": "All-nighters are counterproductive: (1) they eliminate the consolidation period when the brain moves information to long-term memory. (2) Sleep deprivation impairs working memory, attention, and decision-making \u2014 the very cognitive functions needed for exams. (3) Cortisol (stress hormone) rises, further impairing memory retrieval. (4) Material crammed without sleep is forgotten within days. Studies show that students who sleep normally before exams outperform those who pull all-nighters, even when the all-nighter students studied more hours total. The only scenario where an all-nighter helps is if you truly did not study at all \u2014 and even then, a few hours of sleep after studying is better than none.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What does sleep deprivation do to cognitive performance?",
+          "Is more study time always better?"
+        ],
+        "explanation": "The all-nighter is one of the most common and most counterproductive study practices. It trades long-term learning and exam performance for the illusion of maximum preparation.",
+        "distractors": []
+      },
+      {
+        "question": "Create an infographic plan (describe the content and layout) that communicates the importance of sleep for learning to fellow students. Include at least 5 evidence-based facts and 3 practical tips.",
+        "answer": "Content: Title: 'Sleep Is Studying' \u2014 Why your brain needs sleep to learn. Facts: (1) Sleep improves memory retention by 20-40%. (2) Teens need 8-10 hours. (3) REM sleep (late in the night) consolidates creative and procedural memories. (4) Sleep deprivation impairs cognition as much as alcohol intoxication. (5) A 26-minute nap improves performance by 34% (NASA). Tips: (1) Set a consistent bedtime. (2) No screens 1 hour before bed. (3) Study the hardest material 1-2 hours before sleep. Layout: central brain illustration with sleep stages, surrounded by facts in speech bubbles, tips in a sidebar, and a 'myth vs fact' section at the bottom.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Make it visually engaging \u2014 your audience is fellow students.",
+          "Lead with the most surprising fact."
+        ],
+        "explanation": "Infographics are an effective way to communicate research findings to peers. The best ones combine compelling facts with clear visual hierarchy and actionable tips.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The brain process during sleep that stabilises and strengthens new memories for long-term storage",
+      "Rapid Eye Movement sleep \u2014 a stage characterised by dreaming, important for procedural and emotional memory consolidation",
+      "The body's internal 24-hour clock that regulates sleep-wake cycles, hormone release, and body temperature"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "memory consolidation",
+        "definition": "The brain process during sleep that stabilises and strengthens new memories for long-term storage",
+        "example_usage": "Memory consolidation during sleep transfers information from the hippocampus to the cortex."
+      },
+      {
+        "term": "REM sleep",
+        "definition": "Rapid Eye Movement sleep \u2014 a stage characterised by dreaming, important for procedural and emotional memory consolidation",
+        "example_usage": "REM sleep helps consolidate motor skills and creative connections."
+      },
+      {
+        "term": "circadian rhythm",
+        "definition": "The body's internal 24-hour clock that regulates sleep-wake cycles, hormone release, and body temperature",
+        "example_usage": "Teenagers' circadian rhythms shift later, making early school start times challenging."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many students (and parents) think that sleeping less means more time for studying and therefore better results.",
+        "correction": "The opposite is true: sleeping less reduces learning efficiency, impairs memory consolidation, and degrades cognitive performance. A well-rested student studying for 4 hours will typically outperform a sleep-deprived student studying for 7 hours. Sleep is not wasted time \u2014 it is when the brain processes, organises, and stores what was studied. Sacrificing sleep for study time is trading a productive process (consolidation) for a less productive one (fatigued study).",
+        "why_students_think_this": "Our culture glorifies busyness and sleep deprivation as signs of dedication. Students see peers staying up late and assume that is what success requires. The link between sleep and learning is not intuitive."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

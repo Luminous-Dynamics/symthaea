@@ -1,0 +1,180 @@
+{
+  "node_id": "CYBER.FND.ACCESS",
+  "lesson": {
+    "standard_code": "CYBER.FND.ACCESS",
+    "title": "Access Control & Identity",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Access control determines who can access what resources and what they can do with them. The principle of least privilege states that users should have only the minimum access needed for their role. Authentication verifies identity (who are you?), while authorisation determines permissions (what can you do?). Multi-factor authentication (MFA) combines two or more factors: something you know (password), something you have (phone, hardware token), and something you are (fingerprint, face). Role-based access control (RBAC) assigns permissions to roles rather than individuals. In South Africa, where identity theft is a growing concern and POPIA requires adequate security for personal data, strong access control is both a security and legal requirement.",
+    "examples": [
+      {
+        "problem": "A bank teller should be able to view account balances but not modify interest rates. How does RBAC enforce this?",
+        "steps": [
+          {
+            "instruction": "Step 1: Define roles: 'Teller' has read access to accounts. 'Manager' has read/write access. 'Admin' can modify system settings.",
+            "result": "define roles"
+          },
+          {
+            "instruction": "Step 2: Assign the teller to the 'Teller' role. They inherit only the permissions for that role.",
+            "result": "assign role"
+          },
+          {
+            "instruction": "Step 3: If the teller is promoted, change their role to 'Manager' \u2014 permissions update automatically.",
+            "result": "role change"
+          }
+        ],
+        "answer": "Answer: RBAC simplifies management by assigning permissions to roles rather than individuals. This reduces errors and makes auditing easier.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why 'Password123!' is a weak password despite meeting common complexity requirements (uppercase, lowercase, number, symbol).",
+        "steps": [
+          {
+            "instruction": "Step 1: It uses a common base word ('Password') that appears in every password dictionary.",
+            "result": "predictable"
+          },
+          {
+            "instruction": "Step 2: The number and symbol are added in the most common positions (end).",
+            "result": "pattern"
+          },
+          {
+            "instruction": "Step 3: Automated password cracking tools would find this in seconds using dictionary attacks with common substitutions.",
+            "result": "crackable"
+          }
+        ],
+        "answer": "Answer: Password strength comes from unpredictability, not from meeting checkbox requirements. A random passphrase like 'correct-horse-battery-staple' is far stronger despite lacking symbols.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe how multi-factor authentication (MFA) works when logging into online banking.",
+        "steps": [
+          {
+            "instruction": "Step 1: Factor 1 (something you know): enter your username and password.",
+            "result": "knowledge"
+          },
+          {
+            "instruction": "Step 2: Factor 2 (something you have): receive a one-time code on your phone via SMS or authentication app.",
+            "result": "possession"
+          },
+          {
+            "instruction": "Step 3: Both factors must be correct. Even if an attacker steals your password, they cannot log in without your phone.",
+            "result": "dual verification"
+          }
+        ],
+        "answer": "Answer: MFA significantly reduces the risk of account compromise because an attacker must defeat multiple independent authentication factors.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define authentication and authorisation. How are they different?",
+        "answer": "Authentication: verifying WHO you are (identity). Authorisation: determining WHAT you are allowed to do (permissions). Authentication always comes first \u2014 you must prove your identity before the system checks your permissions. Example: logging into a company system (authentication) and then being allowed to access only your department's files (authorisation).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Authentication = identity verification. Authorisation = permission checking."
+        ],
+        "explanation": "A common error is confusing these two concepts. A system that authenticates users but does not properly authorise their access can allow authenticated users to access data they should not see.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the three factors of authentication and give an example of each.",
+        "answer": "(1) Something you know: password, PIN, security question answer. (2) Something you have: phone (for SMS codes), hardware token, smart card, authenticator app. (3) Something you are: fingerprint, facial recognition, iris scan, voice recognition. MFA requires at least two different factors. Using two passwords is NOT MFA because both are 'something you know.'",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "The factors must be from different categories.",
+          "Why is SMS + password MFA but password + PIN not?"
+        ],
+        "explanation": "The security of MFA comes from the independence of factors. An attacker who steals your password (knowledge) would also need to steal your phone (possession) \u2014 two completely different attack vectors.",
+        "distractors": []
+      },
+      {
+        "question": "Your company has had three incidents of former employees accessing systems after termination. Design an offboarding process that prevents this.",
+        "answer": "Process: (1) HR notifies IT immediately upon termination decision (before the employee is informed if it is dismissal). (2) Disable all user accounts within 1 hour of termination. (3) Revoke VPN, email, cloud service, and building access simultaneously. (4) Change any shared passwords the employee knew. (5) Recover company devices (laptop, phone, access cards). (6) Review and remove the employee from all group memberships and distribution lists. (7) Retain audit logs of the employee's recent activity for 90 days. (8) Conduct exit interview covering data handling obligations. Automation: use identity management software that can disable all accounts from a single action.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "The gap between termination and account disabling is the vulnerability.",
+          "Consider all access points, not just the main system."
+        ],
+        "explanation": "Timely offboarding is one of the most commonly neglected security controls. Studies show that 20% of organisations take more than a week to revoke former employees' access.",
+        "distractors": []
+      },
+      {
+        "question": "Compare password-based authentication with passkeys (FIDO2/WebAuthn). What are the security advantages of passkeys?",
+        "answer": "Passwords: vulnerable to phishing (user can be tricked into entering on fake site), reuse attacks (one breach compromises multiple accounts), brute force, keyloggers, and social engineering. Passkeys (FIDO2): bound to the specific website (cannot be phished), stored on the user's device (not on a server to be breached), use public-key cryptography (private key never leaves the device), and resist all known remote attacks. Passkeys are the most significant authentication improvement in decades because they eliminate the most common attack vectors against passwords.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What are the main attack vectors against passwords?",
+          "How does FIDO2 eliminate each one?"
+        ],
+        "explanation": "Passkeys are rapidly being adopted by major platforms (Google, Apple, Microsoft). They represent a fundamental shift from shared secrets (passwords) to asymmetric cryptography for authentication.",
+        "distractors": []
+      },
+      {
+        "question": "Design an access control policy for a healthcare clinic that handles patient records. Address authentication, authorisation, and auditing.",
+        "answer": "Policy: Authentication: all staff must use MFA (smart card + PIN) to access any system containing patient data. Authorisation: RBAC with roles \u2014 Doctor (full read/write on own patients), Nurse (read on assigned ward patients, write vitals), Receptionist (read names and appointment times only), Administrator (system config, no patient data). Least privilege: no role has access beyond its needs. Auditing: all access to patient records is logged (who, what, when). Logs reviewed weekly. Any access outside normal hours triggers an alert. Annual access review: all permissions reviewed against current roles. Break-glass: emergency access to any record with mandatory justification entry and immediate audit review.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Consider the full lifecycle: who gets access, what can they do, and how do you verify?",
+          "Include emergency access for life-threatening situations."
+        ],
+        "explanation": "Healthcare access control must balance security with availability \u2014 in an emergency, a doctor may need any patient's records. The 'break-glass' procedure allows this while maintaining accountability.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Verifying the identity of a user, device, or system",
+      "Determining what an authenticated user is permitted to do",
+      "Authentication requiring two or more independent factors (know, have, are)"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "authentication",
+        "definition": "Verifying the identity of a user, device, or system",
+        "example_usage": "MFA strengthens authentication by requiring multiple identity proofs."
+      },
+      {
+        "term": "authorisation",
+        "definition": "Determining what an authenticated user is permitted to do",
+        "example_usage": "Authorisation ensured the teller could view but not modify account settings."
+      },
+      {
+        "term": "multi-factor authentication",
+        "definition": "Authentication requiring two or more independent factors (know, have, are)",
+        "example_usage": "MFA would have prevented the breach because the attacker only had the password."
+      },
+      {
+        "term": "least privilege",
+        "definition": "The principle that users should have only the minimum access needed for their role",
+        "example_usage": "Least privilege limits the damage an attacker can cause with a compromised account."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think a strong password is sufficient security for important accounts.",
+        "correction": "Even the strongest password can be compromised through phishing, data breaches on other sites (password reuse), keyloggers, or social engineering. Multi-factor authentication adds a second independent layer that protects you even if your password is stolen. For any account containing sensitive data or financial access, MFA should be considered mandatory, not optional.",
+        "why_students_think_this": "Passwords have been the primary authentication mechanism for decades, and people are accustomed to thinking of them as sufficient. The rapid increase in credential theft attacks has made password-only authentication inadequate for sensitive systems."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

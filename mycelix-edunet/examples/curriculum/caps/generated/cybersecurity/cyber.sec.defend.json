@@ -1,0 +1,179 @@
+{
+  "node_id": "CYBER.SEC.DEFEND",
+  "lesson": {
+    "standard_code": "CYBER.SEC.DEFEND",
+    "title": "Defensive Security",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Defensive security encompasses the tools, techniques, and practices used to protect systems and data from attack. Key components include endpoint protection (antivirus, EDR), patch management (keeping software updated), security monitoring (SIEM, log analysis), email security (spam filtering, phishing detection), backup and recovery (3-2-1 rule: 3 copies, 2 media types, 1 off-site), and security hardening (disabling unnecessary services, secure configurations). The NIST Cybersecurity Framework organises defence into five functions: Identify, Protect, Detect, Respond, and Recover. In South Africa, where the Cybercrimes Act (2020) creates obligations for reporting, and POPIA requires adequate security measures, defensive security is both a technical and legal requirement.",
+    "examples": [
+      {
+        "problem": "Explain the 3-2-1 backup rule and why it is important for ransomware defence.",
+        "steps": [
+          {
+            "instruction": "Step 1: 3 copies: original + 2 backups. Protects against any single point of failure.",
+            "result": "redundancy"
+          },
+          {
+            "instruction": "Step 2: 2 media types: e.g., local disk + cloud storage. Protects against media-specific failures.",
+            "result": "diversity"
+          },
+          {
+            "instruction": "Step 3: 1 off-site: at least one backup in a different physical location. Protects against fire, theft, and ransomware that encrypts network-attached backups.",
+            "result": "geographic separation"
+          }
+        ],
+        "answer": "Answer: The 3-2-1 rule ensures that even if ransomware encrypts all local data and backups, the off-site backup allows recovery without paying the ransom.",
+        "visual_description": null
+      },
+      {
+        "problem": "How does a SIEM (Security Information and Event Management) system help defenders?",
+        "steps": [
+          {
+            "instruction": "Step 1: Collects logs from all systems (firewalls, servers, endpoints, applications) into one central platform.",
+            "result": "aggregation"
+          },
+          {
+            "instruction": "Step 2: Correlates events across systems: a failed login on the VPN followed by a successful login from a new IP triggers an alert.",
+            "result": "correlation"
+          },
+          {
+            "instruction": "Step 3: Provides dashboards, automated alerts, and forensic search capabilities for incident investigation.",
+            "result": "analysis"
+          }
+        ],
+        "answer": "Answer: A SIEM turns millions of individual log entries into actionable security intelligence by finding patterns that no human could detect manually.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why is patch management critical and what makes it difficult in practice?",
+        "steps": [
+          {
+            "instruction": "Step 1: Patches fix known vulnerabilities. Unpatched systems are easy targets \u2014 most successful attacks exploit known, patched vulnerabilities.",
+            "result": "why"
+          },
+          {
+            "instruction": "Step 2: Difficulty: patches can break applications (compatibility testing needed), some systems cannot be taken offline (24/7 operations), and organisations have thousands of systems to patch.",
+            "result": "challenges"
+          },
+          {
+            "instruction": "Step 3: Solution: prioritise patches by severity (CVSS score), test on non-production first, automate deployment where possible.",
+            "result": "approach"
+          }
+        ],
+        "answer": "Answer: Most successful cyber attacks exploit vulnerabilities for which patches already exist. Patch management is unglamorous but one of the most effective defences.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List the five functions of the NIST Cybersecurity Framework.",
+        "answer": "Identify (understand your assets and risks), Protect (implement safeguards), Detect (identify security events), Respond (take action on detected events), Recover (restore normal operations). These five functions create a continuous cycle of security management.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: know what you have, protect it, watch for trouble, respond to incidents, get back to normal."
+        ],
+        "explanation": "The NIST framework is the most widely adopted cybersecurity framework globally. It provides a common language for security discussion and a structured approach to improving security posture.",
+        "distractors": []
+      },
+      {
+        "question": "Explain why antivirus software alone is insufficient for modern endpoint protection. What additional capabilities does EDR (Endpoint Detection and Response) provide?",
+        "answer": "Traditional antivirus uses signature matching \u2014 it recognises known malware but cannot detect new or modified threats. EDR adds: (1) behavioural analysis (detects suspicious behaviour even from unknown malware), (2) continuous monitoring (records all endpoint activity for forensic analysis), (3) automated response (isolates compromised endpoints), (4) threat hunting (allows analysts to search for indicators of compromise). Modern threats use fileless malware, living-off-the-land techniques, and custom malware that bypasses signature-based detection.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "What can antivirus detect that EDR cannot? What can EDR detect that antivirus cannot?"
+        ],
+        "explanation": "The shift from antivirus to EDR reflects the evolution of threats. Signature-based detection is necessary but insufficient against modern attackers who create unique malware for each target.",
+        "distractors": []
+      },
+      {
+        "question": "Your organisation has been hit by ransomware. The attacker demands R2 million in Bitcoin. You have backups from 24 hours ago. Describe your response steps.",
+        "answer": "Immediate: (1) Isolate affected systems from the network to prevent spread. (2) Preserve evidence (do not restart or wipe machines). (3) Assess scope: which systems are affected? Is any data exfiltrated? (4) Activate incident response team. Short-term: (5) Determine if backups are intact and uncompromised. (6) Report to SAPS (Cybercrimes Act requires reporting). (7) Notify the Information Regulator if personal data is affected (POPIA). (8) Do NOT pay the ransom (no guarantee of decryption, funds criminal activity). Recovery: (9) Rebuild systems from clean images. (10) Restore data from backups. (11) Patch the vulnerability that was exploited. (12) Conduct post-incident review to prevent recurrence.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Isolate first, investigate second.",
+          "Paying the ransom funds criminal organisations and does not guarantee recovery."
+        ],
+        "explanation": "The decision not to pay ransom is supported by law enforcement globally. Approximately 80% of organisations that pay are attacked again, and 46% that pay do not get all their data back.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse the challenges of implementing a security patching programme in a South African hospital where systems include Windows servers, medical devices, and legacy equipment.",
+        "answer": "Challenges: (1) Medical devices often run embedded OS that cannot be easily patched (vendor-locked, regulatory approval needed for changes). (2) Legacy equipment may run unsupported OS (Windows XP) with no patches available. (3) Systems cannot be taken offline for patching without affecting patient care (24/7 availability). (4) Load shedding adds complexity \u2014 patching during power transitions risks corruption. (5) Limited IT staff and budget. Solutions: (1) Network segmentation to isolate unpatchable devices. (2) Virtual patching via IPS rules. (3) Scheduled maintenance windows during lowest-risk periods. (4) Risk-based prioritisation: internet-facing systems first. (5) Compensating controls for legacy systems (monitoring, restricted access).",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Not all systems can be patched \u2014 what do you do then?",
+          "Consider the intersection of cybersecurity and patient safety."
+        ],
+        "explanation": "Healthcare environments illustrate the tension between security (patching everything) and availability (systems must be running for patient care). The answer is risk-based prioritisation and compensating controls.",
+        "distractors": []
+      },
+      {
+        "question": "Design a defensive security architecture for a medium-sized South African financial services company. Include network, endpoint, identity, data, and monitoring layers.",
+        "answer": "Architecture: Network: next-gen firewall with IPS, network segmentation (DMZ, corporate, server, management), VPN for remote access. Endpoint: EDR on all workstations and servers, mobile device management for phones, application whitelisting on servers. Identity: MFA for all users, privileged access management for admin accounts, single sign-on with conditional access policies. Data: encryption at rest (AES-256) and in transit (TLS 1.3), DLP (Data Loss Prevention) for email and file transfers, database activity monitoring. Monitoring: SIEM collecting logs from all layers, 24/7 SOC (outsourced if needed), automated alerting with playbook-driven response. Additional: 3-2-1 backups with immutable off-site copies, annual penetration testing, quarterly vulnerability scans, security awareness training for all staff, POPIA compliance programme.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Cover all five NIST functions.",
+          "Include SA-specific considerations: POPIA, load shedding, Cybercrimes Act."
+        ],
+        "explanation": "A comprehensive defensive architecture is layered (defence in depth), covers all asset types, and includes people and process alongside technology. No single tool provides complete protection.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Security Information and Event Management \u2014 a system that aggregates and analyses security logs from across an organisation",
+      "Endpoint Detection and Response \u2014 advanced endpoint protection that monitors behaviour and enables investigation",
+      "The process of keeping software updated with security fixes from vendors"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "SIEM",
+        "definition": "Security Information and Event Management \u2014 a system that aggregates and analyses security logs from across an organisation",
+        "example_usage": "The SIEM alert correlated the VPN login anomaly with unusual file access patterns."
+      },
+      {
+        "term": "EDR",
+        "definition": "Endpoint Detection and Response \u2014 advanced endpoint protection that monitors behaviour and enables investigation",
+        "example_usage": "EDR detected the fileless malware that traditional antivirus missed."
+      },
+      {
+        "term": "patch management",
+        "definition": "The process of keeping software updated with security fixes from vendors",
+        "example_usage": "Effective patch management would have prevented the attack, which exploited a vulnerability patched 6 months earlier."
+      },
+      {
+        "term": "3-2-1 backup rule",
+        "definition": "A backup strategy: 3 copies of data, on 2 different media types, with 1 copy off-site",
+        "example_usage": "The 3-2-1 backup rule saved us when ransomware encrypted our primary and network-attached storage."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many organisations focus their security budget on preventing attacks and neglect detection and recovery.",
+        "correction": "Prevention is important but cannot stop all attacks. The NIST framework allocates equal importance to Detect, Respond, and Recover alongside Identify and Protect. Organisations that invest only in prevention are often unable to detect breaches for months (the average dwell time is 200+ days) and lack tested recovery procedures. A balanced approach assumes that some attacks will succeed and focuses on detecting them quickly and recovering efficiently.",
+        "why_students_think_this": "Prevention feels proactive and controllable, while detection and recovery feel like admitting failure. But accepting that breaches will occur and preparing for them is more realistic and effective than assuming prevention alone will suffice."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,180 @@
+{
+  "node_id": "CYBER.FND.NET",
+  "lesson": {
+    "standard_code": "CYBER.FND.NET",
+    "title": "Network Security Basics",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Network security protects the communication pathways between computers and devices. Networks are layered (the OSI model has 7 layers; the TCP/IP model has 4), and attacks can occur at any layer. Key concepts include firewalls (filter traffic based on rules), VPNs (encrypt traffic between networks), IDS/IPS (detect and prevent intrusions), DNS (translates domain names to IP addresses \u2014 a common attack target), and network segmentation (dividing a network into isolated zones). In South Africa, where businesses increasingly rely on internet connectivity for banking, communication, and service delivery, understanding network security basics is essential for protecting against common attacks like man-in-the-middle, DNS spoofing, and DDoS.",
+    "examples": [
+      {
+        "problem": "Explain how a firewall works using the analogy of a security guard at a building entrance.",
+        "steps": [
+          {
+            "instruction": "Step 1: A security guard checks each person against a list: employees can enter, delivery people go to the loading dock, unknown people are turned away.",
+            "result": "rules"
+          },
+          {
+            "instruction": "Step 2: Similarly, a firewall examines each network packet and compares it against rules: allow traffic on port 443 (HTTPS), block traffic on port 23 (Telnet), etc.",
+            "result": "filtering"
+          },
+          {
+            "instruction": "Step 3: A stateful firewall also tracks conversations: if an internal computer requested a web page, allow the response in.",
+            "result": "stateful"
+          }
+        ],
+        "answer": "Answer: Firewalls filter network traffic based on predefined rules, blocking unauthorised access while permitting legitimate communication.",
+        "visual_description": null
+      },
+      {
+        "problem": "What is a man-in-the-middle (MITM) attack and how does HTTPS prevent it?",
+        "steps": [
+          {
+            "instruction": "Step 1: In a MITM attack, an attacker secretly intercepts communication between two parties, potentially reading or altering messages.",
+            "result": "MITM defined"
+          },
+          {
+            "instruction": "Step 2: HTTPS uses TLS certificates to verify the server's identity \u2014 your browser checks that the certificate was issued by a trusted authority.",
+            "result": "authentication"
+          },
+          {
+            "instruction": "Step 3: If an attacker intercepts the connection, they cannot produce a valid certificate for the legitimate domain, and your browser shows a warning.",
+            "result": "detection"
+          }
+        ],
+        "answer": "Answer: HTTPS prevents MITM attacks through server authentication (certificates) and encryption (TLS). The padlock icon means the connection is authenticated and encrypted.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why is network segmentation important? Use a hospital as an example.",
+        "steps": [
+          {
+            "instruction": "Step 1: Without segmentation: all devices (patient monitors, admin computers, guest Wi-Fi) are on one network. Malware from a guest device can reach patient monitors.",
+            "result": "flat network risk"
+          },
+          {
+            "instruction": "Step 2: With segmentation: patient monitors on a separate network from admin computers and guest Wi-Fi. Even if the guest network is compromised, it cannot reach medical devices.",
+            "result": "segmented network"
+          },
+          {
+            "instruction": "Step 3: Segmentation limits the blast radius of any breach \u2014 an attacker who gets into one zone cannot easily move to others.",
+            "result": "containment"
+          }
+        ],
+        "answer": "Answer: Network segmentation is like having fireproof walls in a building \u2014 a fire in one room does not spread to the entire building.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is a firewall and what does it protect against?",
+        "answer": "A firewall is a network security device (hardware or software) that monitors and filters incoming and outgoing traffic based on predefined rules. It protects against unauthorised access, port scanning, and some types of malware by blocking traffic that does not match allowed patterns.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of a firewall as a filter between your network and the internet."
+        ],
+        "explanation": "Firewalls are necessary but not sufficient. They cannot protect against threats that arrive through allowed channels (e.g., malware in an email attachment on an allowed port).",
+        "distractors": []
+      },
+      {
+        "question": "Explain what happens when you type 'www.google.com' into your browser, focusing on the security-relevant steps.",
+        "answer": "(1) DNS lookup: your browser asks a DNS server to translate 'www.google.com' to an IP address. (2) TCP connection: your browser connects to that IP address on port 443 (HTTPS). (3) TLS handshake: the server presents its TLS certificate, your browser verifies it against trusted certificate authorities. (4) Key exchange: a symmetric session key is negotiated. (5) Encrypted communication: all data between your browser and Google is encrypted with the session key. Security risks at each step: DNS spoofing (step 1), MITM (step 3), and certificate authority compromise (step 3).",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Follow the packet from your browser to the server and back.",
+          "Where could an attacker intervene?"
+        ],
+        "explanation": "Understanding this flow demystifies 'secure browsing' and reveals the trust chain: you trust your DNS, your browser trusts certain certificate authorities, and those authorities trust Google's identity.",
+        "distractors": []
+      },
+      {
+        "question": "Your company has a flat network (all devices on one subnet). After a ransomware incident where one infected workstation spread to all servers, you are asked to redesign the network. Propose a segmented architecture.",
+        "answer": "Architecture: (1) DMZ (Demilitarised Zone): web servers, email gateways \u2014 accessible from internet but isolated from internal network. (2) Corporate network: employee workstations \u2014 can access internal resources but not directly reach servers. (3) Server VLAN: production servers \u2014 accessible only from corporate network via specific ports. (4) Management VLAN: admin access to servers \u2014 restricted to IT staff. (5) Guest Wi-Fi: completely isolated, internet-only access. Firewall rules between zones enforce least-privilege access. IDS monitors traffic between zones for anomalies.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Each zone should have the minimum connectivity needed.",
+          "What should happen if one zone is compromised?"
+        ],
+        "explanation": "Network segmentation is one of the most effective controls against lateral movement \u2014 the technique attackers use to spread from an initial foothold to high-value targets.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse the security risks of public Wi-Fi in South African coffee shops and shopping centres. What should users do to protect themselves?",
+        "answer": "Risks: (1) Unencrypted traffic can be intercepted by anyone on the same network. (2) Evil twin attacks: an attacker sets up a fake hotspot with a similar name (e.g., 'FreeCoffeeWiFi'). (3) Session hijacking: an attacker steals session cookies to impersonate you on websites. (4) DNS spoofing: redirecting you to fake banking websites. Protection: (1) Use a VPN to encrypt all traffic. (2) Only visit HTTPS websites. (3) Do not access banking or sensitive accounts on public Wi-Fi. (4) Verify the Wi-Fi network name with staff. (5) Disable auto-connect to open networks.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What can someone on the same Wi-Fi network see?",
+          "How does a VPN protect you?"
+        ],
+        "explanation": "Public Wi-Fi is particularly risky in SA where mobile banking is widespread. An attacker on the same network could potentially intercept banking credentials if the connection is not properly secured.",
+        "distractors": []
+      },
+      {
+        "question": "Design a network security monitoring system for a medium-sized South African business (50 employees, 3 servers, cloud email). Specify what to monitor, how to detect threats, and how to respond.",
+        "answer": "System: Monitor: (1) firewall logs (blocked connections, unusual traffic patterns), (2) DNS queries (detect communication with known malicious domains), (3) authentication logs (failed login attempts, unusual access times), (4) network flow data (detect large data transfers that might indicate exfiltration). Detection: (1) deploy IDS (Snort or Suricata) at network perimeter, (2) configure alerts for known attack signatures and anomalous behaviour, (3) monitor for after-hours traffic. Response: (1) automated blocking of known malicious IPs, (2) alert on-call IT staff for high-severity events, (3) isolate compromised devices from the network, (4) document and investigate all incidents.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "What would you need to see to detect an attack in progress?",
+          "Balance automated responses with human investigation."
+        ],
+        "explanation": "Effective network monitoring is about seeing enough to detect threats without drowning in data. Focus on high-value indicators: authentication anomalies, unusual DNS queries, and large data transfers.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "A network security device that monitors and filters traffic based on predefined rules",
+      "Virtual Private Network \u2014 encrypts traffic between your device and a remote server, protecting data on untrusted networks",
+      "Dividing a network into isolated zones to limit the spread of breaches"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "firewall",
+        "definition": "A network security device that monitors and filters traffic based on predefined rules",
+        "example_usage": "The firewall blocked the incoming connection on port 22."
+      },
+      {
+        "term": "VPN",
+        "definition": "Virtual Private Network \u2014 encrypts traffic between your device and a remote server, protecting data on untrusted networks",
+        "example_usage": "Use a VPN on public Wi-Fi to encrypt your traffic."
+      },
+      {
+        "term": "network segmentation",
+        "definition": "Dividing a network into isolated zones to limit the spread of breaches",
+        "example_usage": "Network segmentation prevented the malware from reaching the database servers."
+      },
+      {
+        "term": "TLS/SSL",
+        "definition": "Transport Layer Security \u2014 the protocol that provides encryption for HTTPS web connections",
+        "example_usage": "The TLS certificate verified the server's identity before transmitting sensitive data."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often assume that a firewall alone provides complete network security.",
+        "correction": "A firewall is an essential first layer but cannot protect against all threats. It does not inspect encrypted traffic (unless using TLS inspection), cannot detect insider threats, and does not protect against attacks that arrive through allowed channels (phishing emails, malicious websites on port 443). Comprehensive network security requires multiple layers: firewall, IDS/IPS, network monitoring, endpoint protection, and user awareness training.",
+        "why_students_think_this": "Firewalls are the most visible security tool, and early security marketing positioned them as the primary defence. Modern threats have evolved far beyond what firewalls alone can handle."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

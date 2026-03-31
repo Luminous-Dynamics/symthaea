@@ -1,0 +1,181 @@
+{
+  "node_id": "CYBER.SEC.AWARE",
+  "lesson": {
+    "standard_code": "CYBER.SEC.AWARE",
+    "title": "Security Awareness",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Security awareness training educates employees about cyber threats and their role in defending against them. Humans are consistently the weakest link in security: 90% of breaches involve a human element (clicking phishing links, weak passwords, sharing credentials, misconfiguration). Effective awareness programmes go beyond annual lectures \u2014 they include simulated phishing campaigns, role-specific training, gamification, and continuous reinforcement. Topics include phishing recognition, password hygiene, social engineering, physical security, data handling, and incident reporting. In South Africa, where WhatsApp and social media scams are common, security awareness extends beyond the workplace to personal digital safety.",
+    "examples": [
+      {
+        "problem": "Design a simulated phishing email that would test employee awareness.",
+        "steps": [
+          {
+            "instruction": "Step 1: Subject: 'URGENT: Your account will be suspended in 24 hours'",
+            "result": "urgency"
+          },
+          {
+            "instruction": "Step 2: From: 'IT Support <it-support@company-za.net>' (note: real domain is company.co.za)",
+            "result": "spoofed sender"
+          },
+          {
+            "instruction": "Step 3: Body: 'Click here to verify your credentials immediately' \u2014 link goes to a fake login page.",
+            "result": "malicious link"
+          }
+        ],
+        "answer": "Answer: Red flags: urgency, sender domain mismatch, generic greeting, request for credentials, suspicious link. Training should teach employees to check all of these.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why do traditional annual security awareness lectures fail?",
+        "steps": [
+          {
+            "instruction": "Step 1: One-time exposure does not create lasting behaviour change \u2014 people forget within weeks.",
+            "result": "forgetting"
+          },
+          {
+            "instruction": "Step 2: Lectures are passive \u2014 employees listen but do not practise.",
+            "result": "passive learning"
+          },
+          {
+            "instruction": "Step 3: Effective programmes use continuous reinforcement: monthly tips, simulated phishing, quick quizzes, and real incident case studies.",
+            "result": "continuous approach"
+          }
+        ],
+        "answer": "Answer: Security awareness works like physical fitness \u2014 a single gym visit does not make you fit. Regular, varied practice builds lasting habits.",
+        "visual_description": null
+      },
+      {
+        "problem": "How can social engineering bypass even strong technical security?",
+        "steps": [
+          {
+            "instruction": "Step 1: An attacker calls the IT helpdesk pretending to be a senior executive who has been locked out of their account.",
+            "result": "pretext"
+          },
+          {
+            "instruction": "Step 2: The helpdesk resets the password without proper verification, giving the attacker access.",
+            "result": "exploitation"
+          },
+          {
+            "instruction": "Step 3: No firewall, encryption, or access control can prevent a human from voluntarily giving away credentials.",
+            "result": "bypass"
+          }
+        ],
+        "answer": "Answer: Social engineering attacks the human layer, which cannot be patched with software. Only training and procedures can defend against it.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is social engineering? Name three common techniques.",
+        "answer": "Social engineering manipulates people into revealing confidential information or performing actions that compromise security. Techniques: (1) Phishing \u2014 fraudulent emails that trick users into clicking malicious links or revealing credentials. (2) Pretexting \u2014 creating a fabricated scenario to extract information (e.g., pretending to be IT support). (3) Tailgating \u2014 following an authorised person through a secure door without scanning your own access card.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Social engineering targets people, not technology.",
+          "Think about how trust is exploited."
+        ],
+        "explanation": "Social engineering exploits fundamental human traits: helpfulness, trust in authority, fear of consequences, and desire to avoid confrontation. Training must address these psychological triggers.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the five red flags of a phishing email.",
+        "answer": "(1) Urgency \u2014 'Act immediately or your account will be suspended.' (2) Sender mismatch \u2014 the display name says 'Standard Bank' but the email address is standardbank@gmail.com. (3) Generic greeting \u2014 'Dear Customer' instead of your name. (4) Suspicious links \u2014 hover over links to see the real URL before clicking. (5) Requests for sensitive information \u2014 legitimate organisations never ask for passwords or PINs via email.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What would a real email from your bank look like vs a phishing attempt?",
+          "Always verify via official channels."
+        ],
+        "explanation": "Phishing is the most common attack vector. Teaching these five red flags and encouraging users to report suspicious emails creates a human detection layer.",
+        "distractors": []
+      },
+      {
+        "question": "Design a 12-month security awareness programme for a company with 200 employees. Include at least 6 activities spread across the year.",
+        "answer": "Programme: Month 1: Baseline simulated phishing test (measure current click rate). Month 2: Interactive workshop on phishing recognition (mandatory, 1 hour). Month 3: Simulated phishing test (measure improvement). Month 4: Password security month \u2014 demo password cracking, roll out password manager, MFA enrolment. Month 5: Physical security \u2014 tailgating awareness, clean desk policy. Month 6: Simulated phishing test + department-specific training (finance: BEC; HR: data handling). Month 7: Social engineering awareness \u2014 show real case studies. Month 8: Secure remote working \u2014 VPN usage, public Wi-Fi risks. Month 9: Simulated phishing test (measure long-term retention). Month 10: Incident reporting drill \u2014 practice reporting a suspicious email. Month 11: POPIA awareness \u2014 what personal data we handle and our obligations. Month 12: Annual review \u2014 celebrate improvements, share metrics (click rate reduction), plan next year. Continuous: monthly security tips via email, security champion programme (one volunteer per department).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Vary the format \u2014 workshops, simulations, videos, quizzes.",
+          "Measure improvement over time."
+        ],
+        "explanation": "Effective awareness programmes are measured by behaviour change (click rate reduction, reporting rate increase), not by attendance or quiz scores. The goal is changing what people do, not just what they know.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why security awareness training often fails and what evidence-based practices improve effectiveness.",
+        "answer": "Common failures: (1) Annual checkbox training \u2014 not enough to change behaviour. (2) Fear-based messaging \u2014 creates anxiety without empowerment. (3) One-size-fits-all \u2014 ignoring role-specific risks. (4) No measurement \u2014 no way to know if it works. (5) Blame culture \u2014 punishing people who fail phishing tests discourages reporting. Evidence-based improvements: (1) Frequent, short interventions (microlearning). (2) Simulated phishing with immediate feedback (teachable moments). (3) Positive reinforcement for reporting. (4) Role-specific scenarios. (5) Executive buy-in and modelling. (6) Tracking metrics over time (click rates, reporting rates, incident frequency).",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What does the research say about changing human behaviour?",
+          "Is fear an effective motivator for security behaviour?"
+        ],
+        "explanation": "The most effective programmes create a security-positive culture where reporting is celebrated, mistakes are learning opportunities, and security is seen as everyone's responsibility \u2014 not just IT's.",
+        "distractors": []
+      },
+      {
+        "question": "Create a security awareness poster for WhatsApp scam prevention, targeting South African smartphone users. Describe the content, visuals, and key messages.",
+        "answer": "Content: Title: 'Think Before You Click \u2014 WhatsApp Scams in SA.' Key messages: (1) Banks never ask for PINs or passwords via WhatsApp. (2) 'Congratulations, you have won!' messages from unknown numbers are scams. (3) Do not click links from unknown contacts \u2014 they may install malware. (4) Verify requests for money from 'friends' by calling them directly \u2014 their account may be hacked. (5) Report and block suspicious contacts. Visual: smartphone screen showing a scam message with red warning overlays highlighting the red flags. Include the WhatsApp 'Report' button location. SA-specific: use local examples (SARS tax refund scam, Capitec phishing), show real WhatsApp message format. Language: clear, simple, no jargon. Include isiZulu and Afrikaans translations of key warnings.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Make it specific to SA \u2014 use local bank names, scam types, and languages.",
+          "Focus on action: what should people DO when they see a suspicious message?"
+        ],
+        "explanation": "WhatsApp scams are one of the most common cyber threats in SA due to high smartphone penetration. Awareness materials must be in languages people use daily and reference local institutions and scam patterns.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Manipulating people into revealing confidential information or performing security-compromising actions",
+      "Fraudulent communications (usually email) designed to trick recipients into revealing sensitive information or clicking malicious links",
+      "An organisational environment where security awareness and good practices are valued and reinforced by everyone"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "social engineering",
+        "definition": "Manipulating people into revealing confidential information or performing security-compromising actions",
+        "example_usage": "The attacker used social engineering to trick the receptionist into giving them building access."
+      },
+      {
+        "term": "phishing",
+        "definition": "Fraudulent communications (usually email) designed to trick recipients into revealing sensitive information or clicking malicious links",
+        "example_usage": "The phishing email looked exactly like a real Nedbank notification."
+      },
+      {
+        "term": "security culture",
+        "definition": "An organisational environment where security awareness and good practices are valued and reinforced by everyone",
+        "example_usage": "Building a security culture means security is everyone's responsibility, not just IT's."
+      },
+      {
+        "term": "simulated phishing",
+        "definition": "Controlled, fake phishing campaigns used to test and train employee awareness",
+        "example_usage": "The simulated phishing campaign showed a 60% click rate, dropping to 15% after training."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many organisations believe that technical controls make security awareness training unnecessary.",
+        "correction": "Technical controls (firewalls, antivirus, email filters) cannot stop all attacks \u2014 especially those that target human behaviour. A perfectly crafted phishing email that bypasses technical filters still requires a human to click the link. Social engineering, insider threats, and business email compromise all exploit human trust rather than technical vulnerabilities. Security awareness training is the human layer of defence in depth \u2014 it complements technical controls, it does not replace them, and they do not replace it.",
+        "why_students_think_this": "The security industry historically focused on technical solutions, creating the impression that buying the right tools provides complete protection. Modern threat landscapes have forced recognition that human factors are equally critical."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

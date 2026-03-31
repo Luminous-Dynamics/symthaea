@@ -1,0 +1,184 @@
+{
+  "node_id": "CYBER.SEC.THREAT",
+  "lesson": {
+    "standard_code": "CYBER.SEC.THREAT",
+    "title": "Threat Analysis",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Threat analysis is the systematic identification, evaluation, and prioritisation of potential threats to an organisation's information systems. The STRIDE model classifies threats into six categories: Spoofing (faking identity), Tampering (modifying data), Repudiation (denying actions), Information disclosure (data leaks), Denial of service (making systems unavailable), and Elevation of privilege (gaining unauthorised access). The cyber kill chain (Lockheed Martin) describes the stages of an attack: reconnaissance, weaponisation, delivery, exploitation, installation, command and control, and actions on objectives. Understanding threat actors (nation-states, cybercriminals, hacktivists, insiders) and their motivations helps predict and prevent attacks.",
+    "examples": [
+      {
+        "problem": "Apply the STRIDE model to analyse threats against an online shopping website.",
+        "steps": [
+          {
+            "instruction": "Step 1: Spoofing: an attacker creates a fake version of the website to steal customer credentials.",
+            "result": "spoofing"
+          },
+          {
+            "instruction": "Step 2: Tampering: an attacker modifies product prices in the database to buy items cheaply.",
+            "result": "tampering"
+          },
+          {
+            "instruction": "Step 3: Denial of Service: a DDoS attack overwhelms the server, making the site unavailable during a sale.",
+            "result": "DoS"
+          }
+        ],
+        "answer": "Answer: STRIDE provides a systematic checklist ensuring no threat category is overlooked. Each category has specific countermeasures.",
+        "visual_description": null
+      },
+      {
+        "problem": "Trace a phishing attack through the cyber kill chain.",
+        "steps": [
+          {
+            "instruction": "Step 1: Reconnaissance: attacker researches the target company's employees on LinkedIn.",
+            "result": "recon"
+          },
+          {
+            "instruction": "Step 2: Weaponisation + Delivery: crafts a convincing email with a malicious attachment, sent to a finance employee.",
+            "result": "delivery"
+          },
+          {
+            "instruction": "Step 3: Exploitation + Installation: the employee opens the attachment, which exploits a vulnerability to install malware.",
+            "result": "exploit"
+          },
+          {
+            "instruction": "Step 4: Command & Control + Actions: malware connects to attacker's server; attacker steals financial data.",
+            "result": "post-exploit"
+          }
+        ],
+        "answer": "Answer: The kill chain shows that attacks have multiple stages, each offering a chance for defenders to detect and stop the attack.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare the motivations and capabilities of different threat actors.",
+        "steps": [
+          {
+            "instruction": "Step 1: Nation-state (e.g., APT groups): highly sophisticated, well-funded, motivated by espionage or sabotage.",
+            "result": "nation-state"
+          },
+          {
+            "instruction": "Step 2: Cybercriminal: motivated by money, uses ransomware, phishing, and fraud. Moderate sophistication.",
+            "result": "criminal"
+          },
+          {
+            "instruction": "Step 3: Insider: an employee with authorised access. Motivated by revenge, money, or ideology. Low technical sophistication but high access.",
+            "result": "insider"
+          }
+        ],
+        "answer": "Answer: Different threat actors require different defences. Nation-states need advanced detection; criminals need robust backups; insiders need access monitoring.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the six categories in the STRIDE threat model and give one example of each.",
+        "answer": "Spoofing: impersonating another user or system. Tampering: modifying data without authorisation. Repudiation: denying having performed an action. Information Disclosure: exposing data to unauthorised parties. Denial of Service: making a system unavailable. Elevation of Privilege: gaining higher access than authorised.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "STRIDE: S=Spoofing, T=Tampering, R=Repudiation, I=Information disclosure, D=Denial of service, E=Elevation of privilege."
+        ],
+        "explanation": "STRIDE was developed by Microsoft as a practical threat modelling framework. It ensures comprehensive coverage of threat categories.",
+        "distractors": []
+      },
+      {
+        "question": "Describe the seven stages of the Lockheed Martin cyber kill chain.",
+        "answer": "(1) Reconnaissance: researching the target. (2) Weaponisation: creating a deliverable payload. (3) Delivery: transmitting the weapon (email, USB, web). (4) Exploitation: triggering the vulnerability. (5) Installation: installing persistent malware. (6) Command and Control: establishing remote control. (7) Actions on Objectives: achieving the attacker's goal (data theft, destruction, ransom).",
+        "difficulty_permille": 250,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of it as an attacker's step-by-step plan.",
+          "Each step is a chance for defenders to intervene."
+        ],
+        "explanation": "The kill chain's value for defenders is that interrupting any stage stops the attack. Most organisations focus on delivery (email filtering) and exploitation (patching), but detection at later stages is also critical.",
+        "distractors": []
+      },
+      {
+        "question": "Your company receives a suspicious email claiming to be from the CEO, asking the finance department to wire R500,000 to a new supplier. Analyse this as a potential threat, identifying the attack type, threat actor, and recommended response.",
+        "answer": "Attack type: Business Email Compromise (BEC) / CEO fraud \u2014 a form of social engineering. Threat actor: likely an organised cybercriminal group. Indicators: (1) urgency ('wire immediately'), (2) unusual request (new supplier, large amount), (3) may use a slightly different email domain (e.g., company-za.com instead of company.co.za). Response: (1) Do NOT wire the money. (2) Verify directly with the CEO via phone (not by replying to the email). (3) Report to IT security. (4) If the email is confirmed fraudulent, block the sender domain. (5) Alert all finance staff. (6) Consider implementing dual-authorisation for transfers above a threshold.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "What are the red flags in this email?",
+          "How would you verify the request?"
+        ],
+        "explanation": "BEC attacks cost businesses billions globally. In SA, they often target finance departments with urgent-sounding requests. The defence is procedural \u2014 verify via a separate channel before acting on financial requests.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why South African organisations are particularly attractive targets for cybercriminals. Consider economic, technical, and regulatory factors.",
+        "answer": "Economic: SA has a large financial services sector (banks, insurance, investment) with high transaction volumes. Technical: uneven cybersecurity maturity \u2014 large enterprises are well-protected but SMEs often lack basic security. High smartphone adoption enables mobile-specific attacks. Load shedding disrupts security systems. Regulatory: POPIA is relatively new (fully effective 2021) and enforcement is still developing. Criminal: SA's high unemployment creates a pool of technically skilled but economically frustrated individuals who may turn to cybercrime. International: SA is a gateway to other African markets, making it a strategic target for attackers seeking regional access.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about what makes SA different from other countries.",
+          "Consider both the targets (what SA has) and the defences (what SA lacks)."
+        ],
+        "explanation": "SA ranks among the top 10 most-targeted countries for cybercrime. The combination of a sophisticated financial system, uneven security maturity, and a large online population creates a rich target environment.",
+        "distractors": []
+      },
+      {
+        "question": "Conduct a threat modelling exercise for a South African e-commerce startup. Identify at least 5 threats, classify each using STRIDE, and propose a countermeasure for each.",
+        "answer": "Threats: (1) Account takeover via credential stuffing (Spoofing) \u2014 Countermeasure: MFA + rate limiting. (2) SQL injection modifying product prices (Tampering) \u2014 Countermeasure: parameterised queries + input validation. (3) Customer claiming they did not place an order (Repudiation) \u2014 Countermeasure: comprehensive audit logging + digital signatures. (4) Customer database breach exposing personal data (Information Disclosure) \u2014 Countermeasure: encryption at rest, access controls, POPIA compliance. (5) DDoS attack during Black Friday sale (Denial of Service) \u2014 Countermeasure: CDN (Cloudflare), auto-scaling, DDoS mitigation service. (6) Admin account compromise giving full database access (Elevation of Privilege) \u2014 Countermeasure: privileged access management, MFA for admin, separate admin accounts from daily-use accounts.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Use STRIDE as a checklist to ensure coverage.",
+          "Each threat should have a specific, actionable countermeasure."
+        ],
+        "explanation": "Threat modelling is most valuable when done early in system design. Retrofitting security is far more expensive and less effective than building it in from the start.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "A threat classification model: Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation of privilege",
+      "The stages of a cyber attack from reconnaissance to achieving objectives",
+      "An individual or group that poses a threat to an organisation's security"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "STRIDE",
+        "definition": "A threat classification model: Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation of privilege",
+        "example_usage": "We used STRIDE to systematically identify threats to the new system."
+      },
+      {
+        "term": "kill chain",
+        "definition": "The stages of a cyber attack from reconnaissance to achieving objectives",
+        "example_usage": "Detecting the attacker at the reconnaissance stage stops the kill chain before damage occurs."
+      },
+      {
+        "term": "threat actor",
+        "definition": "An individual or group that poses a threat to an organisation's security",
+        "example_usage": "The threat actor behind the attack was identified as a financially motivated cybercriminal group."
+      },
+      {
+        "term": "social engineering",
+        "definition": "Manipulating people into revealing confidential information or performing actions that compromise security",
+        "example_usage": "The attacker used social engineering to trick the receptionist into revealing the CEO's email password."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often think cyber threats come only from external hackers.",
+        "correction": "Insider threats (employees, contractors, partners) account for a significant portion of security incidents \u2014 some estimates say 30-40%. Insiders have legitimate access, knowledge of systems, and may bypass technical controls that stop external attackers. Insider threats can be malicious (deliberate theft or sabotage) or accidental (clicking on phishing emails, misconfiguring systems). A comprehensive threat analysis must consider insiders alongside external attackers.",
+        "why_students_think_this": "Media coverage and movies focus on external hackers, creating the impression that threats come from outside. In reality, the most damaging breaches often involve insider access \u2014 either through malicious insiders or through external attackers who compromise insider credentials."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

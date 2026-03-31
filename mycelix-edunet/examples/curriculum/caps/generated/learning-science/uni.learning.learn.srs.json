@@ -1,0 +1,175 @@
+{
+  "node_id": "UNI.LEARNING.LEARN.SRS",
+  "lesson": {
+    "standard_code": "UNI.LEARNING.LEARN.SRS",
+    "title": "Spaced Repetition",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Spaced repetition is a learning technique that schedules review of material at increasing intervals over time to combat the forgetting curve. Hermann Ebbinghaus discovered in 1885 that we forget approximately 70% of new information within 24 hours without review. However, each time we successfully recall something, the memory strengthens and the interval before forgetting lengthens. The SM-2 algorithm (used by Anki and other apps) adjusts review intervals based on how easily you recall each item. Spacing your reviews (day 1, day 3, day 7, day 14, day 30) is far more effective than cramming, because each recall effort strengthens the neural pathway. This is one of the most evidence-backed learning strategies available.",
+    "examples": [
+      {
+        "problem": "Explain the forgetting curve using Ebbinghaus's research.",
+        "steps": [
+          {
+            "instruction": "Step 1: Ebbinghaus memorised nonsense syllables and tracked how quickly he forgot them.",
+            "result": "method"
+          },
+          {
+            "instruction": "Step 2: Without review, about 56% was forgotten within 1 hour and 70% within 24 hours.",
+            "result": "findings"
+          },
+          {
+            "instruction": "Step 3: Each review 'resets' the curve at a higher level, so less is forgotten over longer periods.",
+            "result": "solution"
+          }
+        ],
+        "answer": "Answer: The forgetting curve shows exponential decay, but spaced review flattens the curve with each repetition.",
+        "visual_description": null
+      },
+      {
+        "problem": "How does the SM-2 algorithm decide when to show you a flashcard?",
+        "steps": [
+          {
+            "instruction": "Step 1: You rate your recall: 0 (forgot), 3 (hard), 4 (good), 5 (easy).",
+            "result": "input"
+          },
+          {
+            "instruction": "Step 2: Easy cards get longer intervals (e.g., next review in 10 days). Hard cards get shorter intervals (e.g., tomorrow).",
+            "result": "scheduling"
+          },
+          {
+            "instruction": "Step 3: Over time, well-known cards appear rarely while difficult ones appear frequently.",
+            "result": "optimisation"
+          }
+        ],
+        "answer": "Answer: SM-2 personalises your study schedule so you spend the most time on what you know least.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare cramming the night before an exam with studying 20 minutes per day for 2 weeks using spaced repetition.",
+        "steps": [
+          {
+            "instruction": "Step 1: Cramming: total study time ~3 hours. Information enters short-term memory, enough for the exam, mostly forgotten within a week.",
+            "result": "cramming"
+          },
+          {
+            "instruction": "Step 2: Spaced: total study time ~4.5 hours. Information moves to long-term memory through repeated retrieval over time.",
+            "result": "spaced"
+          },
+          {
+            "instruction": "Step 3: For the exam, both might score similarly. A month later, the spaced student remembers far more.",
+            "result": "long-term outcome"
+          }
+        ],
+        "answer": "Answer: Cramming optimises for tomorrow's test. Spaced repetition optimises for lasting knowledge.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the forgetting curve and what does it predict?",
+        "answer": "The forgetting curve (Ebbinghaus, 1885) shows that newly learned information decays exponentially over time. Without review, about 70% is forgotten within 24 hours. The curve's shape depends on the difficulty of the material and the learner's existing knowledge. Review at optimal intervals flattens the curve, dramatically improving long-term retention.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what happens to your memory of a phone number you looked up once."
+        ],
+        "explanation": "Ebbinghaus's finding has been replicated many times. The specific percentages vary by material type, but the exponential decay pattern is consistent.",
+        "distractors": []
+      },
+      {
+        "question": "Explain why spaced repetition is more effective than massed practice (studying all at once).",
+        "answer": "Spaced repetition forces retrieval from long-term memory each time, strengthening the neural pathways. Massed practice keeps information in working memory, which feels easy but does not build durable long-term connections. Spacing creates 'desirable difficulty' \u2014 the slight effort of recalling makes the memory stronger. Additionally, spacing allows consolidation during sleep between sessions.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Why does struggling to remember something actually help?",
+          "Think about what happens in the brain during sleep."
+        ],
+        "explanation": "Bjork's concept of 'desirable difficulty' explains why effortful retrieval builds stronger memories than effortless re-reading. The difficulty is the point, not the obstacle.",
+        "distractors": []
+      },
+      {
+        "question": "Create a spaced repetition schedule for learning 50 vocabulary words for a language class. Specify how many words to study each day and when to review.",
+        "answer": "Day 1: Learn 10 new words. Day 2: Review Day 1 words + learn 10 new. Day 3: Review Day 1 words + learn 10 new. Day 4: Review Day 2 words + learn 10 new. Day 5: Review Day 3 words + learn 10 new. Day 7: Review Day 1 words (1-week interval). Day 8: Review Day 2+4 words. Continue with expanding intervals. Use Anki or a simple box system: Box 1 (daily), Box 2 (every 3 days), Box 3 (weekly), Box 4 (biweekly).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Do not try to learn all 50 at once.",
+          "The Leitner box system is a simple non-digital approach."
+        ],
+        "explanation": "The Leitner box system is an effective analog alternative to Anki. Cards move to the next box when correctly recalled and back to Box 1 when forgotten.",
+        "distractors": []
+      },
+      {
+        "question": "A student says: 'I tried Anki but it felt too slow \u2014 I can cover more material by just reading my notes.' Evaluate this claim.",
+        "answer": "The student is confusing volume covered with material learned. Reading notes feels faster because it is passive \u2014 the brain is not working hard. Anki feels slow because retrieval is effortful. But research shows that the effortful retrieval in spaced repetition produces 2-3x better long-term retention than passive review. The student is optimising for speed of coverage rather than depth of learning. One month after the exam, the Anki user will remember far more.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Is the goal to cover material or to learn it?",
+          "Why does effortful recall feel slower but produce better results?"
+        ],
+        "explanation": "This is one of the most common objections to spaced repetition. It reveals a fundamental confusion between coverage (how much you looked at) and learning (how much you can recall and apply).",
+        "distractors": []
+      },
+      {
+        "question": "Design a hybrid study system that combines spaced repetition with other learning techniques (e.g., active recall, elaboration, interleaving) for a specific subject.",
+        "answer": "Subject: Biology. System: (1) First encounter: read the textbook section actively, taking notes in question form ('What is mitosis?'). (2) Same day: create Anki cards from your questions. (3) Daily: Anki review (spaced repetition + active recall). (4) Weekly: interleave topics \u2014 mix mitosis, meiosis, and genetics questions in one session. (5) Biweekly: elaborative interrogation \u2014 explain to a study partner WHY each process works the way it does. (6) Monthly: practice exam under test conditions (retrieval practice). This combines spacing, retrieval, interleaving, and elaboration for maximum retention.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Each technique addresses a different aspect of learning.",
+          "The best systems layer multiple evidence-based techniques."
+        ],
+        "explanation": "No single technique is sufficient. The most effective study systems combine multiple evidence-based strategies, each reinforcing the others.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The exponential decay of memory over time without review, discovered by Ebbinghaus in 1885",
+      "A learning technique that reviews material at increasing intervals to strengthen long-term memory",
+      "The idea that some difficulty during learning (like effortful recall) strengthens memory"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "forgetting curve",
+        "definition": "The exponential decay of memory over time without review, discovered by Ebbinghaus in 1885",
+        "example_usage": "The forgetting curve predicts that you will forget 70% of new information within 24 hours."
+      },
+      {
+        "term": "spaced repetition",
+        "definition": "A learning technique that reviews material at increasing intervals to strengthen long-term memory",
+        "example_usage": "Spaced repetition helped him remember 500 medical terms for his exam."
+      },
+      {
+        "term": "desirable difficulty",
+        "definition": "The idea that some difficulty during learning (like effortful recall) strengthens memory",
+        "example_usage": "Struggling to recall a word is a desirable difficulty \u2014 it makes the memory stronger."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that forgetting is a problem to be avoided.",
+        "correction": "Forgetting is actually a feature of how memory works \u2014 it filters out unimportant information. The key insight of spaced repetition is that partial forgetting before review is desirable: the effort of retrieving a fading memory strengthens it more than reviewing something you still remember easily. You should schedule reviews when you are on the verge of forgetting \u2014 not before and not after.",
+        "why_students_think_this": "Our culture treats forgetting as failure. Spaced repetition reframes it as a natural process to be harnessed rather than feared."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

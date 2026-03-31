@@ -1,0 +1,175 @@
+{
+  "node_id": "UNI.STATISTICS.STAT.PROB",
+  "lesson": {
+    "standard_code": "UNI.STATISTICS.STAT.PROB",
+    "title": "Probability Basics",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Probability measures the likelihood of an event occurring, expressed as a number between 0 (impossible) and 1 (certain). It underpins everything from weather forecasts to medical diagnoses to gambling. Two events are independent if one does not affect the other (coin flips); dependent if one changes the other's probability (drawing cards without replacement). Bayes' theorem allows us to update our beliefs based on new evidence \u2014 starting with a prior probability and adjusting it when data arrives. In South Africa, understanding probability helps citizens evaluate risks (disease prevalence, crime statistics) and make better decisions under uncertainty.",
+    "examples": [
+      {
+        "problem": "A fair coin is flipped 3 times. What is the probability of getting exactly 2 heads?",
+        "steps": [
+          {
+            "instruction": "Step 1: List possible outcomes with 2 heads: HHT, HTH, THH = 3 outcomes.",
+            "result": "count favourable"
+          },
+          {
+            "instruction": "Step 2: Total possible outcomes: 2^3 = 8 (HHH, HHT, HTH, THH, HTT, THT, TTH, TTT).",
+            "result": "count total"
+          },
+          {
+            "instruction": "Step 3: P(exactly 2 heads) = 3/8 = 0.375.",
+            "result": "calculate"
+          }
+        ],
+        "answer": "Answer: P(exactly 2 heads in 3 flips) = 3/8 = 37.5%.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain Bayes' theorem intuitively using a medical test example.",
+        "steps": [
+          {
+            "instruction": "Step 1: A disease affects 1 in 1000 people. A test is 99% accurate (positive when you have it, negative when you don't).",
+            "result": "setup"
+          },
+          {
+            "instruction": "Step 2: If you test positive, what is the probability you actually have the disease? Most people say 99%.",
+            "result": "intuition"
+          },
+          {
+            "instruction": "Step 3: Actually: of 1000 people, 1 has the disease (true positive). Of 999 healthy, ~10 test falsely positive. So P(disease|positive) = 1/11 = about 9%.",
+            "result": "calculation"
+          }
+        ],
+        "answer": "Answer: Bayes' theorem shows that when a condition is rare, even accurate tests produce many false positives. P(disease|positive test) depends heavily on the base rate.",
+        "visual_description": null
+      },
+      {
+        "problem": "Are these events independent or dependent? (a) Rolling two dice. (b) Drawing two cards from a deck without replacement.",
+        "steps": [
+          {
+            "instruction": "Step 1: (a) Independent: the result of the first die has no effect on the second die.",
+            "result": "dice"
+          },
+          {
+            "instruction": "Step 2: (b) Dependent: after drawing the first card, the deck has 51 cards, changing the probabilities for the second draw.",
+            "result": "cards"
+          },
+          {
+            "instruction": "Step 3: For independent events: P(A and B) = P(A) x P(B). For dependent: P(A and B) = P(A) x P(B|A).",
+            "result": "formulas"
+          }
+        ],
+        "answer": "Answer: Independence means multiplying probabilities directly; dependence requires conditional probability.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define probability and explain what P=0 and P=1 mean.",
+        "answer": "Probability is a number between 0 and 1 that measures the likelihood of an event occurring. P=0 means the event is impossible (rolling a 7 on a standard die). P=1 means the event is certain (rolling between 1 and 6 on a standard die). P=0.5 means the event is equally likely to occur or not (a fair coin flip).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of probability as a scale from impossible (0) to certain (1)."
+        ],
+        "explanation": "Probabilities must be between 0 and 1 inclusive. If your calculation gives a probability outside this range, something is wrong.",
+        "distractors": []
+      },
+      {
+        "question": "A bag contains 5 red and 3 blue marbles. You draw one marble, replace it, then draw another. What is the probability of drawing two red marbles?",
+        "answer": "Since the marble is replaced, the draws are independent. P(red) = 5/8 each time. P(two reds) = 5/8 x 5/8 = 25/64 = 0.391.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Because we replace the marble, the probability stays the same for the second draw.",
+          "Multiply probabilities for independent events."
+        ],
+        "explanation": "With replacement, the draws are independent and probabilities stay constant. Without replacement, the second draw would have different probabilities.",
+        "distractors": []
+      },
+      {
+        "question": "In a class of 30 students, 12 play soccer, 8 play cricket, and 3 play both. What is the probability that a randomly selected student plays soccer OR cricket?",
+        "answer": "P(soccer or cricket) = P(soccer) + P(cricket) - P(both) = 12/30 + 8/30 - 3/30 = 17/30 = 0.567.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Use the addition rule: P(A or B) = P(A) + P(B) - P(A and B).",
+          "Why do we subtract P(both)?"
+        ],
+        "explanation": "We subtract P(both) because students who play both sports would otherwise be counted twice. This is the inclusion-exclusion principle.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the gambler's fallacy using the example of a coin that has landed heads 10 times in a row.",
+        "answer": "The gambler's fallacy is the mistaken belief that past random events affect future ones. After 10 heads, many people feel 'tails is due.' But each coin flip is independent \u2014 the coin has no memory. P(heads on flip 11) = 0.5, regardless of previous flips. The fallacy arises from confusing the probability of a specific sequence (10 heads then tails) with the conditional probability (tails given 10 heads). The sequence is unlikely a priori, but once 10 heads have occurred, the next flip is unaffected.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Does the coin know what happened on previous flips?",
+          "Distinguish between the probability of a sequence and the probability of the next event."
+        ],
+        "explanation": "The gambler's fallacy costs real money in casinos and lotteries. Understanding it is essential for evaluating risk and making rational decisions under uncertainty.",
+        "distractors": []
+      },
+      {
+        "question": "A home HIV test has 99.5% sensitivity (positive when infected) and 99% specificity (negative when not infected). In a community where 5% of people are HIV-positive, what is the probability that a person who tests positive is actually infected? Show your calculation.",
+        "answer": "In 10,000 people: 500 are HIV+ and 9,500 are HIV-. True positives: 500 x 0.995 = 497.5. False positives: 9,500 x 0.01 = 95. Total positives: 497.5 + 95 = 592.5. P(HIV+|positive test) = 497.5/592.5 = 0.840 = 84%. Despite the high accuracy, 16% of positive results are false positives.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Set up a contingency table with 10,000 people.",
+          "Calculate true positives and false positives separately."
+        ],
+        "explanation": "This is a direct application of Bayes' theorem. In SA, where HIV prevalence is high (12.7%), the positive predictive value is higher than in lower-prevalence countries \u2014 prevalence matters enormously for test interpretation.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "A number between 0 and 1 measuring the likelihood of an event occurring",
+      "Events where the outcome of one does not affect the probability of the other",
+      "A formula for updating the probability of a hypothesis based on new evidence"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "probability",
+        "definition": "A number between 0 and 1 measuring the likelihood of an event occurring",
+        "example_usage": "The probability of rain tomorrow is 0.3, or 30%."
+      },
+      {
+        "term": "independent events",
+        "definition": "Events where the outcome of one does not affect the probability of the other",
+        "example_usage": "Coin flips are independent events."
+      },
+      {
+        "term": "Bayes' theorem",
+        "definition": "A formula for updating the probability of a hypothesis based on new evidence",
+        "example_usage": "Bayes' theorem shows that a positive test result does not always mean you have the disease."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People commonly believe that if an event has not occurred for a while, it is 'due' to happen.",
+        "correction": "This is the gambler's fallacy. Random events have no memory \u2014 past outcomes do not influence future probabilities for independent events. A coin that has landed heads 10 times is still 50/50 on the next flip. The probability of the entire sequence (11 heads) is very low, but the conditional probability (heads on flip 11 given the first 10 were heads) is exactly 0.5.",
+        "why_students_think_this": "Humans are wired to find patterns, even in randomness. The feeling that 'tails is due' is a pattern-seeking instinct misapplied to independent random events."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,181 @@
+{
+  "node_id": "UNI.STATISTICS.STAT.INFER",
+  "lesson": {
+    "standard_code": "UNI.STATISTICS.STAT.INFER",
+    "title": "Inference & Hypothesis Testing",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Statistical inference draws conclusions about a population based on a sample. We cannot survey every person in South Africa, so we survey a representative sample and use probability to quantify our uncertainty. A p-value measures the probability of observing results as extreme as the data if the null hypothesis (no effect) is true. A confidence interval gives a range of plausible values for a population parameter. Significance (typically p < 0.05) does not mean importance \u2014 a trivially small effect can be statistically significant with a large enough sample. Understanding these concepts is critical for evaluating medical claims, policy decisions, and scientific research.",
+    "examples": [
+      {
+        "problem": "A researcher tests whether a new teaching method improves test scores. The null hypothesis is that there is no difference. The p-value is 0.03. Interpret this.",
+        "steps": [
+          {
+            "instruction": "Step 1: The p-value 0.03 means: if the teaching method had no effect, there is only a 3% chance of observing results this extreme.",
+            "result": "p-value interpretation"
+          },
+          {
+            "instruction": "Step 2: Since 0.03 < 0.05, we reject the null hypothesis \u2014 the result is statistically significant.",
+            "result": "significance"
+          },
+          {
+            "instruction": "Step 3: But 'significant' does not tell us how big the improvement is \u2014 we also need the effect size.",
+            "result": "limitation"
+          }
+        ],
+        "answer": "Answer: p = 0.03 means we reject the null hypothesis at the 0.05 level, but we need effect size to know if the improvement is practically meaningful.",
+        "visual_description": null
+      },
+      {
+        "problem": "What does a 95% confidence interval of [48, 52] for a mean score tell us?",
+        "steps": [
+          {
+            "instruction": "Step 1: We are 95% confident that the true population mean falls between 48 and 52.",
+            "result": "interpretation"
+          },
+          {
+            "instruction": "Step 2: This does NOT mean there is a 95% probability the true mean is in this interval \u2014 the true mean is fixed, not random.",
+            "result": "common error"
+          },
+          {
+            "instruction": "Step 3: It means that if we repeated the sampling process many times, 95% of the intervals would contain the true mean.",
+            "result": "correct interpretation"
+          }
+        ],
+        "answer": "Answer: A 95% confidence interval means our method produces intervals that capture the true value 95% of the time over many repetitions.",
+        "visual_description": null
+      },
+      {
+        "problem": "A drug company reports that their new medicine 'significantly reduces headaches' (p = 0.001, effect size = 2% reduction). Is this meaningful?",
+        "steps": [
+          {
+            "instruction": "Step 1: Statistically significant: yes, p = 0.001 is well below 0.05.",
+            "result": "statistical significance"
+          },
+          {
+            "instruction": "Step 2: Practically significant: a 2% reduction in headache frequency is unlikely to be noticeable to patients.",
+            "result": "practical significance"
+          },
+          {
+            "instruction": "Step 3: With a large enough sample, even trivial effects become statistically significant.",
+            "result": "distinction"
+          }
+        ],
+        "answer": "Answer: Statistical significance and practical significance are different. Always ask: how big is the effect, not just is it significant?",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is a null hypothesis? What does it mean to reject it?",
+        "answer": "A null hypothesis (H0) states that there is no effect, no difference, or no relationship in the population. Rejecting it means the data provides sufficient evidence that the observed effect is unlikely to have occurred by chance alone. It does NOT prove the alternative hypothesis is true \u2014 it only says the null is implausible given the data.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "The null hypothesis is the 'nothing is happening' explanation.",
+          "Rejecting it means the data is inconsistent with 'nothing happening.'"
+        ],
+        "explanation": "The null hypothesis framework comes from Neyman-Pearson hypothesis testing. It provides a structured way to evaluate evidence, but it has limitations \u2014 significance does not equal truth.",
+        "distractors": []
+      },
+      {
+        "question": "Explain what a p-value is and what it is NOT.",
+        "answer": "A p-value IS: the probability of observing data as extreme as (or more extreme than) what was observed, assuming the null hypothesis is true. A p-value is NOT: the probability that the null hypothesis is true, the probability that the result is due to chance, or the probability that the result will replicate. Common misinterpretation: 'p = 0.05 means there is a 5% chance the result is wrong.' Correct: 'If there were truly no effect, there is a 5% chance of getting results this extreme.'",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "The p-value is about the data given the null hypothesis, NOT about the null hypothesis given the data.",
+          "This is a subtle but crucial distinction."
+        ],
+        "explanation": "Misinterpretation of p-values is so widespread that the American Statistical Association published a formal statement (2016) clarifying what p-values do and do not mean.",
+        "distractors": []
+      },
+      {
+        "question": "A clinical trial reports: 'Patients who received the new drug had a 95% confidence interval for blood pressure reduction of [2.1, 8.3] mmHg, p = 0.001.' Interpret this result for a non-statistician.",
+        "answer": "Plain language: the drug reduces blood pressure by somewhere between 2.1 and 8.3 mmHg, and we are quite confident this is a real effect (not due to chance). The reduction could be as small as 2 mmHg or as large as 8 mmHg. A doctor would then evaluate whether this range of reduction is clinically meaningful for the patient \u2014 a 2 mmHg reduction might not be worth side effects, while 8 mmHg would be significant.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Focus on the confidence interval \u2014 it tells you the range of plausible effect sizes.",
+          "p = 0.001 just means we are confident it is real, not that it is large."
+        ],
+        "explanation": "Confidence intervals are more informative than p-values because they indicate both the direction and plausible magnitude of the effect, not just whether it is 'significant.'",
+        "distractors": []
+      },
+      {
+        "question": "Explain the 'replication crisis' in science and how it relates to p-value misuse.",
+        "answer": "The replication crisis is the finding that many published scientific results (30-50% in psychology and biomedical research) fail to replicate when repeated. Causes related to p-values: (1) p-hacking \u2014 running many analyses and reporting only the significant ones. (2) Publication bias \u2014 journals prefer 'significant' results, so null results are not published. (3) Underpowered studies \u2014 small samples produce noisy results that may reach p < 0.05 by chance. (4) Misinterpretation \u2014 treating p < 0.05 as proof rather than as one piece of evidence. Solutions include pre-registration of studies, larger samples, and reporting effect sizes and confidence intervals.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Why might many published 'significant' results be false?",
+          "What incentives encourage p-hacking?"
+        ],
+        "explanation": "The replication crisis has led to major reforms in research methodology, including mandatory pre-registration, open data, and increased emphasis on effect sizes over p-values.",
+        "distractors": []
+      },
+      {
+        "question": "Design a simple experiment to test whether studying with music improves test performance. Include: hypothesis, null hypothesis, sample, procedure, what you would measure, and how you would analyse the results.",
+        "answer": "Hypothesis: studying with music improves test performance. Null hypothesis: there is no difference in test scores between music and no-music conditions. Sample: 40 students randomly assigned to two groups (20 music, 20 no-music). Procedure: all students study the same material for 30 minutes, then take the same test. Music group studies with instrumental music; no-music group studies in silence. Measure: test scores (0-100). Analysis: compare mean scores using an independent t-test. Report: mean difference, 95% confidence interval, p-value, and Cohen's d effect size.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Random assignment is crucial for causal inference.",
+          "Report effect size, not just p-value."
+        ],
+        "explanation": "This experiment design illustrates key principles: random assignment (controls for confounds), clear operationalisation (what counts as 'music'), and appropriate analysis (t-test for comparing two means).",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The probability of observing results as extreme as the data if the null hypothesis is true",
+      "A range of values that is likely to contain the true population parameter, with a specified level of confidence",
+      "A result that is unlikely to have occurred by chance, typically when p < 0.05"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "p-value",
+        "definition": "The probability of observing results as extreme as the data if the null hypothesis is true",
+        "example_usage": "A p-value of 0.01 means there is only a 1% chance of this result if the null hypothesis is true."
+      },
+      {
+        "term": "confidence interval",
+        "definition": "A range of values that is likely to contain the true population parameter, with a specified level of confidence",
+        "example_usage": "The 95% confidence interval for the mean was [45, 55]."
+      },
+      {
+        "term": "statistical significance",
+        "definition": "A result that is unlikely to have occurred by chance, typically when p < 0.05",
+        "example_usage": "The result was statistically significant but the effect size was tiny."
+      },
+      {
+        "term": "effect size",
+        "definition": "A measure of the magnitude of an effect, independent of sample size",
+        "example_usage": "The effect size of 0.8 indicated a large practical difference between groups."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people believe that p < 0.05 means there is only a 5% chance the result is wrong.",
+        "correction": "This is the most common misinterpretation of p-values. p < 0.05 means: if the null hypothesis were true, there is less than a 5% chance of seeing data this extreme. It says nothing about the probability that the null hypothesis is true. The probability of the null hypothesis being true depends on many things not captured by the p-value, including prior evidence, study quality, and the plausibility of the hypothesis.",
+        "why_students_think_this": "The p-value is a conditional probability (probability of data given hypothesis), but people interpret it as the inverse (probability of hypothesis given data). These are not the same thing \u2014 confusing them is called the 'base rate fallacy.'"
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

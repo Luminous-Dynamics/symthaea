@@ -1,0 +1,174 @@
+{
+  "node_id": "UNI.LEARNING.LEARN.META",
+  "lesson": {
+    "standard_code": "UNI.LEARNING.LEARN.META",
+    "title": "Metacognition",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Metacognition is thinking about thinking \u2014 the ability to monitor, plan, and evaluate your own cognitive processes. It includes planning (what strategy will I use?), monitoring (is this working?), and evaluating (did it work? what would I do differently?). Research by Flavell and others shows that metacognitive awareness is one of the strongest predictors of academic success \u2014 stronger than IQ. Students who pause to ask 'Do I understand this?' learn more effectively than those who simply re-read material. In South African schools, where resources vary widely, metacognition is a powerful equaliser: it costs nothing but dramatically improves learning outcomes.",
+    "examples": [
+      {
+        "problem": "Before starting a maths problem set, a student asks themselves: 'What type of problems are these? What strategy worked last time? Where did I make mistakes before?' How is this metacognition?",
+        "steps": [
+          {
+            "instruction": "Step 1: Planning: identifying the problem type and selecting an appropriate strategy.",
+            "result": "planning"
+          },
+          {
+            "instruction": "Step 2: Monitoring: recalling past mistakes to watch for them.",
+            "result": "monitoring"
+          },
+          {
+            "instruction": "Step 3: This self-questioning activates prior knowledge and focuses attention on likely difficulties.",
+            "result": "effect"
+          }
+        ],
+        "answer": "Answer: This pre-study reflection is metacognitive planning \u2014 one of the most effective study habits.",
+        "visual_description": null
+      },
+      {
+        "problem": "A student reads a textbook chapter and realises at the bottom of page 3 that they cannot remember anything from page 1. What metacognitive skill are they using?",
+        "steps": [
+          {
+            "instruction": "Step 1: They are monitoring their comprehension \u2014 noticing that understanding has broken down.",
+            "result": "monitoring"
+          },
+          {
+            "instruction": "Step 2: The appropriate response: go back to page 1 and re-read actively (taking notes, asking questions).",
+            "result": "corrective action"
+          },
+          {
+            "instruction": "Step 3: Without monitoring, they would have finished the chapter with the illusion of having studied.",
+            "result": "contrast"
+          }
+        ],
+        "answer": "Answer: Metacognitive monitoring catches comprehension failures early, preventing wasted study time.",
+        "visual_description": null
+      },
+      {
+        "problem": "After an exam, a student reviews their answers and identifies that they lost most marks on graph interpretation questions. How can they use this evaluation?",
+        "steps": [
+          {
+            "instruction": "Step 1: Evaluation: identifying a specific weakness (graph interpretation) from concrete evidence.",
+            "result": "evaluate"
+          },
+          {
+            "instruction": "Step 2: Action: allocate more practice time to graph interpretation before the next exam.",
+            "result": "plan adjustment"
+          },
+          {
+            "instruction": "Step 3: Track whether the targeted practice improves graph scores on the next test.",
+            "result": "feedback loop"
+          }
+        ],
+        "answer": "Answer: Metacognitive evaluation turns exam results into specific improvement plans rather than vague resolutions to 'study harder.'",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define metacognition and name its three main components.",
+        "answer": "Metacognition is thinking about thinking \u2014 awareness and control of your own cognitive processes. Three components: (1) Planning \u2014 deciding what strategy to use before starting a task. (2) Monitoring \u2014 checking whether the strategy is working during the task. (3) Evaluating \u2014 assessing how well the strategy worked after the task and adjusting for next time.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: before, during, after."
+        ],
+        "explanation": "Metacognition research consistently shows that these three components can be taught and practised, and that doing so significantly improves learning outcomes.",
+        "distractors": []
+      },
+      {
+        "question": "Explain why re-reading a textbook is a poor study strategy and suggest a metacognitive alternative.",
+        "answer": "Re-reading creates an 'illusion of knowing' \u2014 the material feels familiar on second reading, but familiarity is not the same as understanding. Metacognitive alternative: after reading a section, close the book and try to explain the key concepts in your own words. If you cannot, you know exactly where your understanding breaks down and can re-read that specific part. This is the 'read-recite-review' method.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Familiarity is not the same as understanding.",
+          "How do you know if you really understand something?"
+        ],
+        "explanation": "Research by Dunlosky et al. (2013) ranked re-reading as a 'low utility' study strategy and practice testing as 'high utility.' The difference is metacognitive \u2014 testing reveals gaps while re-reading hides them.",
+        "distractors": []
+      },
+      {
+        "question": "Design a metacognitive checklist that a student could use before, during, and after studying for a test.",
+        "answer": "Before: What topics will be covered? What do I already know well? What are my weak areas? What study method will I use? How much time do I have? During: Am I understanding this? Can I explain it without looking? Am I just re-reading or actively engaging? Do I need to change my approach? After: What did I learn? What is still unclear? What would I do differently next time? Where should I focus tomorrow?",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Cover all three phases: planning, monitoring, evaluating."
+        ],
+        "explanation": "This checklist externalises metacognitive processes that skilled learners do automatically. For novice learners, having a physical checklist builds the habit until it becomes internalised.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why students who highlight everything in their textbooks are demonstrating poor metacognition.",
+        "answer": "Highlighting everything means the student cannot distinguish important from unimportant information \u2014 a metacognitive failure. They are not monitoring their comprehension ('what is the key point here?') or planning their study ('what will I need for the exam?'). Selective highlighting requires judgment about what matters, which requires understanding. If everything is highlighted, nothing is.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What does highlighting everything reveal about the student's understanding?",
+          "How is selective highlighting different?"
+        ],
+        "explanation": "Research consistently shows that highlighting has low utility as a study strategy, partly because students highlight too much and partly because the act of highlighting is passive \u2014 it does not require deep processing.",
+        "distractors": []
+      },
+      {
+        "question": "Create a 'metacognitive journal' template with prompts for weekly reflection on learning. Include at least 6 questions across the three metacognitive domains.",
+        "answer": "Template: Planning \u2014 (1) What are my learning goals this week? (2) What strategy will I use for the most challenging topic? Monitoring \u2014 (3) Which concepts did I understand immediately vs struggle with? (4) When did I catch myself zoning out or losing focus, and what did I do about it? Evaluating \u2014 (5) What worked well in my studying this week? What did not? (6) If I could redo this week's study, what would I change? (7) What is my specific plan for improving next week based on this reflection?",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Make prompts specific and actionable, not vague.",
+          "Include prompts that force honest self-assessment."
+        ],
+        "explanation": "Metacognitive journals are used in educational research and have shown significant effects on student achievement. The key is consistency \u2014 weekly reflection builds the habit of self-monitoring.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Thinking about thinking \u2014 awareness and control of your own cognitive processes",
+      "Checking whether your current strategy is working during a learning task",
+      "The false feeling of understanding created by familiarity rather than genuine comprehension"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "metacognition",
+        "definition": "Thinking about thinking \u2014 awareness and control of your own cognitive processes",
+        "example_usage": "Metacognition helped her realise she was not actually understanding the chapter."
+      },
+      {
+        "term": "monitoring",
+        "definition": "Checking whether your current strategy is working during a learning task",
+        "example_usage": "Monitoring your comprehension means asking 'do I understand this?' while reading."
+      },
+      {
+        "term": "illusion of knowing",
+        "definition": "The false feeling of understanding created by familiarity rather than genuine comprehension",
+        "example_usage": "Re-reading creates an illusion of knowing because the text feels familiar."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that if material feels familiar, they understand it.",
+        "correction": "Familiarity and understanding are different. You can feel like you 'know' something because you have seen it before (recognition) without being able to explain it, apply it, or recall it on a test (retrieval). This is the illusion of knowing. Testing yourself \u2014 trying to recall or explain without looking \u2014 reveals the gap between feeling and actually knowing.",
+        "why_students_think_this": "Re-reading and reviewing notes create a sense of familiarity that the brain mistakes for understanding. This is why students are often surprised by poor test performance after 'hours of studying.'"
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,180 @@
+{
+  "node_id": "CYBER.SEC.AUDIT",
+  "lesson": {
+    "standard_code": "CYBER.SEC.AUDIT",
+    "title": "Security Auditing",
+    "grade_level": "Professional",
+    "bloom_level": "Understand",
+    "explanation": "Security auditing systematically evaluates an organisation's security controls, policies, and practices against established standards. Audits can be internal (conducted by the organisation) or external (by independent auditors). Key frameworks include ISO 27001 (information security management), NIST CSF (cybersecurity framework), and PCI-DSS (payment card industry). Penetration testing is a specific audit type that simulates real attacks. Vulnerability scanning identifies known weaknesses in systems. In South Africa, POPIA requires 'appropriate technical and organisational measures' to protect personal information \u2014 security audits demonstrate compliance. Regular auditing turns security from a one-time project into a continuous process.",
+    "examples": [
+      {
+        "problem": "What is the difference between a vulnerability scan and a penetration test?",
+        "steps": [
+          {
+            "instruction": "Step 1: Vulnerability scan: automated tool scans systems for known vulnerabilities (e.g., unpatched software, default passwords). Broad coverage, finds known issues.",
+            "result": "scan"
+          },
+          {
+            "instruction": "Step 2: Penetration test: a skilled tester manually attempts to exploit vulnerabilities to gain access, simulating a real attacker. Deeper analysis, finds complex issues.",
+            "result": "pentest"
+          },
+          {
+            "instruction": "Step 3: Analogy: a vulnerability scan checks if your doors are locked. A penetration test has someone try to break in.",
+            "result": "analogy"
+          }
+        ],
+        "answer": "Answer: Both are essential: vulnerability scanning for breadth (regular, automated), penetration testing for depth (periodic, manual).",
+        "visual_description": null
+      },
+      {
+        "problem": "How does an organisation demonstrate POPIA compliance through security auditing?",
+        "steps": [
+          {
+            "instruction": "Step 1: POPIA requires 'appropriate measures' but does not specify exactly what those are.",
+            "result": "requirement"
+          },
+          {
+            "instruction": "Step 2: A security audit maps existing controls against POPIA requirements and identifies gaps.",
+            "result": "assessment"
+          },
+          {
+            "instruction": "Step 3: Documenting the audit results and remediation actions demonstrates due diligence if a breach occurs.",
+            "result": "evidence"
+          }
+        ],
+        "answer": "Answer: POPIA compliance is demonstrated through documented, systematic security practices \u2014 not just having security tools installed.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain audit logging and why it is critical for security.",
+        "steps": [
+          {
+            "instruction": "Step 1: Audit logs record who did what, when, and from where \u2014 every login, file access, configuration change, and permission modification.",
+            "result": "what is logged"
+          },
+          {
+            "instruction": "Step 2: Without audit logs, you cannot detect breaches, investigate incidents, or prove compliance.",
+            "result": "why it matters"
+          },
+          {
+            "instruction": "Step 3: Logs must be protected from tampering \u2014 an attacker who deletes logs can cover their tracks.",
+            "result": "log integrity"
+          }
+        ],
+        "answer": "Answer: Audit logs are the security equivalent of CCTV footage \u2014 without them, incidents cannot be detected or investigated.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define security auditing and explain its purpose.",
+        "answer": "Security auditing is the systematic evaluation of an organisation's security controls, policies, and practices to identify weaknesses and verify compliance with standards. Its purpose is to: (1) identify vulnerabilities before attackers do, (2) verify that security controls work as intended, (3) demonstrate compliance with regulations (POPIA, PCI-DSS), and (4) provide a baseline for measuring security improvement over time.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "An audit answers: are our security measures working?"
+        ],
+        "explanation": "Security auditing transforms security from a subjective feeling ('we think we are secure') into an objective assessment ('here is the evidence of our security posture').",
+        "distractors": []
+      },
+      {
+        "question": "Compare internal and external security audits. What are the advantages and disadvantages of each?",
+        "answer": "Internal: conducted by the organisation's own staff. Advantages: lower cost, deeper knowledge of systems, ongoing access. Disadvantages: potential bias, limited perspective, may lack specialised skills. External: conducted by independent auditors. Advantages: objective perspective, specialised expertise, credibility with regulators and clients. Disadvantages: higher cost, less context about the organisation, point-in-time assessment. Best practice: regular internal audits supplemented by annual external audits.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Can you objectively audit your own work?",
+          "What does an outsider see that an insider misses?"
+        ],
+        "explanation": "Independence is key for credibility. Internal audits provide continuous improvement; external audits provide independent verification. Both are needed.",
+        "distractors": []
+      },
+      {
+        "question": "You are asked to audit a small business's security. Create a checklist of 10 items you would examine.",
+        "answer": "Checklist: (1) Are all systems patched and up to date? (2) Is MFA enabled for all critical accounts? (3) Are backups performed regularly and tested? (4) Is data encrypted at rest and in transit? (5) Are user permissions based on least privilege? (6) Is there an incident response plan? (7) Are employees trained on phishing and security awareness? (8) Are firewall rules reviewed and documented? (9) Are audit logs enabled and protected? (10) Is there a documented password policy (length, complexity, no reuse)?",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Cover people, process, and technology.",
+          "Each item should be verifiable \u2014 can you check it?"
+        ],
+        "explanation": "This checklist covers the most common security gaps in small businesses. Each item can be verified objectively (yes/no or measured) rather than subjectively assessed.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse the limitations of point-in-time security audits. How can organisations address these limitations?",
+        "answer": "Limitations: (1) A point-in-time audit only captures the security posture on the day of the audit \u2014 new vulnerabilities emerge daily. (2) Staff may temporarily improve practices for the audit ('audit mode'). (3) Auditors cannot test every possible attack scenario. (4) The audit report becomes stale quickly as the environment changes. Solutions: (1) Continuous monitoring (SIEM, vulnerability scanning) supplements periodic audits. (2) Automated compliance checking tools. (3) Regular internal assessments between formal audits. (4) Treat security as a process, not an event.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What happens between annual audits?",
+          "Can you be secure on audit day and insecure the next day?"
+        ],
+        "explanation": "The most dangerous mindset is treating an audit as a destination rather than a checkpoint. Security is a continuous process, and audits should drive ongoing improvement.",
+        "distractors": []
+      },
+      {
+        "question": "Design a comprehensive annual security audit programme for a South African healthcare provider that must comply with POPIA and protect patient data.",
+        "answer": "Programme: Q1: External penetration test (network + web application) by a qualified firm. Remediate critical and high findings within 30 days. Q2: Internal audit of access controls (review all user permissions, verify least privilege, check for orphaned accounts). POPIA compliance review (data inventory, consent records, information officer designation). Q3: Vulnerability scan of all systems. Security awareness assessment (simulated phishing campaign). Backup and recovery test (restore from backup to verify integrity). Q4: External audit against ISO 27001 or NIST CSF. Review and update incident response plan. Annual security report to board of directors. Continuous: monthly vulnerability scans, real-time SIEM monitoring, quarterly access reviews.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Spread activities across the year for manageable workload.",
+          "Include both technical and compliance auditing."
+        ],
+        "explanation": "A comprehensive programme covers technical security (pentesting, vulnerability scanning), compliance (POPIA, access reviews), human factors (awareness training), and governance (board reporting). Spreading activities across quarters prevents audit fatigue.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "A systematic evaluation of an organisation's security controls and practices against established standards",
+      "A simulated attack on a system to identify exploitable vulnerabilities",
+      "An automated scan of systems to identify known security weaknesses"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "security audit",
+        "definition": "A systematic evaluation of an organisation's security controls and practices against established standards",
+        "example_usage": "The annual security audit identified 12 critical vulnerabilities."
+      },
+      {
+        "term": "penetration test",
+        "definition": "A simulated attack on a system to identify exploitable vulnerabilities",
+        "example_usage": "The penetration test found that an SQL injection could access the customer database."
+      },
+      {
+        "term": "vulnerability scan",
+        "definition": "An automated scan of systems to identify known security weaknesses",
+        "example_usage": "Weekly vulnerability scans ensure new patches are applied promptly."
+      },
+      {
+        "term": "compliance",
+        "definition": "Adherence to laws, regulations, and industry standards",
+        "example_usage": "POPIA compliance requires documented security measures for personal data."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Some organisations treat security audits as a checkbox exercise \u2014 something to pass rather than learn from.",
+        "correction": "An audit's value is in the findings and the improvements they drive, not in the certificate or report. Organisations that treat audits as compliance theatre gain little security benefit. The most secure organisations welcome audit findings as opportunities to improve, track remediation rigorously, and use audit results to prioritise security investments. The goal is genuine security, not paperwork.",
+        "why_students_think_this": "Regulatory frameworks can create a 'compliance culture' where the goal is passing the audit rather than improving security. This is reinforced when management views security as a cost center rather than a business enabler."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}
