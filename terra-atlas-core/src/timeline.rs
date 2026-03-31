@@ -101,6 +101,19 @@ pub fn corridor_visible(index: usize, year: u32) -> bool {
     index < max_visible
 }
 
+/// EROI decline over time as easy reserves deplete.
+/// Oil declines ~2%/yr, gas ~1%/yr, coal ~0.5%/yr. Floors at 1.0 (thermodynamic minimum).
+pub fn fossil_eroi_at_year(base_eroi: f64, fuel_type: &crate::types::FuelType, year: u32) -> f64 {
+    let annual_decline = match fuel_type {
+        crate::types::FuelType::Oil => 0.02,
+        crate::types::FuelType::Gas => 0.01,
+        crate::types::FuelType::Coal => 0.005,
+        crate::types::FuelType::TarSands => 0.03, // fastest decline — diminishing returns
+    };
+    let eroi = base_eroi * (1.0_f64 - annual_decline).powf(year as f64);
+    eroi.max(1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,6 +131,7 @@ mod tests {
             discovery_year: 1950,
             extraction_cost_per_boe: None,
             decommission_cost_m: None,
+            eroi: None,
         }
     }
 
@@ -162,6 +176,28 @@ mod tests {
         assert!(vault_visible(0, 50));
         assert!(!vault_visible(2, 50));
         assert!(vault_visible(11, 150));
+    }
+
+    #[test]
+    fn test_eroi_decline_over_time() {
+        let base = 25.0;
+        let at_50 = fossil_eroi_at_year(base, &FuelType::Oil, 50);
+        let at_100 = fossil_eroi_at_year(base, &FuelType::Oil, 100);
+        assert!(at_50 < base, "EROI should decline");
+        assert!(at_100 < at_50, "EROI should continue declining");
+        assert!(at_100 >= 1.0, "EROI floors at 1.0");
+    }
+
+    #[test]
+    fn test_eroi_year_zero_unchanged() {
+        assert!((fossil_eroi_at_year(25.0, &FuelType::Oil, 0) - 25.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_eroi_tar_sands_declines_fastest() {
+        let oil_100 = fossil_eroi_at_year(10.0, &FuelType::Oil, 100);
+        let tar_100 = fossil_eroi_at_year(10.0, &FuelType::TarSands, 100);
+        assert!(tar_100 < oil_100, "tar sands should decline faster than oil");
     }
 
     #[test]

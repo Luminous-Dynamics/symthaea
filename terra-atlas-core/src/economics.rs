@@ -33,6 +33,73 @@ pub fn reference_price_per_boe(fuel_type: &FuelType) -> f64 {
     }
 }
 
+// ─── EROI thresholds ────────────────────────────────────────────
+
+/// Full modern civilization with arts & culture (Hall & Lambert).
+pub const EROI_CIVILIZATION: f64 = 12.0;
+/// Basic sustainability — transport, healthcare, education.
+pub const EROI_SUSTAINABILITY: f64 = 5.0;
+/// Bare minimum — enough to drive a truck.
+pub const EROI_MINIMUM: f64 = 3.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EroiTier {
+    /// EROI > 12: can sustain modern civilization
+    Civilization,
+    /// EROI 5-12: basic sustainability
+    Sustainability,
+    /// EROI 3-5: marginal, declining returns
+    Marginal,
+    /// EROI < 3: thermodynamically unviable
+    Unviable,
+}
+
+impl EroiTier {
+    pub fn from_eroi(eroi: f64) -> Self {
+        if eroi >= EROI_CIVILIZATION {
+            Self::Civilization
+        } else if eroi >= EROI_SUSTAINABILITY {
+            Self::Sustainability
+        } else if eroi >= EROI_MINIMUM {
+            Self::Marginal
+        } else {
+            Self::Unviable
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Civilization => "Civilization",
+            Self::Sustainability => "Sustainable",
+            Self::Marginal => "Marginal",
+            Self::Unviable => "Unviable",
+        }
+    }
+}
+
+/// Compute EROI for a deposit. Uses the `eroi` field if set,
+/// otherwise derives a proxy from reference price / extraction cost.
+pub fn compute_eroi(deposit: &FossilDeposit) -> Option<f64> {
+    if let Some(eroi) = deposit.eroi {
+        return Some(eroi);
+    }
+    let cost = deposit.extraction_cost_per_boe?;
+    if cost <= 0.0 {
+        return None;
+    }
+    Some(reference_price_per_boe(&deposit.fuel_type) / cost)
+}
+
+/// EROI-based color for visualization: green → amber → red → dark red.
+pub fn eroi_color(eroi: f64) -> [f32; 3] {
+    match EroiTier::from_eroi(eroi) {
+        EroiTier::Civilization => [0.06, 0.73, 0.51],   // teal-green
+        EroiTier::Sustainability => [0.98, 0.75, 0.14], // amber
+        EroiTier::Marginal => [0.94, 0.27, 0.27],       // red
+        EroiTier::Unviable => [0.50, 0.10, 0.10],       // dark red
+    }
+}
+
 // ─── Computed Economics ─────────────────────────────────────────
 
 /// Full economic analysis of a fossil deposit.
@@ -172,6 +239,7 @@ mod tests {
             discovery_year: 1948,
             extraction_cost_per_boe: Some(10.0),
             decommission_cost_m: None,
+            eroi: None,
         }
     }
 
@@ -206,6 +274,7 @@ mod tests {
             discovery_year: 1970,
             extraction_cost_per_boe: Some(55.0), // expensive extraction
             decommission_cost_m: None,
+            eroi: None,
         };
         let econ = compute_economics(&deposit).unwrap();
         // Revenue: 50 * $65 = $3,250M
@@ -243,6 +312,49 @@ mod tests {
         // Invest $1000, get $1000 back in year 1 → IRR = 0%
         let irr = compute_irr(1000.0, &[1000.0]).unwrap();
         assert!(irr.abs() < 0.001, "IRR was {irr}");
+    }
+
+    #[test]
+    fn test_eroi_uses_field_when_set() {
+        let mut d = ghawar();
+        d.eroi = Some(25.0);
+        assert_eq!(compute_eroi(&d), Some(25.0));
+    }
+
+    #[test]
+    fn test_eroi_derives_from_cost() {
+        let mut d = ghawar();
+        d.eroi = None;
+        d.extraction_cost_per_boe = Some(10.0);
+        // Oil ref price = 75, so proxy = 75/10 = 7.5
+        let eroi = compute_eroi(&d).unwrap();
+        assert!((eroi - 7.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_eroi_none_without_data() {
+        let mut d = ghawar();
+        d.eroi = None;
+        d.extraction_cost_per_boe = None;
+        assert!(compute_eroi(&d).is_none());
+    }
+
+    #[test]
+    fn test_eroi_tier_classification() {
+        assert_eq!(EroiTier::from_eroi(25.0), EroiTier::Civilization);
+        assert_eq!(EroiTier::from_eroi(7.0), EroiTier::Sustainability);
+        assert_eq!(EroiTier::from_eroi(4.0), EroiTier::Marginal);
+        assert_eq!(EroiTier::from_eroi(2.0), EroiTier::Unviable);
+    }
+
+    #[test]
+    fn test_eroi_color_thresholds() {
+        let green = eroi_color(25.0);
+        let amber = eroi_color(7.0);
+        let red = eroi_color(4.0);
+        assert!(green[1] > green[0], "green should be greenish");
+        assert!(amber[0] > amber[2], "amber should be warm");
+        assert!(red[0] > red[1], "red should be reddish");
     }
 
     #[test]

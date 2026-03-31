@@ -235,11 +235,12 @@ pub fn setup_globe_view(
         marker_count += 1;
     }
 
-    // Fossil deposits — muted amber/gray, status-dimmed, with carbon emission halos
+    // Fossil deposits — EROI-colored (green→amber→red), with carbon emission halos
     let halo_mesh = meshes.add(Sphere::new(1.0).mesh().uv(12, 12));
     for deposit in &data.fossil_deposits {
         let pos = geo::lat_lon_to_xyz(deposit.lat, deposit.lon, 1.006);
-        let c = deposit.fuel_type.rgb();
+        let eroi = terra_atlas_core::economics::compute_eroi(deposit).unwrap_or(5.0);
+        let c = terra_atlas_core::economics::eroi_color(eroi);
         let emissive = geo::fossil_emissive_factor(&deposit.status) * 0.5;
         let scale = geo::fossil_scale_factor(&deposit.status);
         let size = geo::marker_size_from_reserves(deposit.proven_reserves_mboe) * scale;

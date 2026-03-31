@@ -37,8 +37,12 @@ pub fn Tooltip() -> impl IntoView {
                     r.name, r.population_m, r.gdp_per_capita / 1000.0, r.phi_mean, r.climate_vulnerability * 100.0)
             }
             Some(HoverInfo::FossilDeposit(d)) => {
-                format!("{} ({:?})\n{:.0} Mboe reserves | {} | {}",
-                    d.name, d.fuel_type, d.proven_reserves_mboe, d.status, d.country)
+                let eroi_str = terra_atlas_core::economics::compute_eroi(d)
+                    .map(|e| format!(" | EROI {:.0}:1 ({})",
+                        e, terra_atlas_core::economics::EroiTier::from_eroi(e).label()))
+                    .unwrap_or_default();
+                format!("{} ({:?})\n{:.0} Mboe reserves | {} | {}{}",
+                    d.name, d.fuel_type, d.proven_reserves_mboe, d.status, d.country, eroi_str)
             }
             Some(HoverInfo::NuclearSite(n)) => {
                 format!("{} ({} {})\n{:.0} MW | {} | {}",

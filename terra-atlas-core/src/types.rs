@@ -413,6 +413,9 @@ pub struct FossilDeposit {
     /// Decommissioning/remediation cost (millions USD). None if unknown.
     #[serde(default)]
     pub decommission_cost_m: Option<f64>,
+    /// Energy Return on Investment (energy out / energy in). None if unknown.
+    #[serde(default)]
+    pub eroi: Option<f64>,
 }
 
 // ─── Nuclear Site ───────────────────────────────────────────────

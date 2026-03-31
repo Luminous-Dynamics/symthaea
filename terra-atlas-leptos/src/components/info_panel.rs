@@ -108,6 +108,12 @@ pub fn InfoPanel() -> impl IntoView {
                             <div class="stat-row"><span class="stat-label">"Production"</span><span class="stat-value">{format!("{:.0} Mboe/yr", d.annual_production_mboe)}</span></div>
                             <div class="stat-row"><span class="stat-label">"Status"</span><span class="stat-value">{d.status.clone()}</span></div>
                             <div class="stat-row"><span class="stat-label">"Discovered"</span><span class="stat-value">{d.discovery_year.to_string()}</span></div>
+                            {terra_atlas_core::economics::compute_eroi(d).map(|e| {
+                                let tier = terra_atlas_core::economics::EroiTier::from_eroi(e);
+                                view! {
+                                    <div class="stat-row"><span class="stat-label">"EROI"</span><span class="stat-value">{format!("{:.0}:1 ({})", e, tier.label())}</span></div>
+                                }
+                            })}
                         </div>
                     }.into_any(),
                     None => view! { <div /> }.into_any(),
