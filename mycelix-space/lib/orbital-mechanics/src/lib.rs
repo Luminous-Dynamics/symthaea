@@ -76,3 +76,4 @@ pub use tle::{TleParseError, TwoLineElement};
 #[cfg(test)]
 mod validation;
 pub mod relativity;
+pub mod solar_system;
