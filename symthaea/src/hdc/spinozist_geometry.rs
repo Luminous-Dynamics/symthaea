@@ -548,17 +548,223 @@ impl AffectBasis {
 // NsmLexicon — word-to-NSM-prime decomposition
 // ============================================================================
 
+// ============================================================================
+// Morphological analysis types
+// ============================================================================
+
+/// How an affix modifies the root word's NSM decomposition.
+#[derive(Debug, Clone, Copy)]
+enum MorphModifier {
+    /// No semantic change (e.g., -ing, -ed, -s).
+    None,
+    /// Swap Good↔Bad primes (e.g., un-, dis-).
+    FlipGoodBad,
+    /// Append NOT prime (e.g., im-, in-, ir-, -less).
+    AddNot,
+    /// Append SOMEONE prime (e.g., -er, -or).
+    AddSomeone,
+    /// Append BAD prime (e.g., mis-).
+    AddBad,
+}
+
+/// Prefix rules: (prefix_str, modifier). Checked in order.
+const PREFIXES: &[(&str, MorphModifier)] = &[
+    ("un", MorphModifier::FlipGoodBad),
+    ("dis", MorphModifier::FlipGoodBad),
+    ("mis", MorphModifier::AddBad),
+    ("im", MorphModifier::AddNot),
+    ("in", MorphModifier::AddNot),
+    ("ir", MorphModifier::AddNot),
+    ("re", MorphModifier::None),
+    ("pre", MorphModifier::None),
+];
+
+/// Suffix rules: (suffix_str, modifier). Ordered longest-first to avoid
+/// partial matches (e.g., "-tion" before "-ion").
+const SUFFIXES: &[(&str, MorphModifier)] = &[
+    ("tion", MorphModifier::None),
+    ("sion", MorphModifier::None),
+    ("ment", MorphModifier::None),
+    ("ness", MorphModifier::None),
+    ("able", MorphModifier::None),
+    ("ible", MorphModifier::None),
+    ("less", MorphModifier::AddNot),
+    ("ful", MorphModifier::None),
+    ("ing", MorphModifier::None),
+    ("ly", MorphModifier::None),
+    ("ed", MorphModifier::None),
+    ("er", MorphModifier::AddSomeone),
+    ("or", MorphModifier::AddSomeone),
+    ("es", MorphModifier::None),
+    ("s", MorphModifier::None),
+];
+
+/// Irregular verb forms → base form. Covers ~70 common English irregulars.
+const IRREGULAR_VERBS: &[(&str, &str)] = &[
+    ("broke", "break"), ("broken", "break"),
+    ("fought", "fight"), ("taught", "teach"),
+    ("drove", "drive"), ("driven", "drive"),
+    ("went", "go"), ("gone", "go"),
+    ("took", "take"), ("taken", "take"),
+    ("gave", "give"), ("given", "give"),
+    ("said", "say"), ("told", "tell"),
+    ("thought", "think"), ("felt", "feel"),
+    ("knew", "know"), ("known", "know"),
+    ("saw", "see"), ("seen", "see"),
+    ("heard", "hear"), ("made", "make"),
+    ("came", "come"), ("ran", "run"),
+    ("wrote", "write"), ("written", "write"),
+    ("spoke", "speak"), ("spoken", "speak"),
+    ("chose", "choose"), ("chosen", "choose"),
+    ("forgot", "forget"), ("forgotten", "forget"),
+    ("forgave", "forgive"), ("forgiven", "forgive"),
+    ("threw", "throw"), ("thrown", "throw"),
+    ("caught", "catch"), ("bought", "buy"),
+    ("brought", "bring"), ("sought", "seek"),
+    ("stood", "stand"), ("understood", "understand"),
+    ("held", "hold"), ("led", "lead"),
+    ("lost", "lose"), ("found", "find"),
+    ("paid", "pay"), ("kept", "keep"),
+    ("left", "leave"), ("built", "build"),
+    ("sent", "send"), ("spent", "spend"),
+    ("lent", "lend"), ("meant", "mean"),
+    ("dealt", "deal"), ("woke", "wake"),
+    ("wore", "wear"), ("worn", "wear"),
+    ("tore", "tear"), ("torn", "tear"),
+    ("swore", "swear"), ("sworn", "swear"),
+    ("hid", "hide"), ("hidden", "hide"),
+    ("bit", "bite"), ("bitten", "bite"),
+    ("ate", "eat"), ("eaten", "eat"),
+    ("drank", "drink"), ("drunk", "drink"),
+    ("drew", "draw"), ("drawn", "draw"),
+    ("grew", "grow"), ("grown", "grow"),
+    ("blew", "blow"), ("blown", "blow"),
+    ("flew", "fly"), ("flown", "fly"),
+    ("froze", "freeze"), ("frozen", "freeze"),
+    ("shook", "shake"), ("shaken", "shake"),
+    ("lay", "lie"), ("lain", "lie"),
+    ("bore", "bear"), ("borne", "bear"),
+    ("wove", "weave"), ("woven", "weave"),
+    ("strove", "strive"), ("striven", "strive"),
+    ("clung", "cling"), ("stung", "sting"),
+    ("swung", "swing"), ("wrung", "wring"),
+    ("sank", "sink"), ("sunk", "sink"),
+    ("shrank", "shrink"), ("shrunk", "shrink"),
+    ("sprang", "spring"), ("sprung", "spring"),
+    ("sang", "sing"), ("sung", "sing"),
+    ("rang", "ring"), ("rung", "ring"),
+    ("began", "begin"), ("begun", "begin"),
+    ("dug", "dig"), ("hung", "hang"),
+    ("struck", "strike"), ("slid", "slide"),
+    ("bound", "bind"), ("wound", "wind"),
+    ("ground", "grind"), ("bled", "bleed"),
+    ("bred", "breed"), ("fed", "feed"),
+    ("fled", "flee"), ("sped", "speed"),
+    ("wept", "weep"), ("crept", "creep"),
+    ("swept", "sweep"), ("slept", "sleep"),
+];
+
+/// Lazily-initialized irregular verb lookup.
+fn irregular_map() -> &'static HashMap<&'static str, &'static str> {
+    use std::sync::OnceLock;
+    static MAP: OnceLock<HashMap<&str, &str>> = OnceLock::new();
+    MAP.get_or_init(|| IRREGULAR_VERBS.iter().copied().collect())
+}
+
+/// Apply a morphological modifier to an NSM decomposition.
+fn apply_modifier(
+    decomposition: &[(SemanticPrime, f32)],
+    modifier: MorphModifier,
+) -> Vec<(SemanticPrime, f32)> {
+    match modifier {
+        MorphModifier::None => decomposition.to_vec(),
+        MorphModifier::FlipGoodBad => {
+            decomposition
+                .iter()
+                .map(|&(prime, weight)| match prime {
+                    SemanticPrime::Good => (SemanticPrime::Bad, weight),
+                    SemanticPrime::Bad => (SemanticPrime::Good, weight),
+                    other => (other, weight),
+                })
+                .collect()
+        }
+        MorphModifier::AddNot => {
+            let mut result = decomposition.to_vec();
+            result.push((SemanticPrime::Not, 0.7));
+            result
+        }
+        MorphModifier::AddSomeone => {
+            let mut result = decomposition.to_vec();
+            result.push((SemanticPrime::Someone, 0.5));
+            result
+        }
+        MorphModifier::AddBad => {
+            let mut result = decomposition.to_vec();
+            result.push((SemanticPrime::Bad, 0.5));
+            result
+        }
+    }
+}
+
+/// Generate candidate stems after stripping a suffix.
+///
+/// Handles common English spelling changes:
+/// - As-is: "helping" → strip -ing → "help"
+/// - Drop doubled consonant: "running" → strip -ing → "runn" → "run"
+/// - Add 'e': "caring" → strip -ing → "car" → "care"
+/// - Change final 'i' to 'y': "happily" → strip -ly → "happi" → "happy"
+fn generate_stem_candidates(raw_stem: &str, _suffix: &str) -> Vec<String> {
+    let mut candidates = Vec::with_capacity(4);
+    if raw_stem.is_empty() {
+        return candidates;
+    }
+
+    // 1. As-is
+    candidates.push(raw_stem.to_string());
+
+    let bytes = raw_stem.as_bytes();
+    let len = bytes.len();
+
+    // 2. Drop doubled final consonant (e.g., "runn" → "run")
+    if len >= 3 && bytes[len - 1] == bytes[len - 2] && !is_vowel(bytes[len - 1]) {
+        candidates.push(raw_stem[..len - 1].to_string());
+    }
+
+    // 3. Add 'e' (e.g., "car" → "care", "mak" → "make")
+    let mut with_e = raw_stem.to_string();
+    with_e.push('e');
+    candidates.push(with_e);
+
+    // 4. Change final 'i' to 'y' (e.g., "happi" → "happy")
+    if bytes[len - 1] == b'i' {
+        let mut with_y = raw_stem[..len - 1].to_string();
+        with_y.push('y');
+        candidates.push(with_y);
+    }
+
+    candidates
+}
+
+fn is_vowel(b: u8) -> bool {
+    matches!(b, b'a' | b'e' | b'i' | b'o' | b'u')
+}
+
+// ============================================================================
+// NsmLexicon
+// ============================================================================
+
 /// Maps words to weighted NSM prime decompositions.
 ///
 /// When a word is found in the lexicon, its HV is computed as a weighted
-/// bundle of its constituent prime HVs. Unknown words fall back to a
-/// deterministic hash (same strategy as `TextHdcEncoder::hash_word`).
+/// bundle of its constituent prime HVs. Unknown words are first checked
+/// against morphological rules (prefix/suffix stripping, irregular verbs)
+/// before falling back to a deterministic hash.
 pub struct NsmLexicon {
     entries: HashMap<String, Vec<(SemanticPrime, f32)>>,
 }
 
 impl NsmLexicon {
-    /// Build the lexicon with ~300+ morally-discriminative word entries.
+    /// Build the lexicon with ~320 morally-discriminative word entries.
     pub fn new() -> Self {
         let mut entries = HashMap::with_capacity(350);
 
@@ -614,6 +820,7 @@ impl NsmLexicon {
         Self::insert(&mut entries, "praise", &[(SemanticPrime::Say, 0.8), (SemanticPrime::Good, 0.9), (SemanticPrime::Someone, 0.5)]);
         Self::insert(&mut entries, "respect", &[(SemanticPrime::Feel, 0.7), (SemanticPrime::Good, 0.8), (SemanticPrime::Someone, 0.6)]);
         Self::insert(&mut entries, "trust", &[(SemanticPrime::Think, 0.6), (SemanticPrime::Good, 0.7), (SemanticPrime::Someone, 0.5), (SemanticPrime::True, 0.4)]);
+        Self::insert(&mut entries, "distrust", &[(SemanticPrime::Think, 0.6), (SemanticPrime::Bad, 0.5), (SemanticPrime::Someone, 0.5), (SemanticPrime::Not, 0.4), (SemanticPrime::True, 0.3)]);
         Self::insert(&mut entries, "neglect", &[(SemanticPrime::Not, 0.8), (SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.6), (SemanticPrime::Someone, 0.5)]);
         Self::insert(&mut entries, "demean", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.9), (SemanticPrime::Feel, 0.7), (SemanticPrime::Someone, 0.6)]);
         Self::insert(&mut entries, "undermine", &[(SemanticPrime::Do, 0.7), (SemanticPrime::Bad, 0.7), (SemanticPrime::Not, 0.5), (SemanticPrime::Good, 0.3)]);
@@ -931,9 +1138,10 @@ impl NsmLexicon {
 
     /// Encode a word as a ContinuousHV via its NSM decomposition.
     ///
-    /// If the word is in the lexicon, returns a weighted bundle of the
-    /// activated prime HVs. If not found, falls back to a deterministic
-    /// hash-based random HV.
+    /// Resolution order:
+    /// 1. Direct lexicon lookup (319+ hardcoded entries)
+    /// 2. Morphological analysis (prefix/suffix stripping, irregular verbs)
+    /// 3. Deterministic hash fallback (semantically blind but reproducible)
     pub fn encode_word(&self, word: &str, basis: &NsmPrimeBasis) -> ContinuousHV {
         let lower = word.to_lowercase();
         if let Some(decomposition) = self.entries.get(&lower) {
@@ -941,13 +1149,151 @@ impl NsmLexicon {
                 // Stop word: return zero vector (will not affect bundle)
                 return ContinuousHV::zero(HDC_DIMENSION);
             }
-            let hvs: Vec<&ContinuousHV> =
-                decomposition.iter().map(|(p, _)| basis.prime(*p)).collect();
-            let weights: Vec<f32> = decomposition.iter().map(|(_, w)| *w).collect();
-            ContinuousHV::weighted_bundle(&hvs, &weights)
+            Self::encode_from_decomposition(decomposition, basis)
+        } else if let Some(hv) = self.try_morphological(&lower, basis, 0) {
+            hv
         } else {
             Self::hash_word_static(&lower)
         }
+    }
+
+    /// Encode a decomposition as a weighted bundle of prime HVs.
+    fn encode_from_decomposition(
+        decomposition: &[(SemanticPrime, f32)],
+        basis: &NsmPrimeBasis,
+    ) -> ContinuousHV {
+        let hvs: Vec<&ContinuousHV> =
+            decomposition.iter().map(|(p, _)| basis.prime(*p)).collect();
+        let weights: Vec<f32> = decomposition.iter().map(|(_, w)| *w).collect();
+        ContinuousHV::weighted_bundle(&hvs, &weights)
+    }
+
+    /// Try morphological decomposition: irregular verbs → prefix stripping → suffix stripping.
+    ///
+    /// Recurses up to `depth` 2 to handle compound affixes (e.g., "unkindness").
+    fn try_morphological(
+        &self,
+        word: &str,
+        basis: &NsmPrimeBasis,
+        depth: u8,
+    ) -> Option<ContinuousHV> {
+        if depth > 2 || word.len() < 3 {
+            return None;
+        }
+
+        // 1. Irregular verb lookup
+        if let Some(&base) = irregular_map().get(word) {
+            if let Some(decomp) = self.entries.get(base) {
+                if !decomp.is_empty() {
+                    return Some(Self::encode_from_decomposition(decomp, basis));
+                }
+            }
+            // Base not in lexicon — try morphological on the base itself
+            if depth < 2 {
+                return self.try_morphological(base, basis, depth + 1);
+            }
+        }
+
+        // 2. Prefix stripping
+        for &(prefix, modifier) in PREFIXES {
+            if word.starts_with(prefix) && word.len() > prefix.len() + 2 {
+                let stem = &word[prefix.len()..];
+                if let Some(hv) = self.resolve_stem(stem, basis, depth, modifier) {
+                    return Some(hv);
+                }
+            }
+        }
+
+        // 3. Suffix stripping (longest-first)
+        for &(suffix, modifier) in SUFFIXES {
+            if word.ends_with(suffix) && word.len() > suffix.len() + 2 {
+                let raw_stem = &word[..word.len() - suffix.len()];
+                for candidate in generate_stem_candidates(raw_stem, suffix) {
+                    if let Some(hv) = self.resolve_stem(&candidate, basis, depth, modifier) {
+                        return Some(hv);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Try to resolve a stem: direct lexicon lookup, then recursive morphological.
+    fn resolve_stem(
+        &self,
+        stem: &str,
+        basis: &NsmPrimeBasis,
+        depth: u8,
+        modifier: MorphModifier,
+    ) -> Option<ContinuousHV> {
+        // Direct lexicon lookup
+        if let Some(decomp) = self.entries.get(stem) {
+            if !decomp.is_empty() {
+                let modified = apply_modifier(decomp, modifier);
+                return Some(Self::encode_from_decomposition(&modified, basis));
+            }
+        }
+        // Recursive: try to find the root decomposition via deeper morphological analysis.
+        // For compound affixes (e.g., "unkindness" → un- + kind + -ness), we need
+        // decomposition-level access to apply the modifier. Try to find the root
+        // word's lexicon entry by recursively stripping the stem.
+        if depth < 2 {
+            if let Some(root_decomp) = self.find_root_decomposition(stem, depth + 1) {
+                let modified = apply_modifier(&root_decomp, modifier);
+                return Some(Self::encode_from_decomposition(&modified, basis));
+            }
+        }
+        None
+    }
+
+    /// Recursively strip affixes to find the root word's lexicon decomposition.
+    /// Returns the decomposition (not HV) so callers can apply modifiers.
+    fn find_root_decomposition(
+        &self,
+        word: &str,
+        depth: u8,
+    ) -> Option<Vec<(SemanticPrime, f32)>> {
+        if depth > 2 || word.len() < 3 {
+            return None;
+        }
+
+        // Check irregular verbs
+        if let Some(&base) = irregular_map().get(word) {
+            if let Some(decomp) = self.entries.get(base) {
+                if !decomp.is_empty() {
+                    return Some(decomp.clone());
+                }
+            }
+        }
+
+        // Try suffix stripping to find a lexicon entry
+        for &(suffix, inner_modifier) in SUFFIXES {
+            if word.ends_with(suffix) && word.len() > suffix.len() + 2 {
+                let raw_stem = &word[..word.len() - suffix.len()];
+                for candidate in generate_stem_candidates(raw_stem, suffix) {
+                    if let Some(decomp) = self.entries.get(candidate.as_str()) {
+                        if !decomp.is_empty() {
+                            return Some(apply_modifier(decomp, inner_modifier));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try prefix stripping to find a lexicon entry
+        for &(prefix, inner_modifier) in PREFIXES {
+            if word.starts_with(prefix) && word.len() > prefix.len() + 2 {
+                let stem = &word[prefix.len()..];
+                if let Some(decomp) = self.entries.get(stem) {
+                    if !decomp.is_empty() {
+                        return Some(apply_modifier(decomp, inner_modifier));
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     /// Deterministic hash-based fallback for unknown words.
@@ -973,6 +1319,67 @@ impl NsmLexicon {
     /// Whether the lexicon is empty.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Load additional word decompositions from a JSON file.
+    ///
+    /// JSON format: `{ "words": { "generous": [["Good", 0.9], ["Have", 0.5]] } }`
+    ///
+    /// Returns the number of new words loaded. Existing lexicon entries are
+    /// never overwritten — hardcoded decompositions take priority.
+    pub fn load_external(&mut self, path: &std::path::Path) -> Result<usize, String> {
+        let contents = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+        let parsed: serde_json::Value = serde_json::from_str(&contents)
+            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+        let words = parsed
+            .get("words")
+            .and_then(|v| v.as_object())
+            .ok_or_else(|| "JSON must have a 'words' object at top level".to_string())?;
+
+        let mut loaded = 0usize;
+        for (word, decomp_val) in words {
+            let lower = word.to_lowercase();
+            if self.entries.contains_key(&lower) {
+                continue;
+            }
+            let decomp_arr = decomp_val
+                .as_array()
+                .ok_or_else(|| format!("Decomposition for '{}' must be an array", word))?;
+            let mut decomposition = Vec::with_capacity(decomp_arr.len());
+            for pair in decomp_arr {
+                let pair = pair
+                    .as_array()
+                    .ok_or_else(|| format!("Each prime-weight pair for '{}' must be [str, num]", word))?;
+                if pair.len() != 2 {
+                    return Err(format!("Bad pair length for '{}'", word));
+                }
+                let prime_str = pair[0]
+                    .as_str()
+                    .ok_or_else(|| format!("Prime name must be string for '{}'", word))?;
+                let weight = pair[1]
+                    .as_f64()
+                    .ok_or_else(|| format!("Weight must be number for '{}'", word))?
+                    as f32;
+                if !(0.0..=1.0).contains(&weight) {
+                    return Err(format!(
+                        "Weight {:.2} out of [0,1] for '{}'",
+                        weight, word
+                    ));
+                }
+                let prime: SemanticPrime = serde_json::from_value(
+                    serde_json::Value::String(prime_str.to_string()),
+                )
+                .map_err(|_| {
+                    format!("Unknown SemanticPrime '{}' for word '{}'", prime_str, word)
+                })?;
+                decomposition.push((prime, weight));
+            }
+            self.entries.insert(lower, decomposition);
+            loaded += 1;
+        }
+        Ok(loaded)
     }
 }
 
@@ -1249,10 +1656,42 @@ pub struct SpinozistClassifier {
 
 impl SpinozistClassifier {
     /// Construct a new classifier with default configuration.
+    ///
+    /// Automatically loads expanded lexicon from `data/nsm_lexicon_expanded.json`
+    /// if the file exists. The hardcoded lexicon entries always take priority.
     pub fn new() -> Self {
         let basis = NsmPrimeBasis::new();
         let affects = AffectBasis::new(&basis);
-        let lexicon = NsmLexicon::new();
+        let mut lexicon = NsmLexicon::new();
+
+        // Try to load expanded lexicon if available
+        let candidates = [
+            std::path::PathBuf::from("data/nsm_lexicon_expanded.json"),
+            std::path::PathBuf::from("symthaea/data/nsm_lexicon_expanded.json"),
+        ];
+        for path in &candidates {
+            if path.exists() {
+                match lexicon.load_external(path) {
+                    Ok(n) if n > 0 => {
+                        eprintln!(
+                            "[SpinozistClassifier] Loaded {} external lexicon entries from {}",
+                            n,
+                            path.display()
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        eprintln!(
+                            "[SpinozistClassifier] Warning: failed to load {}: {}",
+                            path.display(),
+                            e
+                        );
+                    }
+                }
+                break;
+            }
+        }
+
         Self {
             basis,
             affects,
@@ -1938,5 +2377,127 @@ mod tests {
         let fluct = compute_trajectory_fluctuatio(&trajectory);
         assert_eq!(fluct.max_tension, 0.0);
         assert!(!fluct.is_ambiguous);
+    }
+
+    // ---- Morphological analysis tests ----
+
+    #[test]
+    fn test_morphological_suffix_stripping() {
+        let lexicon = NsmLexicon::new();
+        let basis = NsmPrimeBasis::new();
+        // "protecting" should resolve close to "protect" via -ing stripping
+        let hv_base = lexicon.encode_word("protect", &basis);
+        let hv_derived = lexicon.encode_word("protecting", &basis);
+        let sim = hv_base.similarity(&hv_derived);
+        assert!(
+            sim > 0.90,
+            "'protecting' should be close to 'protect', sim={:.4}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_morphological_prefix_negation() {
+        let lexicon = NsmLexicon::new();
+        let basis = NsmPrimeBasis::new();
+        // "unkind" should differ from "kind" (Good↔Bad swap)
+        let hv_kind = lexicon.encode_word("kind", &basis);
+        let hv_unkind = lexicon.encode_word("unkind", &basis);
+        let sim = hv_kind.similarity(&hv_unkind);
+        assert!(
+            sim < 0.90,
+            "'unkind' should differ from 'kind', sim={:.4}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_morphological_irregular_verb() {
+        let lexicon = NsmLexicon::new();
+        let basis = NsmPrimeBasis::new();
+        // "thought" should resolve to "think" via irregular verb table
+        assert!(
+            lexicon.contains("think"),
+            "'think' should be in lexicon"
+        );
+        let hv_think = lexicon.encode_word("think", &basis);
+        let hv_thought = lexicon.encode_word("thought", &basis);
+        let sim = hv_think.similarity(&hv_thought);
+        assert!(
+            sim > 0.95,
+            "'thought' should resolve to 'think' via irregular table, sim={:.4}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_morphological_recursive_compound() {
+        let lexicon = NsmLexicon::new();
+        let basis = NsmPrimeBasis::new();
+        // "unkindness" needs 2 strips: -ness → "unkind" → un- → "kind" → flip
+        let hv = lexicon.encode_word("unkindness", &basis);
+        let hv_hash = NsmLexicon::hash_word_static("unkindness");
+        let sim_to_hash = hv.similarity(&hv_hash);
+        // Should NOT be the hash fallback (random)
+        assert!(
+            sim_to_hash < 0.5,
+            "'unkindness' should resolve via morphology, not hash fallback (sim to hash={:.4})",
+            sim_to_hash
+        );
+    }
+
+    #[test]
+    fn test_morphological_json_roundtrip() {
+        let mut lexicon = NsmLexicon::new();
+        let json = r#"{"words": {"generosity": [["Good", 0.9], ["Have", 0.5]]}}"#;
+        let dir = std::env::temp_dir();
+        let path = dir.join("test_nsm_lexicon.json");
+        std::fs::write(&path, json).unwrap();
+        let added = lexicon.load_external(&path).unwrap();
+        assert_eq!(added, 1, "should add 1 new word");
+        assert!(lexicon.contains("generosity"));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_morphological_json_rejects_unknown_prime() {
+        let mut lexicon = NsmLexicon::new();
+        let json = r#"{"words": {"xyzzy": [["FakePrime", 0.5]]}}"#;
+        let dir = std::env::temp_dir();
+        let path = dir.join("test_nsm_bad_prime.json");
+        std::fs::write(&path, json).unwrap();
+        let result = lexicon.load_external(&path);
+        assert!(result.is_err(), "should reject unknown prime");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_morphological_hash_fallback_preserved() {
+        let lexicon = NsmLexicon::new();
+        let basis = NsmPrimeBasis::new();
+        // Completely unknown word should still get a deterministic non-zero HV
+        let hv1 = lexicon.encode_word("xyzzyplugh", &basis);
+        let hv2 = lexicon.encode_word("xyzzyplugh", &basis);
+        let norm: f32 = hv1.values.iter().map(|v| v * v).sum::<f32>().sqrt();
+        assert!(norm > 0.1, "hash fallback should produce non-zero HV");
+        let sim = hv1.similarity(&hv2);
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "same unknown word should produce identical HV"
+        );
+    }
+
+    #[test]
+    fn test_morphological_existing_lexicon_regression() {
+        let lexicon = NsmLexicon::new();
+        let basis = NsmPrimeBasis::new();
+        // "steal" should still encode identically (regression guard)
+        let hv1 = lexicon.encode_word("steal", &basis);
+        let hv2 = lexicon.encode_word("steal", &basis);
+        let sim = hv1.similarity(&hv2);
+        assert!(
+            (sim - 1.0).abs() < 0.0001,
+            "existing lexicon word should be deterministic"
+        );
     }
 }
