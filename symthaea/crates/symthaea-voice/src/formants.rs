@@ -41,11 +41,10 @@ pub fn phonemes_to_frames(
 
         // Energy from stress and prosody
         let energy = if phoneme.ipa == " " {
-            0.0 // silence during pauses
+            0.0
         } else {
-            let base_energy = 0.3 + phoneme.stress as f32 * 0.3;
-            // Serotonin → breathier (lower energy, more aspiration)
-            base_energy * (1.0 - prosody.serotonin * 0.3)
+            let base_energy = 0.7 + phoneme.stress as f32 * 0.3; // louder base
+            base_energy * (1.0 - prosody.serotonin * 0.2)
         };
 
         // Voicing (vowels and voiced consonants are voiced)

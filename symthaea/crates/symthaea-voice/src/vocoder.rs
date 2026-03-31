@@ -99,7 +99,7 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                 filtered = resonate(&mut res[i], filtered, freq, bw, sr);
             }
 
-            output.push(filtered * 0.3); // master volume
+            output.push(filtered * 15.0); // master volume (resonators attenuate heavily)
         }
     }
 
