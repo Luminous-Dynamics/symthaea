@@ -85,24 +85,28 @@ impl LtcVoice {
             let duration_ms = base_dur * stress_stretch / rate_factor;
             let num_frames = (duration_ms / 1000.0 * frame_rate).max(1.0) as usize;
 
-            // Build cognitive state for the encoder
-            // This maps consciousness → HDC vector → LTC input
+            // Build cognitive state WITH phoneme identity encoded
+            // The key insight: each phoneme must produce a DIFFERENT input vector
+            // so the LTC evolves toward different formant targets
+            let (target_f1, target_f2, _target_f3, _) = crate::formants::formant_target_pub(phoneme.ipa);
+
             let cognitive_state = symthaea_vocal_tract::encoder::VoiceCognitiveState {
-                prediction_error: prosody.arousal * 0.5, // arousal ~ prediction error
-                emotional_valence: prosody.valence,
+                // Encode phoneme identity via formant targets normalized to [0,1]
+                prediction_error: target_f1 / 1000.0, // F1 as "prediction error" drives LTC
+                emotional_valence: prosody.valence + (target_f2 - 1500.0) / 3000.0, // F2 offset
                 emotional_arousal: prosody.arousal,
                 unified_quality: prosody.consciousness,
-                epistemic_confidence: 0.8,
-                coherence_velocity: 0.0,
-                cross_agreement: 0.7,
+                epistemic_confidence: if phoneme.is_vowel { 0.9 } else { 0.4 }, // vowels = confident
+                coherence_velocity: (target_f2 - target_f1) / 2000.0, // F2-F1 gap as velocity
+                cross_agreement: if phoneme.stress > 0 { 0.9 } else { 0.5 },
                 consciousness_level: prosody.consciousness,
-                articulation_quality: 0.6,
-                rate_stability: 0.8,
+                articulation_quality: if phoneme.is_vowel { 0.8 } else { 0.5 },
+                rate_stability: 0.8 - progress * 0.3, // decreasing over utterance
                 integrated_phi: prosody.consciousness * 1.5,
-                expected_free_energy: (1.0 - prosody.consciousness) * 2.0,
+                expected_free_energy: target_f1 / 500.0, // F1-driven free energy
             };
 
-            // Encode to 16,384D HV
+            // Encode to 16,384D HV — now different for each phoneme
             let hv = self.encoder.encode(&cognitive_state);
 
             // Evolve LTC for each frame in this phoneme

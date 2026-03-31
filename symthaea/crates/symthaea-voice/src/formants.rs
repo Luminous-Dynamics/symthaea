@@ -89,6 +89,10 @@ pub fn phonemes_to_frames(
 
 /// Map IPA phoneme to formant targets (F1, F2, F3, source type).
 /// Values from Peterson & Barney (1952) and Hillenbrand et al. (1995).
+pub fn formant_target_pub(ipa: &str) -> (f32, f32, f32, SourceType) {
+    formant_target(ipa)
+}
+
 fn formant_target(ipa: &str) -> (f32, f32, f32, SourceType) {
     match ipa {
         // Vowels (Peterson & Barney)
