@@ -301,15 +301,15 @@ pub fn setup_globe_view(
             all_markers.push((s.lat, s.lon, s.capacity_mw, [nc[0] * 0.5, nc[1] * 0.5, nc[2] * 0.5]));
         }
 
-        let clusters = terra_atlas_core::lod::cluster_markers(&all_markers, 6, 12);
+        let clusters = terra_atlas_core::lod::cluster_markers(&all_markers, 4, 8); // coarser = fewer blobs
         let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
         for cell in &clusters {
             let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.01);
             let size = terra_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.35),
-                emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
+                base_color: Color::linear_rgba(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 0.15),
+                emissive: LinearRgba::new(c[0] * 0.1, c[1] * 0.1, c[2] * 0.1, 1.0),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
