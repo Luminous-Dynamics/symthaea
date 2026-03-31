@@ -32,8 +32,15 @@ fn main() {
             serotonin: 0.5,
         };
 
-        println!("  \"{text}\"  (a={arousal} v={valence} Ψ={consciousness})");
-        let audio = symthaea_voice::speak(text, &prosody, sr);
+        // Use Kokoro when available, otherwise Formant
+        let engine = if cfg!(feature = "kokoro") {
+            symthaea_voice::VoiceEngine::Kokoro
+        } else {
+            symthaea_voice::VoiceEngine::Formant
+        };
+        let engine_name = if cfg!(feature = "kokoro") { "Kokoro" } else { "Formant" };
+        println!("  \"{text}\"  (a={arousal} v={valence} Ψ={consciousness}) [{engine_name}]");
+        let audio = symthaea_voice::speak_with_engine(text, &prosody, sr, engine);
         println!("    → {} samples ({:.1}ms)", audio.len(), audio.len() as f32 / sr as f32 * 1000.0);
 
         all_audio.extend_from_slice(&audio);
