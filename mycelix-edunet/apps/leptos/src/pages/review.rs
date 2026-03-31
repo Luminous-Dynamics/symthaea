@@ -27,6 +27,7 @@ enum CardSource {
     MatricPhysics,
     MatricChemistry,
     Grade9Foundations,
+    DynamicSubject(String), // Generated from curriculum graph for any subject
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +66,62 @@ struct MockFlashcard {
     back: &'static str,
     tags: &'static str,
     mastery_permille: u16,
+}
+
+/// Dynamic flashcard generated from curriculum graph nodes
+#[derive(Clone, Debug)]
+struct DynamicFlashcard {
+    front: String,
+    back: String,
+    tags: String,
+    mastery_permille: u16,
+}
+
+/// Generate flashcards from curriculum nodes for a given subject
+fn generate_dynamic_cards(subject: &str) -> Vec<MockFlashcard> {
+    // We can't return MockFlashcard (static refs) from dynamic data,
+    // so we'll use a leaked string approach for compatibility
+    let graph = crate::curriculum::caps_graph();
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+        .unwrap_or_default();
+
+    let mut cards: Vec<MockFlashcard> = Vec::new();
+
+    for node in &graph.nodes {
+        if node.subject_area != subject { continue; }
+
+        let bkt = progress.bkt(&node.id);
+        let mastery = (bkt.p_mastery * 1000.0) as u16;
+
+        // Card 1: What is [topic]?
+        let front = format!("What is {}?", node.title);
+        let back = if node.description.len() > 150 {
+            format!("{}...", &node.description[..147])
+        } else {
+            node.description.clone()
+        };
+        let tags = format!("{} · {}", node.subject_area,
+            node.grade_levels.first().cloned().unwrap_or_default());
+
+        // Leak strings so they have 'static lifetime (acceptable for single-session app)
+        let front_static: &'static str = Box::leak(front.into_boxed_str());
+        let back_static: &'static str = Box::leak(back.into_boxed_str());
+        let tags_static: &'static str = Box::leak(tags.into_boxed_str());
+
+        cards.push(MockFlashcard {
+            front: front_static,
+            back: back_static,
+            tags: tags_static,
+            mastery_permille: mastery,
+        });
+    }
+
+    // Shuffle by mastery (weakest first — prioritize what needs review)
+    cards.sort_by_key(|c| c.mastery_permille);
+
+    // Cap at 20 cards per session
+    cards.truncate(20);
+    cards
 }
 
 /// Generate flashcards for CAPS Matric Mathematics.
@@ -268,6 +325,7 @@ pub fn ReviewPage() -> impl IntoView {
                 CardSource::MatricPhysics => generate_science_cards(),
                 CardSource::MatricChemistry => generate_chemistry_cards(),
                 CardSource::Grade9Foundations => generate_foundations_cards(),
+                CardSource::DynamicSubject(subject) => generate_dynamic_cards(subject),
             };
             cards.set_value(deck);
             set_card_source.set(Some(source));
@@ -421,6 +479,39 @@ pub fn ReviewPage() -> impl IntoView {
                                     <span class="source-label">"Gr9 Foundations"</span>
                                     <span class="source-meta">"12 cards"</span>
                                 </button>
+                            </div>
+                            // Dynamic decks from curriculum subjects
+                            <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1.5rem; margin-bottom: 0.75rem">"More Subjects"</h3>
+                            <div class="source-cards" style="gap: 0.5rem">
+                                {
+                                    let graph = crate::curriculum::caps_graph();
+                                    let mut subjects: Vec<(String, usize)> = graph.subjects().iter()
+                                        .filter(|s| !["Mathematics", "Physical Sciences", "Natural Sciences"].contains(s))
+                                        .map(|s| {
+                                            let count = graph.nodes.iter().filter(|n| n.subject_area == *s).count();
+                                            (s.to_string(), count)
+                                        })
+                                        .filter(|(_, c)| *c >= 2)
+                                        .collect();
+                                    subjects.sort_by(|a, b| b.1.cmp(&a.1));
+                                    subjects.truncate(12);
+
+                                    subjects.into_iter().map(|(subject, count)| {
+                                        let subj = subject.clone();
+                                        let label = if subject.len() > 20 { format!("{}...", &subject[..18]) } else { subject.clone() };
+                                        let select = select_source.clone();
+                                        view! {
+                                            <button
+                                                class="source-card"
+                                                style="padding: 0.6rem 0.75rem; min-height: auto"
+                                                on:click=move |_| select(CardSource::DynamicSubject(subj.clone()))
+                                            >
+                                                <span class="source-label" style="font-size: 0.8rem">{label}</span>
+                                                <span class="source-meta">{count}" topics"</span>
+                                            </button>
+                                        }
+                                    }).collect::<Vec<_>>()
+                                }
                             </div>
                         </div>
                     }.into_any();
