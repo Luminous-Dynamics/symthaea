@@ -4026,3 +4026,4 @@ pub mod live_metrics;
 pub mod config_loader;
 pub mod stoichiometry;
 pub mod relativistic_dht;
+pub mod epistemic_decay;

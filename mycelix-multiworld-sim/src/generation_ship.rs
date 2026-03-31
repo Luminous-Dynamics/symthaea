@@ -36,6 +36,7 @@
 use crate::stochastic::StochasticEngine;
 use crate::stoichiometry::ElementalLedger;
 use crate::relativistic_dht::RelativisticReconciliation;
+use crate::epistemic_decay::EpistemicState;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -175,6 +176,8 @@ pub struct GenerationShip {
     pub mass_ledger: ElementalLedger,
     /// Relativistic timestamp reconciliation for Holochain DHT.
     pub relativistic: RelativisticReconciliation,
+    /// Epistemic decay: knowledge degrades from radiation and isolation.
+    pub epistemic: EpistemicState,
 }
 
 impl GenerationShip {
@@ -209,6 +212,7 @@ impl GenerationShip {
             launch_population,
             mass_ledger: ElementalLedger::for_ship(launch_population, transit_years),
             relativistic: RelativisticReconciliation::new(cruise_velocity_c),
+            epistemic: EpistemicState::default(),
         }
     }
 
@@ -269,6 +273,18 @@ impl GenerationShip {
         // Relativistic clock drift
         let earth_years = self.elapsed_ticks as f64 / TICKS_PER_YEAR;
         self.relativistic.tick(earth_years);
+
+        // Epistemic decay: knowledge degrades from cosmic rays and isolation
+        let tech_levels = [1.5; 8]; // Approximate tech levels (real values from World)
+        let energy_fraction = self.fuel_fraction.min(1.0); // Energy proxy
+        let outside_helio = self.elapsed_ticks > 24; // ~2 years to exit heliosphere
+        self.epistemic.tick(
+            pop_estimate,
+            self.cosmic_ray_dose,
+            outside_helio,
+            energy_fraction,
+            &tech_levels,
+        );
 
         // === INTERSTELLAR DISASTERS ===
 
@@ -385,7 +401,8 @@ impl GenerationShip {
         );
         result.push_str(&format!(
             "\nMass Ledger:\n  C: {:.0} kg | N: {:.0} kg | O: {:.0} kg | P: {:.0} kg\n  Water: {:.0} kg | Lost to void: {:.1} kg\n  Limiting element: {} | Max sustainable: {}\n  Recycling efficiency: {:.1}%\n\
-             Relativistic:\n  {}\n",
+             Relativistic:\n  {}\n\
+             Epistemic:\n  {}\n",
             self.mass_ledger.carbon_kg,
             self.mass_ledger.nitrogen_kg,
             self.mass_ledger.oxygen_kg,
@@ -396,6 +413,7 @@ impl GenerationShip {
             self.mass_ledger.max_sustainable_population,
             self.mass_ledger.recycling_efficiency * 100.0,
             self.relativistic.summary(),
+            self.epistemic.summary(),
         ));
         result
     }
