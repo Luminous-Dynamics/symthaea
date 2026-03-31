@@ -4758,6 +4758,47 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* ===========================================================================
+   Career Pathways
+   =========================================================================== */
+
+.pathway-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: var(--text);
+    transition: border-color 0.2s, transform 0.15s;
+    width: 100%;
+}
+
+.pathway-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.pathway-node {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+    transition: background 0.15s, border-color 0.2s;
+    border-radius: 0 6px 6px 0;
+}
+
+.pathway-node:hover {
+    background: var(--surface-hover);
+}
+
+/* ===========================================================================
    Mastery Heat Map (dashboard)
    =========================================================================== */
 

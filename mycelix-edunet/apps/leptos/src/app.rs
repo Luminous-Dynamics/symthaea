@@ -69,6 +69,7 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/study/:id") view=StudyPageWrapper />
                     <Route path=path!("/exam-prep") view=ExamPrepPage />
                     <Route path=path!("/mock-exam") view=MockExamPage />
+                    <Route path=path!("/pathways") view=PathwaysPage />
                     <Route path=path!("/teacher") view=TeacherDashboardPage />
                     <Route path=path!("/governance") view=GovernancePage />
                     <Route path=path!("/credentials") view=CredentialsPage />
