@@ -152,8 +152,8 @@ pub fn setup_globe_view(
     // [7] Holographic projection base — subtle dark glass disc
     let base_mesh = meshes.add(Sphere::new(1.2).mesh().uv(32, 4));
     let base_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.02, 0.06, 0.08, 0.6), // dark obsidian glass
-        emissive: LinearRgba::new(0.0, 0.03, 0.04, 1.0), // very faint glow
+        base_color: Color::linear_rgba(0.01, 0.03, 0.04, 0.4), // darker obsidian
+        emissive: LinearRgba::new(0.0, 0.015, 0.02, 1.0), // barely visible glow
         perceptual_roughness: 0.1, // polished — catches reflections
         metallic: 0.8,
         alpha_mode: AlphaMode::Blend,
@@ -259,23 +259,40 @@ pub fn setup_globe_view(
         marker_count += 1;
     }
 
-    // Energy site heat blobs (visible when zoomed out)
+    // Heat blob clustering for ALL marker types (visible when zoomed out)
     {
-        let energy_markers: Vec<(f64, f64, f64, [f32; 3])> = data.sites.iter()
-            .map(|s| {
-                let c = s.energy_type.rgb();
-                (s.lat, s.lon, s.capacity_mw, [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6])
-            })
-            .collect();
-        let clusters = terra_atlas_core::lod::cluster_markers(&energy_markers, 8, 16);
-        let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
+        let mut all_markers: Vec<(f64, f64, f64, [f32; 3])> = Vec::new();
+        // Energy
+        for s in &data.sites {
+            let c = s.energy_type.rgb();
+            all_markers.push((s.lat, s.lon, s.capacity_mw, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5]));
+        }
+        // Geothermal
+        let gc = Layer::Geothermal.rgb();
+        for n in &data.geothermal_nodes {
+            all_markers.push((n.lat, n.lon, n.capacity_mw, [gc[0] * 0.5, gc[1] * 0.5, gc[2] * 0.5]));
+        }
+        // Fossil
+        for d in &data.fossil_deposits {
+            let eroi = terra_atlas_core::economics::compute_eroi(d).unwrap_or(5.0);
+            let c = terra_atlas_core::economics::eroi_color(eroi);
+            all_markers.push((d.lat, d.lon, d.proven_reserves_mboe * 0.01, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5]));
+        }
+        // Nuclear
+        let nc = Layer::Nuclear.rgb();
+        for s in &data.nuclear_sites {
+            all_markers.push((s.lat, s.lon, s.capacity_mw, [nc[0] * 0.5, nc[1] * 0.5, nc[2] * 0.5]));
+        }
+
+        let clusters = terra_atlas_core::lod::cluster_markers(&all_markers, 6, 12);
+        let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
         for cell in &clusters {
             let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.01);
             let size = terra_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.6),
-                emissive: LinearRgba::new(c[0] * 0.4, c[1] * 0.4, c[2] * 0.4, 1.0),
+                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.5),
+                emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()
@@ -284,7 +301,7 @@ pub fn setup_globe_view(
                 Mesh3d(blob_mesh.clone()),
                 MeshMaterial3d(mat),
                 Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-                OrbitLod, // only visible when zoomed out
+                OrbitLod,
                 AtlasEntity,
             ));
         }
@@ -306,6 +323,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Geothermal, name: node.name.clone() },
+            SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
         ));
@@ -327,6 +345,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.022)),
             DataMarker { layer: Layer::TerraLumina, name: site.name.clone() },
+            SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
         ));
@@ -348,6 +367,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.016)),
             DataMarker { layer: Layer::ResontiaVaults, name: vault.name.clone() },
+            SurfaceLod,
             TimelineLayer::Vault(i),
             AtlasEntity,
         ));
@@ -373,6 +393,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::FossilDeposits, name: deposit.name.clone() },
+            SurfaceLod,
             TimelineLayer::Fossil,
             AtlasEntity,
         ));
@@ -396,6 +417,7 @@ pub fn setup_globe_view(
                 MeshMaterial3d(halo_mat),
                 Transform::from_xyz(pos[0], pos[1], pos[2])
                     .with_scale(Vec3::splat(halo_radius)),
+                SurfaceLod,
                 TimelineLayer::Fossil,
                 AtlasEntity,
             ));
@@ -421,6 +443,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Nuclear, name: site.name.clone() },
+            SurfaceLod,
             TimelineLayer::Nuclear,
             AtlasEntity,
         ));
