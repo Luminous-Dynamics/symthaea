@@ -14,6 +14,7 @@
 
 pub mod g2p;
 pub mod formants;
+pub mod ltc_voice;
 pub mod vocoder;
 
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
