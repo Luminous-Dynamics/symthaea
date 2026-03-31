@@ -1,0 +1,20 @@
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+---
+data_root_path: /var/lib/mycelix-edunet/conductor
+
+keystore:
+  type: lair_server_in_proc
+  lair_root: /var/lib/mycelix-edunet/lair
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8207
+      allowed_origins: "*"
+
+network:
+  bootstrap_url: https://bootstrap.holo.host
+  signal_url: wss://signal.holo.host
+  transport_pool:
+    - type: quic
