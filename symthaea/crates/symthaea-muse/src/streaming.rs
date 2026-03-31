@@ -871,8 +871,12 @@ impl StreamingSynth {
                 let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
                 let ctx = self.lead_voice.melodic_context(phrase_pos, self.chord_beat_counter);
 
-                // Taste-optimized melody: clean generator that targets the benchmark
-                // Replaces 6 competing systems with one that guarantees good scores
+                // Phrasing: insert rests for breathing space (15-25% of the time)
+                if self.taste_melody.should_rest() {
+                    continue; // skip this note — silence is music too
+                }
+
+                // Taste-optimized melody with phrasing and dynamics
                 let taste_scale = crate::taste_melody::build_scale_with(
                     chord.root_semitones, gesture.prefer_major,
                     self.taste_melody.params.scale_center_hz,

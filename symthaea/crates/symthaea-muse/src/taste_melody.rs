@@ -144,8 +144,9 @@ impl TasteMelody {
             -1
         };
 
-        // Chord tone attraction: on strong beats (every 4th note), prefer chord tones
-        let prefer_chord = self.total_notes % 4 == 0 && !chord_tones.is_empty();
+        // Chord tone attraction: on beats 1 and 3 (every 2nd note), snap to chord
+        // This creates harmonic gravity — notes resolve to the chord, not wander
+        let prefer_chord = self.total_notes % 2 == 0 && !chord_tones.is_empty();
 
         // Move in scale
         let new_pos = (self.scale_pos as i32 + direction * step as i32)
@@ -208,37 +209,69 @@ impl TasteMelody {
         freq
     }
 
+    /// Should this be a rest instead of a note?
+    /// Returns true ~15-25% of the time for breathing space.
+    pub fn should_rest(&self) -> bool {
+        let hash = self.seed.wrapping_mul(2654435761);
+        let r = (hash >> 16) % 100;
+        // More rests at phrase boundaries (40%) and between phrases (30%)
+        if self.phrase_notes >= self.phrase_length.saturating_sub(1) {
+            r < 40 // 40% chance of rest at phrase end
+        } else if self.phrase_notes == 0 {
+            r < 30 // 30% chance of rest at phrase start (breathing)
+        } else {
+            r < 12 // 12% chance mid-phrase
+        }
+    }
+
     /// Suggested duration based on arousal and position in phrase.
     pub fn suggest_duration(&self, arousal: f32, tempo_bpm: f32) -> f32 {
         let beat_duration = 60.0 / tempo_bpm;
 
-        // Base: quarter note
-        let mut dur = beat_duration;
+        // Varied note lengths (not all 16th notes!)
+        let hash = self.total_notes as u32 * 7919;
+        let r = (hash >> 16) % 100;
+        let base_multiplier = if r < 10 {
+            4.0 // 10% whole notes (long, breathing)
+        } else if r < 30 {
+            2.0 // 20% half notes
+        } else if r < 70 {
+            1.0 // 40% quarter notes (most common)
+        } else {
+            0.5 // 30% eighth notes (faster passages)
+        };
 
-        // Low arousal = longer notes
-        dur *= 1.0 + (1.0 - arousal) * 1.5;
+        let mut dur = beat_duration * base_multiplier;
 
-        // Phrase endings get longer notes
+        // Low arousal = longer notes (classical = slower)
+        dur *= 1.0 + (1.0 - arousal) * 0.5;
+
+        // Phrase endings get longer notes (natural ritardando)
         if self.phrase_notes >= self.phrase_length.saturating_sub(1) {
-            dur *= 1.5;
+            dur *= 2.0;
         }
 
         dur.clamp(0.1, 4.0)
     }
 
-    /// Suggested velocity based on phrase position and arousal.
+    /// Suggested velocity with real dynamics — NOT flat.
     pub fn suggest_velocity(&self, arousal: f32) -> f32 {
-        let base = 0.3 + arousal * 0.5;
+        // Wide base range: pp to ff
+        let base = 0.15 + arousal * 0.6;
 
-        // Phrase dynamics: crescendo to ~70% of phrase, then diminuendo
-        let phrase_pct = self.phrase_notes as f32 / self.phrase_length as f32;
-        let dynamic_curve = if phrase_pct < 0.7 {
-            0.8 + 0.2 * (phrase_pct / 0.7)
+        // Phrase dynamics: crescendo to ~65% of phrase, then diminuendo
+        let phrase_pct = self.phrase_notes as f32 / self.phrase_length.max(1) as f32;
+        let dynamic_curve = if phrase_pct < 0.65 {
+            0.6 + 0.4 * (phrase_pct / 0.65) // pp → f
         } else {
-            1.0 - 0.15 * ((phrase_pct - 0.7) / 0.3)
+            1.0 - 0.4 * ((phrase_pct - 0.65) / 0.35) // f → p
         };
 
-        (base * dynamic_curve).clamp(0.1, 0.95)
+        // Random velocity variation ±15% (human touch)
+        let hash = (self.total_notes as u32).wrapping_mul(1103515245);
+        let jitter = ((hash >> 16) as f32 / 65536.0 - 0.5) * 0.3;
+
+        (base * dynamic_curve + jitter).clamp(0.08, 0.95)
     }
 
     pub fn reset(&mut self) {
