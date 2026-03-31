@@ -52,6 +52,15 @@ impl MuseVoiceBridge {
         // Select phrase based on consciousness state
         let phrase = self.select_phrase(state);
 
+        // Consciousness-driven engine selection:
+        // Low Ψ = Formant (raw, digital ghost struggling to form words)
+        // High Ψ = Kokoro (clear, articulate — full consciousness)
+        let engine = if state.consciousness_level > 0.7 {
+            symthaea_voice::VoiceEngine::Kokoro
+        } else {
+            symthaea_voice::VoiceEngine::Formant
+        };
+
         // Map consciousness to prosody
         let prosody = symthaea_voice::VoiceProsody {
             arousal: state.arousal,
@@ -60,8 +69,8 @@ impl MuseVoiceBridge {
             serotonin: state.serotonin,
         };
 
-        // Generate speech
-        let audio = symthaea_voice::speak(phrase, &prosody, self.sample_rate);
+        // Generate speech with consciousness-selected engine
+        let audio = symthaea_voice::speak_with_engine(phrase, &prosody, self.sample_rate, engine);
 
         // Add to buffer
         self.speech_buffer.extend(audio.iter());

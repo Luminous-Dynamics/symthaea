@@ -28,6 +28,7 @@ serde_json = { workspace = true }
 default = []
 muse-live = ["cpal", "ringbuf"]
 voice = ["symthaea-voice"]
+voice-kokoro = ["voice", "symthaea-voice/kokoro"]
 
 [[example]]
 name = "live_demo"
