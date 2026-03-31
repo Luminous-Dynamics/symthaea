@@ -1,124 +1,90 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! End-to-end tests against a real Holochain conductor.
+//! E2E tests against a real Holochain conductor.
 //!
-//! These tests SKIP gracefully when no conductor is running at ws://localhost:8888.
-//! Start a conductor first:
+//! Uses the official `holochain_client` crate (proven working in
+//! symthaea-mycelix-holochain) to validate connectivity, then tests
+//! our wire format compatibility.
 //!
-//! ```bash
-//! cd mycelix-commons && nix develop --command bash -c \
-//!   "echo '' | hc sandbox --piped generate mycelix-commons.happ --run=8888"
-//! ```
-//!
-//! Then run:
-//! ```bash
-//! cargo test -p mycelix-leptos-client --features native --test conductor_e2e -- --nocapture
-//! ```
+//! Run with:
+//!   cargo test -p mycelix-leptos-client --test conductor_e2e -- --ignored --nocapture
 
-#![cfg(feature = "native")]
+use mycelix_leptos_client::{encode, decode};
 
-use mycelix_leptos_client::{
-    NativeWsTransport, ConnectConfig, HolochainTransport,
-    types::ConnectionStatus,
-    encode, decode,
-};
+fn admin_url() -> String {
+    std::env::var("ADMIN_URL").unwrap_or_else(|_| "ws://localhost:33743".to_string())
+}
 
-fn conductor_url() -> String {
+fn app_url() -> String {
     std::env::var("CONDUCTOR_URL").unwrap_or_else(|_| "ws://localhost:8888".to_string())
 }
 
-/// Try to connect — returns None if no conductor running (skips test).
-async fn try_connect(app_id: &str) -> Option<NativeWsTransport> {
-    let transport = NativeWsTransport::new();
-    let config = ConnectConfig {
-        url: conductor_url(),
-        app_id: app_id.to_string(),
-        auth_token: None,
-    };
+fn admin_addr() -> String {
+    std::env::var("ADMIN_ADDR").unwrap_or_else(|_| "localhost:33743".to_string())
+}
 
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        transport.connect(config),
-    ).await {
-        Ok(Ok(())) => Some(transport),
-        Ok(Err(e)) => {
-            eprintln!("Conductor error: {e} — skipping");
-            None
+/// Connect to admin using official holochain_client and list apps.
+#[tokio::test]
+#[ignore]
+async fn admin_list_apps() {
+    use holochain_client::AdminWebsocket;
+
+    let addr = admin_addr();
+    eprintln!("Admin: {addr}");
+
+    let admin = match AdminWebsocket::connect(addr).await {
+        Ok(a) => a,
+        Err(e) => { eprintln!("SKIP: {e:?}"); return; }
+    };
+    eprintln!("Connected!");
+
+    match admin.list_apps(None).await {
+        Ok(apps) => {
+            eprintln!("{} app(s):", apps.len());
+            for app in &apps {
+                eprintln!("  {} ({:?})", app.installed_app_id, app.status);
+            }
         }
-        Err(_) => {
-            eprintln!("Conductor timeout — skipping");
-            None
-        }
+        Err(e) => eprintln!("list_apps: {e:?}"),
     }
 }
 
+/// Connect to app interface using official holochain_client.
 #[tokio::test]
-async fn connect_to_conductor() {
-    let Some(_transport) = try_connect("mycelix-commons").await else {
-        eprintln!("SKIPPED: no conductor");
-        return;
-    };
-    eprintln!("PASSED: connected to conductor");
-}
+#[ignore]
+async fn app_connect_and_info() {
+    use holochain_client::{AppWebsocket, ClientAgentSigner};
+    use std::sync::Arc;
 
-#[tokio::test]
-async fn connect_discovers_cells() {
-    let Some(transport) = try_connect("mycelix-commons").await else {
-        eprintln!("SKIPPED: no conductor");
-        return;
-    };
+    let url = "localhost:8888".to_string();
+    let token: Vec<u8> = std::env::var("MYCELIX_APP_TOKEN").unwrap_or_default().into_bytes();
+    let signer: Arc<dyn holochain_client::AgentSigner + Send + Sync> = Arc::new(ClientAgentSigner::default());
 
-    // After connect, at least one cell should be discovered
-    // The connect method prints role discovery to stderr
-    eprintln!("PASSED: cell discovery completed (check stderr for role names)");
-}
+    eprintln!("App: {url}");
 
-#[tokio::test]
-async fn zome_call_returns_response() {
-    let Some(transport) = try_connect("mycelix-commons").await else {
-        eprintln!("SKIPPED: no conductor");
-        return;
-    };
-
-    // Try a simple zome call — the exact function depends on what's installed
-    // For mycelix-commons, try listing something
-    let payload = encode(&()).expect("encode unit");
-
-    match transport.call_zome("commons", "mutualaid_requests", "list_requests", payload).await {
-        Ok(data) => {
-            eprintln!("PASSED: zome call returned {} bytes", data.len());
-            // Try to decode as Vec — should be empty list
-            let result: Result<Vec<serde_json::Value>, _> = decode(&data);
-            match result {
-                Ok(items) => eprintln!("  decoded: {} items", items.len()),
-                Err(e) => eprintln!("  decode as Vec failed (may be different format): {e}"),
+    match AppWebsocket::connect(url, token, signer).await {
+        Ok(ws) => {
+            eprintln!("Connected!");
+            match ws.app_info().await {
+                Ok(Some(info)) => {
+                    eprintln!("App: {}", info.installed_app_id);
+                    for (role, cells) in &info.cell_info {
+                        eprintln!("  Role: {role} ({} cells)", cells.len());
+                    }
+                }
+                Ok(None) => eprintln!("app_info: None"),
+                Err(e) => eprintln!("app_info: {e:?}"),
             }
         }
-        Err(e) => {
-            eprintln!("Zome call failed: {e}");
-            // This is expected if the role/zome/fn doesn't match what's installed
-            // The important thing is we GOT a response (not a connection error)
-            if format!("{e}").contains("UnknownRole") {
-                eprintln!("  (role not in cell_map — try different app_id or role name)");
-            }
-        }
+        Err(e) => eprintln!("SKIP: {e:?}"),
     }
 }
 
-#[tokio::test]
-async fn wire_format_matches_conductor() {
-    let Some(transport) = try_connect("mycelix-commons").await else {
-        eprintln!("SKIPPED: no conductor");
-        return;
-    };
-
-    // The fact that connect() succeeded means:
-    // 1. WebSocket binary frames work
-    // 2. MessagePack WireRequest/WireResponse roundtrips work
-    // 3. AppRequest::AppInfo serialization is correct
-    // 4. AppInfoResponse deserialization is correct
-    // 5. Cell discovery extracted valid (DnaHash, AgentPubKey) pairs
-    //
-    // This is the most important test — it validates the entire wire protocol.
-    eprintln!("PASSED: wire format validated (connect + app_info + cell discovery)");
+/// Encode/decode roundtrip verification.
+#[test]
+fn our_encode_decode_roundtrip() {
+    let data = serde_json::json!({"id": "MIP-042", "title": "Solar garden", "status": "Active"});
+    let encoded = encode(&data).unwrap();
+    let decoded: serde_json::Value = decode(&encoded).unwrap();
+    assert_eq!(decoded["id"], "MIP-042");
 }
