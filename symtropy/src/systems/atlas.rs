@@ -23,6 +23,13 @@ pub struct SurfaceLod;
 #[derive(Component)]
 pub struct OrbitLod;
 
+/// 4D temporal position for a marker — W coordinate = year.
+/// When 4D mode is active, markers fade based on distance from the timeline slice.
+#[derive(Component)]
+pub struct TemporalW {
+    pub year: f64,
+}
+
 use crate::resources::GamePhase;
 
 /// Marker for all atlas-spawned entities so we can despawn them on exit.
@@ -278,7 +285,8 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Energy, name: site.name.clone() },
-            SurfaceLod, // only visible when zoomed in
+            TemporalW { year: 2010.0 }, // renewables: modern era
+            SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
         ));
@@ -419,6 +427,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::FossilDeposits, name: deposit.name.clone() },
+            TemporalW { year: deposit.discovery_year as f64 },
             SurfaceLod,
             TimelineLayer::Fossil,
             AtlasEntity,
@@ -469,6 +478,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Nuclear, name: site.name.clone() },
+            TemporalW { year: site.commission_year as f64 },
             SurfaceLod,
             TimelineLayer::Nuclear,
             AtlasEntity,
@@ -715,6 +725,35 @@ pub fn timeline_visibility_system(
             Visibility::Hidden
         } else {
             Visibility::Visible
+        };
+    }
+}
+
+/// 4D temporal visibility — markers emerge from the 4th dimension based on timeline year.
+/// Uses Projector4D hyperplane slicing: markers with TemporalW close to the current
+/// timeline year are visible; those far from the slice fade out.
+pub fn temporal_4d_system(
+    timeline: Res<TimelineState>,
+    mut markers: Query<(&TemporalW, &mut Visibility), With<AtlasEntity>>,
+) {
+    // Map timeline year (0-500) to absolute year (1900-2400)
+    let current_year = 1900.0 + timeline.year as f64 * 1.0;
+
+    // Create a Projector4D with the timeline as W-slice
+    let projector = symtropy_render_bridge::Projector4D::new(
+        current_year,
+        100.0, // slice_thickness: markers within ±100 years are visible
+        1.0,
+    );
+
+    for (temporal, mut vis) in markers.iter_mut() {
+        let point = symtropy_math::Point::new([0.0, 0.0, 0.0, temporal.year]);
+        let alpha = projector.alpha(&point);
+
+        *vis = if alpha > 0.05 {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
         };
     }
 }
