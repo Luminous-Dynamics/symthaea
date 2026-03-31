@@ -24,7 +24,7 @@ impl StableResonator {
     }
 
     fn set_target(&mut self, freq: f32, bandwidth: f32, sr: f32) {
-        let bw = bandwidth.max(120.0);
+        let bw = bandwidth.max(150.0); // wider minimum prevents metallic spikes
         let omega = std::f32::consts::TAU * freq / sr;
         let r = (-std::f32::consts::PI * bw / sr).exp().clamp(0.0, 0.99);
         self.target_a1 = -2.0 * r * omega.cos();
@@ -59,9 +59,9 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
     let mut smooth_f0 = frames[0].f0.max(80.0);
     let mut smooth_energy = 0.0f32;
 
-    // FIX 3: Spectral tilt filter state (one-pole LP for -6dB/oct roll-off)
+    // Spectral tilt: aggressive LP to kill piercing highs
     let mut tilt_state = 0.0f32;
-    let tilt_coeff = 0.85; // gentle roll-off
+    let tilt_coeff = 0.95; // strong roll-off (was 0.85 — too gentle)
 
     // FIX 4: Simple reverb (comb filter delay line)
     let reverb_len = (sr * 0.03) as usize; // 30ms early reflection
@@ -105,15 +105,15 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                         0.0
                     };
 
-                    // Composite: 75% filtered pulse + 25% pink noise (WARMTH)
+                    // Composite: 85% pulse + 15% subtle noise (warmth without harshness)
                     noise_state = lcg(&mut noise_state);
-                    let pink = noise_f32(noise_state) * 0.25;
-                    source = (pulse * 0.75 + pink) * smooth_energy;
+                    let pink = noise_f32(noise_state) * 0.10; // reduced from 0.25
+                    source = (pulse * 0.85 + pink) * smooth_energy;
 
-                    // Extra breathiness during open phase
+                    // Gentle breathiness
                     if glottal_phase < 0.4 {
                         noise_state = lcg(&mut noise_state);
-                        source += noise_f32(noise_state) * 0.10 * smooth_energy;
+                        source += noise_f32(noise_state) * 0.05 * smooth_energy; // reduced from 0.10
                     }
                 }
                 SourceType::Fricative => {
@@ -159,7 +159,7 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
             reverb_idx += 1;
             let wet = dry * (1.0 - reverb_mix) + delayed * reverb_mix;
 
-            output.push(wet * 40.0);
+            output.push(wet * 15.0); // reduced from 40 — was causing clipping/distortion
         }
     }
 
