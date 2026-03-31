@@ -1,0 +1,102 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.INVEST",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.INVEST",
+    "title": "Investing Basics",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Investing means putting money into assets that can grow in value over time. Stocks are ownership shares in a company — high potential returns but volatile. Bonds are loans to governments or companies — lower returns but more stable. ETFs (Exchange-Traded Funds) bundle many stocks or bonds into one product, providing instant diversification. Diversification means spreading investments across different assets so a loss in one does not wipe you out. Higher potential returns always come with higher risk. Long-term investing (10+ years) historically outperforms keeping money in cash.",
+    "examples": [
+      {
+        "problem": "Mbali has R50,000 to invest for 20 years. She is considering: (A) a savings account at 5%, (B) a diversified ETF averaging 10%. Compare the outcomes.",
+        "steps": [
+          {"instruction": "Calculate savings account growth", "result": "R50,000 x (1.05)^20 = R132,665"},
+          {"instruction": "Calculate ETF growth", "result": "R50,000 x (1.10)^20 = R336,375"},
+          {"instruction": "Compare the difference", "result": "R336,375 - R132,665 = R203,710 more with the ETF"}
+        ],
+        "answer": "The ETF yields approximately R336,375 vs R132,665 in savings — R203,710 more. The ETF carries more risk (value fluctuates year to year) but historically rewards patience."
+      },
+      {
+        "problem": "Explain why putting all your money into one company's stock is risky, using a real-world analogy.",
+        "steps": [
+          {"instruction": "Consider the scenario", "result": "If you invest R100,000 in one company and it fails, you lose everything"},
+          {"instruction": "Apply diversification", "result": "R100,000 spread across 50 companies (via an ETF) means one failure only costs ~2% of your portfolio"},
+          {"instruction": "Analogy", "result": "It is like carrying all your eggs in one basket vs spreading them across 50 baskets"}
+        ],
+        "answer": "Diversification protects against catastrophic loss. An ETF holding 50+ companies means no single failure can devastate your investment."
+      },
+      {
+        "problem": "Jabulani wants to invest but is nervous about risk. Rank these from lowest to highest risk: JSE Top 40 ETF, government bond, individual tech stock, money market fund.",
+        "steps": [
+          {"instruction": "Money market fund", "result": "Lowest risk — invests in short-term government and corporate debt, very stable"},
+          {"instruction": "Government bond", "result": "Low risk — backed by government, fixed returns, but longer commitment"},
+          {"instruction": "JSE Top 40 ETF", "result": "Medium risk — diversified across 40 large SA companies, fluctuates but stable long-term"},
+          {"instruction": "Individual tech stock", "result": "Highest risk — depends entirely on one company's performance, can lose 50%+ in a year"}
+        ],
+        "answer": "From lowest to highest risk: Money market fund, government bond, JSE Top 40 ETF, individual tech stock."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is an ETF?",
+        "answer": "An Exchange-Traded Fund — a basket of stocks or bonds that trades on an exchange like a single stock, providing diversification in one purchase.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["Think of it as a bundle of many investments in one package"],
+        "explanation": "ETFs allow you to invest in dozens or hundreds of companies at once, reducing the risk of any single company failing.",
+        "distractors": ["A type of savings account", "A government bond", "A cryptocurrency"]
+      },
+      {
+        "question": "What is the relationship between risk and return in investing?",
+        "answer": "Generally, higher potential returns come with higher risk. Safer investments (bonds, money market) offer lower returns, while riskier investments (stocks) offer higher potential returns but with greater chance of loss.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["No investment offers high returns with no risk"],
+        "explanation": "This is a fundamental principle of finance. If someone promises high returns with no risk, it is likely a scam.",
+        "distractors": ["Higher risk always means higher returns", "Risk and return are unrelated", "Only bonds have risk"]
+      },
+      {
+        "question": "If you invest R1,000 per month into an ETF returning 9% annually for 30 years, approximately how much will you have? Use the Rule of 72 for intuition.",
+        "answer": "Approximately R1,830,000",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": ["Total invested is R360,000 over 30 years — compound growth multiplies this significantly"],
+        "explanation": "R1,000/month x 12 months x 30 years = R360,000 contributed. At 9%, compound growth roughly quintuples this to ~R1.83M. The money doubles every 8 years (72/9).",
+        "distractors": ["R360,000", "R720,000", "R5,000,000"]
+      },
+      {
+        "question": "What does diversification mean in investing?",
+        "answer": "Spreading your investments across different assets, sectors, and geographies so that poor performance in one area does not destroy your entire portfolio.",
+        "difficulty_permille": 150,
+        "bloom_level": "Understand",
+        "hints": ["Do not put all your eggs in one basket"],
+        "explanation": "If you own stocks in tech, healthcare, mining, and banking, a crash in tech only affects part of your portfolio.",
+        "distractors": ["Buying the most expensive stocks", "Only investing in one country", "Putting all money into the safest option"]
+      },
+      {
+        "question": "Why is time in the market generally more important than timing the market?",
+        "answer": "Nobody can consistently predict short-term market movements. Missing even the 10 best trading days over 20 years can cut returns by more than half. Staying invested through ups and downs captures the long-term growth trend.",
+        "difficulty_permille": 350,
+        "bloom_level": "Analyze",
+        "hints": ["Think about what happens if you sell during a crash and miss the recovery"],
+        "explanation": "Historical data shows that markets recover from crashes and trend upward over decades. Trying to sell before drops and buy before rises is nearly impossible to do consistently.",
+        "distractors": ["Timing the market is easy with the right tools", "Time does not matter if you pick the right stocks", "Short-term trading always outperforms"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Stock (equity/share)", "definition": "A unit of ownership in a company, entitling you to a share of profits (dividends) and growth", "example_usage": "I bought 100 shares of Naspers on the JSE."},
+      {"term": "Bond", "definition": "A loan to a government or corporation that pays fixed interest over a set period, then returns the principal", "example_usage": "SA government bonds pay around 9% annually."},
+      {"term": "ETF", "definition": "Exchange-Traded Fund — a basket of securities that trades on a stock exchange, offering diversification in a single purchase", "example_usage": "The Satrix Top 40 ETF tracks the 40 largest companies on the JSE."},
+      {"term": "Diversification", "definition": "Spreading investments across multiple asset types and sectors to reduce overall risk", "example_usage": "I diversified by holding SA stocks, international ETFs, and bonds."}
+    ],
+    "misconceptions": [
+      {"misconception": "Investing is gambling", "correction": "Gambling has negative expected returns over time. Diversified investing in broad markets has historically produced positive real returns over long periods (7-10% annually). Individual stock speculation is closer to gambling.", "why_students_think_this": "Media focuses on dramatic gains and losses, and many people only hear about stock market crashes."},
+      {"misconception": "You need a lot of money to start investing", "correction": "Many platforms in SA allow investing from R500 or even R100/month. ETFs provide diversification even with small amounts.", "why_students_think_this": "Investing was historically associated with wealthy individuals, and minimum investment amounts used to be high."},
+      {"misconception": "A good past return guarantees future returns", "correction": "Past performance does not guarantee future results. Markets are influenced by unpredictable events. Diversification and long time horizons are better strategies than chasing last year's winners.", "why_students_think_this": "Human pattern recognition leads us to extrapolate trends, but financial markets are not fully predictable."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.92, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

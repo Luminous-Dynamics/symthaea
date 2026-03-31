@@ -1,0 +1,103 @@
+{
+  "node_id": "UNI.CRITICAL.CT.MEDIA",
+  "lesson": {
+    "standard_code": "UNI.CRITICAL.CT.MEDIA",
+    "title": "Media Literacy",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Media literacy is the ability to critically evaluate information from news, social media, advertising, and other sources. Fact-checking means verifying claims against reliable sources before sharing. Propaganda uses emotional manipulation, selective facts, and repetition to push an agenda. Echo chambers form when algorithms show you only content you already agree with, reinforcing existing beliefs. Key skills: check the source (who published it and why?), look for the original data, read beyond the headline, check multiple sources, and reverse-image search photos. In the digital age, being a critical consumer of information is essential self-defense.",
+    "examples": [
+      {
+        "problem": "You see a WhatsApp forward claiming a new law will tax all airtime purchases at 30%. How do you verify this?",
+        "steps": [
+          {"instruction": "Check the source", "result": "The message has no author, date, or link to legislation — red flag"},
+          {"instruction": "Search official sources", "result": "Check the SARS website, National Treasury, and Parliament (pmg.org.za) for any such legislation"},
+          {"instruction": "Check fact-checking sites", "result": "Search Africa Check (africacheck.org), AFP Fact Check, or Reuters Fact Check for the claim"},
+          {"instruction": "Apply common sense", "result": "A 30% airtime tax would be major news — if no credible news outlet covers it, the claim is almost certainly false"}
+        ],
+        "answer": "The claim is likely false. It lacks a source, is not reported by credible outlets, and is not on any government website. Do not forward unverified claims."
+      },
+      {
+        "problem": "Explain how a social media echo chamber forms.",
+        "steps": [
+          {"instruction": "You engage with content you like", "result": "You like, share, or comment on posts that align with your views"},
+          {"instruction": "The algorithm notices your preferences", "result": "It shows you more similar content to keep you engaged"},
+          {"instruction": "You see fewer opposing viewpoints", "result": "Your feed becomes dominated by one perspective"},
+          {"instruction": "Your views become more extreme", "result": "Without exposure to counter-arguments, positions can become more radical over time"}
+        ],
+        "answer": "Echo chambers form through algorithmic curation: you engage with agreeable content, the algorithm shows more of it, opposing views disappear, and your perspective narrows without you realizing it."
+      },
+      {
+        "problem": "A news site publishes a headline: 'SHOCKING: Government plans to seize all private property.' The article itself says a minister mentioned reviewing land policy. Evaluate this.",
+        "steps": [
+          {"instruction": "Compare headline to content", "result": "The headline ('seize all private property') dramatically exaggerates the article ('reviewing land policy')"},
+          {"instruction": "Identify the technique", "result": "Clickbait — sensationalized headlines designed to generate clicks and emotional reactions"},
+          {"instruction": "Check the publication", "result": "Is this a reputable news outlet or a site that consistently uses inflammatory headlines?"}
+        ],
+        "answer": "This is clickbait. The headline is sensationalized and does not match the actual content. Always read the full article before reacting or sharing."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What are three questions you should ask before sharing a news article?",
+        "answer": "1) Who is the source and are they credible? 2) Does the article provide evidence or just claims? 3) Can I find this story reported by other independent, reputable sources?",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Think about source, evidence, and corroboration"],
+        "explanation": "These three checks catch most misinformation. If a story only appears on one obscure website with no evidence, it is likely false.",
+        "distractors": ["Is the headline interesting?", "Does it confirm what I believe?", "Has it been shared many times?"]
+      },
+      {
+        "question": "What is the difference between misinformation and disinformation?",
+        "answer": "Misinformation is false information shared without intent to deceive (the sharer believes it is true). Disinformation is deliberately false information created and spread with the intent to mislead.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["One is accidental, the other is intentional"],
+        "explanation": "Your grandmother sharing a false health tip on WhatsApp is misinformation. A state-sponsored fake news operation is disinformation. Both are harmful, but the intent differs.",
+        "distractors": ["They mean the same thing", "Misinformation is worse than disinformation", "Disinformation is only from governments"]
+      },
+      {
+        "question": "Name two fact-checking resources available in South Africa or Africa.",
+        "answer": "Africa Check (africacheck.org) and AFP Fact Check. Both verify claims circulating in African media and social networks.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["Think about organizations that specifically investigate claims in African news"],
+        "explanation": "Africa Check is a non-profit fact-checking organization based in Johannesburg. AFP Fact Check covers global misinformation including African content.",
+        "distractors": ["Wikipedia and Google", "The government press office", "Social media trending pages"]
+      },
+      {
+        "question": "Why might an article that makes you very angry or very afraid be worth extra scrutiny?",
+        "answer": "Strong emotional reactions reduce critical thinking. Content designed to provoke anger or fear spreads faster on social media, so clickbait and propaganda deliberately target emotions to bypass rational evaluation.",
+        "difficulty_permille": 300,
+        "bloom_level": "Analyze",
+        "hints": ["Think about what emotions do to your ability to think critically"],
+        "explanation": "Research shows emotional content is shared 3-6x more than neutral content. If something triggers a strong emotion, pause before sharing — that reaction may be exactly what the creator intended.",
+        "distractors": ["Emotional content is always false", "Only logical content is true", "Fear-based articles are always propaganda"]
+      },
+      {
+        "question": "You see a photo on social media of a long queue at a government office with the caption 'Collapse of service delivery — taken today!' How could you verify this?",
+        "answer": "Reverse image search (drag the photo into Google Images or TinEye) to check if it was taken today or is an old recycled photo. Check if credible news outlets are reporting the same event. Look for metadata (date, location) if available.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Images can be reused from different times and places"],
+        "explanation": "Recycling old photos with new captions is one of the most common forms of social media manipulation. A reverse image search often reveals the original context.",
+        "distractors": ["If the photo exists, it must be real", "Check how many likes it has", "Ask the person who posted it"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Echo chamber", "definition": "An environment where you only encounter information and opinions that reinforce your existing beliefs, often created by social media algorithms", "example_usage": "My Twitter feed became an echo chamber — everyone I follow agrees with me on every issue."},
+      {"term": "Clickbait", "definition": "Sensationalized or misleading headlines designed to attract clicks, often exaggerating or misrepresenting the actual content", "example_usage": "The headline screamed disaster but the article described a minor policy change — pure clickbait."},
+      {"term": "Fact-checking", "definition": "The process of verifying claims against reliable evidence and sources before accepting or sharing them", "example_usage": "I fact-checked the claim on Africa Check and found it was false."},
+      {"term": "Propaganda", "definition": "Information, often biased or misleading, used to promote a political agenda or viewpoint through emotional manipulation rather than evidence", "example_usage": "The campaign ad used fear-based propaganda rather than presenting policy facts."}
+    ],
+    "misconceptions": [
+      {"misconception": "I can tell fake news just by looking at it", "correction": "Sophisticated misinformation looks professional and credible. Even experts get fooled. Verification through fact-checking sites and multiple sources is essential — gut feeling is not enough.", "why_students_think_this": "Overconfidence in one's own judgment, and the assumption that fake news looks obviously fake."},
+      {"misconception": "Traditional media is always reliable, or always unreliable", "correction": "Established media outlets have editorial standards and accountability but can still make errors, have biases, or sensationalize. No single source is perfectly reliable — cross-reference everything.", "why_students_think_this": "People tend to hold absolute positions (total trust or total distrust) rather than calibrating confidence based on the specific outlet and story."},
+      {"misconception": "If many people share something, it is probably true", "correction": "False information often spreads faster than truth because it is more sensational, emotional, or surprising. Viral spread is not evidence of accuracy.", "why_students_think_this": "Social proof is a powerful psychological force — we assume the crowd has verified what they share."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

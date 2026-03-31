@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+  "lesson": {
+    "standard_code": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+    "title": "Resource Management",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Resource management is the responsible use of Earth's natural resources \u2014 water, energy, minerals, soil, and biological resources \u2014 to meet current needs without compromising future generations' ability to meet theirs. The circular economy model replaces the linear 'take-make-waste' approach with 'reduce-reuse-recycle-regenerate.' South Africa faces acute resource challenges: it is the 30th driest country, faces an energy crisis, and generates over 54 million tonnes of waste annually. Effective resource management combines individual behaviour change (using less, wasting less) with systemic redesign (renewable energy, water recycling, waste-to-energy).",
+    "examples": [
+      {
+        "problem": "Explain the difference between a linear economy and a circular economy.",
+        "steps": [
+          {
+            "instruction": "Step 1: Linear: extract raw materials, manufacture products, use them, discard as waste. One-way flow.",
+            "result": "linear"
+          },
+          {
+            "instruction": "Step 2: Circular: design products for durability, repair, and recycling. Waste from one process becomes input for another.",
+            "result": "circular"
+          },
+          {
+            "instruction": "Step 3: Example: a glass bottle in a linear economy goes to landfill. In a circular economy, it is returned, cleaned, and refilled.",
+            "result": "example"
+          }
+        ],
+        "answer": "Answer: The linear model assumes infinite resources and infinite waste capacity. The circular model recognises that both are finite.",
+        "visual_description": null
+      },
+      {
+        "problem": "South Africa's Jukskei River in Johannesburg is heavily polluted. Trace the resource management failures that caused this.",
+        "steps": [
+          {
+            "instruction": "Step 1: Inadequate waste collection in informal settlements leads to waste dumping in waterways.",
+            "result": "waste failure"
+          },
+          {
+            "instruction": "Step 2: Sewage treatment works are poorly maintained, releasing untreated sewage into the river.",
+            "result": "infrastructure failure"
+          },
+          {
+            "instruction": "Step 3: Industrial runoff from factories along the river adds chemicals and heavy metals.",
+            "result": "regulatory failure"
+          }
+        ],
+        "answer": "Answer: The Jukskei's pollution reflects failures at individual (littering), municipal (maintenance), and regulatory (enforcement) levels of resource management.",
+        "visual_description": null
+      },
+      {
+        "problem": "How does the Vaal River system demonstrate the interconnection between water, energy, and food (the water-energy-food nexus)?",
+        "steps": [
+          {
+            "instruction": "Step 1: Water: the Vaal supplies water to Gauteng (15 million people) and irrigates farmland.",
+            "result": "water"
+          },
+          {
+            "instruction": "Step 2: Energy: Eskom's coal power stations in Mpumalanga use massive amounts of water for cooling.",
+            "result": "energy"
+          },
+          {
+            "instruction": "Step 3: Food: agriculture accounts for 60% of SA's freshwater use, competing with urban and industrial needs.",
+            "result": "food"
+          }
+        ],
+        "answer": "Answer: Managing any one resource (water, energy, food) without considering the others leads to unintended consequences.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define 'sustainable development' in your own words.",
+        "answer": "Sustainable development means meeting the needs of the present without compromising the ability of future generations to meet their own needs. It requires balancing economic growth, social equity, and environmental protection \u2014 recognising that these three dimensions are interconnected.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about the Brundtland definition: meeting present needs without harming future capacity."
+        ],
+        "explanation": "The Brundtland Commission (1987) defined sustainable development in these terms. The key insight is intergenerational equity \u2014 future people have rights too.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the concept of a circular economy and give two South African examples.",
+        "answer": "A circular economy designs out waste by keeping materials in use as long as possible. SA examples: (1) Mpact Paper recycling \u2014 collects used paper and cardboard, processes it into new packaging, reducing virgin paper demand. (2) Clothing swaps and second-hand markets (e.g., thrift shops in Melville, Johannesburg) extend garment life and reduce textile waste. (3) Informal waste reclaimers (waste pickers) already practise circular economy principles by collecting recyclables from waste for resale.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what happens to your waste after you throw it away.",
+          "Consider formal and informal recycling in SA."
+        ],
+        "explanation": "South Africa's informal waste reclaimers recover an estimated 80-90% of all recycled post-consumer packaging \u2014 a massive circular economy contribution that is often unrecognised.",
+        "distractors": []
+      },
+      {
+        "question": "Your household receives a monthly water bill of R800 for using 25 kilolitres. The City of Cape Town's stepped tariff charges more per kilolitre as usage increases. Calculate the savings if you reduce usage by 30% and explain three practical ways to achieve this.",
+        "answer": "Current: 25 kL at R800. Target: 17.5 kL (30% reduction). Savings depend on the tariff structure but roughly R240-320/month. Three ways: (1) Fix leaking taps and toilets (a running toilet can waste 200 litres/day). (2) Install a rainwater tank for garden use. (3) Take 2-minute showers instead of baths (saves ~100 litres per shower vs bath).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with the biggest water uses: toilet, shower, garden.",
+          "A dripping tap wastes ~30 litres/day."
+        ],
+        "explanation": "Water conservation is especially urgent in South Africa. Cape Town's Day Zero crisis (2018) showed how quickly a major city can run out of water. Conservation is cheaper than building new supply infrastructure.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why recycling alone is insufficient for solving the waste problem. What else is needed?",
+        "answer": "Recycling addresses waste after it is created but does not reduce the amount of waste produced. Limitations: not all materials are recyclable, recycling requires energy and produces emissions, contamination reduces recycling quality, and markets for recycled materials fluctuate. A complete solution requires: (1) Reduce \u2014 produce and consume less. (2) Redesign \u2014 design products for longevity, repairability, and recyclability. (3) Refuse \u2014 reject unnecessary packaging. (4) Legislate \u2014 extended producer responsibility laws that make manufacturers responsible for end-of-life disposal.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Recycling is necessary but not sufficient.",
+          "What happens before waste is created? That is where the biggest impact lies."
+        ],
+        "explanation": "The waste hierarchy prioritises: refuse > reduce > reuse > recycle > recover > dispose. Recycling is fourth on the list \u2014 prevention and reduction are far more effective.",
+        "distractors": []
+      },
+      {
+        "question": "Design a resource management plan for your school that addresses water, energy, and waste. Include current assessment, targets, and specific actions.",
+        "answer": "Answers will vary. Strong responses: (1) assess current usage (water meter readings, electricity bills, waste audit). (2) Set specific targets (reduce water by 20%, electricity by 30%, divert 50% of waste from landfill). (3) Actions \u2014 water: rainwater harvesting, low-flow taps, grey water for gardens. Energy: solar panels, LED lights, motion sensors. Waste: composting food waste, recycling stations, eliminating single-use plastics. (4) Include student engagement and monitoring.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Start with a baseline: how much do you currently use?",
+          "Quick wins build momentum."
+        ],
+        "explanation": "The most effective school resource plans combine measurement, targets, quick wins, and student ownership. Making usage data visible (dashboards) creates natural accountability.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "An economic model that designs out waste by keeping materials in use through reuse, repair, and recycling",
+      "The interconnection between water, energy, and food systems where decisions in one affect the others",
+      "Meeting present needs without compromising future generations' ability to meet theirs"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "circular economy",
+        "definition": "An economic model that designs out waste by keeping materials in use through reuse, repair, and recycling",
+        "example_usage": "The circular economy turns waste into resources."
+      },
+      {
+        "term": "water-energy-food nexus",
+        "definition": "The interconnection between water, energy, and food systems where decisions in one affect the others",
+        "example_usage": "Building a new coal plant affects the nexus: it needs water, produces energy, and competes with food production for water."
+      },
+      {
+        "term": "sustainability",
+        "definition": "Meeting present needs without compromising future generations' ability to meet theirs",
+        "example_usage": "Sustainability requires balancing economic, social, and environmental goals."
+      },
+      {
+        "term": "waste hierarchy",
+        "definition": "A ranking of waste management strategies from most to least preferred: refuse, reduce, reuse, recycle, recover, dispose",
+        "example_usage": "The waste hierarchy shows that prevention is better than recycling."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think recycling is enough to solve environmental problems.",
+        "correction": "Recycling is important but insufficient. It addresses waste after creation rather than preventing it. Not all materials can be recycled, the process itself uses energy, and recycled materials degrade over cycles. The waste hierarchy prioritises refusing and reducing over recycling. Systemic change \u2014 redesigning products, changing business models, and reducing consumption \u2014 is far more impactful than individual recycling efforts alone.",
+        "why_students_think_this": "Recycling is heavily promoted because it is the easiest action for consumers. This creates the impression that it is the most important action, when in fact refusing and reducing are more effective."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

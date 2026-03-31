@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.COMMUNICATION.COM.LISTEN",
+  "lesson": {
+    "standard_code": "UNI.COMMUNICATION.COM.LISTEN",
+    "title": "Active Listening",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Active listening is fully concentrating on, understanding, and responding to a speaker \u2014 going beyond simply hearing words. It involves giving undivided attention, withholding judgment, reflecting back what you hear, asking clarifying questions, and responding thoughtfully. Research shows that most people retain only 25-50% of what they hear. Active listening improves comprehension, builds trust, and reduces misunderstandings. In South Africa's multilingual context, where conversations often cross language and cultural boundaries, active listening is especially important for bridging differences and preventing the assumptions that arise from partial understanding.",
+    "examples": [
+      {
+        "problem": "Your friend is telling you about a problem. You catch yourself mentally preparing your advice while they are still talking. What should you do instead?",
+        "steps": [
+          {
+            "instruction": "Step 1: Notice that your attention has shifted from listening to planning.",
+            "result": "self-awareness"
+          },
+          {
+            "instruction": "Step 2: Refocus on what they are saying right now \u2014 their words, tone, and body language.",
+            "result": "return to listening"
+          },
+          {
+            "instruction": "Step 3: When they finish, reflect back: 'It sounds like you are feeling...' before offering any advice.",
+            "result": "reflect first"
+          }
+        ],
+        "answer": "Answer: Active listening means staying present with the speaker rather than running ahead to your response.",
+        "visual_description": null
+      },
+      {
+        "problem": "List five barriers to active listening and how to overcome each.",
+        "steps": [
+          {
+            "instruction": "Step 1: Distractions (phone, noise) \u2014 remove them. Put your phone face down.",
+            "result": "environmental"
+          },
+          {
+            "instruction": "Step 2: Prejudgment ('I know what they will say') \u2014 stay curious, you might be surprised.",
+            "result": "cognitive"
+          },
+          {
+            "instruction": "Step 3: Emotional reactivity (the topic triggers you) \u2014 breathe and listen through the discomfort.",
+            "result": "emotional"
+          }
+        ],
+        "answer": "Answer: Barriers to listening are usually about the listener's state, not the speaker's message. Managing yourself is the first step to listening well.",
+        "visual_description": null
+      },
+      {
+        "problem": "Demonstrate the difference between hearing and active listening using a classroom scenario.",
+        "steps": [
+          {
+            "instruction": "Step 1: Hearing: the teacher says 'The test is on Friday.' You register the words but do not process the implications.",
+            "result": "passive"
+          },
+          {
+            "instruction": "Step 2: Active listening: you hear 'test on Friday,' mentally note what chapters to study, raise your hand to ask which topics will be covered, and write it in your planner.",
+            "result": "active"
+          },
+          {
+            "instruction": "Step 3: The difference: hearing is passive reception; active listening is engaged processing.",
+            "result": "distinction"
+          }
+        ],
+        "answer": "Answer: Active listening transforms information from sound waves into understanding and action.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What are the four components of active listening?",
+        "answer": "(1) Attending \u2014 giving full physical and mental attention. (2) Understanding \u2014 grasping the speaker's message and emotion. (3) Responding \u2014 providing verbal and non-verbal feedback that shows you are engaged. (4) Remembering \u2014 retaining the key information for later use.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: attend, understand, respond, remember."
+        ],
+        "explanation": "These four components work together. You cannot understand if you are not attending; you cannot respond helpfully if you have not understood.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the technique of 'reflective listening' and why it is effective.",
+        "answer": "Reflective listening means paraphrasing what the speaker said and reflecting it back: 'So what I hear you saying is...' or 'It sounds like you feel...'. It is effective because: (1) it confirms you understood correctly (or allows correction), (2) the speaker feels genuinely heard, (3) it slows down the conversation enough for both parties to think carefully, and (4) it de-escalates emotional conversations by demonstrating empathy.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about how it feels when someone accurately reflects your feelings back to you.",
+          "How does this differ from just nodding and saying 'yes'?"
+        ],
+        "explanation": "Reflective listening comes from Carl Rogers' person-centred therapy. It is one of the most validated communication techniques in psychology.",
+        "distractors": []
+      },
+      {
+        "question": "In a group discussion, one person dominates the conversation while a quiet member has something to say but cannot get a word in. As a listener, how would you use active listening skills to improve the dynamic?",
+        "answer": "Strategies: (1) Acknowledge the dominant speaker's point concisely: 'That is an interesting point about X.' (2) Create space: 'I would like to hear other perspectives. [Name], what do you think?' (3) Use body language: turn toward the quiet person to signal interest. (4) After the quiet person speaks, reflect their point to validate it: 'So you are suggesting...' This ensures all voices are heard without directly criticising the dominant speaker.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "How can you redirect without being confrontational?",
+          "Think about the quiet person's experience."
+        ],
+        "explanation": "Active listening in groups includes listening for who is NOT speaking and creating conditions for their contribution.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse how listening skills differ across cultures in South Africa. Consider at least two cultural norms around listening.",
+        "answer": "Examples: (1) In some cultures, direct eye contact during listening shows respect and engagement; in others, looking down shows deference and respect, especially toward elders. (2) Some cultures expect the listener to remain silent until the speaker finishes (even through long pauses); others expect active verbal feedback ('mm-hmm', 'yes') as signs of engagement. (3) Some cultures value indirect communication where the main point is implied rather than stated directly \u2014 active listening requires reading between the lines. Effective cross-cultural listening means being aware of these differences rather than assuming your own norms are universal.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What listening behaviours might be misinterpreted across cultures?",
+          "How does ubuntu shape listening norms?"
+        ],
+        "explanation": "Misinterpreting cultural listening norms causes unnecessary conflict. What looks like 'not listening' in one culture may be deep respect in another.",
+        "distractors": []
+      },
+      {
+        "question": "Design a 15-minute active listening exercise for a group of 20 people that practises all four components (attending, understanding, responding, remembering).",
+        "answer": "Exercise: Pair up (10 pairs). Round 1 (3 min): Person A speaks about a meaningful experience for 2 minutes while Person B listens without interrupting. Person B then has 1 minute to reflect back what they heard (attending + understanding + responding). Round 2 (3 min): swap roles. Group debrief (5 min): each person shares one thing their partner said that surprised them (remembering). Facilitator asks: 'What was hard about not interrupting? What did you learn?' Final reflection (4 min): write one insight about your own listening habits.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Include practice of each component.",
+          "Build in reflection \u2014 the learning happens in the debrief."
+        ],
+        "explanation": "Structured listening exercises with debriefs are used in conflict resolution training, counselling education, and leadership development. The key insight often reported: 'I did not realise how much I interrupt.'",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Fully concentrating on, understanding, and responding to a speaker with engaged attention",
+      "Paraphrasing and reflecting back what the speaker said to confirm understanding",
+      "Listening to understand the speaker's emotions and perspective, not just their words"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "active listening",
+        "definition": "Fully concentrating on, understanding, and responding to a speaker with engaged attention",
+        "example_usage": "Active listening means your phone is away and your mind is with the speaker."
+      },
+      {
+        "term": "reflective listening",
+        "definition": "Paraphrasing and reflecting back what the speaker said to confirm understanding",
+        "example_usage": "Reflective listening: 'So what I hear you saying is that you feel excluded from the group.'"
+      },
+      {
+        "term": "empathic listening",
+        "definition": "Listening to understand the speaker's emotions and perspective, not just their words",
+        "example_usage": "Empathic listening helped her realise her friend was not angry but scared."
+      },
+      {
+        "term": "non-verbal cues",
+        "definition": "Communication through body language, facial expressions, tone of voice, and gestures",
+        "example_usage": "His words said 'I am fine' but his non-verbal cues said otherwise."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often think they are better listeners than they actually are.",
+        "correction": "Research consistently shows that people overestimate their listening ability. Studies find that most people retain only 25-50% of what they hear, and the retention drops further over time. Active listening is a skill that requires conscious practice \u2014 it does not come naturally in a world full of distractions.",
+        "why_students_think_this": "Listening feels passive and easy compared to speaking. Because we hear sound effortlessly, we assume we are listening well. But hearing and listening are very different processes."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,123 @@
+{
+  "node_id": "UNI.EMOTIONAL.EQ.SELF",
+  "lesson": {
+    "standard_code": "UNI.EMOTIONAL.EQ.SELF",
+    "title": "Self-Awareness",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Self-awareness is the ability to recognise and understand your own emotions, thoughts, values, and how they influence your behaviour. It includes knowing your strengths and limitations, identifying your emotional triggers, and understanding how your mood affects those around you. Research by Daniel Goleman shows that self-awareness is the foundation of emotional intelligence — without it, the other skills (self-management, social awareness, relationship skills) cannot develop fully. In the South African context, self-awareness also means understanding how your identity, culture, and history shape your worldview and responses to others.",
+    "examples": [
+      {
+        "problem": "You feel angry after receiving critical feedback at work. Identify the emotion, the trigger, and a constructive response.",
+        "steps": [
+          {"instruction": "Step 1: Name the emotion — anger, possibly mixed with embarrassment or hurt pride.", "result": "emotion identified"},
+          {"instruction": "Step 2: Identify the trigger — the criticism felt like a personal attack on your competence.", "result": "trigger identified"},
+          {"instruction": "Step 3: Pause before reacting. Ask: is the feedback valid? What can I learn? Respond by thanking the person and asking for specific suggestions.", "result": "constructive response"}
+        ],
+        "answer": "Answer: Self-awareness means recognising the emotion (anger), understanding why it arose (perceived threat to competence), and choosing a response rather than reacting impulsively.",
+        "visual_description": null
+      },
+      {
+        "problem": "How can journaling improve self-awareness?",
+        "steps": [
+          {"instruction": "Step 1: Writing about your day forces you to reflect on your emotions and reactions.", "result": "reflection"},
+          {"instruction": "Step 2: Over time, patterns emerge — you notice recurring triggers, habits, and emotional responses.", "result": "pattern recognition"},
+          {"instruction": "Step 3: Awareness of patterns gives you the power to choose different responses.", "result": "agency"}
+        ],
+        "answer": "Answer: Journaling creates a feedback loop between experience and reflection, making unconscious emotional patterns visible and changeable.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe how cultural background can shape emotional expression and self-awareness.",
+        "steps": [
+          {"instruction": "Step 1: In some SA cultures, expressing sadness openly (especially for men) is discouraged, leading to suppressed awareness of grief.", "result": "cultural norms"},
+          {"instruction": "Step 2: Ubuntu philosophy encourages awareness of how your emotions affect the community, not just yourself.", "result": "relational awareness"},
+          {"instruction": "Step 3: Self-awareness includes recognising these cultural influences without judging them.", "result": "meta-awareness"}
+        ],
+        "answer": "Answer: Culture shapes which emotions you learn to notice and express. Self-awareness includes understanding these cultural lenses.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define self-awareness and explain why it is considered the foundation of emotional intelligence.",
+        "answer": "Self-awareness is the ability to recognise your own emotions, strengths, weaknesses, values, and their impact on your behaviour. It is foundational because you cannot manage emotions you do not recognise, empathise with others if you do not understand your own feelings, or build relationships effectively without knowing your patterns.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about what happens when someone does not know they are angry — can they manage their anger?"],
+        "explanation": "Goleman's model places self-awareness first because all other EQ competencies depend on it. You cannot regulate what you cannot perceive.",
+        "distractors": ["Self-awareness means being self-critical", "Emotional intelligence is about suppressing emotions"]
+      },
+      {
+        "question": "List three emotional triggers that are common for teenagers and explain why each occurs.",
+        "answer": "Examples: (1) Feeling excluded from a friend group — triggers fear of rejection and need for belonging. (2) Unfair treatment by a teacher — triggers sense of injustice and powerlessness. (3) Social media comparison — triggers inadequacy and envy. Each occurs because teenagers are developing identity and are especially sensitive to social evaluation and fairness.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about situations that cause strong reactions.", "Consider developmental needs at this age: belonging, identity, fairness."],
+        "explanation": "Understanding common triggers helps normalise emotional responses. These are not weaknesses — they reflect genuine developmental needs that are especially intense during adolescence.",
+        "distractors": ["Teenagers should not have emotional triggers", "Triggers are irrational and should be eliminated"]
+      },
+      {
+        "question": "Keep a brief emotion log for one day: note three moments when you felt a strong emotion, what triggered it, and how you responded. Reflect on any patterns.",
+        "answer": "Answers will vary. Strong responses: (1) name specific emotions (not just 'good' or 'bad'); (2) identify specific triggers; (3) note the response (reactive vs reflective); (4) identify at least one pattern or surprise.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["Set three reminders during the day to check in with yourself.", "Use emotion words like frustrated, anxious, proud, relieved — not just happy/sad."],
+        "explanation": "Emotion logging is a proven self-awareness tool used in cognitive behavioural therapy. It builds the habit of noticing emotions in real time rather than only in retrospect.",
+        "distractors": ["Tracking emotions makes them worse", "Strong emotions should be avoided"]
+      },
+      {
+        "question": "A friend tells you that you come across as dismissive when others share their problems. You feel surprised and defensive. Analyse what is happening in terms of self-awareness.",
+        "answer": "The gap between your self-image (caring friend) and the feedback (dismissive behaviour) reveals a blind spot in self-awareness. Defensiveness is a natural protective response but blocks growth. A self-aware response would be: acknowledge the discomfort, consider whether the feedback has merit, ask for specific examples, and reflect on whether your behaviour matches your intentions.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": ["Why does the feedback make you defensive?", "Consider the Johari Window — what is in your blind spot?"],
+        "explanation": "The Johari Window model describes four quadrants: open (known to self and others), hidden (known to self only), blind (known to others only), and unknown. Feedback reveals the blind quadrant, which is uncomfortable but essential for growth.",
+        "distractors": ["Defensiveness means the feedback is wrong", "You should only trust your own self-assessment"]
+      },
+      {
+        "question": "Create a personal 'emotional profile' that maps your top 3 strengths, 3 growth areas, 3 common triggers, and your typical response patterns. Include a plan for improving one area.",
+        "answer": "Answers will vary. Strong responses: (1) honest and specific strengths (not vague); (2) growth areas framed constructively; (3) triggers with root cause analysis; (4) response patterns described without judgment; (5) improvement plan with concrete actions and a way to measure progress.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Be honest — this is for your growth, not for grading.", "Ask a trusted friend for input on your blind spots."],
+        "explanation": "Creating an emotional profile externalises self-knowledge, making it more concrete and actionable. Revisiting it periodically tracks growth over time.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Name the emotion specifically — 'frustrated' is more useful than 'bad'.",
+      "Triggers are not flaws — they reveal what matters to you.",
+      "Self-awareness is a skill that improves with practice, not a fixed trait."
+    ],
+    "key_vocabulary": [
+      {"term": "self-awareness", "definition": "The ability to recognise and understand your own emotions, thoughts, values, and their influence on behaviour", "example_usage": "Self-awareness helped me realise that my frustration was really about feeling unheard."},
+      {"term": "emotional trigger", "definition": "A stimulus that provokes a strong emotional response, often linked to past experiences or core needs", "example_usage": "Being interrupted is a trigger for me because it feels dismissive."},
+      {"term": "blind spot", "definition": "An aspect of yourself that others can see but you cannot (from the Johari Window model)", "example_usage": "My blind spot was that I talk over people when I am excited."},
+      {"term": "emotional intelligence", "definition": "The ability to perceive, understand, manage, and use emotions effectively in yourself and in relationships", "example_usage": "Emotional intelligence is as important as academic intelligence for life success."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think self-awareness means being self-critical or overthinking everything.",
+        "correction": "Self-awareness is non-judgmental observation of your own inner experience. It means noticing 'I am feeling angry' without adding 'and I am a bad person for feeling this way.' It is about clarity, not criticism.",
+        "why_students_think_this": "The word 'awareness' can sound like constant monitoring or analysis. In practice, it is more like developing a gentle habit of checking in with yourself."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.89,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.89,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

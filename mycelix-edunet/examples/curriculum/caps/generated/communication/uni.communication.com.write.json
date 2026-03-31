@@ -1,0 +1,179 @@
+{
+  "node_id": "UNI.COMMUNICATION.COM.WRITE",
+  "lesson": {
+    "standard_code": "UNI.COMMUNICATION.COM.WRITE",
+    "title": "Clear Writing",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Clear writing communicates ideas effectively by matching structure and language to the audience and purpose. It involves organising thoughts before writing (outlining), using plain language (avoiding unnecessary jargon), writing in active voice where possible, structuring paragraphs with topic sentences, providing evidence for claims, and editing ruthlessly. George Orwell's six rules remain a useful guide: never use a long word where a short one will do; if it is possible to cut a word, cut it; never use a foreign phrase or jargon when there is an everyday equivalent. In South Africa, where many learners write in English as a second or third language, clarity is even more important than sophistication.",
+    "examples": [
+      {
+        "problem": "Rewrite this sentence for clarity: 'The implementation of the new policy framework was undertaken by the relevant governmental authorities with a view to addressing the multifaceted challenges pertaining to service delivery.'",
+        "steps": [
+          {
+            "instruction": "Step 1: Identify the core message: who did what?",
+            "result": "find the core"
+          },
+          {
+            "instruction": "Step 2: Remove unnecessary words and jargon.",
+            "result": "simplify"
+          },
+          {
+            "instruction": "Step 3: Rewrite in active voice with plain language.",
+            "result": "rewrite"
+          }
+        ],
+        "answer": "Answer: Clear version: 'The government introduced a new policy to improve service delivery.'",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how to structure a five-paragraph essay.",
+        "steps": [
+          {
+            "instruction": "Step 1: Paragraph 1: Introduction \u2014 hook, context, thesis statement.",
+            "result": "intro"
+          },
+          {
+            "instruction": "Step 2: Paragraphs 2-4: Body \u2014 each with one main point, evidence, and analysis.",
+            "result": "body"
+          },
+          {
+            "instruction": "Step 3: Paragraph 5: Conclusion \u2014 restate thesis, summarise key points, final thought.",
+            "result": "conclusion"
+          }
+        ],
+        "answer": "Answer: The five-paragraph structure provides a reliable framework for organising arguments, especially useful for exams and short assignments.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why is editing important? Show the before and after of editing a paragraph.",
+        "steps": [
+          {
+            "instruction": "Step 1: First draft: 'There are many very important reasons why I basically think that education is really essential for all people everywhere in the world.'",
+            "result": "bloated draft"
+          },
+          {
+            "instruction": "Step 2: Identify problems: 'there are' construction, redundancies ('very important', 'basically', 'really'), vague language.",
+            "result": "diagnose"
+          },
+          {
+            "instruction": "Step 3: Edited: 'Education is essential for all people.' \u2014 from 24 words to 6, with no loss of meaning.",
+            "result": "clean version"
+          }
+        ],
+        "answer": "Answer: Good writing is rewriting. First drafts capture ideas; editing makes them clear.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List three principles of clear writing.",
+        "answer": "1. Use active voice ('The dog bit the man' not 'The man was bitten by the dog'). 2. Cut unnecessary words \u2014 if a word does not add meaning, remove it. 3. Use plain language \u2014 write 'use' not 'utilise', 'help' not 'facilitate'.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: active voice, brevity, plain language."
+        ],
+        "explanation": "These three principles address the most common causes of unclear writing. Applying them consistently transforms writing quality.",
+        "distractors": []
+      },
+      {
+        "question": "Rewrite these sentences for clarity: (a) 'It is the opinion of this writer that...' (b) 'Due to the fact that it was raining...' (c) 'The meeting was attended by twelve people.'",
+        "answer": "(a) 'I believe...' (b) 'Because it was raining...' (c) 'Twelve people attended the meeting.' Each rewrite is shorter, clearer, and uses active voice.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Remove padding phrases.",
+          "Convert passive voice to active."
+        ],
+        "explanation": "Academic writing often encourages padding and passive voice, creating the false impression that complexity equals intelligence. Clear writing takes more skill than complex writing.",
+        "distractors": []
+      },
+      {
+        "question": "Write a clear paragraph (5-7 sentences) explaining why water conservation matters in South Africa. Use a topic sentence, supporting evidence, and a concluding sentence.",
+        "answer": "Example: South Africa is a water-scarce country, receiving only 495mm of rainfall annually \u2014 well below the global average of 860mm. The country's growing population increases demand, while climate change makes rainfall more unpredictable. Cape Town's 2018 Day Zero crisis showed how quickly a major city can approach water shortage. Simple actions like fixing leaks, using grey water for gardens, and reducing shower times can significantly reduce household consumption. Water conservation is not just an environmental issue \u2014 it is a matter of survival for millions of South Africans.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with your main point. Support it with facts. End with significance."
+        ],
+        "explanation": "This paragraph follows the topic sentence -> evidence -> analysis -> conclusion structure. Each sentence builds on the previous one.",
+        "distractors": []
+      },
+      {
+        "question": "Compare two versions of the same message \u2014 one written for a technical audience and one for a general audience. Explain how you adapted language, structure, and detail.",
+        "answer": "Technical: 'The aquifer recharge rate has decreased by 15% over the past decade due to reduced precipitation and increased impervious surface area from urban expansion.' General: 'Underground water reserves are refilling 15% slower than ten years ago because there is less rain and more concrete covering the ground in cities.' Adaptations: replaced jargon (aquifer recharge rate, impervious surface area) with plain language, maintained accuracy, added brief explanation of causation.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What does your reader already know?",
+          "Which technical terms can be replaced without losing accuracy?"
+        ],
+        "explanation": "Writing for different audiences is not about 'dumbing down' \u2014 it is about translating specialist knowledge into language the reader can use. The information remains equally rigorous.",
+        "distractors": []
+      },
+      {
+        "question": "Edit a 200-word piece of your own writing down to 100 words while preserving all essential meaning. Reflect on what you learned from the process.",
+        "answer": "Answers will vary. Strong responses: (1) successfully halve the word count; (2) preserve all essential meaning; (3) identify what was cut (redundancies, filler, unnecessary qualifiers); (4) reflect on how the shorter version is actually clearer and more impactful.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Read each sentence and ask: what would be lost if I cut this?",
+          "Combine sentences that make related points."
+        ],
+        "explanation": "Cutting 50% of a text forces you to identify what truly matters. This exercise builds the most important editing skill: knowing what to remove.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "A sentence structure where the subject performs the action ('The team won the game' vs passive 'The game was won by the team')",
+      "The first sentence of a paragraph that states its main idea",
+      "The process of revising and improving written text by removing errors, cutting unnecessary words, and improving clarity"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "active voice",
+        "definition": "A sentence structure where the subject performs the action ('The team won the game' vs passive 'The game was won by the team')",
+        "example_usage": "Active voice makes writing more direct and engaging."
+      },
+      {
+        "term": "topic sentence",
+        "definition": "The first sentence of a paragraph that states its main idea",
+        "example_usage": "A strong topic sentence tells the reader what the paragraph will be about."
+      },
+      {
+        "term": "editing",
+        "definition": "The process of revising and improving written text by removing errors, cutting unnecessary words, and improving clarity",
+        "example_usage": "The first draft was 500 words; after editing, it was 300 words and much clearer."
+      },
+      {
+        "term": "audience",
+        "definition": "The intended readers of a piece of writing, whose knowledge and needs shape how you write",
+        "example_usage": "Writing for children requires simpler vocabulary than writing for experts."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that using complex vocabulary and long sentences makes writing better.",
+        "correction": "Clear writing uses the simplest language that accurately conveys the meaning. Long, complex sentences are harder to read and more likely to contain errors. The most respected writers \u2014 from Hemingway to Mandela \u2014 wrote with clarity and directness. Sophistication comes from the quality of your ideas, not the complexity of your words.",
+        "why_students_think_this": "Academic environments sometimes reward elaborate language, creating the impression that complexity equals intelligence. Students who write in a second language may also use complex structures to appear more proficient."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

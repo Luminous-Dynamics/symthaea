@@ -1,0 +1,105 @@
+{
+  "node_id": "UNI.HEALTH.HL.MENTAL",
+  "lesson": {
+    "standard_code": "UNI.HEALTH.HL.MENTAL",
+    "title": "Mental Health",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Mental health is as important as physical health and affects how you think, feel, and cope with life. Stress is a normal response to pressure, but chronic stress damages physical and mental health. Anxiety is excessive worry that persists beyond the triggering situation. Depression is more than sadness — it involves persistent low mood, loss of interest, sleep changes, and difficulty functioning for two or more weeks. One in three South Africans will experience a mental health condition in their lifetime. Seeking help is a sign of strength. The SA Depression and Anxiety Group (SADAG) helpline is 0800 567 567 (toll-free, 24/7).",
+    "examples": [
+      {
+        "problem": "How can you tell the difference between normal sadness and depression?",
+        "steps": [
+          {"instruction": "Duration", "result": "Normal sadness passes within days. Depression persists for 2+ weeks."},
+          {"instruction": "Intensity", "result": "Sadness allows functioning. Depression makes daily tasks (work, hygiene, eating) feel overwhelming or impossible."},
+          {"instruction": "Scope", "result": "Sadness is usually about a specific event. Depression affects everything — even activities you usually enjoy feel empty."},
+          {"instruction": "Physical symptoms", "result": "Depression often includes sleep changes (too much or too little), appetite changes, fatigue, difficulty concentrating, and physical pain."}
+        ],
+        "answer": "Depression differs from sadness in duration (2+ weeks), severity (impairs daily functioning), and scope (affects all areas of life). If you recognize these signs, seek professional help."
+      },
+      {
+        "problem": "List five evidence-based strategies for managing everyday stress.",
+        "steps": [
+          {"instruction": "Physical activity", "result": "30 minutes of exercise releases endorphins and reduces cortisol. Even a brisk walk helps."},
+          {"instruction": "Sleep hygiene", "result": "7-9 hours of consistent sleep. Avoid screens 1 hour before bed. Same bedtime daily."},
+          {"instruction": "Social connection", "result": "Talking to trusted friends or family. Isolation worsens stress; connection buffers it."},
+          {"instruction": "Structured problem-solving", "result": "Write down the problem, list possible solutions, evaluate each, choose one, act on it. Replaces rumination with action."},
+          {"instruction": "Breathing techniques", "result": "4-7-8 breathing: inhale for 4 counts, hold for 7, exhale for 8. Activates the parasympathetic nervous system."}
+        ],
+        "answer": "Exercise, sleep, social connection, problem-solving, and breathing techniques are all evidence-based stress management strategies. Consistent practice matters more than intensity."
+      },
+      {
+        "problem": "Your friend says 'I have been feeling empty and tired for weeks, nothing interests me anymore, and I have been sleeping 14 hours a day.' What should you do?",
+        "steps": [
+          {"instruction": "Recognize the warning signs", "result": "Persistent emptiness, loss of interest, excessive sleep for weeks — these are symptoms of depression"},
+          {"instruction": "Listen without judgment", "result": "Do not say 'just cheer up' or 'others have it worse.' Validate their experience: 'That sounds really difficult.'"},
+          {"instruction": "Encourage professional help", "result": "Suggest seeing a doctor or calling SADAG (0800 567 567). Offer to help make the appointment."},
+          {"instruction": "Stay connected", "result": "Check in regularly. Do not assume one conversation is enough. Depression isolates people."}
+        ],
+        "answer": "Listen with empathy, validate their experience, and gently encourage professional help. Offer practical support (making an appointment, driving them). Do not try to diagnose or fix it yourself."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the SADAG helpline number?",
+        "answer": "0800 567 567 — toll-free, available 24 hours a day, 7 days a week. They also have a WhatsApp line and SMS service.",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["It is a free call from any South African phone"],
+        "explanation": "SADAG (South African Depression and Anxiety Group) is the continent's largest mental health support organization. They provide counselling, referrals, and crisis intervention.",
+        "distractors": ["10111", "112", "0800 123 456"]
+      },
+      {
+        "question": "Why is telling someone with depression to 'just think positive' unhelpful?",
+        "answer": "Depression is a medical condition involving brain chemistry changes, not a choice or attitude problem. Telling someone to 'think positive' implies they can control it through willpower, which creates guilt on top of depression. It dismisses their genuine suffering.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Would you tell someone with a broken leg to just walk it off?"],
+        "explanation": "Depression alters brain neurotransmitter levels (serotonin, dopamine). Like diabetes or asthma, it often requires medical treatment — therapy, medication, or both.",
+        "distractors": ["It is helpful because attitude affects health", "Positive thinking cures mild depression", "Depression is different from sadness so positivity works"]
+      },
+      {
+        "question": "What is the 4-7-8 breathing technique?",
+        "answer": "Inhale through your nose for 4 counts, hold your breath for 7 counts, exhale slowly through your mouth for 8 counts. Repeat 3-4 times. This activates the parasympathetic nervous system, reducing heart rate and anxiety.",
+        "difficulty_permille": 150,
+        "bloom_level": "Apply",
+        "hints": ["The numbers refer to the count for each phase of breathing"],
+        "explanation": "Controlled breathing is one of the fastest ways to reduce acute anxiety. The extended exhale signals safety to the nervous system. It can be done anywhere, anytime.",
+        "distractors": ["Breathe fast for 4 seconds, hold for 7, pant for 8", "Exercise for 4 minutes, rest for 7, stretch for 8", "The numbers represent hours of sleep needed"]
+      },
+      {
+        "question": "How much of the South African population will experience a mental health condition in their lifetime?",
+        "answer": "Approximately one in three (about 30-33%). This makes mental health conditions more common than most people realize.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["It is a surprisingly high proportion"],
+        "explanation": "Despite this prevalence, over 75% of people with mental health conditions in SA do not receive treatment due to stigma, cost, and lack of access to services.",
+        "distractors": ["One in ten", "One in a hundred", "One in fifty"]
+      },
+      {
+        "question": "Name three physical symptoms that can be caused by chronic stress.",
+        "answer": "Headaches, muscle tension/pain, digestive problems (stomach cramps, IBS), insomnia, weakened immune system (frequent illness), elevated blood pressure, and fatigue.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Stress is not just in your head — it affects your whole body"],
+        "explanation": "Chronic stress keeps cortisol elevated, which suppresses the immune system, raises blood pressure, disrupts sleep, and triggers inflammation. The mind-body connection is real.",
+        "distractors": ["Stress only affects mood, not the body", "Only anxiety causes physical symptoms", "Physical symptoms mean it is not a mental health issue"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Depression", "definition": "A mental health condition involving persistent low mood, loss of interest, and difficulty functioning for two or more weeks, caused by a combination of biological, psychological, and social factors", "example_usage": "After weeks of feeling empty and unable to work, she was diagnosed with depression."},
+      {"term": "Anxiety", "definition": "Excessive, persistent worry that is disproportionate to the situation and interferes with daily life", "example_usage": "His anxiety about social situations prevented him from attending work meetings."},
+      {"term": "Stigma", "definition": "Negative attitudes, stereotypes, and discrimination directed at people with mental health conditions, which discourage them from seeking help", "example_usage": "Stigma around mental illness in the community made it hard for him to talk about his depression."},
+      {"term": "Resilience", "definition": "The ability to recover from adversity, stress, or trauma — a skill that can be developed, not a fixed trait", "example_usage": "Building resilience through social support and coping strategies helped her manage ongoing stress."}
+    ],
+    "misconceptions": [
+      {"misconception": "Mental health problems are a sign of weakness", "correction": "Mental health conditions are medical conditions, not character flaws. They affect people of all backgrounds, strengths, and intelligence levels. Seeking help requires courage, not weakness.", "why_students_think_this": "Cultural beliefs equate emotional distress with personal failure, and mental health is less visible than physical illness."},
+      {"misconception": "Therapy is only for 'crazy' people", "correction": "Therapy is a tool for anyone experiencing stress, grief, relationship difficulties, or wanting personal growth — not just for severe mental illness. It is as normal as seeing a physiotherapist for back pain.", "why_students_think_this": "Media portrays therapy as treatment for extreme cases, and stigma frames mental health care as only for those who are severely unwell."},
+      {"misconception": "Children and teens do not get depression", "correction": "Mental health conditions can occur at any age. Depression in young people may manifest differently — as irritability, behavioral changes, or academic decline rather than sadness.", "why_students_think_this": "Adults romanticize childhood as carefree and may dismiss children's emotional distress as 'just a phase.'"}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.92, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

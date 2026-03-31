@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.CRITICAL.CT.FALL",
+  "lesson": {
+    "standard_code": "UNI.CRITICAL.CT.FALL",
+    "title": "Logical Fallacies",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Logical fallacies are errors in reasoning that make an argument invalid. Ad hominem attacks the person instead of their argument. Straw man misrepresents someone's position to make it easier to attack. False dilemma presents only two options when more exist. Appeal to authority treats someone's status as proof. Red herring introduces an irrelevant topic to distract. Slippery slope claims one step inevitably leads to extreme consequences without evidence. Recognizing these in news, politics, advertising, and daily conversation protects you from manipulation.",
+    "examples": [
+      {
+        "problem": "Identify the fallacy: 'You cannot trust Dr. Naidoo's climate research because she was divorced twice.'",
+        "steps": [
+          {"instruction": "Identify the claim being challenged", "result": "Dr. Naidoo's climate research findings"},
+          {"instruction": "Identify the 'reason' given", "result": "Her personal life (divorces)"},
+          {"instruction": "Ask: does the reason address the claim?", "result": "No — marital history has nothing to do with scientific research quality"}
+        ],
+        "answer": "This is an ad hominem fallacy — attacking the person's character instead of addressing the evidence in her research."
+      },
+      {
+        "problem": "Identify the fallacy: 'If we allow students to use calculators in maths class, they will never learn to think, and eventually no one will be able to do basic arithmetic, and civilization will collapse.'",
+        "steps": [
+          {"instruction": "Identify the initial claim", "result": "Allowing calculators in maths class"},
+          {"instruction": "Trace the chain of consequences", "result": "Calculators → cannot think → no basic arithmetic → civilization collapses"},
+          {"instruction": "Check if each step necessarily follows", "result": "No — each step is an unsupported leap. Many countries use calculators and maintain strong numeracy."}
+        ],
+        "answer": "This is a slippery slope fallacy — claiming a minor action will inevitably lead to extreme consequences without justifying each step in the chain."
+      },
+      {
+        "problem": "Identify the fallacy: 'Opponent: We should improve public transport. Response: My opponent wants to ban cars and force everyone onto buses.'",
+        "steps": [
+          {"instruction": "What did the opponent actually say?", "result": "We should improve public transport"},
+          {"instruction": "What was the response?", "result": "Claims the opponent wants to ban cars and force bus use"},
+          {"instruction": "Is the response accurate?", "result": "No — improving public transport does not mean banning cars. The position was distorted to make it easier to attack."}
+        ],
+        "answer": "This is a straw man fallacy — misrepresenting the opponent's position and then attacking the distorted version."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What fallacy is this? 'Either you support this bill entirely, or you are against progress.'",
+        "answer": "False dilemma (false dichotomy). It presents only two extreme options when others exist — someone could support parts of the bill, propose amendments, or have a different approach to achieving progress.",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Are there really only two options here?"],
+        "explanation": "False dilemmas force a binary choice to pressure agreement. Reality usually offers a spectrum of positions.",
+        "distractors": ["Ad hominem", "Red herring", "Appeal to authority"]
+      },
+      {
+        "question": "What fallacy is this? 'Millions of people believe in astrology, so it must have some truth to it.'",
+        "answer": "Appeal to popularity (ad populum). The number of believers does not determine whether something is true. Millions once believed the earth was flat.",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Does the number of people who believe something make it true?"],
+        "explanation": "Truth is determined by evidence, not by how many people accept a claim. This fallacy is especially common in marketing ('best-selling').",
+        "distractors": ["Appeal to authority", "Straw man", "Slippery slope"]
+      },
+      {
+        "question": "A politician is asked about corruption in their department and responds: 'What we should really be talking about is the amazing job growth numbers this quarter.' What fallacy is this?",
+        "answer": "Red herring. The politician introduces an irrelevant topic (job growth) to divert attention from the actual question (corruption).",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Is the response actually addressing the question asked?"],
+        "explanation": "Red herrings are diversionary tactics. The job growth may be real but it does not address the corruption question.",
+        "distractors": ["Straw man", "False dilemma", "Ad hominem"]
+      },
+      {
+        "question": "Why is 'My teacher says it is true, so it must be true' a fallacy?",
+        "answer": "This is an appeal to authority. While teachers are often knowledgeable, their status alone does not make a claim true. The claim should be evaluated on its evidence, and even experts can be wrong or speak outside their expertise.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Being an authority figure does not guarantee correctness"],
+        "explanation": "Legitimate expert opinion is valuable evidence, but it is not proof. The fallacy occurs when authority status is treated as the sole reason to accept a claim.",
+        "distractors": ["This is not a fallacy — teachers are correct", "It is a straw man", "It is a false dilemma"]
+      },
+      {
+        "question": "Create your own example of a straw man fallacy.",
+        "answer": "Example: Person A says 'We should have more vegetarian options in the cafeteria.' Person B responds 'Person A wants to force everyone to stop eating meat and destroy the farming industry.' This misrepresents A's position (more options, not eliminating meat).",
+        "difficulty_permille": 350,
+        "bloom_level": "Create",
+        "hints": ["Take a moderate position and exaggerate it into an extreme version, then attack the extreme version"],
+        "explanation": "A straw man works by replacing someone's actual argument with a weaker, distorted version that is easier to argue against.",
+        "distractors": ["Any example that attacks a person instead of their argument", "Any example that presents only two options", "Any example that changes the subject"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Ad hominem", "definition": "Attacking the person making the argument rather than the argument itself", "example_usage": "Dismissing a scientist's findings because of their nationality is ad hominem."},
+      {"term": "Straw man", "definition": "Misrepresenting someone's argument to make it easier to attack", "example_usage": "He said we should reduce sugar intake, but she claimed he wanted to ban all sweets — that is a straw man."},
+      {"term": "False dilemma", "definition": "Presenting only two options when more possibilities exist", "example_usage": "'You are either with us or against us' is a false dilemma — neutrality and partial agreement also exist."},
+      {"term": "Red herring", "definition": "Introducing an irrelevant topic to divert attention from the original issue", "example_usage": "When asked about budget cuts, the manager talked about last year's awards — a red herring."}
+    ],
+    "misconceptions": [
+      {"misconception": "Identifying a fallacy means the conclusion is wrong", "correction": "A fallacious argument can still have a true conclusion — it just means the reasoning does not support it. The conclusion needs to be evaluated on other evidence.", "why_students_think_this": "People assume that bad reasoning equals a wrong conclusion, but truth and logical validity are separate."},
+      {"misconception": "Only dishonest people use fallacies", "correction": "Most fallacies are committed unintentionally. Our brains are wired for shortcuts that produce fallacious reasoning. Even experts commit fallacies without realizing it.", "why_students_think_this": "Fallacies sound like deliberate tricks, but they are often genuine cognitive errors."},
+      {"misconception": "Expert opinion is always a fallacy (appeal to authority)", "correction": "Citing genuine experts within their field of expertise is strong evidence, not a fallacy. The fallacy occurs when authority alone (without evidence) is treated as proof, or when the 'authority' lacks relevant expertise.", "why_students_think_this": "After learning about appeal to authority, people over-apply it and dismiss all expert testimony."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

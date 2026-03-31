@@ -67,108 +67,118 @@
     ],
     "practice_problems": [
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "A restaurant offers 4 starters, 5 mains, and 3 desserts. How many different 3-course meals (one starter, one main, one dessert) can a customer choose?",
+        "answer": "60",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "Each course is an independent choice.",
+          "Use the fundamental counting principle: multiply the number of options at each stage."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "By the multiplication rule, the total number of meals = 4 x 5 x 3 = 60.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "12",
+          "15",
+          "120"
         ]
       },
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "In how many ways can 6 athletes finish first, second, and third in a race (no ties)?",
+        "answer": "120",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "Order matters here -- this is a permutation.",
+          "Use nPr = n! / (n-r)!."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "6P3 = 6! / (6-3)! = 6! / 3! = 720 / 6 = 120. Alternatively: 6 choices for 1st, 5 for 2nd, 4 for 3rd = 6 x 5 x 4 = 120.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "20",
+          "720",
+          "216"
         ]
       },
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "A team of 4 learners must be selected from a class of 10. How many different teams are possible?",
+        "answer": "210",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "Order does not matter in a team -- use combinations.",
+          "nCr = n! / [r!(n-r)!]."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "10C4 = 10! / (4! x 6!) = (10 x 9 x 8 x 7) / (4 x 3 x 2 x 1) = 5040 / 24 = 210.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "5040",
+          "40",
+          "120"
         ]
       },
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "How many different arrangements can be made using all the letters of the word COMMITTEE?",
+        "answer": "45 360",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "Count the letters and identify which ones repeat.",
+          "COMMITTEE has 9 letters with repeated letters: M (x2), T (x2), E (x2).",
+          "Divide n! by the product of the factorials of each repeated letter."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "COMMITTEE has 9 letters: C, O, M, M, I, T, T, E, E. Repeated: M (2), T (2), E (2). Arrangements = 9! / (2! x 2! x 2!) = 362880 / 8 = 45 360.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "362 880",
+          "90 720",
+          "181 440"
         ]
       },
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "A bag contains 5 red and 7 blue marbles. Two marbles are drawn at random without replacement. What is the probability that both are red?",
+        "answer": "5/33",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "Use counting to find favourable outcomes over total outcomes.",
+          "Favourable: choose 2 red from 5. Total: choose 2 from 12."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "Favourable outcomes = 5C2 = 10. Total outcomes = 12C2 = 66. P(both red) = 10/66 = 5/33.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "5/12",
+          "25/144",
+          "1/6"
         ]
       },
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "Events A and B are such that P(A) = 0.4, P(B) = 0.5, and P(A or B) = 0.7. Are A and B mutually exclusive? Are they independent?",
+        "answer": "Not mutually exclusive; they are independent",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "If mutually exclusive, P(A and B) = 0 and P(A or B) = P(A) + P(B).",
+          "Find P(A and B) using the addition rule first.",
+          "For independence, check if P(A and B) = P(A) x P(B)."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "P(A and B) = P(A) + P(B) - P(A or B) = 0.4 + 0.5 - 0.7 = 0.2. Since P(A and B) = 0.2 (not 0), A and B are NOT mutually exclusive. Check independence: P(A) x P(B) = 0.4 x 0.5 = 0.2 = P(A and B), so A and B ARE independent.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "Mutually exclusive and independent",
+          "Mutually exclusive but not independent",
+          "Neither mutually exclusive nor independent"
         ]
       },
       {
-        "question": "A committee of 3 must be chosen from 5 men and 4 women. How many committees have at least 1 woman?",
-        "answer": "74",
+        "question": "Five boys and 3 girls sit in a row. In how many ways can they be seated if the 3 girls must sit next to each other?",
+        "answer": "4 320",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Try the complement: total minus all-male.,Total ways to choose 3 from 9 people is 9C3."
+          "Treat the 3 girls as a single unit first.",
+          "Count the arrangements of the combined units, then multiply by the internal arrangements of the girls.",
+          "There are 6 units total (5 boys + 1 girl-block)."
         ],
-        "explanation": "Total committees = 9C3 = 84. All-male = 5C3 = 10. At least 1 woman = 84 − 10 = 74.",
+        "explanation": "Treat the 3 girls as one unit. Total units = 5 boys + 1 girl-block = 6. These 6 units can be arranged in 6! = 720 ways. The 3 girls within the block can be arranged in 3! = 6 ways. Total = 720 x 6 = 4 320.",
         "distractors": [
-          "84",
-          "80",
-          "64"
+          "40 320",
+          "720",
+          "2 160"
         ]
       }
     ],

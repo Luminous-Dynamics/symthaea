@@ -1,0 +1,124 @@
+{
+  "node_id": "UNI.CIVIC.CIV.VOTE",
+  "lesson": {
+    "standard_code": "UNI.CIVIC.CIV.VOTE",
+    "title": "Voting & Elections",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Elections are the mechanism through which citizens choose their representatives in a democracy. South Africa uses a proportional representation system for national and provincial elections: voters choose a party, and seats in Parliament are allocated proportionally to vote share. Municipal elections use a mixed system combining ward candidates and proportional party lists. The Independent Electoral Commission (IEC) oversees free and fair elections. Voter registration, understanding ballot papers, and recognising the impact of voter turnout are essential skills for democratic participation.",
+    "examples": [
+      {
+        "problem": "In a national election, Party A receives 60% of the vote and Party B receives 40%. If the National Assembly has 400 seats, how many seats does each party get?",
+        "steps": [
+          {"instruction": "Step 1: Party A seats = 60% of 400 = 0.60 x 400 = 240 seats.", "result": "Party A: 240"},
+          {"instruction": "Step 2: Party B seats = 40% of 400 = 0.40 x 400 = 160 seats.", "result": "Party B: 160"},
+          {"instruction": "Step 3: Total = 240 + 160 = 400 seats (all allocated).", "result": "verified"}
+        ],
+        "answer": "Answer: Party A gets 240 seats and Party B gets 160 seats under proportional representation.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why voter turnout matters using a hypothetical scenario.",
+        "steps": [
+          {"instruction": "Step 1: Suppose only 30% of eligible voters participate in an election.", "result": "low turnout"},
+          {"instruction": "Step 2: A party winning 60% of that 30% effectively has support from only 18% of the eligible population.", "result": "minority mandate"},
+          {"instruction": "Step 3: The elected government lacks broad legitimacy, which can lead to policy that does not reflect the majority's wishes.", "result": "legitimacy concern"}
+        ],
+        "answer": "Answer: Low voter turnout means elected officials may represent a small minority, undermining democratic legitimacy.",
+        "visual_description": null
+      },
+      {
+        "problem": "What is the difference between proportional representation and a first-past-the-post system?",
+        "steps": [
+          {"instruction": "Step 1: Proportional representation (PR) allocates seats based on overall vote share — 30% of votes = roughly 30% of seats.", "result": "PR explained"},
+          {"instruction": "Step 2: First-past-the-post (FPTP) elects the single candidate with the most votes in each constituency — a party can win many constituencies with slim margins.", "result": "FPTP explained"},
+          {"instruction": "Step 3: PR tends to produce multi-party legislatures; FPTP tends to produce two-party dominance.", "result": "key difference"}
+        ],
+        "answer": "Answer: PR allocates seats proportionally to vote share (used in SA national elections); FPTP gives each seat to the local winner (used in countries like the UK).",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What organisation runs elections in South Africa, and what is its main responsibility?",
+        "answer": "The Independent Electoral Commission (IEC) manages and oversees elections to ensure they are free and fair.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think of the body that manages voter registration and election day logistics in SA."],
+        "explanation": "The IEC is established by Chapter 9 of the Constitution as an independent body. It registers voters, manages the electoral roll, runs polling stations, counts votes, and declares results.",
+        "distractors": ["The Department of Home Affairs runs elections", "The President appoints election results"]
+      },
+      {
+        "question": "Explain how the proportional representation system works in South African national elections.",
+        "answer": "Voters vote for a party, not an individual candidate. Seats in the National Assembly (400 total) are allocated to parties in proportion to their share of the national vote. Parties then fill their seats from pre-published candidate lists.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["In PR, you vote for a party, not a person.", "Think about what happens when a party gets 25% of the vote."],
+        "explanation": "This system ensures that minority parties that receive significant vote share still get representation, unlike winner-take-all systems where small parties can be shut out entirely.",
+        "distractors": ["Voters choose individual candidates in each constituency", "Only the top two parties get seats"]
+      },
+      {
+        "question": "In a municipal election, Ward 5 has three candidates. Candidate X gets 4,500 votes, Candidate Y gets 3,200, and Candidate Z gets 2,300. Who wins the ward seat and why?",
+        "answer": "Candidate X wins with 4,500 votes because ward elections use a first-past-the-post system where the candidate with the most votes wins, regardless of whether they got more than 50%.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["Ward elections are FPTP — the candidate with the most votes wins.", "No runoff is needed."],
+        "explanation": "SA municipal elections combine FPTP ward candidates with PR party list seats. In ward races, the simple plurality winner takes the seat. Candidate X won with 45% of votes — no absolute majority required.",
+        "distractors": ["There must be a runoff because no one got 50%", "Candidate X needs at least 5,000 votes to win"]
+      },
+      {
+        "question": "Analyse the potential consequences of a country switching from proportional representation to first-past-the-post.",
+        "answer": "Smaller parties would likely lose representation as they cannot win individual constituencies. This could reduce diversity of voices in parliament, potentially leading to a two-party system. However, it could create stronger constituency-representative links and clearer government mandates. Minority communities might lose dedicated representation.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": ["Consider what happens to a party with 15% support spread evenly across the country.", "Think about the tradeoffs between representation and governance."],
+        "explanation": "Electoral system design has profound effects on political culture. PR favours diversity and coalition-building; FPTP favours decisive governance and local accountability. Neither is objectively better — each reflects different democratic values.",
+        "distractors": ["FPTP is always more democratic", "PR always leads to unstable coalitions"]
+      },
+      {
+        "question": "South Africa's voter turnout has declined from 86% in 1994 to about 66% in 2019 and 59% in 2024. Evaluate the causes and suggest strategies to improve participation.",
+        "answer": "Causes include disillusionment with government (corruption scandals, service delivery failures), voter apathy among youth, practical barriers (registration, transport to polls), and a sense that one vote does not matter. Strategies: civic education in schools, easier registration (online, automatic), extended voting hours, community-based voter drives, and addressing root causes of disillusionment through transparent governance.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": ["Think about both practical barriers and motivational factors.", "Consider what has changed since 1994 that might affect voter enthusiasm."],
+        "explanation": "The 1994 election had extraordinary turnout because it was the first democratic election after apartheid. As the novelty faded and governance challenges emerged, some voters became disillusioned. Youth voter registration is particularly low. Addressing this requires both systemic changes and civic engagement.",
+        "distractors": ["Low turnout means democracy is working fine", "Mandatory voting is the only solution"]
+      }
+    ],
+    "hints": [
+      "SA national elections use proportional representation; municipal elections use a mixed system.",
+      "The IEC is the independent body that runs elections in South Africa.",
+      "Voter turnout directly affects the legitimacy of election outcomes."
+    ],
+    "key_vocabulary": [
+      {"term": "proportional representation", "definition": "An electoral system where seats are allocated in proportion to the votes each party receives", "example_usage": "Under proportional representation, a party with 25% of votes gets about 25% of seats."},
+      {"term": "first-past-the-post", "definition": "An electoral system where the candidate with the most votes in a constituency wins the seat", "example_usage": "Ward elections in SA use first-past-the-post."},
+      {"term": "voter turnout", "definition": "The percentage of eligible voters who actually cast a ballot in an election", "example_usage": "South Africa's voter turnout has declined since 1994."},
+      {"term": "constituency", "definition": "A geographic area represented by an elected official", "example_usage": "Each ward is a constituency that elects one councillor."},
+      {"term": "electoral commission", "definition": "An independent body responsible for managing elections", "example_usage": "The IEC is South Africa's electoral commission."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think their single vote cannot make a difference.",
+        "correction": "In proportional representation, every vote directly affects how many seats a party gets — even a small number of votes can determine whether a party gains or loses a seat. In ward elections, races are sometimes decided by very few votes. Collective voter apathy leads to governments that do not reflect the population's true preferences.",
+        "why_students_think_this": "When millions of people vote, one vote feels insignificant. But elections are decided by aggregates, and close races happen frequently at local level."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

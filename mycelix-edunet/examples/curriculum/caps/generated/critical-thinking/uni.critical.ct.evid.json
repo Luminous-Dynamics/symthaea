@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.CRITICAL.CT.EVID",
+  "lesson": {
+    "standard_code": "UNI.CRITICAL.CT.EVID",
+    "title": "Evidence Evaluation",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Not all evidence is equally reliable. Peer-reviewed research is the gold standard — experts evaluate the methodology before publication. Anecdotes (personal stories) are the weakest evidence because they represent one experience, not a pattern. Correlation (two things occurring together) does not prove causation (one causing the other) — ice cream sales and drowning deaths both rise in summer, but ice cream does not cause drowning. Evaluate sources by checking: Who published it? What is their expertise? Is the methodology described? Can the results be replicated? Is there a conflict of interest?",
+    "examples": [
+      {
+        "problem": "Evaluate this claim: 'My grandfather smoked for 60 years and lived to 92, so smoking is not dangerous.'",
+        "steps": [
+          {"instruction": "Identify the type of evidence", "result": "Anecdote — a single personal experience"},
+          {"instruction": "Assess the reasoning", "result": "One person surviving does not disprove population-level risk. Thousands of studies with millions of participants show smoking causes cancer, heart disease, and early death."},
+          {"instruction": "Apply survivorship bias", "result": "We hear about the grandfather who survived, not the many smokers who died at 55. This is survivorship bias."}
+        ],
+        "answer": "This is anecdotal evidence subject to survivorship bias. Population-level peer-reviewed research overwhelmingly shows smoking is dangerous, regardless of individual exceptions."
+      },
+      {
+        "problem": "A news headline claims: 'Study shows people who eat chocolate are thinner.' Evaluate this correlation claim.",
+        "steps": [
+          {"instruction": "Identify the implied claim", "result": "Eating chocolate causes weight loss (causation)"},
+          {"instruction": "Consider alternative explanations", "result": "Thinner people may feel more comfortable eating chocolate. Both could be caused by a third factor (e.g., higher income = more dark chocolate + better gym access)."},
+          {"instruction": "Check what the study actually shows", "result": "The study found a correlation — an association, not proof that chocolate causes thinness."}
+        ],
+        "answer": "Correlation does not prove causation. The headline implies causation but the data only shows association. Many confounding variables could explain the link."
+      },
+      {
+        "problem": "You find two sources about a health treatment. Source A: a blog post by someone who tried it. Source B: a meta-analysis of 15 randomized controlled trials published in The Lancet. Which is more reliable and why?",
+        "steps": [
+          {"instruction": "Assess Source A", "result": "Single person's experience, no control group, no systematic methodology, potential placebo effect, no peer review"},
+          {"instruction": "Assess Source B", "result": "Meta-analysis (combines multiple studies), randomized controlled trials (gold standard), peer-reviewed in a top journal, systematic methodology"},
+          {"instruction": "Compare", "result": "Source B is vastly more reliable — it synthesizes controlled evidence from thousands of participants"}
+        ],
+        "answer": "Source B (meta-analysis in The Lancet) is far more reliable. It combines controlled experiments, was peer-reviewed, and represents evidence from thousands of participants versus one person's experience."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What does 'correlation does not imply causation' mean?",
+        "answer": "Just because two things happen together (correlate) does not mean one causes the other. There may be a third factor causing both, or the relationship may be coincidental.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think of two things that increase at the same time but are unrelated"],
+        "explanation": "Example: Cities with more firefighters have more fires. More firefighters do not cause fires — larger cities have both more fires and more firefighters.",
+        "distractors": ["It means correlations are always wrong", "It means only experiments can find truth", "It means statistics are unreliable"]
+      },
+      {
+        "question": "What is peer review and why does it matter?",
+        "answer": "Peer review is the process where independent experts in the field evaluate a research paper's methodology, data, and conclusions before it is published. It catches errors, biases, and unsupported claims, increasing (but not guaranteeing) reliability.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Who checks the work before it is published?"],
+        "explanation": "Without peer review, anyone can publish anything. Peer review acts as a quality filter, though it is imperfect — fraudulent papers occasionally pass.",
+        "distractors": ["It means a friend reviewed it", "It guarantees the research is correct", "Only government agencies do peer review"]
+      },
+      {
+        "question": "A study funded by a soft drink company finds that sugar has no negative health effects. What concern should this raise?",
+        "answer": "Conflict of interest. The funder has a financial interest in the outcome, which could bias the research design, data interpretation, or publication of results. This does not automatically mean the findings are wrong, but it warrants extra scrutiny.",
+        "difficulty_permille": 300,
+        "bloom_level": "Evaluate",
+        "hints": ["Who benefits from this finding?"],
+        "explanation": "Industry-funded studies are more likely to produce results favorable to the funder. Look for independent replication and compare with non-industry studies.",
+        "distractors": ["It is automatically invalid", "Funding source never matters", "Only government-funded studies are reliable"]
+      },
+      {
+        "question": "Rank these from weakest to strongest evidence: (A) A friend's personal experience, (B) A single randomized controlled trial, (C) A meta-analysis of 20 trials, (D) An expert's opinion.",
+        "answer": "From weakest to strongest: (A) Personal experience, (D) Expert opinion, (B) Single randomized trial, (C) Meta-analysis of 20 trials.",
+        "difficulty_permille": 250,
+        "bloom_level": "Analyze",
+        "hints": ["Think about sample size and methodology rigor"],
+        "explanation": "Personal experience (n=1) < expert opinion (informed but could be biased) < single RCT (controlled but one study) < meta-analysis (synthesizes many controlled studies).",
+        "distractors": ["D, A, B, C", "A, B, D, C", "D, B, A, C"]
+      },
+      {
+        "question": "A website claims a supplement cures a disease but provides no references, no author name, and sells the supplement. How reliable is this?",
+        "answer": "Very unreliable. It lacks credible evidence (no references), accountability (no author), and has a financial conflict of interest (selling the product). This has the hallmarks of health misinformation or a scam.",
+        "difficulty_permille": 200,
+        "bloom_level": "Evaluate",
+        "hints": ["Apply all the source evaluation criteria: who, evidence, conflict of interest"],
+        "explanation": "Reliable health information comes from named authors with credentials, cites peer-reviewed research, and does not have a direct financial incentive to promote the product.",
+        "distractors": ["It might be reliable if the testimonials are positive", "The website design indicates quality", "If it is on the internet, it was probably checked"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Peer review", "definition": "The evaluation of research by independent experts in the field before publication in a journal", "example_usage": "The study was published in a peer-reviewed journal, adding credibility to its findings."},
+      {"term": "Correlation", "definition": "A statistical relationship between two variables — they change together, but one does not necessarily cause the other", "example_usage": "There is a correlation between education level and income, but education alone does not determine income."},
+      {"term": "Causation", "definition": "A proven cause-and-effect relationship where one factor directly produces a change in another", "example_usage": "Controlled experiments established causation between the virus and the disease."},
+      {"term": "Anecdotal evidence", "definition": "Evidence based on personal stories or individual experiences rather than systematic research", "example_usage": "Her recovery is anecdotal evidence — we need clinical trials to know if the treatment actually works."}
+    ],
+    "misconceptions": [
+      {"misconception": "If a study is published, it must be true", "correction": "Published studies can have flawed methodology, small sample sizes, or be retracted later. Peer review reduces but does not eliminate errors. Look for replication and meta-analyses.", "why_students_think_this": "Publication in a journal seems like an official stamp of truth, and people are not taught to evaluate research quality."},
+      {"misconception": "Personal experience is the most reliable evidence", "correction": "Personal experience is subject to placebo effect, confirmation bias, coincidence, and memory distortion. Systematic research with control groups is far more reliable.", "why_students_think_this": "Our own experiences feel vivid and certain, while statistics feel abstract and impersonal."},
+      {"misconception": "More data always means better evidence", "correction": "Data quality matters more than quantity. A million survey responses with leading questions are worse than 200 participants in a well-designed experiment with proper controls.", "why_students_think_this": "Large numbers feel impressive and seem more convincing, regardless of how the data was collected."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

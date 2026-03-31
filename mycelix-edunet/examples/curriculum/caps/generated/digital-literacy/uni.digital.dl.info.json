@@ -1,0 +1,105 @@
+{
+  "node_id": "UNI.DIGITAL.DL.INFO",
+  "lesson": {
+    "standard_code": "UNI.DIGITAL.DL.INFO",
+    "title": "Information Literacy",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Information literacy is the ability to find, evaluate, and use information effectively. Effective searching goes beyond typing a question into Google — use specific keywords, quotation marks for exact phrases, and minus signs to exclude terms. Evaluate sources using the CRAAP test: Currency (when was it published?), Relevance (does it address your question?), Authority (who is the author and what are their credentials?), Accuracy (is it supported by evidence?), Purpose (why was it written — to inform, sell, persuade?). Wikipedia is useful for overviews but not as a primary source; check its references instead.",
+    "examples": [
+      {
+        "problem": "You need to find reliable information about diabetes management in South Africa. Demonstrate effective search strategies.",
+        "steps": [
+          {"instruction": "Start with specific keywords", "result": "Search: 'diabetes management guidelines South Africa' rather than just 'diabetes'"},
+          {"instruction": "Use advanced operators", "result": "'diabetes type 2' site:gov.za OR site:who.int — limits results to government and WHO sites"},
+          {"instruction": "Evaluate the top results", "result": "Prioritize results from the SA Department of Health, SEMDSA (Society for Endocrinology), or WHO over blogs and product sites"},
+          {"instruction": "Cross-reference", "result": "Check that information from one source is consistent with other authoritative sources"}
+        ],
+        "answer": "Use specific search terms, site-restricted searches, evaluate source authority, and cross-reference. This approach quickly surfaces reliable medical information."
+      },
+      {
+        "problem": "You find a website claiming a new supplement cures cancer. Apply the CRAAP test.",
+        "steps": [
+          {"instruction": "Currency", "result": "Page has no date — cannot verify when information was published"},
+          {"instruction": "Relevance", "result": "It addresses cancer cures, which is your topic — but relevance alone is not enough"},
+          {"instruction": "Authority", "result": "No author named. The website is a .com selling supplements — not a medical institution"},
+          {"instruction": "Accuracy", "result": "No citations to peer-reviewed research. Uses testimonials instead of clinical data"},
+          {"instruction": "Purpose", "result": "The site sells the supplement — clear commercial interest, not objective information"}
+        ],
+        "answer": "This source fails 4 of 5 CRAAP criteria. It is not reliable for medical decisions. Consult peer-reviewed sources and licensed healthcare providers instead."
+      },
+      {
+        "problem": "How should you use Wikipedia responsibly for a research project?",
+        "steps": [
+          {"instruction": "Use it as a starting point", "result": "Read the Wikipedia article to get an overview and identify key concepts"},
+          {"instruction": "Check the references section", "result": "Wikipedia cites its sources — follow the footnotes to the original peer-reviewed papers, books, and reports"},
+          {"instruction": "Never cite Wikipedia directly", "result": "Cite the original sources that Wikipedia references, after verifying them yourself"},
+          {"instruction": "Check the article quality", "result": "Look for citation-needed tags, edit warnings, and article ratings — these indicate reliability issues"}
+        ],
+        "answer": "Wikipedia is a useful overview and reference finder, not a primary source. Use it to discover original sources, then read and cite those directly."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What does the CRAAP test evaluate?",
+        "answer": "Currency (timeliness), Relevance (applicability to your need), Authority (source credibility), Accuracy (evidence and verification), Purpose (reason for creation — to inform, persuade, or sell).",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": ["It is an acronym for five evaluation criteria"],
+        "explanation": "CRAAP provides a systematic framework for evaluating any source of information, whether online or in print.",
+        "distractors": ["It tests if a website is legal", "It measures internet speed", "It checks for viruses"]
+      },
+      {
+        "question": "You search for 'best laptop 2026' and the top results are all from affiliate review sites. Why should you be cautious?",
+        "answer": "Affiliate sites earn commission when you purchase through their links, creating a conflict of interest. Their 'best' recommendations may prioritize products that pay the highest commission rather than those that are genuinely best for you.",
+        "difficulty_permille": 250,
+        "bloom_level": "Evaluate",
+        "hints": ["How do these review sites make money?"],
+        "explanation": "Look for reviews from sites that do not sell products (e.g., independent tech publications, consumer organizations). Also check user reviews on multiple platforms.",
+        "distractors": ["Top results are always the most reliable", "Affiliate sites are always dishonest", "Only expensive laptops are reviewed"]
+      },
+      {
+        "question": "How do you search for an exact phrase on Google?",
+        "answer": "Put the phrase in quotation marks. Example: \"compound interest formula\" will only return pages with those exact words in that exact order.",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["A specific punctuation mark forces exact matching"],
+        "explanation": "Without quotes, Google searches for each word separately and may return pages missing some of the words. Quotes enforce the exact phrase.",
+        "distractors": ["Use capital letters", "Add 'exact:' before the search", "Use parentheses"]
+      },
+      {
+        "question": "A .gov.za domain is generally more reliable than a .com domain for government policy information. Why?",
+        "answer": "The .gov.za domain is restricted to South African government entities. Anyone can register a .com domain, including individuals and companies with agendas. Government domains have institutional accountability.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about who is allowed to use each domain type"],
+        "explanation": "Domain type is one indicator of authority, not a guarantee. Government sites can have errors too, but they are institutionally accountable and not commercially motivated.",
+        "distractors": [".com is always unreliable", ".gov.za sites are never wrong", "Domain type does not matter at all"]
+      },
+      {
+        "question": "What is the difference between a primary source and a secondary source?",
+        "answer": "A primary source is original, first-hand material (a research paper, government data, interview transcript, historical document). A secondary source interprets or analyzes primary sources (a newspaper article about a study, a textbook chapter, a Wikipedia article).",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["One is the original evidence; the other discusses the original evidence"],
+        "explanation": "When possible, consult primary sources. Secondary sources may misinterpret or selectively represent the original material.",
+        "distractors": ["Primary means more important", "Secondary sources are always unreliable", "There is no meaningful difference"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "CRAAP test", "definition": "A framework for evaluating information sources based on Currency, Relevance, Authority, Accuracy, and Purpose", "example_usage": "I applied the CRAAP test and found the article was outdated and written by someone with no credentials."},
+      {"term": "Primary source", "definition": "Original, first-hand material such as research papers, raw data, interviews, or historical documents", "example_usage": "The clinical trial report is a primary source; the newspaper article about it is secondary."},
+      {"term": "Boolean operators", "definition": "Words like AND, OR, and NOT used in search engines to refine search results", "example_usage": "Searching 'diabetes AND exercise NOT type1' narrows results to type 2 diabetes and exercise."},
+      {"term": "Lateral reading", "definition": "Evaluating a source by leaving the page and searching for information about the author and publication from other sources", "example_usage": "Instead of reading the article's 'About Us' page, I searched for the publication's reputation elsewhere."}
+    ],
+    "misconceptions": [
+      {"misconception": "The first Google result is the most reliable", "correction": "Google ranks by relevance and engagement, not by accuracy or reliability. Paid ads appear first, followed by SEO-optimized pages. Authoritative sources may appear lower in results.", "why_students_think_this": "People trust Google's algorithm to evaluate quality, when it primarily optimizes for relevance and user engagement."},
+      {"misconception": "If it is on the internet, someone has checked it", "correction": "Anyone can publish anything online with no editorial review. There is no universal gatekeeper. Social media posts, blogs, and many websites have zero fact-checking.", "why_students_think_this": "The professional appearance of many websites creates an illusion of authority and editorial oversight."},
+      {"misconception": "Wikipedia is never reliable", "correction": "Wikipedia's accuracy on established scientific and historical topics rivals traditional encyclopedias. Its strength is transparency — you can see every edit and source. It is weak on controversial, recent, or obscure topics.", "why_students_think_this": "Teachers universally warn against citing Wikipedia, which students interpret as it being entirely unreliable."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

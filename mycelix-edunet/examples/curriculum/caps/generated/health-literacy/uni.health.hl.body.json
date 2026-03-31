@@ -1,0 +1,102 @@
+{
+  "node_id": "UNI.HEALTH.HL.BODY",
+  "lesson": {
+    "standard_code": "UNI.HEALTH.HL.BODY",
+    "title": "How Your Body Works",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Your body has interconnected systems that keep you alive. The cardiovascular system (heart, blood vessels) pumps blood carrying oxygen and nutrients. The respiratory system (lungs) exchanges oxygen and carbon dioxide. The digestive system breaks down food into energy. The nervous system (brain, spinal cord, nerves) controls everything. The immune system fights infections. Key vital signs to know: resting heart rate (60-100 bpm), blood pressure (normal ~120/80 mmHg), body temperature (36.1-37.2C), and respiratory rate (12-20 breaths/min). Understanding these helps you communicate with doctors and recognize warning signs.",
+    "examples": [
+      {
+        "problem": "Your blood pressure reading is 145/92 mmHg. What does this mean?",
+        "steps": [
+          {"instruction": "Understand the numbers", "result": "145 = systolic (pressure when heart pumps). 92 = diastolic (pressure between beats)."},
+          {"instruction": "Compare to normal ranges", "result": "Normal: <120/80. Elevated: 120-129/<80. Stage 1 hypertension: 130-139/80-89. Stage 2: 140+/90+."},
+          {"instruction": "Assess this reading", "result": "145/92 is Stage 2 hypertension — both numbers are elevated above normal."}
+        ],
+        "answer": "This is Stage 2 hypertension. You should see a doctor promptly. Untreated high blood pressure increases risk of heart attack, stroke, and kidney disease."
+      },
+      {
+        "problem": "Explain how the cardiovascular and respiratory systems work together when you exercise.",
+        "steps": [
+          {"instruction": "Muscles need more oxygen during exercise", "result": "Working muscles consume oxygen faster and produce more carbon dioxide"},
+          {"instruction": "Respiratory system responds", "result": "Breathing rate increases to bring in more oxygen and expel more CO2"},
+          {"instruction": "Cardiovascular system responds", "result": "Heart rate increases to pump oxygenated blood faster to muscles"},
+          {"instruction": "Together", "result": "Lungs oxygenate blood → heart pumps it to muscles → muscles use oxygen → deoxygenated blood returns → lungs re-oxygenate it"}
+        ],
+        "answer": "The respiratory system loads oxygen into the blood; the cardiovascular system delivers it to muscles. During exercise, both systems increase their rate to meet higher oxygen demand."
+      },
+      {
+        "problem": "What do common blood test results mean? Explain glucose, cholesterol, and white blood cell count.",
+        "steps": [
+          {"instruction": "Fasting glucose", "result": "Normal: 3.9-5.5 mmol/L. 5.6-6.9 = pre-diabetic. 7.0+ = diabetic range. Measures blood sugar."},
+          {"instruction": "Total cholesterol", "result": "Normal: <5.0 mmol/L. LDL ('bad'): <3.0. HDL ('good'): >1.2 for women, >1.0 for men. High cholesterol increases heart disease risk."},
+          {"instruction": "White blood cell count", "result": "Normal: 4,500-11,000 per microlitre. High = possible infection or inflammation. Low = weakened immune system."}
+        ],
+        "answer": "Glucose measures blood sugar (diabetes risk), cholesterol measures heart disease risk, and white blood cells indicate immune system activity. Knowing your ranges helps you act early."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is a normal resting heart rate for an adult?",
+        "answer": "60-100 beats per minute (bpm). Well-trained athletes may have resting rates as low as 40-50 bpm.",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["Feel your pulse at your wrist for 15 seconds and multiply by 4"],
+        "explanation": "A consistently elevated resting heart rate (above 100) may indicate stress, dehydration, fever, or heart conditions. A very low rate (below 50 in non-athletes) may also warrant medical attention.",
+        "distractors": ["30-50 bpm", "100-120 bpm", "150-180 bpm"]
+      },
+      {
+        "question": "What does the immune system do?",
+        "answer": "The immune system identifies and destroys harmful invaders (bacteria, viruses, parasites, fungi) and abnormal cells. It has two branches: innate immunity (general, immediate response) and adaptive immunity (specific, develops memory of past infections).",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think of it as your body's defense force"],
+        "explanation": "Vaccines work by training the adaptive immune system to recognize a pathogen before you encounter it naturally, so it can respond faster and more effectively.",
+        "distractors": ["It only fights bacteria", "It repairs broken bones", "It processes food"]
+      },
+      {
+        "question": "What are the four vital signs?",
+        "answer": "Heart rate (pulse), blood pressure, body temperature, and respiratory rate (breathing rate).",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["These are the first things a nurse measures when you arrive at a clinic"],
+        "explanation": "Vital signs indicate basic body functioning. Abnormalities in any of these warrant medical attention. Blood oxygen saturation (SpO2) is sometimes considered a fifth vital sign.",
+        "distractors": ["Height, weight, age, gender", "Blood type, glucose, cholesterol, BMI", "Vision, hearing, reflexes, strength"]
+      },
+      {
+        "question": "Why is blood pressure measured with two numbers (e.g., 120/80)?",
+        "answer": "The top number (systolic) measures pressure when the heart contracts and pumps blood. The bottom number (diastolic) measures pressure when the heart relaxes between beats. Both numbers matter for assessing cardiovascular health.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["The heart has two phases — pumping and resting"],
+        "explanation": "High systolic indicates strain when the heart pumps. High diastolic indicates the blood vessels never fully relax. Either being elevated increases health risks.",
+        "distractors": ["One measures arteries and the other veins", "One is for the left heart and one for the right", "The first is blood pressure and the second is heart rate"]
+      },
+      {
+        "question": "What is the difference between a symptom and a sign?",
+        "answer": "A symptom is something the patient experiences and reports (pain, nausea, dizziness). A sign is something that can be objectively observed or measured by others (fever, rash, swelling, elevated blood pressure).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["One is subjective (felt by you), the other is objective (seen by others)"],
+        "explanation": "When visiting a doctor, reporting both symptoms (how you feel) and signs (what you have observed) helps with accurate diagnosis.",
+        "distractors": ["They mean the same thing", "Signs are more serious than symptoms", "Symptoms are visible and signs are invisible"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Vital signs", "definition": "Basic measurements of body functioning: heart rate, blood pressure, temperature, and respiratory rate", "example_usage": "The nurse checked my vital signs and found my blood pressure was elevated."},
+      {"term": "Blood pressure", "definition": "The force of blood pushing against artery walls, measured as systolic/diastolic in mmHg", "example_usage": "My blood pressure is 118/76 mmHg, which is in the normal range."},
+      {"term": "Immune system", "definition": "The body's defense network of organs, cells, and proteins that identifies and destroys harmful invaders", "example_usage": "My immune system fought off the cold virus in about a week."},
+      {"term": "Cardiovascular system", "definition": "The heart and blood vessel network that circulates blood, delivering oxygen and nutrients throughout the body", "example_usage": "Regular exercise strengthens the cardiovascular system."}
+    ],
+    "misconceptions": [
+      {"misconception": "The heart is on the left side of the chest", "correction": "The heart is roughly in the center of the chest, slightly left of the midline. It is not far to the left as commonly depicted.", "why_students_think_this": "Cultural depictions (love hearts, hand-on-heart gestures) place it far left, and the stronger heartbeat on the left reinforces this."},
+      {"misconception": "Blood in veins is blue", "correction": "Blood is always red. Deoxygenated blood in veins is dark red, not blue. Veins appear blue through the skin due to how light penetrates and is absorbed by tissue.", "why_students_think_this": "Diagrams color veins blue and arteries red for clarity, and veins look blue through the skin."},
+      {"misconception": "You only use 10% of your brain", "correction": "Brain imaging shows that virtually all areas of the brain are active at various times. Different regions are active for different tasks, but no large portion is permanently unused.", "why_students_think_this": "This myth has been repeated in movies and popular culture for decades, and misinterpretation of early neuroscience research perpetuated it."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

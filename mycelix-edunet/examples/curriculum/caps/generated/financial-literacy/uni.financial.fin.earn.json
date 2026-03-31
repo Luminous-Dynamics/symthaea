@@ -1,0 +1,100 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.EARN",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.EARN",
+    "title": "Earning & Income",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Income is the money you receive for work or investments. A salary is a fixed annual amount paid monthly (e.g., R25,000/month), while a wage is paid per hour worked (e.g., R45/hour). Your payslip shows gross pay (before deductions), then PAYE tax, UIF (1%), medical aid, and pension contributions are subtracted to give net (take-home) pay. Understanding your payslip prevents underpayment and helps you plan your budget accurately.",
+    "examples": [
+      {
+        "problem": "Thandi earns a gross salary of R30,000 per month. Her deductions are: PAYE R4,500, UIF R300, pension R2,100, medical aid R1,800. What is her net pay?",
+        "steps": [
+          {"instruction": "List all deductions", "result": "PAYE R4,500 + UIF R300 + pension R2,100 + medical aid R1,800 = R8,700"},
+          {"instruction": "Subtract total deductions from gross pay", "result": "R30,000 - R8,700 = R21,300"}
+        ],
+        "answer": "Thandi's net (take-home) pay is R21,300 per month."
+      },
+      {
+        "problem": "Sipho works as a barista earning R55/hour. He works 8 hours/day, 5 days/week. What is his gross monthly income (assume 4.33 weeks/month)?",
+        "steps": [
+          {"instruction": "Calculate daily earnings", "result": "R55 x 8 = R440/day"},
+          {"instruction": "Calculate weekly earnings", "result": "R440 x 5 = R2,200/week"},
+          {"instruction": "Calculate monthly earnings", "result": "R2,200 x 4.33 = R9,526/month"}
+        ],
+        "answer": "Sipho's gross monthly income is approximately R9,526."
+      },
+      {
+        "problem": "Naledi sees her payslip shows gross R42,000 but she only received R31,200. She wants to verify. PAYE is R7,350, UIF R420, pension R2,520, medical aid R510. Is the net pay correct?",
+        "steps": [
+          {"instruction": "Sum all listed deductions", "result": "R7,350 + R420 + R2,520 + R510 = R10,800"},
+          {"instruction": "Subtract from gross", "result": "R42,000 - R10,800 = R31,200"},
+          {"instruction": "Compare with amount received", "result": "R31,200 = R31,200, matches"}
+        ],
+        "answer": "Yes, the net pay of R31,200 is correct."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the difference between a salary and a wage?",
+        "answer": "A salary is a fixed amount paid regularly (usually monthly) regardless of hours, while a wage is paid based on the number of hours actually worked.",
+        "difficulty_permille": 150,
+        "bloom_level": "Understand",
+        "hints": ["Think about how each type of worker gets paid differently"],
+        "explanation": "Salaried employees receive the same pay each period; wage earners' pay varies with hours worked.",
+        "distractors": ["A salary is always higher than a wage", "Wages are only for part-time workers", "A salary is paid weekly and a wage is paid monthly"]
+      },
+      {
+        "question": "If your gross monthly salary is R28,000 and total deductions are R6,440, what is your net pay?",
+        "answer": "R21,560",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Net pay = Gross pay minus all deductions"],
+        "explanation": "R28,000 - R6,440 = R21,560. Net pay is what you actually take home.",
+        "distractors": ["R34,440", "R28,000", "R6,440"]
+      },
+      {
+        "question": "Which of the following is NOT typically a payslip deduction in South Africa?",
+        "answer": "VAT",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about which taxes are deducted from your pay vs which are added to purchases"],
+        "explanation": "VAT is a consumption tax added to goods and services, not deducted from your payslip. PAYE, UIF, and pension are common payslip deductions.",
+        "distractors": ["PAYE", "UIF", "Pension fund contribution"]
+      },
+      {
+        "question": "A worker earns R65/hour and works 45 hours per week (the SA legal maximum). What is their gross weekly pay?",
+        "answer": "R2,925",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Multiply the hourly rate by the number of hours"],
+        "explanation": "R65 x 45 hours = R2,925. The Basic Conditions of Employment Act sets 45 hours as the ordinary weekly maximum.",
+        "distractors": ["R2,600", "R3,250", "R2,080"]
+      },
+      {
+        "question": "What does UIF stand for, and why is it deducted from your pay?",
+        "answer": "Unemployment Insurance Fund. It provides short-term financial relief if you lose your job, and also covers maternity, illness, and adoption benefits.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["It is a government fund that helps workers who are temporarily unable to work"],
+        "explanation": "UIF contributions (1% from employee, 1% from employer) fund a safety net for when workers lose income due to unemployment, maternity, or illness.",
+        "distractors": ["Universal Income Facility", "Unified Financial Insurance", "Union Investment Fund"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Gross pay", "definition": "Total earnings before any deductions are made", "example_usage": "My gross pay is R30,000 but I take home less after deductions."},
+      {"term": "Net pay", "definition": "The amount you actually receive after all deductions (take-home pay)", "example_usage": "After tax and UIF, my net pay is R22,500."},
+      {"term": "PAYE", "definition": "Pay As You Earn — income tax deducted by your employer each month on behalf of SARS", "example_usage": "My employer deducts PAYE from my salary and sends it directly to SARS."},
+      {"term": "UIF", "definition": "Unemployment Insurance Fund — a mandatory contribution providing benefits during unemployment, maternity, or illness", "example_usage": "Both I and my employer each contribute 1% of my salary to UIF."}
+    ],
+    "misconceptions": [
+      {"misconception": "Gross pay is the amount I take home", "correction": "Gross pay is your total earnings before deductions. Net pay (after tax, UIF, pension, etc.) is what you actually receive.", "why_students_think_this": "Job adverts often list gross salary, so people assume that is what they will receive."},
+      {"misconception": "If I earn below the tax threshold, no deductions are made", "correction": "Even if you earn below the income tax threshold, UIF (1%) is still deducted. Medical aid and pension may also apply.", "why_students_think_this": "People conflate income tax with all payslip deductions."},
+      {"misconception": "Wages are inferior to salaries", "correction": "Neither is inherently better. Wages can earn more through overtime, while salaries provide predictable income. It depends on the job and industry.", "why_students_think_this": "Cultural bias associates salaried positions with professional or higher-status work."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

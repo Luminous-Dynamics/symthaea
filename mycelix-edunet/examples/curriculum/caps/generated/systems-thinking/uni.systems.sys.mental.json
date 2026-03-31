@@ -1,0 +1,122 @@
+{
+  "node_id": "UNI.SYSTEMS.SYS.MENTAL",
+  "lesson": {
+    "standard_code": "UNI.SYSTEMS.SYS.MENTAL",
+    "title": "Mental Models",
+    "grade_level": "Universal",
+    "bloom_level": "Analyze",
+    "explanation": "Mental models are the internal representations we use to understand the world — simplified maps of reality that guide our decisions. The map is never the territory: every mental model omits details, makes assumptions, and contains blind spots. A farmer's mental model of weather differs from a meteorologist's. A township resident's mental model of the economy differs from a CEO's. Neither is wrong — each is useful in its context but incomplete. Recognising your own mental models, testing them against reality, and being willing to update them is a core skill of systems thinking and critical reasoning.",
+    "examples": [
+      {
+        "problem": "A manager believes that paying workers more always increases productivity. How is this mental model incomplete?",
+        "steps": [
+          {"instruction": "Step 1: The model assumes a direct causal link: more pay -> more productivity.", "result": "identify the model"},
+          {"instruction": "Step 2: Research shows that beyond a certain point, intrinsic motivation (autonomy, purpose, mastery) matters more than pay.", "result": "evidence against"},
+          {"instruction": "Step 3: Other factors matter: working conditions, management quality, tools, team dynamics.", "result": "missing variables"}
+        ],
+        "answer": "Answer: The mental model is incomplete because productivity depends on many factors beyond pay. It is useful for explaining why very low pay reduces productivity but fails at higher pay levels.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the phrase 'the map is not the territory' using a practical example.",
+        "steps": [
+          {"instruction": "Step 1: A road map shows roads, towns, and distances but omits potholes, construction, and traffic.", "result": "map simplifies"},
+          {"instruction": "Step 2: If you rely only on the map, you might plan a route that is technically shortest but practically slowest.", "result": "map fails"},
+          {"instruction": "Step 3: The map is useful but must be supplemented with real-time information (GPS, local knowledge).", "result": "map + reality"}
+        ],
+        "answer": "Answer: All maps (and mental models) are simplifications of reality. They are useful but must be tested against actual conditions.",
+        "visual_description": null
+      },
+      {
+        "problem": "Two economists look at the same data on unemployment. One concludes that government spending is needed; the other concludes that regulations should be cut. How can the same data lead to different conclusions?",
+        "steps": [
+          {"instruction": "Step 1: Each economist has a different mental model of how the economy works.", "result": "different models"},
+          {"instruction": "Step 2: The Keynesian model emphasises demand deficiency; the free-market model emphasises supply-side barriers.", "result": "different frameworks"},
+          {"instruction": "Step 3: The data is interpreted through each model's lens, leading to different policy recommendations.", "result": "model-dependent interpretation"}
+        ],
+        "answer": "Answer: Different mental models cause the same data to be interpreted differently, leading to different conclusions and policy prescriptions.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is a mental model? Why is it important to be aware of your own mental models?",
+        "answer": "A mental model is an internal representation of how something works — a simplified map of reality. Being aware of your mental models is important because they shape what you see, what you ignore, and what solutions you consider. Unexamined mental models can lead to blind spots and poor decisions.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think of mental models as the invisible glasses through which you see the world."],
+        "explanation": "Everyone uses mental models unconsciously. The skill is in making them conscious so you can test and improve them.",
+        "distractors": ["Mental models are always accurate", "Only experts have mental models"]
+      },
+      {
+        "question": "Identify a common mental model about education and explain how it might be incomplete.",
+        "answer": "Common model: 'more studying = better grades.' This is incomplete because it ignores study quality (active recall vs passive re-reading), sleep, nutrition, test anxiety, teacher quality, and learning disabilities. A student studying 10 hours with poor techniques may perform worse than one studying 3 hours with effective methods.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about assumptions people make about success in school.", "What factors does the model ignore?"],
+        "explanation": "This mental model contains a grain of truth (effort matters) but is dangerously incomplete. Students who study inefficiently and fail may conclude they are 'not smart enough' when really their method was wrong.",
+        "distractors": ["More studying always leads to better grades", "Study technique does not matter"]
+      },
+      {
+        "question": "You meet someone who believes that 'poor people are poor because they are lazy.' Use the concept of mental models to analyse this belief.",
+        "answer": "This belief is a mental model that attributes poverty to individual character (internal cause). It ignores systemic factors: historical dispossession, unequal education, structural unemployment, geographic isolation, health barriers, and intergenerational poverty. The model is incomplete because it does not account for the system surrounding the individual. Testing it against evidence (e.g., how hard domestic workers and farm labourers work for minimal pay) reveals its inadequacy.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["What does this model include? What does it leave out?", "Consider structural and historical factors."],
+        "explanation": "This is a classic case of the fundamental attribution error applied at societal scale — attributing outcomes to individual traits while ignoring systemic conditions. In South Africa's context, the legacy of apartheid makes this model particularly incomplete.",
+        "distractors": ["Individual effort is irrelevant", "All mental models about poverty are equally valid"]
+      },
+      {
+        "question": "How can you test and improve your own mental models? Describe a systematic process.",
+        "answer": "Process: (1) Make the model explicit — write down your assumptions about how something works. (2) Identify predictions — what does your model predict will happen? (3) Compare with reality — does the evidence match your predictions? (4) Seek disconfirming evidence — actively look for cases where your model fails. (5) Update the model — incorporate new information and revise assumptions. (6) Repeat — mental models should evolve continuously.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Think about the scientific method applied to everyday thinking.", "What role does disconfirming evidence play?"],
+        "explanation": "Most people only notice evidence that confirms their mental models (confirmation bias). Actively seeking disconfirming evidence is the most powerful way to improve your models.",
+        "distractors": ["Mental models cannot be tested", "Once formed, mental models should not change"]
+      },
+      {
+        "question": "Choose two people with different perspectives on a controversial issue (e.g., land reform in South Africa). Map out the mental model each person likely holds. Identify where the models overlap and where they diverge.",
+        "answer": "Example for land reform: Perspective A (landless community member): mental model includes historical dispossession, current landlessness, belief that redistribution is justice. Perspective B (commercial farmer): mental model includes food security concerns, investment risk, property rights, and fear of Zimbabwe-style collapse. Overlap: both want economic stability and food production. Divergence: differs on the role of property rights, the urgency of redistribution, and the acceptable speed of change.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Both perspectives contain valid concerns.", "Map each model's assumptions, values, and fears."],
+        "explanation": "Mapping competing mental models reveals that most disagreements are not about facts but about which facts are prioritised and what causal stories connect them. Understanding both models is the first step toward productive dialogue.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The map is not the territory — all models are simplifications.",
+      "Your mental models determine what you see and what you miss.",
+      "Seek disconfirming evidence to improve your models."
+    ],
+    "key_vocabulary": [
+      {"term": "mental model", "definition": "An internal representation of how something works, used to understand and predict", "example_usage": "My mental model of the economy predicts that raising interest rates will slow inflation."},
+      {"term": "confirmation bias", "definition": "The tendency to notice and remember evidence that supports your existing beliefs while ignoring contradictory evidence", "example_usage": "Confirmation bias made me ignore data that contradicted my mental model."},
+      {"term": "reframing", "definition": "Changing the mental model through which you view a situation to gain new insights", "example_usage": "Reframing the problem from 'not enough resources' to 'poor resource allocation' changed our approach."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that having a mental model is a flaw — that we should see reality 'as it is' without any model.",
+        "correction": "Mental models are necessary and unavoidable. The brain cannot process raw reality — it must simplify. The goal is not to eliminate mental models but to be aware of them, test them, and hold them lightly so you can update them when evidence demands it.",
+        "why_students_think_this": "The language of 'bias' and 'distortion' makes mental models sound like errors. In fact, they are essential cognitive tools — the problem is only when they are held rigidly and never updated."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

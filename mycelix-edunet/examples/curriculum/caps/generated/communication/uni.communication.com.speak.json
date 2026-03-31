@@ -1,0 +1,181 @@
+{
+  "node_id": "UNI.COMMUNICATION.COM.SPEAK",
+  "lesson": {
+    "standard_code": "UNI.COMMUNICATION.COM.SPEAK",
+    "title": "Public Speaking",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Public speaking is the skill of communicating ideas effectively to a group, whether in a classroom presentation, a community meeting, or a job interview. It involves preparation (knowing your content and audience), structure (clear opening, organised body, strong closing), delivery (voice projection, pace, eye contact, body language), and managing anxiety (which is normal and manageable). Research shows that audiences remember how you made them feel more than the specific words you used. In South Africa, where oral traditions are strong across many cultures, public speaking connects to deep cultural roots of storytelling and oratory.",
+    "examples": [
+      {
+        "problem": "How do you structure a 5-minute presentation?",
+        "steps": [
+          {
+            "instruction": "Step 1: Opening (30 sec): start with a hook \u2014 a question, surprising fact, or brief story that grabs attention.",
+            "result": "hook"
+          },
+          {
+            "instruction": "Step 2: Body (3.5 min): three key points, each with evidence or examples. Use transitions between points.",
+            "result": "body"
+          },
+          {
+            "instruction": "Step 3: Closing (1 min): summarise your key message, call to action or thought-provoking question.",
+            "result": "close"
+          }
+        ],
+        "answer": "Answer: A clear structure helps both the speaker (knowing what comes next reduces anxiety) and the audience (following the argument).",
+        "visual_description": null
+      },
+      {
+        "problem": "You are presenting to your class but notice your hands are shaking and your voice is tight. What do you do?",
+        "steps": [
+          {
+            "instruction": "Step 1: Acknowledge internally: 'I am nervous, and that is normal.' Adrenaline helps you perform.",
+            "result": "normalise"
+          },
+          {
+            "instruction": "Step 2: Use physical techniques: plant your feet, press your toes into the floor, take one slow breath.",
+            "result": "ground"
+          },
+          {
+            "instruction": "Step 3: Focus outward on the audience rather than inward on your anxiety. Make eye contact with one friendly face.",
+            "result": "redirect attention"
+          }
+        ],
+        "answer": "Answer: Anxiety is a sign that you care about the outcome. The goal is not to eliminate it but to channel it into energy and focus.",
+        "visual_description": null
+      },
+      {
+        "problem": "What makes a great opening to a speech? Give an example.",
+        "steps": [
+          {
+            "instruction": "Step 1: A great opening grabs attention immediately \u2014 no 'Um, so, today I am going to talk about...'",
+            "result": "avoid weak openings"
+          },
+          {
+            "instruction": "Step 2: Techniques: rhetorical question ('What if I told you that...?'), surprising statistic, brief personal story, bold statement.",
+            "result": "techniques"
+          },
+          {
+            "instruction": "Step 3: Example: 'Last year, 40% of South African matric learners failed mathematics. I was one of them. Here is what I learned.'",
+            "result": "demonstration"
+          }
+        ],
+        "answer": "Answer: The first 10 seconds determine whether your audience will listen or tune out. Invest time in your opening.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List three techniques for managing public speaking anxiety.",
+        "answer": "(1) Preparation \u2014 knowing your material reduces uncertainty. (2) Deep breathing \u2014 activates the parasympathetic nervous system to calm the fight-or-flight response. (3) Reframing \u2014 view nervousness as excitement (both are arousal states; the difference is interpretation).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Anxiety is your body preparing to perform.",
+          "What can you control? Your preparation and your breathing."
+        ],
+        "explanation": "Research by Alison Wood Brooks (Harvard) shows that reframing anxiety as excitement ('I am excited!') improves performance more than trying to calm down.",
+        "distractors": []
+      },
+      {
+        "question": "Explain why eye contact and pausing are powerful delivery tools.",
+        "answer": "Eye contact creates connection \u2014 it makes each audience member feel personally addressed and conveys confidence and sincerity. Pausing serves multiple purposes: it gives the audience time to absorb a point, creates dramatic emphasis, replaces filler words ('um', 'like'), and gives the speaker a moment to think. A well-timed 3-second pause after an important point is more powerful than rushing ahead.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about speakers you find compelling \u2014 what do they do?",
+          "What effect does a pause have on the listener?"
+        ],
+        "explanation": "Novice speakers fear silence and rush to fill it. Experienced speakers use silence as a tool. A pause says 'what I just said matters.'",
+        "distractors": []
+      },
+      {
+        "question": "Prepare a 2-minute speech outline on a topic you care about. Include a hook, three key points with supporting evidence, and a closing.",
+        "answer": "Answers will vary. Strong responses: (1) compelling hook that relates to the audience; (2) three distinct, logically ordered points; (3) each point supported by evidence (statistic, example, story); (4) transitions between points; (5) closing that calls the audience to thought or action; (6) fits comfortably in 2 minutes (about 300 words spoken).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with your strongest point or your best story.",
+          "Speak your outline aloud and time it."
+        ],
+        "explanation": "Outlining before writing prevents the common mistake of rambling. A spoken word rate of about 150 words per minute means 2 minutes = about 300 words.",
+        "distractors": []
+      },
+      {
+        "question": "Watch (or recall) a speech and evaluate it using these criteria: structure, delivery, audience engagement, and persuasiveness. What worked and what could improve?",
+        "answer": "Answers will vary. Strong responses: (1) specific observations about structure (was there a clear opening, body, close?); (2) delivery analysis (pace, volume, eye contact, gestures); (3) audience engagement (did the speaker use questions, stories, humour?); (4) persuasiveness (did the speech change your thinking or motivate action?); (5) balanced evaluation (both strengths and areas for improvement).",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Be specific \u2014 'good delivery' is too vague. What specifically was good?",
+          "Consider both content and delivery separately."
+        ],
+        "explanation": "Evaluating others' speeches develops your own awareness of effective techniques. The best speakers are also careful observers of other speakers.",
+        "distractors": []
+      },
+      {
+        "question": "Design a public speaking workshop for learners who are terrified of presenting. Include at least 4 progressive activities that build confidence gradually.",
+        "answer": "Progression: (1) Pair sharing \u2014 speak to one person for 30 seconds on a fun topic (minimal threat). (2) Small group (4-5 people) \u2014 share a 1-minute personal story (low stakes, supportive audience). (3) Half-class \u2014 present a 2-minute prepared topic with notes allowed (increased audience, reduced memory load). (4) Full class \u2014 deliver a 3-minute speech without notes on a self-chosen topic (full exposure with content confidence). Between each stage: debrief on what felt hard, what helped, and what they would do differently.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Build from least threatening to most threatening.",
+          "Each stage should feel achievable based on the previous one."
+        ],
+        "explanation": "Gradual exposure is the gold standard for overcoming performance anxiety. Each successful experience at a lower level builds confidence for the next level.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The art of effective persuasion through speaking or writing",
+      "Non-verbal communication through posture, gestures, facial expressions, and movement",
+      "An opening technique that grabs the audience's attention immediately"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "rhetoric",
+        "definition": "The art of effective persuasion through speaking or writing",
+        "example_usage": "Mandela was a master of rhetoric."
+      },
+      {
+        "term": "body language",
+        "definition": "Non-verbal communication through posture, gestures, facial expressions, and movement",
+        "example_usage": "Confident body language \u2014 standing tall, open posture \u2014 reinforces your message."
+      },
+      {
+        "term": "hook",
+        "definition": "An opening technique that grabs the audience's attention immediately",
+        "example_usage": "Her hook was a surprising statistic that made the audience sit up and listen."
+      },
+      {
+        "term": "filler words",
+        "definition": "Unnecessary words like 'um', 'like', 'so', 'basically' that weaken delivery",
+        "example_usage": "Recording yourself reveals how many filler words you use without realising."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people believe that great public speakers are 'naturals' who were born with the skill.",
+        "correction": "Public speaking is a learnable skill, not an innate talent. Most great speakers \u2014 including Mandela, Obama, and Malala \u2014 worked extensively on their craft through preparation, practice, and feedback. Nervousness is universal, even for experienced speakers. The difference is not the absence of anxiety but the presence of preparation and practice.",
+        "why_students_think_this": "Media shows polished final performances, not the hours of practice behind them. This creates the illusion that some people are simply 'born speakers.'"
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

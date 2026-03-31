@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.PLAN",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.PLAN",
+    "title": "Financial Planning",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Financial planning means setting goals and creating a roadmap to achieve them. Short-term goals (under 1 year): emergency fund, paying off debt. Medium-term (1-5 years): car, deposit for a home. Long-term (5+ years): retirement, children's education. For retirement, start early — contributing R2,000/month from age 25 at 10% yields ~R12.6M by 65, versus ~R4.5M starting at 35. Estate planning ensures your assets pass to your chosen beneficiaries through a valid will. Without a will, SA intestate succession laws decide who inherits. Review your financial plan annually.",
+    "examples": [
+      {
+        "problem": "Create a simple financial plan for Nompilo, age 28, earning R25,000 net/month, no savings, R15,000 in store debt.",
+        "steps": [
+          {"instruction": "Phase 1 (months 1-6): Emergency starter fund", "result": "Save R1,000/month while paying R3,000/month on store debt (R15,000 paid in 5 months). Starter fund: R6,000"},
+          {"instruction": "Phase 2 (months 7-12): Full emergency fund", "result": "Redirect debt payments to savings: R4,000/month x 6 = R24,000 additional. Total emergency fund: R30,000 (2.4 months expenses)"},
+          {"instruction": "Phase 3 (year 2+): Long-term investing", "result": "R2,000/month to retirement annuity, R2,000/month to continue building emergency fund to 6 months"}
+        ],
+        "answer": "Phase 1: Kill debt + start saving. Phase 2: Build emergency fund. Phase 3: Begin retirement investing. Each phase has a clear target and timeline."
+      },
+      {
+        "problem": "Why does Thabo need a will? He is 35, unmarried, with a partner and one child.",
+        "steps": [
+          {"instruction": "Without a will (intestate succession)", "result": "Under SA law, his child inherits everything. His unmarried partner receives nothing, even if they shared a home for 10 years."},
+          {"instruction": "With a will", "result": "Thabo can specify that his partner receives the house and his child receives other assets and investments."},
+          {"instruction": "Additional protections", "result": "He can name a guardian for his child and an executor to manage the estate."}
+        ],
+        "answer": "Without a will, Thabo's partner gets nothing under intestate law. A will lets him protect both his partner and child according to his wishes."
+      },
+      {
+        "problem": "Compare two retirement scenarios: Person A starts at 25, saves R1,500/month. Person B starts at 40, saves R4,000/month. Both retire at 65, earning 10% annually.",
+        "steps": [
+          {"instruction": "Person A: 40 years of investing", "result": "R1,500/month x 12 = R18,000/year for 40 years. Future value ≈ R9,480,000"},
+          {"instruction": "Person B: 25 years of investing", "result": "R4,000/month x 12 = R48,000/year for 25 years. Future value ≈ R5,310,000"},
+          {"instruction": "Total contributed", "result": "Person A: R720,000. Person B: R1,200,000. A contributed less but has almost double the result."}
+        ],
+        "answer": "Person A accumulates ~R9.5M by contributing R720K total. Person B accumulates ~R5.3M despite contributing R1.2M. Starting 15 years earlier is worth more than tripling the contribution."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What are the three time horizons of financial goals?",
+        "answer": "Short-term (under 1 year): emergency fund, debt repayment. Medium-term (1-5 years): car purchase, home deposit, education. Long-term (5+ years): retirement, children's education fund, wealth building.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["Think about what you need in months vs years vs decades"],
+        "explanation": "Each horizon requires different savings vehicles: short-term in accessible accounts, medium-term in notice deposits or conservative funds, long-term in growth investments like equities.",
+        "distractors": ["Weekly, monthly, yearly", "Small, medium, large amounts", "Savings, spending, donating"]
+      },
+      {
+        "question": "What happens to your assets in South Africa if you die without a will?",
+        "answer": "The Intestate Succession Act determines who inherits. A surviving spouse and children share the estate in specific proportions. Unmarried partners, friends, and charities receive nothing regardless of the deceased's wishes.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["SA law has specific rules for who inherits when there is no will"],
+        "explanation": "Without a will, the Master of the High Court appoints an executor, and distribution follows a rigid legal formula that may not reflect the deceased's actual wishes.",
+        "distractors": ["The government takes everything", "The oldest child inherits all", "Assets are divided equally among all family members"]
+      },
+      {
+        "question": "Why should you start retirement savings as early as possible?",
+        "answer": "Compound interest grows exponentially over time. Starting 10 years earlier can more than double your retirement fund, even with smaller contributions, because earlier money compounds for longer.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about the compound interest examples from the saving lesson"],
+        "explanation": "R1,000/month from age 25-65 (40 years) at 10% ≈ R6.3M. From 35-65 (30 years) ≈ R2.3M. The first 10 years of contributions generate more than the last 20.",
+        "distractors": ["It does not matter when you start if you save enough", "Starting early only helps by a small amount", "Retirement is too far away to plan for in your 20s"]
+      },
+      {
+        "question": "What is an executor of an estate?",
+        "answer": "A person or institution appointed (in your will or by the court) to manage and distribute your estate after death. They pay debts, file final tax returns, and transfer assets to beneficiaries.",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": ["They carry out the instructions in the will"],
+        "explanation": "In SA, the executor is appointed by the Master of the High Court. Professional executors (banks, attorneys) charge fees (typically 3.5% + VAT of the estate value).",
+        "distractors": ["The person who writes the will", "The oldest beneficiary", "A SARS official"]
+      },
+      {
+        "question": "How often should you review your financial plan?",
+        "answer": "At least annually, and after any major life event (marriage, divorce, child born, job change, inheritance, serious illness).",
+        "difficulty_permille": 150,
+        "bloom_level": "Understand",
+        "hints": ["Life changes alter your financial needs and goals"],
+        "explanation": "A plan made at 25 will not suit you at 35 with a family. Regular reviews ensure your budget, insurance, investments, and will remain aligned with your current life.",
+        "distractors": ["Once when you first create it", "Every 5-10 years", "Only when something goes wrong"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Financial plan", "definition": "A comprehensive document outlining your financial goals, current situation, and the strategies to bridge the gap", "example_usage": "My financial plan includes clearing debt by June, building an emergency fund, and starting a retirement annuity."},
+      {"term": "Estate planning", "definition": "Arranging for the management and distribution of your assets after death, including wills, trusts, and beneficiary designations", "example_usage": "I updated my estate plan to include my new child as a beneficiary."},
+      {"term": "Will (testament)", "definition": "A legal document that specifies how your assets should be distributed after your death and who should care for minor children", "example_usage": "In my will, I left the house to my spouse and set up a trust for my children's education."},
+      {"term": "Retirement annuity (RA)", "definition": "A tax-advantaged investment vehicle in SA designed for retirement savings, with contributions deductible up to 27.5% of taxable income", "example_usage": "I contribute R3,000/month to my retirement annuity, which reduces my taxable income."}
+    ],
+    "misconceptions": [
+      {"misconception": "I am too young to think about retirement", "correction": "Starting at 25 instead of 35 can double or triple your retirement fund due to compound interest. Every year of delay costs significantly more to make up later.", "why_students_think_this": "Retirement feels distant and abstract when you are in your 20s, and immediate expenses feel more pressing."},
+      {"misconception": "A will is only for wealthy people", "correction": "Everyone with any assets (even a bank account, car, or personal belongings) or children needs a will. Without one, the law decides who gets what, which may not match your wishes.", "why_students_think_this": "Estate planning sounds like a rich-person activity, and young people do not think about death."},
+      {"misconception": "My retirement fund from work is enough", "correction": "Many employer funds replace only 40-60% of pre-retirement income. You likely need additional savings (retirement annuity, TFSA, investments) to maintain your lifestyle in retirement.", "why_students_think_this": "Employer contributions feel automatic and sufficient, and people rarely calculate what percentage of salary the fund actually replaces."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.92, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

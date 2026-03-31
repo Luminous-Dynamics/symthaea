@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.CRITICAL.CT.DECIDE",
+  "lesson": {
+    "standard_code": "UNI.CRITICAL.CT.DECIDE",
+    "title": "Decision Making",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Good decision making combines evidence, probability, and structured analysis. Cost-benefit analysis lists all pros (benefits) and cons (costs) of each option, including non-monetary factors like time, stress, and relationships. Expected value multiplies each outcome's value by its probability: EV = (probability x payoff) for each scenario, then sum. For example, a 10% chance of winning R10,000 has an expected value of R1,000. The sunk cost fallacy (continuing something because you already invested in it) and status quo bias (preferring things to stay the same) commonly distort decisions.",
+    "examples": [
+      {
+        "problem": "Sipho is deciding whether to commute by car or take the Gautrain to work. Apply cost-benefit analysis.",
+        "steps": [
+          {"instruction": "List car costs", "result": "Petrol R3,500/mo, insurance R950/mo, maintenance R500/mo, parking R1,200/mo, toll R600/mo = R6,750/mo. Also: stress, accident risk, 90 min/day"},
+          {"instruction": "List Gautrain costs", "result": "Monthly pass R2,800/mo, feeder bus R400/mo = R3,200/mo. Also: 75 min/day, can work on train, no parking stress"},
+          {"instruction": "Compare", "result": "Gautrain saves R3,550/mo (R42,600/year), saves 15 min/day, and adds productive time on the train"}
+        ],
+        "answer": "The Gautrain saves R3,550/month and reduces stress. The car offers flexibility but at significant financial and time cost. For a regular commute, the Gautrain is the stronger choice."
+      },
+      {
+        "problem": "A lottery ticket costs R10. The jackpot is R5,000,000 with a 1 in 2,000,000 chance. Should you buy it?",
+        "steps": [
+          {"instruction": "Calculate expected value", "result": "EV = (1/2,000,000) x R5,000,000 = R2.50"},
+          {"instruction": "Compare to cost", "result": "The ticket costs R10 but the expected value is only R2.50"},
+          {"instruction": "Interpret", "result": "On average, you lose R7.50 per ticket. Over 100 tickets, you would expect to spend R1,000 and win back R250."}
+        ],
+        "answer": "The expected value is R2.50 but the ticket costs R10 — a losing proposition. Lotteries are entertainment, not investment strategies."
+      },
+      {
+        "problem": "Ayanda has spent R30,000 renovating a rental property but has since learned the area is declining and she will not recover the investment. She is considering spending R20,000 more. Should the R30,000 already spent influence her decision?",
+        "steps": [
+          {"instruction": "Identify the sunk cost", "result": "R30,000 is already spent and cannot be recovered regardless of what she decides now"},
+          {"instruction": "Frame the real decision", "result": "Should I spend R20,000 more? Will that R20,000 generate returns exceeding R20,000?"},
+          {"instruction": "Evaluate forward-looking costs and benefits only", "result": "If the area is declining, the R20,000 is unlikely to generate sufficient returns"}
+        ],
+        "answer": "No — the R30,000 already spent is a sunk cost and should not influence the decision. Only the future costs and benefits of the additional R20,000 matter. Throwing more money at a bad investment does not recover past losses."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is expected value and how do you calculate it?",
+        "answer": "Expected value is the average outcome of a decision if repeated many times. Calculate by multiplying each possible outcome by its probability, then summing all results. EV = sum of (probability x value) for each outcome.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think of what would happen on average over many repetitions"],
+        "explanation": "A coin flip paying R100 for heads and R0 for tails has EV = (0.5 x R100) + (0.5 x R0) = R50. You would not win R50 on any single flip, but over many flips, R50 is the average.",
+        "distractors": ["The most likely outcome", "The best possible outcome", "The total of all possible outcomes"]
+      },
+      {
+        "question": "You paid R500 for a movie ticket but 30 minutes in, the movie is terrible. Should you stay?",
+        "answer": "No (unless you start enjoying it). The R500 is a sunk cost — it is spent whether you stay or leave. The decision should be based on: will I enjoy the remaining 90 minutes more than doing something else?",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Can you get the R500 back by staying?"],
+        "explanation": "Staying in a bad movie to 'get your money's worth' wastes time in addition to money. The sunk cost fallacy makes us feel we must continue because we already invested.",
+        "distractors": ["Yes, you paid for it", "Yes, it might get better", "Only leave if the ticket was free"]
+      },
+      {
+        "question": "A job offer pays R5,000 more per month but requires relocating to a city where rent is R4,000 more and you have no family or friends. How would you structure this decision?",
+        "answer": "Net financial gain: R5,000 - R4,000 = R1,000/month. But also consider non-financial costs: isolation, loss of support network, relocation expenses, career growth potential, quality of life. A cost-benefit analysis should include both monetary and non-monetary factors.",
+        "difficulty_permille": 300,
+        "bloom_level": "Analyze",
+        "hints": ["Not all costs and benefits are financial"],
+        "explanation": "Decisions that look good on paper (R5,000 raise) can be poor when all factors are considered. Mental health, social connection, and career trajectory matter as much as salary.",
+        "distractors": ["Always take the higher salary", "Never relocate for work", "Only compare the monetary difference"]
+      },
+      {
+        "question": "What is status quo bias?",
+        "answer": "The tendency to prefer the current state of affairs over change, even when change would be beneficial. People overvalue what they have and overestimate the risks of change.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about why people stick with bad situations rather than changing"],
+        "explanation": "Status quo bias keeps people in bad jobs, unfavorable contracts, and suboptimal habits because changing feels risky and uncertain. The cost of staying is often invisible.",
+        "distractors": ["Preferring new things over old things", "Being indecisive", "Always choosing the cheapest option"]
+      },
+      {
+        "question": "You can take a guaranteed R5,000 or flip a coin for R12,000 (heads) or R0 (tails). Which has higher expected value?",
+        "answer": "The coin flip has EV = (0.5 x R12,000) + (0.5 x R0) = R6,000, which is higher than the guaranteed R5,000. However, a risk-averse person might rationally choose the certain R5,000.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Calculate the expected value of each option"],
+        "explanation": "Expected value favors the gamble, but expected value does not account for risk tolerance. If you need R5,000 for rent, the certain option prevents a 50% chance of having nothing.",
+        "distractors": ["The guaranteed R5,000 has higher expected value", "Both have the same expected value", "You cannot calculate expected value for random events"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Cost-benefit analysis", "definition": "A systematic process of listing and comparing all costs and benefits of each option to determine the best course of action", "example_usage": "A cost-benefit analysis showed that fixing the old car was cheaper than buying a new one."},
+      {"term": "Expected value", "definition": "The average outcome of a decision calculated by multiplying each outcome by its probability and summing the results", "example_usage": "The expected value of the investment is R8,000 per year based on historical returns."},
+      {"term": "Sunk cost fallacy", "definition": "The error of continuing an action because of past investment (time, money, effort) rather than future costs and benefits", "example_usage": "I kept reading the terrible book because I was halfway through — a classic sunk cost fallacy."},
+      {"term": "Opportunity cost", "definition": "The value of the best alternative you give up when making a choice", "example_usage": "The opportunity cost of spending Saturday studying was missing the concert with friends."}
+    ],
+    "misconceptions": [
+      {"misconception": "The best decision always produces the best outcome", "correction": "Good decisions can lead to bad outcomes (bad luck) and bad decisions can lead to good outcomes (good luck). The quality of a decision should be judged by the process, not the result.", "why_students_think_this": "Outcome bias makes us evaluate decisions based on results. A surgeon who follows perfect protocol but loses a patient made a good decision with a bad outcome."},
+      {"misconception": "Rational decisions should ignore emotions entirely", "correction": "Emotions provide valuable information about preferences, values, and social consequences. Good decisions integrate emotional signals with analytical reasoning, not suppress them.", "why_students_think_this": "The false dichotomy between reason and emotion suggests they are opposed, when research shows they are complementary."},
+      {"misconception": "More information always leads to better decisions", "correction": "Beyond a certain point, additional information creates analysis paralysis and decision fatigue without improving quality. Focus on the few factors that matter most.", "why_students_think_this": "It feels responsible to gather as much information as possible, and stopping feels premature."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

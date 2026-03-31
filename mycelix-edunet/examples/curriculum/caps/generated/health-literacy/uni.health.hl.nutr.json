@@ -1,0 +1,104 @@
+{
+  "node_id": "UNI.HEALTH.HL.NUTR",
+  "lesson": {
+    "standard_code": "UNI.HEALTH.HL.NUTR",
+    "title": "Nutrition & Diet",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Nutrition is the science of how food fuels and builds your body. The three macronutrients are: carbohydrates (energy, found in bread, rice, potatoes — 4 cal/g), proteins (building and repair, found in meat, beans, eggs — 4 cal/g), and fats (energy storage, cell membranes, hormone production, found in oil, nuts, avocado — 9 cal/g). Micronutrients (vitamins and minerals) are needed in small amounts but are essential. SA food labels show kilojoules (1 cal = 4.184 kJ), protein, fat, carbohydrates, sugar, sodium, and fibre per serving. Hydration needs are roughly 2-3 litres of water daily, more in hot weather or during exercise.",
+    "examples": [
+      {
+        "problem": "Read this food label and assess the nutritional value. Per 100g: Energy 1,680 kJ, Protein 8g, Total Fat 22g (Saturated 12g), Carbohydrates 55g (Sugar 32g), Sodium 180mg, Fibre 2g.",
+        "steps": [
+          {"instruction": "Convert energy to calories", "result": "1,680 kJ / 4.184 = ~401 calories per 100g — this is energy-dense"},
+          {"instruction": "Assess sugar", "result": "32g sugar per 100g means 32% sugar — very high. WHO recommends under 25g of added sugar per day."},
+          {"instruction": "Assess fat", "result": "22g fat, 12g saturated. Saturated fat is over half of total fat — high. Saturated fat increases LDL cholesterol."},
+          {"instruction": "Assess fibre", "result": "2g fibre per 100g is low. Adults need 25-30g fibre daily."}
+        ],
+        "answer": "This is a high-sugar, high-fat, low-fibre product (likely a biscuit or sweet snack). It should be an occasional treat, not a regular food item."
+      },
+      {
+        "problem": "Design a balanced meal for R50 or less using affordable South African foods.",
+        "steps": [
+          {"instruction": "Choose a carbohydrate base", "result": "Brown rice or pap (maize meal) — R5-8 per serving. Provides energy and some fibre."},
+          {"instruction": "Add protein", "result": "Tinned pilchards (R18-22) or dried lentils (R5-8 per serving). Both are affordable, nutritious proteins."},
+          {"instruction": "Add vegetables", "result": "Frozen mixed vegetables (R15-20/bag) or seasonal fresh (spinach, cabbage, carrots) — R10-15."},
+          {"instruction": "Total and assess", "result": "Brown rice + tinned pilchards + frozen veg = ~R35-45. Covers all macronutrients plus vitamins and minerals."}
+        ],
+        "answer": "Brown rice with tinned pilchards and mixed vegetables costs under R45, provides protein, complex carbs, fibre, omega-3 fats, and multiple vitamins. Nutritious eating does not require expensive foods."
+      },
+      {
+        "problem": "Sipho drinks 3 cans of regular Coca-Cola per day. What is his daily sugar intake from this alone?",
+        "steps": [
+          {"instruction": "Check sugar per can (330ml)", "result": "A 330ml Coca-Cola contains approximately 35g of sugar"},
+          {"instruction": "Calculate daily total", "result": "35g x 3 = 105g of sugar from drinks alone"},
+          {"instruction": "Compare to guidelines", "result": "WHO recommends under 25g of added sugar per day. Sipho consumes 4.2 times the recommended limit from drinks alone."},
+          {"instruction": "Calorie impact", "result": "105g sugar x 4 cal/g = 420 empty calories daily — equivalent to a full meal with no nutritional value"}
+        ],
+        "answer": "105g of sugar daily — over 4 times the WHO recommendation. This contributes to weight gain, diabetes risk, and tooth decay. Switching to water would eliminate 420 empty calories daily."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What are the three macronutrients and what is each one's primary function?",
+        "answer": "Carbohydrates (primary energy source), Proteins (building and repairing tissues, enzymes, hormones), Fats (energy storage, cell membrane structure, hormone production, nutrient absorption).",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["Macro means large — these are the nutrients you need in large quantities"],
+        "explanation": "A balanced diet includes all three. Cutting out any macronutrient entirely is generally unhealthy. The key is choosing quality sources (whole grains over refined, lean protein, unsaturated fats).",
+        "distractors": ["Vitamins, minerals, water", "Sugar, salt, fibre", "Calcium, iron, zinc"]
+      },
+      {
+        "question": "How many litres of water should an adult drink per day?",
+        "answer": "Approximately 2-3 litres (8-12 glasses), more during hot weather, exercise, or illness. Thirst is an imperfect guide — by the time you feel thirsty, you may already be mildly dehydrated.",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["About 8 glasses is a common guideline"],
+        "explanation": "Water needs vary by body size, activity level, climate, and health. Urine colour is a good indicator — pale yellow means well-hydrated, dark yellow means drink more.",
+        "distractors": ["0.5 litres", "5-6 litres", "Only when thirsty"]
+      },
+      {
+        "question": "Why are 'empty calories' a problem? Give an example.",
+        "answer": "Empty calories provide energy (kilojoules) without significant vitamins, minerals, fibre, or protein. They contribute to weight gain without nourishing the body. Examples: soft drinks, sweets, white bread, alcohol.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["These foods give energy but nothing else your body needs"],
+        "explanation": "A 500ml soft drink has ~250 calories but zero protein, vitamins, or fibre. An apple has similar calories but provides fibre, vitamin C, and antioxidants.",
+        "distractors": ["Calories that do not provide energy", "Calories from vegetables", "Calories that are not absorbed"]
+      },
+      {
+        "question": "On a food label, what does a high sodium content indicate and why should you care?",
+        "answer": "High sodium means the food is high in salt. Excessive sodium intake (above 2,000mg/day) increases blood pressure, which raises the risk of heart disease and stroke. Processed foods, crisps, and cured meats are typically high in sodium.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Sodium is the main component of table salt"],
+        "explanation": "South Africa mandated sodium reduction in bread and processed foods in 2016. Even so, many people exceed the daily limit. Check labels and choose lower-sodium options.",
+        "distractors": ["Sodium is always healthy because your body needs it", "High sodium only affects people with existing heart conditions", "Sodium and sugar are the same thing"]
+      },
+      {
+        "question": "What is the difference between saturated and unsaturated fat?",
+        "answer": "Saturated fat (solid at room temperature — butter, animal fat, coconut oil) raises LDL cholesterol and heart disease risk. Unsaturated fat (liquid at room temperature — olive oil, avocado, nuts, fish) is healthier and can improve cholesterol levels.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["One is solid at room temperature, the other is liquid"],
+        "explanation": "Not all fat is bad. Replace saturated fats with unsaturated fats rather than cutting all fat. Trans fats (in some margarine and fried foods) are the most harmful type.",
+        "distractors": ["All fats are equally unhealthy", "Saturated fat is only in plants", "Unsaturated fat causes weight gain faster"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Macronutrients", "definition": "Nutrients needed in large amounts: carbohydrates, proteins, and fats, which provide energy and building materials", "example_usage": "A balanced meal contains all three macronutrients."},
+      {"term": "Micronutrients", "definition": "Vitamins and minerals needed in small amounts but essential for body functions like immunity, bone health, and blood production", "example_usage": "Iron and vitamin C are micronutrients — you need small amounts but deficiency causes serious problems."},
+      {"term": "Kilojoules (kJ)", "definition": "The unit of energy used on South African food labels. 1 calorie = 4.184 kilojoules.", "example_usage": "This snack contains 840 kJ per serving, which is about 200 calories."},
+      {"term": "Saturated fat", "definition": "A type of fat (solid at room temperature) that raises LDL cholesterol and increases cardiovascular disease risk when consumed in excess", "example_usage": "The food label shows 8g of saturated fat — I should look for a lower-fat option."}
+    ],
+    "misconceptions": [
+      {"misconception": "Eating fat makes you fat", "correction": "Excess calories from any source (carbs, protein, or fat) cause weight gain, not fat alone. Healthy fats (avocado, nuts, olive oil, fish) are essential for body functions. Fat has more calories per gram (9 vs 4), so portions matter.", "why_students_think_this": "The word 'fat' in food and the word 'fat' describing body composition are the same, creating a false direct link."},
+      {"misconception": "Carbohydrates are bad for you", "correction": "Complex carbohydrates (whole grains, vegetables, legumes) provide essential energy, fibre, and nutrients. Refined carbs (white bread, sugar) lack nutrition. The type and quantity of carbs matter, not carbs as a category.", "why_students_think_this": "Low-carb diet trends demonize all carbohydrates without distinguishing between refined and complex sources."},
+      {"misconception": "Supplements can replace a healthy diet", "correction": "Supplements cannot replicate the complex interactions of nutrients in whole foods (fibre, phytochemicals, synergistic absorption). They are useful for specific deficiencies but are not a substitute for varied, nutritious eating.", "why_students_think_this": "Marketing presents supplements as convenient alternatives, and people prefer a pill to changing eating habits."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

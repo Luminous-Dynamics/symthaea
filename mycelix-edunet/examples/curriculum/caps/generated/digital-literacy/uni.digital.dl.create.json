@@ -1,0 +1,106 @@
+{
+  "node_id": "UNI.DIGITAL.DL.CREATE",
+  "lesson": {
+    "standard_code": "UNI.DIGITAL.DL.CREATE",
+    "title": "Digital Creation",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Digital creation skills empower you to produce content rather than only consuming it. Basic HTML structures web pages using tags: <h1> for headings, <p> for paragraphs, <a> for links, <img> for images. Spreadsheets (Excel, Google Sheets) are powerful for budgets, data analysis, and calculations using formulas (=SUM, =AVERAGE, =IF). Presentations (PowerPoint, Google Slides) communicate ideas visually — effective slides use minimal text, strong visuals, and follow the 6x6 rule (max 6 words per bullet, 6 bullets per slide). These are foundational skills for any modern workplace.",
+    "examples": [
+      {
+        "problem": "Create a basic monthly budget spreadsheet using formulas.",
+        "steps": [
+          {"instruction": "Set up columns", "result": "Column A: Category, Column B: Budgeted Amount, Column C: Actual Amount, Column D: Difference"},
+          {"instruction": "Enter categories in column A", "result": "Row 2: Rent, Row 3: Groceries, Row 4: Transport, Row 5: Utilities, Row 6: Savings, Row 7: TOTAL"},
+          {"instruction": "Add the Difference formula in D2", "result": "=B2-C2 (this shows whether you are over or under budget for each category)"},
+          {"instruction": "Add the TOTAL formula in B7", "result": "=SUM(B2:B6) to total all budgeted amounts. Same for C7 and D7."}
+        ],
+        "answer": "The spreadsheet automatically calculates totals and differences. If Actual exceeds Budgeted, the difference is negative — flagging overspending."
+      },
+      {
+        "problem": "Write basic HTML for a personal introduction page.",
+        "steps": [
+          {"instruction": "Start with the page structure", "result": "<!DOCTYPE html><html><head><title>About Me</title></head><body>"},
+          {"instruction": "Add a heading", "result": "<h1>Hello, I am Thandi</h1>"},
+          {"instruction": "Add a paragraph", "result": "<p>I am a teacher from Johannesburg interested in digital literacy.</p>"},
+          {"instruction": "Add a link", "result": "<a href=\"mailto:thandi@example.com\">Email me</a>"},
+          {"instruction": "Close the page", "result": "</body></html>"}
+        ],
+        "answer": "This simple HTML page displays a heading, paragraph, and email link. Every tag that opens (<h1>) must close (</h1>). Save the file as index.html and open it in a browser to see the result."
+      },
+      {
+        "problem": "Design an effective 5-slide presentation about a community project proposal.",
+        "steps": [
+          {"instruction": "Slide 1: Title slide", "result": "Project name, your name, date. One compelling image."},
+          {"instruction": "Slide 2: The Problem", "result": "3-4 bullet points with statistics. Include one data visual (chart or infographic)."},
+          {"instruction": "Slide 3: The Solution", "result": "What you propose, in 4-5 concise bullets. Include a diagram or process flow."},
+          {"instruction": "Slide 4: Budget & Timeline", "result": "Simple table or timeline graphic. Key costs and milestones only."},
+          {"instruction": "Slide 5: Call to Action", "result": "What you need from the audience. Contact details. One strong closing image."}
+        ],
+        "answer": "Five focused slides, each with a single clear purpose. Use images and data visuals rather than walls of text. Speak to the details — do not put everything on the slides."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What spreadsheet formula would you use to calculate the average of cells B2 through B10?",
+        "answer": "=AVERAGE(B2:B10)",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["The function name is the same as the mathematical concept"],
+        "explanation": "=AVERAGE(range) calculates the arithmetic mean. B2:B10 means all cells from B2 to B10 inclusive.",
+        "distractors": ["=MEAN(B2:B10)", "=SUM(B2:B10)/COUNT(B2:B10)", "=AVG(B2-B10)"]
+      },
+      {
+        "question": "In HTML, which tag creates a hyperlink to another website?",
+        "answer": "The <a> (anchor) tag with an href attribute. Example: <a href=\"https://example.com\">Click here</a>",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["It stands for 'anchor' and uses a special attribute for the URL"],
+        "explanation": "The href attribute specifies the destination URL. The text between <a> and </a> is what the user sees and clicks.",
+        "distractors": ["<link>", "<url>", "<href>"]
+      },
+      {
+        "question": "What does the spreadsheet formula =IF(C5>B5, \"Over budget\", \"OK\") do?",
+        "answer": "It checks if the value in C5 is greater than B5. If true, it displays 'Over budget'. If false, it displays 'OK'.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["IF formulas test a condition and return different values based on the result"],
+        "explanation": "=IF(condition, value_if_true, value_if_false) is one of the most useful spreadsheet functions. Here it compares actual spending (C5) to budget (B5).",
+        "distractors": ["It adds C5 and B5 together", "It formats C5 as currency", "It deletes the value in C5"]
+      },
+      {
+        "question": "What is the 6x6 rule for presentations?",
+        "answer": "Maximum 6 words per bullet point and maximum 6 bullet points per slide. This prevents information overload and keeps the audience focused on the speaker rather than reading dense slides.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["It limits the amount of text on each slide"],
+        "explanation": "Slides are visual aids, not documents. If you put everything on the slide, the audience reads instead of listening. Key details should be spoken, not written.",
+        "distractors": ["6 slides maximum per presentation", "6 colors maximum", "6 seconds per slide"]
+      },
+      {
+        "question": "Name two free alternatives to Microsoft Office for creating documents, spreadsheets, and presentations.",
+        "answer": "Google Workspace (Google Docs, Sheets, Slides — free with a Google account, works in browser) and LibreOffice (free, open-source, runs on your computer, compatible with Microsoft formats).",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["One is cloud-based, the other is installed locally"],
+        "explanation": "Both are fully capable alternatives. Google Workspace is best for collaboration (multiple people editing simultaneously). LibreOffice works offline.",
+        "distractors": ["Adobe Acrobat", "Notepad", "WhatsApp"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "HTML", "definition": "HyperText Markup Language — the standard language for creating web pages, using tags to structure content", "example_usage": "I used HTML tags like <h1> and <p> to create a simple web page."},
+      {"term": "Spreadsheet formula", "definition": "A calculation instruction in a spreadsheet cell, starting with = sign, that computes values from other cells", "example_usage": "The formula =SUM(A1:A10) adds up all values in column A from row 1 to 10."},
+      {"term": "Cell reference", "definition": "The address of a cell in a spreadsheet, identified by its column letter and row number (e.g., B5)", "example_usage": "Cell B5 contains the grocery budget amount."},
+      {"term": "Tag (HTML)", "definition": "A markup element in HTML enclosed in angle brackets that defines the structure of content, e.g., <p> for paragraph", "example_usage": "The <img> tag inserts an image into the web page."}
+    ],
+    "misconceptions": [
+      {"misconception": "You need to be a programmer to create a website", "correction": "Basic HTML is simple enough to learn in an afternoon. Many platforms (WordPress, Wix, Google Sites) require no coding at all. Modern web creation is accessible to everyone.", "why_students_think_this": "Websites look complex from the outside, and 'coding' sounds intimidating."},
+      {"misconception": "Spreadsheets are only for accountants", "correction": "Spreadsheets are useful for anyone — budgeting, grade tracking, inventory, event planning, data analysis, even recipe scaling. They are general-purpose calculation and organization tools.", "why_students_think_this": "Spreadsheets are associated with finance and look intimidating with their grid of cells."},
+      {"misconception": "Good presentations need complex animations and transitions", "correction": "The best presentations use minimal effects. Flashy animations distract from the content and look unprofessional. Clear structure, strong visuals, and concise text are what matter.", "why_students_think_this": "Software features imply they should be used, and animation feels impressive."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

@@ -1,0 +1,123 @@
+{
+  "node_id": "UNI.SYSTEMS.SYS.FEED",
+  "lesson": {
+    "standard_code": "UNI.SYSTEMS.SYS.FEED",
+    "title": "Feedback Loops",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "A feedback loop occurs when the output of a system feeds back as input, influencing future behaviour. Negative (balancing) feedback loops stabilise a system — like a thermostat that turns off heating when the room reaches the set temperature. Positive (reinforcing) feedback loops amplify change — like compound interest, where earned interest generates more interest. Most real systems contain both types. Understanding feedback loops helps explain why some problems worsen over time (reinforcing loops) and why others self-correct (balancing loops). In South Africa, the cycle of poverty is a reinforcing loop: less education leads to lower income, which leads to less access to education.",
+    "examples": [
+      {
+        "problem": "Identify the feedback loop: A popular restaurant gets good reviews, attracting more customers, leading to more reviews.",
+        "steps": [
+          {"instruction": "Step 1: Good food attracts customers who leave positive reviews.", "result": "initial output"},
+          {"instruction": "Step 2: More positive reviews attract even more customers.", "result": "feedback"},
+          {"instruction": "Step 3: More customers mean more reviews, amplifying the cycle.", "result": "reinforcing loop identified"}
+        ],
+        "answer": "Answer: This is a positive (reinforcing) feedback loop — success breeds more success.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how body temperature regulation works as a feedback loop.",
+        "steps": [
+          {"instruction": "Step 1: Body temperature rises above 37C.", "result": "deviation detected"},
+          {"instruction": "Step 2: The hypothalamus triggers sweating and blood vessel dilation.", "result": "corrective action"},
+          {"instruction": "Step 3: Body cools back toward 37C, and sweating stops.", "result": "stability restored"}
+        ],
+        "answer": "Answer: This is a negative (balancing) feedback loop — the system corrects deviations to maintain a set point.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain climate change as a positive feedback loop involving ice and albedo.",
+        "steps": [
+          {"instruction": "Step 1: Rising temperatures melt ice, reducing Earth's reflective surface (albedo).", "result": "less reflection"},
+          {"instruction": "Step 2: Darker ocean and land absorb more heat.", "result": "more warming"},
+          {"instruction": "Step 3: More warming melts more ice, further reducing albedo.", "result": "reinforcing loop"}
+        ],
+        "answer": "Answer: The ice-albedo feedback is a reinforcing loop where warming melts ice, which causes more warming.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define positive (reinforcing) and negative (balancing) feedback loops.",
+        "answer": "A reinforcing feedback loop amplifies change — the output strengthens the input, causing exponential growth or decline. A balancing feedback loop counteracts change — the output works against the input, stabilising the system around a set point.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think of 'reinforcing' as making things bigger and 'balancing' as keeping things stable."],
+        "explanation": "The terms 'positive' and 'negative' do not mean good and bad. 'Positive' means the feedback reinforces the original direction of change; 'negative' means it opposes it.",
+        "distractors": ["Positive feedback loops are always beneficial", "Negative feedback loops are always harmful"]
+      },
+      {
+        "question": "A farmer notices that as soil erodes, fewer crops grow, which leaves more soil exposed to wind and rain, causing more erosion. Identify and explain the type of feedback loop.",
+        "answer": "This is a reinforcing (positive) feedback loop. Erosion reduces crop cover, which increases erosion, which further reduces crop cover. Without intervention, the system accelerates toward degradation.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Does the effect amplify or dampen the original change?", "Think about what happens if nothing is done."],
+        "explanation": "This is a common environmental reinforcing loop. Breaking it requires intervention — planting cover crops, building terraces, or adding mulch to protect exposed soil.",
+        "distractors": ["This is a balancing loop because erosion eventually stops", "This is not a feedback loop because it only goes in one direction"]
+      },
+      {
+        "question": "Draw a causal loop diagram showing the feedback loop in bank savings: deposits earn interest, interest is added to deposits, earning more interest.",
+        "answer": "Deposits -> (positive) -> Interest Earned -> (positive) -> Deposits. Both arrows are positive (same direction), making this a reinforcing loop. As deposits grow, interest grows, which grows deposits further.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["In a causal loop diagram, label each arrow + (same direction) or - (opposite direction).", "An even number of negative signs = reinforcing loop."],
+        "explanation": "Compound interest is the classic example of a reinforcing loop. R100 at 10% becomes R110, then R121, then R133.10 — each year the growth is larger because the base is larger.",
+        "distractors": ["Interest is a balancing loop", "The loop stops when you reach a certain amount"]
+      },
+      {
+        "question": "South Africa's load shedding creates a feedback loop: power cuts reduce economic activity, which reduces tax revenue, which reduces Eskom's funding, which worsens infrastructure, which causes more power cuts. Analyse this loop and identify potential intervention points.",
+        "answer": "This is a reinforcing (vicious) loop. Intervention points: (1) independent power producers (break Eskom monopoly), (2) renewable energy investment (bypass aging coal infrastructure), (3) demand-side management (reduce load on the grid), (4) maintenance investment (fix existing plants to break the decline cycle), (5) corruption reduction (ensure funds reach infrastructure).",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": ["Trace the full loop step by step.", "Where could you break or weaken one of the links?"],
+        "explanation": "Complex socio-economic feedback loops often require multiple simultaneous interventions. A single fix (e.g., just building new plants) may not be enough if corruption diverts funds or maintenance continues to lag.",
+        "distractors": ["The loop will naturally balance itself", "Only one intervention point exists"]
+      },
+      {
+        "question": "Design a system with both a reinforcing and a balancing feedback loop. Describe how they interact and what behaviour the combined system produces.",
+        "answer": "Example: A fish population in a dam. Reinforcing loop: more fish reproduce, creating more fish. Balancing loop: as fish increase, food becomes scarce, slowing reproduction and increasing death rates. Combined: the population grows rapidly at first (reinforcing dominates), then levels off at carrying capacity (balancing dominates), producing S-shaped (logistic) growth.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Think about natural systems that grow but then stabilise.", "Most real systems have both types of loop."],
+        "explanation": "The interaction between reinforcing and balancing loops produces characteristic patterns: exponential growth, S-curves, oscillations, or collapse. Recognising these patterns helps predict system behaviour.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Reinforcing loops amplify; balancing loops stabilise.",
+      "In causal loop diagrams, an even number of minus signs = reinforcing loop.",
+      "Most real systems have both reinforcing and balancing loops working simultaneously."
+    ],
+    "key_vocabulary": [
+      {"term": "feedback loop", "definition": "A circular causal relationship where the output of a system feeds back as input", "example_usage": "The thermostat creates a feedback loop that keeps room temperature stable."},
+      {"term": "reinforcing loop", "definition": "A feedback loop that amplifies change, leading to exponential growth or decline", "example_usage": "Compound interest is a reinforcing loop."},
+      {"term": "balancing loop", "definition": "A feedback loop that counteracts change, stabilising a system around a set point", "example_usage": "Body temperature regulation is a balancing loop."},
+      {"term": "causal loop diagram", "definition": "A visual tool showing the feedback relationships between variables in a system", "example_usage": "We drew a causal loop diagram to understand the poverty cycle."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think 'positive feedback' means something good and 'negative feedback' means something bad.",
+        "correction": "In systems thinking, 'positive' means the feedback reinforces the direction of change (which can be good or bad — compound interest vs. erosion). 'Negative' means the feedback opposes the change (which stabilises the system — thermostat, body temperature). The terms describe the loop's behaviour, not its desirability.",
+        "why_students_think_this": "In everyday language, 'positive' and 'negative' have value connotations. Systems thinking uses them as technical terms describing loop structure."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.89,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.89,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

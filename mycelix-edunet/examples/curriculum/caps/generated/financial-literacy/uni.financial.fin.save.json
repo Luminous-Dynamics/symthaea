@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.SAVE",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.SAVE",
+    "title": "Saving & Compound Interest",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Saving means setting money aside for future use. An emergency fund (3-6 months of expenses) protects against unexpected costs like car repairs or job loss. Compound interest is interest earned on both your principal and previously earned interest: A = P(1 + r/n)^(nt), where P is principal, r is annual rate, n is compounding frequency, and t is years. The Rule of 72 estimates doubling time: 72 / interest rate = years to double. Starting early matters enormously because compounding accelerates over time.",
+    "examples": [
+      {
+        "problem": "Zanele saves R5,000 in a savings account earning 7% annual interest, compounded monthly. How much will she have after 5 years?",
+        "steps": [
+          {"instruction": "Identify the variables: P=5000, r=0.07, n=12, t=5", "result": "A = 5000(1 + 0.07/12)^(12x5)"},
+          {"instruction": "Calculate the rate per period", "result": "0.07/12 = 0.005833"},
+          {"instruction": "Calculate the exponent", "result": "12 x 5 = 60 periods"},
+          {"instruction": "Compute the result", "result": "A = 5000 x (1.005833)^60 = 5000 x 1.4176 = R7,088"}
+        ],
+        "answer": "After 5 years, Zanele will have approximately R7,088 — earning R2,088 in interest on a R5,000 deposit."
+      },
+      {
+        "problem": "How long will it take to double R10,000 at 8% annual interest using the Rule of 72?",
+        "steps": [
+          {"instruction": "Apply the Rule of 72", "result": "72 / 8 = 9 years"},
+          {"instruction": "Verify: at 8%, after 9 years", "result": "R10,000 x (1.08)^9 = R10,000 x 1.999 ≈ R20,000"}
+        ],
+        "answer": "It takes approximately 9 years to double your money at 8% interest."
+      },
+      {
+        "problem": "Themba's monthly expenses are R12,000. How much does he need in an emergency fund (3-month minimum)?",
+        "steps": [
+          {"instruction": "Multiply monthly expenses by 3 (minimum)", "result": "R12,000 x 3 = R36,000"},
+          {"instruction": "Calculate the ideal 6-month fund", "result": "R12,000 x 6 = R72,000"},
+          {"instruction": "Plan monthly savings", "result": "Saving R3,000/month reaches the minimum in 12 months"}
+        ],
+        "answer": "Themba needs R36,000 minimum (R72,000 ideal). At R3,000/month, he reaches the minimum in 1 year."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Using the Rule of 72, how long does it take to double your money at 6% interest?",
+        "answer": "12 years",
+        "difficulty_permille": 150,
+        "bloom_level": "Apply",
+        "hints": ["Divide 72 by the interest rate"],
+        "explanation": "72 / 6 = 12 years. This is an approximation but remarkably accurate for rates between 2-15%.",
+        "distractors": ["6 years", "18 years", "72 years"]
+      },
+      {
+        "question": "Why does compound interest grow faster than simple interest?",
+        "answer": "Compound interest earns interest on previously earned interest, not just the original principal. Each period, the base amount grows, so interest in later periods is larger.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about what happens to the interest you earned last year"],
+        "explanation": "With simple interest, R1,000 at 10% always earns R100/year. With compound interest, year 1 earns R100, year 2 earns R110 (10% of R1,100), and so on.",
+        "distractors": ["It uses a higher interest rate", "Banks add bonus money", "It is the same but calculated differently"]
+      },
+      {
+        "question": "If you invest R2,000 at 10% compounded annually, how much do you have after 3 years?",
+        "answer": "R2,662",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["Use A = P(1 + r)^t since compounding is annual (n=1)"],
+        "explanation": "A = 2000 x (1.10)^3 = 2000 x 1.331 = R2,662. You earned R662 in interest.",
+        "distractors": ["R2,600", "R2,200", "R2,700"]
+      },
+      {
+        "question": "What is the recommended size of an emergency fund?",
+        "answer": "3 to 6 months of essential living expenses",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["Think about how long it might take to find a new job"],
+        "explanation": "3 months is the minimum safety net; 6 months provides more security, especially for those with dependents or variable income.",
+        "distractors": ["1 month of salary", "R10,000 regardless of expenses", "12 months of total income"]
+      },
+      {
+        "question": "Person A starts saving R500/month at age 25. Person B starts saving R1,000/month at age 35. Both earn 8% annually and retire at 60. Who has more? Why?",
+        "answer": "Person A has more (approximately R1,140,000 vs R920,000) despite saving half the monthly amount, because they had 10 extra years of compounding.",
+        "difficulty_permille": 400,
+        "bloom_level": "Analyze",
+        "hints": ["Compound interest rewards time more than amount"],
+        "explanation": "Person A: 35 years of compounding on R500/month. Person B: 25 years on R1,000/month. The extra decade of growth for Person A outweighs Person B's doubled contribution.",
+        "distractors": ["Person B because they save more each month", "They end up with the same amount", "Person A only if interest rates are above 10%"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Compound interest", "definition": "Interest calculated on both the initial principal and all previously accumulated interest", "example_usage": "Thanks to compound interest, my R10,000 grew to R19,672 in 10 years at 7%."},
+      {"term": "Emergency fund", "definition": "Savings set aside specifically for unexpected expenses or income loss, typically 3-6 months of expenses", "example_usage": "My emergency fund covered the R8,000 car repair without going into debt."},
+      {"term": "Rule of 72", "definition": "A quick formula to estimate how many years it takes to double an investment: divide 72 by the annual interest rate", "example_usage": "At 9% interest, the Rule of 72 says my money doubles in about 8 years."},
+      {"term": "Principal", "definition": "The original amount of money saved or invested, before any interest is earned", "example_usage": "I deposited a principal of R5,000 into my savings account."}
+    ],
+    "misconceptions": [
+      {"misconception": "I will start saving when I earn more", "correction": "The power of compound interest depends on time, not amount. Saving even R200/month starting today beats saving R1,000/month starting 10 years later.", "why_students_think_this": "People underestimate exponential growth and overestimate the impact of a larger future salary."},
+      {"misconception": "A savings account is the best place for all savings", "correction": "Savings accounts are ideal for emergency funds (accessible, low risk). For long-term growth, investments typically outperform savings account interest rates after inflation.", "why_students_think_this": "Savings accounts feel safe and familiar, and the distinction between short-term and long-term saving is not widely taught."},
+      {"misconception": "Compound interest only matters for large amounts", "correction": "Compounding works on any amount. R100/month at 10% for 30 years becomes over R200,000. The percentage growth is the same regardless of the starting amount.", "why_students_think_this": "Small numbers produce small absolute returns initially, making the growth seem negligible."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

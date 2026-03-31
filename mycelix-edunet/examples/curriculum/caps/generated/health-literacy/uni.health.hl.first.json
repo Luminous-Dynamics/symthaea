@@ -1,0 +1,105 @@
+{
+  "node_id": "UNI.HEALTH.HL.FIRST",
+  "lesson": {
+    "standard_code": "UNI.HEALTH.HL.FIRST",
+    "title": "First Aid Basics",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "First aid is immediate care given before professional medical help arrives. It can save lives. For an unresponsive person: check for danger, tap and shout, call 10177 (national ambulance), check breathing. If not breathing, begin CPR: 30 chest compressions (hard, fast, center of chest) then 2 rescue breaths, repeat until help arrives. For bleeding: apply direct pressure with a clean cloth. For burns: cool under running water for 20 minutes — no ice, no butter, no toothpaste. Recovery position: on their side, head tilted back, to keep the airway open if breathing but unconscious. Learning basic first aid is one of the most valuable skills you can have.",
+    "examples": [
+      {
+        "problem": "You find someone collapsed and unresponsive in a parking lot. Walk through the emergency response steps.",
+        "steps": [
+          {"instruction": "D — Danger: Check the scene is safe", "result": "Look for traffic, electrical hazards, or threats before approaching"},
+          {"instruction": "R — Response: Tap and shout", "result": "Tap their shoulders firmly and shout 'Are you okay?' If no response, proceed."},
+          {"instruction": "S — Send for help: Call 10177", "result": "Call the national ambulance or ask a bystander to call. Put on speakerphone."},
+          {"instruction": "A — Airway: Tilt head back, lift chin", "result": "This opens the airway. Look, listen, and feel for breathing for 10 seconds."},
+          {"instruction": "B — Breathing: If not breathing, start CPR", "result": "30 compressions (5-6 cm deep, at the rate of 100-120/min) then 2 breaths. Repeat."}
+        ],
+        "answer": "Follow DRSAB: Danger, Response, Send for help, Airway, Breathing. If not breathing, begin CPR immediately. Doing something (even imperfect CPR) is vastly better than doing nothing."
+      },
+      {
+        "problem": "A child pulls a pot of boiling water off the stove and burns their arm. What do you do?",
+        "steps": [
+          {"instruction": "Remove from danger", "result": "Move the child away from the stove. Remove clothing from the burned area unless stuck to the skin."},
+          {"instruction": "Cool the burn", "result": "Hold under cool (not cold/ice) running water for 20 minutes. This reduces tissue damage."},
+          {"instruction": "Do NOT apply", "result": "No ice (causes frostbite on damaged skin), no butter/oil (traps heat), no toothpaste (irritates and causes infection)"},
+          {"instruction": "Cover and seek help", "result": "Cover loosely with a clean, non-fluffy cloth or cling wrap. Call 10177 or go to the nearest clinic for anything larger than a R5 coin."}
+        ],
+        "answer": "Cool under running water for 20 minutes, cover loosely, seek medical help. Never apply ice, butter, or toothpaste to burns."
+      },
+      {
+        "problem": "Someone is bleeding heavily from a deep cut on their forearm. What do you do?",
+        "steps": [
+          {"instruction": "Apply direct pressure", "result": "Press firmly on the wound with a clean cloth, bandage, or clothing. Do not lift to check — this disrupts clotting."},
+          {"instruction": "Elevate if possible", "result": "Raise the injured arm above heart level to reduce blood flow to the wound."},
+          {"instruction": "If bleeding soaks through", "result": "Add more material on top — do not remove the first layer. Maintain pressure."},
+          {"instruction": "Call for help", "result": "Call 10177 if bleeding does not stop within 10 minutes or if the wound is deep, large, or from glass/metal."}
+        ],
+        "answer": "Apply firm, direct pressure and do not release. Elevate the limb. Call 10177 for heavy or persistent bleeding. Do not remove embedded objects — apply pressure around them."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the correct ratio of chest compressions to rescue breaths in adult CPR?",
+        "answer": "30 compressions to 2 breaths. Compressions should be 5-6 cm deep at a rate of 100-120 per minute (the tempo of 'Stayin' Alive' by the Bee Gees).",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": ["30 and 2 — think thirty-two"],
+        "explanation": "If you are untrained or uncomfortable giving breaths, compression-only CPR (hands-only) is still effective and far better than doing nothing.",
+        "distractors": ["15 compressions to 1 breath", "5 compressions to 1 breath", "10 compressions to 3 breaths"]
+      },
+      {
+        "question": "What is the SA national ambulance number?",
+        "answer": "10177. Also useful: 112 (emergency from any mobile phone), 10111 (police), ER24: 084 124.",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["It is a 5-digit number starting with 10"],
+        "explanation": "Save these numbers in your phone. In an emergency, seconds matter. Know your nearest hospital's location too.",
+        "distractors": ["911", "999", "10111"]
+      },
+      {
+        "question": "Why should you NOT put ice directly on a burn?",
+        "answer": "Ice can cause frostbite on already damaged skin, making the injury worse. It constricts blood vessels and reduces blood flow needed for healing. Cool (not cold) running water for 20 minutes is the correct treatment.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["The skin is already damaged — extreme cold adds a second injury"],
+        "explanation": "Cool running water removes heat from the tissue without causing further damage. 20 minutes is evidence-based — shorter periods are less effective.",
+        "distractors": ["Ice is fine for burns", "Ice speeds up healing", "Cold water is the same as ice"]
+      },
+      {
+        "question": "When should you place someone in the recovery position?",
+        "answer": "When a person is unconscious but breathing normally. The recovery position (on their side, head tilted back, top leg bent for stability) keeps the airway open and allows fluids to drain, preventing choking.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["They are alive and breathing but not awake"],
+        "explanation": "If someone is unconscious on their back, their tongue can block the airway and vomit can cause choking. The recovery position prevents both. Do NOT use it if you suspect spinal injury — keep them still.",
+        "distractors": ["When someone has a headache", "When someone is conscious but dizzy", "When someone is not breathing"]
+      },
+      {
+        "question": "What is the single most important thing you can do if someone collapses and is not breathing?",
+        "answer": "Start CPR immediately. Every minute without CPR reduces survival by 7-10%. Imperfect CPR is vastly better than no CPR. Push hard and fast on the center of the chest.",
+        "difficulty_permille": 150,
+        "bloom_level": "Understand",
+        "hints": ["Action, even imperfect, saves lives"],
+        "explanation": "Bystander CPR doubles or triples survival from cardiac arrest. Most people hesitate out of fear of doing it wrong — but doing nothing is the worst outcome. You cannot make it worse.",
+        "distractors": ["Wait for the ambulance", "Check their wallet for medical information", "Give them water"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "CPR", "definition": "Cardiopulmonary Resuscitation — emergency procedure combining chest compressions and rescue breaths to maintain blood flow when the heart stops", "example_usage": "She performed CPR for 8 minutes until the paramedics arrived and the patient survived."},
+      {"term": "Recovery position", "definition": "Placing an unconscious but breathing person on their side with head tilted back to maintain an open airway and prevent choking", "example_usage": "After he fainted but was breathing, we put him in the recovery position until the ambulance arrived."},
+      {"term": "DRSAB", "definition": "First aid assessment sequence: Danger, Response, Send for help, Airway, Breathing", "example_usage": "I remembered DRSAB from my first aid course and checked for danger before approaching the casualty."},
+      {"term": "Direct pressure", "definition": "First aid technique of pressing firmly on a wound to control bleeding by helping blood clot", "example_usage": "I applied direct pressure with a clean cloth to stop the bleeding from the cut."}
+    ],
+    "misconceptions": [
+      {"misconception": "You can get sued for giving first aid in South Africa", "correction": "SA law protects good Samaritans. If you act in good faith, with reasonable skill, and without expectation of payment, you are protected. The greater legal risk is failing to assist when you could have.", "why_students_think_this": "Fear of litigation from American media and general anxiety about making things worse."},
+      {"misconception": "You should tilt the head back and pour water in for someone who fainted", "correction": "Never pour water into an unconscious person's mouth — they can choke. If unconscious and breathing, place in recovery position. If they are conscious, offer small sips of water.", "why_students_think_this": "A cultural instinct to give water to someone in distress, without understanding airway risks in unconscious patients."},
+      {"misconception": "Apply butter or toothpaste to burns", "correction": "These trap heat in the skin, increase infection risk, and make medical treatment harder. The only correct first response is cool running water for 20 minutes.", "why_students_think_this": "Traditional home remedies have been passed down through generations, and the cooling sensation of toothpaste feels like it helps."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

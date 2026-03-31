@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.DIGITAL.DL.CITIZEN",
+  "lesson": {
+    "standard_code": "UNI.DIGITAL.DL.CITIZEN",
+    "title": "Digital Citizenship",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Digital citizenship means behaving responsibly and ethically online. Online etiquette (netiquette) includes the same courtesy you would show in person — avoid all-caps (it reads as shouting), think before posting, and remember there is a real person behind every screen. Copyright protects creators' work: sharing someone's music, art, or writing without permission is often illegal. Your digital footprint is the trail of data you leave online — future employers, partners, and institutions can find old posts, photos, and comments. The POPIA (Protection of Personal Information Act) in SA gives you rights over how organizations use your personal data.",
+    "examples": [
+      {
+        "problem": "You want to use a photo you found on Google Images for your small business website. Can you?",
+        "steps": [
+          {"instruction": "Check the license", "result": "Most images online are copyrighted. Using them without permission is illegal, even for small businesses."},
+          {"instruction": "Find legal alternatives", "result": "Use Creative Commons licensed images (search on Unsplash, Pexels, Pixabay), purchase stock photos, or take your own photographs."},
+          {"instruction": "Understand Creative Commons", "result": "CC-BY: free to use with credit. CC-BY-SA: free with credit and same license. CC-BY-NC: free with credit, non-commercial only. CC0: no restrictions."}
+        ],
+        "answer": "You cannot use most Google Images results without permission. Use royalty-free sites (Unsplash, Pexels) or purchase a license. Always check the specific license terms."
+      },
+      {
+        "problem": "A friend tags you in an embarrassing photo from 10 years ago. You are applying for jobs. What should you consider?",
+        "steps": [
+          {"instruction": "Understand your digital footprint", "result": "70-80% of employers check social media during hiring. This photo is now part of your public profile."},
+          {"instruction": "Take action", "result": "Ask your friend to remove the tag or delete the photo. Untag yourself if they do not. Adjust privacy settings."},
+          {"instruction": "Audit your online presence", "result": "Search your own name on Google. Review all social media profiles. Remove or hide anything unprofessional."}
+        ],
+        "answer": "Your digital footprint matters for employment. Ask the friend to remove it, untag yourself, and audit your entire online presence. Think of every post as permanent and public."
+      },
+      {
+        "problem": "Someone is being harassed in an online group you belong to. What is responsible digital citizenship?",
+        "steps": [
+          {"instruction": "Do not participate or encourage", "result": "Even 'liking' or laughing at harassment enables it"},
+          {"instruction": "Support the victim", "result": "Reach out privately to check on them. Publicly disagree with the harassment if safe to do so."},
+          {"instruction": "Report and document", "result": "Report the behavior to platform moderators. Take screenshots as evidence. In serious cases, report to the police (SA Cybercrimes Act)."}
+        ],
+        "answer": "Being a good digital citizen means not being a bystander. Report harassment, support the target, and do not amplify harmful behavior through engagement."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is a digital footprint?",
+        "answer": "The trail of data you create through online activity — social media posts, comments, photos, search history, online purchases, app usage. It is permanent, searchable, and can be viewed by employers, institutions, and others.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["Think about what someone could find about you by searching online"],
+        "explanation": "Your active footprint includes things you post. Your passive footprint includes data collected about you (cookies, location data, browsing history).",
+        "distractors": ["The size of your device's storage", "Your internet speed", "The number of apps you have installed"]
+      },
+      {
+        "question": "What does POPIA (Protection of Personal Information Act) give you the right to do?",
+        "answer": "POPIA gives you the right to: know what personal data organizations hold about you, request correction of inaccurate data, request deletion of your data, object to processing of your data, and complain to the Information Regulator if your rights are violated.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["It protects your personal information from misuse by companies and organizations"],
+        "explanation": "POPIA (effective July 2021) is South Africa's data protection law, similar to Europe's GDPR. Organizations must have a lawful reason to collect your data and must protect it.",
+        "distractors": ["The right to free internet", "The right to post anything online", "The right to access any website"]
+      },
+      {
+        "question": "Is it legal to share a copyrighted song on your social media page?",
+        "answer": "Generally no, unless you have permission from the copyright holder, the use falls under fair dealing exceptions (criticism, review, news reporting), or the song is explicitly shared under a permissive license.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Creating or performing a song gives the creator automatic copyright"],
+        "explanation": "Many platforms have licensing agreements (YouTube, Spotify), but sharing full songs on personal pages without permission violates copyright. Use licensed clips or link to official sources.",
+        "distractors": ["Yes, if you give credit", "Yes, if you do not profit from it", "Yes, everything shared online is free to use"]
+      },
+      {
+        "question": "What is the 'grandmother test' for social media posts?",
+        "answer": "Before posting anything online, ask: 'Would I be comfortable if my grandmother (or future employer, or child) saw this?' If not, do not post it. This simple test prevents most regrettable online behavior.",
+        "difficulty_permille": 100,
+        "bloom_level": "Understand",
+        "hints": ["It is a simple filter for deciding what to post"],
+        "explanation": "The internet is permanent. Content you post can be screenshotted, shared, and surface years later in contexts you did not anticipate.",
+        "distractors": ["A test of internet speed", "A privacy setting check", "An age verification process"]
+      },
+      {
+        "question": "What should you do if you discover a company has your personal data but you never gave them permission?",
+        "answer": "Under POPIA, contact the company's Information Officer and request details about what data they hold and how they obtained it. You can request deletion. If they do not comply, file a complaint with the Information Regulator (inforegulator.org.za).",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["POPIA gives you specific rights regarding your personal data"],
+        "explanation": "Organizations must have a legal basis for processing your data. If they cannot demonstrate one, they must delete your data upon request.",
+        "distractors": ["There is nothing you can do", "Sue them immediately", "Post about it on social media"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Digital footprint", "definition": "The trail of data created by your online activities, including posts, searches, purchases, and passive data collection", "example_usage": "My digital footprint includes every tweet, online purchase, and website I have visited."},
+      {"term": "Copyright", "definition": "Legal protection automatically granted to creators of original works (music, writing, art, code), giving them exclusive rights to reproduce and distribute their work", "example_usage": "You cannot use that photograph on your website without the photographer's permission due to copyright."},
+      {"term": "Creative Commons", "definition": "A set of standardized licenses that allow creators to specify how others may use their work, from fully open to restricted", "example_usage": "The image was licensed under Creative Commons BY-SA, so I used it with attribution."},
+      {"term": "POPIA", "definition": "Protection of Personal Information Act — South Africa's data protection law giving individuals rights over their personal information", "example_usage": "Under POPIA, the company must tell me what personal data they hold about me."}
+    ],
+    "misconceptions": [
+      {"misconception": "If it is on the internet, it is free to use", "correction": "Most online content is copyrighted automatically upon creation. Sharing, copying, or using it without permission or a license can be illegal. Look for explicit licenses (Creative Commons) or use royalty-free sources.", "why_students_think_this": "The ease of copying digital content creates the impression that it is free to use, and enforcement seems rare."},
+      {"misconception": "I can delete things from the internet permanently", "correction": "Once posted, content can be screenshotted, cached, archived, and shared beyond your control. Deleting from your account does not remove copies others may have made. Assume everything posted is permanent.", "why_students_think_this": "The delete button creates an illusion of control, and people do not think about caching, screenshots, and web archives."},
+      {"misconception": "Online actions do not have real-world consequences", "correction": "Cyberbullying, defamation, hate speech, and sharing illegal content have legal consequences under SA law (Cybercrimes Act, 2020). People have been fired, arrested, and sued for online behavior.", "why_students_think_this": "The screen creates a sense of separation and anonymity, making online actions feel less consequential than face-to-face behavior."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

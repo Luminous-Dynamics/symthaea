@@ -1,0 +1,175 @@
+{
+  "node_id": "UNI.SUSTAINABILITY.SUST.ACTION",
+  "lesson": {
+    "standard_code": "UNI.SUSTAINABILITY.SUST.ACTION",
+    "title": "Sustainable Action",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Sustainable action means translating environmental knowledge into concrete behaviour change \u2014 both individual and collective. Individual actions (reducing consumption, conserving energy, choosing sustainable transport) matter, but collective action (policy advocacy, community organising, corporate accountability) creates systemic change. Understanding your carbon footprint helps identify where your impact is greatest, but systemic factors (the energy grid, urban planning, food systems) constrain individual choices. The most effective sustainability approach combines personal behaviour change with civic engagement to change the systems that make unsustainable choices the default.",
+    "examples": [
+      {
+        "problem": "Calculate a simplified carbon footprint for a South African household.",
+        "steps": [
+          {
+            "instruction": "Step 1: Electricity: average SA household uses ~600 kWh/month. SA grid emits ~1 kg CO2/kWh. = 600 kg CO2/month.",
+            "result": "electricity"
+          },
+          {
+            "instruction": "Step 2: Transport: average commute 30 km/day by car = ~150 kg CO2/month.",
+            "result": "transport"
+          },
+          {
+            "instruction": "Step 3: Food: meat-heavy diet adds ~200 kg CO2/month; plant-based ~80 kg CO2/month.",
+            "result": "food"
+          }
+        ],
+        "answer": "Answer: A typical SA household emits roughly 1,000 kg (1 tonne) CO2/month, with electricity being the largest contributor due to coal-heavy grid.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare the impact of individual vs systemic action using the example of plastic waste.",
+        "steps": [
+          {
+            "instruction": "Step 1: Individual: you stop using plastic straws (saves ~1 kg plastic/year).",
+            "result": "individual"
+          },
+          {
+            "instruction": "Step 2: Systemic: a national ban on single-use plastics (prevents millions of tonnes/year).",
+            "result": "systemic"
+          },
+          {
+            "instruction": "Step 3: Both matter: individual action builds the political will for systemic change.",
+            "result": "connection"
+          }
+        ],
+        "answer": "Answer: Individual action without systemic change is insufficient; systemic change without individual buy-in is unsustainable. Both are needed.",
+        "visual_description": null
+      },
+      {
+        "problem": "How can a community organise for sustainable action? Give a South African example.",
+        "steps": [
+          {
+            "instruction": "Step 1: The Philippi Horticultural Area (PHA) Food and Farming Campaign mobilised Cape Town residents to protect one of the city's last urban farms from development.",
+            "result": "organising"
+          },
+          {
+            "instruction": "Step 2: They used petitions, public meetings, legal challenges, and media campaigns.",
+            "result": "tools"
+          },
+          {
+            "instruction": "Step 3: The campaign succeeded in getting the area declared a heritage site, protecting food production for thousands of families.",
+            "result": "outcome"
+          }
+        ],
+        "answer": "Answer: Community organising translates individual concern into collective power that can change policy and protect shared resources.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is a carbon footprint?",
+        "answer": "A carbon footprint is the total amount of greenhouse gases (measured in CO2 equivalent) produced directly and indirectly by an individual, organisation, event, or product. It includes emissions from energy use, transport, food, and consumption.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about all the activities in your day that use energy or produce waste."
+        ],
+        "explanation": "Carbon footprints help identify where your environmental impact is greatest, guiding where to focus reduction efforts.",
+        "distractors": []
+      },
+      {
+        "question": "List five individual actions that reduce environmental impact, ranked from most to least effective.",
+        "answer": "(1) Have fewer children (58.6 tonnes CO2/year saved per child not born in developed countries). (2) Live car-free (2.4 tonnes/year). (3) Avoid one transatlantic flight (1.6 tonnes/trip). (4) Switch to a plant-based diet (0.8 tonnes/year). (5) Buy green energy or install solar (0.8-1.5 tonnes/year, varies by grid).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think beyond recycling \u2014 what are the big-ticket items?",
+          "Consider the research by Wynes and Nicholas (2017)."
+        ],
+        "explanation": "Most sustainability advice focuses on low-impact actions (recycling bags, turning off lights). The highest-impact individual actions are often not discussed because they are more uncomfortable.",
+        "distractors": []
+      },
+      {
+        "question": "You want to reduce your household's carbon footprint by 30%. Using the simplified calculation (electricity, transport, food), identify where to focus and create an action plan.",
+        "answer": "If the baseline is 1,000 kg CO2/month: target is 700 kg. Focus on the biggest source \u2014 electricity (600 kg). Actions: install a solar geyser (reduces electricity by ~40% = 240 kg saved), switch to LED lighting (saves ~30 kg), use gas for cooking (saves ~20 kg). Transport: cycle or use public transport 2 days/week (saves ~30 kg). Food: reduce meat to 3 days/week (saves ~60 kg). Total savings: ~380 kg. New total: ~620 kg (38% reduction).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Target the biggest sources first.",
+          "Calculate whether your plan achieves the target."
+        ],
+        "explanation": "Effective sustainability planning prioritises high-impact changes. Installing a solar geyser in SA has a bigger carbon impact than most other household changes combined.",
+        "distractors": []
+      },
+      {
+        "question": "Critically evaluate the argument: 'Individual action does not matter because big corporations produce most emissions.'",
+        "answer": "Partially true: 100 companies produce 71% of global industrial emissions. But: (1) those companies produce products that individuals buy \u2014 consumer demand drives corporate supply. (2) Individual action builds social norms and political will for systemic regulation. (3) 'Corporations vs individuals' is a false dichotomy \u2014 we need both. (4) The 'corporate blame' narrative can become an excuse for personal inaction. The most effective approach is both: reduce personal consumption AND advocate for corporate and government accountability.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Who buys what corporations produce?",
+          "Can systemic change happen without individual willingness to change?"
+        ],
+        "explanation": "This is an increasingly common argument that contains a grain of truth but can become paralyzing. The answer is not either/or but both/and.",
+        "distractors": []
+      },
+      {
+        "question": "Design a sustainable action campaign for your school or community. Include: the problem, the goal, three individual actions, two systemic actions, and how you will measure success.",
+        "answer": "Answers will vary. Strong responses: (1) clearly defined, locally relevant problem; (2) specific, measurable goal; (3) individual actions that are easy to adopt; (4) systemic actions that address root causes (petitions, policy proposals, partnerships); (5) measurable indicators of success; (6) a timeline and accountability mechanism.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Make it local and specific \u2014 global problems feel too big.",
+          "Include both easy wins and structural changes."
+        ],
+        "explanation": "The most effective campaigns connect individual behaviour change to a larger story of systemic change, making people feel that their personal actions are part of something bigger.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The total greenhouse gas emissions caused directly and indirectly by an individual, organisation, or product",
+      "Coordinated effort by a group of people to achieve a common goal, especially in advocacy or policy change",
+      "Making misleading claims about the environmental benefits of a product or practice"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "carbon footprint",
+        "definition": "The total greenhouse gas emissions caused directly and indirectly by an individual, organisation, or product",
+        "example_usage": "Calculating your carbon footprint helps identify where to reduce your impact."
+      },
+      {
+        "term": "collective action",
+        "definition": "Coordinated effort by a group of people to achieve a common goal, especially in advocacy or policy change",
+        "example_usage": "Collective action by communities pushed the government to invest in renewable energy."
+      },
+      {
+        "term": "greenwashing",
+        "definition": "Making misleading claims about the environmental benefits of a product or practice",
+        "example_usage": "The company's 'eco-friendly' label was greenwashing \u2014 the product was still highly polluting."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that individual actions are either sufficient by themselves or completely pointless.",
+        "correction": "Neither extreme is correct. Individual actions alone cannot solve systemic problems like climate change, but they are not pointless \u2014 they reduce personal impact, create demand for sustainable alternatives, normalise sustainable behaviour, and build the political constituency for systemic change. The most effective approach combines personal action with civic engagement.",
+        "why_students_think_this": "Media narratives tend to either heroize individual action ('save the planet by recycling!') or dismiss it ('your recycling does not matter'). Both framings are oversimplifications."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

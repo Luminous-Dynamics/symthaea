@@ -1,0 +1,184 @@
+{
+  "node_id": "UNI.EMOTIONAL.EQ.MGMT",
+  "lesson": {
+    "standard_code": "UNI.EMOTIONAL.EQ.MGMT",
+    "title": "Self-Management",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Self-management is the ability to regulate your emotions, thoughts, and behaviours effectively in different situations. It includes impulse control (pausing before reacting), stress management (using healthy coping strategies), goal-setting (turning intentions into action), and self-motivation (persisting through difficulty). Self-management does not mean suppressing emotions \u2014 it means choosing how to express and act on them. In South Africa, where many young people face stressors like poverty, violence, and family instability, self-management skills are vital for resilience and success.",
+    "examples": [
+      {
+        "problem": "You are in a heated argument and feel the urge to say something hurtful. How do you apply self-management?",
+        "steps": [
+          {
+            "instruction": "Step 1: Recognise the impulse \u2014 your body is tense, your heart rate is elevated.",
+            "result": "awareness"
+          },
+          {
+            "instruction": "Step 2: Use a pause technique: take three deep breaths or say 'I need a moment.'",
+            "result": "pause"
+          },
+          {
+            "instruction": "Step 3: Reframe: what do I actually want from this conversation? Probably not to hurt the other person.",
+            "result": "reframe"
+          },
+          {
+            "instruction": "Step 4: Respond with your intention, not your impulse.",
+            "result": "intentional response"
+          }
+        ],
+        "answer": "Answer: Self-management means creating a gap between stimulus and response, then choosing a response aligned with your values.",
+        "visual_description": null
+      },
+      {
+        "problem": "A Grade 11 learner is overwhelmed by exams, family responsibilities, and social pressure. What self-management strategies could help?",
+        "steps": [
+          {
+            "instruction": "Step 1: Prioritise: list all tasks and rank by urgency and importance (Eisenhower matrix).",
+            "result": "prioritise"
+          },
+          {
+            "instruction": "Step 2: Break large tasks into small steps \u2014 'study Chapter 3, Section 1' instead of 'study for maths'.",
+            "result": "chunking"
+          },
+          {
+            "instruction": "Step 3: Schedule recovery: short breaks, exercise, or talking to a friend to prevent burnout.",
+            "result": "recovery"
+          }
+        ],
+        "answer": "Answer: Self-management under stress requires prioritisation, task decomposition, and deliberate recovery \u2014 not just pushing harder.",
+        "visual_description": null
+      },
+      {
+        "problem": "How does goal-setting contribute to self-management?",
+        "steps": [
+          {
+            "instruction": "Step 1: A goal gives direction \u2014 without it, effort is scattered.",
+            "result": "direction"
+          },
+          {
+            "instruction": "Step 2: SMART goals (Specific, Measurable, Achievable, Relevant, Time-bound) make progress trackable.",
+            "result": "structure"
+          },
+          {
+            "instruction": "Step 3: Tracking progress maintains motivation and reveals when adjustments are needed.",
+            "result": "feedback"
+          }
+        ],
+        "answer": "Answer: Goal-setting transforms vague intentions into structured action plans with built-in accountability.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the difference between suppressing emotions and managing them?",
+        "answer": "Suppressing means pushing emotions down and pretending they do not exist, which often causes them to resurface more intensely. Managing means acknowledging the emotion, understanding it, and choosing how to respond. For example, managing anger means recognising 'I am angry because I feel disrespected' and deciding to address the issue calmly, rather than either exploding or pretending everything is fine.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what happens to a shaken fizzy drink \u2014 suppressing is like holding the cap on."
+        ],
+        "explanation": "Emotional suppression is associated with increased stress, anxiety, and physical health problems. Healthy management acknowledges emotions as valid information while choosing constructive responses.",
+        "distractors": []
+      },
+      {
+        "question": "Describe three healthy stress management techniques and explain why each works.",
+        "answer": "(1) Physical exercise releases endorphins and reduces cortisol. (2) Deep breathing activates the parasympathetic nervous system, calming the fight-or-flight response. (3) Social connection provides emotional support and perspective. Each works by directly addressing the physiological or psychological mechanisms of stress.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what stress does to your body.",
+          "What activities naturally calm you down?"
+        ],
+        "explanation": "These are evidence-based techniques. Exercise is one of the most effective anti-anxiety interventions known. Deep breathing is used in clinical settings. Social support is consistently associated with resilience.",
+        "distractors": []
+      },
+      {
+        "question": "You have a goal to improve your maths grade from 50% to 65% by the end of the term. Create a SMART action plan.",
+        "answer": "Specific: improve maths from 50% to 65%. Measurable: track weekly test scores. Achievable: 15% improvement over 10 weeks is realistic with effort. Relevant: maths is needed for my career goals. Time-bound: by end of term. Actions: (1) attend extra maths classes twice per week, (2) do 30 minutes of practice problems daily, (3) ask the teacher for help on specific weak areas, (4) review each test to identify error patterns.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Make each element of SMART specific to your situation.",
+          "Include concrete actions, not just wishes."
+        ],
+        "explanation": "SMART goals work because they transform vague aspirations into trackable commitments with clear criteria for success.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why New Year's resolutions typically fail, using self-management principles.",
+        "answer": "Resolutions fail because they are usually vague ('exercise more'), lack implementation plans, rely on motivation rather than habit systems, do not include recovery from setbacks, and are often too ambitious. Self-management principles that would improve success: set specific small goals, build habits with environmental cues, plan for obstacles (if-then planning), track progress visibly, and treat setbacks as data rather than failure.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What is missing from 'I will exercise more' as a goal?",
+          "Think about what happens after the first failure."
+        ],
+        "explanation": "Research shows that implementation intentions ('I will exercise at 7am on Monday, Wednesday, and Friday at the park') are far more effective than goal intentions ('I will exercise more').",
+        "distractors": []
+      },
+      {
+        "question": "Design a personal self-management toolkit: identify your top 3 stress situations, your default (unhelpful) response to each, and a replacement strategy. Include a way to track your progress.",
+        "answer": "Answers will vary. Strong responses include: (1) specific, honest identification of stress situations; (2) non-judgmental description of current default responses; (3) evidence-based replacement strategies; (4) a simple tracking mechanism (app, journal, or accountability partner); (5) a plan for what to do when the replacement strategy fails.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Be honest about your defaults \u2014 no one is grading this.",
+          "Make replacement strategies specific and realistic."
+        ],
+        "explanation": "The most effective self-management toolkits are personalised, realistic, and include a plan for failure. Perfection is not the goal \u2014 gradual improvement is.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The ability to regulate emotions, thoughts, and behaviours effectively across situations",
+      "The ability to pause and think before acting on an urge or strong emotion",
+      "Goals that are Specific, Measurable, Achievable, Relevant, and Time-bound"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "self-management",
+        "definition": "The ability to regulate emotions, thoughts, and behaviours effectively across situations",
+        "example_usage": "Self-management helped her stay calm during the difficult conversation."
+      },
+      {
+        "term": "impulse control",
+        "definition": "The ability to pause and think before acting on an urge or strong emotion",
+        "example_usage": "Impulse control prevents saying things you will regret."
+      },
+      {
+        "term": "SMART goals",
+        "definition": "Goals that are Specific, Measurable, Achievable, Relevant, and Time-bound",
+        "example_usage": "Her SMART goal was to read one book per month for six months."
+      },
+      {
+        "term": "resilience",
+        "definition": "The ability to recover from setbacks, adapt to change, and keep going in the face of adversity",
+        "example_usage": "Resilience is not about avoiding difficulty but bouncing back from it."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think self-management means never showing emotion or always being calm.",
+        "correction": "Self-management is about choosing your response, not eliminating your emotions. Sometimes the appropriate response is to express anger, sadness, or frustration \u2014 the key is doing so intentionally rather than reactively. A self-managed person might say 'I am angry about this and here is why' rather than either exploding or shutting down.",
+        "why_students_think_this": "Cultural messages like 'be strong' and 'don't cry' equate emotional management with emotional suppression. True self-management values emotional honesty."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

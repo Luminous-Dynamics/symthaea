@@ -1,0 +1,103 @@
+{
+  "node_id": "UNI.DIGITAL.DL.SAFE",
+  "lesson": {
+    "standard_code": "UNI.DIGITAL.DL.SAFE",
+    "title": "Digital Safety",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Digital safety protects your identity, finances, and privacy online. Strong passwords are 12+ characters mixing uppercase, lowercase, numbers, and symbols — or even better, use a passphrase like 'Correct-Horse-Battery-Staple!42'. Never reuse passwords across sites; use a password manager (Bitwarden, KeePass). Enable two-factor authentication (2FA) everywhere possible. Phishing is when attackers impersonate trusted entities (banks, SARS) via email, SMS, or WhatsApp to steal your credentials — always verify the sender and never click suspicious links. A VPN encrypts your internet traffic, especially important on public WiFi.",
+    "examples": [
+      {
+        "problem": "You receive an SMS: 'Dear customer, your FNB account has been compromised. Click here to verify: fnb-secure-login.co.za.ng'. Is this legitimate?",
+        "steps": [
+          {"instruction": "Check the URL carefully", "result": "fnb-secure-login.co.za.ng — this is a .ng (Nigeria) domain disguised to look like .co.za. Real FNB uses fnb.co.za"},
+          {"instruction": "Check the communication pattern", "result": "Banks do not send SMS links asking you to log in. They ask you to call them or visit a branch."},
+          {"instruction": "Verify independently", "result": "Open your banking app directly (do not click the link) or call the number on the back of your card"}
+        ],
+        "answer": "This is a phishing attempt. The domain is fake (.ng not .co.za), and banks never send login links via SMS. Delete the message and report it to your bank."
+      },
+      {
+        "problem": "Create a strong, memorable password for your email account.",
+        "steps": [
+          {"instruction": "Use a passphrase approach", "result": "Think of a memorable sentence: 'My dog Biscuit loves the beach in December!'"},
+          {"instruction": "Convert to a password", "result": "Take first letters + numbers + symbols: MdBlTb!D2023 or use the full phrase: MyDogBiscuit-Beach-December!23"},
+          {"instruction": "Verify strength", "result": "15 characters, mixed case, numbers, symbols. Would take centuries to crack by brute force."},
+          {"instruction": "Store it", "result": "Use a password manager (Bitwarden is free) rather than writing it on paper or in a text file"}
+        ],
+        "answer": "The passphrase 'MyDogBiscuit-Beach-December!23' is strong, memorable, and unique. Store it in a password manager and enable 2FA on the email account."
+      },
+      {
+        "problem": "You are at a coffee shop using public WiFi to do internet banking. What risks exist and how do you protect yourself?",
+        "steps": [
+          {"instruction": "Identify the risk", "result": "Public WiFi is unencrypted — anyone on the same network can potentially intercept your data (man-in-the-middle attack)"},
+          {"instruction": "Protection 1: VPN", "result": "A VPN encrypts all your traffic so even if intercepted, it cannot be read"},
+          {"instruction": "Protection 2: HTTPS", "result": "Ensure the banking site shows https:// and a padlock icon — this encrypts the connection"},
+          {"instruction": "Protection 3: Use mobile data instead", "result": "Your 4G/5G connection is encrypted and more secure than public WiFi"}
+        ],
+        "answer": "Public WiFi is unsafe for banking. Use a VPN, verify HTTPS, or switch to mobile data. Better yet, do banking on mobile data only."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Why should you never reuse passwords across different websites?",
+        "answer": "If one website is breached and your password is stolen, attackers will try that same email-password combination on every major site (credential stuffing). Unique passwords per site limit the damage to only the breached service.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about what happens when a website you use gets hacked"],
+        "explanation": "Major breaches happen regularly — LinkedIn, Facebook, Adobe have all been breached. If you used the same password everywhere, all your accounts are compromised from one breach.",
+        "distractors": ["It is fine if the password is strong", "Only financial sites need unique passwords", "Password reuse is only risky for email"]
+      },
+      {
+        "question": "What is two-factor authentication (2FA) and why should you enable it?",
+        "answer": "2FA requires two forms of verification to log in: something you know (password) and something you have (phone for a code, authenticator app, or hardware key). Even if your password is stolen, the attacker cannot log in without the second factor.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["What extra step does your bank require when you log in?"],
+        "explanation": "2FA dramatically reduces account compromise. An authenticator app (Google Authenticator, Authy) is more secure than SMS codes, which can be intercepted via SIM swap fraud.",
+        "distractors": ["Having two passwords", "Logging in from two devices", "Using two email addresses"]
+      },
+      {
+        "question": "What are three red flags that an email might be a phishing attempt?",
+        "answer": "1) Urgency or threats ('Your account will be closed in 24 hours'). 2) Suspicious sender address (support@amaz0n-security.com instead of @amazon.com). 3) Requests for passwords, PINs, or personal information — legitimate companies never ask for these via email.",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Think about the language, the sender, and what they are asking for"],
+        "explanation": "Phishing relies on fear, urgency, and impersonation. Legitimate organizations communicate through official channels and never request sensitive credentials via email.",
+        "distractors": ["Professional design means it is real", "If it mentions your name, it is legitimate", "Only emails with attachments are dangerous"]
+      },
+      {
+        "question": "What is a password manager and why is it safer than remembering passwords?",
+        "answer": "A password manager securely stores all your passwords in an encrypted vault. You only need to remember one strong master password. It generates unique, complex passwords for each site, eliminating reuse. It auto-fills passwords to prevent phishing (it will not fill credentials on fake sites).",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["How can you have unique 20-character passwords for 50 sites?"],
+        "explanation": "Free options like Bitwarden are available. A password manager is more secure than writing passwords down or reusing them, and more practical than memorizing unique passwords for every site.",
+        "distractors": ["It makes passwords less secure by storing them", "It costs too much for regular people", "It only works on computers, not phones"]
+      },
+      {
+        "question": "Why is SIM swap fraud particularly dangerous in South Africa?",
+        "answer": "Criminals convince your mobile carrier to transfer your phone number to their SIM card. They then receive your SMS-based 2FA codes, password reset links, and banking OTPs, gaining access to your bank accounts and online services. SA has high rates of this fraud.",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
+        "hints": ["What happens if someone else receives all your SMS messages?"],
+        "explanation": "To protect against SIM swap: use app-based 2FA instead of SMS, set a PIN on your SIM, register for your carrier's SIM swap notifications, and never share personal details that could be used for social engineering.",
+        "distractors": ["It only affects prepaid users", "Your bank always detects it automatically", "It is not possible if your phone is password protected"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Phishing", "definition": "A social engineering attack where criminals impersonate trusted entities to trick you into revealing passwords, financial details, or personal information", "example_usage": "I received a phishing email pretending to be from SARS asking for my banking details."},
+      {"term": "Two-factor authentication (2FA)", "definition": "A security method requiring two different forms of identification — typically a password plus a code from your phone or authenticator app", "example_usage": "With 2FA enabled, even if someone steals my password, they cannot access my account."},
+      {"term": "VPN", "definition": "Virtual Private Network — encrypts your internet traffic and routes it through a secure server, protecting privacy especially on public networks", "example_usage": "I use a VPN when connecting to public WiFi at the airport."},
+      {"term": "Password manager", "definition": "Software that securely generates, stores, and auto-fills unique passwords for all your accounts, requiring only one master password", "example_usage": "Bitwarden generates and remembers a unique 20-character password for each site I use."}
+    ],
+    "misconceptions": [
+      {"misconception": "I have nothing to hide, so privacy does not matter", "correction": "Privacy is not about hiding wrongdoing. Your personal data (location, contacts, financial info, health records) can be used for identity theft, financial fraud, targeted scams, and manipulation. Everyone deserves data protection.", "why_students_think_this": "Privacy is framed as something only criminals need, rather than as a fundamental right that protects everyone."},
+      {"misconception": "A strong password is enough to keep me safe", "correction": "Passwords can be stolen through phishing, data breaches, and keyloggers regardless of strength. 2FA, keeping software updated, and not clicking suspicious links are equally important.", "why_students_think_this": "Password strength feels like the primary and sufficient security measure, when it is only one layer of defense."},
+      {"misconception": "Macs and iPhones do not get viruses", "correction": "While less commonly targeted than Windows, Apple devices are not immune to malware, phishing, or social engineering attacks. No platform is completely safe without good security practices.", "why_students_think_this": "Apple's marketing emphasized security, and historical lower targeting created a false sense of immunity."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

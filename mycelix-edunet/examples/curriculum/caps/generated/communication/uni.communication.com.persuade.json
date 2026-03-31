@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.COMMUNICATION.COM.PERSUADE",
+  "lesson": {
+    "standard_code": "UNI.COMMUNICATION.COM.PERSUADE",
+    "title": "Persuasion & Negotiation",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Persuasion is the art of influencing others' beliefs or actions through reason, evidence, and appeal. Negotiation is the process of reaching agreement between parties with different interests. Robert Cialdini identified six principles of persuasion: reciprocity (people return favours), commitment (people honour stated positions), social proof (people follow others), authority (people defer to experts), liking (people agree with those they like), and scarcity (people value what is rare). In negotiation, Fisher and Ury's 'Getting to Yes' framework emphasises separating people from problems, focusing on interests rather than positions, generating options for mutual gain, and using objective criteria. These skills are essential for everything from job interviews to community advocacy in South Africa.",
+    "examples": [
+      {
+        "problem": "A community group wants the municipality to fix potholes. How can they use persuasion principles?",
+        "steps": [
+          {
+            "instruction": "Step 1: Reciprocity: the community has been paying rates \u2014 the municipality owes service delivery.",
+            "result": "reciprocity"
+          },
+          {
+            "instruction": "Step 2: Social proof: show that neighbouring wards have had their roads fixed.",
+            "result": "social proof"
+          },
+          {
+            "instruction": "Step 3: Authority: get an engineer's report on the damage and safety risk.",
+            "result": "authority"
+          }
+        ],
+        "answer": "Answer: Combining multiple persuasion principles is more effective than relying on just one.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain BATNA and why it matters in negotiation.",
+        "steps": [
+          {
+            "instruction": "Step 1: BATNA = Best Alternative To a Negotiated Agreement \u2014 your plan B if the negotiation fails.",
+            "result": "define"
+          },
+          {
+            "instruction": "Step 2: Knowing your BATNA gives you power: you can walk away if the deal is worse than your alternative.",
+            "result": "power"
+          },
+          {
+            "instruction": "Step 3: Example: in a salary negotiation, your BATNA might be another job offer. Having one gives you leverage.",
+            "result": "example"
+          }
+        ],
+        "answer": "Answer: Your negotiation power is directly proportional to the quality of your alternatives. Always know your BATNA before negotiating.",
+        "visual_description": null
+      },
+      {
+        "problem": "What is the difference between a position and an interest? Why does it matter?",
+        "steps": [
+          {
+            "instruction": "Step 1: Position: 'I want a 20% raise.' Interest: 'I need to feel valued and cover my increased rent.'",
+            "result": "distinction"
+          },
+          {
+            "instruction": "Step 2: Positions are often incompatible; interests often overlap.",
+            "result": "overlap"
+          },
+          {
+            "instruction": "Step 3: Focusing on interests opens creative solutions: flexible hours, professional development, title change.",
+            "result": "options"
+          }
+        ],
+        "answer": "Answer: Positional bargaining creates winners and losers. Interest-based negotiation can create mutual gains.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name Cialdini's six principles of persuasion with a brief definition of each.",
+        "answer": "1. Reciprocity (people feel obliged to return favours). 2. Commitment/Consistency (people stick to stated commitments). 3. Social proof (people do what they see others doing). 4. Authority (people defer to credible experts). 5. Liking (people are persuaded by those they like). 6. Scarcity (people value what is rare or limited).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: give, commit, follow, trust, like, want."
+        ],
+        "explanation": "These principles operate largely unconsciously. Understanding them helps you both persuade ethically and resist manipulation.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the difference between persuasion and manipulation. Give an example of each.",
+        "answer": "Persuasion respects the other person's autonomy and uses honest information to help them make an informed choice. Manipulation deceives, withholds information, or exploits emotional vulnerabilities to get compliance. Example of persuasion: 'This product costs more but lasts three times longer \u2014 here are the consumer reports.' Example of manipulation: 'This is the last one in stock!' (when it is not) to create false scarcity.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about whether the other person would agree if they had all the information.",
+          "Does the technique respect or exploit the other person?"
+        ],
+        "explanation": "The line between persuasion and manipulation is transparency and respect for autonomy. Ethical persuaders want the other person to make a genuinely informed choice.",
+        "distractors": []
+      },
+      {
+        "question": "You are negotiating with your landlord for a rent reduction. Prepare for the negotiation using Fisher and Ury's framework: identify your interests, the landlord's interests, your BATNA, and two creative options.",
+        "answer": "Your interests: affordable rent, stable housing, good relationship with landlord. Landlord's interests: reliable income, property maintenance, avoiding vacancy costs. Your BATNA: move to a cheaper place (but moving is expensive and disruptive). Creative options: (1) offer a longer lease in exchange for reduced rent (gives landlord income security); (2) offer to handle minor maintenance yourself in exchange for a discount (saves landlord time and money).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "What does the landlord actually want? It is not just money.",
+          "Can you offer something valuable to the landlord that costs you little?"
+        ],
+        "explanation": "Interest-based negotiation works because it expands the pie. Instead of fighting over a fixed amount, you find ways to create value for both sides.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse an advertisement (print, TV, or social media) and identify which of Cialdini's principles it uses. Evaluate whether the use is ethical.",
+        "answer": "Answers will vary. Strong responses: (1) identify the specific ad and its claims; (2) correctly identify 2-3 Cialdini principles at work; (3) evaluate whether each use is honest or manipulative; (4) consider the target audience's vulnerability; (5) distinguish between legitimate persuasion and exploitation.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Look for: celebrity endorsements (authority + liking), 'limited time offer' (scarcity), '5 million customers trust us' (social proof).",
+          "Ask: would I still be persuaded if I knew how the technique works?"
+        ],
+        "explanation": "Media literacy includes understanding persuasion techniques. Once you can identify the principles being used, you can evaluate whether the underlying argument has merit independent of the persuasion packaging.",
+        "distractors": []
+      },
+      {
+        "question": "Design a negotiation strategy for a real situation in your life (e.g., negotiating study group rules, household chores, or a project deadline). Include: parties, interests, BATNA, 3 creative options, and your opening statement.",
+        "answer": "Answers will vary. Strong responses: (1) clearly identify all parties and their interests (not just positions); (2) realistic BATNA assessment; (3) creative options that address multiple interests; (4) opening statement that is firm but collaborative; (5) acknowledgment of what the other party values.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Start by understanding what the other party needs, not just what you want.",
+          "Your opening sets the tone \u2014 collaborative, not adversarial."
+        ],
+        "explanation": "The best negotiation preparation focuses more on understanding the other party's interests than on planning your arguments. Curiosity about their needs often reveals solutions you could not have imagined alone.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Best Alternative To a Negotiated Agreement \u2014 your plan B if the negotiation fails",
+      "The social norm of returning favours \u2014 people feel obliged to give back when they receive",
+      "A position is what you say you want; an interest is why you want it"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "BATNA",
+        "definition": "Best Alternative To a Negotiated Agreement \u2014 your plan B if the negotiation fails",
+        "example_usage": "Knowing her BATNA gave her the confidence to walk away from a bad deal."
+      },
+      {
+        "term": "reciprocity",
+        "definition": "The social norm of returning favours \u2014 people feel obliged to give back when they receive",
+        "example_usage": "The free sample triggered reciprocity: she felt obliged to buy something."
+      },
+      {
+        "term": "interest vs position",
+        "definition": "A position is what you say you want; an interest is why you want it",
+        "example_usage": "Their positions were incompatible but their interests overlapped significantly."
+      },
+      {
+        "term": "win-win",
+        "definition": "A negotiation outcome where both parties gain value \u2014 also called 'integrative bargaining'",
+        "example_usage": "Finding a win-win required understanding what each side truly valued."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often think negotiation is about winning \u2014 getting the most while giving the least.",
+        "correction": "Effective negotiation is about creating value, not just claiming it. Win-lose thinking often produces lose-lose outcomes because the 'losing' party resents the result and may not honour the agreement. The best negotiators focus on expanding the total value and then dividing it fairly, which creates durable agreements and preserves relationships.",
+        "why_students_think_this": "Movies and popular culture portray negotiation as adversarial combat. In reality, the most successful negotiators are collaborative problem-solvers who invest heavily in understanding the other party's needs."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.CRITICAL.CT.BIAS",
+  "lesson": {
+    "standard_code": "UNI.CRITICAL.CT.BIAS",
+    "title": "Cognitive Biases",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Cognitive biases are systematic errors in thinking that affect everyone. Confirmation bias makes us seek information that supports our existing beliefs and ignore contradicting evidence. Anchoring causes us to rely too heavily on the first piece of information we receive. The Dunning-Kruger effect means beginners overestimate their ability while experts underestimate theirs. Availability bias makes us overestimate the likelihood of events we can easily recall (plane crashes feel common because they are dramatic, though cars are far deadlier). Knowing these biases does not eliminate them, but it helps you pause and reason more carefully.",
+    "examples": [
+      {
+        "problem": "You believe a particular political party is corrupt. You read three articles: two supporting your view and one presenting evidence of their good governance. You share the two negative articles and dismiss the positive one. What bias is at play?",
+        "steps": [
+          {"instruction": "Identify the pattern", "result": "You sought and amplified information supporting your existing belief"},
+          {"instruction": "Identify the bias", "result": "Confirmation bias — selectively processing information that confirms what you already believe"},
+          {"instruction": "What should you do?", "result": "Give the contradicting evidence equal consideration. Ask: if I believed the opposite, would I find this article convincing?"}
+        ],
+        "answer": "This is confirmation bias. You selectively accepted evidence supporting your existing view and dismissed contradictory evidence without evaluating it fairly."
+      },
+      {
+        "problem": "A shop prices a jacket at R2,500, then crosses it out and writes R1,200. You feel like you are getting a great deal. Are you?",
+        "steps": [
+          {"instruction": "Identify the anchor", "result": "The R2,500 'original' price is the anchor — the first number you see"},
+          {"instruction": "How does anchoring affect judgment?", "result": "R1,200 feels cheap relative to R2,500. Without the anchor, you might evaluate R1,200 on its own merits."},
+          {"instruction": "What should you do?", "result": "Ignore the crossed-out price. Ask: is R1,200 a fair price for this jacket compared to similar jackets elsewhere?"}
+        ],
+        "answer": "This is anchoring bias. The inflated 'original' price makes the sale price feel like a bargain, even if R1,200 is the normal market price."
+      },
+      {
+        "problem": "After watching a documentary about plane crashes, Mpho is terrified of flying but happily drives 1,000km to avoid it. Is this rational?",
+        "steps": [
+          {"instruction": "Check the actual statistics", "result": "Driving is roughly 100 times more dangerous per kilometer than flying. You are far more likely to die in the car trip than on a flight."},
+          {"instruction": "Identify the bias", "result": "Availability bias — plane crashes are dramatic, heavily reported, and easily recalled. Car accidents are routine and forgettable."},
+          {"instruction": "The documentary's effect", "result": "It made plane crash scenarios highly 'available' in Mpho's mind, distorting risk perception"}
+        ],
+        "answer": "Availability bias. Dramatic, memorable events (plane crashes) feel more likely than mundane, common ones (car accidents). Statistically, Mpho chose the more dangerous option."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the Dunning-Kruger effect?",
+        "answer": "People with limited knowledge in an area tend to overestimate their competence, while genuine experts tend to underestimate theirs. As you learn more, you realize how much you do not know.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about someone who just started learning something and thinks they are already an expert"],
+        "explanation": "A beginner guitar player after 2 weeks may think they are quite good. A professional with 20 years of practice sees how much they still have to learn. Expertise reveals complexity.",
+        "distractors": ["Smart people think they are dumb", "Stupid people cannot learn", "Only uneducated people have biases"]
+      },
+      {
+        "question": "You are negotiating a salary. The employer says R15,000/month. You wanted R20,000 but now R18,000 feels like a win. What bias is affecting you?",
+        "answer": "Anchoring. The employer's first offer (R15,000) became your reference point. R18,000 feels like a big gain from R15,000, even though it is below your actual target of R20,000.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["What was the first number mentioned, and how did it affect your judgment?"],
+        "explanation": "In negotiations, whoever sets the first number often controls the range. This is why it can be strategic to state your desired salary first.",
+        "distractors": ["Confirmation bias", "Dunning-Kruger effect", "Sunk cost fallacy"]
+      },
+      {
+        "question": "You have spent R5,000 on concert tickets but feel ill on the day. You force yourself to go because you already paid. What bias is this?",
+        "answer": "Sunk cost fallacy. The R5,000 is spent regardless of whether you attend. The rational decision is based only on whether attending will be enjoyable given your illness, not on money already spent.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Can you get the money back by going? Does going change the past expense?"],
+        "explanation": "Sunk costs are irrecoverable. Letting past expenditure drive current decisions leads to throwing good time/money after bad.",
+        "distractors": ["Anchoring", "Loss aversion", "Availability bias"]
+      },
+      {
+        "question": "Why is it so hard to overcome our own biases?",
+        "answer": "Biases operate automatically and unconsciously — they are mental shortcuts (heuristics) that evolved because they are usually fast and adequate. We are often unaware they are influencing us, and even awareness does not eliminate them, only reduces their impact.",
+        "difficulty_permille": 300,
+        "bloom_level": "Analyze",
+        "hints": ["Think about whether these biases are conscious or unconscious"],
+        "explanation": "Biases are features of normal human cognition, not defects. They save mental energy in most situations but fail in specific contexts. Strategies like checklists, seeking opposing views, and decision frameworks help.",
+        "distractors": ["Only unintelligent people have biases", "Reading about biases eliminates them", "Biases are always harmful"]
+      },
+      {
+        "question": "Give an example of confirmation bias in everyday life.",
+        "answer": "Example: Someone who believes a certain diet is the best will notice and remember every success story, while forgetting or dismissing people who tried it and failed. They may only follow social media accounts that promote the diet.",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["Think about a strong belief you hold and how you seek information about it"],
+        "explanation": "Confirmation bias shapes what we search for, what we notice, and what we remember. It creates a self-reinforcing bubble of agreeable information.",
+        "distractors": ["Noticing patterns that are not there", "Being biased against a group of people", "Forgetting things you learned"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Confirmation bias", "definition": "The tendency to search for, interpret, and remember information that confirms your existing beliefs while ignoring contradictory evidence", "example_usage": "Confirmation bias made me only read articles that supported my opinion."},
+      {"term": "Anchoring", "definition": "The tendency to rely too heavily on the first piece of information encountered when making decisions", "example_usage": "The estate agent showed us the most expensive house first to anchor our expectations high."},
+      {"term": "Availability bias", "definition": "Overestimating the likelihood of events that are easy to recall, often because they are dramatic or recent", "example_usage": "After watching the news about a shark attack, I overestimated the danger of swimming."},
+      {"term": "Dunning-Kruger effect", "definition": "The tendency for people with limited knowledge to overestimate their competence, while experts underestimate theirs", "example_usage": "He completed one online course and thought he knew more than the doctor — classic Dunning-Kruger."}
+    ],
+    "misconceptions": [
+      {"misconception": "I am aware of biases, so they do not affect me", "correction": "Knowing about biases helps but does not eliminate them. They operate unconsciously. Even psychologists who study biases are subject to them. Use structured decision-making processes.", "why_students_think_this": "People believe awareness equals immunity, underestimating how automatic biases are."},
+      {"misconception": "Only uneducated or unintelligent people have cognitive biases", "correction": "Everyone has cognitive biases — they are built into human cognition. Highly educated people can be more prone to some biases (like confirmation bias) because they are better at constructing arguments to defend their existing views.", "why_students_think_this": "Intelligence feels like a shield against error, and it is uncomfortable to accept that smart people make systematic thinking mistakes."},
+      {"misconception": "All mental shortcuts are bad", "correction": "Heuristics (mental shortcuts) are efficient and usually produce good-enough decisions quickly. They only become problematic in specific situations. Without them, simple decisions would take hours.", "why_students_think_this": "Learning about biases can create the impression that intuitive thinking is always flawed."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

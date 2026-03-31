@@ -1,0 +1,123 @@
+{
+  "node_id": "UNI.SYSTEMS.SYS.STOCK",
+  "lesson": {
+    "standard_code": "UNI.SYSTEMS.SYS.STOCK",
+    "title": "Stocks and Flows",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Stocks and flows are the foundation of system dynamics. A stock is an accumulation — anything you can measure at a point in time (water in a dam, money in a bank account, population of a city). A flow is a rate of change — how quickly the stock increases or decreases over time (rainfall into the dam, withdrawals from the account, births and deaths). The bathtub analogy is powerful: the water level (stock) depends on the tap (inflow) and the drain (outflow). Stocks change slowly even when flows change quickly, which explains why problems like climate change or national debt are hard to reverse quickly.",
+    "examples": [
+      {
+        "problem": "A bathtub has 100 litres of water. The tap adds 5 litres per minute and the drain removes 3 litres per minute. What is the water level after 10 minutes?",
+        "steps": [
+          {"instruction": "Step 1: Net flow = inflow - outflow = 5 - 3 = 2 litres/minute.", "result": "net flow"},
+          {"instruction": "Step 2: Change over 10 minutes = 2 x 10 = 20 litres.", "result": "total change"},
+          {"instruction": "Step 3: Final stock = 100 + 20 = 120 litres.", "result": "final level"}
+        ],
+        "answer": "Answer: The bathtub will contain 120 litres after 10 minutes.",
+        "visual_description": null
+      },
+      {
+        "problem": "South Africa's Vaal Dam has a capacity of 2,536 million cubic metres. If inflows are 50 million m3/month and outflows (usage + evaporation) are 60 million m3/month, how long before the dam drops from 80% to 50%?",
+        "steps": [
+          {"instruction": "Step 1: 80% capacity = 2028.8 million m3. 50% capacity = 1268 million m3.", "result": "stock levels"},
+          {"instruction": "Step 2: Net outflow = 60 - 50 = 10 million m3/month.", "result": "net depletion rate"},
+          {"instruction": "Step 3: Drop needed = 2028.8 - 1268 = 760.8 million m3. Time = 760.8 / 10 = 76.08 months (about 6.3 years).", "result": "time to depletion"}
+        ],
+        "answer": "Answer: At constant rates, the dam would drop from 80% to 50% in approximately 76 months (6.3 years).",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why a country's national debt continues to grow even after the government reduces its deficit.",
+        "steps": [
+          {"instruction": "Step 1: National debt is a stock (total accumulated debt). The deficit is a flow (new borrowing per year).", "result": "stock vs flow"},
+          {"instruction": "Step 2: Reducing the deficit from R100 billion to R50 billion per year still adds R50 billion to the stock each year.", "result": "positive flow"},
+          {"instruction": "Step 3: The debt stock only decreases if the government runs a surplus (outflow exceeds inflow).", "result": "reversal condition"}
+        ],
+        "answer": "Answer: Reducing the deficit slows the rate of debt growth but does not reduce the total debt — that requires a surplus (negative net flow).",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define 'stock' and 'flow' in systems thinking. Give one example of each.",
+        "answer": "A stock is an accumulation measured at a point in time (e.g., water in a dam, population, savings balance). A flow is a rate that changes a stock over time (e.g., rainfall, births/deaths, deposits/withdrawals).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["A stock is like a snapshot; a flow is like a movie."],
+        "explanation": "The distinction is between a quantity (stock) and a rate (flow). You can measure a stock at an instant; flows only make sense over a period of time.",
+        "distractors": ["Stocks and flows are the same thing measured differently", "Flows are always faster than stocks"]
+      },
+      {
+        "question": "A savings account has R10,000. You deposit R500/month and withdraw R200/month. Interest adds 0.5% of the balance each month. What is the balance after 3 months?",
+        "answer": "Month 1: R10,000 + R500 - R200 + R50 = R10,350. Month 2: R10,350 + R500 - R200 + R51.75 = R10,701.75. Month 3: R10,701.75 + R500 - R200 + R53.51 = R11,055.26.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["Calculate interest on the balance at the start of each month.", "Net flow = deposits - withdrawals + interest."],
+        "explanation": "This problem shows multiple inflows (deposits, interest) and one outflow (withdrawals). Interest creates a reinforcing feedback loop because it is calculated on the growing stock.",
+        "distractors": ["Interest is calculated on the original R10,000 each month", "R10,900 (ignoring interest)"]
+      },
+      {
+        "question": "Explain why carbon dioxide levels in the atmosphere continue to rise even though some countries have reduced emissions. Use stock-and-flow thinking.",
+        "answer": "Atmospheric CO2 is a stock. Emissions are an inflow; natural absorption (oceans, forests) is an outflow. Even with reduced emissions, if total global inflow still exceeds outflow, the stock continues to rise. Some countries reducing emissions does not mean global inflow has dropped below outflow.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Think about the global bathtub — is the tap still running faster than the drain?", "Reduction in one country may be offset by increases elsewhere."],
+        "explanation": "This is a critical insight from stock-and-flow thinking: reducing the rate of a problem is not the same as solving it. CO2 levels will only stabilise when total emissions equal natural absorption, and will only decline when absorption exceeds emissions.",
+        "distractors": ["Reducing emissions should immediately lower CO2 levels", "Natural absorption is infinite"]
+      },
+      {
+        "question": "A city's housing shortage is 200,000 units. The government builds 15,000 new units per year, but population growth creates demand for 20,000 new units per year. Analyse the situation using stocks and flows.",
+        "answer": "Housing shortage (stock) = 200,000. Inflow (demand) = 20,000 units/year. Outflow (supply) = 15,000 units/year. Net change = +5,000 shortage/year. After 10 years, the shortage will be 250,000. To reduce the shortage, supply must exceed demand — either build faster or slow population growth/demand.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": ["The shortage is a stock. What flows change it?", "Is the government building fast enough to close the gap?"],
+        "explanation": "This is a common policy trap: announcing large building programmes that are actually insufficient because they do not exceed the rate of new demand. Understanding flows prevents the illusion of progress.",
+        "distractors": ["Building 15,000 units per year will eliminate the shortage in 13 years", "The shortage will stay at 200,000"]
+      },
+      {
+        "question": "Design a stock-and-flow diagram for a university's student population, including at least three flows. Explain what would cause the stock to grow, shrink, or remain stable.",
+        "answer": "Stock: current student population. Inflows: new enrolments (first-years), transfer students. Outflows: graduates, dropouts, transfers out. The stock grows when inflows exceed outflows (e.g., lower admission standards increase enrolments). It shrinks when outflows exceed inflows (e.g., high dropout rates, reduced intake). It remains stable when inflows equal outflows. Financial aid availability, pass rates, and university reputation all influence these flows.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Think about all the ways students enter and leave the university.", "Consider what external factors affect each flow."],
+        "explanation": "Real systems have multiple inflows and outflows, each influenced by different factors. A university that focuses only on increasing admissions without addressing dropouts may see a revolving door effect.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Stocks are measured at a point in time; flows are measured over a period.",
+      "The bathtub analogy: stock = water level, inflow = tap, outflow = drain.",
+      "A stock only decreases when outflows exceed inflows."
+    ],
+    "key_vocabulary": [
+      {"term": "stock", "definition": "An accumulation or quantity measured at a specific point in time", "example_usage": "The amount of water in the dam is a stock."},
+      {"term": "flow", "definition": "A rate of change that increases or decreases a stock over time", "example_usage": "Rainfall into the dam is an inflow; water usage is an outflow."},
+      {"term": "net flow", "definition": "The difference between inflows and outflows", "example_usage": "If inflow is 5 and outflow is 3, the net flow is +2."},
+      {"term": "accumulation", "definition": "The process of a stock building up over time due to net positive inflows", "example_usage": "National debt is an accumulation of annual deficits."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often confuse stocks with flows — for example, thinking that reducing emissions (a flow) immediately reduces atmospheric CO2 (a stock).",
+        "correction": "Reducing a flow slows the rate of change of the stock but does not reverse the stock immediately. The stock will only decrease when outflows exceed inflows. This is why climate action requires emissions to drop below natural absorption rates, not just to decrease.",
+        "why_students_think_this": "In everyday life, turning off a tap stops the water immediately. But atmospheric CO2 is like a bathtub with a very slow drain — reducing the inflow helps but takes decades to lower the level."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

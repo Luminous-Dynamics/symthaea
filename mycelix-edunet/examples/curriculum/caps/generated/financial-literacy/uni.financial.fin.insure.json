@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.INSURE",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.INSURE",
+    "title": "Insurance",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Insurance is risk transfer: you pay a regular premium so that the insurer covers large, unexpected costs. Key types include medical aid (hospital and doctor visits), life insurance (pays beneficiaries if you die), car insurance (covers accidents and theft), household insurance (covers contents and structure), and disability/income protection. A deductible (excess) is the amount you pay before insurance kicks in — higher excess means lower premiums. Insurance protects you from financial catastrophe; without it, a single hospital stay or car accident can destroy years of savings.",
+    "examples": [
+      {
+        "problem": "Palesa pays R2,800/month for medical aid. She needs a surgery costing R120,000. Her plan covers 80% of in-hospital costs. What does she pay out of pocket?",
+        "steps": [
+          {"instruction": "Calculate the insured portion", "result": "R120,000 x 0.80 = R96,000 covered by medical aid"},
+          {"instruction": "Calculate the out-of-pocket cost", "result": "R120,000 - R96,000 = R24,000 Palesa must pay"},
+          {"instruction": "Compare to no insurance", "result": "Without medical aid, she would owe R120,000 — potentially years of savings"}
+        ],
+        "answer": "Palesa pays R24,000 out of pocket. Without insurance, she would face the full R120,000."
+      },
+      {
+        "problem": "David has two car insurance quotes. Policy A: R850/month, R2,500 excess. Policy B: R620/month, R7,500 excess. He has one claim per year on average. Which is cheaper overall?",
+        "steps": [
+          {"instruction": "Policy A annual cost", "result": "R850 x 12 + R2,500 = R12,700/year"},
+          {"instruction": "Policy B annual cost", "result": "R620 x 12 + R7,500 = R14,940/year"},
+          {"instruction": "Compare with no claims", "result": "Policy A: R10,200/year. Policy B: R7,440/year — cheaper if no claims"}
+        ],
+        "answer": "With one claim/year, Policy A costs R12,700 vs Policy B at R14,940. But with no claims, Policy B saves R2,760/year. Choose based on your claim likelihood."
+      },
+      {
+        "problem": "Explain why a 30-year-old with two children needs life insurance more than a 30-year-old with no dependents.",
+        "steps": [
+          {"instruction": "Identify who depends on the income", "result": "Two children rely on the parent's income for food, shelter, education"},
+          {"instruction": "Calculate the financial impact of death", "result": "If the parent dies, children lose 15-20 years of financial support"},
+          {"instruction": "Compare to the single person", "result": "No dependents means no one suffers financially if they pass away"}
+        ],
+        "answer": "Life insurance replaces income for dependents. The parent with children needs coverage to protect their family; the single person has no one who depends on their income."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is an insurance excess (deductible)?",
+        "answer": "The amount you must pay out of your own pocket before the insurance company starts paying. For example, with a R3,000 excess on car insurance, you pay the first R3,000 of any claim.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["It is your share of the cost before the insurer pays"],
+        "explanation": "Higher excess = lower monthly premiums, but more out-of-pocket cost when you claim. Choose based on what you can afford in an emergency.",
+        "distractors": ["The total amount the insurer pays", "The monthly premium", "A bonus for not claiming"]
+      },
+      {
+        "question": "Which type of insurance is legally required to drive a car on South African roads?",
+        "answer": "Third-party liability insurance (included in the Road Accident Fund via your fuel levy). However, this only covers injuries to other people, not damage to your own car — comprehensive or third-party car insurance is separate and optional but strongly recommended.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about what the Road Accident Fund covers"],
+        "explanation": "The RAF (funded through fuel levies) provides third-party injury cover. Separate car insurance (comprehensive, third-party fire and theft, or third-party only) is not legally required but is essential to protect your own vehicle.",
+        "distractors": ["Comprehensive insurance", "Life insurance", "No insurance is required"]
+      },
+      {
+        "question": "Why is it generally not worth insuring cheap items you can afford to replace?",
+        "answer": "Insurance premiums over time often exceed the replacement cost of inexpensive items. Insurance is best used for catastrophic losses you cannot afford to absorb, not for small predictable expenses.",
+        "difficulty_permille": 300,
+        "bloom_level": "Analyze",
+        "hints": ["Think about the total premiums you would pay over several years"],
+        "explanation": "Insuring a R2,000 phone for R150/month means you pay R1,800/year — nearly the replacement cost. Self-insure small items by building an emergency fund.",
+        "distractors": ["You should insure everything", "Cheap items break more often", "Insurance companies refuse to cover cheap items"]
+      },
+      {
+        "question": "What is the difference between medical aid and hospital plan in South Africa?",
+        "answer": "A hospital plan only covers in-hospital (inpatient) treatment. Full medical aid also covers day-to-day expenses like GP visits, medication, and specialists. Hospital plans are cheaper but leave you paying for routine medical costs.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["One covers only serious events, the other covers everyday healthcare too"],
+        "explanation": "Hospital plans are a good option for healthy individuals who rarely visit doctors but want protection against major medical events like surgery or accidents.",
+        "distractors": ["They are the same thing", "Hospital plans cover everything but cost less", "Medical aid only covers emergencies"]
+      },
+      {
+        "question": "If you never make a claim, are insurance premiums wasted money?",
+        "answer": "No. Insurance buys peace of mind and financial protection against catastrophic loss. Not claiming means nothing bad happened — that is the best outcome. The premiums paid are the cost of transferring risk.",
+        "difficulty_permille": 200,
+        "bloom_level": "Evaluate",
+        "hints": ["Think about what would happen if you had no insurance and something bad did occur"],
+        "explanation": "You do not regret wearing a seatbelt on trips where you did not crash. Similarly, insurance protects against the low-probability, high-impact events that could ruin you financially.",
+        "distractors": ["Yes, you should cancel if you have not claimed", "You should only insure things likely to be damaged", "Insurance companies should refund unused premiums"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Premium", "definition": "The regular amount (usually monthly) you pay to maintain your insurance coverage", "example_usage": "My car insurance premium is R950 per month."},
+      {"term": "Excess (deductible)", "definition": "The amount you pay out of pocket before the insurer covers the rest of a claim", "example_usage": "My excess is R5,000, so I paid that and the insurer covered the remaining R45,000."},
+      {"term": "Beneficiary", "definition": "The person designated to receive the insurance payout, especially in life insurance", "example_usage": "I named my wife as the beneficiary on my life insurance policy."},
+      {"term": "Underwriting", "definition": "The process insurers use to assess your risk level and determine your premium", "example_usage": "During underwriting, my medical history and driving record were reviewed."}
+    ],
+    "misconceptions": [
+      {"misconception": "I am young and healthy, so I do not need insurance", "correction": "Accidents and unexpected illnesses can happen at any age. A single hospital stay without medical aid can cost R50,000-R500,000. Young, healthy people also get the best premiums.", "why_students_think_this": "Youth creates a sense of invulnerability, and insurance feels like paying for something you will not use."},
+      {"misconception": "The cheapest policy is the best value", "correction": "The cheapest policy may have exclusions, very high excess, or poor claims service that makes it useless when you need it. Compare coverage, not just price.", "why_students_think_this": "Price is the easiest comparison metric, and policy documents are complex and hard to read."},
+      {"misconception": "Insurance covers everything", "correction": "Every policy has exclusions (things not covered), waiting periods, and limits. Read the fine print — pre-existing conditions, acts of negligence, and certain natural disasters are often excluded.", "why_students_think_this": "Marketing emphasizes coverage, not exclusions, and people rarely read policy documents until they need to claim."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

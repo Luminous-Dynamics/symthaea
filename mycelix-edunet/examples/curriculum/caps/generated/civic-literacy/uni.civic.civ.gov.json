@@ -1,0 +1,125 @@
+{
+  "node_id": "UNI.CIVIC.CIV.GOV",
+  "lesson": {
+    "standard_code": "UNI.CIVIC.CIV.GOV",
+    "title": "How Government Works",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Government is the system through which a society makes and enforces collective decisions. Most modern democracies separate power into three branches: the legislature (makes laws), the executive (implements laws), and the judiciary (interprets laws). In South Africa, the Constitution of 1996 is the supreme law. Parliament has two houses: the National Assembly and the National Council of Provinces. The President heads the executive. The Constitutional Court ensures all laws comply with the Bill of Rights. This separation prevents any single branch from accumulating too much power.",
+    "examples": [
+      {
+        "problem": "Explain how a bill becomes a law in South Africa.",
+        "steps": [
+          {"instruction": "Step 1: A bill is introduced in Parliament, usually by a government minister or a committee.", "result": "bill introduced"},
+          {"instruction": "Step 2: The bill is debated and voted on in the National Assembly (majority needed to pass).", "result": "NA vote"},
+          {"instruction": "Step 3: The bill goes to the National Council of Provinces for review and vote.", "result": "NCOP vote"},
+          {"instruction": "Step 4: The President signs the bill into law (or refers it back if there are constitutional concerns).", "result": "signed into law"}
+        ],
+        "answer": "Answer: A bill passes through both houses of Parliament and is signed by the President to become an Act of Parliament.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why does South Africa have a Constitutional Court separate from the Supreme Court of Appeal?",
+        "steps": [
+          {"instruction": "Step 1: The Constitutional Court is the highest court on constitutional matters.", "result": "constitutional jurisdiction"},
+          {"instruction": "Step 2: The Supreme Court of Appeal handles non-constitutional appeals.", "result": "appellate jurisdiction"},
+          {"instruction": "Step 3: This separation ensures that fundamental rights receive specialised judicial protection.", "result": "rights protection"}
+        ],
+        "answer": "Answer: The Constitutional Court exists to be the final guardian of the Constitution and Bill of Rights, keeping constitutional interpretation separate from ordinary appeals.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify which branch of government is responsible for each action: (a) passing a new tax law, (b) arresting a criminal suspect, (c) declaring a law unconstitutional.",
+        "steps": [
+          {"instruction": "Step 1: Passing a tax law is making law — that is the legislature (Parliament).", "result": "legislature"},
+          {"instruction": "Step 2: Arresting a suspect is enforcing law — that is the executive (police, under the Department of Justice).", "result": "executive"},
+          {"instruction": "Step 3: Declaring a law unconstitutional is interpreting law — that is the judiciary (Constitutional Court).", "result": "judiciary"}
+        ],
+        "answer": "Answer: (a) Legislature, (b) Executive, (c) Judiciary.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the three branches of government and state the main function of each.",
+        "answer": "Legislature (makes laws), Executive (enforces/implements laws), Judiciary (interprets laws and resolves disputes).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about who writes laws, who carries them out, and who settles disagreements about them."],
+        "explanation": "The three branches each have a distinct role: the legislature creates laws through debate and voting; the executive branch (led by the President and ministers) implements laws and manages day-to-day governance; the judiciary interprets laws and ensures they are applied fairly.",
+        "distractors": ["Legislature (enforces laws), Executive (makes laws), Judiciary (interprets laws)", "Legislature (interprets laws), Executive (enforces laws), Judiciary (makes laws)"]
+      },
+      {
+        "question": "What is the role of the National Council of Provinces (NCOP) in South Africa's Parliament?",
+        "answer": "The NCOP represents the nine provinces in Parliament and reviews legislation to ensure provincial interests are considered.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about why South Africa has two houses in Parliament.", "Consider what 'provinces' in the name tells you about its purpose."],
+        "explanation": "The NCOP is the second house of Parliament. It ensures that laws consider the interests and needs of all nine provinces, not just the national majority. Each province sends delegates who vote on legislation that affects provincial matters.",
+        "distractors": ["The NCOP only advises the President", "The NCOP is a court that reviews laws for constitutionality"]
+      },
+      {
+        "question": "Explain why the separation of powers is important for democracy.",
+        "answer": "Separation of powers prevents any one branch from having unchecked authority, protecting citizens from abuse of power through a system of checks and balances.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Consider what could happen if one person or group controlled all three functions.", "Think about the concept of 'checks and balances'."],
+        "explanation": "Without separation of powers, the same group could write laws, enforce them, and judge whether they were followed — creating a potential for tyranny. Each branch can check the others: the judiciary can strike down unconstitutional laws, Parliament can hold the executive accountable through questions and motions of no confidence.",
+        "distractors": ["Separation of powers exists to make government slower and more deliberate", "Separation of powers means the three branches never interact"]
+      },
+      {
+        "question": "Compare the role of a mayor in a South African municipality with the role of the President at national level.",
+        "answer": "Both are heads of the executive branch at their respective levels. The mayor leads municipal governance (local services like water, electricity, roads), while the President leads national governance (defence, foreign affairs, national policy). Both are accountable to their respective legislative bodies.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Think about the three spheres of government in SA: national, provincial, municipal.", "Consider what services each level provides."],
+        "explanation": "South Africa's cooperative governance model has three spheres. The President heads the national executive and is accountable to Parliament. A mayor heads the municipal executive and is accountable to the municipal council. Both implement laws and manage budgets at their level, but their jurisdictions and powers differ.",
+        "distractors": ["The mayor reports to the President", "The President can remove a mayor from office at any time"]
+      },
+      {
+        "question": "A new law is passed that bans all public protests. A citizens' group believes this violates the Constitution. Describe the process they could use to challenge this law.",
+        "answer": "The citizens' group can approach the Constitutional Court (or High Court) to challenge the law as unconstitutional, arguing it violates Section 17 of the Bill of Rights (right to assemble and protest). The court will review the law against the Constitution and can declare it invalid if it unjustifiably limits fundamental rights.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Which branch of government decides if a law is constitutional?", "Look at the Bill of Rights — which section protects the right to protest?"],
+        "explanation": "Section 17 of the SA Constitution guarantees the right to assemble, demonstrate, picket, and petition. Any law that limits this right must pass the limitations clause test (Section 36): it must be reasonable and justifiable in an open and democratic society. The Constitutional Court has the final say on whether the law passes this test.",
+        "distractors": ["Citizens must petition Parliament to repeal the law", "Citizens must wait for the next election to vote out the government"]
+      }
+    ],
+    "hints": [
+      "Remember the three branches: legislature, executive, judiciary.",
+      "In South Africa, the Constitution is the supreme law — all other laws must comply with it.",
+      "Think about who makes laws, who enforces them, and who interprets them."
+    ],
+    "key_vocabulary": [
+      {"term": "separation of powers", "definition": "The division of government into three branches (legislature, executive, judiciary) to prevent concentration of power", "example_usage": "South Africa's separation of powers means Parliament cannot also act as judge."},
+      {"term": "constitution", "definition": "The supreme law of a country that sets out the structure of government and fundamental rights", "example_usage": "The South African Constitution of 1996 guarantees the right to dignity."},
+      {"term": "legislature", "definition": "The branch of government that makes laws, typically a parliament or congress", "example_usage": "The National Assembly is part of South Africa's legislature."},
+      {"term": "checks and balances", "definition": "Mechanisms that allow each branch of government to limit the powers of the other branches", "example_usage": "The Constitutional Court checking Parliament's laws is an example of checks and balances."},
+      {"term": "accountability", "definition": "The obligation of government officials to answer for their actions and decisions", "example_usage": "Ministers must answer questions in Parliament to ensure accountability."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think the President can make any law they want.",
+        "correction": "The President leads the executive branch but cannot make laws alone. Laws must be passed by Parliament (the legislature). The President can propose laws but needs a parliamentary majority to pass them.",
+        "why_students_think_this": "Media often attributes new policies to the President, making it seem like they act alone. In reality, the legislative process involves many people and steps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.BUDGET",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.BUDGET",
+    "title": "Budgeting",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "A budget is a plan for your money. The 50/30/20 rule splits net income: 50% to needs (rent, food, transport), 30% to wants (entertainment, dining out), and 20% to savings and debt repayment. Track expenses weekly using a notebook, spreadsheet, or app. Distinguishing needs from wants is the core skill — rent is a need, Netflix is a want. A budget does not restrict you; it gives you control and prevents month-end shortfalls.",
+    "examples": [
+      {
+        "problem": "Lerato takes home R18,000/month. Apply the 50/30/20 rule to create her budget framework.",
+        "steps": [
+          {"instruction": "Calculate 50% for needs", "result": "R18,000 x 0.50 = R9,000 for rent, groceries, transport, utilities"},
+          {"instruction": "Calculate 30% for wants", "result": "R18,000 x 0.30 = R5,400 for entertainment, clothing, eating out"},
+          {"instruction": "Calculate 20% for savings/debt", "result": "R18,000 x 0.20 = R3,600 for emergency fund, retirement, debt repayment"}
+        ],
+        "answer": "Lerato should allocate R9,000 to needs, R5,400 to wants, and R3,600 to savings/debt repayment."
+      },
+      {
+        "problem": "Bongani lists his monthly expenses: Rent R6,500, groceries R3,200, taxi R1,100, electricity R800, DSTV R899, data R500, clothing R1,200, takeaways R1,500, savings R0. His net income is R16,000. Is he over budget?",
+        "steps": [
+          {"instruction": "Sum all expenses", "result": "R6,500 + R3,200 + R1,100 + R800 + R899 + R500 + R1,200 + R1,500 = R15,700"},
+          {"instruction": "Compare to income", "result": "R16,000 - R15,700 = R300 remaining"},
+          {"instruction": "Check against 50/30/20", "result": "Needs: R11,600 (72.5%) — over. Wants: R4,099 (25.6%). Savings: R0 (0%) — critical gap."}
+        ],
+        "answer": "He is not technically over budget (R300 left), but he saves nothing. He should cut wants (DSTV, takeaways) to free up at least R3,200 (20%) for savings."
+      },
+      {
+        "problem": "Ayanda wants to track whether her grocery spending is reasonable. She spent R850, R720, R910, and R680 over four weeks. What is her monthly grocery total and weekly average?",
+        "steps": [
+          {"instruction": "Add all four weeks", "result": "R850 + R720 + R910 + R680 = R3,160"},
+          {"instruction": "Calculate weekly average", "result": "R3,160 / 4 = R790/week"},
+          {"instruction": "Compare to her budget allocation", "result": "If her needs budget is R10,000, groceries at R3,160 is 31.6% of needs — reasonable"}
+        ],
+        "answer": "Monthly grocery total is R3,160 with a weekly average of R790."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Using the 50/30/20 rule, how much should someone earning R24,000 net per month allocate to savings and debt repayment?",
+        "answer": "R4,800",
+        "difficulty_permille": 150,
+        "bloom_level": "Apply",
+        "hints": ["20% of net income goes to savings and debt"],
+        "explanation": "R24,000 x 0.20 = R4,800. This covers emergency savings, retirement contributions, and extra debt payments.",
+        "distractors": ["R7,200", "R12,000", "R2,400"]
+      },
+      {
+        "question": "Which of these is a 'need' rather than a 'want'? (a) Streaming subscription (b) Electricity (c) Designer shoes (d) Restaurant meals",
+        "answer": "Electricity",
+        "difficulty_permille": 100,
+        "bloom_level": "Understand",
+        "hints": ["A need is something required for basic living"],
+        "explanation": "Electricity is essential for cooking, lighting, and refrigeration. The others are discretionary spending.",
+        "distractors": ["Streaming subscription", "Designer shoes", "Restaurant meals"]
+      },
+      {
+        "question": "If your needs consume 65% of your income instead of 50%, what should you do first?",
+        "answer": "Review your needs category for items that are actually wants (e.g., an expensive car payment could be replaced with a cheaper option), and look for ways to reduce genuine needs (e.g., a cheaper rental, prepaid electricity).",
+        "difficulty_permille": 300,
+        "bloom_level": "Analyze",
+        "hints": ["Sometimes items categorized as needs have cheaper alternatives"],
+        "explanation": "When needs exceed 50%, either income must increase or costs must decrease. Often, some 'needs' include inflated lifestyle choices.",
+        "distractors": ["Stop saving entirely", "Take out a loan to cover the gap", "Ignore the budget since it does not work"]
+      },
+      {
+        "question": "Why is tracking expenses important even if you have a budget plan?",
+        "answer": "A budget is a plan, but tracking shows actual spending. Without tracking, you cannot know if you are following the plan, and small unnoticed expenses (like daily coffee) add up significantly over a month.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about the difference between planning and doing"],
+        "explanation": "Tracking closes the feedback loop. A R35 daily coffee is R1,050/month — invisible without tracking.",
+        "distractors": ["Tracking is only for accountants", "Your bank statement is enough", "Budgets automatically track themselves"]
+      },
+      {
+        "question": "Nomsa earns R15,000 net. Her rent is R5,500, transport R1,800, food R2,800, and utilities R900. What percentage of her income goes to needs?",
+        "answer": "73.3%",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Add up all needs, then divide by total income and multiply by 100"],
+        "explanation": "R5,500 + R1,800 + R2,800 + R900 = R11,000. R11,000 / R15,000 = 0.733 = 73.3%. This is well above the recommended 50%.",
+        "distractors": ["55%", "68%", "80%"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "50/30/20 rule", "definition": "A budgeting guideline that allocates 50% of net income to needs, 30% to wants, and 20% to savings and debt repayment", "example_usage": "Following the 50/30/20 rule, I put R3,000 of my R15,000 salary into savings each month."},
+      {"term": "Needs", "definition": "Essential expenses required for survival and basic functioning — rent, food, transport, utilities, insurance", "example_usage": "My needs total R8,000/month including rent and groceries."},
+      {"term": "Wants", "definition": "Non-essential expenses that improve quality of life but are not required — entertainment, dining out, subscriptions", "example_usage": "I reduced my wants spending by cancelling two streaming services."},
+      {"term": "Expense tracking", "definition": "Recording every purchase to understand where money actually goes", "example_usage": "After tracking for a month, I discovered I spent R2,100 on takeaways."}
+    ],
+    "misconceptions": [
+      {"misconception": "Budgeting means I cannot enjoy life", "correction": "A budget explicitly allocates 30% to wants. It gives you permission to spend on fun without guilt, while protecting your future.", "why_students_think_this": "People associate budgets with restriction rather than intentional spending."},
+      {"misconception": "I do not earn enough to budget", "correction": "Budgeting is most important when money is tight. Even R5,000/month benefits from a plan — it prevents the worst shortfalls.", "why_students_think_this": "People think budgeting is only useful when there is surplus money to allocate."},
+      {"misconception": "The 50/30/20 rule works for everyone exactly as stated", "correction": "It is a guideline. In high-cost cities or on low incomes, needs may exceed 50%. Adjust ratios to your reality, but always prioritize some savings.", "why_students_think_this": "Rules presented as simple formulas seem universal, but living costs vary enormously."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

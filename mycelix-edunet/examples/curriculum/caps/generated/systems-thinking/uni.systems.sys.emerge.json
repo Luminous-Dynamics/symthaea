@@ -1,0 +1,122 @@
+{
+  "node_id": "UNI.SYSTEMS.SYS.EMERGE",
+  "lesson": {
+    "standard_code": "UNI.SYSTEMS.SYS.EMERGE",
+    "title": "Emergence",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Emergence is when complex patterns, behaviours, or properties arise from the interaction of simpler components — none of which individually exhibit those properties. A single ant follows simple rules (follow pheromone trails, avoid obstacles), but a colony of ants collectively builds intricate nests, farms fungi, and wages wars. Traffic jams emerge from individual driving decisions without any central coordinator. Consciousness may emerge from billions of neurons. Markets emerge from individual buying and selling decisions. Emergence teaches us that understanding the parts does not automatically explain the whole — the interactions between parts create something qualitatively new.",
+    "examples": [
+      {
+        "problem": "Explain how a traffic jam can form on a highway with no accident or obstruction.",
+        "steps": [
+          {"instruction": "Step 1: One driver brakes slightly (perhaps they were distracted or a car ahead slowed down).", "result": "small perturbation"},
+          {"instruction": "Step 2: The driver behind brakes harder (reaction time delay means they need to brake more).", "result": "amplification"},
+          {"instruction": "Step 3: This cascades backward through traffic, creating a stop-and-go wave that can persist for hours.", "result": "emergent jam"}
+        ],
+        "answer": "Answer: The traffic jam is an emergent phenomenon — no individual driver caused it, but the collective interaction of braking patterns created a self-sustaining wave.",
+        "visual_description": null
+      },
+      {
+        "problem": "How do murmurations (swirling flocks of starlings) demonstrate emergence?",
+        "steps": [
+          {"instruction": "Step 1: Each starling follows three simple rules: stay close to neighbours, match their speed, and avoid collisions.", "result": "simple rules"},
+          {"instruction": "Step 2: No single bird leads or plans the flock's movement.", "result": "no central control"},
+          {"instruction": "Step 3: The collective result is a breathtaking, coordinated display that appears choreographed.", "result": "emergent beauty"}
+        ],
+        "answer": "Answer: Starling murmurations emerge from simple local rules applied by each bird — the stunning collective pattern has no choreographer.",
+        "visual_description": null
+      },
+      {
+        "problem": "How does the price of bread emerge in a market economy?",
+        "steps": [
+          {"instruction": "Step 1: Farmers, millers, bakers, and consumers each make independent decisions about production, pricing, and purchasing.", "result": "individual agents"},
+          {"instruction": "Step 2: Supply and demand interact — if wheat harvests are poor, flour costs rise, pushing bread prices up.", "result": "interactions"},
+          {"instruction": "Step 3: No central authority sets the price; it emerges from millions of transactions and decisions.", "result": "emergent price"}
+        ],
+        "answer": "Answer: Market prices are emergent — they arise from the collective interactions of producers and consumers, not from any central plan.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define emergence in your own words and give one example from nature.",
+        "answer": "Emergence is when complex behaviour arises from the interactions of simpler parts, where the whole has properties that the individual parts do not. Example: ant colonies build complex structures even though individual ants follow simple chemical signals.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think: the whole is more than the sum of its parts.", "Consider what individual ants, birds, or neurons can do alone versus together."],
+        "explanation": "Emergence is one of the most profound ideas in systems thinking. It explains why complex systems cannot always be understood by studying their parts in isolation.",
+        "distractors": ["Emergence means something new is created from nothing", "Emergence requires a leader or controller"]
+      },
+      {
+        "question": "Explain how Wikipedia demonstrates emergence.",
+        "answer": "Wikipedia is written by millions of volunteer editors, each contributing and editing small pieces. No central authority writes or approves most content. Yet the collective result is a comprehensive encyclopedia. Quality emerges from the interaction of contributors, editors, and community norms — no single person could create it alone.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Who writes Wikipedia? Who decides what stays?", "Think about the rules and norms that guide contributors."],
+        "explanation": "Wikipedia's emergence is guided by soft rules (notability, neutral point of view, verifiability) that shape individual contributions into a coherent whole.",
+        "distractors": ["Wikipedia is centrally planned and written by experts", "Emergence means Wikipedia has no quality control"]
+      },
+      {
+        "question": "In South Africa, informal settlements grow rapidly on city edges. Explain how the settlement pattern is an emergent phenomenon.",
+        "answer": "Each family makes an individual decision about where to build based on local factors: proximity to jobs, transport, water, and social networks. No central planner designs the settlement. Yet recognisable patterns emerge: main pathways develop, market areas form, social structures organise. The settlement's overall structure emerges from thousands of individual decisions interacting with geography and resources.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Think about why the settlement looks the way it does — who decided?", "Consider the simple rules each family follows."],
+        "explanation": "Understanding informal settlements as emergent systems helps policy-makers work with existing patterns rather than imposing top-down plans that ignore the logic of the community.",
+        "distractors": ["Informal settlements are randomly arranged", "A central organiser plans where each shack is built"]
+      },
+      {
+        "question": "Compare a designed system (like a factory assembly line) with an emergent system (like a coral reef). What are the key differences in how order arises?",
+        "answer": "A factory is designed top-down: an engineer specifies each component's role, position, and interaction. A coral reef emerges bottom-up: individual organisms (coral polyps, fish, algae) interact according to their biology, and the complex ecosystem emerges without any blueprint. Key differences: design requires a designer; emergence requires only local rules. Design is predictable; emergence can produce surprises. Design is fragile to specification errors; emergence is resilient because it adapts.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Who or what creates the order in each system?", "Consider resilience — what happens when part of each system is damaged?"],
+        "explanation": "Most real-world systems combine designed and emergent elements. Cities are designed (zoning, infrastructure) but also emergent (culture, economic activity, social networks).",
+        "distractors": ["Designed systems are always better", "Emergent systems are chaotic"]
+      },
+      {
+        "question": "Propose a simple computer simulation with 3-5 rules that could produce emergent behaviour. Describe what you expect to emerge.",
+        "answer": "Example: Conway's Game of Life with 4 rules — (1) a live cell with 2-3 neighbours survives; (2) a live cell with fewer than 2 neighbours dies (isolation); (3) a live cell with more than 3 neighbours dies (overcrowding); (4) a dead cell with exactly 3 neighbours becomes alive (reproduction). Expected emergence: stable structures, oscillators, gliders that move across the grid, and complex evolving patterns — all from four simple rules.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Think about simple local rules that create complex global patterns.", "Consider Conway's Game of Life or Boids simulation."],
+        "explanation": "Conway's Game of Life is the classic demonstration of emergence in computing. From four binary rules, it produces patterns complex enough to simulate a universal Turing machine.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Emergence: the whole is more than the sum of its parts.",
+      "No central controller is needed — complexity arises from local interactions.",
+      "Understanding parts does not automatically explain the whole."
+    ],
+    "key_vocabulary": [
+      {"term": "emergence", "definition": "Complex behaviour or properties arising from the interaction of simpler components", "example_usage": "Consciousness may be an emergent property of neural activity."},
+      {"term": "self-organisation", "definition": "The process by which order arises from local interactions without central control", "example_usage": "Ant colonies self-organise to build complex tunnel systems."},
+      {"term": "bottom-up", "definition": "A process where complex structures arise from the interactions of simpler elements, without top-down design", "example_usage": "Wikipedia is built bottom-up by thousands of volunteer contributors."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think emergence requires a leader, designer, or central controller.",
+        "correction": "The defining feature of emergence is that complex behaviour arises without central control. Ant colonies have no architect. Traffic jams have no coordinator. Market prices have no price-setter. The complexity comes from the interactions between many simple agents following local rules.",
+        "why_students_think_this": "Humans naturally attribute complex outcomes to intentional design. It is counterintuitive that order can arise spontaneously from disorder."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.89,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.89,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

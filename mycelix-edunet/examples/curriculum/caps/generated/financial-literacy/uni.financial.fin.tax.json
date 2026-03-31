@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.TAX",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.TAX",
+    "title": "Tax Basics",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Taxes fund public services like roads, hospitals, schools, and police. In South Africa, income tax is progressive — you pay higher percentages on higher portions of income (18% on the first R237,100, up to 45% on income above R1,817,000). VAT (Value Added Tax) is 15% on most goods and services, with basic foods like bread, milk, and maize zero-rated. SARS (South African Revenue Service) collects taxes. Most employees have PAYE deducted monthly; you file a return annually to reconcile. Tax deductions (retirement, medical, donations) reduce your taxable income.",
+    "examples": [
+      {
+        "problem": "Kagiso earns R350,000 per year. Calculate his income tax using SA tax brackets (2024/25): 18% on first R237,100; 26% on R237,101-R370,500. Tax threshold for under 65: R95,750.",
+        "steps": [
+          {"instruction": "Tax on first R237,100", "result": "R237,100 x 0.18 = R42,678"},
+          {"instruction": "Tax on remainder (R350,000 - R237,100 = R112,900)", "result": "R112,900 x 0.26 = R29,354"},
+          {"instruction": "Total tax before rebate", "result": "R42,678 + R29,354 = R72,032"},
+          {"instruction": "Apply primary rebate (R17,235)", "result": "R72,032 - R17,235 = R54,797"}
+        ],
+        "answer": "Kagiso owes approximately R54,797 in income tax, or about R4,566/month."
+      },
+      {
+        "problem": "A laptop costs R12,000 including VAT at 15%. What is the pre-VAT price and how much is the VAT portion?",
+        "steps": [
+          {"instruction": "VAT-inclusive price means price x 1.15 = R12,000", "result": "Pre-VAT price = R12,000 / 1.15 = R10,434.78"},
+          {"instruction": "VAT amount", "result": "R12,000 - R10,434.78 = R1,565.22"}
+        ],
+        "answer": "The pre-VAT price is R10,434.78 and the VAT portion is R1,565.22."
+      },
+      {
+        "problem": "Nomvula contributes R2,500/month to a retirement annuity. How does this affect her taxable income if she earns R400,000/year?",
+        "steps": [
+          {"instruction": "Calculate annual RA contribution", "result": "R2,500 x 12 = R30,000/year"},
+          {"instruction": "Check deduction limit", "result": "27.5% of R400,000 = R110,000 (max R350,000). R30,000 is within limit."},
+          {"instruction": "Calculate new taxable income", "result": "R400,000 - R30,000 = R370,000"}
+        ],
+        "answer": "Her retirement annuity contribution reduces her taxable income by R30,000, from R400,000 to R370,000, saving her approximately R7,800 in tax (at the 26% marginal rate)."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What does it mean that South Africa has a progressive tax system?",
+        "answer": "You pay higher tax rates on higher portions of your income. Only the income within each bracket is taxed at that bracket's rate — not all your income at the highest rate.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Progressive means rates increase as income increases, but only on the portion above each threshold"],
+        "explanation": "If you earn R300,000, you pay 18% on the first R237,100 and 26% only on the remaining R62,900. You do NOT pay 26% on the full R300,000.",
+        "distractors": ["Everyone pays the same percentage", "Your entire income is taxed at your highest bracket rate", "Higher earners pay less tax"]
+      },
+      {
+        "question": "What is VAT and what is the current rate in South Africa?",
+        "answer": "Value Added Tax is a consumption tax of 15% added to most goods and services. Basic foodstuffs (brown bread, maize meal, milk, rice, eggs, fruits, vegetables) are zero-rated (0% VAT).",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["It is the tax you see on shop receipts"],
+        "explanation": "VAT is collected by businesses and remitted to SARS. Zero-rating basic foods helps lower the tax burden on poorer households who spend more of their income on essentials.",
+        "distractors": ["10%", "20%", "VAT only applies to luxury goods"]
+      },
+      {
+        "question": "If a product costs R500 before VAT, what is the final price including 15% VAT?",
+        "answer": "R575",
+        "difficulty_permille": 150,
+        "bloom_level": "Apply",
+        "hints": ["Multiply the price by 1.15"],
+        "explanation": "R500 x 1.15 = R575. The R75 VAT goes to SARS via the retailer.",
+        "distractors": ["R515", "R650", "R500"]
+      },
+      {
+        "question": "Why should you file your tax return even if PAYE is already deducted?",
+        "answer": "You may be entitled to a refund if you have deductible expenses (retirement contributions, medical expenses, travel allowance) that were not accounted for in your PAYE. Filing reconciles what you owe versus what was already deducted.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["PAYE is an estimate — the actual amount may differ after deductions"],
+        "explanation": "Many taxpayers receive refunds because their employer-deducted PAYE does not account for all eligible deductions. Not filing means leaving money with SARS.",
+        "distractors": ["You do not need to file if PAYE is deducted", "Filing is only for business owners", "SARS automatically calculates your refund"]
+      },
+      {
+        "question": "Name two tax-deductible expenses for an individual in South Africa.",
+        "answer": "Retirement annuity contributions (up to 27.5% of taxable income, capped at R350,000/year) and qualifying medical expenses (medical aid contributions and out-of-pocket medical costs above a threshold).",
+        "difficulty_permille": 250,
+        "bloom_level": "Remember",
+        "hints": ["Think about contributions that reduce your taxable income"],
+        "explanation": "These deductions incentivize saving for retirement and managing healthcare costs. Donations to approved public benefit organizations (Section 18A) are also deductible.",
+        "distractors": ["Groceries and rent", "Entertainment and clothing", "Car payments and gym memberships"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "PAYE", "definition": "Pay As You Earn — income tax deducted from your salary by your employer and paid to SARS on your behalf each month", "example_usage": "My employer deducts PAYE of R4,200 from my monthly salary."},
+      {"term": "VAT", "definition": "Value Added Tax — a 15% consumption tax on most goods and services in South Africa", "example_usage": "The receipt shows the item costs R870 including R113.48 VAT."},
+      {"term": "Tax bracket", "definition": "Income ranges that determine the percentage of tax applied to each portion of your earnings", "example_usage": "My income falls in the 26% tax bracket for the amount above R237,100."},
+      {"term": "Tax rebate", "definition": "A fixed amount subtracted from your calculated tax liability, reducing the amount you owe", "example_usage": "The primary rebate of R17,235 reduces my total tax bill."}
+    ],
+    "misconceptions": [
+      {"misconception": "If I move into a higher tax bracket, all my income is taxed at the higher rate", "correction": "Only the income within the new bracket is taxed at the higher rate. Income in lower brackets is still taxed at lower rates. A raise always increases your take-home pay.", "why_students_think_this": "The phrase 'tax bracket' implies all income is taxed uniformly, and many people fear earning more will make them worse off."},
+      {"misconception": "VAT is the same for all products", "correction": "Basic foodstuffs like brown bread, milk, maize meal, dried beans, rice, fruit and vegetables, eggs, and cooking oil are zero-rated (0% VAT). Exports are also zero-rated.", "why_students_think_this": "Most receipts show 15% VAT, and the zero-rated exemptions are not widely publicized."},
+      {"misconception": "Tax is theft", "correction": "Taxes fund public infrastructure, healthcare, education, social grants, courts, and emergency services. While corruption is a valid concern, the principle of taxation is essential for a functioning society.", "why_students_think_this": "Frustration with government spending inefficiency and corruption leads to rejection of the entire concept."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.91, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

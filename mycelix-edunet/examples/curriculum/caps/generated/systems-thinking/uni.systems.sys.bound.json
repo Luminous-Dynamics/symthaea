@@ -1,0 +1,122 @@
+{
+  "node_id": "UNI.SYSTEMS.SYS.BOUND",
+  "lesson": {
+    "standard_code": "UNI.SYSTEMS.SYS.BOUND",
+    "title": "System Boundaries",
+    "grade_level": "Universal",
+    "bloom_level": "Analyze",
+    "explanation": "Defining system boundaries means deciding what is inside and outside the system you are studying. This choice profoundly shapes what you see and what solutions you find. A school that draws its boundary around the classroom misses the home environment, nutrition, and transport that affect learning. An economist who draws the boundary around GDP misses environmental degradation and unpaid care work. Externalities are costs or benefits that cross system boundaries — pollution from a factory is an externality borne by the surrounding community. Effective systems thinking requires consciously choosing boundaries, acknowledging what is excluded, and adjusting boundaries when the analysis reveals important cross-boundary effects.",
+    "examples": [
+      {
+        "problem": "A factory tracks production costs but not the health costs of pollution on nearby communities. How does boundary choice affect this?",
+        "steps": [
+          {"instruction": "Step 1: The factory's system boundary includes costs of materials, labour, and equipment.", "result": "narrow boundary"},
+          {"instruction": "Step 2: Pollution-related health costs fall outside this boundary — they are externalities borne by the community.", "result": "externality identified"},
+          {"instruction": "Step 3: If we expand the boundary to include community health, the 'true cost' of production is much higher.", "result": "wider boundary reveals hidden costs"}
+        ],
+        "answer": "Answer: The factory's narrow boundary hides the true cost of production. Expanding the boundary reveals externalities that affect the community.",
+        "visual_description": null
+      },
+      {
+        "problem": "Why does measuring a country's success by GDP alone represent a boundary problem?",
+        "steps": [
+          {"instruction": "Step 1: GDP measures market transactions within a country's borders.", "result": "GDP boundary"},
+          {"instruction": "Step 2: It excludes: unpaid domestic work, environmental degradation, social cohesion, inequality, and mental health.", "result": "what is outside"},
+          {"instruction": "Step 3: A country can have rising GDP while forests are destroyed, inequality grows, and mental health declines.", "result": "boundary blindness"}
+        ],
+        "answer": "Answer: GDP as a sole measure uses too narrow a boundary, missing environmental, social, and well-being dimensions of progress.",
+        "visual_description": null
+      },
+      {
+        "problem": "A school principal wants to improve matric pass rates. Compare two different system boundaries for analysing this problem.",
+        "steps": [
+          {"instruction": "Step 1: Narrow boundary (school only): focuses on teaching quality, study resources, and exam preparation.", "result": "school-level analysis"},
+          {"instruction": "Step 2: Wide boundary (school + community): includes learner nutrition, safety getting to school, home study environment, parental involvement, and mental health.", "result": "community-level analysis"},
+          {"instruction": "Step 3: The wider boundary reveals that some matric failures are caused by factors outside the school's direct control.", "result": "boundary determines solutions"}
+        ],
+        "answer": "Answer: The narrow boundary suggests school-level solutions (more revision classes). The wider boundary reveals community-level interventions (feeding schemes, safe transport, counselling) that may be equally or more important.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What does it mean to define a system boundary? Why is this important?",
+        "answer": "Defining a system boundary means deciding what elements and relationships are inside the system you are studying and what is outside. This is important because the boundary determines what you can see, what you measure, and what solutions you consider. A poorly chosen boundary can hide crucial factors.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think of drawing a circle around part of a complex diagram.", "What you include inside the circle shapes everything else."],
+        "explanation": "System boundaries are always a choice. There is no objectively 'correct' boundary — the right boundary depends on the question you are asking and what you want to understand.",
+        "distractors": ["System boundaries are fixed and objective", "Everything should always be included in the system"]
+      },
+      {
+        "question": "Define 'externality' and give an example relevant to South Africa.",
+        "answer": "An externality is a cost or benefit that affects parties not directly involved in a transaction. Example: mining operations in Mpumalanga produce coal (benefit to the mine and energy sector) but create air pollution and acid mine drainage that affect local communities' health and water quality (negative externality). The community bears costs not reflected in the price of coal.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about who pays costs that are not included in the price.", "Consider environmental or health impacts."],
+        "explanation": "Externalities are fundamentally a boundary problem: the market boundary excludes costs borne by third parties. Regulations (like carbon taxes) attempt to bring externalities inside the boundary.",
+        "distractors": ["Externalities only apply to the environment", "Externalities are always negative"]
+      },
+      {
+        "question": "A municipality measures its water system performance by the volume of water delivered. Identify what this boundary excludes and propose a better set of metrics.",
+        "answer": "Excludes: water quality, water losses (leaks in distribution), equity of access (who gets water and who does not), affordability, environmental sustainability (aquifer depletion), and customer satisfaction. Better metrics: volume delivered + percentage lost to leaks + water quality at tap + percentage of households with reliable access + cost per kilolitre + aquifer recharge rate.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Volume alone does not tell you if the water is clean, affordable, or reaching everyone.", "What would a complete picture of 'water service' look like?"],
+        "explanation": "Many municipalities report impressive delivery volumes while rural areas lack access and urban infrastructure leaks 30-40% of treated water. The boundary of 'volume delivered' hides these critical failures.",
+        "distractors": ["Volume is sufficient to measure water performance", "Including more metrics always makes measurement worse"]
+      },
+      {
+        "question": "Compare how different stakeholders would draw the boundary around the 'problem of unemployment' differently. Consider a job-seeker, an employer, and a government economist.",
+        "answer": "Job-seeker: boundary includes personal skills, transport costs, local job availability, discrimination, and network connections. Employer: boundary includes labour costs, productivity, regulations, skills mismatch, and economic demand. Economist: boundary includes macroeconomic conditions, education system output, labour market structure, trade policy, and demographic trends. Each boundary highlights different causes and suggests different solutions.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Each stakeholder experiences and understands unemployment differently.", "What does each person include and exclude?"],
+        "explanation": "Effective policy requires integrating multiple boundary perspectives. Solutions that only address one stakeholder's boundary will miss important factors visible from other perspectives.",
+        "distractors": ["One stakeholder's boundary is the correct one", "All boundaries lead to the same solution"]
+      },
+      {
+        "question": "Choose a problem in your community and draw two system boundary diagrams — one narrow and one wide. Explain what the wider boundary reveals that the narrower one misses, and how this changes the solutions you would propose.",
+        "answer": "Answers will vary. Strong responses: (1) clearly define the problem; (2) draw a narrow boundary with 3-5 internal elements; (3) draw a wider boundary showing 3+ additional factors that cross the narrow boundary; (4) identify externalities and cross-boundary effects; (5) show how solutions change when the boundary widens.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Start with the obvious elements, then ask 'what else affects this?'", "Pay attention to factors that are easy to ignore."],
+        "explanation": "The practice of consciously widening boundaries is one of the most valuable systems thinking skills. It prevents the common error of solving the wrong problem by addressing symptoms within a narrow boundary while ignoring root causes outside it.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Boundaries are always a choice — there is no single 'correct' boundary.",
+      "Externalities are costs or benefits that cross your chosen boundary.",
+      "Widening the boundary often reveals root causes hidden by a narrower view."
+    ],
+    "key_vocabulary": [
+      {"term": "system boundary", "definition": "The line (often conceptual) that defines what is inside and outside the system being studied", "example_usage": "By drawing the system boundary around the school, we missed community factors affecting learning."},
+      {"term": "externality", "definition": "A cost or benefit that affects a party not directly involved in a transaction or decision", "example_usage": "Air pollution from the factory is a negative externality borne by the local community."},
+      {"term": "scope", "definition": "The extent or range of what is included within a system boundary", "example_usage": "We need to widen the scope of our analysis to include environmental impacts."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think there is one correct system boundary that captures everything.",
+        "correction": "All boundaries are simplifications. Including everything would make analysis impossible. The skill is choosing boundaries appropriate to the question, being explicit about what is excluded, and expanding the boundary when excluded factors turn out to be important.",
+        "why_students_think_this": "Students are used to textbook problems with clear, given boundaries. In real life, defining the boundary is itself a critical part of the analysis."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

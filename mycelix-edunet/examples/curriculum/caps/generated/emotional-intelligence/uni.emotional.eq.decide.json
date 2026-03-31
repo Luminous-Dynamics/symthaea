@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.EMOTIONAL.EQ.DECIDE",
+  "lesson": {
+    "standard_code": "UNI.EMOTIONAL.EQ.DECIDE",
+    "title": "Responsible Decision-Making",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Responsible decision-making means making constructive choices about personal behaviour and social interactions based on ethical standards, safety concerns, and the well-being of yourself and others. It involves identifying the problem, gathering relevant information, considering consequences for all affected parties, evaluating options against your values, making a choice, and reflecting on the outcome. In South Africa, where decisions often have community-wide implications and where corruption erodes trust, responsible decision-making is a civic as well as personal skill.",
+    "examples": [
+      {
+        "problem": "Your friend asks you to cover for them by lying to their parents about where they spent the evening. Walk through a responsible decision-making process.",
+        "steps": [
+          {
+            "instruction": "Step 1: Identify the decision: help my friend (loyalty) vs being honest (integrity).",
+            "result": "frame the dilemma"
+          },
+          {
+            "instruction": "Step 2: Consider consequences: if caught, trust is damaged for both of you. If the friend is in danger, the lie could prevent them getting help.",
+            "result": "weigh consequences"
+          },
+          {
+            "instruction": "Step 3: Consider values: honesty, loyalty, and your friend's safety. You can be loyal without lying \u2014 offer to go with them to talk to their parents.",
+            "result": "values-based choice"
+          }
+        ],
+        "answer": "Answer: Responsible decision-making considers consequences beyond the immediate moment and finds creative alternatives that honour multiple values.",
+        "visual_description": null
+      },
+      {
+        "problem": "A local councillor must decide between approving a factory that will create 200 jobs but pollute a river used by 5,000 residents. Analyse this decision ethically.",
+        "steps": [
+          {
+            "instruction": "Step 1: Utilitarian analysis: weigh total benefit (200 jobs) against total harm (5,000 people affected by pollution).",
+            "result": "utilitarian"
+          },
+          {
+            "instruction": "Step 2: Rights analysis: do residents have a right to clean water? Does the factory violate this right?",
+            "result": "rights-based"
+          },
+          {
+            "instruction": "Step 3: Virtue ethics: what would a fair, compassionate, and wise leader do? Seek alternatives that create jobs without pollution.",
+            "result": "virtue ethics"
+          }
+        ],
+        "answer": "Answer: Ethical decision-making uses multiple frameworks to examine the same problem from different angles, leading to more robust decisions.",
+        "visual_description": null
+      },
+      {
+        "problem": "You find R500 on the floor of a busy shopping centre. No one is looking. What do you do and why?",
+        "steps": [
+          {
+            "instruction": "Step 1: Option A: keep it \u2014 'finder's keepers.' But someone may have lost money they desperately needed.",
+            "result": "self-interest"
+          },
+          {
+            "instruction": "Step 2: Option B: hand it in to security \u2014 the owner can claim it, and if unclaimed, it is handled properly.",
+            "result": "integrity"
+          },
+          {
+            "instruction": "Step 3: Reflection: the right choice is not always the easy choice. Handing it in reflects the person you want to be.",
+            "result": "character"
+          }
+        ],
+        "answer": "Answer: Responsible decisions often involve choosing between what is easy and what is right, guided by the kind of person you want to become.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List the steps in a responsible decision-making process.",
+        "answer": "1. Identify the problem or decision. 2. Gather relevant information. 3. Identify all possible options. 4. Consider consequences of each option for yourself and others. 5. Evaluate options against your values and ethical principles. 6. Make a choice. 7. Act on it. 8. Reflect on the outcome and learn from it.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think: problem -> info -> options -> consequences -> values -> choice -> reflect."
+        ],
+        "explanation": "This process slows down decision-making enough to prevent impulsive choices while keeping it practical enough for real-life use.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the difference between a consequence-based (utilitarian) and a duty-based (deontological) approach to ethics.",
+        "answer": "Utilitarian ethics judges an action by its outcomes \u2014 the right action produces the most good for the most people. Deontological ethics judges an action by whether it follows moral rules \u2014 some actions are right or wrong regardless of outcomes (e.g., lying is wrong even if it produces a good outcome). Example: is it okay to steal food to feed a starving child? Utilitarian says yes (reduces suffering). Deontological says no (stealing is wrong). Most real ethical thinking combines both.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about whether the ends justify the means.",
+          "Can a good outcome make a bad action right?"
+        ],
+        "explanation": "Neither framework is sufficient alone. Real ethical decisions often require weighing both consequences and principles, which is why ethical reasoning is a skill, not a formula.",
+        "distractors": []
+      },
+      {
+        "question": "You discover that a friend is cheating on a test. You know that reporting them could end your friendship. Apply a decision-making framework to determine what you should do.",
+        "answer": "Step 1: The problem is a conflict between loyalty and integrity. Step 2: Relevant info \u2014 how serious is the cheating? Is it a pattern? What are the consequences if caught later? Step 3: Options \u2014 ignore it, talk to the friend privately, report it, or help the friend study so they do not need to cheat. Step 4: Consequences of each for all parties. Step 5: Values \u2014 integrity and genuine care for the friend's growth matter. Step 6: Best choice \u2014 talk to the friend privately first, expressing concern. If it continues, consider further action. Step 7: Reflect on the outcome.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Consider all affected parties \u2014 yourself, your friend, other students, the teacher.",
+          "Is there an option that addresses the root cause?"
+        ],
+        "explanation": "Talking to the friend first respects the relationship while upholding integrity. It also addresses the root cause \u2014 why are they cheating? Do they need help studying?",
+        "distractors": []
+      },
+      {
+        "question": "Analyse a real historical decision where leaders made an unethical choice despite knowing better (e.g., apartheid policies, Marikana). What decision-making failures led to the outcome?",
+        "answer": "Example \u2014 Marikana (2012): Police leadership decided to use force against striking mineworkers. Decision-making failures: (1) framing the situation as security threat rather than labour dispute, (2) pressure from mining company interests biased the analysis, (3) dehumanisation of the workers reduced empathy, (4) groupthink among leadership prevented dissent, (5) short-term thinking prioritised immediate 'order' over justice. Responsible decision-making would have considered the workers' legitimate grievances, explored non-violent alternatives, and prioritised human life.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What biases influenced the decision-makers?",
+          "At what point could a different choice have been made?"
+        ],
+        "explanation": "Studying ethical failures reveals common patterns: dehumanisation of those affected, prioritising institutional interests over human welfare, groupthink, and time pressure that prevents reflection.",
+        "distractors": []
+      },
+      {
+        "question": "Create a personal ethical code of 5-7 principles that guide your decision-making. For each principle, give an example of how it would apply in a real situation.",
+        "answer": "Answers will vary. Strong responses: (1) principles are specific and actionable (not vague platitudes); (2) each includes a concrete application; (3) the code acknowledges tensions between principles; (4) the student reflects on where these principles came from (culture, experience, role models); (5) the code includes a principle about updating the code itself when experience reveals inadequacy.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "What matters most to you? Start there.",
+          "Think about situations where you felt proud of a decision \u2014 what principle guided it?"
+        ],
+        "explanation": "A personal ethical code is a living document. The exercise of creating it is as valuable as the product because it forces conscious reflection on values that are usually implicit.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The branch of philosophy concerned with what is morally right and wrong",
+      "The result or effect of an action or decision",
+      "Acting in accordance with your values even when it is difficult or costly"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "ethics",
+        "definition": "The branch of philosophy concerned with what is morally right and wrong",
+        "example_usage": "Ethics helps us navigate situations where there is no easy answer."
+      },
+      {
+        "term": "consequence",
+        "definition": "The result or effect of an action or decision",
+        "example_usage": "Before deciding, consider the consequences for everyone involved."
+      },
+      {
+        "term": "integrity",
+        "definition": "Acting in accordance with your values even when it is difficult or costly",
+        "example_usage": "Returning the wallet showed integrity."
+      },
+      {
+        "term": "dilemma",
+        "definition": "A situation requiring a choice between two or more options, each with significant downsides",
+        "example_usage": "The ethical dilemma forced her to choose between honesty and loyalty."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think ethical decisions have one clearly right answer.",
+        "correction": "Most real ethical situations involve competing values (loyalty vs honesty, individual freedom vs collective welfare). The goal is not to find the 'right' answer but to make a well-reasoned choice that you can defend, while remaining open to learning from the outcome. Ethical reasoning is a process, not a formula.",
+        "why_students_think_this": "Textbook ethics problems are often presented with clear right answers. Real life is messier \u2014 context matters, values conflict, and reasonable people can disagree."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

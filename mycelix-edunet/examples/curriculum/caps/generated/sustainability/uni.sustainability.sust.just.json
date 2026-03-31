@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.SUSTAINABILITY.SUST.JUST",
+  "lesson": {
+    "standard_code": "UNI.SUSTAINABILITY.SUST.JUST",
+    "title": "Environmental Justice",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Environmental justice recognises that environmental harms (pollution, climate change, resource depletion) disproportionately affect poor communities and communities of colour. In South Africa, apartheid's spatial planning concentrated Black communities near industrial zones, waste dumps, and polluted waterways \u2014 a legacy that persists today. The south Durban industrial basin exposes predominantly Black and Indian communities to petrochemical pollution, causing elevated rates of asthma, cancer, and respiratory disease. Environmental justice demands that environmental costs and benefits be distributed fairly, that affected communities have a voice in decisions, and that historical injustices be addressed.",
+    "examples": [
+      {
+        "problem": "Explain how apartheid spatial planning created environmental injustice in South Africa.",
+        "steps": [
+          {
+            "instruction": "Step 1: Apartheid located Black townships near industrial areas, mines, and waste facilities to provide cheap labour.",
+            "result": "historical cause"
+          },
+          {
+            "instruction": "Step 2: White suburbs were located upwind and upstream, away from pollution sources.",
+            "result": "privilege"
+          },
+          {
+            "instruction": "Step 3: Post-apartheid, these patterns persist: industrial zones still border townships, and communities still bear disproportionate health costs.",
+            "result": "legacy"
+          }
+        ],
+        "answer": "Answer: Environmental injustice in SA is not accidental \u2014 it was designed into the landscape by apartheid spatial planning and has not been fully reversed.",
+        "visual_description": null
+      },
+      {
+        "problem": "The south Durban industrial basin: who bears the cost of industrial production?",
+        "steps": [
+          {
+            "instruction": "Step 1: Refineries and petrochemical plants generate profits for their owners and tax revenue for the state.",
+            "result": "benefits"
+          },
+          {
+            "instruction": "Step 2: Local communities (Merebank, Wentworth, Bluff) breathe polluted air, with asthma rates 50% above the national average.",
+            "result": "costs"
+          },
+          {
+            "instruction": "Step 3: These communities are predominantly low-income, Black, and Indian \u2014 they receive the costs but not the benefits of industrial activity.",
+            "result": "injustice"
+          }
+        ],
+        "answer": "Answer: Environmental justice asks: who benefits and who suffers? When the answer falls along lines of race and class, it is an injustice that demands redress.",
+        "visual_description": null
+      },
+      {
+        "problem": "What does the South African Constitution say about environmental rights?",
+        "steps": [
+          {
+            "instruction": "Step 1: Section 24 guarantees everyone the right to an environment that is not harmful to their health or well-being.",
+            "result": "the right"
+          },
+          {
+            "instruction": "Step 2: It also guarantees the right to have the environment protected for present and future generations.",
+            "result": "intergenerational"
+          },
+          {
+            "instruction": "Step 3: This right has been used in court to challenge polluters and hold government accountable for environmental protection failures.",
+            "result": "legal tool"
+          }
+        ],
+        "answer": "Answer: Section 24 is one of the strongest constitutional environmental rights in the world \u2014 the challenge is enforcement.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define environmental justice and explain how it differs from environmentalism.",
+        "answer": "Environmental justice focuses on the fair distribution of environmental benefits and burdens, emphasising that marginalised communities disproportionately bear environmental harms. Traditional environmentalism focuses on conserving nature and reducing pollution broadly. Environmental justice adds a social equity dimension: who is affected, who decides, and who benefits? It originated in communities of colour fighting toxic waste dumps in their neighbourhoods.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Environmentalism asks 'how do we protect nature?' Environmental justice asks 'who bears the cost?'"
+        ],
+        "explanation": "The environmental justice movement began in the 1980s when studies showed that toxic waste sites in the US were disproportionately located near Black communities. The same pattern exists globally.",
+        "distractors": []
+      },
+      {
+        "question": "Explain how climate change is an environmental justice issue.",
+        "answer": "Climate change disproportionately affects communities that contributed least to it. Developing countries (like those in sub-Saharan Africa) produce far less CO2 per capita but face the worst impacts: drought, flooding, food insecurity, and climate migration. Within countries, poor communities have fewer resources to adapt (no air conditioning, no flood insurance, no ability to relocate). Climate change amplifies existing inequalities.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Who produces the most emissions? Who suffers the most?",
+          "Think about the capacity to adapt."
+        ],
+        "explanation": "Africa produces about 4% of global CO2 emissions but is projected to be the continent most severely affected by climate change. This disproportion is at the heart of climate justice.",
+        "distractors": []
+      },
+      {
+        "question": "Research the south Durban industrial basin and explain how it illustrates environmental injustice. Include health impacts, community demographics, and the response of affected communities.",
+        "answer": "The south Durban basin contains two oil refineries, a paper mill, and chemical plants. Surrounding communities (primarily Black and Indian, low-income) experience elevated rates of asthma (up to 52% of children), leukaemia, and respiratory disease. Community organisations like the South Durban Community Environmental Alliance (SDCEA) have fought for decades for pollution monitoring, industry accountability, and relocation of the worst polluters. The community's struggle illustrates both the injustice and the power of organised resistance.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Connect the demographics to the pollution exposure.",
+          "What has the community done in response?"
+        ],
+        "explanation": "The south Durban case is one of SA's most documented environmental justice struggles. It demonstrates how environmental injustice intersects with racial and economic inequality.",
+        "distractors": []
+      },
+      {
+        "question": "Evaluate whether South Africa's environmental laws adequately protect marginalised communities. Consider Section 24 of the Constitution and the National Environmental Management Act (NEMA).",
+        "answer": "On paper, the legal framework is strong: Section 24 guarantees environmental rights, and NEMA requires environmental impact assessments for developments. In practice, enforcement is weak: understaffed regulators, corruption, political pressure from industries that create jobs, and communities lacking resources to litigate. The Phuleni asbestos community, Vaal River pollution, and Mpumalanga air quality failures show that laws on paper do not automatically translate to justice on the ground. Strengthening enforcement, community access to legal support, and whistleblower protection would help close the gap.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Strong laws but weak enforcement \u2014 what are the barriers?",
+          "Consider the power dynamics between industry and community."
+        ],
+        "explanation": "This gap between law and practice is a central challenge. Environmental justice requires not just rights but the capacity to enforce them.",
+        "distractors": []
+      },
+      {
+        "question": "Propose a community-based environmental monitoring programme for a neighbourhood near an industrial site. Include what to monitor, how to collect data, and how to use the data for advocacy.",
+        "answer": "Programme: (1) Monitor: air quality (PM2.5, SO2 \u2014 using low-cost sensors), water quality (pH, heavy metals \u2014 using test kits), and health symptoms (community health surveys). (2) Collect: train community members as citizen scientists, establish regular monitoring schedules, use smartphone apps for data collection and mapping. (3) Advocate: compile data into accessible reports, present to local government and media, partner with legal organisations like the Centre for Environmental Rights, submit data as evidence in environmental impact assessments. (4) Sustain: connect with university researchers for technical support, build a community data dashboard.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Community-generated data is powerful because it cannot be dismissed as outsider interference.",
+          "Partner with experts for credibility."
+        ],
+        "explanation": "Community-based monitoring empowers residents to generate their own evidence rather than relying on industry or government data. This shifts the power dynamic fundamentally.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The fair distribution of environmental benefits and burdens, ensuring that marginalised communities are not disproportionately harmed",
+      "A cost or benefit of economic activity that affects third parties who did not choose to be involved",
+      "The disproportionate siting of environmentally harmful activities (waste dumps, factories, pollution) near communities of colour"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "environmental justice",
+        "definition": "The fair distribution of environmental benefits and burdens, ensuring that marginalised communities are not disproportionately harmed",
+        "example_usage": "Environmental justice demands that pollution not be concentrated in poor neighbourhoods."
+      },
+      {
+        "term": "externality",
+        "definition": "A cost or benefit of economic activity that affects third parties who did not choose to be involved",
+        "example_usage": "Pollution from the refinery is a negative externality borne by surrounding communities."
+      },
+      {
+        "term": "environmental racism",
+        "definition": "The disproportionate siting of environmentally harmful activities (waste dumps, factories, pollution) near communities of colour",
+        "example_usage": "Apartheid-era spatial planning is an example of environmental racism."
+      },
+      {
+        "term": "Section 24",
+        "definition": "The section of the SA Constitution guaranteeing the right to an environment not harmful to health or well-being",
+        "example_usage": "Activists used Section 24 to challenge the factory's pollution permit."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students sometimes think environmental justice is only about nature or wildlife conservation.",
+        "correction": "Environmental justice is fundamentally about people \u2014 specifically about how environmental harms fall disproportionately on poor and marginalised communities. It connects environmental issues to social justice, race, class, and power. While wildlife conservation matters, environmental justice centres on human health, community well-being, and equitable access to clean air, water, and land.",
+        "why_students_think_this": "Traditional environmentalism emphasised wilderness preservation, which can seem disconnected from human communities. Environmental justice reframes environmental issues as social justice issues."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

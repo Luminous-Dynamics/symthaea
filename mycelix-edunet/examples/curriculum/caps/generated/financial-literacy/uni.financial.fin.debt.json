@@ -1,0 +1,102 @@
+{
+  "node_id": "UNI.FINANCIAL.FIN.DEBT",
+  "lesson": {
+    "standard_code": "UNI.FINANCIAL.FIN.DEBT",
+    "title": "Borrowing & Credit",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Credit is borrowed money you must repay with interest. Your credit score (maintained by TransUnion, Experian, XDS in SA) reflects your repayment history and determines what interest rates lenders offer. Good debt finances appreciating assets or income growth (home loan, education). Bad debt finances depreciating items or consumption (clothing accounts, payday loans). Interest rates vary hugely: home loans ~11%, credit cards ~18-22%, store accounts ~21%, payday loans can exceed 60% annualized. Always know your total cost of credit before borrowing.",
+    "examples": [
+      {
+        "problem": "Lindiwe wants to buy a R15,000 laptop. Option A: credit card at 20% interest, paying R500/month. Option B: save R2,500/month for 6 months. Compare the total cost.",
+        "steps": [
+          {"instruction": "Option B (saving): Total cost", "result": "R2,500 x 6 months = R15,000 exactly"},
+          {"instruction": "Option A (credit card): Estimate repayment", "result": "At 20% p.a. (1.67%/month) paying R500/month, it takes ~38 months to repay"},
+          {"instruction": "Option A: Total paid", "result": "38 x R500 = R19,000 — that is R4,000 in interest (27% more)"}
+        ],
+        "answer": "Saving costs R15,000. The credit card costs R19,000 — R4,000 extra in interest. Unless the laptop is urgently needed for income, saving is far cheaper."
+      },
+      {
+        "problem": "What factors affect a credit score in South Africa?",
+        "steps": [
+          {"instruction": "Payment history (most important)", "result": "Paying bills on time improves your score; missed payments damage it significantly"},
+          {"instruction": "Credit utilization", "result": "Using less than 30% of your available credit is ideal"},
+          {"instruction": "Length of credit history", "result": "Longer history of responsible use improves your score"},
+          {"instruction": "Number of inquiries", "result": "Many credit applications in a short period lowers your score"}
+        ],
+        "answer": "The four main factors are: payment history, credit utilization ratio, length of credit history, and number of recent inquiries."
+      },
+      {
+        "problem": "Sifiso has two debts: a store account of R8,000 at 21% interest, and a personal loan of R20,000 at 15% interest. He has R2,000 extra per month. Which should he pay off first?",
+        "steps": [
+          {"instruction": "Identify the higher interest rate", "result": "Store account at 21% costs more per rand borrowed"},
+          {"instruction": "Apply the avalanche method", "result": "Pay minimums on the personal loan, throw all extra (R2,000) at the store account"},
+          {"instruction": "Once store account is cleared", "result": "Redirect all payments to the personal loan"}
+        ],
+        "answer": "Pay off the store account first (21% interest) using the debt avalanche method. This minimizes total interest paid."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the difference between good debt and bad debt?",
+        "answer": "Good debt finances assets that appreciate or increase your earning power (home loan, student loan). Bad debt finances consumption or depreciating items (store credit for clothing, payday loans for entertainment).",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Ask: will this thing I am borrowing for be worth more or less in 5 years?"],
+        "explanation": "A home loan builds equity as property values rise. A store account for fast fashion finances items that lose value immediately.",
+        "distractors": ["All debt is bad", "Good debt has no interest", "Bad debt is only from payday lenders"]
+      },
+      {
+        "question": "If you owe R10,000 on a credit card at 21% annual interest and only pay the minimum (R200/month), approximately how long will it take to pay off?",
+        "answer": "Over 9 years, paying approximately R21,600 total (more than double the original amount)",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["At 21% annual, monthly interest alone on R10,000 is R175 — so R200 barely covers interest"],
+        "explanation": "Monthly interest is R10,000 x 0.21/12 = R175. Of your R200 payment, only R25 reduces the principal. This is why minimum payments are a trap.",
+        "distractors": ["About 2 years", "About 4 years", "About 50 months"]
+      },
+      {
+        "question": "You can check your credit report for free in South Africa. True or false?",
+        "answer": "True. Under the National Credit Act, every South African is entitled to one free credit report per year from each credit bureau (TransUnion, Experian, XDS, Compuscan).",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["The National Credit Act protects consumers"],
+        "explanation": "You can request your free report online from any SA credit bureau. Checking your own report does not affect your score.",
+        "distractors": ["False, you must pay", "True, but it hurts your score", "Only if you have existing debt"]
+      },
+      {
+        "question": "Why should you avoid payday loans?",
+        "answer": "Payday loans charge extremely high interest rates (often 50-60% annualized or more) and create debt cycles where borrowers must take new loans to repay old ones, trapping them in escalating debt.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Look at the total cost of borrowing, not just the monthly payment"],
+        "explanation": "A R2,000 payday loan might cost R400 in fees for just 30 days. That is 240% annualized. Alternatives include negotiating with creditors, using savings, or community lending circles (stokvels).",
+        "distractors": ["They are illegal in South Africa", "They are fine for emergencies", "The interest rates are similar to bank loans"]
+      },
+      {
+        "question": "What is the debt avalanche method?",
+        "answer": "Pay minimum amounts on all debts, then put all extra money toward the debt with the highest interest rate. Once that is paid off, apply those payments to the next highest rate debt.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["It prioritizes by interest rate to minimize total cost"],
+        "explanation": "The avalanche method saves the most money on interest compared to the snowball method (which prioritizes smallest balance for psychological wins).",
+        "distractors": ["Pay off the largest debt first", "Pay equal amounts to all debts", "Only pay the minimum on everything"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Credit score", "definition": "A numerical rating (300-900 in SA) reflecting your creditworthiness based on repayment history and borrowing behavior", "example_usage": "My credit score of 750 qualified me for a lower interest rate on my home loan."},
+      {"term": "Interest rate", "definition": "The percentage charged by a lender for borrowing money, expressed annually", "example_usage": "My credit card charges 21% interest per year on the outstanding balance."},
+      {"term": "Total cost of credit", "definition": "The full amount you will pay over the life of a loan, including principal, interest, and all fees", "example_usage": "The car costs R200,000 but the total cost of credit over 5 years is R280,000."},
+      {"term": "Debt avalanche", "definition": "A repayment strategy that targets the highest-interest debt first while paying minimums on all others", "example_usage": "Using the debt avalanche, I paid off my 21% store account before my 12% personal loan."}
+    ],
+    "misconceptions": [
+      {"misconception": "Checking my own credit score lowers it", "correction": "Checking your own report is a 'soft inquiry' and does not affect your score. Only lender inquiries when you apply for credit are 'hard inquiries' that can slightly lower your score.", "why_students_think_this": "People confuse self-checks with lender inquiries and avoid monitoring their credit as a result."},
+      {"misconception": "Having no debt means a good credit score", "correction": "Having no credit history can result in a low or nonexistent score. Responsibly using a small amount of credit (and paying it off) builds a positive history.", "why_students_think_this": "It seems logical that owing nothing would be ideal, but lenders need evidence of responsible repayment."},
+      {"misconception": "The monthly payment is what matters, not the interest rate", "correction": "A lower monthly payment often means a longer repayment period and more total interest paid. A R200/month payment on a 21% card can cost double the original purchase.", "why_students_think_this": "Monthly affordability feels tangible, while total interest over years is abstract and hard to calculate mentally."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

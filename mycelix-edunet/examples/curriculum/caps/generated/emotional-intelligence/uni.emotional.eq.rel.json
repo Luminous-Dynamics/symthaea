@@ -1,0 +1,180 @@
+{
+  "node_id": "UNI.EMOTIONAL.EQ.REL",
+  "lesson": {
+    "standard_code": "UNI.EMOTIONAL.EQ.REL",
+    "title": "Relationship Skills",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Relationship skills encompass the ability to establish and maintain healthy, supportive connections with diverse individuals and groups. This includes clear communication (expressing yourself honestly and listening actively), teamwork (contributing to shared goals while valuing others' contributions), conflict resolution (addressing disagreements constructively), and boundary-setting (knowing and communicating your limits). In South Africa, where community relationships are central to daily life and professional networks often span cultural boundaries, strong relationship skills are essential for personal and collective success.",
+    "examples": [
+      {
+        "problem": "Two team members disagree about how to approach a school project. One wants thorough research; the other wants to start building immediately. How can they resolve this?",
+        "steps": [
+          {
+            "instruction": "Step 1: Each person states their position and the reason behind it (not just what, but why).",
+            "result": "understand interests"
+          },
+          {
+            "instruction": "Step 2: Find common ground: both want a good result. The disagreement is about method, not goal.",
+            "result": "shared goal"
+          },
+          {
+            "instruction": "Step 3: Compromise: spend one session on focused research, then start building with the research as a foundation.",
+            "result": "integrative solution"
+          }
+        ],
+        "answer": "Answer: Good conflict resolution identifies the underlying interests behind positions and finds solutions that address both.",
+        "visual_description": null
+      },
+      {
+        "problem": "How do you set a boundary without damaging a relationship?",
+        "steps": [
+          {
+            "instruction": "Step 1: Use 'I' statements: 'I need quiet time after school to decompress' instead of 'You are too demanding.'",
+            "result": "non-blaming language"
+          },
+          {
+            "instruction": "Step 2: Be specific about what you need, not vague about what is wrong.",
+            "result": "clarity"
+          },
+          {
+            "instruction": "Step 3: Affirm the relationship: 'I value our friendship, and I also need this for my well-being.'",
+            "result": "both/and"
+          }
+        ],
+        "answer": "Answer: Healthy boundaries actually strengthen relationships by preventing resentment and burnout.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe active listening in practice during a difficult conversation.",
+        "steps": [
+          {
+            "instruction": "Step 1: Give full attention \u2014 put away your phone, make eye contact, face the speaker.",
+            "result": "presence"
+          },
+          {
+            "instruction": "Step 2: Reflect back what you hear: 'It sounds like you are feeling frustrated because...'",
+            "result": "reflection"
+          },
+          {
+            "instruction": "Step 3: Ask clarifying questions instead of planning your response: 'Can you tell me more about that?'",
+            "result": "curiosity"
+          }
+        ],
+        "answer": "Answer: Active listening makes the other person feel heard, which de-escalates tension and builds trust.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List four key components of healthy relationships.",
+        "answer": "Trust (reliability and honesty), respect (valuing the other person's autonomy and dignity), communication (expressing needs and listening), and reciprocity (both people contributing to the relationship). All four must be present \u2014 a relationship with trust but no communication will struggle; one with communication but no respect will be harmful.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what makes you feel safe and valued in a relationship."
+        ],
+        "explanation": "These four components apply to all relationships \u2014 friendships, romantic partnerships, family relationships, and professional connections.",
+        "distractors": []
+      },
+      {
+        "question": "Explain the difference between assertive, aggressive, and passive communication styles.",
+        "answer": "Assertive: expressing your needs clearly and respectfully while acknowledging others' needs ('I feel frustrated when meetings run late. Can we agree on a time limit?'). Aggressive: expressing your needs at others' expense ('You always waste my time with these long meetings!'). Passive: not expressing your needs at all, then feeling resentful. Assertive communication respects both yourself and the other person.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about who gets their needs met in each style.",
+          "Consider the long-term effect of each on the relationship."
+        ],
+        "explanation": "Assertiveness is often confused with aggression, especially in cultures where directness is uncommon. The key difference is that assertiveness includes respect for the other person's needs.",
+        "distractors": []
+      },
+      {
+        "question": "Role-play scenario: a friend repeatedly borrows your things without asking. Write out an assertive conversation addressing this.",
+        "answer": "Example: 'Hey, I wanted to talk about something. I have noticed that you sometimes borrow my charger and headphones without asking first. I do not mind sharing, but I need you to ask me first so I know where my things are. Can we agree on that?' If they respond defensively: 'I am not saying you are a bad friend \u2014 I just need this boundary for my own peace of mind. It is important to me.'",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Use 'I' statements and specific examples.",
+          "Focus on the behaviour, not the person's character."
+        ],
+        "explanation": "Assertive conversations follow a pattern: describe the specific behaviour, explain its impact on you, state what you need, and invite a response. Avoid 'always' and 'never' which trigger defensiveness.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse why conflict avoidance can be as damaging as aggressive conflict in a team setting.",
+        "answer": "Conflict avoidance allows problems to fester, creates passive-aggressive dynamics, leads to poor decisions (no one challenges bad ideas), and erodes trust (people sense inauthenticity). Aggressive conflict damages relationships through hostility. Both fail because they prevent honest engagement with differences. Healthy teams need constructive conflict \u2014 the ability to disagree respectfully, challenge ideas, and reach better solutions through debate.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What happens to unresolved issues in a team?",
+          "Think about 'artificial harmony' vs genuine agreement."
+        ],
+        "explanation": "Patrick Lencioni identifies 'fear of conflict' as one of the five dysfunctions of a team. Teams that avoid conflict produce mediocre results because they never challenge each other's thinking.",
+        "distractors": []
+      },
+      {
+        "question": "Design a conflict resolution protocol for a student committee with members from diverse backgrounds. Include at least 5 steps and explain the rationale for each.",
+        "answer": "Protocol: (1) Cooling-off period \u2014 if emotions are high, take 10 minutes before engaging (rationale: prevents reactive escalation). (2) Each person states their perspective uninterrupted for 2 minutes (rationale: feeling heard reduces defensiveness). (3) Each person summarises the other's position to their satisfaction (rationale: ensures genuine understanding). (4) Identify shared goals and values (rationale: reminds both parties they are on the same team). (5) Brainstorm solutions together without evaluating initially (rationale: separates idea generation from criticism). (6) Choose a solution by consensus or vote (rationale: democratic decision-making). (7) Follow up after one week to assess whether the solution is working (rationale: accountability and adjustment).",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Think about what goes wrong in conflicts and design against each failure mode.",
+          "Consider cultural differences in conflict style."
+        ],
+        "explanation": "Effective conflict resolution protocols are explicit because different cultures have different norms for disagreement. Making the process clear and agreed-upon in advance reduces misunderstanding.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Fully concentrating on what is being said, reflecting it back, and asking clarifying questions",
+      "Expressing your needs clearly and respectfully while acknowledging others' needs",
+      "The process of addressing disagreements constructively to find mutually acceptable solutions"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "active listening",
+        "definition": "Fully concentrating on what is being said, reflecting it back, and asking clarifying questions",
+        "example_usage": "Active listening means putting down your phone and focusing entirely on the speaker."
+      },
+      {
+        "term": "assertiveness",
+        "definition": "Expressing your needs clearly and respectfully while acknowledging others' needs",
+        "example_usage": "Assertiveness is the middle ground between aggression and passivity."
+      },
+      {
+        "term": "conflict resolution",
+        "definition": "The process of addressing disagreements constructively to find mutually acceptable solutions",
+        "example_usage": "Conflict resolution helped the team move past their disagreement and produce better work."
+      },
+      {
+        "term": "boundary",
+        "definition": "A limit you set to protect your well-being while maintaining relationships",
+        "example_usage": "Setting a boundary about study time helped her balance friendship and academics."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people believe that good relationships should be conflict-free.",
+        "correction": "All healthy relationships involve disagreement. The quality of a relationship is determined not by the absence of conflict but by how conflict is handled. Constructive conflict \u2014 where both people feel safe to disagree, listen to each other, and work toward solutions \u2014 actually strengthens relationships by building trust and deepening understanding.",
+        "why_students_think_this": "Media often portrays ideal relationships as harmonious and effortless. In reality, lasting relationships require ongoing negotiation, compromise, and the willingness to work through difficult conversations."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

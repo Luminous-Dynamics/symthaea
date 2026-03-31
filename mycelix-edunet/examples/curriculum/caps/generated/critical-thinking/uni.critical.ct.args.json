@@ -1,0 +1,101 @@
+{
+  "node_id": "UNI.CRITICAL.CT.ARGS",
+  "lesson": {
+    "standard_code": "UNI.CRITICAL.CT.ARGS",
+    "title": "Argument Structure",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "An argument is a set of statements where premises (reasons) support a conclusion. A valid argument has a logical structure where if the premises are true, the conclusion must follow. A sound argument is valid AND has true premises. Identifying premises and conclusions is the foundation of critical thinking — it lets you evaluate whether someone's reasoning actually supports their claim. Look for indicator words: premises ('because', 'since', 'given that') and conclusions ('therefore', 'so', 'thus', 'consequently').",
+    "examples": [
+      {
+        "problem": "Identify the premises and conclusion: 'All mammals breathe air. Whales are mammals. Therefore, whales breathe air.'",
+        "steps": [
+          {"instruction": "Find the conclusion (look for 'therefore')", "result": "'Whales breathe air' is the conclusion"},
+          {"instruction": "Identify the premises (the supporting statements)", "result": "Premise 1: 'All mammals breathe air.' Premise 2: 'Whales are mammals.'"},
+          {"instruction": "Check validity: if both premises are true, must the conclusion be true?", "result": "Yes — this is a valid deductive argument (and sound, because both premises are factually true)"}
+        ],
+        "answer": "Premise 1: All mammals breathe air. Premise 2: Whales are mammals. Conclusion: Whales breathe air. This argument is both valid and sound."
+      },
+      {
+        "problem": "Evaluate this argument: 'It rained every Monday for the last three weeks. Therefore, it will rain next Monday.'",
+        "steps": [
+          {"instruction": "Identify the premise", "result": "'It rained every Monday for the last three weeks'"},
+          {"instruction": "Identify the conclusion", "result": "'It will rain next Monday'"},
+          {"instruction": "Assess the reasoning", "result": "This is an inductive argument — the premise provides some evidence but does not guarantee the conclusion. Three weeks is a small sample, and day of the week does not cause rain."}
+        ],
+        "answer": "This is a weak inductive argument. The premise provides a pattern but not a logical guarantee. The conclusion could easily be false."
+      },
+      {
+        "problem": "Is this argument valid? 'If it is raining, the ground is wet. The ground is wet. Therefore, it is raining.'",
+        "steps": [
+          {"instruction": "Map the logical form", "result": "If P then Q. Q is true. Therefore P is true."},
+          {"instruction": "Check for the fallacy", "result": "This is 'affirming the consequent' — a formal fallacy. The ground could be wet from a sprinkler, a burst pipe, or dew."},
+          {"instruction": "A valid version would be", "result": "'If P then Q. P is true. Therefore Q is true.' (affirming the antecedent / modus ponens)"}
+        ],
+        "answer": "Invalid. This commits the fallacy of affirming the consequent. A wet ground does not prove rain — other causes exist."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the difference between a valid argument and a sound argument?",
+        "answer": "A valid argument has correct logical structure (if premises are true, conclusion must follow). A sound argument is valid AND has premises that are actually true.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Validity is about structure; soundness adds truth"],
+        "explanation": "'All fish can fly. A salmon is a fish. Therefore, a salmon can fly.' is valid (the logic works) but not sound (the first premise is false).",
+        "distractors": ["They mean the same thing", "Valid means the conclusion is true", "Sound means people agree with it"]
+      },
+      {
+        "question": "Identify the conclusion: 'Since the unemployment rate is rising and consumer spending is falling, we are likely heading into a recession.'",
+        "answer": "'We are likely heading into a recession.'",
+        "difficulty_permille": 150,
+        "bloom_level": "Apply",
+        "hints": ["Look for what the reasons (after 'since') are supporting"],
+        "explanation": "'Since' introduces the premises (rising unemployment, falling spending). The claim being supported is the recession prediction.",
+        "distractors": ["The unemployment rate is rising", "Consumer spending is falling", "Since the unemployment rate is rising"]
+      },
+      {
+        "question": "Is this a deductive or inductive argument? 'Every swan I have ever seen is white. Therefore, all swans are white.'",
+        "answer": "Inductive. It generalizes from observed cases to a universal claim. The conclusion goes beyond what the premises guarantee (black swans exist in Australia).",
+        "difficulty_permille": 250,
+        "bloom_level": "Analyze",
+        "hints": ["Does the conclusion follow with certainty or just probability?"],
+        "explanation": "Deductive arguments claim certainty; inductive arguments claim probability. Past observations cannot prove a universal truth — one counter-example (a black swan) disproves it.",
+        "distractors": ["Deductive because it reaches a definite conclusion", "Neither — it is an opinion", "Deductive because it uses the word 'all'"]
+      },
+      {
+        "question": "What are premise indicator words? Give three examples.",
+        "answer": "Words that signal a premise is coming. Examples: 'because', 'since', 'given that', 'as shown by', 'for the reason that', 'assuming that'.",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": ["These words introduce reasons or evidence"],
+        "explanation": "Premise indicators help you identify which parts of an argument are providing support, versus which part is the claim being supported (the conclusion).",
+        "distractors": ["Therefore, thus, so", "Maybe, perhaps, possibly", "But, however, although"]
+      },
+      {
+        "question": "Reconstruct this into premise-conclusion form: 'We should invest in renewable energy because fossil fuels are finite and climate change is accelerating.'",
+        "answer": "Premise 1: Fossil fuels are finite. Premise 2: Climate change is accelerating. Conclusion: We should invest in renewable energy.",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": ["'Because' introduces the premises; the claim before it is the conclusion"],
+        "explanation": "The word 'because' signals that what follows are the reasons. The statement before 'because' is the conclusion being supported.",
+        "distractors": ["The conclusion is that fossil fuels are finite", "There is only one premise", "This is not an argument, just a statement"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Premise", "definition": "A statement offered as evidence or reason to support a conclusion", "example_usage": "The premise 'all humans are mortal' supports the conclusion about Socrates."},
+      {"term": "Conclusion", "definition": "The statement that the premises are intended to prove or support", "example_usage": "The conclusion 'therefore, we should act now' follows from the evidence presented."},
+      {"term": "Valid argument", "definition": "An argument where the conclusion follows necessarily from the premises, regardless of whether the premises are true", "example_usage": "The argument is valid because IF the premises were true, the conclusion would have to be true."},
+      {"term": "Sound argument", "definition": "An argument that is both valid in structure and has true premises", "example_usage": "The argument is sound because the logic is correct and the facts check out."}
+    ],
+    "misconceptions": [
+      {"misconception": "If the conclusion is true, the argument must be good", "correction": "A true conclusion can follow from bad reasoning or false premises (by coincidence). What matters is whether the premises actually support the conclusion.", "why_students_think_this": "People focus on whether they agree with the conclusion rather than evaluating the reasoning."},
+      {"misconception": "Arguments are the same as disagreements", "correction": "In logic, an argument is a structured set of claims (premises leading to a conclusion). It is not a fight or disagreement — it is reasoned support for a position.", "why_students_think_this": "In everyday language, 'argument' means a heated dispute, not a logical structure."},
+      {"misconception": "Strong opinions are strong arguments", "correction": "Confidence, passion, or conviction do not make an argument logically strong. Only the quality of evidence and reasoning matter.", "why_students_think_this": "People confuse the emotional force of a claim with its logical strength."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.94, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

@@ -1,0 +1,106 @@
+{
+  "node_id": "UNI.HEALTH.HL.PREVENT",
+  "lesson": {
+    "standard_code": "UNI.HEALTH.HL.PREVENT",
+    "title": "Disease Prevention",
+    "grade_level": "Adult",
+    "bloom_level": "Understand",
+    "explanation": "Prevention is far more effective and cheaper than treatment. Vaccines train your immune system to recognize diseases before you encounter them — they have eradicated smallpox and nearly eliminated polio. Basic hygiene (handwashing with soap for 20 seconds, especially before eating and after the toilet) prevents most diarrheal diseases. STIs (sexually transmitted infections) are prevented by consistent condom use, mutual monogamy, regular testing, and PrEP for HIV-negative people at risk. Chronic diseases (diabetes, heart disease, many cancers) are largely preventable through not smoking, regular exercise, a balanced diet, moderate alcohol, and regular health screening. In SA, HIV, TB, diabetes, and hypertension are the leading health burdens — all are manageable with prevention and early treatment.",
+    "examples": [
+      {
+        "problem": "Explain how vaccines work using the example of a flu vaccine.",
+        "steps": [
+          {"instruction": "What the vaccine contains", "result": "Inactive or weakened flu virus components (not live virus — you cannot get flu from the vaccine)"},
+          {"instruction": "What your body does", "result": "Your immune system recognizes the viral components as foreign and creates antibodies specifically designed to attack them"},
+          {"instruction": "Memory formation", "result": "Memory B-cells and T-cells 'remember' the virus. If you encounter the real flu virus later, your immune system responds immediately."},
+          {"instruction": "Population effect (herd immunity)", "result": "When enough people are vaccinated (typically 80-95%), the disease cannot spread easily, protecting those who cannot be vaccinated (infants, immunocompromised)"}
+        ],
+        "answer": "Vaccines introduce harmless parts of a pathogen so your immune system learns to fight it. If you later encounter the real disease, your body responds quickly and effectively."
+      },
+      {
+        "problem": "What are the five most impactful lifestyle changes for preventing chronic disease?",
+        "steps": [
+          {"instruction": "Do not smoke (or quit)", "result": "Smoking is the single largest preventable cause of death. Quitting at any age reduces risk."},
+          {"instruction": "Exercise regularly", "result": "150 minutes of moderate exercise per week (30 min, 5 days). Reduces heart disease, diabetes, cancer, and depression risk."},
+          {"instruction": "Eat a balanced diet", "result": "More vegetables, fruit, whole grains, lean protein. Less sugar, processed food, and saturated fat."},
+          {"instruction": "Limit alcohol", "result": "Maximum 2 standard drinks/day for men, 1 for women. Heavy drinking causes liver disease, cancer, and accidents."},
+          {"instruction": "Regular screening", "result": "Blood pressure, glucose, cholesterol, cancer screening (Pap smear, mammogram, PSA) as recommended by your doctor."}
+        ],
+        "answer": "Not smoking, exercising, eating well, limiting alcohol, and getting regular screenings can prevent up to 80% of chronic diseases including heart disease, type 2 diabetes, and many cancers."
+      },
+      {
+        "problem": "Nomsa is 28 and sexually active with multiple partners. What STI prevention strategies should she follow?",
+        "steps": [
+          {"instruction": "Consistent condom use", "result": "Male or female condoms for every sexual encounter — they protect against HIV, gonorrhea, chlamydia, and syphilis"},
+          {"instruction": "Regular STI testing", "result": "Test every 3-6 months or with each new partner. Many STIs have no symptoms initially."},
+          {"instruction": "Consider PrEP", "result": "Pre-exposure prophylaxis — a daily pill that is over 99% effective at preventing HIV. Available free at SA public clinics."},
+          {"instruction": "HPV vaccination", "result": "If not already vaccinated, the HPV vaccine prevents cervical cancer and genital warts. Available for adults in SA."},
+          {"instruction": "Open communication", "result": "Discuss STI status with partners. Knowing is not shameful — it is responsible."}
+        ],
+        "answer": "Use condoms consistently, test regularly (every 3-6 months), consider PrEP for HIV prevention, get HPV vaccinated, and communicate openly with partners."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "How long should you wash your hands to effectively remove germs?",
+        "answer": "At least 20 seconds with soap and water — about the time it takes to sing 'Happy Birthday' twice. Lather all surfaces including between fingers and under nails.",
+        "difficulty_permille": 100,
+        "bloom_level": "Remember",
+        "hints": ["Sing a short song to time yourself"],
+        "explanation": "Handwashing with soap for 20 seconds reduces diarrheal diseases by 30-40% and respiratory infections by about 20%. It is the single most cost-effective health intervention.",
+        "distractors": ["5 seconds is enough", "Just water without soap works", "Hand sanitizer is always better"]
+      },
+      {
+        "question": "What is herd immunity?",
+        "answer": "When a sufficient proportion of a population is immune to a disease (through vaccination or prior infection), the disease cannot spread easily, which indirectly protects those who are not immune (newborns, immunocompromised people).",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Think about how disease spreads when most people around you are immune"],
+        "explanation": "The threshold varies by disease: measles needs ~95% immunity, polio ~80%. When vaccination rates drop below these thresholds, outbreaks occur — as seen with measles outbreaks globally.",
+        "distractors": ["Everyone must be vaccinated for it to work", "It means only healthy people get immunity", "Herd immunity cannot be achieved through vaccines"]
+      },
+      {
+        "question": "Why should you get screened for diabetes if you have no symptoms?",
+        "answer": "Type 2 diabetes can develop silently for years, causing damage to blood vessels, kidneys, eyes, and nerves before symptoms appear. Early detection through screening allows lifestyle changes and treatment that prevent these complications.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Some diseases cause damage before you feel anything"],
+        "explanation": "In SA, over 4.5 million people have diabetes, and many are undiagnosed. Risk factors include family history, being overweight, physical inactivity, and being over 45. A simple fasting blood glucose test can detect it.",
+        "distractors": ["You only need testing if you feel sick", "Diabetes always has obvious symptoms", "Screening causes unnecessary worry"]
+      },
+      {
+        "question": "What is PrEP and who should consider taking it?",
+        "answer": "Pre-Exposure Prophylaxis — a daily antiretroviral pill taken by HIV-negative people at substantial risk of infection. It is over 99% effective when taken consistently. Recommended for people with HIV-positive partners, those with multiple sexual partners, or people who do not consistently use condoms.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": ["Pre-exposure means before potential exposure to the virus"],
+        "explanation": "PrEP is available free at public health facilities in South Africa. It prevents HIV infection but does not protect against other STIs — condoms are still recommended.",
+        "distractors": ["A treatment for people who already have HIV", "A vaccine against HIV", "A cure for HIV"]
+      },
+      {
+        "question": "Name three common vaccines that adults in South Africa may need.",
+        "answer": "Flu vaccine (annually), tetanus booster (every 10 years), HPV vaccine (if not given in childhood), hepatitis B (for healthcare workers and at-risk individuals). COVID-19 boosters as recommended.",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": ["Think beyond childhood vaccines — some need boosters or are given in adulthood"],
+        "explanation": "Vaccination is not just for children. Adults need boosters and new vaccines. The SA Expanded Programme on Immunisation (EPI) provides free childhood vaccines; adult vaccines may require a visit to a pharmacy or private doctor.",
+        "distractors": ["Adults do not need vaccines", "Only travel vaccines are needed", "Childhood vaccines protect you for life with no boosters"]
+      }
+    ],
+    "key_vocabulary": [
+      {"term": "Vaccine", "definition": "A preparation that stimulates the immune system to produce antibodies against a disease without causing the disease, providing future protection", "example_usage": "The measles vaccine has prevented an estimated 56 million deaths since 2000."},
+      {"term": "Herd immunity", "definition": "Indirect protection from infectious disease that occurs when a large percentage of a population is immune, reducing disease spread to vulnerable individuals", "example_usage": "When vaccination rates dropped below 90%, the community lost herd immunity and measles cases surged."},
+      {"term": "PrEP", "definition": "Pre-Exposure Prophylaxis — antiretroviral medication taken by HIV-negative individuals to prevent HIV infection, over 99% effective when taken daily", "example_usage": "She takes PrEP daily as an additional layer of protection along with condoms."},
+      {"term": "Screening", "definition": "Testing for a disease in people who have no symptoms, to detect it early when treatment is most effective", "example_usage": "Regular blood pressure screening caught his hypertension before it caused damage."}
+    ],
+    "misconceptions": [
+      {"misconception": "Vaccines cause the disease they are meant to prevent", "correction": "Most vaccines contain inactive or weakened components that cannot cause the disease. Mild side effects (sore arm, low fever) are normal immune responses, not the disease itself.", "why_students_think_this": "Mild post-vaccination symptoms are mistaken for the disease, and misinformation campaigns have spread this myth widely."},
+      {"misconception": "Natural immunity is always better than vaccine immunity", "correction": "Getting a disease naturally risks serious complications, hospitalization, or death. Vaccines provide immunity without these risks. For some diseases (like HPV and tetanus), the vaccine produces stronger immunity than natural infection.", "why_students_think_this": "The appeal to nature fallacy makes 'natural' sound superior, and people underestimate disease severity."},
+      {"misconception": "STIs only happen to promiscuous people", "correction": "STIs can be transmitted in any sexual encounter, including in long-term relationships where one partner has an undetected infection. Stigma prevents testing, which increases spread. Anyone who is sexually active should test regularly.", "why_students_think_this": "Moral judgment is attached to STIs, creating a false belief that 'good' people do not get them."}
+    ],
+    "generation_quality": {"coherence": 0.95, "hallucination_detected": false, "veto_count": 0, "epistemic_confidence": 0.93, "needs_human_review": false}
+  },
+  "flashcards": [],
+  "quality": {"coherence": 0.95, "hallucination_detected": false, "needs_human_review": false, "veto_count": 0},
+  "generated_at": "2026-03-31T08:00:00"
+}

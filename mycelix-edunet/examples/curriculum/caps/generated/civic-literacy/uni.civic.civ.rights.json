@@ -1,0 +1,124 @@
+{
+  "node_id": "UNI.CIVIC.CIV.RIGHTS",
+  "lesson": {
+    "standard_code": "UNI.CIVIC.CIV.RIGHTS",
+    "title": "Rights & Responsibilities",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Human rights are fundamental entitlements that belong to every person by virtue of being human. South Africa's Bill of Rights (Chapter 2 of the Constitution) enshrines 27 rights including equality, dignity, life, freedom of expression, and access to education, healthcare, and housing. Rights come with responsibilities: the right to vote carries the responsibility to participate thoughtfully; the right to free expression does not extend to hate speech. Understanding the balance between individual rights and collective well-being is essential for a functioning democracy.",
+    "examples": [
+      {
+        "problem": "A school refuses to admit a learner because of their religion. Which right is being violated and what can the family do?",
+        "steps": [
+          {"instruction": "Step 1: Section 9 (equality) and Section 15 (freedom of religion) of the Bill of Rights protect against religious discrimination.", "result": "identify rights"},
+          {"instruction": "Step 2: The family can lodge a complaint with the SA Human Rights Commission (SAHRC).", "result": "complaint mechanism"},
+          {"instruction": "Step 3: If unresolved, they can approach the Equality Court for a ruling.", "result": "legal remedy"}
+        ],
+        "answer": "Answer: The right to equality (Section 9) and freedom of religion (Section 15) are violated. The family can complain to the SAHRC or approach the Equality Court.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the difference between a right and a responsibility using the right to education as an example.",
+        "steps": [
+          {"instruction": "Step 1: Section 29 guarantees everyone the right to basic education.", "result": "the right"},
+          {"instruction": "Step 2: The responsibility of the state is to provide schools, teachers, and resources.", "result": "state responsibility"},
+          {"instruction": "Step 3: The learner's responsibility is to attend school, respect the learning environment, and engage with the material.", "result": "individual responsibility"}
+        ],
+        "answer": "Answer: The right to education means the state must provide access; the responsibility means learners must actively participate and respect the educational environment.",
+        "visual_description": null
+      },
+      {
+        "problem": "Can the government limit your rights? Under what circumstances?",
+        "steps": [
+          {"instruction": "Step 1: Section 36 (the limitations clause) allows rights to be limited, but only if the limitation is reasonable and justifiable in an open and democratic society.", "result": "limitations clause"},
+          {"instruction": "Step 2: The limitation must consider the nature of the right, the purpose and extent of the limitation, and whether less restrictive means are available.", "result": "proportionality test"},
+          {"instruction": "Step 3: Example: Freedom of expression can be limited to prohibit hate speech (Promotion of Equality and Prevention of Unfair Discrimination Act).", "result": "concrete example"}
+        ],
+        "answer": "Answer: Yes, rights can be limited under Section 36, but only through a law of general application that is reasonable, justifiable, and proportional.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List five rights protected in the South African Bill of Rights.",
+        "answer": "Any five of: equality, human dignity, life, freedom and security of the person, freedom of religion, freedom of expression, right to assembly, right to vote, right to education, right to healthcare, right to housing, right to water and food, right to a healthy environment, right to access information, children's rights.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about what you need to live a dignified life.", "Consider both civil/political rights and socio-economic rights."],
+        "explanation": "The SA Bill of Rights contains 27 rights spanning civil, political, social, and economic domains. This breadth reflects the country's history and commitment to addressing past injustices.",
+        "distractors": ["Only civil and political rights are in the Bill of Rights", "The Bill of Rights only protects South African citizens"]
+      },
+      {
+        "question": "What is the difference between civil/political rights and socio-economic rights? Give an example of each.",
+        "answer": "Civil/political rights protect freedoms from government interference (e.g., freedom of expression). Socio-economic rights guarantee access to basic needs (e.g., right to housing). Civil rights are immediately enforceable; socio-economic rights require progressive realisation within available resources.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about 'freedom from' vs 'right to'.", "Consider the Grootboom housing case."],
+        "explanation": "The Constitutional Court in the Grootboom case (2000) established that the state must take reasonable measures to progressively realise socio-economic rights, even if it cannot fulfil them immediately.",
+        "distractors": ["Socio-economic rights are not real rights", "Civil rights are more important than socio-economic rights"]
+      },
+      {
+        "question": "A journalist publishes a story that a politician says is defamatory. The politician wants the story removed. Analyse the competing rights at play.",
+        "answer": "The journalist's right to freedom of expression and the media (Section 16) competes with the politician's right to dignity (Section 10). Courts must balance these: truthful reporting in the public interest is protected, but false and malicious statements are not. The public's right to information (Section 32) also factors in.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Identify all the rights involved.", "Consider whose interests are at stake — the journalist, the politician, and the public."],
+        "explanation": "Rights often come into tension. South African courts use proportionality analysis to balance competing rights. In media cases, the court considers whether the publication was in the public interest, whether it was true, and whether it was fair comment.",
+        "distractors": ["Freedom of expression always wins", "Politicians have no right to privacy"]
+      },
+      {
+        "question": "Explain why having rights without responsibilities can be harmful to society. Use a specific example.",
+        "answer": "If people exercise their right to free expression without the responsibility to avoid incitement, it can lead to hate speech and violence. For example, during the July 2021 unrest in SA, some social media posts incited looting. The right to expression does not protect speech that causes imminent harm.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Think about how one person's unrestricted exercise of a right can harm others.", "Consider the relationship between freedom and accountability."],
+        "explanation": "Rights exist within a social contract. Exercising a right irresponsibly can infringe on others' rights. The Constitution recognises this by allowing reasonable limitations and by including duties alongside rights.",
+        "distractors": ["Rights are absolute and can never be limited", "Responsibilities are optional in a democracy"]
+      },
+      {
+        "question": "Design a poster campaign for your community that educates people about one specific right and its corresponding responsibility. Describe what it would include and why.",
+        "answer": "Answers will vary. A strong response would: (1) choose a specific right (e.g., right to a healthy environment, Section 24), (2) explain the right in plain language, (3) describe the responsibility (e.g., not littering, reducing pollution, reporting environmental crimes), (4) include a call to action, and (5) justify why this right matters to the community.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Choose a right that is relevant to your daily life.", "Think about what your community can do to uphold this right."],
+        "explanation": "Creating educational materials requires understanding the right deeply enough to explain it simply, and connecting it to practical actions that community members can take.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The SA Bill of Rights is in Chapter 2 of the Constitution (Sections 7-39).",
+      "Remember: rights come with responsibilities.",
+      "The limitations clause (Section 36) is key to understanding when rights can be restricted."
+    ],
+    "key_vocabulary": [
+      {"term": "Bill of Rights", "definition": "Chapter 2 of the South African Constitution, containing 27 fundamental rights", "example_usage": "The Bill of Rights protects everyone's right to equality."},
+      {"term": "human dignity", "definition": "The inherent worth of every person, protected by Section 10 of the SA Constitution", "example_usage": "The court ruled that the treatment violated the prisoner's right to human dignity."},
+      {"term": "limitations clause", "definition": "Section 36 of the Constitution, which sets out when and how rights may be limited", "example_usage": "The limitations clause requires any restriction on rights to be reasonable and justifiable."},
+      {"term": "progressive realisation", "definition": "The obligation to gradually fulfil socio-economic rights within available resources", "example_usage": "The right to housing requires progressive realisation — the state must show ongoing improvement."},
+      {"term": "civic duty", "definition": "The responsibilities that come with citizenship, such as voting, obeying laws, and paying taxes", "example_usage": "Voting is both a right and a civic duty in a democracy."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "People often believe that rights are absolute and can never be limited.",
+        "correction": "Section 36 of the SA Constitution allows rights to be limited, but only by a law of general application and only if the limitation is reasonable and justifiable. No right is entirely absolute — even the right to life must be balanced against other considerations.",
+        "why_students_think_this": "The word 'right' implies something unconditional. Students may not realise that competing rights and societal needs require careful balancing."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.89,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.89,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

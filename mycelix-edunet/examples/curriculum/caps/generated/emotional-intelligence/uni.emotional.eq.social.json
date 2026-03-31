@@ -1,0 +1,179 @@
+{
+  "node_id": "UNI.EMOTIONAL.EQ.SOCIAL",
+  "lesson": {
+    "standard_code": "UNI.EMOTIONAL.EQ.SOCIAL",
+    "title": "Social Awareness",
+    "grade_level": "Universal",
+    "bloom_level": "Understand",
+    "explanation": "Social awareness is the ability to understand others' perspectives, empathise with their experiences, and recognise social and cultural dynamics. It includes empathy (feeling with someone), perspective-taking (seeing through their eyes), and cultural awareness (understanding how identity shapes experience). In South Africa's diverse society \u2014 with 11 official languages and deep historical inequalities \u2014 social awareness is essential for building bridges across difference. Ubuntu philosophy ('I am because we are') embodies social awareness as a cultural value: individual well-being is inseparable from community well-being.",
+    "examples": [
+      {
+        "problem": "A classmate who is usually outgoing becomes quiet and withdrawn. How would you demonstrate social awareness?",
+        "steps": [
+          {
+            "instruction": "Step 1: Notice the change in behaviour \u2014 something is different from their baseline.",
+            "result": "observation"
+          },
+          {
+            "instruction": "Step 2: Approach gently: 'I noticed you seem quiet today. Is everything okay?' without pressure.",
+            "result": "empathic inquiry"
+          },
+          {
+            "instruction": "Step 3: Listen without trying to fix the problem. Sometimes being heard is what someone needs.",
+            "result": "empathic listening"
+          }
+        ],
+        "answer": "Answer: Social awareness means noticing others' emotional states and responding with care, not assumptions.",
+        "visual_description": null
+      },
+      {
+        "problem": "How does perspective-taking help resolve conflict between two cultural groups?",
+        "steps": [
+          {
+            "instruction": "Step 1: Each group has a narrative shaped by their history and experiences.",
+            "result": "recognise narratives"
+          },
+          {
+            "instruction": "Step 2: Perspective-taking means genuinely trying to understand the other group's story without agreeing or disagreeing.",
+            "result": "understand without judging"
+          },
+          {
+            "instruction": "Step 3: When both groups feel heard, they can find common ground that neither saw from their own perspective alone.",
+            "result": "common ground"
+          }
+        ],
+        "answer": "Answer: Perspective-taking does not mean abandoning your own view \u2014 it means expanding your understanding to include others' views.",
+        "visual_description": null
+      },
+      {
+        "problem": "A new learner joins your school from a rural area. They speak isiZulu at home and struggle with English instruction. How can social awareness guide your response?",
+        "steps": [
+          {
+            "instruction": "Step 1: Recognise that language barrier does not equal lack of intelligence.",
+            "result": "avoid assumptions"
+          },
+          {
+            "instruction": "Step 2: Understand the systemic context: rural schools often have fewer resources and different curricula.",
+            "result": "contextual awareness"
+          },
+          {
+            "instruction": "Step 3: Offer practical support: share notes, explain concepts in simpler English, or connect them with other isiZulu speakers.",
+            "result": "supportive action"
+          }
+        ],
+        "answer": "Answer: Social awareness combines empathy with understanding of structural context to guide meaningful support.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define empathy and distinguish it from sympathy.",
+        "answer": "Empathy is feeling with someone \u2014 understanding their emotions from their perspective. Sympathy is feeling for someone \u2014 acknowledging their pain from your own perspective. Empathy says 'I can see why you feel that way.' Sympathy says 'I feel sorry for you.' Empathy connects; sympathy can create distance.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about the difference between 'I understand your pain' and 'That is sad for you'."
+        ],
+        "explanation": "Brene Brown describes the difference as: empathy is climbing down into someone's experience; sympathy is looking down from above. Empathy requires vulnerability; sympathy maintains distance.",
+        "distractors": []
+      },
+      {
+        "question": "Explain what 'ubuntu' means and how it relates to social awareness.",
+        "answer": "Ubuntu (often translated as 'I am because we are') is a Southern African philosophy that emphasises interconnectedness, communal responsibility, and shared humanity. It relates to social awareness because it frames individual well-being as inseparable from community well-being. Social awareness in ubuntu means constantly considering how your actions affect others and recognising your obligations to the collective.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think beyond the individual \u2014 how does ubuntu expand your circle of concern?"
+        ],
+        "explanation": "Ubuntu is not just an abstract philosophy \u2014 it operates in daily life through practices like communal meals, collective decision-making, and mutual aid during hardship.",
+        "distractors": []
+      },
+      {
+        "question": "You witness a learner being mocked for wearing second-hand school shoes. Describe what social awareness would lead you to notice, feel, and do.",
+        "answer": "Notice: the power dynamics at play \u2014 the mockers have social capital; the target is vulnerable. Feel: empathy for the humiliation and recognition that poverty is not a choice. Do: intervene to stop the mocking (if safe), privately check on the target, and consider raising the issue of bullying around poverty with a teacher or the school governing body. Social awareness also means recognising that many learners may feel similar shame silently.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "What emotions might the target be feeling?",
+          "What structural factors contribute to this situation?"
+        ],
+        "explanation": "Poverty-related bullying is a significant issue in SA schools. Social awareness connects individual incidents to broader patterns of inequality and creates space for systemic responses.",
+        "distractors": []
+      },
+      {
+        "question": "Analyse how social media can both enhance and diminish social awareness. Give examples of each.",
+        "answer": "Enhance: exposes users to diverse perspectives (e.g., following accounts from different cultures), enables empathy through personal stories (#FeesMustFall testimonies), mobilises collective action. Diminish: creates echo chambers that reinforce existing views, reduces empathy through anonymity and distance, promotes performative empathy (virtue signalling without action), and can spread stereotypes and misinformation that reduce genuine understanding.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about both the connecting and isolating effects of social media.",
+          "Consider when online empathy translates to real-world action and when it does not."
+        ],
+        "explanation": "Social media is a tool \u2014 its effect on social awareness depends on how it is used. Deliberate exposure to diverse perspectives enhances awareness; passive scrolling in echo chambers diminishes it.",
+        "distractors": []
+      },
+      {
+        "question": "Design an activity for a diverse classroom that builds perspective-taking skills across cultural, economic, or linguistic differences.",
+        "answer": "Answers will vary. Strong responses: an activity where learners share stories from their own cultural perspective on a common theme (e.g., 'what success means in my family'), with structured listening rules (no interrupting, no debating, only asking clarifying questions). Include reflection where each learner writes what they learned about someone else's perspective that surprised them. The activity must be safe (voluntary sharing, no forced vulnerability) and facilitated to prevent judgment.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Safety is crucial \u2014 sharing across difference requires trust.",
+          "Focus on listening and understanding, not debating."
+        ],
+        "explanation": "The most effective perspective-taking activities involve personal narrative sharing with structured listening protocols. They work because stories engage empathy more than facts do.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "The ability to understand and share the feelings of another person from their perspective",
+      "The cognitive skill of imagining a situation from another person's point of view",
+      "A Southern African philosophy meaning 'I am because we are' \u2014 emphasising interconnectedness and communal responsibility"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "empathy",
+        "definition": "The ability to understand and share the feelings of another person from their perspective",
+        "example_usage": "Empathy means trying to see the world through your friend's eyes, not just your own."
+      },
+      {
+        "term": "perspective-taking",
+        "definition": "The cognitive skill of imagining a situation from another person's point of view",
+        "example_usage": "Perspective-taking helped the mediator understand both sides of the dispute."
+      },
+      {
+        "term": "ubuntu",
+        "definition": "A Southern African philosophy meaning 'I am because we are' \u2014 emphasising interconnectedness and communal responsibility",
+        "example_usage": "Ubuntu teaches that a person exists through their relationships with others."
+      },
+      {
+        "term": "cultural awareness",
+        "definition": "Understanding how culture shapes people's values, beliefs, communication styles, and behaviours",
+        "example_usage": "Cultural awareness helped her understand why her colleague avoided direct eye contact as a sign of respect."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often confuse empathy with agreement \u2014 thinking that understanding someone's perspective means you must agree with them.",
+        "correction": "Empathy means understanding how someone feels and why, not necessarily agreeing with their conclusions or actions. You can empathise with a person's frustration (understanding their emotional experience) while disagreeing with their proposed solution. Empathy is about connection, not endorsement.",
+        "why_students_think_this": "In debates and arguments, 'understanding' is often treated as 'agreeing.' Students may fear that showing empathy for an opposing view weakens their own position."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.88,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.88,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

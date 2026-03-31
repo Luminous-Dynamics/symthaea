@@ -1,0 +1,123 @@
+{
+  "node_id": "UNI.CIVIC.CIV.ENGAGE",
+  "lesson": {
+    "standard_code": "UNI.CIVIC.CIV.ENGAGE",
+    "title": "Civic Engagement",
+    "grade_level": "Universal",
+    "bloom_level": "Apply",
+    "explanation": "Civic engagement means actively participating in the life of your community and country beyond just voting. It includes attending community meetings, joining civic organisations, volunteering, contacting elected officials, participating in public comment periods, peaceful protest, and community organising. In South Africa, the Promotion of Access to Information Act (PAIA) gives citizens the right to request information from government. Public participation is a constitutional requirement for law-making. Active citizens hold government accountable and drive positive change from the ground up.",
+    "examples": [
+      {
+        "problem": "Your community's water supply has been unreliable for months. Describe three civic actions you could take.",
+        "steps": [
+          {"instruction": "Step 1: Attend your ward councillor's community meeting and raise the issue formally.", "result": "direct engagement"},
+          {"instruction": "Step 2: Organise a petition signed by affected residents and submit it to the municipality.", "result": "collective action"},
+          {"instruction": "Step 3: Use PAIA to request information about the municipality's water infrastructure budget and maintenance schedule.", "result": "information request"}
+        ],
+        "answer": "Answer: Engage your ward councillor, organise a community petition, and use PAIA to demand transparency about water infrastructure spending.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the difference between activism and community organising.",
+        "steps": [
+          {"instruction": "Step 1: Activism typically focuses on raising awareness about an issue through public actions (protests, campaigns, social media).", "result": "activism defined"},
+          {"instruction": "Step 2: Community organising builds sustained local power by connecting people, developing leaders, and creating structures for ongoing collective action.", "result": "organising defined"},
+          {"instruction": "Step 3: Both are valuable — activism creates visibility while organising creates lasting change infrastructure.", "result": "relationship"}
+        ],
+        "answer": "Answer: Activism raises awareness and pressure; community organising builds sustained local power structures for ongoing change.",
+        "visual_description": null
+      },
+      {
+        "problem": "Parliament publishes a draft bill for public comment. How can an ordinary citizen participate?",
+        "steps": [
+          {"instruction": "Step 1: Read the draft bill (published in the Government Gazette and on Parliament's website).", "result": "access the document"},
+          {"instruction": "Step 2: Write a submission addressing specific clauses, explaining concerns or suggestions with reasoning.", "result": "write submission"},
+          {"instruction": "Step 3: Submit before the deadline via email, post, or by attending public hearings.", "result": "submit"}
+        ],
+        "answer": "Answer: Citizens can read the bill, write substantive comments, and submit them before the deadline or attend public hearings in person.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name three ways an ordinary citizen can participate in their community beyond voting.",
+        "answer": "Attending community meetings, volunteering for local organisations, submitting public comments on proposed laws, joining a community policing forum, organising neighbourhood clean-ups, contacting ward councillors about issues.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about actions you can take between elections.", "Consider both individual and group activities."],
+        "explanation": "Democracy is not just about elections. Active participation between elections is what keeps government responsive and accountable to the people it serves.",
+        "distractors": ["Civic engagement only means voting", "Only politicians can participate in governance"]
+      },
+      {
+        "question": "What is PAIA and how can citizens use it?",
+        "answer": "The Promotion of Access to Information Act (PAIA) gives everyone the right to request records or information held by the state or private bodies. Citizens can use it to demand transparency — for example, requesting budget documents, tender records, or environmental impact assessments.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about Section 32 of the Constitution — the right of access to information.", "PAIA is the law that makes this right practical."],
+        "explanation": "PAIA was enacted to give effect to the constitutional right of access to information. It requires government bodies to respond to information requests within 30 days and provides appeal mechanisms if requests are refused.",
+        "distractors": ["PAIA only applies to journalists", "Government can refuse any information request without reason"]
+      },
+      {
+        "question": "Your school wants to build a parking lot on a community green space. Design a civic engagement strategy to address this.",
+        "answer": "Strategy should include: (1) research — verify ownership and zoning of the land; (2) organise — gather affected community members and document their concerns; (3) engage formally — attend school governing body meetings, submit written objections; (4) escalate if needed — petition the municipal planning department, contact local media, explore legal options; (5) propose alternatives — suggest alternative parking locations.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["Start with facts before emotions.", "Use official channels first, then escalate."],
+        "explanation": "Effective civic engagement combines research, coalition-building, and strategic use of formal processes. Starting with official channels shows good faith and is often more effective than jumping to protest.",
+        "distractors": ["Just protest immediately", "Accept the decision because the school has authority"]
+      },
+      {
+        "question": "Compare the effectiveness of online activism (e.g., social media campaigns) versus in-person community organising. What are the strengths and limitations of each?",
+        "answer": "Online activism: strengths include rapid spread, low cost, global reach, and ability to raise awareness quickly. Limitations include slacktivism (engagement without action), echo chambers, misinformation, and difficulty sustaining momentum. In-person organising: strengths include building real relationships, sustained commitment, local accountability, and tangible outcomes. Limitations include slower growth, geographic constraints, and higher resource requirements. The most effective strategies combine both.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Consider the #FeesMustFall movement which used both online and in-person strategies.", "Think about what each approach achieves that the other cannot."],
+        "explanation": "The #FeesMustFall movement (2015-2016) in South Africa demonstrated how social media could amplify campus protests into a national conversation, leading to concrete policy changes. But the sustained organising on campuses was what created real pressure.",
+        "distractors": ["Online activism is always superficial", "In-person organising is outdated"]
+      },
+      {
+        "question": "Design a civic engagement programme for young people in your community. Include at least four activities and explain how each builds civic capacity.",
+        "answer": "Answers will vary. Strong responses include: (1) mock council meetings to practise democratic process and public speaking; (2) a PAIA project where students request and analyse government information; (3) a community audit identifying local needs and mapping resources; (4) mentorship with local councillors or civil society leaders; (5) a community service project addressing an identified need; (6) media literacy workshops to critically evaluate news and political messaging.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": ["Think about what skills young people need to become effective civic participants.", "Consider activities that build both knowledge and practical experience."],
+        "explanation": "Effective civic education combines knowledge, skills, and practical experience. Young people learn democracy best by practising it — not just studying it in a textbook.",
+        "distractors": []
+      }
+    ],
+    "hints": [
+      "Civic engagement goes far beyond voting — it includes any action to improve your community.",
+      "PAIA gives you the legal right to request government information.",
+      "Effective engagement usually combines multiple strategies: formal channels, collective action, and public pressure."
+    ],
+    "key_vocabulary": [
+      {"term": "civic engagement", "definition": "Active participation in the political and community life of a society", "example_usage": "Attending a ward meeting is a form of civic engagement."},
+      {"term": "public comment", "definition": "The process by which citizens can submit feedback on proposed laws or policies", "example_usage": "Parliament invited public comment on the draft education amendment bill."},
+      {"term": "community organising", "definition": "Building collective power at the local level through sustained relationship-building and shared action", "example_usage": "The neighbourhood formed a community organising committee to address crime."},
+      {"term": "petition", "definition": "A formal written request signed by many people, addressed to an authority", "example_usage": "The community submitted a petition with 500 signatures demanding road repairs."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Many people think civic engagement is only for political activists or experts.",
+        "correction": "Every citizen can engage civically — attending a school governing body meeting, reporting a pothole, volunteering at a soup kitchen, or writing to your councillor are all forms of civic engagement. You do not need special qualifications or political affiliation.",
+        "why_students_think_this": "Media coverage tends to focus on dramatic protests and prominent activists, making everyday civic participation seem less significant or relevant."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.87,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.87,
+      "needs_human_review": false
+    }
+  },
+  "assessment": null,
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.87,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}
