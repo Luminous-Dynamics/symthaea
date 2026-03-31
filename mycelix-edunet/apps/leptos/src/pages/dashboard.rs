@@ -262,8 +262,9 @@ pub fn DashboardPage() -> impl IntoView {
             // Achievement milestones
             <crate::achievements::AchievementBadges />
 
-            // Share progress
+            // Share + Export/Import progress
             <ShareProgress />
+            <ProgressPortability />
 
             // Mastery heat map
             <MasteryHeatMap />
@@ -1198,6 +1199,63 @@ fn ShareProgress() -> impl IntoView {
                 {move || if copied.get() { "\u{2714} Copied!" } else { "\u{1F4CB} Share My Progress" }}
             </button>
         </div>
+    }
+}
+
+#[component]
+fn ProgressPortability() -> impl IntoView {
+    let (import_status, set_import_status) = signal::<Option<String>>(None);
+
+    view! {
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap">
+            <button
+                style="flex: 1; min-width: 120px; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; font-family: inherit"
+                on:click=move |_| {
+                    let json = crate::persistence::export_all();
+                    crate::persistence::trigger_download("edunet-progress.json", &json);
+                }
+            >"\u{1F4E5} Export Progress"</button>
+
+            <label style="flex: 1; min-width: 120px; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; font-family: inherit; text-align: center">
+                "\u{1F4E4} Import Progress"
+                <input
+                    type="file"
+                    accept=".json"
+                    style="display: none"
+                    on:change=move |ev| {
+                        use wasm_bindgen::JsCast;
+                        let target = ev.target().unwrap();
+                        let input: web_sys::HtmlInputElement = target.unchecked_into();
+                        if let Some(files) = input.files() {
+                            if let Some(file) = files.get(0) {
+                                let reader = web_sys::FileReader::new().unwrap();
+                                let reader_clone = reader.clone();
+                                let onload = wasm_bindgen::closure::Closure::wrap(Box::new(move |_: web_sys::Event| {
+                                    if let Ok(result) = reader_clone.result() {
+                                        if let Some(text) = result.as_string() {
+                                            match crate::persistence::import_all(&text) {
+                                                Ok(summary) => {
+                                                    set_import_status.set(Some(format!("Imported: {}", summary)));
+                                                    if let Some(w) = web_sys::window() { let _ = w.location().reload(); }
+                                                }
+                                                Err(e) => set_import_status.set(Some(format!("Error: {}", e))),
+                                            }
+                                        }
+                                    }
+                                }) as Box<dyn FnMut(_)>);
+                                reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                                onload.forget();
+                                let _ = reader.read_as_text(&file);
+                            }
+                        }
+                    }
+                />
+            </label>
+        </div>
+        {move || import_status.get().map(|msg| {
+            let color = if msg.starts_with("Error") { "var(--error)" } else { "var(--mastery-green)" };
+            view! { <div style=format!("font-size: 0.75rem; color: {}; margin-bottom: 0.5rem; text-align: center", color)>{msg}</div> }
+        })}
     }
 }
 
