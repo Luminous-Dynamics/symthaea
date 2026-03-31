@@ -56,7 +56,7 @@ pub fn setup_globe_view(
     commands.spawn((
         AmbientLight {
             color: Color::linear_rgb(0.15, 0.18, 0.25),
-            brightness: 50.0,
+            brightness: 300.0,
             ..default()
         },
         AtlasEntity,
@@ -129,7 +129,7 @@ pub fn setup_globe_view(
         if brightness < 0.45 {
             continue;
         }
-        let size = 0.1 + brightness * 0.3;
+        let size = 0.15 + brightness * 0.5;
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(
                 chunk[3] * brightness * 1.5,
@@ -207,7 +207,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.025)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.040)),
             DataMarker { layer: Layer::TerraLumina, name: site.name.clone() },
             TimelineLayer::Renewable,
             AtlasEntity,
@@ -227,7 +227,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.018)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.030)),
             DataMarker { layer: Layer::ResontiaVaults, name: vault.name.clone() },
             TimelineLayer::Vault(i),
             AtlasEntity,
@@ -313,7 +313,7 @@ pub fn setup_globe_view(
     for stress in &stress_data {
         let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.02);
         let c = terra_atlas_core::energy_trading::stress_color(stress.allostatic_load);
-        let size = 0.015 + stress.allostatic_load * 0.025;
+        let size = 0.025 + stress.allostatic_load * 0.035;
         // Solid marker for the stress point
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(c[0], c[1], c[2]),
@@ -329,8 +329,8 @@ pub fn setup_globe_view(
         ));
         // Translucent stress halo — larger when under more stress
         if stress.allostatic_load > 0.3 {
-            let halo_size = 0.03 + stress.allostatic_load * 0.06;
-            let alpha = stress.allostatic_load * 0.15;
+            let halo_size = 0.05 + stress.allostatic_load * 0.10;
+            let alpha = stress.allostatic_load * 0.20;
             let halo_mat = materials.add(StandardMaterial {
                 base_color: Color::linear_rgba(c[0], c[1] * 0.3, c[2] * 0.2, alpha),
                 alpha_mode: AlphaMode::Blend,
@@ -369,7 +369,7 @@ pub fn draw_arcs_system(
         .map(|s| (s.lat, s.lon, s.capacity_mw))
         .collect();
     let trades = terra_atlas_core::energy_trading::simulate_trades(&trade_sites, t as f64);
-    let trade_color = Color::linear_rgba(0.0, 1.0, 0.5, 0.5); // bright green
+    let trade_color = Color::linear_rgba(0.2, 1.0, 0.3, 0.8); // bright green, more opaque
     for trade in &trades {
         let from = geo::lat_lon_to_xyz(trade.seller_lat, trade.seller_lon, 1.0);
         let to = geo::lat_lon_to_xyz(trade.buyer_lat, trade.buyer_lon, 1.0);
@@ -388,7 +388,7 @@ pub fn draw_arcs_system(
     }
 
     // Maglev corridors — amber arcs
-    let maglev_color = Color::linear_rgba(0.984, 0.749, 0.141, 0.7);
+    let maglev_color = Color::linear_rgba(1.0, 0.8, 0.1, 0.9); // bright amber
     for corridor in &atlas_data.data.maglev_corridors {
         let from = geo::lat_lon_to_xyz(corridor.from_lat, corridor.from_lon, 1.0);
         let to = geo::lat_lon_to_xyz(corridor.to_lat, corridor.to_lon, 1.0);
@@ -406,7 +406,7 @@ pub fn draw_arcs_system(
     }
 
     // Supply routes — cyan arcs, dimmer
-    let supply_color = Color::linear_rgba(0.0, 0.87, 1.0, 0.3);
+    let supply_color = Color::linear_rgba(0.0, 0.7, 1.0, 0.6); // cyan, more visible
     for route in &atlas_data.data.supply_routes {
         let from = geo::lat_lon_to_xyz(route.from_lat, route.from_lon, 1.0);
         let to = geo::lat_lon_to_xyz(route.to_lat, route.to_lon, 1.0);

@@ -35,8 +35,8 @@ pub fn xyz_to_lat_lon(pos: [f32; 3], _radius: f64) -> (f64, f64) {
 
 /// Marker size from capacity (MW). Logarithmic scaling, clamped.
 pub fn marker_size_from_capacity(capacity_mw: f64) -> f32 {
-    let size = (capacity_mw + 1.0).ln() as f32 * 0.003;
-    size.clamp(0.012, 0.035)
+    let size = (capacity_mw + 1.0).ln() as f32 * 0.004;
+    size.clamp(0.018, 0.045)
 }
 
 /// Peak height for great-circle arc elevation above the globe surface.
@@ -66,8 +66,8 @@ pub fn emission_halo_radius(annual_production_mboe: f64, fuel_type: &crate::type
 
 /// Marker size from proven reserves (million barrels oil equivalent). Logarithmic, clamped.
 pub fn marker_size_from_reserves(reserves_mboe: f64) -> f32 {
-    let size = (reserves_mboe + 1.0).ln() as f32 * 0.002;
-    size.clamp(0.010, 0.030)
+    let size = (reserves_mboe + 1.0).ln() as f32 * 0.004;
+    size.clamp(0.018, 0.050)
 }
 
 /// Emissive multiplier based on fossil deposit status (transition narrative).
@@ -123,8 +123,8 @@ mod tests {
 
     #[test]
     fn test_marker_size_bounds() {
-        assert_eq!(marker_size_from_capacity(0.0), 0.012); // below min clamp
-        assert_eq!(marker_size_from_capacity(1e6), 0.035); // above max clamp
+        assert_eq!(marker_size_from_capacity(0.0), 0.018); // below min clamp
+        assert_eq!(marker_size_from_capacity(1e6), 0.045); // above max clamp
     }
 
     #[test]
@@ -146,8 +146,8 @@ mod tests {
 
     #[test]
     fn test_marker_size_from_reserves_bounds() {
-        assert_eq!(marker_size_from_reserves(0.0), 0.010);
-        assert_eq!(marker_size_from_reserves(1e9), 0.030);
+        assert_eq!(marker_size_from_reserves(0.0), 0.018);
+        assert_eq!(marker_size_from_reserves(1e9), 0.050);
         let mid = marker_size_from_reserves(1000.0);
         assert!(mid > 0.010 && mid < 0.030);
     }
