@@ -12,7 +12,16 @@ use terra_atlas_bevy::globe::{Atmosphere, Globe};
 use terra_atlas_bevy::markers::DataMarker;
 use terra_atlas_bevy::timeline::{TimelineLayer, TimelineState};
 use terra_atlas_core::geo;
+use terra_atlas_core::lod::LodLevel;
 use terra_atlas_core::types::Layer;
+
+/// Tag for markers that are only visible at Surface LOD (close zoom).
+#[derive(Component)]
+pub struct SurfaceLod;
+
+/// Tag for heat blob markers visible at Orbit LOD (far zoom).
+#[derive(Component)]
+pub struct OrbitLod;
 
 use crate::resources::GamePhase;
 
@@ -85,8 +94,8 @@ pub fn setup_globe_view(
     ));
 
     // [2] Sacred geometry wireframe grid — the hologram's skeleton
-    // Inner sphere at 0.995 radius, visible through translucent Earth
-    let grid_mesh = meshes.add(Sphere::new(0.995).mesh().uv(24, 24)); // low-poly = visible edges
+    // Inner sphere at 0.97 radius — far enough inside to avoid z-fighting
+    let grid_mesh = meshes.add(Sphere::new(0.97).mesh().uv(24, 24)); // low-poly = visible edges
     let grid_material = materials.add(StandardMaterial {
         base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.12), // Mycelix cyan, very faint
         emissive: LinearRgba::new(0.0, 0.4, 0.5, 1.0),
@@ -243,10 +252,42 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Energy, name: site.name.clone() },
+            SurfaceLod, // only visible when zoomed in
             TimelineLayer::Renewable,
             AtlasEntity,
         ));
         marker_count += 1;
+    }
+
+    // Energy site heat blobs (visible when zoomed out)
+    {
+        let energy_markers: Vec<(f64, f64, f64, [f32; 3])> = data.sites.iter()
+            .map(|s| {
+                let c = s.energy_type.rgb();
+                (s.lat, s.lon, s.capacity_mw, [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6])
+            })
+            .collect();
+        let clusters = terra_atlas_core::lod::cluster_markers(&energy_markers, 8, 16);
+        let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
+        for cell in &clusters {
+            let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.01);
+            let size = terra_atlas_core::lod::heat_blob_size(cell.count);
+            let c = cell.avg_color;
+            let mat = materials.add(StandardMaterial {
+                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.6),
+                emissive: LinearRgba::new(c[0] * 0.4, c[1] * 0.4, c[2] * 0.4, 1.0),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            });
+            commands.spawn((
+                Mesh3d(blob_mesh.clone()),
+                MeshMaterial3d(mat),
+                Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+                OrbitLod, // only visible when zoomed out
+                AtlasEntity,
+            ));
+        }
     }
 
     // Geothermal nodes — red
@@ -608,6 +649,27 @@ pub fn timeline_visibility_system(
         } else {
             Visibility::Visible
         };
+    }
+}
+
+/// LOD visibility — toggle markers based on camera zoom distance.
+pub fn lod_visibility_system(
+    camera: Query<&Transform, With<OrbitalCamera>>,
+    mut surface_markers: Query<&mut Visibility, (With<SurfaceLod>, Without<OrbitLod>)>,
+    mut orbit_blobs: Query<&mut Visibility, (With<OrbitLod>, Without<SurfaceLod>)>,
+) {
+    let Ok(cam_tf) = camera.single() else { return };
+    let distance = cam_tf.translation.length();
+    let lod = LodLevel::from_camera_distance(distance);
+
+    let show_surface = matches!(lod, LodLevel::Surface | LodLevel::Atmosphere);
+    let show_orbit = matches!(lod, LodLevel::Orbit);
+
+    for mut vis in surface_markers.iter_mut() {
+        *vis = if show_surface { Visibility::Visible } else { Visibility::Hidden };
+    }
+    for mut vis in orbit_blobs.iter_mut() {
+        *vis = if show_orbit { Visibility::Visible } else { Visibility::Hidden };
     }
 }
 

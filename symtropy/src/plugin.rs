@@ -122,6 +122,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::timeline_visibility_system,
                     systems::atlas::celestial_orbit_system,
                     systems::atlas::holographic_pulse_system,
+                    systems::atlas::lod_visibility_system,
                     terra_atlas_bevy::selection::click_select_system,
                     terra_atlas_bevy::selection::update_selection_text,
                 ).run_if(in_state(GamePhase::GlobeView)))
