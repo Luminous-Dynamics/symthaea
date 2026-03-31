@@ -158,7 +158,18 @@ impl HolochainTransport for NativeWsTransport {
             // Use cloned `this` instead of `self` to satisfy 'static lifetime
             eprintln!("[NativeWs] Connecting to {}...", config.url);
 
-            let (ws_stream, _) = tokio_tungstenite::connect_async(&config.url).await
+            // Holochain conductor requires Origin header
+            let request = tokio_tungstenite::tungstenite::http::Request::builder()
+                .uri(&config.url)
+                .header("Host", "localhost")
+                .header("Origin", "http://localhost")
+                .header("Connection", "Upgrade")
+                .header("Upgrade", "websocket")
+                .header("Sec-WebSocket-Version", "13")
+                .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
+                .body(())
+                .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
+            let (ws_stream, _) = tokio_tungstenite::connect_async(request).await
                 .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
 
             let (write, mut read) = ws_stream.split();

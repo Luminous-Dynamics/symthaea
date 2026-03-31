@@ -23,13 +23,15 @@ use mycelix_leptos_client::{
     encode, decode,
 };
 
-const CONDUCTOR_URL: &str = "ws://localhost:8888";
+fn conductor_url() -> String {
+    std::env::var("CONDUCTOR_URL").unwrap_or_else(|_| "ws://localhost:8888".to_string())
+}
 
 /// Try to connect — returns None if no conductor running (skips test).
 async fn try_connect(app_id: &str) -> Option<NativeWsTransport> {
     let transport = NativeWsTransport::new();
     let config = ConnectConfig {
-        url: CONDUCTOR_URL.to_string(),
+        url: conductor_url(),
         app_id: app_id.to_string(),
         auth_token: None,
     };
@@ -44,7 +46,7 @@ async fn try_connect(app_id: &str) -> Option<NativeWsTransport> {
             None
         }
         Err(_) => {
-            eprintln!("Conductor timeout at {CONDUCTOR_URL} — skipping");
+            eprintln!("Conductor timeout — skipping");
             None
         }
     }
@@ -53,7 +55,7 @@ async fn try_connect(app_id: &str) -> Option<NativeWsTransport> {
 #[tokio::test]
 async fn connect_to_conductor() {
     let Some(_transport) = try_connect("mycelix-commons").await else {
-        eprintln!("SKIPPED: no conductor at {CONDUCTOR_URL}");
+        eprintln!("SKIPPED: no conductor");
         return;
     };
     eprintln!("PASSED: connected to conductor");
