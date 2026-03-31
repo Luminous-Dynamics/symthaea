@@ -5,8 +5,11 @@
 //! Downloads the 82M parameter model from HuggingFace on first use.
 //! Produces human-quality speech at 24kHz. Feature-gated: `kokoro`.
 
+// Logging stubs (avoid tracing dependency)
 #[cfg(feature = "kokoro")]
-use tracing::{info, warn};
+macro_rules! info { ($($t:tt)*) => { eprintln!("[kokoro] {}", format!($($t)*)) }; }
+#[cfg(feature = "kokoro")]
+macro_rules! warn { ($($t:tt)*) => { eprintln!("[kokoro WARN] {}", format!($($t)*)) }; }
 
 /// Kokoro engine configuration.
 #[derive(Debug, Clone)]
