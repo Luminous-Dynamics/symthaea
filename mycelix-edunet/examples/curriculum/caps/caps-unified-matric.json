@@ -7,7 +7,7 @@
     "subject_area": "Multi-Subject",
     "domain": "Multi-Subject",
     "version": "2024",
-    "total_standards": 2052,
+    "total_standards": 2079,
     "domains": [
       "Software Design and Engineering",
       "Energy & Change",
@@ -232,7 +232,7 @@
     ],
     "created_at": "2026-03-30",
     "notes": "Merged 116 curriculum documents with 0 bridge edges. 2002 unique nodes, 1848 edges.",
-    "total_edges": 1908
+    "total_edges": 1916
   },
   "nodes": [
     {
@@ -60976,12 +60976,29 @@
       "difficulty": "Intermediate",
       "domain": "English Language Arts",
       "subdomain": "Writing",
-      "tags": ["essay", "argumentative", "discursive", "narrative", "descriptive", "writing", "english"],
+      "tags": [
+        "essay",
+        "argumentative",
+        "discursive",
+        "narrative",
+        "descriptive",
+        "writing",
+        "english"
+      ],
       "estimated_hours": 12,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Create",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.ESSAY", "description": "Essay Writing", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.ESSAY",
+          "description": "Essay Writing",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.COMPREHENSION",
@@ -60991,12 +61008,29 @@
       "difficulty": "Intermediate",
       "domain": "English Language Arts",
       "subdomain": "Reading",
-      "tags": ["comprehension", "inference", "tone", "bias", "summary", "critical-analysis", "english"],
+      "tags": [
+        "comprehension",
+        "inference",
+        "tone",
+        "bias",
+        "summary",
+        "critical-analysis",
+        "english"
+      ],
       "estimated_hours": 10,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Analyze",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.COMPREHENSION", "description": "Reading Comprehension", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.COMPREHENSION",
+          "description": "Reading Comprehension",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.LANGUAGE",
@@ -61006,12 +61040,28 @@
       "difficulty": "Intermediate",
       "domain": "English Language Arts",
       "subdomain": "Grammar",
-      "tags": ["grammar", "parts-of-speech", "active-passive", "direct-indirect", "concord", "english"],
+      "tags": [
+        "grammar",
+        "parts-of-speech",
+        "active-passive",
+        "direct-indirect",
+        "concord",
+        "english"
+      ],
       "estimated_hours": 10,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Apply",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.LANGUAGE", "description": "Language Structures and Conventions", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.LANGUAGE",
+          "description": "Language Structures and Conventions",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.LITERATURE",
@@ -61021,12 +61071,30 @@
       "difficulty": "Advanced",
       "domain": "English Language Arts",
       "subdomain": "Literature",
-      "tags": ["literature", "novel", "poetry", "drama", "theme", "character", "figurative-language", "english"],
+      "tags": [
+        "literature",
+        "novel",
+        "poetry",
+        "drama",
+        "theme",
+        "character",
+        "figurative-language",
+        "english"
+      ],
       "estimated_hours": 15,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Evaluate",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.LITERATURE", "description": "Literature Study", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.LITERATURE",
+          "description": "Literature Study",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.VISUAL",
@@ -61036,12 +61104,28 @@
       "difficulty": "Intermediate",
       "domain": "English Language Arts",
       "subdomain": "Visual Literacy",
-      "tags": ["visual-literacy", "advertisements", "cartoons", "graphs", "infographics", "english"],
+      "tags": [
+        "visual-literacy",
+        "advertisements",
+        "cartoons",
+        "graphs",
+        "infographics",
+        "english"
+      ],
       "estimated_hours": 6,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Analyze",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.VISUAL", "description": "Visual Literacy", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.VISUAL",
+          "description": "Visual Literacy",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.TRANSACTIONAL",
@@ -61051,12 +61135,29 @@
       "difficulty": "Intermediate",
       "domain": "English Language Arts",
       "subdomain": "Writing",
-      "tags": ["transactional", "letters", "reports", "reviews", "speeches", "cv", "english"],
+      "tags": [
+        "transactional",
+        "letters",
+        "reports",
+        "reviews",
+        "speeches",
+        "cv",
+        "english"
+      ],
       "estimated_hours": 10,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Create",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.TRANSACTIONAL", "description": "Transactional Writing", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.TRANSACTIONAL",
+          "description": "Transactional Writing",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.POETRY",
@@ -61066,12 +61167,30 @@
       "difficulty": "Advanced",
       "domain": "English Language Arts",
       "subdomain": "Literature",
-      "tags": ["poetry", "imagery", "metaphor", "simile", "personification", "alliteration", "rhyme", "english"],
+      "tags": [
+        "poetry",
+        "imagery",
+        "metaphor",
+        "simile",
+        "personification",
+        "alliteration",
+        "rhyme",
+        "english"
+      ],
       "estimated_hours": 10,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Evaluate",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.POETRY", "description": "Poetry Analysis", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.POETRY",
+          "description": "Poetry Analysis",
+          "grade_level": "Grade12"
+        }
+      ]
     },
     {
       "id": "CAPS.English.Gr12.SUMMARY",
@@ -61081,12 +61200,386 @@
       "difficulty": "Intermediate",
       "domain": "English Language Arts",
       "subdomain": "Writing",
-      "tags": ["summary", "paraphrase", "key-points", "word-limit", "english"],
+      "tags": [
+        "summary",
+        "paraphrase",
+        "key-points",
+        "word-limit",
+        "english"
+      ],
       "estimated_hours": 6,
-      "grade_levels": ["Grade12"],
+      "grade_levels": [
+        "Grade12"
+      ],
       "bloom_level": "Analyze",
       "subject_area": "English Language Arts",
-      "academic_standards": [{"framework": "CAPS", "code": "CAPS.English.Gr12.SUMMARY", "description": "Summary Writing", "grade_level": "Grade12"}]
+      "academic_standards": [
+        {
+          "framework": "CAPS",
+          "code": "CAPS.English.Gr12.SUMMARY",
+          "description": "Summary Writing",
+          "grade_level": "Grade12"
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Accounting.Gr12.FS",
+      "title": "Financial Statements",
+      "description": "Prepare income statement, balance sheet, cash flow statement for sole traders and companies. Adjustments, depreciation, bad debts, accruals. GAAP principles.",
+      "subject_area": "Accounting",
+      "subdomain": "Financial Statements",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 25,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 60,
+        "total_paper_marks": 150,
+        "percentage": 40.0
+      },
+      "node_type": "topic",
+      "domain": "Accounting",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Accounting.Gr12.COST",
+      "title": "Cost Accounting & Manufacturing",
+      "description": "Production cost statement, break-even analysis, unit cost calculations, raw materials, labour, overheads. Cost-volume-profit analysis.",
+      "subject_area": "Accounting",
+      "subdomain": "Cost Accounting",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 20,
+      "difficulty": "Advanced",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.7
+      },
+      "node_type": "topic",
+      "domain": "Accounting",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Accounting.Gr12.AUDIT",
+      "title": "Auditing & Internal Controls",
+      "description": "Internal audit procedures, internal controls, corporate governance (King IV), ethics, fraud prevention, roles of auditors.",
+      "subject_area": "Accounting",
+      "subdomain": "Auditing",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "exam_weight": {
+        "paper": 2,
+        "marks": 50,
+        "total_paper_marks": 150,
+        "percentage": 33.3
+      },
+      "node_type": "topic",
+      "domain": "Accounting",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Accounting.Gr12.VAT",
+      "title": "VAT, Budgets & Projections",
+      "description": "VAT calculations (15%), cash budgets, projected income statements, debtors/creditors age analysis, inventory valuation (FIFO, weighted average).",
+      "subject_area": "Accounting",
+      "subdomain": "Management Accounting",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Accounting",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Business.Gr12.MACRO",
+      "title": "Business Environments",
+      "description": "Micro, market, macro environments. SWOT analysis, PESTLE analysis, Porter's Five Forces. Impact of legislation on business (BBBEE, LRA, CPA).",
+      "subject_area": "Business Studies",
+      "subdomain": "Environments",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 40,
+        "total_paper_marks": 150,
+        "percentage": 26.7
+      },
+      "node_type": "topic",
+      "domain": "Business Studies",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Business.Gr12.VENTURE",
+      "title": "Business Ventures & Entrepreneurship",
+      "description": "Starting a business, business plan components, forms of ownership (sole trader, partnership, CC, Pty Ltd), franchising, insurance.",
+      "subject_area": "Business Studies",
+      "subdomain": "Ventures",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Business Studies",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Business.Gr12.MANAGE",
+      "title": "Management & Leadership",
+      "description": "Management functions (planning, organising, leading, controlling), leadership styles, conflict management, team dynamics, quality management (TQM).",
+      "subject_area": "Business Studies",
+      "subdomain": "Management",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Business Studies",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Business.Gr12.HR",
+      "title": "Human Resources & Labour Relations",
+      "description": "Recruitment, selection, placement, induction, training, performance management. Labour relations: CCMA, strikes, lockouts, trade unions.",
+      "subject_area": "Business Studies",
+      "subdomain": "HR",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Business Studies",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Geography.Gr12.CLIMATE",
+      "title": "Climate & Weather of SA",
+      "description": "Factors influencing SA climate: latitude, altitude, ocean currents (warm Agulhas, cold Benguela), pressure systems. Reading synoptic weather maps.",
+      "subject_area": "Geography",
+      "subdomain": "Climatology",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 50,
+        "total_paper_marks": 150,
+        "percentage": 33.3
+      },
+      "node_type": "topic",
+      "domain": "Geography",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Geography.Gr12.GEOMORPH",
+      "title": "Geomorphology",
+      "description": "Drainage basins, river profiles, fluvial processes (erosion, deposition), landforms (oxbow lakes, deltas, floodplains). Catchment management in SA.",
+      "subject_area": "Geography",
+      "subdomain": "Geomorphology",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Geography",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Geography.Gr12.SETTLE",
+      "title": "Settlement & Development",
+      "description": "Urban settlement patterns, urbanisation in SA, rural-urban migration, informal settlements, service delivery, sustainable development, SDGs.",
+      "subject_area": "Geography",
+      "subdomain": "Human Geography",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Geography",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Geography.Gr12.GIS",
+      "title": "Geographic Information Systems (GIS)",
+      "description": "GIS concepts, layers, spatial data, remote sensing, GPS coordinates. Map skills: scale, direction, contour lines, cross-sections.",
+      "subject_area": "Geography",
+      "subdomain": "GIS",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 10,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Geography",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.History.Gr12.CW",
+      "title": "The Cold War",
+      "description": "Origins, proxy wars (Korea, Vietnam, Angola), Cuban Missile Crisis, d\u00e9tente, collapse of USSR. Impact on Africa and SA.",
+      "subject_area": "History",
+      "subdomain": "Cold War",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "exam_weight": {
+        "paper": 1,
+        "marks": 50,
+        "total_paper_marks": 150,
+        "percentage": 33.3
+      },
+      "node_type": "topic",
+      "domain": "History",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.History.Gr12.CIVIL",
+      "title": "Civil Rights Movement (USA & SA)",
+      "description": "US civil rights: Brown v Board, Rosa Parks, MLK, Malcolm X, Black Panthers. SA: apartheid resistance, Sharpeville, Soweto 1976, UDF, release of Mandela.",
+      "subject_area": "History",
+      "subdomain": "Civil Rights",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "History",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.History.Gr12.APART",
+      "title": "Apartheid South Africa (1948-1994)",
+      "description": "National Party policies, Group Areas Act, Bantu Education, pass laws, resistance movements (ANC, PAC), Rivonia Trial, international sanctions, CODESA, 1994 elections.",
+      "subject_area": "History",
+      "subdomain": "SA History",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Evaluate",
+      "estimated_hours": 25,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "History",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.History.Gr12.TRC",
+      "title": "Truth & Reconciliation Commission",
+      "description": "TRC formation, amnesty process, victims' testimonies, reparations, Desmond Tutu, restorative vs retributive justice, legacy and debate.",
+      "subject_area": "History",
+      "subdomain": "Transition",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Evaluate",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "History",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Tourism.Gr12.SA",
+      "title": "Tourism in South Africa",
+      "description": "SA tourism attractions (Kruger, Table Mountain, Robben Island, Drakensberg), tourism sectors, responsible tourism, BBBEE in tourism, marketing SA.",
+      "subject_area": "Tourism",
+      "subdomain": "SA Tourism",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Tourism",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Tourism.Gr12.WORLD",
+      "title": "World Tourism & Culture",
+      "description": "UNESCO World Heritage Sites, cultural tourism, ecotourism, dark tourism, time zones, currency exchange, travel documentation, health precautions.",
+      "subject_area": "Tourism",
+      "subdomain": "World Tourism",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Tourism",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "CAPS.Tourism.Gr12.SUSTAIN",
+      "title": "Sustainable Tourism",
+      "description": "Environmental impact of tourism, carbon footprint, responsible tourism practices, community-based tourism, fair trade tourism.",
+      "subject_area": "Tourism",
+      "subdomain": "Sustainability",
+      "grade_levels": [
+        "Grade12"
+      ],
+      "bloom_level": "Analyze",
+      "estimated_hours": 10,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Tourism",
+      "tags": [],
+      "supplementary_resources": []
     }
   ],
   "edges": [
@@ -74445,6 +74938,62 @@
       "edge_type": "AppliedIn",
       "strength_permille": 800,
       "rationale": "Ecosystem ecology is the science behind sustainability \u2014 understanding biomes and nutrient cycles IS understanding climate impact."
+    },
+    {
+      "from": "CAPS.Accounting.Gr12.FS",
+      "to": "UNI.FINANCIAL.FIN.PLAN",
+      "edge_type": "AppliedIn",
+      "strength_permille": 850,
+      "rationale": "Financial statements are the language of business \u2014 the accounting you learn IS financial planning in practice."
+    },
+    {
+      "from": "CAPS.Accounting.Gr12.VAT",
+      "to": "LEGAL.TAX.PERSONAL",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "VAT calculations in accounting directly apply to tax compliance."
+    },
+    {
+      "from": "CAPS.Business.Gr12.VENTURE",
+      "to": "LEGAL.BUSINESS.REG",
+      "edge_type": "AppliedIn",
+      "strength_permille": 900,
+      "rationale": "Starting a business in Business Studies IS the CIPC registration process in Legal Awareness."
+    },
+    {
+      "from": "CAPS.Business.Gr12.HR",
+      "to": "LEGAL.EMPLOY.BCEA",
+      "edge_type": "AppliedIn",
+      "strength_permille": 850,
+      "rationale": "HR management requires understanding the BCEA and LRA \u2014 employment law IS HR practice."
+    },
+    {
+      "from": "CAPS.Geography.Gr12.CLIMATE",
+      "to": "UNI.SUSTAINABILITY.SUST.CLIMATE",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "SA climatology IS the local face of global climate science."
+    },
+    {
+      "from": "CAPS.Geography.Gr12.SETTLE",
+      "to": "UNI.CIVIC.CIV.ENGAGE",
+      "edge_type": "AppliedIn",
+      "strength_permille": 700,
+      "rationale": "Understanding urbanisation and service delivery connects directly to civic engagement."
+    },
+    {
+      "from": "CAPS.History.Gr12.APART",
+      "to": "LEGAL.RIGHTS.CONST",
+      "edge_type": "AppliedIn",
+      "strength_permille": 900,
+      "rationale": "The SA Constitution was born from apartheid's end. Understanding the history IS understanding why these rights exist."
+    },
+    {
+      "from": "CAPS.Tourism.Gr12.SUSTAIN",
+      "to": "UNI.SUSTAINABILITY.SUST.ACTION",
+      "edge_type": "AppliedIn",
+      "strength_permille": 750,
+      "rationale": "Sustainable tourism IS sustainability in action in one of SA's biggest industries."
     }
   ]
 }
