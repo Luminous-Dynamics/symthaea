@@ -77,10 +77,11 @@ pub fn setup_globe_view(
     let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(128, 128));
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let earth_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(1.0, 1.0, 1.0, 0.78), // mostly visible, slight transparency
+        // Deep dark Earth — geography as ghost data, not satellite photo
+        base_color: Color::linear_rgba(0.08, 0.12, 0.14, 0.45),
         base_color_texture: Some(earth_texture),
-        perceptual_roughness: 0.3,  // slightly glossy for holographic sheen
-        metallic: 0.1,
+        emissive: LinearRgba::new(0.01, 0.03, 0.04, 1.0), // ghost glow — coastlines barely visible
+        unlit: true,
         alpha_mode: AlphaMode::Blend,
         double_sided: true,
         ..default()
