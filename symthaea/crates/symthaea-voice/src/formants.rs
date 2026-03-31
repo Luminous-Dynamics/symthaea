@@ -24,13 +24,14 @@ pub fn phonemes_to_frames(
     for (i, phoneme) in phonemes.iter().enumerate() {
         let progress = i as f32 / total_phonemes.max(1.0);
 
-        // Dynamic phoneme timing: vowels sustain, consonants snap
+        // Dynamic phoneme timing: vowels sustain, consonants hold enough to be heard
         let base_dur = if phoneme.is_vowel {
-            phoneme.base_duration_ms * 1.3 // vowels 30% longer (sustain)
+            phoneme.base_duration_ms * 1.4 // vowels sustain
         } else if phoneme.ipa == " " {
-            phoneme.base_duration_ms // pauses unchanged
+            phoneme.base_duration_ms
         } else {
-            phoneme.base_duration_ms * 0.6 // consonants 40% shorter (snap)
+            // Consonants need at least 40ms to be audible
+            (phoneme.base_duration_ms * 0.8).max(40.0)
         };
         // Stressed syllables get more time
         let stress_stretch = 1.0 + phoneme.stress as f32 * 0.4;
@@ -52,8 +53,13 @@ pub fn phonemes_to_frames(
         let energy = if phoneme.ipa == " " {
             0.0
         } else {
-            let base_energy = 0.7 + phoneme.stress as f32 * 0.3; // louder base
-            base_energy * (1.0 - prosody.serotonin * 0.2)
+            let base_energy = if phoneme.is_vowel {
+                0.7 + phoneme.stress as f32 * 0.2
+            } else {
+                // Consonants need strong energy for noise to be heard
+                0.9
+            };
+            base_energy * (1.0 - prosody.serotonin * 0.15)
         };
 
         // Voicing (vowels and voiced consonants are voiced)
