@@ -29,6 +29,22 @@ use crate::resources::GamePhase;
 #[derive(Component)]
 pub struct AtlasEntity;
 
+/// Current aesthetic preset — cycle with number keys 1-5.
+#[derive(Resource)]
+pub struct CurrentAesthetic {
+    pub aesthetic: terra_atlas_core::aesthetics::Aesthetic,
+    pub changed: bool,
+}
+
+impl Default for CurrentAesthetic {
+    fn default() -> Self {
+        Self {
+            aesthetic: terra_atlas_core::aesthetics::Aesthetic::Holographic,
+            changed: false,
+        }
+    }
+}
+
 /// Holds loaded data for arc rendering each frame (gizmos are immediate-mode).
 #[derive(Resource)]
 pub struct AtlasData {
@@ -684,6 +700,70 @@ pub fn timeline_visibility_system(
         } else {
             Visibility::Visible
         };
+    }
+}
+
+/// Aesthetic switcher — number keys 1-5 cycle visual presets.
+pub fn aesthetic_switch_system(
+    kb: Res<ButtonInput<KeyCode>>,
+    mut current: ResMut<CurrentAesthetic>,
+) {
+    use terra_atlas_core::aesthetics::Aesthetic;
+    let new = if kb.just_pressed(KeyCode::Digit1) { Some(Aesthetic::Holographic) }
+        else if kb.just_pressed(KeyCode::Digit2) { Some(Aesthetic::Satellite) }
+        else if kb.just_pressed(KeyCode::Digit3) { Some(Aesthetic::Procedural) }
+        else if kb.just_pressed(KeyCode::Digit4) { Some(Aesthetic::Minimal) }
+        else if kb.just_pressed(KeyCode::Digit5) { Some(Aesthetic::Night) }
+        else { None };
+
+    if let Some(aesthetic) = new {
+        if aesthetic != current.aesthetic {
+            current.aesthetic = aesthetic;
+            current.changed = true;
+            info!("[atlas] Aesthetic: {} (press 1-5 to switch)", aesthetic.label());
+        }
+    }
+}
+
+/// Apply aesthetic changes to globe materials when preset changes.
+pub fn aesthetic_apply_system(
+    mut current: ResMut<CurrentAesthetic>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    globe_q: Query<&MeshMaterial3d<StandardMaterial>, With<Globe>>,
+    atmo_q: Query<&MeshMaterial3d<StandardMaterial>, With<Atmosphere>>,
+) {
+    if !current.changed { return; }
+    current.changed = false;
+
+    let config = terra_atlas_core::aesthetics::config_for(current.aesthetic);
+
+    // Update globe material
+    for mat_handle in globe_q.iter() {
+        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+            let c = config.globe.base_color;
+            mat.base_color = Color::linear_rgba(c[0], c[1], c[2], c[3]);
+            let e = config.globe.emissive;
+            mat.emissive = LinearRgba::new(e[0], e[1], e[2], e[3]);
+            mat.unlit = config.globe.unlit;
+            if !config.globe.unlit {
+                mat.perceptual_roughness = config.globe.roughness;
+                mat.metallic = config.globe.metalness;
+            }
+            if config.globe.alpha_blend {
+                mat.alpha_mode = AlphaMode::Blend;
+            } else {
+                mat.alpha_mode = AlphaMode::Opaque;
+            }
+        }
+    }
+
+    // Update atmosphere/fresnel materials
+    for mat_handle in atmo_q.iter() {
+        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+            let f = &config.fresnel;
+            mat.base_color = Color::linear_rgba(f.color[0], f.color[1], f.color[2], f.color[3]);
+            mat.emissive = LinearRgba::new(f.emissive[0], f.emissive[1], f.emissive[2], f.emissive[3]);
+        }
     }
 }
 

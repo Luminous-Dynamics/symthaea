@@ -106,6 +106,7 @@ impl Plugin for SymtropyPlugin {
                 .init_resource::<terra_atlas_bevy::camera::OrbitalCameraConfig>()
                 .init_resource::<terra_atlas_bevy::timeline::TimelineState>()
                 .init_resource::<terra_atlas_bevy::selection::SelectedMarker>()
+                .init_resource::<systems::atlas::CurrentAesthetic>()
                 .add_systems(Update,
                     systems::atlas::atlas_toggle_system
                         .run_if(in_state(GamePhase::Playing)))
@@ -123,6 +124,8 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::celestial_orbit_system,
                     systems::atlas::holographic_pulse_system,
                     systems::atlas::lod_visibility_system,
+                    systems::atlas::aesthetic_switch_system,
+                    systems::atlas::aesthetic_apply_system,
                     terra_atlas_bevy::selection::click_select_system,
                     terra_atlas_bevy::selection::update_selection_text,
                 ).run_if(in_state(GamePhase::GlobeView)))
