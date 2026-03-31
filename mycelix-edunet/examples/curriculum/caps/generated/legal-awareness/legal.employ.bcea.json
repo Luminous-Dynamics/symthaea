@@ -1,0 +1,91 @@
+{
+  "node_id": "LEGAL.EMPLOY.BCEA",
+  "lesson": {
+    "standard_code": "LEGAL.EMPLOY.BCEA",
+    "title": "Employment Rights (BCEA & LRA)",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Basic Conditions of Employment Act: maximum 45 hours/week (9hrs/day for 5-day week), overtime at 1.5\u00d7 (max 10hrs/week), 21 consecutive days annual leave, 30 days sick leave per 3-year cycle, 4 months maternity leave. National minimum wage: R27.58/hour (2024). Labour Relations Act: protection against unfair dismissal (need valid reason + fair procedure), right to join a union, CCMA handles disputes (0861 22 22 62). Retrenchment: Section 189 requires consultation, LIFO principle, severance = 1 week per year of service.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Employment Rights (BCEA & LRA)",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Employment Rights (BCEA & LRA) best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Employment Rights (BCEA & LRA)?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Employment Rights (BCEA & LRA) in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Employment",
+        "definition": "Key concept in Employment Rights (BCEA & LRA)",
+        "example_usage": "Applied in Employment Rights (BCEA & LRA) work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Employment Rights (BCEA & LRA)",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

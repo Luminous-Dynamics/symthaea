@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.WELD.MIG",
+  "lesson": {
+    "standard_code": "TRADE.WELD.MIG",
+    "title": "MIG/MAG Welding (GMAW)",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Gas Metal Arc Welding feeds continuous wire through a gun with shielding gas. MIG uses inert gas (argon) for aluminium/stainless. MAG uses active gas (CO2 or argon-CO2 mix) for mild steel. Higher deposition rates than SMAW \u2014 ideal for production. Wire sizes: 0.8mm (thin sheet), 1.0mm (general), 1.2mm (heavy). Settings: voltage controls arc length, wire speed controls heat input. Common in SA automotive, manufacturing, and fabrication. Produces cleaner welds than SMAW with less slag.",
+    "examples": [
+      {
+        "problem": "Practical scenario in MIG/MAG Welding (GMAW)",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow MIG/MAG Welding (GMAW) best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in MIG/MAG Welding (GMAW)?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs MIG/MAG Welding (GMAW) in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "MIG/MAG",
+        "definition": "Key concept in MIG/MAG Welding (GMAW)",
+        "example_usage": "Applied in MIG/MAG Welding (GMAW) work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for MIG/MAG Welding (GMAW)",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

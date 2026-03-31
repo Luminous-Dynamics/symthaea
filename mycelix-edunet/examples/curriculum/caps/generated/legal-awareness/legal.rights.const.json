@@ -1,0 +1,91 @@
+{
+  "node_id": "LEGAL.RIGHTS.CONST",
+  "lesson": {
+    "standard_code": "LEGAL.RIGHTS.CONST",
+    "title": "Know Your Constitutional Rights",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "The SA Constitution (1996) is the supreme law. Chapter 2 Bill of Rights guarantees: Section 9 (equality), Section 10 (human dignity), Section 12 (freedom and security), Section 14 (privacy), Section 16 (freedom of expression), Section 23 (fair labour practices), Section 24 (clean environment), Section 25 (property), Section 26 (housing), Section 27 (healthcare, food, water, social security), Section 28 (children's rights), Section 29 (education). These rights apply to everyone in SA. Limitations only allowed per Section 36 (reasonable and justifiable in an open and democratic society).",
+    "examples": [
+      {
+        "problem": "Practical scenario in Know Your Constitutional Rights",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Know Your Constitutional Rights best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Know Your Constitutional Rights?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Know Your Constitutional Rights in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Know",
+        "definition": "Key concept in Know Your Constitutional Rights",
+        "example_usage": "Applied in Know Your Constitutional Rights work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Know Your Constitutional Rights",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

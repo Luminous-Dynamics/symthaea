@@ -1,0 +1,91 @@
+{
+  "node_id": "LEGAL.BUSINESS.REG",
+  "lesson": {
+    "standard_code": "LEGAL.BUSINESS.REG",
+    "title": "Starting a Business in South Africa",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Register via CIPC (Companies and Intellectual Property Commission): private company (Pty Ltd) costs R175 online. Steps: 1) Reserve company name, 2) File CoR14.1 (Memorandum of Incorporation), 3) Get registration certificate. Then: register for tax (SARS: income tax, VAT if turnover >R1M), register for UIF (Unemployment Insurance Fund), register for COIDA (workmen's compensation). Municipal business licence may be required. BEE compliance: submit B-BBEE certificate for government tenders. Open business bank account (FNB, Standard Bank, Nedbank, ABSA all offer business accounts).",
+    "examples": [
+      {
+        "problem": "Practical scenario in Starting a Business in South Africa",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Starting a Business in South Africa best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Starting a Business in South Africa?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Starting a Business in South Africa in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Starting",
+        "definition": "Key concept in Starting a Business in South Africa",
+        "example_usage": "Applied in Starting a Business in South Africa work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Starting a Business in South Africa",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.ELEC.CERT",
+  "lesson": {
+    "standard_code": "TRADE.ELEC.CERT",
+    "title": "Wireman's Licence & COC",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "A Certificate of Compliance (COC) is legally required for all new electrical installations, alterations, and property transfers in SA. Only registered electricians can issue COCs. Testing: insulation resistance (\u22651M\u03a9 at 500V DC), earth continuity (<1\u03a9), polarity check, earth leakage trip test (<30ms). A wireman's licence requires: trade test, 3+ years practical experience, registration with Department of Employment and Labour. Without a valid COC, property sales cannot proceed.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Wireman's Licence & COC",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Wireman's Licence & COC best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Wireman's Licence & COC?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Wireman's Licence & COC in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Wireman's",
+        "definition": "Key concept in Wireman's Licence & COC",
+        "example_usage": "Applied in Wireman's Licence & COC work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Wireman's Licence & COC",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

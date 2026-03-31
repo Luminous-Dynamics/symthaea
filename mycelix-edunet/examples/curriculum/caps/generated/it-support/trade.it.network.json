@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.IT.NETWORK",
+  "lesson": {
+    "standard_code": "TRADE.IT.NETWORK",
+    "title": "Basic Networking",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Networks connect devices to share resources. IP addressing: IPv4 (e.g., 192.168.1.100), subnet mask (255.255.255.0 = /24 = 254 hosts). DHCP assigns IPs automatically. DNS translates names to IPs. Wi-Fi: 2.4GHz (longer range, slower) vs 5GHz (shorter range, faster). Router setup: access via 192.168.1.1, change default password, set WPA3/WPA2 encryption. Ethernet cabling: Cat5e/Cat6, T568B crimping standard. Troubleshooting: ping gateway, check cables, ipconfig/ifconfig, traceroute. Firewall blocks unauthorized access.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Basic Networking",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Basic Networking best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Basic Networking?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Basic Networking in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Basic",
+        "definition": "Key concept in Basic Networking",
+        "example_usage": "Applied in Basic Networking work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Basic Networking",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

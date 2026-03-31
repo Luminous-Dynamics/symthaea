@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.PLUMB.DRAIN",
+  "lesson": {
+    "standard_code": "TRADE.PLUMB.DRAIN",
+    "title": "Drainage & Sanitation Systems",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Drainage removes wastewater safely. Key principles: gravity flow (minimum 1:60 gradient for 110mm pipe), trap seals (50mm water seal prevents sewer gas), ventilation (allows air into system, prevents siphonage). In SA: 40mm for basins, 50mm for baths/showers, 110mm for toilets. Septic tanks for rural properties: 3000L minimum for 4-person household. Municipal connection requires council approval. SANS 10252-2 governs installation. Grease traps mandatory for commercial kitchens.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Drainage & Sanitation Systems",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Drainage & Sanitation Systems best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Drainage & Sanitation Systems?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Drainage & Sanitation Systems in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Drainage",
+        "definition": "Key concept in Drainage & Sanitation Systems",
+        "example_usage": "Applied in Drainage & Sanitation Systems work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Drainage & Sanitation Systems",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

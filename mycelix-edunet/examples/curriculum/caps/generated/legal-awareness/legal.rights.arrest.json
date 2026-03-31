@@ -1,0 +1,91 @@
+{
+  "node_id": "LEGAL.RIGHTS.ARREST",
+  "lesson": {
+    "standard_code": "LEGAL.RIGHTS.ARREST",
+    "title": "Rights During Arrest & Detention",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Section 35 of the Constitution: you have the right to remain silent, the right to be informed of charges in a language you understand, the right to a lawyer (Legal Aid SA: 0800 110 110), the right to be brought before a court within 48 hours, and the right to bail unless the interests of justice require otherwise. Police must identify themselves and show a warrant (unless caught in the act). You may not be tortured or treated inhumanely. You can refuse to answer questions without a lawyer present. If rights are violated: report to IPID (Independent Police Investigative Directorate) 012 399 0000.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Rights During Arrest & Detention",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Rights During Arrest & Detention best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Rights During Arrest & Detention?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Rights During Arrest & Detention in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Rights",
+        "definition": "Key concept in Rights During Arrest & Detention",
+        "example_usage": "Applied in Rights During Arrest & Detention work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Rights During Arrest & Detention",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

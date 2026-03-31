@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.AGRI.CROP",
+  "lesson": {
+    "standard_code": "TRADE.AGRI.CROP",
+    "title": "Crop Production Basics",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "SA is a water-scarce country \u2014 efficient irrigation is critical. Major crops: maize (largest, mainly Free State/North West), wheat (Western Cape winter rainfall), potatoes, sugarcane (KZN). Soil preparation: test pH (most crops prefer 5.5-6.5), add lime if acidic. Fertilisation: NPK ratios \u2014 maize needs high N. Integrated Pest Management: identify pest first, use biological controls before chemicals. Irrigation: drip (most efficient, 90-95%), sprinkler, flood. SA growing seasons: summer crops Oct-Mar, winter crops Apr-Sep.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Crop Production Basics",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Crop Production Basics best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Crop Production Basics?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Crop Production Basics in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Crop",
+        "definition": "Key concept in Crop Production Basics",
+        "example_usage": "Applied in Crop Production Basics work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Crop Production Basics",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

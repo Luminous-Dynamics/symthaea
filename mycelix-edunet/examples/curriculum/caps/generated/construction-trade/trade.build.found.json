@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.BUILD.FOUND",
+  "lesson": {
+    "standard_code": "TRADE.BUILD.FOUND",
+    "title": "Foundations & Brickwork",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Foundations transfer building loads to the ground. Strip footings (most common in SA houses): typically 600mm wide \u00d7 200mm deep, reinforced concrete. Raft foundations for poor soil or sloping sites. Brickwork: stretcher bond (half-brick walls), English bond (one-brick walls). Mortar mix: 1:4 cement:sand (class II). Damp-proof course (DPC) at 150mm above ground level. SANS 10400-H covers foundations. Building plans require municipal approval before construction begins. First fix plumbing and electrical before plastering.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Foundations & Brickwork",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Foundations & Brickwork best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Foundations & Brickwork?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Foundations & Brickwork in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Foundations",
+        "definition": "Key concept in Foundations & Brickwork",
+        "example_usage": "Applied in Foundations & Brickwork work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Foundations & Brickwork",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

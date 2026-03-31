@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.PLUMB.BASIC",
+  "lesson": {
+    "standard_code": "TRADE.PLUMB.BASIC",
+    "title": "Plumbing Fundamentals",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Plumbing systems deliver clean water and remove waste. SA uses copper (15mm, 22mm for domestic), PVC (40mm, 50mm, 110mm for drainage), and increasingly PEX/multilayer for hot water. Key skills: soldering copper joints (flux + solder), solvent-welding PVC, compression fittings. Water pressure in SA municipalities: typically 300-600 kPa. Pressure-reducing valves required above 400 kPa. All work must comply with SANS 10252 (water supply) and SANS 10400 Part P.",
+    "examples": [
+      {
+        "problem": "Practical scenario in Plumbing Fundamentals",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow Plumbing Fundamentals best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in Plumbing Fundamentals?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs Plumbing Fundamentals in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Plumbing",
+        "definition": "Key concept in Plumbing Fundamentals",
+        "example_usage": "Applied in Plumbing Fundamentals work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for Plumbing Fundamentals",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}

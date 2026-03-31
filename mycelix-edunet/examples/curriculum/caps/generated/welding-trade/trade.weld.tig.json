@@ -1,0 +1,91 @@
+{
+  "node_id": "TRADE.WELD.TIG",
+  "lesson": {
+    "standard_code": "TRADE.WELD.TIG",
+    "title": "TIG Welding (GTAW)",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Gas Tungsten Arc Welding produces the highest quality welds. Non-consumable tungsten electrode creates the arc; filler rod added separately. Shielding: pure argon. Ideal for stainless steel, aluminium, thin materials, and pipe work. Requires both hands (torch + filler) and foot pedal for amperage. Slowest process but best appearance and strength. Used in aerospace, food processing (sanitary welds), and artistic metalwork. In SA: high demand for TIG welders in petrochemical and food industries.",
+    "examples": [
+      {
+        "problem": "Practical scenario in TIG Welding (GTAW)",
+        "steps": [
+          {
+            "instruction": "Assess the situation",
+            "result": "Understanding"
+          },
+          {
+            "instruction": "Apply the correct procedure",
+            "result": "Safe, compliant work"
+          },
+          {
+            "instruction": "Verify and document",
+            "result": "Quality assured"
+          }
+        ],
+        "answer": "Follow TIG Welding (GTAW) best practices"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the first step when beginning work in TIG Welding (GTAW)?",
+        "answer": "Safety assessment and preparation",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think safety first"
+        ],
+        "explanation": "Always start with safety.",
+        "distractors": [
+          "Skip to the job",
+          "Ask someone else",
+          "Guess"
+        ]
+      },
+      {
+        "question": "Describe the key regulation or standard that governs TIG Welding (GTAW) in South Africa.",
+        "answer": "See lesson content for specific SA regulations.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about SANS standards or Acts"
+        ],
+        "explanation": "SA has specific standards for each trade.",
+        "distractors": [
+          "No regulations exist",
+          "Use UK standards",
+          "It's unregulated"
+        ]
+      }
+    ],
+    "key_vocabulary": [
+      {
+        "term": "TIG",
+        "definition": "Key concept in TIG Welding (GTAW)",
+        "example_usage": "Applied in TIG Welding (GTAW) work"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "You don't need formal training for TIG Welding (GTAW)",
+        "correction": "Proper training and certification are required for safety and legal compliance in SA.",
+        "why_students_think_this": "People see informal work and assume no qualifications are needed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.85,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.85,
+      "needs_human_review": true
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.85,
+    "hallucination_detected": false,
+    "needs_human_review": true,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T14:00:00"
+}
