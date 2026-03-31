@@ -1,0 +1,343 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr12.NERVOUS",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr12.NERVOUS",
+    "title": "Nervous and Endocrine Systems: Brain, Reflex Arc, Eye, Ear, Hormones, and Drug Abuse (35 marks)",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "The nervous system enables rapid communication via electrical impulses along neurons. The brain has three main parts: cerebrum (thinking, memory, voluntary actions), cerebellum (balance, coordination), and medulla oblongata (involuntary functions: breathing, heart rate). A reflex arc is the pathway of a rapid, involuntary response: receptor → sensory neuron → interneuron (spinal cord) → motor neuron → effector. The eye focuses light onto the retina (rods for dim light, cones for colour); the ear detects sound waves (vibrations: eardrum → ossicles → cochlea → auditory nerve). The endocrine system uses hormones for slower, longer-lasting communication: pituitary (TSH, GH, ADH), thyroid (thyroxine), adrenal (adrenaline), pancreas (insulin/glucagon). Drug abuse (alcohol, nicotine, dagga/cannabis, heroin, tik/methamphetamine) disrupts nervous system function — a significant social issue in South Africa.",
+    "examples": [
+      {
+        "problem": "Describe the pathway of a reflex arc using the knee-jerk reflex as an example.",
+        "steps": [
+          {
+            "instruction": "Step 1: Stimulus — A tap on the patellar tendon below the kneecap stretches the quadriceps muscle.",
+            "result": "stimulus"
+          },
+          {
+            "instruction": "Step 2: Receptor — Stretch receptors in the quadriceps muscle detect the stretch and generate a nerve impulse.",
+            "result": "receptor"
+          },
+          {
+            "instruction": "Step 3: Sensory neuron — The impulse travels along the sensory (afferent) neuron to the spinal cord.",
+            "result": "sensory neuron"
+          },
+          {
+            "instruction": "Step 4: Integration — In the spinal cord, the sensory neuron synapses directly with a motor neuron (this is a simple 2-neuron reflex — no interneuron). The brain is NOT involved, making the response involuntary and fast.",
+            "result": "integration"
+          },
+          {
+            "instruction": "Step 5: Motor neuron — The impulse travels along the motor (efferent) neuron to the quadriceps muscle.",
+            "result": "motor neuron"
+          },
+          {
+            "instruction": "Step 6: Effector — The quadriceps contracts, causing the lower leg to kick forward (extension). This reflex protects against muscle damage.",
+            "result": "effector and response"
+          }
+        ],
+        "answer": "Answer: Knee-jerk reflex arc: stretch receptor → sensory neuron → spinal cord (synapse) → motor neuron → quadriceps muscle contracts. It is involuntary, rapid, and protective.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe how the human eye focuses light from a near object onto the retina (accommodation).",
+        "steps": [
+          {
+            "instruction": "Step 1: Light from a near object enters the eye through the cornea (initial refraction) and passes through the pupil.",
+            "result": "light entry"
+          },
+          {
+            "instruction": "Step 2: For near vision, the ciliary muscles CONTRACT, which relaxes the suspensory ligaments.",
+            "result": "ciliary muscles"
+          },
+          {
+            "instruction": "Step 3: With relaxed suspensory ligaments, the elastic lens becomes THICKER and more curved (rounder), increasing its refractive power.",
+            "result": "lens shape changes"
+          },
+          {
+            "instruction": "Step 4: The thicker lens bends (refracts) the diverging light rays more strongly, focusing them precisely onto the retina (specifically the fovea, which has the highest concentration of cones).",
+            "result": "focused image"
+          }
+        ],
+        "answer": "Answer: Near accommodation: ciliary muscles CONTRACT → suspensory ligaments RELAX → lens becomes THICKER (rounder) → increased refraction → image focused on retina.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how the endocrine system regulates blood glucose levels using insulin and glucagon.",
+        "steps": [
+          {
+            "instruction": "Step 1: After a meal, blood glucose rises. The beta cells of the islets of Langerhans in the pancreas detect this and secrete insulin.",
+            "result": "high glucose detected"
+          },
+          {
+            "instruction": "Step 2: Insulin stimulates cells (especially liver and muscle) to take up glucose from the blood. Liver converts glucose to glycogen (glycogenesis). Blood glucose decreases to normal levels.",
+            "result": "insulin action"
+          },
+          {
+            "instruction": "Step 3: Between meals or during exercise, blood glucose drops. The alpha cells of the islets of Langerhans detect this and secrete glucagon.",
+            "result": "low glucose detected"
+          },
+          {
+            "instruction": "Step 4: Glucagon stimulates the liver to convert glycogen back to glucose (glycogenolysis), releasing it into the blood. Blood glucose rises to normal levels.",
+            "result": "glucagon action"
+          },
+          {
+            "instruction": "Step 5: This is negative feedback — insulin and glucagon work antagonistically to maintain blood glucose homeostasis at ~4-8 mmol/L.",
+            "result": "negative feedback"
+          }
+        ],
+        "answer": "Answer: Insulin (beta cells) lowers blood glucose by promoting glucose uptake and glycogen storage. Glucagon (alpha cells) raises blood glucose by stimulating glycogen breakdown. Together they maintain homeostasis via negative feedback.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the three main parts of the brain and state one function of each.",
+        "answer": "Cerebrum: higher-order thinking, memory, voluntary movements, interpretation of senses. Cerebellum: balance, coordination of movement, posture. Medulla oblongata: involuntary functions (breathing rate, heart rate, blood pressure, swallowing).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "The cerebrum is the largest part — think 'cerebral' = thinking.",
+          "The medulla controls things you do NOT have to think about."
+        ],
+        "explanation": "The brain has three major regions with distinct functions: cerebrum (conscious), cerebellum (coordination), medulla oblongata (automatic/involuntary). Damage to the medulla is often fatal.",
+        "distractors": [
+          "The cerebellum controls thinking and memory",
+          "The medulla controls voluntary movements",
+          "The cerebrum controls only vision"
+        ]
+      },
+      {
+        "question": "Explain the difference between rods and cones in the retina of the eye.",
+        "answer": "Rods: sensitive to dim light (night vision), cannot distinguish colour, more numerous (~120 million), found mainly in the peripheral retina. Cones: require bright light, detect colour (three types: red, green, blue), less numerous (~6 million), concentrated in the fovea (centre of retina for sharp, detailed vision).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Rods = dim light, no colour. Cones = bright light, colour vision.",
+          "The fovea has the highest concentration of cones — this is why you look directly at something to see it clearly."
+        ],
+        "explanation": "Rods and cones are photoreceptors with different functions. Rods dominate peripheral vision in dim conditions; cones provide colour and detail at the fovea in bright light.",
+        "distractors": [
+          "Rods detect colour and cones detect dim light",
+          "Both rods and cones are concentrated in the fovea",
+          "Rods are more sensitive to bright light than cones"
+        ]
+      },
+      {
+        "question": "A learner touches a hot stove and immediately pulls their hand away before feeling pain. Describe the reflex arc involved and explain why the response occurs before the pain is felt.",
+        "answer": "Reflex arc: Heat receptor in finger (receptor) → sensory neuron → spinal cord (interneuron synapses with motor neuron) → motor neuron → arm muscles contract (effector) → hand pulls away. The response occurs before pain because the reflex arc pathway goes to the SPINAL CORD, not the brain. The brain only receives the pain signal afterwards (slightly delayed). This involuntary reflex protects the body from damage by responding faster than conscious thought.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Reflexes bypass the brain — they are processed in the spinal cord.",
+          "The pain signal reaches the brain AFTER the withdrawal response has already begun."
+        ],
+        "explanation": "Reflex arcs are faster than voluntary responses because the impulse only travels to the spinal cord (short pathway), not to the brain (longer pathway). This protects against further injury.",
+        "distractors": [
+          "The brain processes the reflex before the spinal cord",
+          "Pain is felt before the hand is pulled away",
+          "Reflex arcs involve only sensory neurons"
+        ]
+      },
+      {
+        "question": "Compare the nervous system and the endocrine system in terms of: speed of communication, type of signal, duration of effect, and specificity of target. [NSC-style question]",
+        "answer": "Nervous system: rapid (milliseconds), electrical impulses along neurons, short-lived effect (stops when impulse stops), specific targets (individual muscles/glands via specific neurons). Endocrine system: slower (seconds to hours), chemical hormones via blood, longer-lasting effect (minutes to days), widespread targets (all cells with the correct receptor).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Nervous = fast and specific. Endocrine = slow and widespread.",
+          "Both systems work together to coordinate body functions."
+        ],
+        "explanation": "The nervous and endocrine systems are complementary: the nervous system handles rapid, precise responses; the endocrine system handles slower, sustained regulation. Many functions involve both (e.g. stress response: nervous = adrenaline release, endocrine = cortisol).",
+        "distractors": [
+          "The endocrine system is faster than the nervous system",
+          "Hormones travel along neurons",
+          "Nervous system effects last longer than endocrine effects"
+        ]
+      },
+      {
+        "question": "South Africa has high rates of substance abuse, including alcohol (foetal alcohol spectrum disorder is prevalent in some communities), tik (methamphetamine, especially in the Western Cape), and nyaope (a mixture of heroin and other substances in Gauteng). Choose ONE of these substances and evaluate its effects on the nervous system, including short-term and long-term consequences. [NSC-style 8-mark question]",
+        "answer": "Tik (methamphetamine): Short-term effects: Tik causes a massive release of dopamine in the brain's reward pathway, producing intense euphoria, increased alertness, decreased appetite, and increased heart rate and blood pressure. The user feels invincible and may engage in risky behaviour. Long-term effects: Repeated use depletes dopamine stores, leading to tolerance (need more for the same effect) and severe dependence. Chronic use causes: 1) Neurotoxicity — destruction of dopamine-producing neurons, leading to permanent cognitive impairment, memory loss, and difficulty experiencing pleasure (anhedonia). 2) Psychosis — hallucinations, paranoia, and violent behaviour ('tik psychosis'). 3) Physical deterioration — severe dental decay ('meth mouth'), skin sores, weight loss, weakened immune system. 4) Social consequences — family breakdown, crime, unemployment, homelessness. Mechanism: Tik blocks dopamine reuptake transporters and causes reverse transport, flooding the synapse with dopamine. Eventually, dopamine neurons are damaged, and the brain cannot function normally without the drug. Recovery is difficult because the reward pathway is permanently altered. SA context: Tik is particularly devastating in the Western Cape, affecting vulnerable communities. Mandrax was previously the dominant drug; tik's rise since ~2003 has overwhelmed rehabilitation services.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Which neurotransmitter does this drug affect? What happens when that neurotransmitter system is damaged?",
+          "Consider physical, psychological, and social consequences — NSC examiners expect multiple dimensions."
+        ],
+        "explanation": "Tik floods synapses with dopamine (reward pathway), causing euphoria but eventually destroying dopamine neurons. Long-term use leads to cognitive damage, psychosis, and severe dependence. SA's Western Cape is particularly affected.",
+        "distractors": [
+          "Tik only affects the body, not the brain",
+          "Tik is not addictive because it is not a 'hard' drug",
+          "The effects of tik are fully reversible when the person stops using"
+        ]
+      }
+    ],
+    "hints": [
+      "Reflex arc: Receptor → Sensory → Integration (spinal cord) → Motor → Effector. Reflexes bypass the brain for speed.",
+      "Eye accommodation: near = ciliary muscles CONTRACT, lens THICKER. Far = ciliary muscles RELAX, lens THINNER.",
+      "Blood glucose: Insulin LOWERS (high glucose → insulin from beta cells). Glucagon RAISES (low glucose → glucagon from alpha cells)."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "synapse",
+        "definition": "The junction between two neurons where a neurotransmitter is released from one neuron to stimulate the next",
+        "example_usage": "Acetylcholine is released at the synapse between a motor neuron and a muscle cell."
+      },
+      {
+        "term": "reflex arc",
+        "definition": "The neural pathway of a reflex: receptor → sensory neuron → interneuron (CNS) → motor neuron → effector",
+        "example_usage": "The withdrawal reflex uses a reflex arc through the spinal cord, bypassing the brain for speed."
+      },
+      {
+        "term": "accommodation",
+        "definition": "The process by which the lens of the eye changes shape to focus on objects at different distances",
+        "example_usage": "When reading, the ciliary muscles contract and the lens becomes thicker — this is accommodation."
+      },
+      {
+        "term": "homeostasis",
+        "definition": "The maintenance of a stable internal environment within narrow limits, despite changes in the external environment",
+        "example_usage": "Blood glucose homeostasis is maintained by the antagonistic actions of insulin and glucagon."
+      },
+      {
+        "term": "neurotransmitter",
+        "definition": "A chemical released at a synapse that transmits a nerve impulse from one neuron to the next",
+        "example_usage": "Dopamine is a neurotransmitter involved in reward and pleasure — drugs like tik cause excessive dopamine release."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think reflexes involve the brain.",
+        "correction": "Simple reflexes are processed in the SPINAL CORD, not the brain. The brain receives the sensory information AFTER the reflex has already occurred. This is why reflexes are faster than voluntary responses.",
+        "why_students_think_this": "Students confuse 'nervous system' with 'brain'. Emphasise: the spinal cord is part of the CNS and can process simple reflexes independently."
+      },
+      {
+        "misconception": "Students think the lens does all the focusing in the eye.",
+        "correction": "The CORNEA does most of the light refraction (about 2/3). The lens provides fine-tuning (accommodation) to focus on objects at different distances by changing shape. Without the cornea, the lens alone cannot focus light properly.",
+        "why_students_think_this": "The lens is emphasised in accommodation lessons, so students forget the cornea's role. Both structures contribute to focusing."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr12.NERVOUS",
+    "title": "Assessment: Nervous and Endocrine Systems (NSC exam format, 35 marks)",
+    "items": [
+      {
+        "question": "Name the five components of a reflex arc in order.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Receptor → sensory neuron → interneuron (relay neuron in CNS) → motor neuron → effector",
+        "points": 3,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Start with what detects the stimulus and end with what produces the response."
+      },
+      {
+        "question": "Explain how the eye adjusts to focus on a distant object (accommodation for far vision).",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Ciliary muscles RELAX → suspensory ligaments become TAUT (pull on lens) → lens becomes THINNER (flatter) → less refraction → light from distant object focused on retina.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Opposite of near vision: muscles relax, lens flattens."
+      },
+      {
+        "question": "Describe how insulin and glucagon maintain blood glucose homeostasis.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "High glucose → beta cells release insulin → cells take up glucose, liver stores glycogen → glucose falls. Low glucose → alpha cells release glucagon → liver breaks down glycogen → glucose rises. Negative feedback maintains balance.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Two hormones, opposite effects, both from the pancreas."
+      },
+      {
+        "question": "Analyse how alcohol affects the nervous system at the synapse level.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Alcohol enhances the effect of the inhibitory neurotransmitter GABA (slowing brain activity) and inhibits the excitatory neurotransmitter glutamate. This depresses CNS function: slowed reaction time, impaired judgement, reduced coordination, slurred speech. Chronic use damages neurons and causes dependence.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Alcohol is a CNS depressant — which neurotransmitter systems does it affect?"
+      },
+      {
+        "question": "Evaluate the impact of foetal alcohol spectrum disorder (FASD) on South African communities and discuss preventive measures.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "SA has among the highest FASD rates globally (some Western Cape communities: 40-100 per 1,000 births). Alcohol crosses the placenta and damages the developing foetal brain, causing intellectual disability, facial abnormalities, and behavioural problems. Prevention: education about alcohol harm during pregnancy, community support programmes, alcohol availability restrictions, and support for pregnant women struggling with alcohol dependence. FASD is 100% preventable — no amount of alcohol is safe during pregnancy.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "FASD is entirely preventable. What barriers prevent prevention?"
+      }
+    ],
+    "total_points": 18,
+    "estimated_minutes": 22,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the three main parts of the brain?",
+      "back": "Cerebrum (thinking, voluntary actions), cerebellum (balance, coordination), medulla oblongata (involuntary functions: breathing, heart rate).",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is a reflex arc?",
+      "back": "The neural pathway of a reflex: receptor → sensory neuron → interneuron (spinal cord) → motor neuron → effector. Fast, involuntary, bypasses the brain.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "How does the eye focus on near objects?",
+      "back": "Ciliary muscles CONTRACT → suspensory ligaments RELAX → lens becomes THICKER (rounder) → more refraction → focused on retina.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the difference between rods and cones?",
+      "back": "Rods: dim light vision, no colour, peripheral retina. Cones: bright light, colour vision (R/G/B), concentrated at fovea.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What do insulin and glucagon do?",
+      "back": "Insulin (beta cells): lowers blood glucose. Glucagon (alpha cells): raises blood glucose. Both from pancreas; negative feedback.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is a synapse?",
+      "back": "The junction between two neurons. Neurotransmitters are released from vesicles in the presynaptic neuron, cross the synaptic cleft, and bind to receptors on the postsynaptic neuron.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "How does tik (methamphetamine) affect the brain?",
+      "back": "Causes massive dopamine release in the reward pathway. Long-term use destroys dopamine neurons, causing cognitive damage, psychosis, and severe dependence.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is FASD?",
+      "back": "Foetal Alcohol Spectrum Disorder — brain damage in babies caused by alcohol crossing the placenta during pregnancy. SA has among the highest FASD rates globally. 100% preventable.",
+      "tags": ["CAPS.LifeSciences.Gr12.NERVOUS", "Grade12", "Nervous System"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

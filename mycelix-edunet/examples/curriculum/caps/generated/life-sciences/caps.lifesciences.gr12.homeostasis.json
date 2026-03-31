@@ -1,0 +1,343 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr12.HOMEOSTASIS",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr12.HOMEOSTASIS",
+    "title": "Homeostasis and Excretion: Thermoregulation, Kidney/Nephron, ADH, and Diabetes (35 marks)",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "Homeostasis is the maintenance of a stable internal environment despite external changes. Thermoregulation maintains body temperature at ~37 degrees C. When cold: arterioles in skin vasoconstrict (reduce blood flow to skin surface), muscles shiver (generate heat), hair erector muscles contract (raise body hair for insulation). When hot: arterioles vasodilate (increase blood flow to skin for heat radiation), sweat glands secrete sweat (evaporative cooling). The kidneys regulate water balance, pH, and remove nitrogenous waste (urea) from blood. Each kidney contains ~1 million nephrons: blood is filtered at the glomerulus (Bowman's capsule), useful substances are reabsorbed in the proximal convoluted tubule, and water is selectively reabsorbed in the collecting duct under the control of ADH (antidiuretic hormone). Diabetes mellitus (Type 1 and Type 2) affects blood glucose homeostasis and is a growing health concern in South Africa.",
+    "examples": [
+      {
+        "problem": "Describe the body's thermoregulatory responses when external temperature drops below 10 degrees C.",
+        "steps": [
+          {
+            "instruction": "Step 1: Thermoreceptors in the skin detect the cold. Information is sent to the hypothalamus (thermoregulatory centre in the brain).",
+            "result": "detection"
+          },
+          {
+            "instruction": "Step 2: Vasoconstriction — Arterioles in the skin constrict, reducing blood flow to the skin surface. Less heat is lost by radiation.",
+            "result": "vasoconstriction"
+          },
+          {
+            "instruction": "Step 3: Shivering — Skeletal muscles contract rapidly and involuntarily, generating heat through increased cellular respiration.",
+            "result": "shivering"
+          },
+          {
+            "instruction": "Step 4: Hair erector muscles contract — Body hairs stand upright, trapping a layer of insulating air close to the skin (more effective in hairy mammals; less so in humans).",
+            "result": "piloerection"
+          },
+          {
+            "instruction": "Step 5: Increased metabolic rate — The thyroid gland releases more thyroxine, increasing basal metabolic rate and heat production.",
+            "result": "metabolic increase"
+          }
+        ],
+        "answer": "Answer: Cold response: hypothalamus detects → vasoconstriction (reduce heat loss), shivering (generate heat), piloerection (insulation), increased thyroxine (raise metabolic rate). All maintain core temperature at ~37 degrees C.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the structure and function of a nephron, tracing the path of filtrate from Bowman's capsule to the collecting duct.",
+        "steps": [
+          {
+            "instruction": "Step 1: Glomerulus and Bowman's capsule — Blood enters the glomerulus (capillary network) under high pressure. Small molecules (water, glucose, amino acids, urea, salts) are forced out of the blood into Bowman's capsule by ultrafiltration. Large molecules (proteins) and blood cells remain in the blood.",
+            "result": "ultrafiltration"
+          },
+          {
+            "instruction": "Step 2: Proximal convoluted tubule (PCT) — Most useful substances are reabsorbed back into the blood: ALL glucose, ALL amino acids, most water (~65%), and many salts. This occurs by active transport and osmosis.",
+            "result": "selective reabsorption"
+          },
+          {
+            "instruction": "Step 3: Loop of Henle — Creates a concentration gradient in the medulla (countercurrent multiplier). The descending limb is permeable to water (water leaves by osmosis); the ascending limb actively pumps out salts (NaCl) but is impermeable to water.",
+            "result": "concentration gradient"
+          },
+          {
+            "instruction": "Step 4: Distal convoluted tubule (DCT) — Fine-tuning of salt and pH balance. Some active reabsorption and secretion of ions (H+, K+).",
+            "result": "fine-tuning"
+          },
+          {
+            "instruction": "Step 5: Collecting duct — Final water reabsorption controlled by ADH. When ADH is high (dehydrated), the collecting duct walls become permeable to water, and water is reabsorbed by osmosis (concentrated urine). When ADH is low (hydrated), walls are impermeable, and dilute urine is produced.",
+            "result": "ADH-controlled water reabsorption"
+          }
+        ],
+        "answer": "Answer: Nephron pathway: Bowman's capsule (ultrafiltration) → PCT (reabsorption of glucose, amino acids, water) → Loop of Henle (concentration gradient) → DCT (ion regulation) → Collecting duct (ADH-controlled water reabsorption).",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how ADH regulates water balance in the body (osmoregulation).",
+        "steps": [
+          {
+            "instruction": "Step 1: When the body is dehydrated (e.g. sweating during exercise, not drinking enough water), blood becomes more concentrated (higher osmotic pressure/osmolarity).",
+            "result": "dehydration detected"
+          },
+          {
+            "instruction": "Step 2: Osmoreceptors in the hypothalamus detect the increased blood concentration and stimulate the posterior pituitary gland to release MORE ADH into the blood.",
+            "result": "ADH released"
+          },
+          {
+            "instruction": "Step 3: ADH travels in the blood to the kidneys. It makes the walls of the collecting duct and distal convoluted tubule MORE permeable to water by inserting aquaporin channels.",
+            "result": "ADH action on kidney"
+          },
+          {
+            "instruction": "Step 4: More water is reabsorbed from the collecting duct back into the blood by osmosis. The urine becomes smaller in volume and more concentrated (dark yellow).",
+            "result": "concentrated urine"
+          },
+          {
+            "instruction": "Step 5: When the body is over-hydrated (e.g. after drinking lots of water), blood is dilute → less ADH released → collecting duct walls become less permeable → less water reabsorbed → large volume of dilute urine produced. This is negative feedback.",
+            "result": "over-hydration response"
+          }
+        ],
+        "answer": "Answer: ADH increases when dehydrated (concentrates urine by reabsorbing more water); decreases when hydrated (dilutes urine). This is negative feedback maintaining blood water concentration.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "State the role of the hypothalamus in thermoregulation.",
+        "answer": "The hypothalamus acts as the thermoregulatory centre of the body. It receives information from thermoreceptors in the skin (external temperature) and in the blood (core temperature). It then initiates appropriate responses (vasoconstriction/vasodilation, shivering, sweating) to maintain body temperature at ~37 degrees C.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "The hypothalamus is like a thermostat — it detects temperature and triggers responses.",
+          "It is located in the brain, below the thalamus."
+        ],
+        "explanation": "The hypothalamus is the body's thermostat. It integrates thermal information and coordinates responses via the nervous system (shivering, vasoconstriction) and endocrine system (thyroxine release).",
+        "distractors": [
+          "The cerebrum controls thermoregulation",
+          "The hypothalamus only detects external temperature",
+          "The skin controls body temperature independently"
+        ]
+      },
+      {
+        "question": "Explain why a person exercising vigorously on a hot day in Johannesburg produces small volumes of concentrated (dark) urine.",
+        "answer": "Exercise causes sweating (thermoregulation), which loses water from the body. This increases blood concentration (osmolarity). Osmoreceptors in the hypothalamus detect this and trigger increased ADH release from the posterior pituitary. ADH makes the collecting duct walls more permeable, so more water is reabsorbed back into the blood from the nephron filtrate. Less water remains in the urine, resulting in small volumes of concentrated, dark urine.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Follow the chain: sweating → dehydration → more ADH → more water reabsorbed → concentrated urine.",
+          "ADH = Anti-Diuretic Hormone. A diuretic makes you urinate MORE; anti-diuretic makes you urinate LESS."
+        ],
+        "explanation": "Sweating during exercise causes dehydration, triggering ADH release. ADH conserves water by increasing reabsorption in the collecting duct, producing concentrated urine. This is a homeostatic response.",
+        "distractors": [
+          "The kidneys stop filtering blood during exercise",
+          "Concentrated urine is produced because the person is drinking too much water",
+          "ADH decreases during dehydration"
+        ]
+      },
+      {
+        "question": "Describe the process of ultrafiltration in the kidney, explaining why proteins are NOT found in the filtrate.",
+        "answer": "Ultrafiltration occurs in the glomerulus (capillary network) within Bowman's capsule. The afferent arteriole is wider than the efferent arteriole, creating high blood pressure in the glomerulus. This pressure forces small molecules (water, glucose, amino acids, urea, salts, ions) through the capillary wall and basement membrane into Bowman's capsule. Proteins and blood cells are TOO LARGE to pass through the pores of the basement membrane, so they remain in the blood. The filtrate in Bowman's capsule is therefore blood plasma minus proteins.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Why is the afferent arteriole wider than the efferent? Think about pressure.",
+          "The basement membrane acts as a molecular sieve — what is too large to pass through?"
+        ],
+        "explanation": "Ultrafiltration uses pressure to force small molecules through the glomerular membrane. The size-selective membrane retains proteins and cells. Finding protein in urine indicates kidney damage.",
+        "distractors": [
+          "Proteins are actively removed from the filtrate in the PCT",
+          "All blood components enter Bowman's capsule",
+          "The efferent arteriole is wider than the afferent arteriole"
+        ]
+      },
+      {
+        "question": "Compare Type 1 and Type 2 diabetes mellitus in terms of cause, age of onset, insulin production, and treatment. [NSC-style question]",
+        "answer": "Type 1: Autoimmune disease — immune system destroys beta cells of the islets of Langerhans. Usually diagnosed in childhood/adolescence. No insulin produced (absolute deficiency). Treatment: daily insulin injections + blood glucose monitoring. Type 2: Cells become resistant to insulin (insulin receptors less responsive) and/or beta cells produce insufficient insulin. Usually diagnosed in adults (>40), but increasing in younger people due to obesity. Some insulin produced but not effective. Treatment: lifestyle changes (diet, exercise, weight loss) + oral medications (e.g. metformin) + insulin if needed. SA context: Type 2 diabetes is rapidly increasing due to urbanisation, Western diet, and sedentary lifestyles. ~4.5 million South Africans have diabetes (many undiagnosed).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Type 1 = no insulin (autoimmune). Type 2 = insulin resistance (lifestyle-related).",
+          "Which type is increasing in SA and why?"
+        ],
+        "explanation": "Type 1 is autoimmune (no insulin, juvenile onset, injections required). Type 2 is insulin resistance (lifestyle-related, adult onset, manageable with diet/exercise). SA faces a Type 2 epidemic linked to urbanisation.",
+        "distractors": [
+          "Type 1 diabetes is caused by eating too much sugar",
+          "Type 2 diabetes always requires insulin injections",
+          "Type 1 diabetes is more common than Type 2"
+        ]
+      },
+      {
+        "question": "A patient is admitted to hospital with kidney failure. Their blood shows high levels of urea and creatinine, and their urine contains protein. Evaluate what these findings indicate about kidney function and explain why dialysis is necessary. [NSC-style 8-mark question]",
+        "answer": "High blood urea and creatinine: The kidneys are failing to filter waste products from the blood. Normally, urea (from protein metabolism) and creatinine (from muscle metabolism) are removed by ultrafiltration in the glomerulus and excreted in urine. High blood levels indicate the glomeruli are not filtering effectively. Protein in urine (proteinuria): Normally, proteins are too large to pass through the glomerular membrane. Protein in urine indicates damage to the glomerular membrane (holes are too large), allowing proteins to leak through. This could be caused by hypertension (SA has very high rates), diabetes (damages glomerular capillaries), or infection. Dialysis necessity: Without functioning kidneys, toxic waste products (urea, creatinine, excess salts) accumulate in the blood to dangerous levels. Dialysis uses an artificial membrane to filter blood externally: blood flows on one side, dialysis fluid (with normal concentrations of salts and glucose but no urea) flows on the other. Urea diffuses from blood to dialysis fluid down a concentration gradient. The membrane prevents protein and blood cell loss. Dialysis must be performed regularly (typically 3x per week, 4 hours per session) until a kidney transplant is available.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What does each blood/urine finding tell you about which part of the nephron is damaged?",
+          "Dialysis mimics the kidney's filtration function using an artificial semi-permeable membrane."
+        ],
+        "explanation": "High blood urea = filtration failure. Proteinuria = glomerular membrane damage. Dialysis replaces kidney function by filtering blood through an artificial membrane, removing wastes by diffusion. SA has high kidney disease rates linked to hypertension and diabetes.",
+        "distractors": [
+          "High blood urea is normal and does not indicate kidney problems",
+          "Protein in urine is normal because kidneys secrete excess protein",
+          "Dialysis adds urea to the blood"
+        ]
+      }
+    ],
+    "hints": [
+      "Thermoregulation responses: Cold = vasoconstriction + shivering + piloerection. Hot = vasodilation + sweating.",
+      "Nephron order: Bowman's capsule → PCT → Loop of Henle → DCT → Collecting duct. Each has a specific function.",
+      "ADH = Anti-Diuretic Hormone. More ADH = less urine (more water reabsorbed). Less ADH = more urine."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "homeostasis",
+        "definition": "The maintenance of a constant internal environment within narrow limits despite changes in external conditions",
+        "example_usage": "Body temperature is maintained at ~37 degrees C by homeostatic mechanisms involving the hypothalamus."
+      },
+      {
+        "term": "ultrafiltration",
+        "definition": "The filtration of blood under high pressure in the glomerulus, forcing small molecules into Bowman's capsule while retaining large molecules (proteins) and blood cells",
+        "example_usage": "Ultrafiltration in the kidney produces ~180 litres of filtrate per day, of which only ~1.5 litres becomes urine."
+      },
+      {
+        "term": "ADH (antidiuretic hormone)",
+        "definition": "A hormone produced by the hypothalamus and released by the posterior pituitary that increases water reabsorption in the collecting duct of the nephron",
+        "example_usage": "Dehydration triggers ADH release, which concentrates the urine and conserves water."
+      },
+      {
+        "term": "osmoregulation",
+        "definition": "The regulation of water and salt concentrations in body fluids to maintain a constant osmotic pressure",
+        "example_usage": "The kidneys and ADH work together to maintain osmoregulation."
+      },
+      {
+        "term": "vasoconstriction",
+        "definition": "The narrowing of blood vessels (arterioles) in the skin, reducing blood flow to the surface and decreasing heat loss",
+        "example_usage": "In cold weather, vasoconstriction reduces heat loss through the skin, keeping the core warm."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think the kidneys only remove urea from the blood.",
+        "correction": "The kidneys have MULTIPLE functions: 1) Excretion of urea and other metabolic wastes. 2) Osmoregulation (water balance via ADH). 3) Regulation of blood pH. 4) Regulation of electrolyte concentrations (Na+, K+, Ca2+). 5) Production of erythropoietin (stimulates red blood cell production).",
+        "why_students_think_this": "Excretion is emphasised in lessons, so students forget the regulatory functions. Emphasise: the kidney is a regulatory organ, not just a filter."
+      },
+      {
+        "misconception": "Students confuse vasodilation and vasoconstriction, thinking vasodilation occurs when cold.",
+        "correction": "When COLD: vasoconstriction (blood vessels narrow, less blood to skin, less heat lost). When HOT: vasodilation (blood vessels widen, more blood to skin surface, more heat lost by radiation). Remember: 'dilate' = open wider (hot → want to lose heat).",
+        "why_students_think_this": "The terms sound similar and students mix them up. Use the mnemonic: 'dilate = wide/open = hot' and 'constrict = narrow/closed = cold'."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr12.HOMEOSTASIS",
+    "title": "Assessment: Homeostasis and Excretion (NSC exam format, 35 marks)",
+    "items": [
+      {
+        "question": "Define homeostasis and give two examples of variables that are homeostatically regulated.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Homeostasis: maintenance of a constant internal environment. Examples: body temperature (~37 degrees C), blood glucose concentration (~4-8 mmol/L), blood water concentration/osmolarity, blood pH (~7.35-7.45).",
+        "points": 3,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: temperature, sugar, water, pH — all kept within narrow limits."
+      },
+      {
+        "question": "Explain how the body responds when environmental temperature rises above 37 degrees C.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Hypothalamus detects elevated blood temperature. Responses: vasodilation (arterioles widen, more blood flows to skin surface, heat lost by radiation), sweating (sweat glands secrete sweat, evaporation cools the skin), reduced metabolic rate, behavioural responses (seeking shade, removing clothing).",
+        "points": 4,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Two main physiological responses: vasodilation and sweating."
+      },
+      {
+        "question": "Trace the path of a molecule of urea from the blood in the renal artery to the urine in the bladder.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Renal artery → afferent arteriole → glomerulus (urea filtered by ultrafiltration into Bowman's capsule) → proximal convoluted tubule → Loop of Henle → distal convoluted tubule → collecting duct → renal pelvis → ureter → bladder. Urea is not reabsorbed, so it remains in the filtrate throughout.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Follow the nephron structure from start to finish."
+      },
+      {
+        "question": "Analyse how ADH controls water reabsorption in the kidney using the concept of negative feedback.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Dehydration → increased blood osmolarity → osmoreceptors in hypothalamus detect → posterior pituitary releases more ADH → collecting duct walls become more permeable (aquaporins inserted) → more water reabsorbed → blood osmolarity decreases → less ADH released (negative feedback). The cycle reverses during over-hydration.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Negative feedback = response opposes the stimulus."
+      },
+      {
+        "question": "Evaluate the impact of the Type 2 diabetes epidemic on the South African healthcare system and suggest evidence-based prevention strategies.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Impact: ~4.5M South Africans have diabetes (60% undiagnosed). Complications (blindness, kidney failure, amputations) strain an already overburdened public health system. Cost of treatment competes with HIV/AIDS and TB funding. Prevention: promote healthy diets (reduce sugar, processed food), increase physical activity, screen high-risk groups (obese, family history, >45 years), community health education programmes, tax sugar-sweetened beverages (SA's sugar tax since 2018). Early diagnosis and lifestyle intervention can prevent or delay Type 2 diabetes.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider: prevalence, complications, healthcare costs, and prevention strategies."
+      }
+    ],
+    "total_points": 19,
+    "estimated_minutes": 24,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is homeostasis?",
+      "back": "The maintenance of a constant internal environment within narrow limits, despite changes in external conditions.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does the hypothalamus do in thermoregulation?",
+      "back": "Acts as the body's thermostat: detects temperature changes via thermoreceptors and initiates responses (vasoconstriction/vasodilation, shivering/sweating).",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is ultrafiltration?",
+      "back": "High-pressure filtration in the glomerulus that forces small molecules (water, glucose, urea, salts) into Bowman's capsule while retaining proteins and blood cells.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What does ADH do?",
+      "back": "ADH (antidiuretic hormone) increases water reabsorption in the collecting duct by inserting aquaporin channels. More ADH = concentrated urine. Less ADH = dilute urine.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the order of nephron structures?",
+      "back": "Bowman's capsule → Proximal convoluted tubule → Loop of Henle → Distal convoluted tubule → Collecting duct.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What happens during vasoconstriction?",
+      "back": "Arterioles in the skin narrow, reducing blood flow to the skin surface and decreasing heat loss. Occurs when cold.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the difference between Type 1 and Type 2 diabetes?",
+      "back": "Type 1: autoimmune, no insulin produced, childhood onset, needs injections. Type 2: insulin resistance, some insulin produced, adult onset (increasing in youth), managed with lifestyle + medication.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Why is protein in the urine (proteinuria) a sign of kidney damage?",
+      "back": "Normally proteins are too large to pass through the glomerular membrane during ultrafiltration. Proteinuria indicates damage to the membrane, allowing proteins to leak through.",
+      "tags": ["CAPS.LifeSciences.Gr12.HOMEOSTASIS", "Grade12", "Homeostasis"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}
