@@ -54,6 +54,8 @@ pub mod mock;
 pub mod browser;
 #[cfg(feature = "tauri")]
 pub mod tauri;
+#[cfg(feature = "native")]
+pub mod native;
 pub mod client;
 
 // Re-exports for convenience
@@ -62,6 +64,8 @@ pub use error::ClientError;
 pub use transport::HolochainTransport;
 pub use types::{ConnectConfig, ConnectionStatus, ZomeCallRequest, ZomeCallResponse, encode, decode};
 pub use mock::MockTransport;
+#[cfg(feature = "native")]
+pub use native::NativeWsTransport;
 
 #[cfg(feature = "browser")]
 pub use browser::BrowserWsTransport;

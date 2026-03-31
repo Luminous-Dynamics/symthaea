@@ -177,7 +177,7 @@ pub(crate) enum AppResponse {
 }
 
 /// App info response from the conductor.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AppInfoResponse {
     /// The installed app ID.
     pub installed_app_id: String,
@@ -187,7 +187,7 @@ pub(crate) struct AppInfoResponse {
 }
 
 /// A single role→cell mapping from app_info.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct CellInfoEntry {
     /// Role name from the hApp manifest.
     pub role_name: String,
@@ -196,7 +196,7 @@ pub(crate) struct CellInfoEntry {
 }
 
 /// Cell info variant — we only care about Provisioned cells.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub(crate) enum CellInfoVariant {
     /// A provisioned (running) cell.
@@ -208,7 +208,7 @@ pub(crate) enum CellInfoVariant {
 }
 
 /// A provisioned cell with its cell_id.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ProvisionedCell {
     /// `(DnaHash, AgentPubKey)` as raw bytes.
     pub cell_id: (Vec<u8>, Vec<u8>),
