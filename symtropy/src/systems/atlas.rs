@@ -468,6 +468,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Energy, name: format!("{} (Φ={:.2})", stress.name, stress.phi) },
+            SurfaceLod,
             AtlasEntity,
         ));
         // Translucent stress halo — larger when under more stress
@@ -486,6 +487,7 @@ pub fn setup_globe_view(
                 Mesh3d(stress_mesh.clone()),
                 MeshMaterial3d(halo_mat),
                 Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(halo_size)),
+                SurfaceLod,
                 AtlasEntity,
             ));
         }
@@ -551,6 +553,7 @@ pub fn setup_globe_view(
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker { layer: Layer::Regions, name: format!("{} ({}% participation)", pulse.name, (pulse.participation * 100.0) as u32) },
+            SurfaceLod,
             AtlasEntity,
         ));
     }
@@ -733,9 +736,9 @@ pub fn celestial_orbit_system(
         // Draw faint orbit ring
         let segments = 64;
         let orbit_color = if body.is_sun {
-            Color::linear_rgba(1.0, 0.8, 0.3, 0.08)
+            Color::linear_rgba(1.0, 0.8, 0.3, 0.03) // barely visible
         } else {
-            Color::linear_rgba(0.3, 0.4, 0.5, 0.05)
+            Color::linear_rgba(0.3, 0.4, 0.5, 0.02) // ghost lines
         };
 
         for i in 0..segments {
