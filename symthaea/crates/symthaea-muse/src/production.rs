@@ -73,19 +73,17 @@ pub fn velocity_to_spectral_tilt(velocity: f32, harmonic_index: usize) -> f32 {
 /// Analysis showed notes scattered across 119 semitones (full piano range).
 /// Memorable melodies stay within ~10-14 semitones (Jakubowski 2017).
 pub fn constrain_pitch_range(freq: f32, center_freq: f32, max_range_semitones: f32) -> f32 {
-    let semitones_from_center = (freq / center_freq).log2() * 12.0;
     let half_range = max_range_semitones / 2.0;
+    let min_freq = center_freq * 2.0f32.powf(-half_range / 12.0);
+    let max_freq = center_freq * 2.0f32.powf(half_range / 12.0);
 
-    if semitones_from_center.abs() <= half_range {
-        freq // within range
+    if freq >= min_freq && freq <= max_freq {
+        freq
     } else {
-        // Fold back into range by octave transposition
-        let mut f = freq;
-        while (f / center_freq).log2() * 12.0 > half_range {
-            f /= 2.0;
-        }
-        while (f / center_freq).log2() * 12.0 < -half_range {
-            f *= 2.0;
+        // Hard clamp to boundary then octave-fold inward
+        let mut f = freq.clamp(min_freq * 0.5, max_freq * 2.0);
+        while f > max_freq { f /= 2.0; }
+        while f < min_freq { f *= 2.0;
         }
         f
     }
