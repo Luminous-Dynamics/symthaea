@@ -88,16 +88,15 @@ impl Plugin for SymtropyPlugin {
                 systems::living_dungeon::living_dungeon_system,
             ).chain().run_if(in_state(GamePhase::Playing)))
             // Consciousness aura + resonance wave visual manifold
-            // FIXME: B0001 query conflict — disabled until query filters are fixed
-            // .add_systems(Update, (
-            //     systems::consciousness_aura::spawn_auras,
-            //     systems::consciousness_aura::aura_update_system,
-            //     systems::consciousness_aura::resonance_wave_system,
-            //     systems::consciousness_aura::resonance_wave_animate_system,
-            //     systems::consciousness_aura::consciousness_perception_gate_system,
-            //     systems::dimensional_leakage::dimensional_leakage_system,
-            //     systems::dimensional_leakage::leakage_visual_system,
-            // ).chain().run_if(in_state(GamePhase::Playing)))
+            .add_systems(Update, (
+                systems::consciousness_aura::spawn_auras,
+                systems::consciousness_aura::aura_update_system,
+                systems::consciousness_aura::resonance_wave_system,
+                systems::consciousness_aura::resonance_wave_animate_system,
+                systems::consciousness_aura::consciousness_perception_gate_system,
+                systems::dimensional_leakage::dimensional_leakage_system,
+                systems::dimensional_leakage::leakage_visual_system,
+            ).chain().run_if(in_state(GamePhase::Playing)))
             // Mycelix physicalized cryptography (only when --features mycelix)
             ;
         // Terra Atlas globe view (only when --features atlas)
