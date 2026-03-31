@@ -848,9 +848,10 @@ impl StreamingSynth {
                 // Extended chord type from consciousness state (7ths, 9ths, sus, dim)
                 let ext_chord = ExtendedChordType::from_state(&self.state, grooved_beat);
                 let chord_ratios = ext_chord.ratios();
-                // Spread chord tones across 3 octaves for variety
+                // Chord tones filtered to singable range (MIDI 55-80 ≈ G3-G#5)
                 let chord_freqs: Vec<f32> = chord_ratios.iter()
                     .flat_map(|&r| vec![root_freq * r * 0.5, root_freq * r, root_freq * r * 2.0])
+                    .filter(|&f| f >= 196.0 && f <= 830.0) // G3 to G#5
                     .collect();
 
                 // Build scale tones (major or minor based on emotional gesture)

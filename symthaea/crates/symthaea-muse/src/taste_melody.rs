@@ -82,16 +82,16 @@ impl TasteMelody {
             if consciousness > 0.7 { self.phrase_length += 1; }
         }
 
-        // Determine interval size (tuned from benchmark feedback)
-        // v6→v7: steps 36→55%, thirds 26→15%, repeated 26→10%
+        // Determine interval size (tuned from benchmark v8 feedback)
+        // v8: steps 42%, thirds 25%, repeated 21%. Need steps→55%, thirds→15%
         let step = if r < 2 {
-            0 // 2% deliberate repeat — chord snap adds ~8% more
-        } else if r < 77 {
-            1 // 75% step — produces ~55% after chord snap dilution
-        } else if r < 87 {
-            2 // 10% third
+            0 // 2% deliberate repeat
+        } else if r < 82 {
+            1 // 80% step — need more to hit 55% after dilution
+        } else if r < 90 {
+            2 // 8% third (was 10%)
         } else {
-            3 + ((self.seed >> 24) % 2) as usize // 13% leap
+            3 + ((self.seed >> 24) % 2) as usize // 10% leap
         };
 
         // Apply direction
