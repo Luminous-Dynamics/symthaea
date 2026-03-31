@@ -8,7 +8,7 @@
 
 use leptos::prelude::*;
 
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::use_holochain;
 
 // ---------------------------------------------------------------------------
 // Data types (mirror dao_zome integrity types for the UI layer)
@@ -37,69 +37,66 @@ pub struct ProposalView {
 // Mock data (teacher/parent friendly examples)
 // ---------------------------------------------------------------------------
 
-fn mock_proposals() -> Vec<ProposalView> {
-    vec![
-        ProposalView {
-            proposal_id: "prop_001".into(),
-            title: "Add more fraction practice problems".into(),
-            description: "Our 4th graders need extra practice with adding and subtracting \
-                          fractions. Can we add a set of 20 new problems with visual aids \
-                          like fraction bars and pie charts?"
-                .into(),
-            proposer: "Ms. Rivera".into(),
-            proposal_type: "Normal".into(),
-            category: "Mathematics".into(),
-            status: "Active".into(),
-            for_votes: 25,
-            against_votes: 2,
-            abstain_votes: 1,
-            weighted_for: 0,
-            weighted_against: 0,
-            voting_mode: "Simple".into(),
-            voting_deadline: "3 days remaining".into(),
-            created_at: "2026-03-20".into(),
-        },
-        ProposalView {
-            proposal_id: "prop_002".into(),
-            title: "Start a school garden science unit".into(),
-            description: "Students could learn about plant biology, ecosystems, and \
-                          measurement through a hands-on garden project. We'd need \
-                          a small raised bed and basic supplies."
-                .into(),
-            proposer: "Mr. Thompson".into(),
-            proposal_type: "Normal".into(),
-            category: "Science".into(),
-            status: "Active".into(),
-            for_votes: 18,
-            against_votes: 3,
-            abstain_votes: 2,
-            weighted_for: 0,
-            weighted_against: 0,
-            voting_mode: "Simple".into(),
-            voting_deadline: "5 days remaining".into(),
-            created_at: "2026-03-22".into(),
-        },
-        ProposalView {
-            proposal_id: "prop_003".into(),
-            title: "Add a typing practice module".into(),
-            description: "Many students are hunt-and-peck typing. A fun typing practice \
-                          module with games would help them build this essential skill \
-                          before middle school."
-                .into(),
-            proposer: "Mrs. Chen".into(),
-            proposal_type: "Normal".into(),
-            category: "Computer Science".into(),
-            status: "Active".into(),
-            for_votes: 30,
-            against_votes: 1,
-            abstain_votes: 0,
-            weighted_for: 0,
-            weighted_against: 0,
-            voting_mode: "Simple".into(),
-            voting_deadline: "7 days remaining".into(),
-            created_at: "2026-03-18".into(),
-        },
-    ]
+fn real_proposals() -> Vec<ProposalView> {
+    let store = crate::persistence::GovernanceStore::load();
+    let mut proposals: Vec<ProposalView> = store.proposals.iter().map(|p| ProposalView {
+        proposal_id: p.id.clone(),
+        title: p.title.clone(),
+        description: p.description.clone(),
+        proposer: p.proposer.clone(),
+        proposal_type: "Normal".into(),
+        category: p.category.clone(),
+        status: p.status.clone(),
+        for_votes: p.for_votes,
+        against_votes: p.against_votes,
+        abstain_votes: 0,
+        weighted_for: 0,
+        weighted_against: 0,
+        voting_mode: "Simple".into(),
+        voting_deadline: if p.status == "Active" { "Ongoing".into() } else { "Closed".into() },
+        created_at: p.created_at.clone(),
+    }).collect();
+
+    // Add seed proposals if store is empty (first-time experience)
+    if proposals.is_empty() {
+        proposals = vec![
+            ProposalView {
+                proposal_id: "seed_001".into(),
+                title: "Add Gr11 Life Sciences content".into(),
+                description: "Life Sciences is a popular matric subject but has no content yet. Adding Gr11 LS would help students build the foundation for Gr12.".into(),
+                proposer: "Community".into(),
+                proposal_type: "Normal".into(),
+                category: "Curriculum".into(),
+                status: "Active".into(),
+                for_votes: 3,
+                against_votes: 0,
+                abstain_votes: 0,
+                weighted_for: 0,
+                weighted_against: 0,
+                voting_mode: "Simple".into(),
+                voting_deadline: "Ongoing".into(),
+                created_at: "2026-03-31".into(),
+            },
+            ProposalView {
+                proposal_id: "seed_002".into(),
+                title: "Add isiZulu and Afrikaans language content".into(),
+                description: "SA has 11 official languages. Adding basic language learning for isiZulu and Afrikaans would serve millions of students.".into(),
+                proposer: "Community".into(),
+                proposal_type: "Normal".into(),
+                category: "Curriculum".into(),
+                status: "Active".into(),
+                for_votes: 5,
+                against_votes: 0,
+                abstain_votes: 0,
+                weighted_for: 0,
+                weighted_against: 0,
+                voting_mode: "Simple".into(),
+                voting_deadline: "Ongoing".into(),
+                created_at: "2026-03-31".into(),
+            },
+        ];
+    }
+    proposals
 }
 
 // ---------------------------------------------------------------------------
@@ -143,11 +140,11 @@ pub fn GovernancePage() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<ProposalView>>("dao", "list_active_proposals", &())
+                .call_zome_default::<(), Vec<ProposalView>>("dao", "list_active_proposals", &())
                 .await
             {
                 Ok(p) => p,
-                Err(_) => mock_proposals(),
+                Err(_) => real_proposals(),
             }
         }
     });
@@ -328,15 +325,29 @@ fn SimpleTopicDetail(proposal: ProposalView) -> impl IntoView {
                             <div class="simple-vote-buttons">
                                 <button
                                     class="vote-btn vote-btn-for"
-                                    on:click=move |_| set_user_vote.set(Some("Yes".into()))
+                                    on:click={
+                                        let pid = proposal.proposal_id.clone();
+                                        move |_| {
+                                            let mut store = crate::persistence::GovernanceStore::load();
+                                            store.vote(&pid, true);
+                                            set_user_vote.set(Some("Yes — recorded!".into()));
+                                        }
+                                    }
                                 >
-                                    "Yes"
+                                    "Yes, add this"
                                 </button>
                                 <button
                                     class="vote-btn vote-btn-against"
-                                    on:click=move |_| set_user_vote.set(Some("No".into()))
+                                    on:click={
+                                        let pid = proposal.proposal_id.clone();
+                                        move |_| {
+                                            let mut store = crate::persistence::GovernanceStore::load();
+                                            store.vote(&pid, false);
+                                            set_user_vote.set(Some("No — recorded!".into()));
+                                        }
+                                    }
                                 >
-                                    "No"
+                                    "Not needed"
                                 </button>
                             </div>
                         }
@@ -582,6 +593,15 @@ fn CreateProposalForm(on_close: impl Fn() + Send + Sync + 'static) -> impl IntoV
                                     class="btn-primary"
                                     on:click=move |_| {
                                         if !title.get().is_empty() && !description.get().is_empty() {
+                                            let profile = crate::persistence::load::<crate::student_profile::StudentProfile>("edunet_profile");
+                                            let name = profile.map(|p| p.name).unwrap_or_else(|| "Anonymous".into());
+                                            let mut store = crate::persistence::GovernanceStore::load();
+                                            store.create_proposal(
+                                                title.get_untracked(),
+                                                description.get_untracked(),
+                                                category.get_untracked(),
+                                                name,
+                                            );
                                             set_submitted.set(true);
                                         }
                                     }

@@ -51,6 +51,74 @@ use crate::curriculum::ProgressStore;
 use crate::study_tracker::StudyTracker;
 use crate::student_profile::StudentProfile;
 
+// ============================================================
+// Governance Store — localStorage-first DAO preview
+// ============================================================
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct GovernanceStore {
+    pub proposals: Vec<LocalProposal>,
+    pub next_id: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LocalProposal {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub category: String,
+    pub proposer: String,
+    pub for_votes: u32,
+    pub against_votes: u32,
+    pub status: String, // "Active", "Approved", "Rejected"
+    pub created_at: String,
+    pub voted: bool, // has current user voted
+}
+
+const GOV_KEY: &str = "edunet_governance";
+
+impl GovernanceStore {
+    pub fn load() -> Self {
+        load::<GovernanceStore>(GOV_KEY).unwrap_or_default()
+    }
+
+    pub fn save_store(&self) {
+        save(GOV_KEY, self);
+    }
+
+    pub fn create_proposal(&mut self, title: String, description: String, category: String, proposer: String) {
+        let now = js_sys::Date::new_0();
+        let date = format!("{:04}-{:02}-{:02}", now.get_full_year(), now.get_month() + 1, now.get_date());
+        self.next_id += 1;
+        self.proposals.push(LocalProposal {
+            id: format!("local_{}", self.next_id),
+            title,
+            description,
+            category,
+            proposer,
+            for_votes: 0,
+            against_votes: 0,
+            status: "Active".into(),
+            created_at: date,
+            voted: false,
+        });
+        self.save_store();
+    }
+
+    pub fn vote(&mut self, proposal_id: &str, is_for: bool) {
+        if let Some(p) = self.proposals.iter_mut().find(|p| p.id == proposal_id) {
+            if !p.voted {
+                if is_for { p.for_votes += 1; } else { p.against_votes += 1; }
+                p.voted = true;
+                // Auto-resolve: 5+ for votes = approved, 5+ against = rejected
+                if p.for_votes >= 5 { p.status = "Approved".into(); }
+                if p.against_votes >= 5 { p.status = "Rejected".into(); }
+                self.save_store();
+            }
+        }
+    }
+}
+
 /// Bundled export of all student data.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ExportBundle {
