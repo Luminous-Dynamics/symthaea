@@ -66,6 +66,7 @@ pub fn setup_globe_view(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut holo_materials: ResMut<Assets<terra_atlas_bevy::holographic_material::HolographicMaterial>>,
     asset_server: Res<AssetServer>,
     dungeon_cameras: Query<Entity, (With<Camera2d>, Without<OrbitalCamera>)>,
 ) {
@@ -89,22 +90,29 @@ pub fn setup_globe_view(
 
     // ═══ HOLOGRAPHIC GLOBE ═══════════════════════════════════════
 
-    // [1] Semi-transparent Earth — see the grid through the surface
+    // [1] Globe with custom holographic shader — true Fresnel + scanlines
     let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(128, 128));
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
-    let earth_material = materials.add(StandardMaterial {
-        // Deep dark Earth — geography as ghost data, not satellite photo
-        base_color: Color::linear_rgba(0.08, 0.12, 0.14, 0.45),
-        base_color_texture: Some(earth_texture),
-        emissive: LinearRgba::new(0.01, 0.03, 0.04, 1.0), // ghost glow — coastlines barely visible
-        unlit: true,
-        alpha_mode: AlphaMode::Blend,
-        double_sided: true,
-        ..default()
+    let holo_globe = holo_materials.add(terra_atlas_bevy::holographic_material::HolographicMaterial {
+        base: StandardMaterial {
+            base_color: Color::linear_rgba(0.12, 0.18, 0.22, 0.6),
+            base_color_texture: Some(earth_texture),
+            alpha_mode: AlphaMode::Blend,
+            double_sided: true,
+            ..default()
+        },
+        extension: terra_atlas_bevy::holographic_material::HolographicExtension {
+            fresnel_color: LinearRgba::new(0.0, 0.87, 1.0, 1.0), // Mycelix cyan
+            fresnel_power: 3.0,
+            scanline_speed: 0.5,
+            scanline_density: 15.0,
+            hologram_alpha: 0.6,
+            ..default()
+        },
     });
     commands.spawn((
         Mesh3d(earth_mesh),
-        MeshMaterial3d(earth_material),
+        MeshMaterial3d(holo_globe),
         Transform::IDENTITY,
         Globe,
         AtlasEntity,

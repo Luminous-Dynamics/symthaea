@@ -103,6 +103,7 @@ impl Plugin for SymtropyPlugin {
         #[cfg(feature = "atlas")]
         {
             app
+                .add_plugins(bevy::pbr::MaterialPlugin::<terra_atlas_bevy::holographic_material::HolographicMaterial>::default())
                 .init_resource::<terra_atlas_bevy::camera::OrbitalCameraConfig>()
                 .init_resource::<terra_atlas_bevy::timeline::TimelineState>()
                 .init_resource::<terra_atlas_bevy::selection::SelectedMarker>()
@@ -128,6 +129,7 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::aesthetic_apply_system,
                     terra_atlas_bevy::selection::click_select_system,
                     terra_atlas_bevy::selection::update_selection_text,
+                    terra_atlas_bevy::holographic_material::update_holographic_time,
                 ).run_if(in_state(GamePhase::GlobeView)))
                 .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view);
         }
