@@ -40,11 +40,9 @@ pub fn speak(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32> {
     let phonemes = g2p::text_to_phonemes(text);
     if phonemes.is_empty() { return Vec::new(); }
 
-    // Use LTC-driven voice (liquid transitions from differential equations)
-    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-voice");
-    let mut ltc = ltc_voice::LtcVoice::new(&genesis);
-    let frames = ltc.phonemes_to_frames(&phonemes, prosody, sample_rate);
-
+    // Use static formant targets (proven working — "Commodore SAM" quality)
+    // with consciousness-shaped prosody. LTC upgrade for smoothing is WIP.
+    let frames = formants::phonemes_to_frames(&phonemes, prosody, sample_rate);
     vocoder::synthesize(&frames, sample_rate)
 }
 
