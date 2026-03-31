@@ -291,8 +291,8 @@ pub fn setup_globe_view(
             let size = terra_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
             let mat = materials.add(StandardMaterial {
-                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.5),
-                emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
+                base_color: Color::linear_rgba(c[0], c[1], c[2], 0.6),
+                emissive: LinearRgba::new(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, 1.0),
                 alpha_mode: AlphaMode::Blend,
                 unlit: true,
                 ..default()

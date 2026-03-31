@@ -37,8 +37,8 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
     vec![
         CelestialBody {
             name: "Sun".into(),
-            orbit_radius: 12.0,
-            visual_radius: 1.5,
+            orbit_radius: 18.0,  // further away
+            visual_radius: 0.8,  // smaller — shouldn't compete with globe
             orbit_speed: 0.005,
             orbit_offset: 0.0,
             y_offset: 0.5,
@@ -50,8 +50,8 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Moon".into(),
-            orbit_radius: 2.5,
-            visual_radius: 0.18,
+            orbit_radius: 2.8,
+            visual_radius: 0.12,  // smaller, subtle
             orbit_speed: 0.03,
             orbit_offset: 1.2,
             y_offset: 0.15,
@@ -63,8 +63,8 @@ pub fn solar_system_bodies() -> Vec<CelestialBody> {
         },
         CelestialBody {
             name: "Venus".into(),
-            orbit_radius: 8.0,
-            visual_radius: 0.3,
+            orbit_radius: 9.0,
+            visual_radius: 0.2,
             orbit_speed: 0.008,
             orbit_offset: 2.4,
             y_offset: -0.3,
