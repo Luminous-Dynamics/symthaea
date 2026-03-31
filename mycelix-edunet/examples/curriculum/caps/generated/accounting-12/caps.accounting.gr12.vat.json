@@ -1,0 +1,266 @@
+{
+  "node_id": "CAPS.Accounting.Gr12.VAT",
+  "lesson": {
+    "standard_code": "CAPS.Accounting.Gr12.VAT",
+    "title": "CAPS.Accounting.Gr12.VAT: VAT, Budgets & Projections — VAT at 15%, Cash Budgets, Projected Income Statements, Age Analysis, Inventory Valuation",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Value Added Tax (VAT) in South Africa is charged at 15% on most goods and services. Businesses registered for VAT collect output VAT on sales and pay input VAT on purchases, remitting the difference to SARS. Cash budgets project expected cash receipts and payments over a future period, helping businesses plan for surpluses or shortfalls. Projected income statements forecast future profit based on expected trends. Debtors and creditors age analysis categorises amounts owed by time period (current, 30 days, 60 days, 90+ days) to manage credit risk. Inventory is valued using FIFO (first-in, first-out) or weighted average cost methods. These tools help SA businesses make informed financial decisions.",
+    "examples": [
+      {
+        "problem": "A retailer in Cape Town sold goods for R11 500 (VAT inclusive). Calculate the VAT amount and the selling price excluding VAT.",
+        "steps": [
+          {
+            "instruction": "Step 1: VAT-inclusive price = Price excluding VAT x 1.15. So Price excl. VAT = R11 500 / 1.15",
+            "result": "Price excluding VAT = R10 000"
+          },
+          {
+            "instruction": "Step 2: VAT amount = R11 500 - R10 000",
+            "result": "VAT = R1 500"
+          }
+        ],
+        "answer": "Answer: Selling price excluding VAT is R10 000 and the VAT amount is R1 500",
+        "visual_description": null
+      },
+      {
+        "problem": "Prepare a Cash Budget for Khumalo Traders for April 2026. Expected: Cash sales R60 000, Receipts from debtors R85 000, Payment to creditors R72 000, Salaries R35 000, Rent R12 000, Opening bank balance R18 000.",
+        "steps": [
+          {
+            "instruction": "Step 1: Total receipts = Cash sales + Receipts from debtors = R60 000 + R85 000",
+            "result": "Total receipts = R145 000"
+          },
+          {
+            "instruction": "Step 2: Total payments = Creditors + Salaries + Rent = R72 000 + R35 000 + R12 000",
+            "result": "Total payments = R119 000"
+          },
+          {
+            "instruction": "Step 3: Net cash flow = Total receipts - Total payments = R145 000 - R119 000",
+            "result": "Net cash flow = R26 000"
+          },
+          {
+            "instruction": "Step 4: Closing balance = Opening balance + Net cash flow = R18 000 + R26 000",
+            "result": "Closing balance = R44 000"
+          }
+        ],
+        "answer": "Answer: The projected closing bank balance for April 2026 is R44 000",
+        "visual_description": null
+      },
+      {
+        "problem": "A business has the following inventory transactions for Product X using FIFO: Opening stock 100 units at R50 each. Purchased 200 units at R55 each. Sold 180 units. Calculate the value of closing stock.",
+        "steps": [
+          {
+            "instruction": "Step 1: Under FIFO, the first units purchased are the first sold. The 180 units sold come from: 100 units at R50 + 80 units at R55",
+            "result": "Cost of sales = (100 x R50) + (80 x R55) = R5 000 + R4 400 = R9 400"
+          },
+          {
+            "instruction": "Step 2: Remaining stock = 200 - 80 = 120 units at R55 each",
+            "result": "Closing stock = 120 x R55 = R6 600"
+          }
+        ],
+        "answer": "Answer: Closing stock value using FIFO is R6 600 (120 units at R55 each)",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "A business had output VAT of R45 000 and input VAT of R31 500 for the two-month VAT period. Calculate the amount payable to or receivable from SARS.",
+        "answer": "VAT payable to SARS = Output VAT - Input VAT = R45 000 - R31 500 = R13 500 payable to SARS.",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "If output VAT exceeds input VAT, the business owes SARS.",
+          "Output VAT is collected on sales; input VAT is paid on purchases."
+        ],
+        "explanation": "Output VAT (R45 000) is the VAT collected from customers on sales. Input VAT (R31 500) is the VAT paid to suppliers on purchases. The difference of R13 500 must be paid to SARS. If input VAT were higher, the business would receive a refund.",
+        "distractors": [
+          "R13 500 receivable from SARS",
+          "R76 500 payable to SARS",
+          "R45 000 payable to SARS"
+        ]
+      },
+      {
+        "question": "Goods were purchased for R8 050 (VAT inclusive). Calculate the price excluding VAT and the input VAT amount.",
+        "answer": "Price excluding VAT = R8 050 / 1.15 = R7 000. Input VAT = R8 050 - R7 000 = R1 050.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "To remove VAT: divide the inclusive amount by 1.15.",
+          "VAT amount = Inclusive price - Exclusive price."
+        ],
+        "explanation": "The VAT-inclusive price includes the original price plus 15% VAT. To find the exclusive price: R8 050 / 1.15 = R7 000. The VAT portion is R8 050 - R7 000 = R1 050. Always divide by 1.15, not multiply by 0.15 (which would give the wrong answer of R1 207.50).",
+        "distractors": [
+          "Excl. R6 842.50, VAT R1 207.50",
+          "Excl. R7 000, VAT R1 207.50",
+          "Excl. R6 843, VAT R1 207"
+        ]
+      },
+      {
+        "question": "Prepare a debtors age analysis from the following information for Mkhize Wholesalers: Total debtors R120 000. Current (0-30 days) R55 000, 31-60 days R35 000, 61-90 days R20 000, 90+ days R10 000. Comment on the credit management.",
+        "answer": "Age analysis: Current R55 000 (45.8%), 31-60 days R35 000 (29.2%), 61-90 days R20 000 (16.7%), 90+ days R10 000 (8.3%). The 90+ days amount of R10 000 is concerning as these debts may be irrecoverable. The business should follow up on overdue accounts and consider stricter credit terms.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Calculate each category as a percentage of total debtors.",
+          "Debtors older than 90 days are a high risk for bad debts."
+        ],
+        "explanation": "A healthy debtors book has most amounts in the current column. Here, 25% of debts are over 60 days old, which suggests collection problems. The R10 000 over 90 days should be actively pursued or written off. Management should review credit policies and consider offering discounts for early payment.",
+        "distractors": [
+          "The age analysis looks healthy because most debt is current",
+          "Only the 90+ days column matters for credit management",
+          "Age analysis is not necessary if total debtors are known"
+        ]
+      },
+      {
+        "question": "A business has the following inventory data for June using the weighted average method: Opening stock: 50 units at R40 = R2 000. Purchase 1 June: 100 units at R44 = R4 400. Purchase 15 June: 150 units at R48 = R7 200. Sales during June: 220 units. Calculate the closing stock value.",
+        "answer": "Total cost = R2 000 + R4 400 + R7 200 = R13 600. Total units = 50 + 100 + 150 = 300. Weighted average = R13 600 / 300 = R45.33 per unit. Closing stock = 300 - 220 = 80 units x R45.33 = R3 626.67 (rounded to R3 627).",
+        "difficulty_permille": 625,
+        "bloom_level": "Apply",
+        "hints": [
+          "Weighted average cost = Total cost of all units available / Total number of units available.",
+          "Apply this average cost to both units sold and units remaining."
+        ],
+        "explanation": "Weighted average cost per unit = (R2 000 + R4 400 + R7 200) / (50 + 100 + 150) = R13 600 / 300 = R45.33. Units sold = 220 at R45.33 = R9 973.33 (cost of sales). Closing stock = 80 units at R45.33 = R3 626.67. Note: FIFO would give a different closing stock value because it uses specific costs.",
+        "distractors": [
+          "R3 200 (using only opening stock price)",
+          "R3 840 (using only last purchase price)",
+          "R3 520 (using simple average of R40, R44, R48)"
+        ]
+      },
+      {
+        "question": "Prepare a projected income statement for Sithole Traders for the six months ending 31 August 2026. Current year actuals (12 months): Sales R2 400 000, Cost of Sales R1 440 000, Gross Profit R960 000, Operating Expenses R576 000, Net Profit R384 000. Projections: Sales expected to increase by 10%, cost of sales ratio remains constant, operating expenses increase by 5%.",
+        "answer": "Projected 6-month Sales = (R2 400 000 / 2) x 1.10 = R1 320 000. Cost of Sales ratio = 60%, so COS = R1 320 000 x 0.60 = R792 000. Gross Profit = R528 000. Operating Expenses = (R576 000 / 2) x 1.05 = R302 400. Projected Net Profit = R528 000 - R302 400 = R225 600.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "First calculate the cost of sales ratio from current figures (COS/Sales).",
+          "Remember to halve the annual figures for a 6-month projection before applying growth rates."
+        ],
+        "explanation": "Current COS ratio = R1 440 000 / R2 400 000 = 60%. For 6 months: Base sales = R1 200 000, projected = R1 200 000 x 1.10 = R1 320 000. COS = 60% x R1 320 000 = R792 000. GP = R528 000. Base expenses (6 months) = R288 000, projected = R288 000 x 1.05 = R302 400. Net Profit = R528 000 - R302 400 = R225 600.",
+        "distractors": [
+          "Net Profit R422 400 (using full year figures with growth)",
+          "Net Profit R225 600 but incorrect COS of R660 000",
+          "Net Profit R192 000 (no growth applied)"
+        ]
+      }
+    ],
+    "hints": [
+      "To extract VAT from an inclusive amount, divide by 1.15 (not multiply by 15/115).",
+      "Cash budgets deal only with actual cash movements, not accruals or depreciation.",
+      "FIFO assumes the oldest stock is sold first; weighted average spreads cost evenly."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "output VAT",
+        "definition": "VAT charged by a business on goods or services sold to customers",
+        "example_usage": "The output VAT on the R10 000 sale was R1 500."
+      },
+      {
+        "term": "input VAT",
+        "definition": "VAT paid by a business on goods or services purchased from suppliers",
+        "example_usage": "The business claimed R31 500 input VAT on its purchases."
+      },
+      {
+        "term": "cash budget",
+        "definition": "A financial plan that projects expected cash receipts and payments for a future period",
+        "example_usage": "The cash budget showed a projected shortfall of R15 000 in July."
+      },
+      {
+        "term": "FIFO",
+        "definition": "First-In, First-Out — an inventory valuation method where the oldest stock is assumed to be sold first",
+        "example_usage": "Using FIFO, the closing stock is valued at the most recent purchase price."
+      },
+      {
+        "term": "age analysis",
+        "definition": "A report that categorises amounts owed by debtors or to creditors according to how long they have been outstanding",
+        "example_usage": "The debtors age analysis showed R10 000 outstanding for more than 90 days."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often calculate VAT by multiplying the inclusive amount by 15%, instead of dividing by 1.15.",
+        "correction": "To extract VAT from an inclusive amount: divide by 1.15 to get the exclusive price, then subtract. For example, R1 150 inclusive: R1 150 / 1.15 = R1 000 exclusive, VAT = R150. Multiplying R1 150 by 0.15 gives R172.50 which is incorrect.",
+        "why_students_think_this": "Students confuse adding VAT (multiply by 0.15 and add) with removing VAT (divide by 1.15). The 15% is calculated on the exclusive price, not the inclusive price."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Accounting.Gr12.VAT",
+    "title": "Assessment: VAT, Budgets & Projections — VAT Calculations, Cash Budgets, Inventory Valuation",
+    "items": [
+      {
+        "question": "What is the current VAT rate in South Africa and which government body administers it?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "15%, administered by the South African Revenue Service (SARS)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about who collects taxes in SA."
+      },
+      {
+        "question": "Calculate the closing bank balance: Opening balance R22 000, Cash receipts R98 000, Payments to creditors R54 000, Salaries R28 000, Equipment purchased R15 000.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Closing balance = R22 000 + R98 000 - R54 000 - R28 000 - R15 000 = R23 000",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Closing balance = Opening balance + Total receipts - Total payments."
+      },
+      {
+        "question": "Compare FIFO and weighted average inventory valuation methods. Which gives a higher closing stock value when prices are rising? Explain why.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "FIFO gives a higher closing stock value when prices rise because closing stock is valued at the most recent (higher) purchase prices. Weighted average smooths all costs together, giving a middle value.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Under FIFO, closing stock consists of the most recently purchased items."
+      }
+    ],
+    "total_points": 6,
+    "estimated_minutes": 40,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "How do you extract VAT from a VAT-inclusive price?",
+      "back": "Divide the inclusive price by 1.15 to get the exclusive price. VAT amount = Inclusive - Exclusive. Example: R2 300 / 1.15 = R2 000 exclusive, VAT = R300.",
+      "tags": ["CAPS.Accounting.Gr12.VAT", "Grade12", "VAT"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the formula for closing balance in a Cash Budget?",
+      "back": "Closing Balance = Opening Balance + Total Receipts - Total Payments. Depreciation is NOT included (it is not a cash payment).",
+      "tags": ["CAPS.Accounting.Gr12.VAT", "Grade12", "Budgets"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is FIFO inventory valuation?",
+      "back": "First-In, First-Out: assumes the oldest stock is sold first. Closing stock is valued at the most recent purchase prices. Gives higher closing stock when prices are rising.",
+      "tags": ["CAPS.Accounting.Gr12.VAT", "Grade12", "Inventory"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "When is VAT payable to SARS vs receivable from SARS?",
+      "back": "Payable: when Output VAT (on sales) > Input VAT (on purchases). Receivable: when Input VAT > Output VAT (a refund is due).",
+      "tags": ["CAPS.Accounting.Gr12.VAT", "Grade12", "VAT"],
+      "difficulty_permille": 333
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

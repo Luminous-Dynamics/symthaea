@@ -1,0 +1,273 @@
+{
+  "node_id": "CAPS.Business.Gr12.VENTURE",
+  "lesson": {
+    "standard_code": "CAPS.Business.Gr12.VENTURE",
+    "title": "CAPS.Business.Gr12.VENTURE: Business Ventures — Business Plans, Forms of Ownership, Franchising, Insurance, CIPC Registration",
+    "grade_level": "Grade12",
+    "bloom_level": "Apply",
+    "explanation": "Starting a business in South Africa requires choosing the correct form of ownership and completing legal requirements. A sole trader is simple to set up with unlimited liability. A private company (Pty Ltd) offers limited liability and must register with the Companies and Intellectual Property Commission (CIPC). Close corporations (CCs) can no longer be newly registered but existing ones still operate. A business plan is essential for securing finance and guiding operations; it includes an executive summary, market analysis, marketing plan, operational plan and financial projections. Franchising allows entrepreneurs to use an established brand (e.g., Nando's, Spur, Debonairs) by paying franchise fees and royalties. Business insurance (short-term for assets, liability insurance, loss-of-income cover) protects against financial losses from unforeseen events.",
+    "examples": [
+      {
+        "problem": "Compare a sole trader and a private company (Pty Ltd) on four key criteria: liability, continuity, capital raising, and legal requirements.",
+        "steps": [
+          {
+            "instruction": "Step 1: Liability — Sole trader has unlimited liability (personal assets at risk). Pty Ltd has limited liability (shareholders risk only their investment)",
+            "result": "Key difference in risk"
+          },
+          {
+            "instruction": "Step 2: Continuity — Sole trader ceases on owner's death. Pty Ltd has perpetual succession (continues regardless of shareholders)",
+            "result": "Pty Ltd is more stable"
+          },
+          {
+            "instruction": "Step 3: Capital — Sole trader limited to personal funds and loans. Pty Ltd can issue shares to up to 50 shareholders",
+            "result": "Pty Ltd has greater capital access"
+          },
+          {
+            "instruction": "Step 4: Legal requirements — Sole trader has minimal registration. Pty Ltd must register with CIPC, file annual returns, and comply with the Companies Act",
+            "result": "Pty Ltd has greater compliance burden"
+          }
+        ],
+        "answer": "Answer: Pty Ltd offers better liability protection and capital access but requires more legal compliance than a sole trader",
+        "visual_description": null
+      },
+      {
+        "problem": "Thandi wants to open a Steers franchise in Rustenburg. Outline the advantages and disadvantages of franchising for her.",
+        "steps": [
+          {
+            "instruction": "Step 1: Advantages — established brand recognition, proven business model, training and support from franchisor, group marketing, bulk purchasing",
+            "result": "Lower risk than starting from scratch"
+          },
+          {
+            "instruction": "Step 2: Disadvantages — high initial franchise fee (can be R1 million+), ongoing royalty payments (typically 5-8% of turnover), limited independence in decision-making, must follow franchisor's strict operational procedures",
+            "result": "Less freedom and higher ongoing costs"
+          },
+          {
+            "instruction": "Step 3: Other considerations — franchise agreement terms, territory exclusivity, renewal conditions, exit clauses",
+            "result": "Legal aspects to consider"
+          }
+        ],
+        "answer": "Answer: Franchising offers Thandi lower risk with brand support, but at the cost of franchise fees, royalties and limited operational freedom",
+        "visual_description": null
+      },
+      {
+        "problem": "List the key sections of a business plan for a new tutoring centre in Johannesburg.",
+        "steps": [
+          {
+            "instruction": "Step 1: Executive summary — brief overview of the business concept, target market (Grade 10-12 learners), and financial highlights",
+            "result": "First impression for investors"
+          },
+          {
+            "instruction": "Step 2: Market analysis — research on demand for tutoring, competitor analysis, target market demographics in Johannesburg",
+            "result": "Understanding the market"
+          },
+          {
+            "instruction": "Step 3: Marketing plan — pricing strategy, advertising (social media, school partnerships), location, and unique selling proposition (e.g., small group classes, exam prep focus)",
+            "result": "How to attract customers"
+          },
+          {
+            "instruction": "Step 4: Financial plan — start-up costs, projected income and expenses for 3 years, break-even analysis, funding requirements",
+            "result": "Financial viability demonstration"
+          }
+        ],
+        "answer": "Answer: A complete business plan includes executive summary, market analysis, marketing strategy, operational plan, management structure and financial projections",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What does CIPC stand for and what is its role in business registration in South Africa?",
+        "answer": "CIPC stands for the Companies and Intellectual Property Commission. It is the government body responsible for registering companies, close corporations and co-operatives in South Africa. Businesses must register with CIPC to obtain a registration number and operate as a legal entity. CIPC also handles intellectual property registrations (trademarks, patents).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about where a new Pty Ltd company is registered.",
+          "CIPC handles both company registration and intellectual property."
+        ],
+        "explanation": "CIPC is the regulatory body under the Department of Trade, Industry and Competition. A new company must file a Memorandum of Incorporation (MOI) with CIPC, pay the registration fee (around R175 online), and choose a unique company name. Registration can be done online at www.cipc.co.za.",
+        "distractors": [
+          "CIPC stands for Company and Investment Protection Commission",
+          "CIPC only registers companies listed on the JSE",
+          "Only companies with more than 50 employees need to register"
+        ]
+      },
+      {
+        "question": "Explain why a business plan is important when applying for a loan from a South African bank such as Standard Bank or FNB.",
+        "answer": "A business plan demonstrates to the bank that the entrepreneur has thoroughly researched the market, has a clear strategy for generating revenue, and can repay the loan. Banks assess the financial projections, cash flow forecasts and break-even analysis to determine whether the business is financially viable. The plan also shows the entrepreneur's management capability and understanding of risks.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What does a bank need to know before lending money?",
+          "Think about the financial sections of a business plan."
+        ],
+        "explanation": "Banks use the business plan to assess creditworthiness and risk. Key sections they examine include the financial projections (can the business generate enough cash to repay?), market analysis (is there real demand?), management team (are they capable?), and collateral (what security is offered?). Without a business plan, most formal lenders will not approve a loan.",
+        "distractors": [
+          "Banks do not require business plans for loans under R1 million",
+          "A business plan is only needed for franchise applications",
+          "The bank only looks at the owner's personal credit score"
+        ]
+      },
+      {
+        "question": "Bongani runs a panel beating workshop in Durban as a sole trader. He is considering converting to a Pty Ltd company. Advise him on three advantages of converting and two potential disadvantages.",
+        "answer": "Advantages: (1) Limited liability — his personal assets (house, car) will be protected if the business fails. (2) Easier to raise capital by admitting shareholders. (3) Perpetual succession — the business continues if Bongani becomes ill or passes away. Disadvantages: (1) Higher administrative costs (annual returns, accounting, audit requirements). (2) Less flexibility in decision-making (must comply with Companies Act, may need board approval).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Consider what happens to Bongani's house if the sole trader business cannot pay its debts.",
+          "Think about the additional compliance requirements of a Pty Ltd company."
+        ],
+        "explanation": "Converting to Pty Ltd protects Bongani's personal assets through limited liability — creditors can only claim against the company's assets. However, he must bear the costs of compliance: filing annual returns with CIPC, maintaining proper financial records, and potentially appointing an auditor. He loses the simplicity of sole proprietorship but gains legal protection.",
+        "distractors": [
+          "A Pty Ltd company has no compliance requirements",
+          "Sole traders have limited liability in South Africa",
+          "Converting to Pty Ltd means Bongani loses ownership"
+        ]
+      },
+      {
+        "question": "Distinguish between short-term insurance and long-term insurance. Give two examples of each that a SA business might need.",
+        "answer": "Short-term insurance covers assets and liabilities for a defined period (usually 12 months, renewable). Examples: fire insurance for premises, vehicle insurance for delivery trucks, public liability insurance, theft insurance. Long-term insurance covers events over an extended period. Examples: life insurance on key personnel (key-person insurance), retirement annuity for the business owner. Short-term claims restore assets; long-term provides financial security over time.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Short-term insurance relates to assets and events; long-term relates to life and retirement.",
+          "Think about what a business needs to protect: its physical assets and its people."
+        ],
+        "explanation": "Short-term insurance (e.g., Santam, OUTsurance) covers buildings, vehicles, stock, cash-in-transit, and liability. Premiums are paid monthly or annually. Long-term insurance (e.g., Old Mutual, Sanlam) covers life events and includes key-person insurance, group life cover for employees, and retirement funds. Both types protect the business from financial risk.",
+        "distractors": [
+          "Short-term and long-term insurance are the same thing",
+          "Businesses only need short-term insurance",
+          "Life insurance is a form of short-term insurance"
+        ]
+      },
+      {
+        "question": "Evaluate whether franchising is a better option than starting an independent restaurant for a first-time entrepreneur in Johannesburg. Consider at least four factors in your evaluation.",
+        "answer": "Franchising advantages: (1) Proven brand and business model reduce risk. (2) Training and operational support from franchisor. (3) Group marketing and bulk purchasing lower costs. (4) Banks are more willing to finance franchises (lower risk profile). Disadvantages: (1) High initial investment (franchise fee R500 000-R5 million for a restaurant). (2) Ongoing royalties reduce profits. (3) Limited menu and operational freedom. (4) Franchise agreement may restrict territory or exit options. For a first-time entrepreneur, franchising is generally lower risk but less profitable long-term than a successful independent restaurant.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider financial, operational, independence and risk factors.",
+          "Think about what a first-time entrepreneur lacks (experience, brand recognition)."
+        ],
+        "explanation": "For a first-time entrepreneur, franchising offers a structured path with lower failure rates (estimated 10-15% vs 60-80% for independent startups in SA). However, the significant upfront costs and ongoing royalties mean net profit margins are typically lower. The decision depends on the entrepreneur's experience, capital, risk appetite and desire for independence. A franchise is like renting a proven business model versus building one from scratch.",
+        "distractors": [
+          "Independent restaurants always outperform franchises",
+          "Franchise fees are a one-time cost with no ongoing payments",
+          "First-time entrepreneurs should never consider franchising"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember that close corporations (CCs) cannot be newly registered since 2011, but existing CCs still operate.",
+      "A Memorandum of Incorporation (MOI) replaced the old Memorandum and Articles of Association under the Companies Act 71 of 2008.",
+      "When evaluating business forms, always consider liability, capital, continuity and compliance."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "limited liability",
+        "definition": "A legal principle where shareholders' personal assets are protected and they can only lose the amount they invested in the company",
+        "example_usage": "The Pty Ltd structure gives the owner limited liability, protecting her house and car."
+      },
+      {
+        "term": "franchise",
+        "definition": "A business model where a franchisor grants a franchisee the right to operate using its brand, systems and support in exchange for fees and royalties",
+        "example_usage": "She bought a Nando's franchise for R2.5 million, which included training and equipment."
+      },
+      {
+        "term": "CIPC",
+        "definition": "Companies and Intellectual Property Commission — the SA government body that registers companies and handles intellectual property",
+        "example_usage": "The new Pty Ltd company was registered with CIPC within 5 business days."
+      },
+      {
+        "term": "business plan",
+        "definition": "A formal document outlining a business's objectives, strategies, market analysis and financial projections",
+        "example_usage": "The bank required a detailed business plan before approving the R500 000 business loan."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that a sole trader has limited liability because 'it is their own business'.",
+        "correction": "A sole trader has UNLIMITED liability. There is no legal separation between the owner and the business. If the business owes R500 000 in debt, creditors can take the owner's personal assets (house, car, savings) to settle the debt. Only Pty Ltd companies and corporations offer limited liability.",
+        "why_students_think_this": "Students confuse ownership (the business belongs to one person) with liability protection. They assume having full control means having full protection, when in fact it means having full risk."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Business.Gr12.VENTURE",
+    "title": "Assessment: Business Ventures — Forms of Ownership, Franchising, Business Plans, Insurance",
+    "items": [
+      {
+        "question": "Name two forms of business ownership that offer limited liability in South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Private company (Pty Ltd) and public company (Ltd). Existing close corporations (CC) also have limited liability.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about which business forms separate the owner's personal assets from business debts."
+      },
+      {
+        "question": "Draft three key sections that should appear in a business plan for a new laundry service in a Johannesburg township. Include specific details relevant to the target market.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "1. Market Analysis: demand from working professionals, students and households without washing machines; competitor analysis of existing laundromats. 2. Marketing Plan: pricing (R30-R80 per load), flyer distribution, WhatsApp marketing, strategic location near taxi ranks. 3. Financial Plan: start-up costs (machines R150 000, deposit R20 000, working capital R30 000), projected monthly revenue and expenses, break-even at 3 months.",
+        "points": 3,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Think about the specific needs and demographics of the target community."
+      },
+      {
+        "question": "Evaluate whether franchising or independent ownership is more suitable for a young entrepreneur with R200 000 in savings who wants to open a coffee shop. Justify your answer.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Independent ownership is more suitable because R200 000 is insufficient for most coffee franchise fees (typically R500 000+). An independent shop allows creative freedom, lower start-up costs and no royalty payments. However, the entrepreneur must develop their own brand, systems and supplier relationships without support. Recommendation: start independently, build experience and capital, then consider franchising later.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider the financial requirements of franchising vs the entrepreneur's available capital."
+      }
+    ],
+    "total_points": 8,
+    "estimated_minutes": 40,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Create", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the difference between unlimited and limited liability?",
+      "back": "Unlimited liability (sole trader): owner's personal assets can be seized to pay business debts. Limited liability (Pty Ltd): shareholders can only lose the amount they invested; personal assets are protected.",
+      "tags": ["CAPS.Business.Gr12.VENTURE", "Grade12", "Business Ventures"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "Name five key sections of a business plan.",
+      "back": "1. Executive summary 2. Market analysis 3. Marketing plan 4. Operational plan 5. Financial projections. Also: management structure, risk analysis.",
+      "tags": ["CAPS.Business.Gr12.VENTURE", "Grade12", "Business Ventures"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is a franchise fee vs a royalty in franchising?",
+      "back": "Franchise fee: once-off upfront payment for the right to use the brand (e.g., R1 million for a KFC). Royalty: ongoing percentage of turnover paid to the franchisor (typically 5-8% monthly).",
+      "tags": ["CAPS.Business.Gr12.VENTURE", "Grade12", "Business Ventures"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What document must a Pty Ltd company file with CIPC?",
+      "back": "A Memorandum of Incorporation (MOI), which sets out the company's rules, rights of shareholders, and governance structures. It replaced the old Memorandum and Articles of Association.",
+      "tags": ["CAPS.Business.Gr12.VENTURE", "Grade12", "Business Ventures"],
+      "difficulty_permille": 333
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

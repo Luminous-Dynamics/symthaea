@@ -1,0 +1,270 @@
+{
+  "node_id": "CAPS.Geography.Gr12.CLIMATE",
+  "lesson": {
+    "standard_code": "CAPS.Geography.Gr12.CLIMATE",
+    "title": "CAPS.Geography.Gr12.CLIMATE: Climate & Weather — SA Climate Factors, Pressure Systems, Synoptic Maps, Climate Change",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "South Africa's climate is influenced by latitude (22-35 S, mostly subtropical), altitude (interior plateau at 1 200+ m cools temperatures), ocean currents (warm Agulhas current on the east coast brings moisture and rainfall; cold Benguela current on the west coast creates dry, cool conditions), and prevailing winds. Pressure systems drive weather: the South Atlantic High and South Indian High produce fair weather; mid-latitude cyclones bring cold fronts and rain to the Western Cape in winter. Coastal lows cause berg winds (hot, dry offshore winds). Synoptic weather maps show isobars (lines of equal pressure), fronts, and weather systems at a specific time. Climate change is increasing temperatures, changing rainfall patterns, and intensifying extreme weather events across SA, threatening agriculture, water security and biodiversity.",
+    "examples": [
+      {
+        "problem": "Explain why Durban (east coast) receives significantly more rainfall than Port Nolloth (west coast), despite both being coastal cities.",
+        "steps": [
+          {
+            "instruction": "Step 1: Durban is warmed by the Agulhas Current (warm Mozambique current), which heats the air above it, causing high evaporation and moisture-laden onshore winds",
+            "result": "Warm current = high evaporation = moisture"
+          },
+          {
+            "instruction": "Step 2: Port Nolloth is cooled by the Benguela Current (cold), which cools the air above it, reducing evaporation and creating stable atmospheric conditions (temperature inversion)",
+            "result": "Cold current = low evaporation = stable dry air"
+          },
+          {
+            "instruction": "Step 3: The cold Benguela Current creates fog but not significant rainfall, while the warm Agulhas Current promotes convectional rainfall, especially in summer",
+            "result": "Contrasting rainfall patterns explained"
+          }
+        ],
+        "answer": "Answer: Durban receives more rain because the warm Agulhas Current promotes evaporation and moisture, while Port Nolloth is dry because the cold Benguela Current suppresses evaporation and creates stable air conditions",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe what happens when a cold front passes over Cape Town, using your knowledge of mid-latitude cyclones.",
+        "steps": [
+          {
+            "instruction": "Step 1: Before the front — warm, dry berg wind conditions as a coastal low moves ahead of the front. Temperatures rise, skies are clear",
+            "result": "Pre-frontal conditions: warm and dry"
+          },
+          {
+            "instruction": "Step 2: During the front — cold, dense polar air undercuts warm air, forcing it to rise rapidly. Heavy rainfall, strong north-westerly to south-westerly winds, dramatic temperature drop",
+            "result": "Frontal passage: rain and cooling"
+          },
+          {
+            "instruction": "Step 3: After the front — cold, clear conditions as the cold air mass settles. South-easterly winds, clear skies, low temperatures",
+            "result": "Post-frontal conditions: cold and clear"
+          }
+        ],
+        "answer": "Answer: A cold front brings a sequence of warm pre-frontal conditions, heavy rain during passage, and cold clear weather afterwards",
+        "visual_description": null
+      },
+      {
+        "problem": "On a synoptic map, identify and explain the weather associated with a high-pressure system (anticyclone) positioned over the interior of South Africa.",
+        "steps": [
+          {
+            "instruction": "Step 1: High-pressure systems have descending air (subsidence), which warms adiabatically as it sinks",
+            "result": "Sinking air = warming = clear skies"
+          },
+          {
+            "instruction": "Step 2: The descending air suppresses cloud formation, resulting in clear, dry conditions with large daily temperature ranges",
+            "result": "Dry, sunny weather"
+          },
+          {
+            "instruction": "Step 3: In winter, the continental high strengthens over the interior, bringing frost to the Free State and Highveld due to radiation cooling under clear skies",
+            "result": "Clear nights = severe frost on the Highveld"
+          }
+        ],
+        "answer": "Answer: A high-pressure system over the SA interior brings clear, dry weather with potentially severe frost in winter due to radiation cooling under cloudless skies",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List four factors that influence the climate of South Africa.",
+        "answer": "1. Latitude (22-35 S, subtropical to temperate). 2. Altitude (interior plateau above 1 200 m moderates temperatures). 3. Ocean currents (warm Agulhas on east coast, cold Benguela on west coast). 4. Distance from the sea (continental interior has larger temperature range). Others: prevailing winds, mountain barriers (escarpment).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about geographic features that affect temperature and rainfall.",
+          "Consider both oceanic and terrestrial influences."
+        ],
+        "explanation": "These factors work together to create SA's diverse climate zones: Mediterranean (Western Cape), subtropical (KZN coast), semi-arid (Karoo, Northern Cape), arid (Namib), and temperate (Highveld). The interaction between ocean currents, altitude and latitude explains why Johannesburg (1 750 m) is cooler than Durban (sea level) despite being further north.",
+        "distractors": [
+          "South Africa has a uniform climate due to its small size",
+          "Only latitude and ocean currents affect SA's climate",
+          "The Benguela Current warms the west coast"
+        ]
+      },
+      {
+        "question": "Explain why the Western Cape receives its rainfall mainly in winter while Gauteng receives rainfall mainly in summer.",
+        "answer": "Western Cape: Mid-latitude cyclones and their associated cold fronts move northward in winter, bringing rain. In summer, the South Atlantic High shifts southward and blocks frontal systems. Gauteng: In summer, the ITCZ (Inter-Tropical Convergence Zone) moves southward, bringing moist tropical air over the interior. Convectional heating of the plateau causes afternoon thunderstorms. In winter, the continental high suppresses rainfall over the interior.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about which weather systems affect each region and when.",
+          "Consider the seasonal shift of pressure belts and the ITCZ."
+        ],
+        "explanation": "SA's rainfall pattern is determined by the seasonal shift of global pressure belts. In winter, the westerly wind belt and cold fronts move north to reach Cape Town. In summer, tropical moisture from the Indian Ocean reaches the interior. The escarpment acts as a barrier, with most rain falling on the eastern side (orographic rainfall).",
+        "distractors": [
+          "Both regions receive rain in summer from the same system",
+          "The Western Cape gets winter rain because of the Benguela Current",
+          "Gauteng gets summer rain because it is closer to the equator"
+        ]
+      },
+      {
+        "question": "On a synoptic weather map, you observe closely spaced isobars between two weather systems. What does this indicate about the expected weather conditions?",
+        "answer": "Closely spaced isobars indicate a steep pressure gradient, meaning strong winds are expected. The closer the isobars, the stronger the pressure gradient force and the faster the wind. This often occurs between a high-pressure and low-pressure system, or along a cold front. The area would experience windy conditions, possibly with associated rain if near a frontal system.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think of isobars like contour lines — when they are close together, the change is steep.",
+          "What happens when there is a large pressure difference over a short distance?"
+        ],
+        "explanation": "Isobars show atmospheric pressure at sea level. Closely spaced isobars = steep pressure gradient = strong winds. Widely spaced isobars = gentle pressure gradient = light winds. On synoptic maps, you can estimate wind speed from isobar spacing. Wind blows roughly parallel to isobars (due to the Coriolis effect), slightly inward toward low pressure.",
+        "distractors": [
+          "Closely spaced isobars indicate calm weather",
+          "Isobar spacing has no relationship to wind speed",
+          "Closely spaced isobars only occur near the equator"
+        ]
+      },
+      {
+        "question": "Explain how berg winds form and describe their impact on the eastern parts of South Africa.",
+        "answer": "Berg winds form when a coastal low (low-pressure system) develops along the coast, drawing air from the high-pressure interior across the escarpment toward the coast. As the air descends from the plateau (approximately 1 500 m) to sea level, it warms adiabatically at about 10 degrees C per 1 000 m. This produces hot, dry offshore winds. Impact: extreme heat (40+ degrees C at the coast), increased fire risk in dry vegetation, discomfort, rapid evaporation of moisture. Berg winds often precede cold fronts.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about what happens to air temperature when air descends from a high altitude.",
+          "Consider the dry adiabatic lapse rate: about 10 degrees C per 1 000 m of descent."
+        ],
+        "explanation": "Berg winds are a significant weather phenomenon in SA. The air warms adiabatically as it descends — meaning it heats due to increasing pressure, not from an external heat source. If interior air starts at 20 degrees C at 1 500 m altitude, it arrives at the coast at approximately 35 degrees C. These hot, dry conditions create extreme fire danger, especially in the Western Cape fynbos and KZN grasslands.",
+        "distractors": [
+          "Berg winds blow from the coast toward the mountains",
+          "Berg winds bring cool, moist conditions",
+          "Berg winds occur only in the Western Cape"
+        ]
+      },
+      {
+        "question": "Evaluate the potential impact of climate change on South African agriculture, with specific reference to maize production in the Free State and wine production in the Western Cape.",
+        "answer": "Maize (Free State): Rising temperatures and more variable rainfall threaten the main maize-producing region. Increased frequency of droughts reduces yields. Higher temperatures increase evapotranspiration, requiring more water. Shifting rainfall patterns may make some areas unsuitable for maize. Wine (Western Cape): Warming may push ideal grape-growing zones further south toward cooler areas. Changes in winter rainfall patterns affect grape quality. Earlier harvest dates and increased pest pressure. Some varieties may become unviable in current locations. Both sectors must adapt through drought-resistant cultivars, water conservation, and diversification.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about what crops need (specific temperatures, rainfall) and how climate change alters these.",
+          "Consider both direct effects (temperature, rainfall) and indirect effects (pests, water availability)."
+        ],
+        "explanation": "Climate change projections for SA indicate 2-4 degrees C warming by 2100, reduced rainfall in the west and increased variability in the east. Maize needs 450-600 mm of rain during the growing season — drought years already cause crop failures (2015/16 drought). Wine grapes require specific temperature ranges for quality — warming pushes these zones poleward. Adaptation strategies include GM crops, conservation agriculture, crop insurance, and shifting to drought-tolerant varieties.",
+        "distractors": [
+          "Climate change will improve SA agriculture by increasing temperatures",
+          "Only coastal agriculture is affected by climate change",
+          "SA farmers cannot adapt to climate change"
+        ]
+      }
+    ],
+    "hints": [
+      "The Agulhas Current is WARM (east coast, moist conditions). The Benguela Current is COLD (west coast, dry conditions). Remember: A = warm like Africa's east.",
+      "Wind blows from HIGH pressure to LOW pressure, deflected by the Coriolis effect.",
+      "On synoptic maps, always identify the position of high-pressure and low-pressure systems first, then trace fronts and predict weather."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "synoptic weather map",
+        "definition": "A map showing atmospheric conditions (pressure, fronts, temperature) over a large area at a specific time",
+        "example_usage": "The synoptic map showed a cold front approaching Cape Town from the south-west."
+      },
+      {
+        "term": "isobar",
+        "definition": "A line on a weather map connecting places with equal atmospheric pressure",
+        "example_usage": "The closely spaced isobars indicated strong winds were expected over the Western Cape."
+      },
+      {
+        "term": "Agulhas Current",
+        "definition": "A warm ocean current flowing southward along the east coast of South Africa, originating from the Mozambique Channel",
+        "example_usage": "The warm Agulhas Current makes Durban's coastal waters warm enough for swimming year-round."
+      },
+      {
+        "term": "cold front",
+        "definition": "The leading edge of a cold air mass that undercuts and replaces warmer air, causing uplift, cloud formation and rainfall",
+        "example_usage": "The cold front brought heavy rain and a 15-degree temperature drop to Cape Town overnight."
+      },
+      {
+        "term": "berg wind",
+        "definition": "A hot, dry wind that blows from the interior plateau down toward the coast, warming adiabatically as it descends",
+        "example_usage": "Berg wind conditions pushed temperatures above 40 degrees C in Durban."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think the Benguela Current causes the west coast to be cold, not realising it also makes it dry.",
+        "correction": "The cold Benguela Current has TWO effects: (1) It cools the coast, making temperatures lower than expected for the latitude. (2) It creates atmospheric stability (temperature inversion) that suppresses convection and rainfall, making the west coast arid. This is why the Namib Desert exists right next to the ocean — cold water means dry air.",
+        "why_students_think_this": "Students focus on temperature (cold current = cold coast) but miss the moisture connection. Cold water = less evaporation = less moisture in the air = less rain. The temperature inversion (warm air above cold surface air) prevents vertical air movement needed for rain."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Geography.Gr12.CLIMATE",
+    "title": "Assessment: Climate & Weather — SA Climate Factors, Synoptic Maps, Climate Change",
+    "items": [
+      {
+        "question": "Name the two main ocean currents that affect South Africa's climate and state whether each is warm or cold.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Agulhas Current (warm, east coast) and Benguela Current (cold, west coast)",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "One flows along each coast of South Africa."
+      },
+      {
+        "question": "On a synoptic map, a cold front is approaching Cape Town from the south-west with closely spaced isobars. Predict the weather Cape Town will experience over the next 24 hours.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Initial warm berg wind conditions, followed by a dramatic temperature drop, heavy rain, strong north-westerly shifting to south-westerly winds, then cold clear skies as the front passes. Closely spaced isobars indicate strong winds throughout.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Describe pre-frontal, frontal and post-frontal conditions."
+      },
+      {
+        "question": "Evaluate the statement: 'Climate change will only affect coastal areas of South Africa.' Do you agree? Justify your answer with reference to the interior regions.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Disagree. Interior regions face severe climate change impacts: increased drought frequency in maize-producing areas (Free State), higher temperatures on the Highveld increasing evapotranspiration and water stress, more intense thunderstorms causing flash flooding, and reduced water availability in the Vaal and Orange River systems. The interior may face greater agricultural disruption than the coast.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Think about agriculture, water supply and temperature impacts on the interior plateau."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 40,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the difference between the Agulhas and Benguela currents?",
+      "back": "Agulhas: WARM current, east coast, brings moisture and rainfall, warm sea temperatures. Benguela: COLD current, west coast, creates dry conditions, fog, and temperature inversions. This explains why Durban is wet and lush while the west coast is arid.",
+      "tags": ["CAPS.Geography.Gr12.CLIMATE", "Grade12", "Climate"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "Why does the Western Cape get winter rainfall?",
+      "back": "In winter, the westerly wind belt and mid-latitude cyclones shift northward, bringing cold fronts to the Western Cape. In summer, the South Atlantic High blocks these systems.",
+      "tags": ["CAPS.Geography.Gr12.CLIMATE", "Grade12", "Climate"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What do closely spaced isobars on a synoptic map indicate?",
+      "back": "A steep pressure gradient, meaning strong winds. The closer the isobars, the stronger the wind. Widely spaced isobars = light winds.",
+      "tags": ["CAPS.Geography.Gr12.CLIMATE", "Grade12", "Climate"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "How do berg winds form?",
+      "back": "A coastal low draws air from the high-pressure interior across the escarpment toward the coast. As air descends, it warms adiabatically (~10 degrees C per 1000 m), producing hot, dry offshore winds. Often precedes cold fronts.",
+      "tags": ["CAPS.Geography.Gr12.CLIMATE", "Grade12", "Climate"],
+      "difficulty_permille": 555
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

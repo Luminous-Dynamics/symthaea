@@ -1,0 +1,273 @@
+{
+  "node_id": "CAPS.Geography.Gr12.GEOMORPH",
+  "lesson": {
+    "standard_code": "CAPS.Geography.Gr12.GEOMORPH",
+    "title": "CAPS.Geography.Gr12.GEOMORPH: Geomorphology — Drainage Basins, River Profiles, Erosion & Deposition, Fluvial Landforms",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Geomorphology studies the formation and evolution of landforms shaped by rivers, weathering and erosion. A drainage basin is the area drained by a river and its tributaries, bounded by a watershed (ridge). Rivers have three courses: the upper course (steep gradient, V-shaped valleys, waterfalls, interlocking spurs), the middle course (lateral erosion increases, meanders develop, floodplains widen), and the lower course (gentle gradient, wide floodplain, ox-bow lakes, deltas). Erosion processes include hydraulic action (water pressure), abrasion (rocks scrape the bed), attrition (rocks collide and break down), and solution (chemical dissolution). Deposition occurs when a river loses energy. South Africa's major rivers — the Orange (longest at 2 200 km), Vaal, Limpopo, and Tugela — demonstrate these processes across diverse landscapes.",
+    "examples": [
+      {
+        "problem": "Explain how an oxbow lake forms, with reference to a meander on the Vaal River.",
+        "steps": [
+          {
+            "instruction": "Step 1: A meander develops as the river erodes the outer bank (where velocity is greatest) through hydraulic action and abrasion, forming a river cliff",
+            "result": "Outer bank erodes, meander grows"
+          },
+          {
+            "instruction": "Step 2: Deposition occurs on the inner bank (where velocity is slowest), forming a slip-off slope (point bar)",
+            "result": "Inner bank builds up"
+          },
+          {
+            "instruction": "Step 3: Over time, the meander neck narrows as erosion continues on both outer banks. During a flood, the river breaks through the narrow neck, taking the shorter, steeper route",
+            "result": "Meander neck is cut through"
+          },
+          {
+            "instruction": "Step 4: Deposition seals off the abandoned meander loop, creating an oxbow lake. Over time, the oxbow lake may dry up to form a meander scar",
+            "result": "Oxbow lake formed"
+          }
+        ],
+        "answer": "Answer: An oxbow lake forms when a meander's neck is eroded through during flooding, and the abandoned loop is sealed off by deposition",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the features of the upper course of the Orange River near its source in the Drakensberg mountains of Lesotho.",
+        "steps": [
+          {
+            "instruction": "Step 1: Steep gradient — the river descends rapidly from the Drakensberg (over 3 000 m altitude)",
+            "result": "High velocity, fast-flowing water"
+          },
+          {
+            "instruction": "Step 2: Vertical erosion dominates — the river cuts downward into resistant basalt rock, creating a V-shaped valley",
+            "result": "Deep, narrow valley"
+          },
+          {
+            "instruction": "Step 3: Waterfalls form where the river flows over bands of harder rock overlying softer rock (e.g., Augrabies Falls further downstream)",
+            "result": "Waterfalls and rapids"
+          },
+          {
+            "instruction": "Step 4: The river carries large angular boulders as bedload due to its high energy",
+            "result": "Coarse sediment transported"
+          }
+        ],
+        "answer": "Answer: The upper course features a steep gradient, V-shaped valley, waterfalls, rapids and vertical erosion into the Drakensberg basalt",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the formation of a floodplain and its importance for communities along the Limpopo River.",
+        "steps": [
+          {
+            "instruction": "Step 1: In the lower course, lateral erosion widens the valley. During floods, water spills over the banks and deposits alluvium (fine silt, sand, clay)",
+            "result": "Flat area of deposited sediment alongside the river"
+          },
+          {
+            "instruction": "Step 2: Each flood adds a new layer of alluvium, building up the floodplain. Natural levees form along the banks where the coarsest material is deposited first",
+            "result": "Fertile, layered floodplain with raised banks"
+          },
+          {
+            "instruction": "Step 3: The Limpopo floodplain supports agriculture (crops, grazing) because of the fertile alluvial soil. However, communities face flood risk during heavy rains",
+            "result": "Agricultural value vs flood hazard"
+          }
+        ],
+        "answer": "Answer: Floodplains form through repeated deposition of alluvium during floods, creating fertile agricultural land but posing flood risks to communities along the Limpopo",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the following terms: (a) drainage basin, (b) watershed, (c) tributary, (d) confluence.",
+        "answer": "(a) Drainage basin: the area of land drained by a river and all its tributaries. (b) Watershed: the boundary (ridge of high ground) separating one drainage basin from another. (c) Tributary: a smaller river or stream that flows into a larger river. (d) Confluence: the point where two rivers join.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of the drainage basin as a funnel that collects water.",
+          "The watershed is the rim of the funnel."
+        ],
+        "explanation": "These terms describe the components of a river system. The Orange River drainage basin is the largest in SA, covering parts of Lesotho, the Free State, Northern Cape and Namibia. The Vaal is a tributary of the Orange, and their confluence is near Douglas in the Northern Cape.",
+        "distractors": [
+          "A watershed is the lowest point in a drainage basin",
+          "A tributary is the main river in a basin",
+          "A confluence is where a river meets the sea"
+        ]
+      },
+      {
+        "question": "Name and explain the four processes of river erosion.",
+        "answer": "1. Hydraulic action: the force of water breaks rock fragments from the bed and banks. 2. Abrasion (corrasion): rocks and sediment carried by the river scrape and wear away the bed and banks (like sandpaper). 3. Attrition: rocks and pebbles in the river collide with each other, becoming smaller and rounder. 4. Solution (corrosion): slightly acidic water chemically dissolves soluble rocks such as limestone.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about how water physically and chemically breaks down rock.",
+          "Hydraulic action uses water force; abrasion uses rock tools."
+        ],
+        "explanation": "These processes work together. Hydraulic action loosens rocks, abrasion scrapes the channel, attrition reduces particle size, and solution dissolves minerals. The dominant process depends on rock type (solution is important in limestone areas), river velocity, and the amount of sediment carried (bedload).",
+        "distractors": [
+          "Erosion only occurs in the upper course of a river",
+          "Attrition makes rocks larger and more angular",
+          "Hydraulic action only affects soft rocks"
+        ]
+      },
+      {
+        "question": "Compare the cross-sectional profile of a river in its upper course with its lower course. Include at least three differences.",
+        "answer": "Upper course: narrow and deep channel, steep V-shaped valley sides, large angular boulders on the riverbed, small volume of water, steep gradient. Lower course: wide and shallow channel, flat floodplain on both sides, fine sediment (silt, sand) on the riverbed, large volume of water, gentle gradient. The river changes from vertical erosion (down-cutting) in the upper course to lateral erosion (widening) in the lower course.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Draw both cross-sections in your mind — the shapes are very different.",
+          "Think about what type of erosion dominates in each course."
+        ],
+        "explanation": "The river's energy changes along its profile. In the upper course, high gradient gives high velocity and vertical erosion creates a deep narrow channel. In the lower course, the gentle gradient reduces velocity; the river loses energy and deposits material, creating a wide, shallow channel with extensive floodplains. The Augrabies section of the Orange River (upper) contrasts sharply with the Orange River near Upington (lower).",
+        "distractors": [
+          "The upper course channel is wider than the lower course",
+          "Floodplains are found in the upper course",
+          "The lower course has the steepest gradient"
+        ]
+      },
+      {
+        "question": "Explain the formation of a waterfall and describe the process of waterfall retreat, using the example of Augrabies Falls on the Orange River.",
+        "answer": "Formation: A waterfall forms where a river flows over a band of hard rock (e.g., granite at Augrabies) underlain by softer rock. The softer rock erodes faster through hydraulic action and abrasion, creating an overhang of hard rock. Retreat: The overhang becomes unsupported and eventually collapses. The fallen debris is swirled around at the base, deepening a plunge pool through abrasion. This process repeats, causing the waterfall to retreat upstream, leaving a gorge downstream. Augrabies Falls drops 56 m into a deep plunge pool carved into granite.",
+        "difficulty_permille": 500,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what happens when hard rock sits on top of soft rock in a river.",
+          "The plunge pool at the base plays a key role in undercutting."
+        ],
+        "explanation": "Waterfall retreat is a slow process over thousands of years. At Augrabies, the Orange River has carved a gorge 18 km long through waterfall retreat. The differential erosion of hard and soft rock creates the step, and the energy of falling water deepens the plunge pool, undermining the hard cap rock. This process continues today.",
+        "distractors": [
+          "Waterfalls only form in mountainous areas",
+          "The plunge pool fills up with sediment and disappears",
+          "Waterfalls move downstream over time"
+        ]
+      },
+      {
+        "question": "The Limpopo River flooded severely in the year 2000, causing significant damage to communities in its floodplain. Evaluate the human and physical factors that contributed to the flood damage, and suggest two strategies to reduce future flood risk.",
+        "answer": "Physical factors: Exceptionally heavy rainfall (Cyclone Eline), saturated soils, steep tributary catchments funnel water quickly into the Limpopo, flat floodplain allows water to spread widely. Human factors: Settlement on the floodplain (lack of alternative land), deforestation in catchment reduces interception, poorly maintained drainage infrastructure. Strategies: (1) Early warning systems and flood evacuation plans for floodplain communities. (2) Reforestation of catchment areas to increase water interception and reduce runoff speed. Other options: building levees, flood zoning regulations, wetland rehabilitation.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both natural and human-caused factors that worsened the flooding.",
+          "Think about prevention (reducing flood risk) and preparedness (reducing damage)."
+        ],
+        "explanation": "The 2000 Limpopo floods killed over 700 people across southern Africa. Physical causes were amplified by human factors: deforestation increased runoff, and settlement on the floodplain put people in harm's way. Effective flood management combines structural approaches (levees, dams) with non-structural approaches (land-use planning, early warning, education). Wetland rehabilitation is particularly effective as wetlands act as natural sponges.",
+        "distractors": [
+          "Building more settlements on the floodplain to create jobs",
+          "Channelising the river will solve all flooding problems",
+          "Floods on the Limpopo are caused only by climate change"
+        ]
+      }
+    ],
+    "hints": [
+      "Rivers erode vertically in the upper course (steep gradient) and laterally in the lower course (gentle gradient).",
+      "Deposition occurs when a river loses energy — due to reduced gradient, entering a lake/sea, or reduced volume.",
+      "SA rivers are generally less voluminous than European or American rivers — many are seasonal or have reduced flow due to dam construction."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "drainage basin",
+        "definition": "The total area of land drained by a river and all its tributaries, bounded by a watershed",
+        "example_usage": "The Orange River drainage basin covers over 900 000 square km across four countries."
+      },
+      {
+        "term": "meander",
+        "definition": "A pronounced curve or loop in a river channel, formed by lateral erosion on the outer bank and deposition on the inner bank",
+        "example_usage": "The Vaal River forms large meanders as it crosses the flat Free State plains."
+      },
+      {
+        "term": "floodplain",
+        "definition": "A flat area of alluvium (deposited sediment) alongside a river, formed by repeated flooding",
+        "example_usage": "Farmers grow crops on the fertile Limpopo River floodplain."
+      },
+      {
+        "term": "abrasion",
+        "definition": "The wearing away of the riverbed and banks by rocks and sediment carried in the water, acting like sandpaper",
+        "example_usage": "Abrasion smoothed the boulders in the riverbed into rounded pebbles."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think rivers flow faster in the lower course because the river is bigger and wider.",
+        "correction": "While the volume of water is greater in the lower course, the velocity is not necessarily faster everywhere. In the upper course, the steep gradient creates fast, turbulent flow in the narrow channel. In the lower course, the gentle gradient slows the river despite more water. However, the lower course often has greater discharge (volume per second) and less friction relative to volume, so mean velocity can sometimes be similar. The key is that gradient determines energy, not channel width alone.",
+        "why_students_think_this": "Students associate 'bigger river' with 'faster river'. They see a wide river in the lower course and assume it is flowing fast, not realising that gradient is the primary driver of velocity. Waterfalls in the upper course clearly demonstrate high velocity despite small volume."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Geography.Gr12.GEOMORPH",
+    "title": "Assessment: Geomorphology — Drainage Basins, River Processes, Fluvial Landforms",
+    "items": [
+      {
+        "question": "Name the four processes of river erosion.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Hydraulic action, abrasion (corrasion), attrition, solution (corrosion)",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Two physical processes, one mechanical, one chemical."
+      },
+      {
+        "question": "Describe the formation of an oxbow lake, using labelled diagrams or clear step-by-step descriptions.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "1. Meander develops with erosion on outer bank, deposition on inner bank. 2. Meander neck narrows over time. 3. During flood, river breaks through the neck. 4. Deposition seals off the old meander loop, forming an oxbow lake.",
+        "points": 4,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Focus on what happens to the meander neck over time."
+      },
+      {
+        "question": "Evaluate the impact of building a large dam (like the Gariep Dam on the Orange River) on the downstream river environment and communities.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Positive: flood control, water storage for irrigation and municipal use, hydroelectric power, recreation. Negative: reduced downstream flow affects ecosystems, trapped sediment reduces floodplain fertility, altered flood regime disrupts natural processes, displaced communities during construction, reduced sediment at river mouth causes coastal erosion. Overall, dams provide critical water security but significantly alter the natural river system.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider effects on flow regime, sediment transport, ecosystems and human communities."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 40,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the three courses of a river and their key features?",
+      "back": "Upper: steep gradient, V-shaped valley, waterfalls, vertical erosion. Middle: meanders develop, floodplain widens, lateral erosion. Lower: gentle gradient, wide floodplain, oxbow lakes, deltas, deposition dominates.",
+      "tags": ["CAPS.Geography.Gr12.GEOMORPH", "Grade12", "Geomorphology"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Name SA's longest river and its approximate length.",
+      "back": "The Orange River, approximately 2 200 km. It rises in the Drakensberg (Lesotho) and flows westward to the Atlantic Ocean. The Vaal River is its largest tributary.",
+      "tags": ["CAPS.Geography.Gr12.GEOMORPH", "Grade12", "Geomorphology"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "How does an oxbow lake form?",
+      "back": "1. Meander neck narrows through erosion. 2. Flood cuts through the neck (shorter path). 3. Deposition seals off the old loop. 4. Abandoned loop becomes an oxbow lake, eventually drying to a meander scar.",
+      "tags": ["CAPS.Geography.Gr12.GEOMORPH", "Grade12", "Geomorphology"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the difference between erosion and deposition?",
+      "back": "Erosion: wearing away and removal of material (occurs when the river has high energy). Deposition: dropping of transported material (occurs when the river loses energy due to reduced gradient, volume, or entering still water).",
+      "tags": ["CAPS.Geography.Gr12.GEOMORPH", "Grade12", "Geomorphology"],
+      "difficulty_permille": 222
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

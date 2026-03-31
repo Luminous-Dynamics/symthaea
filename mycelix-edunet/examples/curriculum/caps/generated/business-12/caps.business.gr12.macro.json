@@ -1,0 +1,282 @@
+{
+  "node_id": "CAPS.Business.Gr12.MACRO",
+  "lesson": {
+    "standard_code": "CAPS.Business.Gr12.MACRO",
+    "title": "CAPS.Business.Gr12.MACRO: Business Environments — SWOT, PESTLE, Porter's Five Forces, BBBEE, Legislation",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Every business operates within three environments. The micro environment includes internal factors the business controls (management, resources, business culture). The market environment involves stakeholders the business interacts with (customers, suppliers, competitors, intermediaries). The macro environment covers external forces beyond the business's control, analysed using PESTLE: Political (government policy, BBBEE), Economic (inflation, exchange rates), Social (demographics, HIV/AIDS), Technological (automation, e-commerce), Legal (Labour Relations Act, Consumer Protection Act, Companies Act), and Environmental (climate, sustainability). SWOT analysis evaluates internal Strengths and Weaknesses alongside external Opportunities and Threats. Porter's Five Forces assesses industry competitiveness: rivalry among existing firms, threat of new entrants, threat of substitutes, bargaining power of buyers, and bargaining power of suppliers.",
+    "examples": [
+      {
+        "problem": "Conduct a SWOT analysis for a small spaza shop in Soweto that is facing competition from a new Shoprite in the area.",
+        "steps": [
+          {
+            "instruction": "Step 1: Strengths — close to customers, flexible hours, offers credit to regulars, personal relationships",
+            "result": "Internal advantages identified"
+          },
+          {
+            "instruction": "Step 2: Weaknesses — limited product range, no bulk buying power, informal record-keeping, limited capital",
+            "result": "Internal disadvantages identified"
+          },
+          {
+            "instruction": "Step 3: Opportunities — specialise in items Shoprite does not stock (traditional foods), offer delivery service, register for government support programmes",
+            "result": "External opportunities identified"
+          },
+          {
+            "instruction": "Step 4: Threats — price competition from Shoprite, customers switching to formal retail, rising wholesale prices, load shedding affecting refrigeration",
+            "result": "External threats identified"
+          }
+        ],
+        "answer": "Answer: The spaza shop's key strength is community relationships; its main threat is price competition from large retailers. It should specialise and offer services that Shoprite cannot.",
+        "visual_description": null
+      },
+      {
+        "problem": "Apply Porter's Five Forces to the South African fast-food industry.",
+        "steps": [
+          {
+            "instruction": "Step 1: Rivalry among existing firms — HIGH. Many competitors (Nando's, KFC, Steers, McDonald's, Hungry Lion) compete aggressively on price and promotions",
+            "result": "Intense competitive rivalry"
+          },
+          {
+            "instruction": "Step 2: Threat of new entrants — MODERATE. High capital needed for franchise setup, but street food vendors enter easily at a small scale",
+            "result": "Moderate barriers to entry"
+          },
+          {
+            "instruction": "Step 3: Threat of substitutes — MODERATE. Home-cooked meals and healthier eating trends can substitute fast food",
+            "result": "Substitutes exist"
+          },
+          {
+            "instruction": "Step 4: Bargaining power of buyers — HIGH. Customers can easily switch between brands due to low switching costs",
+            "result": "Buyers have strong power"
+          },
+          {
+            "instruction": "Step 5: Bargaining power of suppliers — LOW to MODERATE. Large chains buy in bulk and can negotiate, but speciality ingredient suppliers may have more power",
+            "result": "Suppliers have limited power"
+          }
+        ],
+        "answer": "Answer: The SA fast-food industry is highly competitive with strong buyer power and intense rivalry, making differentiation essential for profitability",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how the Consumer Protection Act (CPA) affects a furniture retailer in Pretoria.",
+        "steps": [
+          {
+            "instruction": "Step 1: The CPA gives consumers the right to return defective goods within 6 months for a repair, replacement or refund",
+            "result": "Right to safe, good quality goods"
+          },
+          {
+            "instruction": "Step 2: The retailer must display prices clearly in Rand, including VAT, with no hidden charges",
+            "result": "Right to disclosure and information"
+          },
+          {
+            "instruction": "Step 3: The retailer cannot use unfair contract terms or force consumers to sign contracts they do not understand",
+            "result": "Right to fair and honest dealing"
+          }
+        ],
+        "answer": "Answer: The CPA protects consumers through rights to quality goods, transparent pricing and fair contracts, placing obligations on the retailer to comply",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List and briefly explain the six components of the PESTLE analysis.",
+        "answer": "Political (government policies, political stability), Economic (inflation, interest rates, exchange rates, unemployment), Social (demographics, culture, health issues like HIV/AIDS), Technological (innovation, automation, digital platforms), Legal (legislation like LRA, CPA, BBBEE Act), Environmental (climate change, sustainability, natural disasters).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "PESTLE is an acronym — each letter represents one external factor.",
+          "Think about forces outside the business that affect its operations."
+        ],
+        "explanation": "PESTLE covers all macro-environmental forces. Each factor can create opportunities or threats for a business. For example, a weak Rand (Economic) makes imports expensive but boosts exports. New data protection laws (Legal) require compliance investment.",
+        "distractors": [
+          "PESTLE stands for Price, Economics, Sales, Technology, Labour, Environment",
+          "PESTLE only applies to large multinational companies",
+          "The 'E' in PESTLE stands for Education"
+        ]
+      },
+      {
+        "question": "Explain the purpose of the Broad-Based Black Economic Empowerment (BBBEE) Act and how it affects a medium-sized construction company bidding for government contracts in Gauteng.",
+        "answer": "BBBEE aims to redress the inequalities of apartheid by promoting black participation in the economy through ownership, management control, skills development, enterprise development and socio-economic development. A construction company needs a good BBBEE scorecard (Level 1-8) to win government tenders, as organs of state must give preference to BBBEE-compliant businesses. A higher BBBEE level improves the company's chances of securing contracts.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about why BBBEE was introduced in the context of SA history.",
+          "Government procurement policies favour businesses with better BBBEE levels."
+        ],
+        "explanation": "BBBEE is a government policy framework for economic transformation. The BBBEE scorecard measures a company across 5 elements. Companies are rated from Level 1 (most compliant, 135% procurement recognition) to Level 8 (10% recognition). Non-compliant companies are classified as non-contributor. For government tenders, BBBEE level is a critical evaluation criterion.",
+        "distractors": [
+          "BBBEE only applies to companies with more than 500 employees",
+          "BBBEE compliance is voluntary for all businesses",
+          "BBBEE has no impact on government tender processes"
+        ]
+      },
+      {
+        "question": "A cell phone accessories business in Sandton notices that a new competitor has opened nearby with lower prices. Using Porter's Five Forces, analyse the 'threat of new entrants' and 'competitive rivalry' forces for this business.",
+        "answer": "Threat of new entrants: HIGH — low capital required to start a cell phone accessories business, few regulations, easy access to suppliers (China imports). This means more competitors can enter easily. Competitive rivalry: HIGH — many similar businesses, products are largely undifferentiated (same brands), price competition is intense, and customers can easily compare prices. The business must differentiate through service, location or exclusive products.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider barriers to entry: how much capital, expertise and regulation is needed?",
+          "For rivalry, think about how similar the products are and how easy it is for customers to switch."
+        ],
+        "explanation": "Low barriers to entry (minimal capital, simple business model) mean new entrants constantly appear, increasing competition. With largely homogeneous products, rivalry is intense and price-driven. The business should consider differentiation strategies: exclusive product lines, superior customer service, repair services, or an online presence.",
+        "distractors": [
+          "Threat of new entrants is low because the market is saturated",
+          "Competitive rivalry is low because each shop has loyal customers",
+          "Porter's Five Forces only applies to manufacturing businesses"
+        ]
+      },
+      {
+        "question": "Discuss how the Labour Relations Act (LRA) protects both employers and employees in South Africa. Give two rights of each party.",
+        "answer": "Employee rights: (1) Right to fair labour practices, including protection against unfair dismissal (substantive and procedural fairness required). (2) Right to join a trade union and participate in lawful strike action. Employer rights: (1) Right to lock out employees during a legal industrial dispute. (2) Right to dismiss employees for misconduct, incapacity or operational requirements, provided correct procedures are followed.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "The LRA aims to balance the power between employers and employees.",
+          "Think about what happens during labour disputes — both sides have legal options."
+        ],
+        "explanation": "The LRA (Act 66 of 1995) promotes economic development, social justice, and labour peace. It establishes the CCMA (Commission for Conciliation, Mediation and Arbitration) to resolve disputes. Employees are protected from unfair dismissal and can organise collectively. Employers can discipline and dismiss with valid reasons and fair procedures, and can lock out during legal disputes.",
+        "distractors": [
+          "The LRA only protects employees, not employers",
+          "Employers can dismiss employees at any time without reason",
+          "Strikes are illegal in South Africa"
+        ]
+      },
+      {
+        "question": "Evaluate the impact of South Africa's high unemployment rate (approximately 32%) on a retail clothing chain like Mr Price. Consider at least three PESTLE factors in your response.",
+        "answer": "Economic: High unemployment reduces disposable income, leading to lower sales and forcing Mr Price to compete on price with value-for-money ranges. Social: Unemployment increases crime rates, raising security costs. Changing consumer preferences toward affordable fashion. Political: Government job creation programmes and social grants partially support consumer spending. Mr Price can adapt by expanding affordable product lines, increasing online sales (Technological), and supporting enterprise development for BBBEE compliance (Legal/Political).",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider how unemployment affects consumer spending power.",
+          "Link at least three PESTLE factors to specific business impacts."
+        ],
+        "explanation": "High unemployment affects multiple PESTLE dimensions. Economically, reduced consumer spending forces price competition. Socially, demographic shifts and crime affect store locations and security budgets. Politically, BBBEE and social grants influence business strategy. Technologically, e-commerce can reach broader markets. The business must adapt its product mix, pricing strategy and distribution channels to operate in this challenging macro environment.",
+        "distractors": [
+          "Unemployment only affects the Economic PESTLE factor",
+          "High unemployment is beneficial because labour costs decrease",
+          "Retail businesses are not affected by unemployment"
+        ]
+      }
+    ],
+    "hints": [
+      "SWOT: Strengths and Weaknesses are INTERNAL (controllable). Opportunities and Threats are EXTERNAL (uncontrollable).",
+      "Porter's Five Forces analyses industry attractiveness, not individual business strength.",
+      "When applying PESTLE, always relate each factor to the specific SA business context."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "SWOT analysis",
+        "definition": "A strategic planning tool that evaluates a business's Strengths, Weaknesses, Opportunities and Threats",
+        "example_usage": "The SWOT analysis revealed that the company's main weakness was its outdated technology."
+      },
+      {
+        "term": "PESTLE analysis",
+        "definition": "A framework for analysing macro-environmental factors: Political, Economic, Social, Technological, Legal and Environmental",
+        "example_usage": "The PESTLE analysis highlighted the impact of new environmental regulations on the mining company."
+      },
+      {
+        "term": "BBBEE",
+        "definition": "Broad-Based Black Economic Empowerment — a SA government policy framework to promote economic transformation and redress apartheid-era inequalities",
+        "example_usage": "The company improved its BBBEE level to qualify for government tenders."
+      },
+      {
+        "term": "Porter's Five Forces",
+        "definition": "A model that analyses five competitive forces determining industry profitability: rivalry, new entrants, substitutes, buyer power and supplier power",
+        "example_usage": "Porter's Five Forces showed that buyer power in the industry was high due to many alternatives."
+      },
+      {
+        "term": "Consumer Protection Act (CPA)",
+        "definition": "SA legislation (Act 68 of 2008) that protects consumer rights including the right to quality goods, fair pricing and honest information",
+        "example_usage": "Under the CPA, the customer returned the faulty appliance within 6 months for a full refund."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students confuse the market environment with the macro environment, placing competitors under PESTLE.",
+        "correction": "Competitors are part of the market environment (analysed using Porter's Five Forces). The macro environment (PESTLE) covers broad external forces like government policy, economic conditions and social trends that affect all businesses in the economy, not just direct competitors.",
+        "why_students_think_this": "Both environments are 'external' to the business. Students must distinguish between stakeholders the business interacts with directly (market) and forces that affect everyone (macro)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Business.Gr12.MACRO",
+    "title": "Assessment: Business Environments — SWOT, PESTLE, Porter's Five Forces, SA Legislation",
+    "items": [
+      {
+        "question": "List the five forces in Porter's Five Forces model.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Competitive rivalry, threat of new entrants, threat of substitutes, bargaining power of buyers, bargaining power of suppliers",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about the different competitive pressures an industry faces."
+      },
+      {
+        "question": "Conduct a PESTLE analysis for a tourism business in Cape Town, identifying one factor for each letter with a brief explanation.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "P: Visa regulations for tourists. E: Exchange rate (weak Rand attracts foreign tourists). S: Safety concerns and cultural diversity. T: Online booking platforms. L: BBBEE requirements for tourism operators. E: Water scarcity and environmental conservation.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Relate each factor specifically to tourism in Cape Town."
+      },
+      {
+        "question": "Evaluate whether BBBEE has been effective in transforming the South African economy. Present arguments for and against.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "For: Increased black ownership and management, improved access to opportunities, skills development funding. Against: Fronting (superficial compliance), benefits concentrated among a few connected individuals, compliance costs burden small businesses, has not significantly reduced unemployment or inequality. Balanced view acknowledges progress but recognises implementation challenges.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both the intended outcomes and the criticisms of BBBEE implementation."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 45,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What does PESTLE stand for?",
+      "back": "Political, Economic, Social, Technological, Legal, Environmental — six macro-environmental forces that affect businesses externally.",
+      "tags": ["CAPS.Business.Gr12.MACRO", "Grade12", "Business Environments"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the difference between the micro and macro business environments?",
+      "back": "Micro: internal factors the business controls (management, resources). Macro: external forces beyond control (PESTLE factors). The market environment (customers, competitors, suppliers) sits between them.",
+      "tags": ["CAPS.Business.Gr12.MACRO", "Grade12", "Business Environments"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Name three pieces of SA legislation that affect businesses.",
+      "back": "1. Labour Relations Act (LRA) — employer-employee relations. 2. Consumer Protection Act (CPA) — consumer rights. 3. BBBEE Act — economic transformation. Others: Companies Act, Employment Equity Act.",
+      "tags": ["CAPS.Business.Gr12.MACRO", "Grade12", "Business Environments"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "In SWOT analysis, which factors are internal and which are external?",
+      "back": "Internal: Strengths (positive) and Weaknesses (negative). External: Opportunities (positive) and Threats (negative). The business can control internal factors but must respond to external ones.",
+      "tags": ["CAPS.Business.Gr12.MACRO", "Grade12", "Business Environments"],
+      "difficulty_permille": 222
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

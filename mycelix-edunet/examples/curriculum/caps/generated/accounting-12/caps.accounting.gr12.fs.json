@@ -1,0 +1,302 @@
+{
+  "node_id": "CAPS.Accounting.Gr12.FS",
+  "lesson": {
+    "standard_code": "CAPS.Accounting.Gr12.FS",
+    "title": "CAPS.Accounting.Gr12.FS: Financial Statements — Income Statement, Balance Sheet, Cash Flow Statement",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Financial statements summarise a business's financial performance and position. The Income Statement shows revenue minus expenses to calculate net profit for a period. The Balance Sheet presents assets, equity and liabilities at a specific date, following the accounting equation: Assets = Owner's Equity + Liabilities. The Cash Flow Statement tracks cash inflows and outflows across operating, investing and financing activities. Year-end adjustments include depreciation (straight-line method), provision for bad debts, accrued expenses and prepaid income. South African businesses follow GAAP principles such as going concern, historical cost and prudence.",
+    "examples": [
+      {
+        "problem": "Sipho's Furniture has the following balances at 28 February 2026: Sales R980 000, Cost of Sales R588 000, Operating Expenses R196 000, Interest on loan R14 700. Prepare the Income Statement.",
+        "steps": [
+          {
+            "instruction": "Step 1: Calculate Gross Profit = Sales - Cost of Sales = R980 000 - R588 000",
+            "result": "Gross Profit = R392 000"
+          },
+          {
+            "instruction": "Step 2: Calculate Operating Profit = Gross Profit - Operating Expenses = R392 000 - R196 000",
+            "result": "Operating Profit = R196 000"
+          },
+          {
+            "instruction": "Step 3: Calculate Net Profit = Operating Profit - Interest on loan = R196 000 - R14 700",
+            "result": "Net Profit = R181 300"
+          }
+        ],
+        "answer": "Answer: Net Profit for the year ended 28 February 2026 is R181 300",
+        "visual_description": null
+      },
+      {
+        "problem": "Equipment was purchased on 1 March 2024 for R120 000. The business uses straight-line depreciation at 10% per annum. Calculate the carrying value at 28 February 2026.",
+        "steps": [
+          {
+            "instruction": "Step 1: Annual depreciation = Cost x Rate = R120 000 x 10% = R12 000",
+            "result": "R12 000 per year"
+          },
+          {
+            "instruction": "Step 2: Accumulated depreciation for 2 years = R12 000 x 2 = R24 000",
+            "result": "Total depreciation = R24 000"
+          },
+          {
+            "instruction": "Step 3: Carrying value = Cost - Accumulated depreciation = R120 000 - R24 000",
+            "result": "Carrying value = R96 000"
+          }
+        ],
+        "answer": "Answer: The carrying value of the equipment at 28 February 2026 is R96 000",
+        "visual_description": null
+      },
+      {
+        "problem": "Naledi Trading has debtors of R85 000 at year-end. The provision for bad debts must be adjusted to 5% of debtors. The existing provision is R3 000. Calculate the adjustment.",
+        "steps": [
+          {
+            "instruction": "Step 1: Required provision = 5% of R85 000 = R4 250",
+            "result": "New provision = R4 250"
+          },
+          {
+            "instruction": "Step 2: Adjustment = Required provision - Existing provision = R4 250 - R3 000",
+            "result": "Increase in provision = R1 250"
+          },
+          {
+            "instruction": "Step 3: Debit Bad debts expense R1 250, Credit Provision for bad debts R1 250",
+            "result": "Journal entry recorded"
+          }
+        ],
+        "answer": "Answer: The provision for bad debts increases by R1 250 to R4 250",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Thabo's Stores had sales of R1 200 000, cost of sales R720 000, operating expenses R240 000 and interest income R8 500. Calculate the net profit.",
+        "answer": "Net Profit = R248 500. Gross Profit = R1 200 000 - R720 000 = R480 000. Operating Profit = R480 000 - R240 000 = R240 000. Net Profit = R240 000 + R8 500 = R248 500.",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start by calculating Gross Profit: Sales minus Cost of Sales.",
+          "Interest income is added to Operating Profit to get Net Profit."
+        ],
+        "explanation": "Gross Profit = R1 200 000 - R720 000 = R480 000. Operating Profit = R480 000 - R240 000 = R240 000. Interest income is other income, so Net Profit = R240 000 + R8 500 = R248 500.",
+        "distractors": [
+          "R240 000",
+          "R480 000",
+          "R231 500"
+        ]
+      },
+      {
+        "question": "A delivery vehicle was bought for R280 000 on 1 March 2023. Depreciation is 20% p.a. on the straight-line method. Calculate the carrying value on 28 February 2026.",
+        "answer": "Carrying value = R112 000. Annual depreciation = R280 000 x 20% = R56 000. Three years: R56 000 x 3 = R168 000. Carrying value = R280 000 - R168 000 = R112 000.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Straight-line depreciation uses the original cost each year.",
+          "Count the number of complete years from purchase to year-end."
+        ],
+        "explanation": "Annual depreciation = R280 000 x 20/100 = R56 000. From 1 March 2023 to 28 February 2026 is 3 full years. Accumulated depreciation = R56 000 x 3 = R168 000. Carrying value = R280 000 - R168 000 = R112 000.",
+        "distractors": [
+          "R168 000",
+          "R224 000",
+          "R56 000"
+        ]
+      },
+      {
+        "question": "Prepare the Balance Sheet extract for Zama Traders on 28 February 2026: Fixed assets at cost R500 000, Accumulated depreciation R150 000, Debtors R95 000, Bank (favourable) R42 000, Capital R350 000, Creditors R62 000, Long-term loan R75 000. Show that the accounting equation balances.",
+        "answer": "Total Assets = R487 000 (Fixed assets R350 000 + Debtors R95 000 + Bank R42 000). Owner's Equity + Liabilities = R487 000 (Capital R350 000 + Creditors R62 000 + Long-term loan R75 000). The equation balances.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Fixed assets on the Balance Sheet are shown at carrying value (cost minus accumulated depreciation).",
+          "Check: Assets = Owner's Equity + Liabilities."
+        ],
+        "explanation": "Carrying value of fixed assets = R500 000 - R150 000 = R350 000. Total Assets = R350 000 + R95 000 + R42 000 = R487 000. Total Equity and Liabilities = R350 000 + R62 000 + R75 000 = R487 000. The accounting equation balances at R487 000.",
+        "distractors": [
+          "Total Assets = R637 000 (using cost instead of carrying value)",
+          "Total Assets = R487 000 but Equity + Liabilities = R412 000",
+          "Total Assets = R445 000"
+        ]
+      },
+      {
+        "question": "Lindiwe's salon paid R18 000 rent for 12 months on 1 September 2025. The financial year ends 28 February 2026. Calculate the prepaid rent and the rent expense for the Income Statement.",
+        "answer": "Rent expense = R9 000 (6 months: Sep to Feb). Prepaid rent = R9 000 (6 months: Mar to Aug, paid in advance).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Determine how many months fall within the current financial year (1 March 2025 to 28 February 2026).",
+          "The portion of rent that relates to months after year-end is prepaid."
+        ],
+        "explanation": "The rent of R18 000 covers September 2025 to August 2026 (12 months). Monthly rent = R18 000 / 12 = R1 500. Months in current year (Sep-Feb) = 6 months. Rent expense = 6 x R1 500 = R9 000. Prepaid (Mar-Aug) = 6 x R1 500 = R9 000. The prepaid rent appears as a current asset on the Balance Sheet.",
+        "distractors": [
+          "Rent expense R18 000, no prepayment",
+          "Rent expense R12 000, prepaid R6 000",
+          "Rent expense R7 500, prepaid R10 500"
+        ]
+      },
+      {
+        "question": "Classify the following items into the Cash Flow Statement sections (Operating, Investing, or Financing): (a) Cash received from debtors R340 000, (b) Purchased new equipment R180 000, (c) Additional capital contribution by owner R100 000, (d) Salaries paid R95 000, (e) Sold old vehicle at carrying value R45 000, (f) Repaid portion of bank loan R30 000.",
+        "answer": "Operating: (a) R340 000 inflow, (d) R95 000 outflow. Investing: (b) R180 000 outflow, (e) R45 000 inflow. Financing: (c) R100 000 inflow, (f) R30 000 outflow.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Operating activities relate to day-to-day trading (sales, expenses).",
+          "Investing activities involve buying or selling fixed assets. Financing involves owner contributions and loan movements."
+        ],
+        "explanation": "Cash from debtors and salaries paid are part of normal trading, so they are Operating activities. Equipment purchases and vehicle sales involve non-current assets, so they are Investing activities. Capital contributions and loan repayments relate to how the business is funded, so they are Financing activities.",
+        "distractors": [
+          "Equipment purchase is Operating because it is used in operations",
+          "Capital contribution is Operating because it increases bank",
+          "Vehicle sale is Financing because it generates cash"
+        ]
+      }
+    ],
+    "hints": [
+      "Always start the Income Statement with Sales, then subtract Cost of Sales to get Gross Profit.",
+      "The Balance Sheet must balance: Assets = Owner's Equity + Liabilities.",
+      "Year-end adjustments are recorded in the General Journal before preparing financial statements."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "depreciation",
+        "definition": "The systematic allocation of the cost of a fixed asset over its useful life",
+        "example_usage": "The straight-line depreciation on the vehicle is R28 000 per year."
+      },
+      {
+        "term": "provision for bad debts",
+        "definition": "An estimated amount set aside for debtors who may not pay their accounts",
+        "example_usage": "The provision for bad debts was adjusted to 5% of the debtors balance."
+      },
+      {
+        "term": "accrued expense",
+        "definition": "An expense that has been incurred but not yet paid by year-end",
+        "example_usage": "Salaries accrued at year-end amounted to R12 500."
+      },
+      {
+        "term": "carrying value",
+        "definition": "The value of a fixed asset on the Balance Sheet, calculated as cost minus accumulated depreciation",
+        "example_usage": "The carrying value of the equipment is R96 000."
+      },
+      {
+        "term": "GAAP",
+        "definition": "Generally Accepted Accounting Practice — the framework of standards and principles that govern financial reporting",
+        "example_usage": "According to GAAP, the business must apply the going concern principle."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often confuse the Income Statement with the Balance Sheet, thinking both show the same period.",
+        "correction": "The Income Statement covers a period (e.g., year ended 28 Feb 2026) and shows profit or loss. The Balance Sheet shows the financial position at a specific date (e.g., as at 28 Feb 2026).",
+        "why_students_think_this": "Both statements are prepared at year-end, so students assume they serve the same purpose. Remember: Income Statement = movie (what happened over time), Balance Sheet = photograph (snapshot at one moment)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Accounting.Gr12.FS",
+    "title": "Assessment: Financial Statements — Income Statement, Balance Sheet, Cash Flow Statement, Year-End Adjustments, GAAP",
+    "items": [
+      {
+        "question": "Name three sections of the Cash Flow Statement.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Operating activities, Investing activities, Financing activities",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about the three types of business activities that involve cash."
+      },
+      {
+        "question": "Calculate the Gross Profit if Sales = R750 000 and Cost of Sales = R450 000.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Gross Profit = R750 000 - R450 000 = R300 000",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Gross Profit = Sales - Cost of Sales."
+      },
+      {
+        "question": "A machine costing R200 000 is depreciated at 15% p.a. straight-line. Calculate the carrying value after 4 years and prepare the adjusting journal entry for year 4.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Annual depreciation = R30 000, Accumulated = R120 000, Carrying value = R80 000. Journal: Debit Depreciation R30 000, Credit Accumulated Depreciation R30 000.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Calculate annual depreciation first, then multiply by the number of years."
+      },
+      {
+        "question": "Explain why the prudence concept requires creating a provision for bad debts even though we do not know which debtors will default.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The prudence concept requires that losses should be recognised as soon as they are anticipated, not when they actually occur. Since experience shows some debtors will not pay, we must make provision to avoid overstating assets and profit.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Think about what happens if we overstate assets by not providing for bad debts."
+      },
+      {
+        "question": "Prepare a Balance Sheet extract showing the fixed asset note for two assets: Equipment (cost R400 000, accumulated depreciation R160 000) and Vehicles (cost R300 000, accumulated depreciation R180 000).",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Equipment: Cost R400 000 - Acc. Dep. R160 000 = Carrying Value R240 000. Vehicles: Cost R300 000 - Acc. Dep. R180 000 = Carrying Value R120 000. Total Fixed Assets = R360 000.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Show cost, accumulated depreciation and carrying value for each asset."
+      }
+    ],
+    "total_points": 13,
+    "estimated_minutes": 60,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the accounting equation?",
+      "back": "Assets = Owner's Equity + Liabilities. This equation must always balance on the Balance Sheet.",
+      "tags": ["CAPS.Accounting.Gr12.FS", "Grade12", "Financial Statements"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "How is straight-line depreciation calculated?",
+      "back": "Annual depreciation = (Cost - Residual value) / Useful life, or Cost x Rate%. The same amount is charged each year.",
+      "tags": ["CAPS.Accounting.Gr12.FS", "Grade12", "Financial Statements"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the difference between an accrued expense and a prepaid expense?",
+      "back": "An accrued expense has been incurred but not yet paid (liability). A prepaid expense has been paid in advance for a future period (asset).",
+      "tags": ["CAPS.Accounting.Gr12.FS", "Grade12", "Financial Statements"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What does the Cash Flow Statement show that the Income Statement does not?",
+      "back": "The Cash Flow Statement shows actual cash movements (receipts and payments), while the Income Statement includes non-cash items like depreciation and accruals.",
+      "tags": ["CAPS.Accounting.Gr12.FS", "Grade12", "Financial Statements"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "Name four GAAP principles relevant to Gr12 Accounting.",
+      "back": "Going concern, Historical cost, Prudence (conservatism), Matching (accrual basis). Others include Business entity and Materiality.",
+      "tags": ["CAPS.Accounting.Gr12.FS", "Grade12", "Financial Statements"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "How do you calculate the provision for bad debts adjustment?",
+      "back": "Required provision = % of Debtors. Adjustment = Required provision - Existing provision. If positive, increase provision (debit expense); if negative, decrease provision (credit income).",
+      "tags": ["CAPS.Accounting.Gr12.FS", "Grade12", "Financial Statements"],
+      "difficulty_permille": 666
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

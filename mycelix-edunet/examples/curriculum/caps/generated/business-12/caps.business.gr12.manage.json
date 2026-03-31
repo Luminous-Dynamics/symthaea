@@ -1,0 +1,269 @@
+{
+  "node_id": "CAPS.Business.Gr12.MANAGE",
+  "lesson": {
+    "standard_code": "CAPS.Business.Gr12.MANAGE",
+    "title": "CAPS.Business.Gr12.MANAGE: Management & Leadership — Functions, Styles, TQM, Conflict Management",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Management involves four key functions: planning (setting goals and strategies), organising (allocating resources and assigning tasks), leading (motivating and directing employees), and controlling (monitoring performance and taking corrective action). Leadership styles range from autocratic (leader makes all decisions), to democratic (participative, employees contribute to decisions), to laissez-faire (hands-off, employees have freedom). Effective managers choose styles based on the situation. Total Quality Management (TQM) is a philosophy where every employee is responsible for continuous improvement of products, services and processes. Conflict management in the workplace involves identifying sources of conflict and applying strategies such as negotiation, mediation and compromise. SA businesses use the CCMA for unresolved labour disputes.",
+    "examples": [
+      {
+        "problem": "Identify which management function is being applied in each scenario: (a) The manager sets sales targets for the next quarter. (b) The manager assigns specific tasks to each team member. (c) The manager motivates staff with a bonus incentive. (d) The manager compares actual sales to targets and addresses shortfalls.",
+        "steps": [
+          {
+            "instruction": "Step 1: Setting sales targets = Planning (establishing goals and strategies)",
+            "result": "(a) Planning"
+          },
+          {
+            "instruction": "Step 2: Assigning tasks = Organising (allocating resources and responsibilities)",
+            "result": "(b) Organising"
+          },
+          {
+            "instruction": "Step 3: Motivating with bonuses = Leading (influencing and inspiring employees)",
+            "result": "(c) Leading"
+          },
+          {
+            "instruction": "Step 4: Comparing actual to targets = Controlling (measuring and correcting performance)",
+            "result": "(d) Controlling"
+          }
+        ],
+        "answer": "Answer: (a) Planning, (b) Organising, (c) Leading, (d) Controlling — the four functions of management (POLC)",
+        "visual_description": null
+      },
+      {
+        "problem": "A restaurant manager in Pretoria notices that food quality has been inconsistent, with customer complaints increasing. Suggest how TQM principles could address this problem.",
+        "steps": [
+          {
+            "instruction": "Step 1: Customer focus — survey customers to identify specific quality issues (cold food, wrong orders, slow service)",
+            "result": "Understand customer expectations"
+          },
+          {
+            "instruction": "Step 2: Employee involvement — train all kitchen and floor staff in quality standards, and empower them to flag problems immediately",
+            "result": "Everyone responsible for quality"
+          },
+          {
+            "instruction": "Step 3: Continuous improvement — implement daily checklists for food preparation, regular taste testing, and weekly team reviews of complaints",
+            "result": "Systematic quality monitoring"
+          }
+        ],
+        "answer": "Answer: TQM requires a customer-focused, whole-team approach to quality with systematic processes for continuous improvement",
+        "visual_description": null
+      },
+      {
+        "problem": "Two department heads at a Johannesburg manufacturing company are in conflict over budget allocation. Recommend an appropriate conflict management strategy.",
+        "steps": [
+          {
+            "instruction": "Step 1: Identify the source — both departments need more resources than available (scarce resource conflict)",
+            "result": "Resource-based conflict"
+          },
+          {
+            "instruction": "Step 2: Apply negotiation — bring both parties together to discuss needs and find common ground",
+            "result": "Collaborative approach"
+          },
+          {
+            "instruction": "Step 3: Use compromise — allocate budget proportionally based on strategic priority and return on investment",
+            "result": "Both parties gain something"
+          }
+        ],
+        "answer": "Answer: Negotiation leading to compromise, where budget is allocated based on strategic priorities with both departments receiving partial funding",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name and briefly explain the four functions of management.",
+        "answer": "Planning: setting goals and deciding strategies to achieve them. Organising: arranging resources, assigning tasks and establishing structures. Leading: motivating, directing and influencing employees to work toward goals. Controlling: monitoring performance, comparing it to plans, and taking corrective action where needed.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Remember POLC: Planning, Organising, Leading, Controlling.",
+          "Each function builds on the previous one."
+        ],
+        "explanation": "The four functions form a continuous cycle. Planning sets direction, organising provides structure, leading energises people, and controlling ensures the plan is being followed. If controlling reveals problems, the cycle restarts with revised planning.",
+        "distractors": [
+          "Planning, Operating, Logistics, Communication",
+          "Preparing, Organising, Listening, Correcting",
+          "Planning, Outsourcing, Lending, Controlling"
+        ]
+      },
+      {
+        "question": "Compare autocratic and democratic leadership styles. In which SA business situation would each be more appropriate?",
+        "answer": "Autocratic: leader makes decisions without consulting employees. Appropriate during emergencies (e.g., mine safety evacuation — no time for discussion). Democratic: leader consults employees and considers their input before deciding. Appropriate in creative industries (e.g., advertising agency brainstorming campaigns — diverse ideas improve outcomes). Autocratic is faster but may cause resentment; democratic builds commitment but takes longer.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about situations where quick decisions are critical vs situations where employee input adds value.",
+          "Consider the impact on employee motivation for each style."
+        ],
+        "explanation": "Autocratic leadership works best in high-pressure, time-critical situations (emergency, military, security). Democratic leadership is effective when employee expertise and buy-in are important (project planning, policy development). Most SA managers use a situational approach, adapting their style to the context.",
+        "distractors": [
+          "Autocratic leadership is always better because the manager is most experienced",
+          "Democratic leadership is always superior because it is more fair",
+          "Laissez-faire leadership is the most common style in SA businesses"
+        ]
+      },
+      {
+        "question": "Explain the concept of Total Quality Management (TQM) and describe three of its key principles.",
+        "answer": "TQM is a management philosophy where every person in the organisation is committed to continuous quality improvement. Key principles: (1) Customer focus — quality is defined by what the customer needs and expects. (2) Continuous improvement (kaizen) — constantly seeking small improvements in processes, products and services. (3) Employee involvement — empowering all employees to identify and solve quality problems, not just management.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "TQM is not just about inspecting products at the end — it is about building quality into every step.",
+          "Think about who is responsible for quality in TQM (everyone, not just the quality department)."
+        ],
+        "explanation": "TQM originated in Japanese manufacturing (Toyota Production System) and is widely applied in SA. Other principles include: process-centred approach, integrated systems, strategic and systematic approach, data-driven decision making, and effective communication. TQM requires a cultural shift where quality becomes everyone's responsibility.",
+        "distractors": [
+          "TQM means hiring a quality manager to inspect all products",
+          "TQM only applies to manufacturing companies",
+          "TQM focuses on reducing costs, not improving quality"
+        ]
+      },
+      {
+        "question": "A team leader at a call centre in Sandton is experiencing conflict between two employees who disagree about shift scheduling. Apply the conflict management process to resolve this.",
+        "answer": "Step 1: Identify the conflict — disagreement over shift preferences (interest-based conflict). Step 2: Meet with each employee separately to understand their concerns (one may need morning shifts for childcare, the other for studies). Step 3: Bring both parties together for a mediated discussion. Step 4: Find a compromise (e.g., alternate weeks, split shifts) or a win-win solution (adjust schedules to accommodate both needs). Step 5: Document the agreement and follow up to ensure it is working.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "First understand why each person wants their preferred shift.",
+          "Look for a win-win solution before resorting to compromise."
+        ],
+        "explanation": "Effective conflict management follows a structured process: identify, analyse, address, resolve, follow up. The team leader should act as a mediator rather than imposing a solution. Understanding underlying interests (not just positions) often reveals creative solutions. If unresolved, the matter could escalate to HR or, for labour disputes, the CCMA.",
+        "distractors": [
+          "The manager should simply decide the schedule without consulting either employee",
+          "Conflict should be ignored as it will resolve itself",
+          "Both employees should be disciplined for causing disruption"
+        ]
+      },
+      {
+        "question": "Evaluate the statement: 'A good leader does not need to be a good manager.' Do you agree? Justify your answer with reference to SA business examples.",
+        "answer": "Disagree. While leadership (inspiring and influencing people) and management (planning, organising, controlling) are distinct skills, effective business leaders need both. For example, a Shoprite store manager must lead (motivate staff, build team spirit) AND manage (control stock, plan schedules, monitor budgets). A visionary leader without management skills may inspire but fail to deliver results. Conversely, a manager without leadership skills may control processes but struggle with employee engagement and innovation. The best SA business leaders (e.g., Patrice Motsepe, Nicky Oppenheimer) demonstrate both capabilities.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider situations where leadership alone is insufficient without management systems.",
+          "Think about whether you can successfully run a business with only one skill set."
+        ],
+        "explanation": "Leadership and management are complementary, not interchangeable. Leadership focuses on people and vision; management focuses on systems and results. The most effective business people excel at both. In SA's complex business environment, leaders must navigate transformation, labour relations and rapid change — requiring both inspirational leadership and rigorous management discipline.",
+        "distractors": [
+          "Agree — leaders only need vision, managers handle the details",
+          "Leadership and management are exactly the same thing",
+          "Only large companies need both leadership and management"
+        ]
+      }
+    ],
+    "hints": [
+      "The four management functions (POLC) form a continuous cycle, not a once-off process.",
+      "Leadership styles exist on a spectrum — most effective leaders adapt their style to the situation.",
+      "TQM requires buy-in from all levels, not just top management."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "autocratic leadership",
+        "definition": "A leadership style where the leader makes decisions unilaterally without consulting subordinates",
+        "example_usage": "The mine manager used an autocratic style during the emergency evacuation."
+      },
+      {
+        "term": "democratic leadership",
+        "definition": "A leadership style where the leader involves employees in the decision-making process",
+        "example_usage": "The democratic leader held a team meeting to gather input on the new work schedule."
+      },
+      {
+        "term": "Total Quality Management",
+        "definition": "A management philosophy focused on continuous improvement of quality through the involvement of all employees",
+        "example_usage": "The factory implemented TQM, reducing defects by 40% in one year."
+      },
+      {
+        "term": "conflict management",
+        "definition": "The process of identifying and addressing disputes constructively to reach a resolution",
+        "example_usage": "The HR manager used negotiation and compromise for effective conflict management."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students believe that democratic leadership is always the best style because it sounds fair and modern.",
+        "correction": "No single leadership style is best in all situations. Democratic leadership works well when time allows and employee input adds value, but autocratic leadership is necessary in emergencies (mine accident, fire evacuation) where immediate action is required. Laissez-faire works with highly skilled, self-motivated teams. Good leaders adapt their style to the situation (situational leadership).",
+        "why_students_think_this": "The word 'democratic' has positive connotations from politics. Students associate autocratic with negative authoritarian behaviour. In reality, the effectiveness of a style depends on the context, not the name."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Business.Gr12.MANAGE",
+    "title": "Assessment: Management & Leadership — Functions, Styles, TQM, Conflict Management",
+    "items": [
+      {
+        "question": "List the four management functions in order.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Planning, Organising, Leading, Controlling (POLC)",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "POLC"
+      },
+      {
+        "question": "A restaurant chain is receiving complaints about slow service. Apply TQM principles to suggest three specific improvements.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "1. Customer focus: survey customers to identify specific delays (ordering, preparation, delivery). 2. Employee involvement: train waitstaff in time management and empower them to report bottlenecks. 3. Continuous improvement: implement kitchen timers, streamline the menu during peak hours, conduct weekly performance reviews.",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Think about TQM's three core principles: customer focus, continuous improvement, employee involvement."
+      },
+      {
+        "question": "Evaluate the effectiveness of the laissez-faire leadership style for managing a team of new interns at a Johannesburg accounting firm.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Laissez-faire would be ineffective for new interns because they lack experience and need guidance, structure and supervision. Interns require clear instructions (more autocratic/directive initially) and mentoring. Laissez-faire would lead to confusion, mistakes and poor productivity. It is better suited for experienced, self-motivated professionals who need autonomy.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider the experience level and independence of interns."
+      }
+    ],
+    "total_points": 9,
+    "estimated_minutes": 35,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the four functions of management?",
+      "back": "POLC: Planning (setting goals), Organising (arranging resources), Leading (motivating people), Controlling (monitoring and correcting performance).",
+      "tags": ["CAPS.Business.Gr12.MANAGE", "Grade12", "Management"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "Name three leadership styles and when each is appropriate.",
+      "back": "Autocratic: emergencies, quick decisions needed. Democratic: when employee input adds value, team projects. Laissez-faire: experienced, self-motivated teams who need autonomy.",
+      "tags": ["CAPS.Business.Gr12.MANAGE", "Grade12", "Management"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the difference between leadership and management?",
+      "back": "Leadership: influencing and inspiring people, setting vision, building relationships. Management: planning, organising, controlling resources and processes. Both are needed for business success.",
+      "tags": ["CAPS.Business.Gr12.MANAGE", "Grade12", "Management"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What are three core principles of TQM?",
+      "back": "1. Customer focus (quality defined by customer needs). 2. Continuous improvement (kaizen — ongoing small improvements). 3. Employee involvement (everyone responsible for quality, not just QC department).",
+      "tags": ["CAPS.Business.Gr12.MANAGE", "Grade12", "Management"],
+      "difficulty_permille": 333
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

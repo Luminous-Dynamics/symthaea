@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Domestic Wiring & Circuits?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
+        "question": "A client's house has a DB with a 60A main breaker. The existing circuits draw: lighting 10A, plugs 16A, geyser 18A, stove 32A. The client wants to add a 20A plug circuit for a workshop. Will the main breaker handle the total load? Show your calculation.",
+        "answer": "Total existing load: 10 + 16 + 18 + 32 = 76A. Adding 20A workshop: 76 + 20 = 96A. This exceeds the 60A main breaker. However, diversity factor applies (not all circuits draw maximum simultaneously). Typical diversity: 60-70% of total installed load. At 65%: 96 x 0.65 = 62.4A. This is borderline -- recommend upgrading to an 80A main breaker to allow headroom and comply with SANS 10142.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
         "hints": [
-          "Think safety first"
+          "Remember that diversity factor means not all circuits draw their maximum at the same time.",
+          "SANS 10142 requires that the main breaker can handle the maximum demand after applying diversity."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "Load calculations with diversity factor are essential for DB design. A 60A breaker on a 96A installed load relies heavily on diversity -- it is safer to upgrade the main breaker.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "Yes, 60A is always sufficient for a house",
+          "Just add the circuit without checking -- the breaker will trip if overloaded",
+          "Replace all existing breakers with smaller ones to make room"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Domestic Wiring & Circuits in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "You are wiring a new kitchen with 4 double plug points and a dedicated oven circuit. What cable sizes do you need for each circuit per SANS 10142, and what breaker ratings?",
+        "answer": "Plug circuit (4 double sockets): 2.5mm² twin-and-earth cable, protected by a 20A circuit breaker. This is the standard for 16A socket outlets per SANS 10142. Dedicated oven circuit: minimum 4mm² cable for ovens up to 7.5kW (32A at 230V). For larger ovens (up to 10kW, ~43A), use 6mm² cable with a 40A breaker. Both circuits must have earth continuity and be protected by the earth leakage unit (30mA). All connections must use approved junction boxes -- no twisted wires under tape.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
+        "bloom_level": "Apply",
         "hints": [
-          "Think about SANS standards or Acts"
+          "Cable size depends on the current-carrying capacity needed. 2.5mm² handles up to 24A; 4mm² handles up to 32A.",
+          "Always check the oven's kW rating plate and calculate current: I = P/V."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Matching cable size to load is a fundamental safety requirement. Undersized cables overheat and cause fires. SANS 10142 Table 1 specifies minimum cable sizes for each circuit type.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "1.5mm² is fine for plug circuits because it's cheaper",
+          "Any cable can be used as long as the breaker is correct",
+          "The oven can share a circuit with the plug points"
+        ]
+      },
+      {
+        "question": "During a COC inspection, you measure insulation resistance of 0.8MΩ on a lighting circuit. The circuit uses 1.5mm² cable and is 25m long. Is this acceptable? What should you do?",
+        "answer": "Not acceptable. SANS 10142 requires minimum 1MΩ insulation resistance at 500V DC for all circuits. 0.8MΩ indicates degraded insulation, possibly from moisture, damaged cable, or a poor connection. Steps: (1) Isolate the circuit. (2) Disconnect all luminaires and switches to test the cable alone. (3) If cable alone reads <1MΩ, locate the fault using a megger, testing section by section. (4) Replace damaged cable sections. (5) Retest to confirm ≥1MΩ before issuing the COC. Never issue a COC for a circuit that fails insulation resistance testing.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "The 1MΩ minimum is non-negotiable for COC compliance.",
+          "Low insulation resistance can indicate water ingress, rodent damage, or ageing cable insulation."
+        ],
+        "explanation": "Insulation resistance testing is one of the four mandatory COC tests. Issuing a COC for a failing circuit is illegal and dangerous -- it could result in electrocution or fire.",
+        "distractors": [
+          "0.8MΩ is close enough -- round up and pass it",
+          "The cable is probably fine; just retest on a drier day",
+          "Replace the entire DB board to fix the problem"
+        ]
+      },
+      {
+        "question": "A homeowner complains that their earth leakage trips every time the geyser element turns on. The geyser is 3 years old. Describe your diagnostic process.",
+        "answer": "Diagnostic process: (1) Test the earth leakage unit itself using the test button -- it should trip within 30ms at 30mA. If it doesn't, replace the unit. (2) If the unit is functional, isolate the geyser circuit at the DB and reset. If the earth leakage holds, the fault is on the geyser circuit. (3) Disconnect the geyser element and test insulation resistance between element terminals and the tank body. A reading below 1MΩ indicates the element's insulation has degraded (common after 3-5 years due to limescale). (4) Check the earth wire connection at the geyser -- a loose earth can cause intermittent tripping. (5) Most likely diagnosis: failed geyser element allowing current leakage to earth through the water/tank. Replace the element, test insulation resistance, and confirm the earth leakage no longer trips.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Earth leakage trips when current flows through an unintended path (e.g., through water to the tank body to earth).",
+          "Geyser elements degrade over time, especially in areas with hard water."
+        ],
+        "explanation": "Systematic fault-finding is a core electrician skill. Start by verifying the protection device, then isolate circuits to narrow down the fault, then test individual components. The most common cause of geyser-related earth leakage tripping is a degraded element.",
+        "distractors": [
+          "Just bypass the earth leakage unit so it stops tripping",
+          "Replace the entire geyser without testing",
+          "Tell the homeowner to use less hot water"
+        ]
+      },
+      {
+        "question": "Draw and label a simplified circuit diagram for a domestic DB board serving: 1 lighting circuit (15A), 2 plug circuits (20A each), 1 geyser circuit (20A), and 1 stove circuit (40A). Include the main switch, earth leakage, and all breakers.",
+        "answer": "The DB layout from left to right: (1) Main isolator switch (63A or 80A, double-pole). (2) Earth leakage unit (63A, 30mA sensitivity) -- all circuits pass through this. (3) Circuit breakers on DIN rail: CB1 = 15A (lighting, 1.5mm² cable), CB2 = 20A (plugs circuit 1, 2.5mm²), CB3 = 20A (plugs circuit 2, 2.5mm²), CB4 = 20A (geyser, 2.5mm²), CB5 = 40A (stove, 6mm²). Neutral bar at bottom, earth bar bonded to DB enclosure. Each circuit's live wire runs through its CB, neutral connects to the neutral bar, and earth connects to the earth bar. The earth bar is bonded to the main earth electrode (typically a copper rod driven 1.5m into the ground).",
+        "difficulty_permille": 700,
+        "bloom_level": "Apply",
+        "hints": [
+          "The main switch isolates everything. The earth leakage protects all downstream circuits.",
+          "Label each breaker with its circuit name, rating, and cable size. This is required for COC compliance."
+        ],
+        "explanation": "DB layout design is a practical skill tested in the trade test. The sequence is always: main switch → earth leakage → individual circuit breakers. All circuits must be clearly labelled per SANS 10142.",
+        "distractors": [
+          "The earth leakage can be placed after the circuit breakers",
+          "The stove circuit doesn't need its own breaker if it has a plug",
+          "Neutral wires don't need to go through the earth leakage unit"
         ]
       }
     ],

@@ -1,0 +1,294 @@
+{
+  "node_id": "CAPS.History.Gr12.CIVIL",
+  "lesson": {
+    "standard_code": "CAPS.History.Gr12.CIVIL",
+    "title": "Civil Rights Movements: USA and South Africa",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "The civil rights movements in the USA and South Africa fought racial segregation and oppression through different strategies. In the USA, the movement gained momentum with Brown v Board of Education (1954, ending school segregation), the Montgomery Bus Boycott (1955-56, sparked by Rosa Parks), the March on Washington (1963, MLK's 'I Have a Dream'), and the Civil Rights Act (1964, outlawing discrimination). The Black Panthers (1966) advocated self-defence and Black Power. In South Africa, the ANC Women's League mobilised against pass laws (1956 Women's March), the Defiance Campaign (1952) used mass civil disobedience, the Sharpeville Massacre (1960, 69 killed) led to ANC/PAC banning, the Soweto Uprising (1976, students protested Afrikaans-medium education), and the UDF (1983) coordinated mass action. Key comparisons: MLK and Mandela both advocated non-violence but Mandela later accepted armed struggle; Malcolm X and Steve Biko both emphasised Black consciousness and self-reliance but differed in context and methods.",
+    "examples": [
+      {
+        "problem": "Compare the strategies of Martin Luther King Jr and Nelson Mandela in their respective civil rights struggles.",
+        "steps": [
+          {
+            "instruction": "Step 1: Both initially advocated non-violent resistance inspired by Gandhian principles. MLK maintained non-violence throughout; Mandela shifted to armed struggle after Sharpeville (1960) and the banning of the ANC.",
+            "result": "Shared starting point, divergent paths"
+          },
+          {
+            "instruction": "Step 2: MLK operated within a democratic system where he could appeal to constitutional rights and federal intervention. Mandela faced a state that had no constitutional protections for Black South Africans.",
+            "result": "Different political contexts shaped strategy"
+          },
+          {
+            "instruction": "Step 3: Both used international attention: MLK through media coverage of police brutality (Birmingham, Selma); Mandela through the global anti-apartheid movement and sanctions campaigns.",
+            "result": "International solidarity as a shared tool"
+          }
+        ],
+        "answer": "While both leaders fought racial oppression and used moral authority, their contexts determined their strategies. MLK could work within American democracy; Mandela concluded that the apartheid state's total exclusion of Black citizens required armed resistance alongside political mobilisation.",
+        "visual_description": null
+      },
+      {
+        "problem": "Analyse the significance of the Soweto Uprising (1976) for the anti-apartheid struggle.",
+        "steps": [
+          {
+            "instruction": "Step 1: On 16 June 1976, thousands of students in Soweto marched against the imposition of Afrikaans as the medium of instruction in Black schools. Police opened fire, killing Hector Pieterson (aged 13) among many others.",
+            "result": "Immediate cause and violent response"
+          },
+          {
+            "instruction": "Step 2: The uprising spread nationwide, radicalising a new generation. Many young people fled the country and joined the ANC's armed wing, Umkhonto we Sizwe (MK).",
+            "result": "Generational shift in resistance"
+          },
+          {
+            "instruction": "Step 3: International condemnation intensified. The UN Security Council condemned apartheid, and economic sanctions gained momentum. The iconic photograph of Hector Pieterson became a global symbol of apartheid's brutality.",
+            "result": "International turning point"
+          }
+        ],
+        "answer": "The Soweto Uprising transformed the anti-apartheid struggle by bringing youth into the movement, intensifying international pressure, and demonstrating that the apartheid government could not maintain control through violence alone.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the significance of the Brown v Board of Education ruling (1954) for the US civil rights movement.",
+        "answer": "The Supreme Court ruled that racial segregation in public schools was unconstitutional, overturning the 'separate but equal' doctrine of Plessy v Ferguson (1896). Its significance: it established a legal precedent that segregation violated the 14th Amendment's equal protection clause; it empowered civil rights activists to challenge segregation in other areas (transport, public facilities); and it provoked massive resistance in Southern states, highlighting the gap between law and practice.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what 'separate but equal' meant in practice -- were Black schools ever truly equal?",
+          "Consider both the legal impact and the social resistance the ruling provoked."
+        ],
+        "explanation": "Brown v Board showed that the Constitution could be used as a tool for racial justice, but also that legal change alone does not guarantee social change. Implementation required further activism and federal enforcement.",
+        "distractors": [
+          "It only applied to schools in the North",
+          "It was immediately and peacefully implemented across all states",
+          "It upheld the principle of separate but equal"
+        ]
+      },
+      {
+        "question": "Analyse the role of the ANC Women's League and the 1956 Women's March in the anti-apartheid struggle.",
+        "answer": "On 9 August 1956, approximately 20,000 women of all races marched to the Union Buildings in Pretoria to protest the extension of pass laws to women. Led by Lillian Ngoyi, Helen Joseph, Rahima Moosa, and Sophie Williams, the march demonstrated multiracial solidarity and women's central role in resistance. The women left signed petitions at PM Strijdom's office and stood in silence for 30 minutes. The march is commemorated annually as Women's Day (9 August). It challenged the patriarchal assumption that resistance was men's work and showed that apartheid affected all aspects of life, including women's freedom of movement.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider what pass laws meant for women specifically: they restricted movement, separated families, and controlled labour.",
+          "The phrase 'You strike a woman, you strike a rock' (Wathint' Abafazi, Wathint' Imbokodo) comes from this march."
+        ],
+        "explanation": "The 1956 Women's March is significant because it demonstrated that women were not passive victims but active agents of resistance, and it established a tradition of multiracial, gender-inclusive activism that continued through the UDF era.",
+        "distractors": [
+          "The march was organised only by white women in solidarity",
+          "Pass laws had already been applied to women before 1956",
+          "The march resulted in the immediate abolition of pass laws"
+        ]
+      },
+      {
+        "question": "Compare Malcolm X's Black Power philosophy with Steve Biko's Black Consciousness Movement. What did they share, and how did they differ?",
+        "answer": "Shared elements: Both rejected white liberal leadership of the struggle; both emphasised Black self-reliance, pride, and psychological liberation; both argued that Black people must define their own identity rather than accepting definitions imposed by the oppressor. Differences: Malcolm X operated within the context of the US, initially advocated racial separatism through the Nation of Islam, and later (after his Hajj) embraced a more inclusive Pan-Africanism. Biko's BCM was rooted in the SA context of apartheid's racial categories, rejected white participation in Black organisations (not out of hatred but to build self-confidence), and influenced community programmes (health clinics, literacy). Biko was murdered in police custody (1977); Malcolm X was assassinated (1965).",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Focus on the psychological dimension: both argued that the first step in liberation is mental freedom from internalised oppression.",
+          "Consider how their different political contexts shaped their philosophies."
+        ],
+        "explanation": "This comparison is central to CAPS Grade 12. Students must show they understand that similar ideas emerged independently in different contexts, and that comparison requires both identifying similarities and explaining differences in context.",
+        "distractors": [
+          "Both advocated armed struggle as their primary strategy",
+          "Biko's ideas were directly borrowed from Malcolm X",
+          "Both rejected African cultural identity in favour of Western individualism"
+        ]
+      },
+      {
+        "question": "[Source-based] Study the photograph of the Montgomery Bus Boycott (1955-56). Explain why the boycott was effective and what it revealed about the economic power of Black communities.",
+        "answer": "The boycott was effective because African Americans constituted approximately 75% of bus riders in Montgomery. When they refused to ride, the bus company lost most of its revenue and faced financial collapse. For 381 days, Black residents walked, carpooled, or used Black-owned taxis. This revealed that Black communities held significant economic power that segregation depended on -- segregation was profitable for white-owned businesses only as long as Black people complied. The boycott's success (the Supreme Court ruled bus segregation unconstitutional in Browder v Gayle, 1956) demonstrated that economic pressure could be as powerful as legal or political action.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about who benefited economically from segregated buses and who suffered.",
+          "Consider: the boycott lasted over a year. What does that tell you about community organisation?"
+        ],
+        "explanation": "The Montgomery boycott is a key case study in the economic dimensions of civil rights. It showed that racial segregation was maintained not just by law but by economic relationships, and that disrupting those relationships was a powerful form of resistance.",
+        "distractors": [
+          "The boycott lasted only a few days before the city conceded",
+          "The boycott was organised by white allies, not the Black community",
+          "The bus company's revenue was unaffected because white riders increased"
+        ]
+      },
+      {
+        "question": "Evaluate the role of the United Democratic Front (UDF) in the 1980s as a vehicle for mass democratic resistance against apartheid.",
+        "answer": "The UDF, launched in 1983 to oppose the Tricameral Parliament (which gave limited representation to Coloureds and Indians but excluded Africans), became the largest legal anti-apartheid coalition. It united over 600 organisations: civic associations, trade unions, youth, women's, and religious groups. The UDF coordinated consumer boycotts, rent boycotts, stay-aways, and made townships 'ungovernable.' It was aligned with the ANC's Freedom Charter but operated legally inside SA when the ANC was banned. Its significance: it demonstrated that apartheid could not function without the cooperation of the oppressed; it maintained resistance pressure during the State of Emergency (1985-90); and it provided organisational infrastructure for negotiations in the early 1990s.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider why the UDF was so effective: it was a broad coalition, not a single organisation, making it harder for the state to suppress.",
+          "Think about the relationship between the UDF (legal, internal) and the ANC (banned, in exile)."
+        ],
+        "explanation": "The UDF represents the internal dimension of the anti-apartheid struggle. While the ANC operated from exile and MK conducted armed operations, the UDF maintained visible, mass-based resistance inside South Africa, demonstrating that apartheid had lost domestic legitimacy.",
+        "distractors": [
+          "The UDF was a military organisation that conducted armed operations",
+          "The UDF only represented African communities, not Coloureds or Indians",
+          "The Tricameral Parliament successfully co-opted all opposition groups"
+        ]
+      },
+      {
+        "question": "Using specific examples, explain why the Civil Rights Act of 1964 was both a triumph and a limitation for the US civil rights movement.",
+        "answer": "Triumph: It outlawed discrimination based on race, colour, religion, sex, or national origin in employment, education, and public accommodations. It gave the federal government enforcement power and was the most significant civil rights legislation since Reconstruction. It resulted directly from years of activism: sit-ins, Freedom Rides, Birmingham campaign, and the March on Washington. Limitation: It did not address economic inequality, housing segregation (addressed later by the Fair Housing Act 1968), or police brutality. It did not end de facto segregation in Northern cities. Many Southern states resisted enforcement. The persistence of systemic racism led to the rise of Black Power movements, urban riots (Watts 1965, Detroit 1967), and ongoing struggles that showed legal equality did not mean lived equality.",
+        "difficulty_permille": 875,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Distinguish between de jure (legal) and de facto (in practice) equality.",
+          "Consider why the movement continued and radicalised after 1964 if the Act 'solved' the problem."
+        ],
+        "explanation": "This question requires balanced evaluation -- acknowledging both achievement and limitation. CAPS expects students to avoid one-sided conclusions and to understand that legislative change is necessary but not sufficient for social transformation.",
+        "distractors": [
+          "The Civil Rights Act immediately ended all forms of racism in the USA",
+          "The Act was passed without any opposition in Congress",
+          "After 1964, the civil rights movement disbanded because its goals were achieved"
+        ]
+      }
+    ],
+    "hints": [
+      "Comparison questions require both similarities AND differences -- never give only one.",
+      "Source-based questions: extract evidence FROM the source, then add your OWN knowledge.",
+      "Always name specific events, dates, and people -- avoid vague generalisations."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "civil disobedience",
+        "definition": "Deliberately breaking unjust laws as a form of protest, accepting the legal consequences",
+        "example_usage": "Rosa Parks practised civil disobedience by refusing to give up her bus seat."
+      },
+      {
+        "term": "Black Consciousness",
+        "definition": "A philosophy emphasising Black self-reliance, pride, and psychological liberation from internalised oppression, associated with Steve Biko",
+        "example_usage": "Biko argued that Black Consciousness was the first step: 'The most potent weapon in the hands of the oppressor is the mind of the oppressed.'"
+      },
+      {
+        "term": "Tricameral Parliament",
+        "definition": "The 1983 South African constitutional reform that created separate chambers for Whites, Coloureds, and Indians, but excluded Africans entirely",
+        "example_usage": "The UDF was formed specifically to oppose the Tricameral Parliament."
+      },
+      {
+        "term": "desegregation",
+        "definition": "The process of ending the separation of racial groups in public spaces, schools, and institutions",
+        "example_usage": "Brown v Board of Education ordered the desegregation of public schools."
+      },
+      {
+        "term": "pass laws",
+        "definition": "South African laws requiring Black people to carry identification documents (passes) that controlled their movement and access to white areas",
+        "example_usage": "The Sharpeville Massacre occurred during a protest against pass laws."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "The US and SA civil rights movements were identical because they both fought racism.",
+        "correction": "While both fought racial oppression, the contexts differed fundamentally. In the US, African Americans were a minority fighting within a democracy for rights guaranteed by the Constitution. In SA, the Black majority was excluded from all political participation by a white minority regime. This shaped different strategies and outcomes.",
+        "why_students_think_this": "Surface-level comparison focuses on shared themes of racism without examining structural and demographic differences."
+      },
+      {
+        "misconception": "The ANC always used non-violent methods.",
+        "correction": "The ANC adopted non-violence initially (Defiance Campaign, 1952) but shifted to armed struggle after the Sharpeville Massacre (1960) and the banning of liberation movements. Umkhonto we Sizwe (MK) was formed in 1961 with Mandela as its first commander. The ANC used both armed struggle and political negotiation.",
+        "why_students_think_this": "Mandela's later image as a reconciler overshadows the earlier decision to adopt armed resistance."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.History.Gr12.CIVIL",
+    "title": "Assessment: Civil Rights Movements -- USA and South Africa",
+    "items": [
+      {
+        "question": "Name the US Supreme Court case (1954) that declared school segregation unconstitutional.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Brown v Board of Education",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "This case overturned Plessy v Ferguson (1896)."
+      },
+      {
+        "question": "Explain why the Sharpeville Massacre (1960) was a turning point in the anti-apartheid struggle.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Police killed 69 unarmed protesters demonstrating against pass laws. The government banned the ANC and PAC, forcing them underground and into exile. This led to the adoption of armed struggle (MK formed 1961) and intensified international condemnation.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about what changed AFTER Sharpeville in terms of strategy and international response."
+      },
+      {
+        "question": "Compare the philosophies of Malcolm X and Steve Biko. Identify TWO similarities and TWO differences.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Similarities: Both emphasised Black pride/self-reliance and rejected white leadership of Black struggles. Differences: Malcolm X was initially a racial separatist (Nation of Islam) while Biko rejected racial categorisation; Malcolm X operated in a US democracy while Biko faced apartheid's total exclusion.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Structure your answer clearly: Similarity 1, Similarity 2, Difference 1, Difference 2."
+      },
+      {
+        "question": "Evaluate the statement: 'The Civil Rights Act of 1964 ended racism in the United States.' Do you agree? Support your answer with evidence.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Disagree. While the Act was a major legal achievement (outlawing discrimination in employment and public accommodations), it did not address economic inequality, housing segregation, or systemic racism. De facto segregation persisted in Northern cities. Urban riots (Watts, Detroit) and the rise of Black Power showed that legal equality did not translate to lived equality.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Distinguish between de jure (legal) and de facto (actual) equality."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 45,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What was the significance of Brown v Board of Education (1954)?",
+      "back": "The Supreme Court ruled school segregation unconstitutional, overturning 'separate but equal' (Plessy v Ferguson). It empowered challenges to segregation in all areas of public life.",
+      "tags": ["CAPS.History.Gr12.CIVIL", "Grade12", "Civil Rights"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What happened at Sharpeville on 21 March 1960?",
+      "back": "Police killed 69 unarmed protesters demonstrating against pass laws. Led to banning of ANC/PAC, adoption of armed struggle (MK, 1961), and intensified international condemnation of apartheid.",
+      "tags": ["CAPS.History.Gr12.CIVIL", "Grade12", "Civil Rights"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "Who led the Black Consciousness Movement in South Africa?",
+      "back": "Steve Biko. He emphasised Black self-reliance and psychological liberation: 'The most potent weapon in the hands of the oppressor is the mind of the oppressed.' Biko was killed in police custody in September 1977.",
+      "tags": ["CAPS.History.Gr12.CIVIL", "Grade12", "Civil Rights"],
+      "difficulty_permille": 350
+    },
+    {
+      "front": "What was the Soweto Uprising (1976)?",
+      "back": "On 16 June 1976, students protested Afrikaans-medium instruction. Police opened fire, killing Hector Pieterson and many others. It radicalised a new generation and intensified international pressure on apartheid.",
+      "tags": ["CAPS.History.Gr12.CIVIL", "Grade12", "Civil Rights"],
+      "difficulty_permille": 400
+    },
+    {
+      "front": "What was the United Democratic Front (UDF)?",
+      "back": "Launched in 1983 to oppose the Tricameral Parliament. A coalition of 600+ organisations that coordinated mass resistance (boycotts, stay-aways, making townships 'ungovernable'). Aligned with ANC but operated legally inside SA.",
+      "tags": ["CAPS.History.Gr12.CIVIL", "Grade12", "Civil Rights"],
+      "difficulty_permille": 550
+    },
+    {
+      "front": "Compare MLK and Mandela on the use of violence.",
+      "back": "MLK maintained non-violence throughout, appealing to constitutional rights within US democracy. Mandela started with non-violence but adopted armed struggle after Sharpeville (1960) and the banning of the ANC, arguing the apartheid state left no peaceful option.",
+      "tags": ["CAPS.History.Gr12.CIVIL", "Grade12", "Civil Rights"],
+      "difficulty_permille": 650
+    }
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

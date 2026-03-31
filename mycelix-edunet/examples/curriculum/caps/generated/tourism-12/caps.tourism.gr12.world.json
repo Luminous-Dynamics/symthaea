@@ -1,0 +1,266 @@
+{
+  "node_id": "CAPS.Tourism.Gr12.WORLD",
+  "lesson": {
+    "standard_code": "CAPS.Tourism.Gr12.WORLD",
+    "title": "World Tourism: International Travel and Global Destinations",
+    "grade_level": "Grade12",
+    "bloom_level": "Apply",
+    "explanation": "World tourism involves understanding global destinations, UNESCO World Heritage Sites, and the practical skills needed for international travel. UNESCO designates World Heritage Sites in three categories: cultural (e.g., Machu Picchu, Great Wall of China), natural (e.g., Great Barrier Reef, Serengeti), and mixed (e.g., Machu Picchu is often cited as both). Cultural tourism involves experiencing the traditions, arts, cuisine, and history of a destination. Practical international travel skills include: time zone calculations (the world is divided into 24 time zones; South Africa is UTC+2/SAST), currency exchange calculations, and understanding travel documents. Passports must typically be valid for 6 months beyond the travel date with at least 2 blank pages. Visa requirements vary by destination and nationality. Health requirements include vaccinations (yellow fever certificate required for entry to many African countries), malaria prophylaxis (for travel to endemic areas like Mozambique, Tanzania), and travel insurance. South African travellers should check the Department of International Relations and Cooperation (DIRCO) for advisories.",
+    "examples": [
+      {
+        "problem": "A traveller departs Johannesburg (SAST, UTC+2) at 20:00 on a flight that takes 11 hours to London (GMT, UTC+0). What is the local arrival time in London?",
+        "steps": [
+          {
+            "instruction": "Step 1: Departure time in Johannesburg: 20:00 SAST (UTC+2).",
+            "result": "Starting point established"
+          },
+          {
+            "instruction": "Step 2: Add flight time: 20:00 + 11 hours = 07:00 the next day (in SAST).",
+            "result": "Arrival time in SA time"
+          },
+          {
+            "instruction": "Step 3: Convert to London time: London is UTC+0, SA is UTC+2, so subtract 2 hours: 07:00 - 2 = 05:00.",
+            "result": "Local London arrival time"
+          }
+        ],
+        "answer": "The traveller arrives in London at 05:00 local time the next morning.",
+        "visual_description": null
+      },
+      {
+        "problem": "Calculate how much a South African tourist would receive in euros if they exchange R10,000 at a rate of R20.50 = 1 EUR, with the bank charging 2.5% commission.",
+        "steps": [
+          {
+            "instruction": "Step 1: Calculate commission: R10,000 x 2.5% = R250.",
+            "result": "Commission deducted"
+          },
+          {
+            "instruction": "Step 2: Amount available for exchange: R10,000 - R250 = R9,750.",
+            "result": "Net amount"
+          },
+          {
+            "instruction": "Step 3: Convert to euros: R9,750 / R20.50 = 475.61 EUR.",
+            "result": "Final euros received"
+          }
+        ],
+        "answer": "The tourist receives 475.61 EUR after commission.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "A traveller departs Cape Town (SAST, UTC+2) at 22:30 on a flight to Dubai (GST, UTC+4) that takes 9 hours and 15 minutes. What is the local arrival time in Dubai?",
+        "answer": "Departure: 22:30 SAST. Add flight time: 22:30 + 9h15 = 07:45 next day (SAST). Convert to Dubai time: Dubai is UTC+4, SA is UTC+2, so ADD 2 hours: 07:45 + 2 = 09:45 Dubai local time the next morning.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "When travelling EAST, you ADD time zone difference. Dubai is 2 hours AHEAD of SA.",
+          "Be careful with overnight flights: if you add hours past midnight, you move to the next day."
+        ],
+        "explanation": "Time zone calculations are a core CAPS Tourism skill. The key is: (1) add flight time to departure, (2) adjust for time zone difference. Moving east = add hours; moving west = subtract hours.",
+        "distractors": [
+          "07:45 SAST (forgot to convert time zones)",
+          "05:45 Dubai time (subtracted instead of added)",
+          "09:45 the same day (miscounted the overnight)"
+        ]
+      },
+      {
+        "question": "A South African family wants to exchange R25,000 to US dollars for a holiday. The buy rate is R18.75 = 1 USD and the bank charges 2% commission. How many US dollars will they receive?",
+        "answer": "Commission: R25,000 x 2% = R500. Amount for exchange: R25,000 - R500 = R24,500. Dollars received: R24,500 / R18.75 = 1,306.67 USD.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Always deduct commission FIRST, then convert the remaining amount.",
+          "The 'buy rate' is what the bank charges you per unit of foreign currency."
+        ],
+        "explanation": "Currency exchange calculations test both mathematical skills and understanding of banking terminology. Students must know that commission reduces the amount available for conversion.",
+        "distractors": [
+          "1,333.33 USD (forgot to deduct commission)",
+          "1,306.67 ZAR (gave answer in wrong currency)",
+          "1,280.00 USD (applied commission after conversion)"
+        ]
+      },
+      {
+        "question": "Explain the THREE categories of UNESCO World Heritage Sites and give one example of each that is NOT in South Africa.",
+        "answer": "Cultural: Sites of outstanding human creative achievement or bearing testimony to a cultural tradition. Example: The Great Wall of China (testament to ancient Chinese engineering and defense strategy). Natural: Sites containing outstanding natural features, biodiversity, or geological formations. Example: The Great Barrier Reef, Australia (world's largest coral reef ecosystem). Mixed: Sites meeting both cultural and natural criteria. Example: Machu Picchu, Peru (Incan citadel in an outstanding mountain setting) or Mount Athos, Greece (monastic community in a significant natural landscape).",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
+        "hints": [
+          "Cultural = human achievement; Natural = environment/geology; Mixed = both criteria met.",
+          "South Africa has sites in all three categories: Robben Island (cultural), iSimangaliso (natural), Maloti-Drakensberg (mixed)."
+        ],
+        "explanation": "UNESCO World Heritage Sites are a core tourism topic. Understanding the classification system helps explain why sites are protected and how they contribute to cultural tourism.",
+        "distractors": [
+          "UNESCO only recognises natural sites",
+          "Mixed sites are simply sites that are both old and new",
+          "Any famous landmark is automatically a UNESCO site"
+        ]
+      },
+      {
+        "question": "A South African tourist is planning a trip to Kenya. List the health precautions they should take and the travel documents they will need.",
+        "answer": "Health precautions: (1) Yellow fever vaccination certificate (required for entry to Kenya and recommended by WHO for East Africa). (2) Malaria prophylaxis (Kenya has malaria-endemic areas, especially coastal and lake regions; take anti-malarial tablets as prescribed). (3) Hepatitis A and typhoid vaccinations (recommended). (4) Travel health insurance covering medical evacuation. Travel documents: (1) Valid South African passport (valid for at least 6 months beyond travel date, with at least 2 blank pages). (2) Visa -- South Africans may need an e-visa for Kenya (check current requirements as these change). (3) Return or onward ticket. (4) Proof of accommodation. (5) Proof of sufficient funds.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about health risks specific to East Africa: tropical diseases, waterborne illnesses.",
+          "For documents, consider what immigration officials check at the border: identity, permission to enter, proof you will leave, proof you can support yourself."
+        ],
+        "explanation": "Practical travel preparation is a key CAPS Tourism competency. Students must connect destination-specific health risks with appropriate precautions and understand visa/passport requirements.",
+        "distractors": [
+          "No vaccinations are needed for travel within Africa",
+          "A South African ID book is sufficient for travel to Kenya",
+          "Malaria is not a risk in East Africa"
+        ]
+      },
+      {
+        "question": "Analyse the impact of cultural tourism on a destination community. Use a specific example to illustrate both positive and negative impacts.",
+        "answer": "Example: Bali, Indonesia. Positive impacts: cultural tourism generates income for local artisans (woodcarving, batik, silver work), preserves traditional dance and music (performances for tourists incentivise continued practice), funds temple maintenance and cultural festivals, and creates employment in hospitality and guiding. Negative impacts: commodification of culture (sacred ceremonies performed for tourist entertainment lose spiritual meaning), overcrowding at cultural sites (environmental damage, reduced quality for worshippers), cultural erosion (young people adopt tourist culture rather than traditional practices), and economic dependency (community welfare tied to tourist numbers, vulnerable to crises like COVID-19). Alternative SA example: Shakaland/KZN Zulu cultural villages -- income vs authenticity debate.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider the tension between preservation (tourism funds cultural maintenance) and commodification (culture becomes a product).",
+          "Think about who benefits: do local communities receive income, or do tour operators capture most of the revenue?"
+        ],
+        "explanation": "Cultural tourism impact analysis is a higher-order CAPS skill. Strong answers use a specific destination, identify stakeholders, and evaluate both sides with evidence.",
+        "distractors": [
+          "Cultural tourism always preserves traditions",
+          "Only negative impacts exist from cultural tourism",
+          "Communities have no agency in how their culture is presented to tourists"
+        ]
+      }
+    ],
+    "hints": [
+      "For time zone calculations: EAST = ADD, WEST = SUBTRACT relative to your current zone.",
+      "For currency exchange: ALWAYS deduct commission before converting.",
+      "UNESCO questions: know the difference between cultural, natural, and mixed sites."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "UNESCO World Heritage Site",
+        "definition": "A landmark or area designated by UNESCO as having cultural, historical, scientific, or natural significance, legally protected by international treaties",
+        "example_usage": "South Africa has 10 UNESCO World Heritage Sites, including Robben Island and the Cradle of Humankind."
+      },
+      {
+        "term": "cultural tourism",
+        "definition": "Travel motivated by interest in the arts, heritage, traditions, cuisine, and lifestyle of a destination's people",
+        "example_usage": "Cultural tourism in Japan includes visiting temples, attending tea ceremonies, and experiencing traditional festivals."
+      },
+      {
+        "term": "exchange rate",
+        "definition": "The value of one currency expressed in terms of another currency",
+        "example_usage": "If the exchange rate is R18.50 = 1 USD, then R1,850 would buy 100 US dollars."
+      },
+      {
+        "term": "yellow fever certificate",
+        "definition": "An International Certificate of Vaccination proving vaccination against yellow fever, required for entry to many African and South American countries",
+        "example_usage": "South African travellers to East Africa must carry a valid yellow fever certificate."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Time zone calculations only require adding or subtracting -- you don't need to know which direction.",
+        "correction": "Direction matters: travelling east means moving to a later time zone (add hours), travelling west means moving to an earlier time zone (subtract hours). Without knowing the direction, you could get the answer exactly backwards.",
+        "why_students_think_this": "Students memorise formulas without understanding why. Visualising the globe with the sun moving west-to-east helps."
+      },
+      {
+        "misconception": "You apply commission after converting currency.",
+        "correction": "Banks deduct commission from the original amount BEFORE converting. This reduces the amount available for exchange, resulting in fewer foreign currency units.",
+        "why_students_think_this": "The logical sequence seems to be 'convert then pay fees,' but banks take their commission first."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Tourism.Gr12.WORLD",
+    "title": "Assessment: World Tourism -- International Travel",
+    "items": [
+      {
+        "question": "A flight departs Johannesburg (UTC+2) at 23:00 and arrives in New York (UTC-5) after 16 hours. What is the local arrival time in New York?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "23:00 + 16h = 15:00 next day (SAST). 15:00 - 7h (time difference) = 08:00 New York time the next day.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "New York is 7 hours BEHIND South Africa."
+      },
+      {
+        "question": "Calculate how many British pounds a tourist receives when exchanging R15,000 at a rate of R23.40 = 1 GBP with 3% commission.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Commission: R15,000 x 3% = R450. Net: R14,550. GBP: R14,550 / R23.40 = 621.79 GBP.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Deduct commission first, then convert."
+      },
+      {
+        "question": "Explain why a yellow fever certificate is required for travel to certain African countries.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Yellow fever is a mosquito-borne viral disease endemic in tropical Africa and South America. Countries require the certificate to prevent infected travellers from spreading the disease. The WHO recommends vaccination for all travellers to endemic areas. The certificate is valid for life (since 2016).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about public health and disease prevention."
+      },
+      {
+        "question": "Evaluate the positive and negative impacts of cultural tourism on a destination of your choice.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Must name a specific destination, identify at least 2 positive and 2 negative impacts, and reach a balanced conclusion. Positive: income, preservation, employment. Negative: commodification, overcrowding, cultural erosion.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Use a specific example, not a generic answer."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 35,
+    "bloom_distribution": [
+      ["Apply", 2],
+      ["Understand", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "How do you calculate arrival time across time zones?",
+      "back": "1. Add flight duration to departure time. 2. Find the time zone difference (destination UTC - origin UTC). 3. Add the difference (if positive/east) or subtract (if negative/west). Remember: crossing midnight = next day.",
+      "tags": ["CAPS.Tourism.Gr12.WORLD", "Grade12", "World Tourism"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "How do you calculate currency exchange with commission?",
+      "back": "1. Calculate commission: Amount x commission%. 2. Subtract commission from original amount. 3. Divide remaining amount by exchange rate. Example: R10,000 at 2% commission, rate R20/EUR = (R10,000 - R200) / R20 = 490 EUR.",
+      "tags": ["CAPS.Tourism.Gr12.WORLD", "Grade12", "World Tourism"],
+      "difficulty_permille": 350
+    },
+    {
+      "front": "What are the 3 categories of UNESCO World Heritage Sites?",
+      "back": "Cultural (human achievement, e.g., Great Wall of China), Natural (environment/geology, e.g., Great Barrier Reef), Mixed (both criteria, e.g., Machu Picchu). South Africa has sites in all three categories.",
+      "tags": ["CAPS.Tourism.Gr12.WORLD", "Grade12", "World Tourism"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What travel documents does a South African need for international travel?",
+      "back": "Valid passport (6 months validity, 2 blank pages), visa (varies by destination), return ticket, proof of accommodation, proof of funds, and applicable vaccination certificates (e.g., yellow fever for East Africa).",
+      "tags": ["CAPS.Tourism.Gr12.WORLD", "Grade12", "World Tourism"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "South Africa's time zone?",
+      "back": "SAST (South African Standard Time) = UTC+2. No daylight saving. 2 hours ahead of London (GMT/UTC+0), 7 hours ahead of New York (EST/UTC-5), 2 hours behind Dubai (GST/UTC+4).",
+      "tags": ["CAPS.Tourism.Gr12.WORLD", "Grade12", "World Tourism"],
+      "difficulty_permille": 150
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

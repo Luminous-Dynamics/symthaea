@@ -1,0 +1,243 @@
+{
+  "node_id": "CAPS.Tourism.Gr12.SA",
+  "lesson": {
+    "standard_code": "CAPS.Tourism.Gr12.SA",
+    "title": "Tourism in South Africa",
+    "grade_level": "Grade12",
+    "bloom_level": "Apply",
+    "explanation": "South Africa is one of Africa's top tourist destinations, attracting over 10 million international visitors annually (pre-COVID). The country offers diverse attractions across natural, cultural, and heritage categories. Top attractions include Kruger National Park (Big Five safaris, 2 million hectares), Table Mountain (one of the New7Wonders of Nature), Robben Island (UNESCO World Heritage Site, Mandela's prison), the Drakensberg mountains (uKhahlamba World Heritage Site, San rock art), and the Garden Route (scenic coastal drive from Mossel Bay to Storms River). South African Tourism (SAT) is the national tourism marketing organisation, while the South African Tourism Services Association (SATSA) represents the private sector. The tourism industry is divided into sectors: transport (airlines, car rental, coaches), accommodation (hotels, B&Bs, lodges, backpackers), attractions (natural, cultural, man-made), and support services (travel agencies, tour operators, guides). BBBEE (Broad-Based Black Economic Empowerment) in tourism aims to transform ownership, management, and employment to reflect South Africa's demographics. The Tourism BBBEE Charter sets targets for black ownership, management, skills development, enterprise development, and preferential procurement.",
+    "examples": [
+      {
+        "problem": "Explain the role of South African Tourism (SAT) in promoting the country as a tourist destination.",
+        "steps": [
+          {
+            "instruction": "Step 1: SAT is a public entity responsible for marketing South Africa internationally. Its campaigns include 'Sho't Left' (domestic tourism) and 'Live Again' (post-COVID recovery).",
+            "result": "Marketing function identified"
+          },
+          {
+            "instruction": "Step 2: SAT conducts market research to identify target markets (Europe, Americas, Asia, Africa), attends international tourism trade shows (WTM London, ITB Berlin), and works with airlines to secure direct routes.",
+            "result": "Strategic activities"
+          },
+          {
+            "instruction": "Step 3: SAT also promotes domestic tourism, recognising that South Africans themselves are the largest tourist market. Domestic tourism creates jobs in rural areas and distributes economic benefits beyond major cities.",
+            "result": "Domestic tourism promotion"
+          }
+        ],
+        "answer": "SAT plays a critical role in positioning South Africa as a competitive global destination through international marketing, trade partnerships, and domestic tourism campaigns that spread economic benefits across the country.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Classify the following attractions as natural, cultural, or heritage: (a) Kruger National Park, (b) Robben Island, (c) the Cradle of Humankind, (d) the Cape Winelands, (e) the Apartheid Museum.",
+        "answer": "(a) Kruger National Park: natural attraction (Big Five wildlife, biodiversity). (b) Robben Island: heritage attraction (UNESCO World Heritage Site, political prison). (c) Cradle of Humankind: heritage attraction (UNESCO site, Mrs Ples and Little Foot fossils). (d) Cape Winelands: cultural attraction (wine-tasting, Afrikaner/Huguenot heritage, cuisine). (e) Apartheid Museum: cultural/heritage attraction (documents apartheid history through interactive exhibits). Note: some attractions can be classified under more than one category.",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": [
+          "Natural attractions are based on the environment; cultural attractions reflect human activities and traditions; heritage attractions have historical significance, often with UNESCO status.",
+          "Some attractions overlap categories -- the Cradle of Humankind is both natural (geological) and heritage (historical significance)."
+        ],
+        "explanation": "Classifying attractions is a basic tourism skill. Understanding categories helps with marketing (who is the target market?) and conservation planning (what needs protection?).",
+        "distractors": [
+          "All national parks are heritage attractions because the government manages them",
+          "Cultural and heritage are the same category",
+          "Man-made attractions cannot be heritage sites"
+        ]
+      },
+      {
+        "question": "Explain THREE ways BBBEE in tourism aims to transform the industry. Give a practical example for each.",
+        "answer": "(1) Ownership transformation: Increasing black ownership of tourism businesses (e.g., community-owned lodges near national parks where local communities hold equity stakes). (2) Skills development: Training and upskilling historically disadvantaged individuals for tourism careers (e.g., SANParks' honorary ranger programme training youth as field guides). (3) Preferential procurement: Tourism businesses sourcing goods and services from black-owned enterprises (e.g., a hotel chain purchasing linen from a black-owned textile company or using local community transport services). Additional examples: enterprise development (established hotels mentoring emerging B&B owners), management representation (targets for black people in senior management positions).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "BBBEE has specific 'pillars' or elements: ownership, management control, skills development, enterprise development, preferential procurement.",
+          "Think about the tourism value chain: who owns hotels? who supplies food? who guides tourists? BBBEE aims to transform all these levels."
+        ],
+        "explanation": "BBBEE in tourism is not just about compliance but about ensuring that tourism's economic benefits are shared by all South Africans, particularly those excluded under apartheid from owning and managing businesses.",
+        "distractors": [
+          "BBBEE only applies to government-owned tourism companies",
+          "BBBEE requires all tourism businesses to be black-owned",
+          "BBBEE has no skills development component"
+        ]
+      },
+      {
+        "question": "Analyse the economic contribution of tourism to South Africa. Include direct and indirect contributions.",
+        "answer": "Direct contributions: Tourism directly contributed approximately 3.7% to GDP (pre-COVID) through spending on accommodation, transport, attractions, food, and shopping. The industry directly employed approximately 740,000 people. Indirect contributions: Tourism supports related industries (agriculture supplying hotels, construction of tourism infrastructure, manufacturing of souvenirs, financial services processing payments). The multiplier effect means that every R1 spent by a tourist generates additional economic activity as that money circulates. Tourism also generates foreign exchange earnings (important for the balance of payments), stimulates infrastructure development (airports, roads, telecommunications), and can promote rural development by bringing economic activity to areas with few other industries. Negative impacts: seasonal unemployment, low wages, leakage (profits leaving the country to foreign-owned hotel chains).",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Distinguish between DIRECT (tourist spending on tourism services) and INDIRECT (spending in related industries).",
+          "Remember the multiplier effect: money circulates through the economy multiple times."
+        ],
+        "explanation": "Understanding tourism's economic contribution requires looking beyond hotel and restaurant revenue to the entire value chain. CAPS expects students to consider both positive and negative economic impacts.",
+        "distractors": [
+          "Tourism only benefits major cities like Cape Town and Johannesburg",
+          "The multiplier effect means tourism revenue stays entirely within the tourism sector",
+          "Tourism has no negative economic impacts"
+        ]
+      },
+      {
+        "question": "Evaluate the impact of load-shedding (electricity blackouts) on South Africa's tourism industry. Suggest TWO strategies the industry can use to mitigate this impact.",
+        "answer": "Impact: Load-shedding damages SA's tourism reputation (negative media coverage internationally), disrupts guest experiences (no lights, no hot water, restaurants unable to cook, security systems offline), increases operating costs (generators, inverters, fuel), deters business tourism (conferences cancelled due to unreliable power), and creates safety concerns (traffic lights offline, reduced street lighting). Mitigation strategies: (1) Invest in solar power and battery storage systems to ensure uninterrupted service (many lodges already operate off-grid, which can be marketed as 'eco-friendly'). (2) Transparent communication with international guests before arrival, providing reassurance about backup power and positioning SA's natural attractions (safaris, mountains, beaches) as experiences that do not depend on grid electricity. Additional strategies: lobby government for tourism-area prioritisation, develop load-shedding-proof itineraries, partner with renewable energy providers.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about the tourist experience from arrival to departure: what depends on electricity?",
+          "Consider both the immediate impact (disrupted stay) and the long-term impact (reputation damage, reduced bookings)."
+        ],
+        "explanation": "This is a contemporary issue that CAPS expects students to engage with. Load-shedding connects tourism to broader economic and infrastructure challenges in South Africa. Strong answers demonstrate the ability to analyse a problem and propose practical solutions.",
+        "distractors": [
+          "Load-shedding has no impact on tourism because tourists only visit outdoor attractions",
+          "All tourism businesses already have backup generators so there is no problem",
+          "International tourists are unaware of load-shedding"
+        ]
+      },
+      {
+        "question": "Explain the difference between the roles of SAT (South African Tourism) and SATSA (South African Tourism Services Association).",
+        "answer": "SAT is a government-established public entity responsible for marketing South Africa as a tourist destination both domestically and internationally. It conducts research, runs advertising campaigns, and represents SA at international trade shows. Its funding comes primarily from government. SATSA is a private-sector membership body that represents tourism businesses (hotels, tour operators, car rental companies, etc.). SATSA sets quality standards for its members, provides a complaints and dispute resolution mechanism for tourists, advocates for the industry's interests with government, and offers networking and business development support. Key difference: SAT markets the COUNTRY (destination marketing); SATSA represents and supports BUSINESSES within the industry (industry association).",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think: SAT = government marketing body; SATSA = private sector industry body.",
+          "SAT answers the question 'Why visit South Africa?' SATSA answers 'How do we ensure quality tourism services?'"
+        ],
+        "explanation": "Understanding the distinction between public and private sector roles in tourism is a key CAPS competency. SAT and SATSA complement each other: SAT brings tourists to the country; SATSA ensures they have a quality experience.",
+        "distractors": [
+          "SAT and SATSA are the same organisation with different names",
+          "SATSA is a government department",
+          "SAT is responsible for setting quality standards for hotels"
+        ]
+      }
+    ],
+    "hints": [
+      "Tourism questions often ask you to link attractions, marketing, and economic impact.",
+      "Always consider both POSITIVE and NEGATIVE impacts of tourism.",
+      "BBBEE questions require specific examples, not just general descriptions."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "multiplier effect",
+        "definition": "The principle that initial spending generates additional economic activity as money circulates through the economy",
+        "example_usage": "A tourist's hotel bill pays staff wages, who spend at local shops, generating further income."
+      },
+      {
+        "term": "BBBEE",
+        "definition": "Broad-Based Black Economic Empowerment: a programme to increase black participation in ownership, management, and employment across industries",
+        "example_usage": "The Tourism BBBEE Charter sets targets for transformation in the tourism sector."
+      },
+      {
+        "term": "leakage",
+        "definition": "The portion of tourism revenue that leaves the local economy, typically through foreign-owned businesses repatriating profits",
+        "example_usage": "When a tourist stays at an international hotel chain, a significant portion of the revenue leaks out of South Africa."
+      },
+      {
+        "term": "domestic tourism",
+        "definition": "Travel by residents within their own country for leisure, business, or other purposes",
+        "example_usage": "SAT's 'Sho't Left' campaign encourages South Africans to explore their own country."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Tourism only benefits Cape Town and Johannesburg.",
+        "correction": "Tourism benefits many regions: Kruger (Limpopo/Mpumalanga), Drakensberg (KZN), Garden Route (Western/Eastern Cape), Sun City (North West), Durban beaches (KZN). Rural and community-based tourism specifically aims to distribute benefits beyond major cities.",
+        "why_students_think_this": "Major cities receive the most media coverage and have the most visible tourism infrastructure."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Tourism.Gr12.SA",
+    "title": "Assessment: Tourism in South Africa",
+    "items": [
+      {
+        "question": "Name the national tourism marketing organisation of South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "South African Tourism (SAT)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "This is a government public entity."
+      },
+      {
+        "question": "Explain the difference between direct and indirect economic contributions of tourism.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Direct: spending on tourism services (hotels, transport, attractions). Indirect: spending in supporting industries (agriculture, construction, manufacturing) stimulated by tourism demand. The multiplier effect amplifies the total impact.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about where tourist money goes FIRST (direct) and then where it flows NEXT (indirect)."
+      },
+      {
+        "question": "Analyse TWO challenges facing South Africa's tourism industry and suggest solutions.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Challenges could include: crime/safety concerns, load-shedding, visa regulations, infrastructure, transformation. Solutions should be practical and specific (e.g., tourism safety partnerships with SAPS, solar/battery backup for load-shedding, e-visa systems).",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Choose challenges that affect tourist numbers or experience, then propose realistic solutions."
+      },
+      {
+        "question": "Evaluate whether BBBEE in tourism has been successful in transforming the industry.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Balanced answer acknowledging progress (community lodges, skills programmes, procurement targets) and limitations (slow ownership transfer, fronting, large chains still dominating, rural areas underserved). Conclusion should be evidence-based.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both statistics and practical examples."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 35,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the role of South African Tourism (SAT)?",
+      "back": "Government public entity responsible for marketing SA as a tourist destination domestically and internationally. Conducts research, runs campaigns (Sho't Left), and represents SA at international trade shows.",
+      "tags": ["CAPS.Tourism.Gr12.SA", "Grade12", "Tourism SA"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "Name 5 top South African tourist attractions.",
+      "back": "Kruger National Park, Table Mountain, Robben Island, Drakensberg mountains, Garden Route. Others: Cradle of Humankind, Cape Winelands, V&A Waterfront, Blyde River Canyon, iSimangaliso Wetland Park.",
+      "tags": ["CAPS.Tourism.Gr12.SA", "Grade12", "Tourism SA"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What is the tourism multiplier effect?",
+      "back": "Tourist spending generates additional economic activity as money circulates: hotel pays staff, staff buy groceries, grocer pays suppliers, etc. Each R1 of tourism spending generates multiple rounds of economic activity.",
+      "tags": ["CAPS.Tourism.Gr12.SA", "Grade12", "Tourism SA"],
+      "difficulty_permille": 400
+    },
+    {
+      "front": "What is 'leakage' in tourism economics?",
+      "back": "Revenue that leaves the local economy -- typically when foreign-owned hotel chains repatriate profits, or when imported goods are used instead of local products. Reduces the net benefit of tourism to the host country.",
+      "tags": ["CAPS.Tourism.Gr12.SA", "Grade12", "Tourism SA"],
+      "difficulty_permille": 450
+    },
+    {
+      "front": "What are the 4 main tourism sectors?",
+      "back": "1. Transport (airlines, car rental, coaches). 2. Accommodation (hotels, B&Bs, lodges, backpackers). 3. Attractions (natural, cultural, man-made). 4. Support services (travel agencies, tour operators, guides).",
+      "tags": ["CAPS.Tourism.Gr12.SA", "Grade12", "Tourism SA"],
+      "difficulty_permille": 250
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

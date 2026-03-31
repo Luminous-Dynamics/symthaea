@@ -1,0 +1,270 @@
+{
+  "node_id": "CAPS.Accounting.Gr12.AUDIT",
+  "lesson": {
+    "standard_code": "CAPS.Accounting.Gr12.AUDIT",
+    "title": "CAPS.Accounting.Gr12.AUDIT: Auditing & Internal Controls — Internal Audit, Corporate Governance, Ethics, Fraud Prevention",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Auditing ensures that financial records are accurate, complete and free from fraud. Internal controls are procedures a business puts in place to safeguard assets and ensure reliable reporting. Key controls include segregation of duties (different people handle authorisation, recording and custody), physical controls (safes, locks), authorisation limits and regular reconciliations. The King IV Report on Corporate Governance (South Africa) guides ethical business conduct, requiring transparency, accountability, fairness and responsibility. Internal auditors review these controls and report to management. Fraud prevention involves creating an ethical culture, implementing whistleblowing policies and conducting regular audits. Understanding these concepts helps future business leaders maintain integrity.",
+    "examples": [
+      {
+        "problem": "Identify three internal control weaknesses in this scenario: At Nkosi Hardware, the cashier records sales, deposits cash and reconciles the bank statement. The owner never checks the petty cash.",
+        "steps": [
+          {
+            "instruction": "Step 1: The cashier handles recording, custody of cash and bank reconciliation — no segregation of duties",
+            "result": "Weakness 1: Lack of segregation of duties"
+          },
+          {
+            "instruction": "Step 2: The same person who receives cash also deposits it — opportunity for theft",
+            "result": "Weakness 2: No independent verification of deposits"
+          },
+          {
+            "instruction": "Step 3: Petty cash is never checked by the owner — no supervisory review",
+            "result": "Weakness 3: No physical controls over petty cash"
+          }
+        ],
+        "answer": "Answer: Three weaknesses are lack of segregation of duties, no independent verification of deposits, and no supervisory control over petty cash",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how the King IV principles of transparency and accountability would apply to a company listed on the JSE.",
+        "steps": [
+          {
+            "instruction": "Step 1: Transparency requires the company to disclose financial results, directors' remuneration and material risks in annual reports",
+            "result": "Public disclosure obligations"
+          },
+          {
+            "instruction": "Step 2: Accountability means the board of directors must answer to shareholders for their decisions and the company's performance",
+            "result": "Board accountability to stakeholders"
+          },
+          {
+            "instruction": "Step 3: The company must have an audit committee with independent directors who oversee financial reporting",
+            "result": "Independent oversight structure"
+          }
+        ],
+        "answer": "Answer: A JSE-listed company must publish transparent financial reports and the board is accountable to shareholders through structures like independent audit committees",
+        "visual_description": null
+      },
+      {
+        "problem": "Suggest three measures to prevent fraud at a retail store in Polokwane.",
+        "steps": [
+          {
+            "instruction": "Step 1: Implement segregation of duties so that the person who receives stock does not also record it in the inventory system",
+            "result": "Segregation of duties"
+          },
+          {
+            "instruction": "Step 2: Install CCTV cameras and use electronic point-of-sale systems that record every transaction",
+            "result": "Physical and technological controls"
+          },
+          {
+            "instruction": "Step 3: Establish a confidential whistleblowing hotline and code of conduct for all employees",
+            "result": "Ethical culture and reporting mechanism"
+          }
+        ],
+        "answer": "Answer: Segregation of duties, CCTV and POS systems, and a whistleblowing hotline with a code of conduct",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define 'segregation of duties' and explain why it is an important internal control.",
+        "answer": "Segregation of duties means dividing responsibilities among different employees so that no single person controls all aspects of a transaction (authorisation, recording, custody). This reduces the risk of fraud and errors because it requires collusion between multiple people to commit and conceal irregularities.",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what could go wrong if one person handles every step of a transaction.",
+          "Consider the three functions: authorise, record and safeguard."
+        ],
+        "explanation": "Segregation of duties is a fundamental internal control. For example, the person who approves a purchase order should not also be the person who receives the goods or pays the supplier. This separation creates checks and balances that prevent any individual from both committing and concealing fraud.",
+        "distractors": [
+          "Segregation of duties means each employee has only one job",
+          "It means rotating employees between departments every month",
+          "It refers to separating personal and business finances"
+        ]
+      },
+      {
+        "question": "List and briefly explain the four principles of King IV corporate governance.",
+        "answer": "Transparency: open disclosure of information. Accountability: being answerable for decisions and actions. Responsibility: acting in the best interest of stakeholders. Fairness: treating all stakeholders equitably, without favouritism or discrimination.",
+        "difficulty_permille": 250,
+        "bloom_level": "Remember",
+        "hints": [
+          "The four principles can be remembered as TARF: Transparency, Accountability, Responsibility, Fairness.",
+          "Think about what makes a company trustworthy."
+        ],
+        "explanation": "King IV's four principles guide all South African organisations: Transparency (disclose relevant information), Accountability (directors answer to stakeholders), Responsibility (act ethically and in the interest of the company and society), Fairness (equitable treatment of all stakeholders including employees, customers and communities).",
+        "distractors": [
+          "Profitability, Growth, Innovation, Sustainability",
+          "Transparency, Accuracy, Reliability, Feasibility",
+          "Authority, Control, Regulation, Finance"
+        ]
+      },
+      {
+        "question": "A bookkeeper at a Johannesburg company discovers that the sales manager has been creating fictitious invoices for a non-existent client and pocketing the payments. Identify the type of fraud, the internal control failure, and two corrective actions.",
+        "answer": "Type: Misappropriation of assets (fictitious invoicing fraud). Control failure: Lack of verification of client existence and no independent review of sales invoices. Corrective actions: (1) Require independent approval of new client accounts, (2) Conduct regular reconciliation of sales invoices to delivery notes and client confirmations.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider which internal controls should have caught fake invoices.",
+          "Think about what checks could verify whether a client actually exists."
+        ],
+        "explanation": "This is misappropriation of assets through fictitious invoicing. The company failed to independently verify new clients and did not reconcile invoices to actual deliveries. Corrective actions include requiring management approval for new client accounts with supporting documentation, and monthly reconciliation of sales invoices to proof of delivery.",
+        "distractors": [
+          "This is a tax evasion issue, not an internal control matter",
+          "The bookkeeper should simply fire the sales manager",
+          "Only external auditors can detect this type of fraud"
+        ]
+      },
+      {
+        "question": "Explain the role of an internal auditor versus an external auditor. Who appoints each, and to whom do they report?",
+        "answer": "Internal auditor: appointed by the company, reports to management or audit committee, evaluates internal controls and operational efficiency on an ongoing basis. External auditor: appointed by shareholders at the AGM, reports to shareholders, provides an independent opinion on whether financial statements are fairly presented. External auditors must be independent (registered with IRBA in SA).",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about who benefits from each type of audit.",
+          "Consider the independence requirement for external auditors."
+        ],
+        "explanation": "Internal auditors are employees who continuously assess internal controls, risk management and compliance. They report to the audit committee or management. External auditors are independent professionals (registered with IRBA) appointed by shareholders to verify financial statements annually. They express an audit opinion and report to shareholders.",
+        "distractors": [
+          "Internal and external auditors have the same role",
+          "External auditors are appointed by the directors",
+          "Internal auditors provide the audit opinion on financial statements"
+        ]
+      },
+      {
+        "question": "Evaluate whether the following statement is correct: 'A business with strong internal controls will never experience fraud.' Justify your answer with reference to corporate governance principles.",
+        "answer": "The statement is incorrect. Strong internal controls significantly reduce the risk of fraud but cannot eliminate it entirely. Employees may collude to override controls, management may override systems (management override), and new fraud methods may emerge. King IV recognises this by requiring ongoing risk assessment, ethical leadership, and a culture of accountability rather than guaranteeing zero fraud.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Can controls be overridden? By whom?",
+          "Think about the limitations of any control system."
+        ],
+        "explanation": "No system of internal controls is foolproof. Collusion between employees, management override of controls, and sophisticated fraud schemes can defeat even well-designed systems. King IV addresses this through ongoing risk assessment, whistleblower protection, and an ethical corporate culture. Controls reduce fraud risk but require continuous vigilance.",
+        "distractors": [
+          "The statement is correct because strong controls prevent all fraud",
+          "Controls only prevent employee fraud, not management fraud",
+          "Fraud only occurs in businesses without any controls"
+        ]
+      }
+    ],
+    "hints": [
+      "Internal controls can be categorised as preventive (stop problems before they occur) or detective (find problems after they occur).",
+      "King IV applies to all South African organisations, not just listed companies.",
+      "When analysing internal control weaknesses, look for situations where one person has too much power over a transaction."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "segregation of duties",
+        "definition": "Dividing responsibilities so that no single person handles authorisation, recording and custody of the same transaction",
+        "example_usage": "The store owner ensures segregation of duties by having different staff handle cash, recording and banking."
+      },
+      {
+        "term": "King IV Report",
+        "definition": "South Africa's corporate governance code that guides ethical and effective leadership of organisations",
+        "example_usage": "According to King IV, the company must have an independent audit committee."
+      },
+      {
+        "term": "internal audit",
+        "definition": "An independent evaluation of a company's internal controls, risk management and governance processes, conducted by employees of the organisation",
+        "example_usage": "The internal audit revealed weaknesses in the purchasing system."
+      },
+      {
+        "term": "fraud",
+        "definition": "Intentional deception for personal gain, including theft, misappropriation of assets and manipulation of financial records",
+        "example_usage": "The accountant committed fraud by creating fictitious expenses."
+      },
+      {
+        "term": "corporate governance",
+        "definition": "The system of rules, practices and processes by which a company is directed and controlled",
+        "example_usage": "Good corporate governance ensures the company acts in the best interests of all stakeholders."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often think that only large companies need internal controls and corporate governance.",
+        "correction": "All businesses, regardless of size, benefit from internal controls. Even a sole trader should separate personal and business finances, reconcile bank statements, and keep proper records. King IV principles apply to all organisations in South Africa.",
+        "why_students_think_this": "Textbook examples often focus on large corporations. Students do not realise that the spaza shop owner who counts stock weekly and keeps receipts is also practising internal control."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.89,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Accounting.Gr12.AUDIT",
+    "title": "Assessment: Auditing & Internal Controls — Corporate Governance, Ethics, Fraud Prevention",
+    "items": [
+      {
+        "question": "Name the four principles of King IV corporate governance.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Transparency, Accountability, Responsibility, Fairness",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "TARF"
+      },
+      {
+        "question": "A clothing store in Durban has the same employee ordering stock, receiving deliveries and processing payments to suppliers. Identify two internal control weaknesses and suggest improvements.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Weakness 1: No segregation of duties (one person handles ordering, receiving and payment). Weakness 2: No independent verification of goods received. Improvement: Assign different staff to ordering, receiving and payment. Require receiving reports signed by a different employee.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Think about who authorises, who records, and who has custody."
+      },
+      {
+        "question": "Discuss how a whistleblowing policy contributes to fraud prevention, with reference to an SA business example.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "A whistleblowing policy encourages employees to report suspected fraud confidentially without fear of retaliation. In SA, the Protected Disclosures Act protects whistleblowers. For example, an employee at a retail chain can anonymously report a manager inflating expense claims through a dedicated hotline, allowing the company to investigate and take corrective action.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider why employees might be reluctant to report fraud without protection."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 50,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the four King IV principles?",
+      "back": "Transparency, Accountability, Responsibility, Fairness (TARF). These guide ethical governance for all SA organisations.",
+      "tags": ["CAPS.Accounting.Gr12.AUDIT", "Grade12", "Auditing"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is segregation of duties?",
+      "back": "Dividing transaction responsibilities (authorisation, recording, custody) among different people to prevent fraud and errors.",
+      "tags": ["CAPS.Accounting.Gr12.AUDIT", "Grade12", "Auditing"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the difference between an internal and external auditor?",
+      "back": "Internal auditor: employee, reports to management/audit committee, reviews controls continuously. External auditor: independent professional (IRBA registered), appointed by shareholders, gives opinion on financial statements annually.",
+      "tags": ["CAPS.Accounting.Gr12.AUDIT", "Grade12", "Auditing"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "Name three types of internal controls.",
+      "back": "1. Segregation of duties 2. Physical controls (safes, locks, CCTV) 3. Authorisation controls (approval limits, signatures). Also: reconciliations, IT controls, documentation.",
+      "tags": ["CAPS.Accounting.Gr12.AUDIT", "Grade12", "Auditing"],
+      "difficulty_permille": 333
+    }
+  ],
+  "quality": {
+    "coherence": 0.89,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

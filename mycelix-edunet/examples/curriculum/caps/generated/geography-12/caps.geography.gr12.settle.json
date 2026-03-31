@@ -1,0 +1,270 @@
+{
+  "node_id": "CAPS.Geography.Gr12.SETTLE",
+  "lesson": {
+    "standard_code": "CAPS.Geography.Gr12.SETTLE",
+    "title": "CAPS.Geography.Gr12.SETTLE: Settlement Geography — Urbanisation, Rural-Urban Migration, Informal Settlements, Service Delivery",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Urbanisation is the process by which an increasing proportion of a country's population lives in urban areas. South Africa is approximately 68% urbanised, driven by rural-urban migration as people move to cities seeking employment, education and better services. Push factors include rural poverty, lack of services, drought and limited opportunities. Pull factors include perceived job opportunities, better healthcare and education, and urban amenities. This rapid urbanisation has led to informal settlements (shack dwellings) in areas like Alexandra (Johannesburg), Khayelitsha (Cape Town), and KwaMashu (Durban), characterised by inadequate housing, limited water and sanitation, overcrowding, and unemployment. Service delivery challenges — providing water, electricity, sanitation, housing and waste removal — are a major issue for SA municipalities. The Sustainable Development Goals (SDGs), particularly SDG 11 (Sustainable Cities), guide urban planning efforts.",
+    "examples": [
+      {
+        "problem": "Explain the push and pull factors driving rural-urban migration from the Eastern Cape to Johannesburg.",
+        "steps": [
+          {
+            "instruction": "Step 1: Push factors (reasons to leave rural areas) — high unemployment in rural Eastern Cape, lack of job opportunities, limited access to healthcare and secondary schools, drought affecting subsistence farming, poor infrastructure",
+            "result": "Rural disadvantages identified"
+          },
+          {
+            "instruction": "Step 2: Pull factors (reasons to move to Johannesburg) — perceived job opportunities in mining, manufacturing and services, better hospitals (Chris Hani Baragwanath), universities (Wits, UJ), access to social services, family already in Johannesburg",
+            "result": "Urban attractions identified"
+          },
+          {
+            "instruction": "Step 3: Result — migrants often settle in informal areas (Alexandra, Diepsloot) because formal housing is unaffordable, creating a cycle of urban poverty",
+            "result": "Urbanisation creates new challenges"
+          }
+        ],
+        "answer": "Answer: Rural poverty and lack of services push people from the Eastern Cape, while perceived urban opportunities pull them to Johannesburg, often resulting in informal settlement growth",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the living conditions in an informal settlement such as Khayelitsha in Cape Town and explain three challenges faced by residents.",
+        "steps": [
+          {
+            "instruction": "Step 1: Housing — makeshift structures built from corrugated iron, wood and plastic sheeting. Overcrowded, with families of 5+ in single rooms. No insulation, prone to fire",
+            "result": "Inadequate and dangerous housing"
+          },
+          {
+            "instruction": "Step 2: Services — limited access to clean running water (shared communal taps), inadequate sanitation (shared portable toilets or bucket systems), unreliable or illegal electricity connections",
+            "result": "Basic service deficiencies"
+          },
+          {
+            "instruction": "Step 3: Social challenges — high unemployment, crime, substance abuse, limited access to healthcare, overcrowded schools, flooding during winter rains",
+            "result": "Complex social problems"
+          }
+        ],
+        "answer": "Answer: Khayelitsha residents face inadequate housing, limited basic services (water, sanitation, electricity), and social challenges including unemployment and crime",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how SDG 11 (Sustainable Cities and Communities) relates to South Africa's urbanisation challenges.",
+        "steps": [
+          {
+            "instruction": "Step 1: SDG 11 aims to make cities inclusive, safe, resilient and sustainable by 2030",
+            "result": "Global framework for urban development"
+          },
+          {
+            "instruction": "Step 2: Relevant targets for SA include providing adequate, safe and affordable housing (11.1), sustainable transport (11.2), inclusive urbanisation planning (11.3), and reducing deaths from disasters (11.5)",
+            "result": "Specific targets applicable to SA"
+          },
+          {
+            "instruction": "Step 3: SA's progress is mixed — RDP housing programme has delivered 4+ million houses, but the backlog is growing. Informal settlements continue to expand faster than formal housing delivery",
+            "result": "Implementation gap between targets and reality"
+          }
+        ],
+        "answer": "Answer: SDG 11 provides the framework for SA's urban development goals, but implementation is hampered by the scale of urbanisation, limited municipal capacity and fiscal constraints",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define urbanisation and state the approximate percentage of South Africa's population that lives in urban areas.",
+        "answer": "Urbanisation is the process by which an increasing proportion of a population moves to and lives in towns and cities. Approximately 68% of South Africa's population (about 41 million people) lives in urban areas. This figure is expected to reach 75% by 2030.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Urbanisation is a process, not a fixed state.",
+          "SA is one of the most urbanised countries in Africa."
+        ],
+        "explanation": "South Africa's urbanisation rate is high compared to the rest of Africa (average 43%). Major urban centres include Johannesburg-Pretoria (Gauteng, 16 million), Cape Town (4.7 million), Durban (3.9 million), and Port Elizabeth (1.3 million). Rural provinces like Limpopo and Eastern Cape have lower urbanisation rates.",
+        "distractors": [
+          "Approximately 30% of SA's population is urbanised",
+          "Urbanisation means people moving from cities to rural areas",
+          "SA has a lower urbanisation rate than most African countries"
+        ]
+      },
+      {
+        "question": "Distinguish between rural-urban migration and urbanisation. Are they the same thing?",
+        "answer": "They are related but not the same. Rural-urban migration is the physical movement of people from rural to urban areas (one cause of urbanisation). Urbanisation is the broader process of increasing urban population proportion, which also includes natural population growth in cities (births exceeding deaths), reclassification of rural areas as urban, and expansion of urban boundaries. Migration is a component of urbanisation, not the whole process.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Migration is about movement; urbanisation is about the result.",
+          "Can urban areas grow without migration?"
+        ],
+        "explanation": "In SA, rural-urban migration is the primary driver of urbanisation, but natural increase (high birth rates in urban areas) also contributes significantly. Additionally, when municipal boundaries expand to include previously rural areas, the urban population increases statistically without anyone moving. Understanding this distinction is important for urban planning.",
+        "distractors": [
+          "Urbanisation and rural-urban migration are exactly the same",
+          "Urbanisation only occurs through migration",
+          "Natural population growth does not contribute to urbanisation"
+        ]
+      },
+      {
+        "question": "Explain three ways in which informal settlements contribute to environmental problems in South African cities.",
+        "answer": "(1) Water pollution: lack of proper sanitation (bucket toilets, no sewage systems) causes contamination of rivers and groundwater (e.g., Jukskei River in Alexandra is heavily polluted). (2) Air pollution: burning wood, coal, paraffin and waste for cooking and heating creates toxic smoke, causing respiratory diseases. (3) Waste management: no formal refuse collection leads to illegal dumping, blocked drainage and increased flood risk. Plastic waste contaminates watercourses.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about what happens when thousands of people live in an area without proper infrastructure.",
+          "Consider water, air and land pollution."
+        ],
+        "explanation": "Informal settlements have an outsized environmental footprint because they lack the infrastructure to manage waste, water and energy. The Jukskei River flowing through Alexandra is one of the most polluted rivers in SA, with high levels of E. coli from untreated sewage. Air quality monitoring in informal settlements consistently shows dangerous levels of particulate matter from indoor cooking fires.",
+        "distractors": [
+          "Informal settlements have minimal environmental impact",
+          "Only formal industrial areas cause pollution in cities",
+          "Government waste collection services cover all informal settlements"
+        ]
+      },
+      {
+        "question": "Discuss the causes of service delivery protests in South African townships and suggest two strategies to address the underlying issues.",
+        "answer": "Causes: (1) Slow delivery of basic services (water, electricity, housing, sanitation). (2) Corruption and mismanagement of municipal funds. (3) Unemployment and poverty. (4) Broken promises by politicians. (5) Poor communication between municipalities and residents. Strategies: (1) Improve municipal governance through transparent budgeting, community participation in planning, and accountability mechanisms (audit outcomes). (2) Prioritise investment in bulk infrastructure (water treatment, electricity networks) in underserved areas with ring-fenced maintenance budgets.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about what specific services are most lacking in affected communities.",
+          "Consider both the immediate causes (service gaps) and underlying causes (governance, funding)."
+        ],
+        "explanation": "SA experiences thousands of service delivery protests annually, often concentrated in Gauteng, the Western Cape and KwaZulu-Natal. Root causes include the legacy of apartheid spatial planning (townships far from economic centres), rapid urbanisation exceeding infrastructure capacity, and municipal dysfunction (many municipalities receive qualified audit opinions). Solutions require both increased investment and improved governance.",
+        "distractors": [
+          "Service delivery protests are caused solely by political agitation",
+          "All SA municipalities provide adequate basic services",
+          "Building more houses alone will solve service delivery challenges"
+        ]
+      },
+      {
+        "question": "Evaluate the effectiveness of the South African government's RDP (Reconstruction and Development Programme) housing programme in addressing the housing crisis. Consider both achievements and limitations.",
+        "answer": "Achievements: Over 4.5 million RDP houses delivered since 1994, providing formal shelter to approximately 20 million people. Improved access to water, electricity and sanitation for millions. Recognised internationally as a major housing delivery programme. Limitations: Housing backlog has grown from 1.5 million (1994) to over 2.3 million (2024) due to population growth and continued urbanisation. Quality concerns — some RDP houses are poorly built (cracking, leaking). Peripheral locations far from jobs and services increase transport costs. Dependency on government provision rather than enabling self-help housing. The programme addresses quantity but not always quality or location.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider the scale of achievement and the scale of the remaining challenge.",
+          "Quality, location and sustainability matter as much as quantity."
+        ],
+        "explanation": "The RDP housing programme is one of the largest public housing programmes globally. However, the housing backlog continues to grow because delivery cannot keep pace with demand. Critics argue that the programme creates unsustainable urban sprawl, locating beneficiaries far from economic opportunities. The shift toward 'Breaking New Ground' (BNG) policy aims to address location and quality, promoting higher-density, mixed-use development closer to city centres.",
+        "distractors": [
+          "The RDP programme has eliminated the housing backlog",
+          "RDP houses are always located near employment centres",
+          "The government should stop building houses and let the market solve the problem"
+        ]
+      }
+    ],
+    "hints": [
+      "Push factors make people want to LEAVE rural areas; pull factors ATTRACT them to cities.",
+      "Informal settlements are a symptom of urbanisation outpacing housing delivery.",
+      "Service delivery is a municipal responsibility in SA — local government provides water, electricity, sanitation and refuse removal."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "urbanisation",
+        "definition": "The process by which an increasing proportion of a country's population lives in towns and cities",
+        "example_usage": "South Africa's urbanisation rate has increased from 52% in 1990 to approximately 68% today."
+      },
+      {
+        "term": "informal settlement",
+        "definition": "An unplanned residential area where housing is built from makeshift materials on land that is often occupied illegally, lacking formal services",
+        "example_usage": "Alexandra is one of the oldest and most densely populated informal settlements in Johannesburg."
+      },
+      {
+        "term": "rural-urban migration",
+        "definition": "The movement of people from rural (countryside) areas to urban (town/city) areas, usually in search of employment and better services",
+        "example_usage": "Rural-urban migration from the Eastern Cape to Gauteng has increased since 1994."
+      },
+      {
+        "term": "service delivery",
+        "definition": "The provision of basic services by government to communities, including water, electricity, sanitation, housing and waste removal",
+        "example_usage": "Service delivery protests erupted when the municipality failed to provide water for three months."
+      },
+      {
+        "term": "SDG 11",
+        "definition": "Sustainable Development Goal 11: Make cities and human settlements inclusive, safe, resilient and sustainable",
+        "example_usage": "SDG 11 targets guide Cape Town's planning for affordable housing near transport routes."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students assume that all people in informal settlements are unemployed and chose to live there.",
+        "correction": "Many informal settlement residents are employed (often in low-wage work such as domestic work, construction, security or retail) but cannot afford formal housing due to low wages and high housing costs. They did not 'choose' informal living — it is the only affordable option close enough to their workplaces. SA's housing market has a massive gap between social housing (RDP) qualification and entry-level private housing.",
+        "why_students_think_this": "Media coverage often portrays informal settlements as places of poverty only. Students may not understand that even employed people in SA struggle to access formal housing due to the affordability gap (earning too much for RDP but too little for a bond)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Geography.Gr12.SETTLE",
+    "title": "Assessment: Settlement Geography — Urbanisation, Migration, Informal Settlements, Service Delivery",
+    "items": [
+      {
+        "question": "List three push factors and three pull factors of rural-urban migration in South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Push: rural unemployment, lack of services (healthcare, education), drought/environmental degradation. Pull: perceived job opportunities, better services (hospitals, schools), urban amenities and infrastructure.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Push = reasons to leave rural areas. Pull = reasons to go to cities."
+      },
+      {
+        "question": "Explain how rapid urbanisation contributes to the growth of informal settlements in South African cities.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Rapid urbanisation brings more people to cities than the government can provide housing for. Formal housing is expensive and has a long waiting list (10+ years for RDP). Migrants settle on vacant land near cities, building informal structures. The demand for housing far exceeds supply, creating continuously expanding informal settlements.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about the gap between the rate of migration and the rate of housing delivery."
+      },
+      {
+        "question": "Evaluate two strategies the South African government could use to reduce the growth of informal settlements. Consider both supply-side and demand-side approaches.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Supply-side: Accelerate housing delivery through public-private partnerships, higher-density social housing near transport corridors (not on urban periphery), and in-situ upgrading of existing informal settlements (cheaper than relocation). Demand-side: Invest in rural development (agriculture, education, healthcare) to reduce push factors; create economic opportunities in secondary cities (decentralise from Gauteng). Both approaches are needed simultaneously.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Supply-side means providing more housing. Demand-side means reducing the need for people to move to cities."
+      }
+    ],
+    "total_points": 9,
+    "estimated_minutes": 35,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the difference between push and pull factors of migration?",
+      "back": "Push factors: negative conditions that drive people AWAY from rural areas (poverty, drought, lack of services). Pull factors: positive attractions that draw people TO cities (jobs, services, education). Both operate simultaneously.",
+      "tags": ["CAPS.Geography.Gr12.SETTLE", "Grade12", "Settlement"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "Name three challenges faced by residents of informal settlements in SA.",
+      "back": "1. Inadequate housing (fire risk, flooding, no insulation). 2. Limited basic services (water, sanitation, electricity). 3. Social problems (unemployment, crime, overcrowded schools). Also: environmental degradation, health risks.",
+      "tags": ["CAPS.Geography.Gr12.SETTLE", "Grade12", "Settlement"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is SDG 11?",
+      "back": "Sustainable Development Goal 11: Make cities and human settlements inclusive, safe, resilient and sustainable. Key targets include adequate affordable housing, sustainable transport, inclusive urban planning, and reduced disaster deaths.",
+      "tags": ["CAPS.Geography.Gr12.SETTLE", "Grade12", "Settlement"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the approximate urbanisation rate of South Africa?",
+      "back": "Approximately 68% (about 41 million people live in urban areas). SA is one of the most urbanised countries in Africa. Major urban centres: Gauteng (16 million), Cape Town (4.7 million), eThekwini/Durban (3.9 million).",
+      "tags": ["CAPS.Geography.Gr12.SETTLE", "Grade12", "Settlement"],
+      "difficulty_permille": 222
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

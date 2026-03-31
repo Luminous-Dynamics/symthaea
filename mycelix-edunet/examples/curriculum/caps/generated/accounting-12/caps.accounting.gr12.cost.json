@@ -1,0 +1,266 @@
+{
+  "node_id": "CAPS.Accounting.Gr12.COST",
+  "lesson": {
+    "standard_code": "CAPS.Accounting.Gr12.COST",
+    "title": "CAPS.Accounting.Gr12.COST: Cost Accounting — Production Cost Statement, Break-Even Analysis, Unit Costs",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Cost accounting helps manufacturing businesses determine the total cost of producing goods. The Production Cost Statement shows three cost elements: direct materials (raw materials used), direct labour (factory workers' wages) and factory overheads (rent, electricity, depreciation of machinery). Total factory cost = Direct materials + Direct labour + Factory overheads. Unit cost = Total factory cost / Units produced. Break-even analysis determines the sales volume where total revenue equals total costs, meaning no profit or loss. Break-even point (units) = Fixed costs / (Selling price per unit - Variable cost per unit). SA manufacturers use this to make pricing and production decisions.",
+    "examples": [
+      {
+        "problem": "Mandela Manufacturing produces wooden desks. For March 2026: raw materials used R180 000, direct labour R120 000, factory overheads R90 000, 1 500 desks were produced. Calculate the unit cost.",
+        "steps": [
+          {
+            "instruction": "Step 1: Total factory cost = R180 000 + R120 000 + R90 000",
+            "result": "Total factory cost = R390 000"
+          },
+          {
+            "instruction": "Step 2: Unit cost = Total factory cost / Units produced = R390 000 / 1 500",
+            "result": "Unit cost = R260 per desk"
+          }
+        ],
+        "answer": "Answer: The cost to produce one desk is R260",
+        "visual_description": null
+      },
+      {
+        "problem": "A factory has fixed costs of R450 000 per month. Each product sells for R150 and has variable costs of R90 per unit. Calculate the break-even point in units and in Rand value.",
+        "steps": [
+          {
+            "instruction": "Step 1: Contribution per unit = Selling price - Variable cost = R150 - R90",
+            "result": "Contribution = R60 per unit"
+          },
+          {
+            "instruction": "Step 2: Break-even (units) = Fixed costs / Contribution per unit = R450 000 / R60",
+            "result": "Break-even = 7 500 units"
+          },
+          {
+            "instruction": "Step 3: Break-even (Rands) = Break-even units x Selling price = 7 500 x R150",
+            "result": "Break-even = R1 125 000"
+          }
+        ],
+        "answer": "Answer: Break-even point is 7 500 units or R1 125 000 in sales",
+        "visual_description": null
+      },
+      {
+        "problem": "Prepare a Production Cost Statement: Opening raw materials R25 000, Purchases R160 000, Closing raw materials R15 000, Direct labour R110 000, Factory overheads R85 000, Opening work-in-progress R30 000, Closing work-in-progress R20 000.",
+        "steps": [
+          {
+            "instruction": "Step 1: Raw materials used = Opening RM + Purchases - Closing RM = R25 000 + R160 000 - R15 000",
+            "result": "Direct materials = R170 000"
+          },
+          {
+            "instruction": "Step 2: Total factory cost = R170 000 + R110 000 + R85 000",
+            "result": "Total factory cost = R365 000"
+          },
+          {
+            "instruction": "Step 3: Cost of production = Total factory cost + Opening WIP - Closing WIP = R365 000 + R30 000 - R20 000",
+            "result": "Cost of production = R375 000"
+          }
+        ],
+        "answer": "Answer: Cost of finished goods produced = R375 000",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "A bakery has fixed costs of R36 000 per month. Each cake sells for R80 and costs R50 in variable costs. How many cakes must be sold to break even?",
+        "answer": "Break-even = R36 000 / (R80 - R50) = R36 000 / R30 = 1 200 cakes per month.",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "Contribution per unit = Selling price - Variable cost per unit.",
+          "Break-even (units) = Fixed costs / Contribution per unit."
+        ],
+        "explanation": "Contribution per cake = R80 - R50 = R30. Break-even = R36 000 / R30 = 1 200 cakes. If the bakery sells exactly 1 200 cakes, total revenue (R96 000) equals total costs (R36 000 fixed + R60 000 variable = R96 000).",
+        "distractors": [
+          "450 cakes",
+          "720 cakes",
+          "1 800 cakes"
+        ]
+      },
+      {
+        "question": "Calculate the total factory cost: Direct materials R95 000, Direct labour R65 000, Indirect labour R18 000, Factory rent R24 000, Factory electricity R12 000, Depreciation of machinery R8 000.",
+        "answer": "Factory overheads = R18 000 + R24 000 + R12 000 + R8 000 = R62 000. Total factory cost = R95 000 + R65 000 + R62 000 = R222 000.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Indirect labour, factory rent, factory electricity and depreciation are all factory overheads.",
+          "Total factory cost = Direct materials + Direct labour + Factory overheads."
+        ],
+        "explanation": "Factory overheads include all indirect factory costs: indirect labour R18 000, factory rent R24 000, factory electricity R12 000, depreciation R8 000 = R62 000. Total factory cost = R95 000 + R65 000 + R62 000 = R222 000.",
+        "distractors": [
+          "R160 000",
+          "R222 000 but forgetting indirect labour",
+          "R284 000"
+        ]
+      },
+      {
+        "question": "A clothing factory produced 4 000 shirts at a total factory cost of R520 000. The selling price is R195 per shirt. Calculate the unit cost, profit per shirt, and total profit if all shirts are sold.",
+        "answer": "Unit cost = R520 000 / 4 000 = R130. Profit per shirt = R195 - R130 = R65. Total profit = R65 x 4 000 = R260 000.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Unit cost = Total factory cost / Number of units produced.",
+          "Profit per unit = Selling price per unit - Unit cost."
+        ],
+        "explanation": "Unit cost = R520 000 / 4 000 = R130 per shirt. Profit per shirt = R195 - R130 = R65. Total profit = 4 000 x R65 = R260 000. This assumes all 4 000 shirts are sold and there are no additional selling and distribution costs.",
+        "distractors": [
+          "Unit cost R195, profit per shirt R65",
+          "Unit cost R130, total profit R520 000",
+          "Unit cost R130, total profit R195 000"
+        ]
+      },
+      {
+        "question": "Explain the difference between fixed costs and variable costs, giving two examples of each in a SA manufacturing context.",
+        "answer": "Fixed costs remain constant regardless of production volume (e.g., factory rent R25 000/month, insurance R5 000/month). Variable costs change in proportion to production volume (e.g., raw material costs increase with more units, packaging costs per unit).",
+        "difficulty_permille": 500,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about which costs stay the same even if the factory produces zero units.",
+          "Variable costs are directly linked to the number of units produced."
+        ],
+        "explanation": "Fixed costs (factory rent, insurance, security, management salaries) do not change with production levels. Variable costs (raw materials, direct labour per unit, packaging, electricity for machines) increase or decrease as production volume changes. Understanding this distinction is essential for break-even analysis.",
+        "distractors": [
+          "Fixed costs never change at all, variable costs change daily",
+          "Fixed costs are always higher than variable costs",
+          "All labour is a fixed cost"
+        ]
+      },
+      {
+        "question": "A factory currently sells 10 000 units at R200 each. Fixed costs are R600 000 and variable costs are R120 per unit. The factory wants to earn a target profit of R400 000. How many units must it sell?",
+        "answer": "Required sales = (Fixed costs + Target profit) / Contribution per unit = (R600 000 + R400 000) / (R200 - R120) = R1 000 000 / R80 = 12 500 units.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "First calculate the contribution per unit (selling price minus variable cost).",
+          "For target profit: Required units = (Fixed costs + Target profit) / Contribution per unit."
+        ],
+        "explanation": "Contribution per unit = R200 - R120 = R80. To achieve the target: (R600 000 + R400 000) / R80 = 12 500 units. This means the factory needs to sell 2 500 more units than the current 10 000 to achieve the R400 000 profit target. Revenue would be 12 500 x R200 = R2 500 000.",
+        "distractors": [
+          "5 000 units",
+          "10 000 units",
+          "15 000 units"
+        ]
+      }
+    ],
+    "hints": [
+      "Always distinguish between direct costs (traceable to the product) and indirect costs (factory overheads).",
+      "Break-even analysis assumes selling price and costs per unit remain constant.",
+      "Remember to include work-in-progress adjustments when calculating cost of finished goods produced."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "direct materials",
+        "definition": "Raw materials that can be directly traced to the finished product",
+        "example_usage": "The wood used to make the desk is a direct material costing R85 per unit."
+      },
+      {
+        "term": "factory overheads",
+        "definition": "Indirect manufacturing costs that cannot be traced directly to a specific product",
+        "example_usage": "Factory overheads include rent, insurance and depreciation of machinery."
+      },
+      {
+        "term": "break-even point",
+        "definition": "The level of sales at which total revenue equals total costs, resulting in zero profit or loss",
+        "example_usage": "The factory must sell 7 500 units to break even."
+      },
+      {
+        "term": "contribution per unit",
+        "definition": "The amount each unit sold contributes toward covering fixed costs and generating profit, calculated as selling price minus variable cost per unit",
+        "example_usage": "The contribution per unit is R60, meaning each sale covers R60 of fixed costs."
+      },
+      {
+        "term": "work-in-progress",
+        "definition": "Partially completed goods that are still in the production process at the end of a period",
+        "example_usage": "Closing work-in-progress of R20 000 must be subtracted from total factory cost."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students often include selling and distribution costs in the Production Cost Statement.",
+        "correction": "The Production Cost Statement only includes manufacturing costs (direct materials, direct labour, factory overheads). Selling and distribution costs (advertising, delivery, sales commission) appear in the Income Statement as operating expenses.",
+        "why_students_think_this": "Students see all expenses as production-related. Remember: if the cost is incurred outside the factory, it does not belong in the Production Cost Statement."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Accounting.Gr12.COST",
+    "title": "Assessment: Cost Accounting — Production Cost Statement, Break-Even Analysis, Unit Costs",
+    "items": [
+      {
+        "question": "Name the three elements of manufacturing cost.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Direct materials, Direct labour, Factory overheads",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "These are the three cost categories in a Production Cost Statement."
+      },
+      {
+        "question": "Calculate the break-even point in units if fixed costs are R240 000, selling price is R160 per unit and variable cost is R100 per unit.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Break-even = R240 000 / (R160 - R100) = R240 000 / R60 = 4 000 units",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Break-even = Fixed costs / Contribution per unit."
+      },
+      {
+        "question": "A factory manager wants to reduce the break-even point. Suggest and evaluate two strategies to achieve this.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Increase selling price (increases contribution per unit) or reduce fixed costs (lowers the target to cover). Could also reduce variable costs. Each strategy has trade-offs such as losing customers or compromising quality.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Look at the break-even formula and consider what happens when you change each variable."
+      }
+    ],
+    "total_points": 6,
+    "estimated_minutes": 40,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the break-even formula in units?",
+      "back": "Break-even (units) = Fixed Costs / (Selling Price per unit - Variable Cost per unit). The denominator is the contribution per unit.",
+      "tags": ["CAPS.Accounting.Gr12.COST", "Grade12", "Cost Accounting"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the formula for Total Factory Cost?",
+      "back": "Total Factory Cost = Direct Materials + Direct Labour + Factory Overheads",
+      "tags": ["CAPS.Accounting.Gr12.COST", "Grade12", "Cost Accounting"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "How is raw materials used calculated?",
+      "back": "Raw Materials Used = Opening Raw Materials + Purchases - Closing Raw Materials",
+      "tags": ["CAPS.Accounting.Gr12.COST", "Grade12", "Cost Accounting"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the difference between direct labour and indirect labour?",
+      "back": "Direct labour: wages of workers who physically make the product (e.g., machine operators). Indirect labour: factory workers not directly making goods (e.g., cleaners, security, supervisors).",
+      "tags": ["CAPS.Accounting.Gr12.COST", "Grade12", "Cost Accounting"],
+      "difficulty_permille": 444
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

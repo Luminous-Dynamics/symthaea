@@ -1,0 +1,278 @@
+{
+  "node_id": "CAPS.Business.Gr12.HR",
+  "lesson": {
+    "standard_code": "CAPS.Business.Gr12.HR",
+    "title": "CAPS.Business.Gr12.HR: Human Resources — Recruitment, Selection, Training, Performance Appraisal, Labour Relations",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Human Resources (HR) management ensures a business attracts, develops and retains the right employees. The process begins with recruitment: conducting a job analysis to determine requirements, writing job descriptions and specifications, and advertising the position (internally, newspapers, online platforms like LinkedIn, PNet). Selection involves screening applications, shortlisting, interviewing (structured, unstructured, panel), and checking references. Induction introduces new employees to the company culture, policies and their role. Training (on-the-job and off-the-job) develops employees' skills. Performance appraisal evaluates employee work against set standards. In South Africa, the CCMA (Commission for Conciliation, Mediation and Arbitration) resolves labour disputes. Trade unions represent workers' collective interests, and the right to strike and lockout is regulated by the Labour Relations Act.",
+    "examples": [
+      {
+        "problem": "Draft a job advertisement for an accounts clerk position at a retail company in Bloemfontein.",
+        "steps": [
+          {
+            "instruction": "Step 1: Include the company name, position title and brief company description",
+            "result": "Rainbow Retailers (Pty) Ltd seeks an Accounts Clerk for their Bloemfontein branch"
+          },
+          {
+            "instruction": "Step 2: List key duties from the job description — processing invoices, reconciling accounts, capturing data on Pastel",
+            "result": "Responsibilities clearly outlined"
+          },
+          {
+            "instruction": "Step 3: State minimum requirements from the job specification — Grade 12 with Accounting, bookkeeping certificate or diploma, 1 year experience, computer literacy",
+            "result": "Qualifications and experience specified"
+          },
+          {
+            "instruction": "Step 4: Include salary range (R8 000-R12 000 per month), application deadline, how to apply and compliance note (BBBEE candidates encouraged)",
+            "result": "Practical details and EE compliance"
+          }
+        ],
+        "answer": "Answer: A complete job advertisement includes company details, position summary, key responsibilities, minimum requirements, salary indication, application instructions and a closing date",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the steps a HR manager should follow to dismiss an employee for poor performance, ensuring compliance with the Labour Relations Act.",
+        "steps": [
+          {
+            "instruction": "Step 1: Counsel the employee — have a private meeting to discuss performance concerns and set clear improvement targets with a timeframe (e.g., 3 months)",
+            "result": "Verbal counselling and targets set"
+          },
+          {
+            "instruction": "Step 2: If no improvement, issue a written warning specifying the performance shortfall and required standards. Provide support (training, mentoring)",
+            "result": "Written warning with support"
+          },
+          {
+            "instruction": "Step 3: If still no improvement after reasonable opportunity, conduct a formal incapacity hearing where the employee can bring a representative. Consider alternatives (transfer, demotion)",
+            "result": "Formal hearing with procedural fairness"
+          },
+          {
+            "instruction": "Step 4: If dismissal is the outcome, provide written notice with reasons. The employee has the right to refer the matter to the CCMA within 30 days",
+            "result": "Fair dismissal with CCMA recourse"
+          }
+        ],
+        "answer": "Answer: Dismissal for poor performance requires counselling, warnings, support, a hearing and consideration of alternatives — following both substantive and procedural fairness as required by the LRA",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the role of the CCMA in a dispute between a dismissed employee and their employer in Durban.",
+        "steps": [
+          {
+            "instruction": "Step 1: The dismissed employee refers the dispute to the CCMA within 30 days of dismissal",
+            "result": "Case registered"
+          },
+          {
+            "instruction": "Step 2: The CCMA appoints a commissioner who first attempts conciliation — bringing both parties together to negotiate a settlement",
+            "result": "Conciliation attempted"
+          },
+          {
+            "instruction": "Step 3: If conciliation fails, the case proceeds to arbitration — the commissioner hears evidence from both sides and makes a binding decision",
+            "result": "Arbitration award issued"
+          }
+        ],
+        "answer": "Answer: The CCMA provides a free, accessible dispute resolution process through conciliation and, if needed, binding arbitration",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Distinguish between a job description and a job specification.",
+        "answer": "A job description outlines the duties, responsibilities and working conditions of a position (what the job involves). A job specification lists the qualifications, skills, experience and personal qualities required of the person who will fill the position (what the person needs). Both are derived from a job analysis.",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": [
+          "Job description = about the JOB. Job specification = about the PERSON.",
+          "Both are created from a job analysis."
+        ],
+        "explanation": "Job description: title, department, duties (e.g., 'Process monthly invoices, reconcile bank statements, file documents'). Job specification: 'Grade 12 with Accounting, 2 years experience, proficiency in Sage Pastel, attention to detail, ability to work under pressure.' Together, they guide recruitment and selection.",
+        "distractors": [
+          "A job description and job specification are the same document",
+          "A job specification describes what the job involves",
+          "A job description lists the qualifications needed"
+        ]
+      },
+      {
+        "question": "Name and explain three types of interviews used in the selection process.",
+        "answer": "Structured interview: predetermined questions asked to all candidates in the same order, allowing fair comparison. Unstructured interview: informal conversation allowing follow-up questions, giving a sense of personality but harder to compare candidates. Panel interview: multiple interviewers (e.g., HR manager, department head, team leader) interview the candidate together, reducing individual bias.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about the format and fairness of each type.",
+          "Consider who conducts the interview and how questions are prepared."
+        ],
+        "explanation": "Structured interviews are most defensible legally (same questions for all), panel interviews reduce bias, and unstructured interviews are flexible but may lead to inconsistent evaluation. Many SA companies use a combination. Behavioural interviews (asking for past examples) and competency-based interviews are also common.",
+        "distractors": [
+          "All interviews must follow the same format by law",
+          "Panel interviews involve interviewing multiple candidates simultaneously",
+          "Unstructured interviews are not allowed in SA"
+        ]
+      },
+      {
+        "question": "Explain the difference between on-the-job training and off-the-job training. Give one SA example of each.",
+        "answer": "On-the-job training: learning while working at the actual workplace. Example: A new teller at FNB is trained by an experienced teller while serving customers (mentoring/job shadowing). Off-the-job training: learning away from the workplace. Example: An employee attends a Sage Pastel accounting course at a training centre in Johannesburg for a week. On-the-job is cheaper and practical; off-the-job provides focused, specialised learning.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Where does the training take place — at the workplace or elsewhere?",
+          "Think about the advantages and disadvantages of each method."
+        ],
+        "explanation": "On-the-job methods include mentoring, coaching, job rotation, apprenticeships. They are cost-effective but may disrupt normal work. Off-the-job methods include workshops, seminars, conferences, online courses. They provide dedicated learning time but cost money (course fees, travel, temporary replacement staff). SA companies can claim Skills Development Levy credits for qualifying training.",
+        "distractors": [
+          "On-the-job training always involves a formal qualification",
+          "Off-the-job training means learning at a different company",
+          "Only off-the-job training counts for Skills Development Levy"
+        ]
+      },
+      {
+        "question": "A Woolworths store in Cape Town wants to conduct performance appraisals for its floor staff. Describe the purpose of performance appraisals and suggest an appropriate method for this context.",
+        "answer": "Purpose: To evaluate employee performance against set standards, identify training needs, make decisions about promotions and salary increases, give constructive feedback, and motivate employees. Appropriate method: Rating scale — supervisor rates each employee on criteria such as customer service, product knowledge, punctuality, teamwork and sales targets using a scale (1-5). This is practical for retail because it is structured, quick to administer for many staff, and allows comparison across employees.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Consider the size of the team and the type of work (customer-facing retail).",
+          "A good appraisal method should be fair, practical and provide useful feedback."
+        ],
+        "explanation": "Performance appraisal methods include: rating scales (structured, numerical), narrative essays (detailed written evaluation), 360-degree feedback (input from supervisors, peers, subordinates and customers), and Management By Objectives (MBO — evaluating against pre-set goals). For retail floor staff with many employees, rating scales are most practical. Appraisals should be conducted regularly (quarterly or biannually) and documented.",
+        "distractors": [
+          "Performance appraisals are only used to identify employees to dismiss",
+          "Only managers can conduct performance appraisals",
+          "Performance appraisals are optional in SA businesses"
+        ]
+      },
+      {
+        "question": "Workers at a manufacturing plant in Port Elizabeth plan to go on strike over a 10% wage demand. The employer has offered 4%. Explain the legal requirements for a protected strike in South Africa and the employer's options.",
+        "answer": "Legal requirements for a protected strike: (1) The dispute must first be referred to the CCMA for conciliation. (2) A certificate of non-resolution must be issued by the CCMA. (3) 48 hours written notice must be given to the employer. (4) The strike must be about a matter of mutual interest (wages qualify). Employer's options: (1) Continue negotiating. (2) Implement a lockout (refuse entry to striking workers). (3) Hire temporary replacement workers during the strike. (4) Apply to the Labour Court if the strike becomes unprotected (violence, no notice given). Striking workers in a protected strike cannot be dismissed for striking.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "A protected strike must follow specific legal procedures before workers can down tools.",
+          "The employer also has rights during a strike — think about what they can legally do."
+        ],
+        "explanation": "The LRA protects the right to strike but requires procedural compliance. An unprotected strike (no conciliation, no notice, or about a matter already in arbitration) allows the employer to dismiss participants. During a protected strike, employees receive no wages but cannot be dismissed. The employer may lock out workers and hire replacements. Both sides are encouraged to continue negotiating toward a settlement.",
+        "distractors": [
+          "Workers can strike at any time without notice",
+          "Employers cannot hire replacement workers during a strike",
+          "Striking workers must always be paid their wages"
+        ]
+      }
+    ],
+    "hints": [
+      "The recruitment process follows a logical sequence: job analysis, job description, job specification, advertising, selection, appointment, induction.",
+      "Dismissal in SA requires both substantive fairness (valid reason) and procedural fairness (correct process).",
+      "The CCMA provides free dispute resolution — conciliation first, then arbitration if needed."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "recruitment",
+        "definition": "The process of attracting a pool of suitable candidates for a job vacancy",
+        "example_usage": "The company used PNet and LinkedIn for external recruitment of the IT manager position."
+      },
+      {
+        "term": "induction",
+        "definition": "A programme to introduce new employees to the organisation, its culture, policies and their specific role",
+        "example_usage": "During induction, new employees received a tour of the factory and a copy of the company policies."
+      },
+      {
+        "term": "CCMA",
+        "definition": "Commission for Conciliation, Mediation and Arbitration — a SA body that resolves labour disputes through conciliation and arbitration",
+        "example_usage": "The dismissed worker referred her case to the CCMA for arbitration."
+      },
+      {
+        "term": "performance appraisal",
+        "definition": "A systematic evaluation of an employee's job performance against established standards and expectations",
+        "example_usage": "The annual performance appraisal revealed that the salesperson exceeded targets by 15%."
+      },
+      {
+        "term": "trade union",
+        "definition": "An organisation of workers formed to protect and advance their collective interests regarding wages, working conditions and rights",
+        "example_usage": "The trade union negotiated a 6% wage increase on behalf of its members."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think an employer can dismiss an employee immediately for poor performance.",
+        "correction": "Dismissal for poor performance (incapacity) requires a fair process: counselling, warnings, provision of support (training), a reasonable period to improve, and a formal hearing. The employee must be informed of the standards expected and given a chance to improve. Immediate dismissal is only possible for serious misconduct (theft, assault) and still requires a disciplinary hearing.",
+        "why_students_think_this": "Students confuse misconduct (deliberate wrongdoing) with incapacity (inability to perform). Misconduct may warrant quicker action, but even then, procedural fairness (a hearing) is required. The LRA protects employees from unfair dismissal."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.Business.Gr12.HR",
+    "title": "Assessment: Human Resources — Recruitment, Selection, Training, Performance, Labour Relations",
+    "items": [
+      {
+        "question": "List the steps in the recruitment and selection process in the correct order.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Job analysis, job description, job specification, advertising, receiving applications, shortlisting, interviews, reference checks, appointment, induction.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Start with understanding the job, then finding and choosing the right person."
+      },
+      {
+        "question": "A retail manager wants to appraise floor staff performance fairly. Design a simple rating scale with four criteria and a 1-5 scale.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Criteria: (1) Customer service quality (1-5), (2) Product knowledge (1-5), (3) Punctuality and attendance (1-5), (4) Teamwork and cooperation (1-5). Total possible: 20. Score 17-20: Excellent, 13-16: Good, 9-12: Satisfactory, Below 9: Needs improvement.",
+        "points": 3,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Choose criteria relevant to retail floor work."
+      },
+      {
+        "question": "Evaluate the role of trade unions in South Africa. Are they still necessary in a democracy with labour legislation? Give arguments for and against.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "For: Unions protect vulnerable workers, negotiate better wages and conditions collectively, hold employers accountable, provide legal representation at CCMA. Against: Some unions are politically captured, strikes damage the economy, union demands sometimes exceed what businesses can afford, legislation already provides basic protections. Balanced view: unions remain necessary to balance power between employers and employees, but must be accountable and act responsibly.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider the power imbalance between individual workers and large employers."
+      }
+    ],
+    "total_points": 9,
+    "estimated_minutes": 40,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Create", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the difference between a job description and a job specification?",
+      "back": "Job description: outlines the duties and responsibilities of the JOB. Job specification: lists the qualifications, skills and qualities needed by the PERSON filling the job.",
+      "tags": ["CAPS.Business.Gr12.HR", "Grade12", "Human Resources"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does the CCMA do?",
+      "back": "The Commission for Conciliation, Mediation and Arbitration resolves labour disputes. Process: conciliation (negotiate settlement) then arbitration (binding decision) if conciliation fails. Free service for employees.",
+      "tags": ["CAPS.Business.Gr12.HR", "Grade12", "Human Resources"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What two types of fairness are required for a lawful dismissal in SA?",
+      "back": "Substantive fairness: a valid reason (misconduct, incapacity, or operational requirements). Procedural fairness: the correct process was followed (hearing, right to representation, opportunity to respond).",
+      "tags": ["CAPS.Business.Gr12.HR", "Grade12", "Human Resources"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What are the requirements for a protected strike in SA?",
+      "back": "1. Dispute referred to CCMA for conciliation. 2. Certificate of non-resolution issued. 3. 48 hours written notice to employer. 4. Strike must be about a matter of mutual interest. Workers in a protected strike cannot be dismissed for striking.",
+      "tags": ["CAPS.Business.Gr12.HR", "Grade12", "Human Resources"],
+      "difficulty_permille": 555
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T16:00:00"
+}

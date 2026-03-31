@@ -1,0 +1,253 @@
+{
+  "node_id": "CAPS.History.Gr12.TRC",
+  "lesson": {
+    "standard_code": "CAPS.History.Gr12.TRC",
+    "title": "The Truth and Reconciliation Commission (TRC)",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "The Truth and Reconciliation Commission (TRC) was established by the Promotion of National Unity and Reconciliation Act (1995) to address human rights violations committed during the apartheid era (1960-1994). Chaired by Archbishop Desmond Tutu, the TRC operated through three committees: the Human Rights Violations Committee (hearing victims' testimonies), the Amnesty Committee (granting amnesty to perpetrators who made full disclosure of politically motivated acts), and the Reparation and Rehabilitation Committee (recommending reparations for victims). Notable cases include the testimony of the Pieterson family regarding the death of Hector Pieterson in the Soweto Uprising, and the Amy Biehl case where her American parents supported the amnesty of her killers and established a foundation in the community. The TRC was grounded in the concept of restorative justice (healing through truth-telling) as opposed to retributive justice (punishment). Its legacy remains debated: supporters argue it prevented a bloodbath and established a shared historical record; critics argue that amnesty denied justice to victims, reparations were inadequate, and the 'rainbow nation' narrative obscured ongoing inequality.",
+    "examples": [
+      {
+        "problem": "Explain the difference between restorative justice and retributive justice, and why South Africa chose the restorative approach.",
+        "steps": [
+          {
+            "instruction": "Step 1: Retributive justice focuses on punishing the offender (Nuremberg model: trials and imprisonment). Restorative justice focuses on healing the relationship between victim, offender, and community through truth-telling, acknowledgement, and making amends.",
+            "result": "Two models defined"
+          },
+          {
+            "instruction": "Step 2: South Africa chose restorative justice because: the negotiated settlement required compromise (the NP would not have agreed to Nuremberg-style trials); gathering evidence for prosecutions was extremely difficult; and Archbishop Tutu argued that ubuntu ('I am because we are') required healing rather than vengeance.",
+            "result": "Pragmatic and philosophical reasons"
+          },
+          {
+            "instruction": "Step 3: The amnesty condition was 'full disclosure' -- perpetrators had to reveal the complete truth about their actions and demonstrate political motivation. This was not blanket amnesty but conditional on honesty.",
+            "result": "The mechanism of accountability"
+          }
+        ],
+        "answer": "South Africa's choice of restorative justice reflected both the political realities of the negotiated transition (prosecution could have derailed reconciliation) and the philosophical commitment to ubuntu. The TRC was not about forgetting or forgiving, but about establishing truth as a foundation for a new society.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the structure and purpose of the TRC's three committees.",
+        "answer": "The Human Rights Violations Committee heard testimony from victims and witnesses, documenting approximately 21,000 statements covering 36,000 violations. Its purpose was to establish an official record of suffering. The Amnesty Committee received 7,112 applications and granted amnesty to perpetrators who demonstrated that their acts were politically motivated and made full disclosure (not all applications were granted -- about 1,500 received amnesty). The Reparation and Rehabilitation Committee recommended financial reparations and symbolic measures (renaming streets, memorials) for victims. Its purpose was to acknowledge suffering materially. Together, the three committees aimed to balance truth, accountability, and healing.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": [
+          "Each committee had a distinct function: documenting truth, processing amnesty, and recommending repair.",
+          "Remember that amnesty was conditional on full disclosure and political motivation."
+        ],
+        "explanation": "Understanding the TRC's structure is essential for evaluating its effectiveness. Each committee addressed a different aspect of transitional justice, and the tensions between them (e.g., victims wanting punishment while amnesty was granted) are central to the debate about the TRC's legacy.",
+        "distractors": [
+          "The TRC had only one committee that handled all functions",
+          "All amnesty applications were automatically granted",
+          "The Reparation Committee had the power to award reparations directly"
+        ]
+      },
+      {
+        "question": "Analyse the Amy Biehl case as an example of the TRC's amnesty process. Why is it considered significant?",
+        "answer": "Amy Biehl was a 26-year-old American Fulbright scholar who was killed in Guguletu, Cape Town, in 1993 by PAC-affiliated youths during anti-apartheid violence. Four men were convicted of her murder. In 1998, they applied for and received TRC amnesty after demonstrating full disclosure and political motivation. Significantly, Amy's parents (Linda and Peter Biehl) supported the amnesty application and established the Amy Biehl Foundation in the community where she died. Two of the amnestied men later worked for the foundation. The case is significant because: it demonstrated the TRC's principle that political violence could be understood without being condoned; it showed that forgiveness was possible even for the most personal losses; and it became an international symbol of restorative justice.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider the case from multiple perspectives: the killers, the Biehl family, the community, and the TRC process.",
+          "Think about why this case attracted international attention."
+        ],
+        "explanation": "The Amy Biehl case illustrates both the strengths and complexities of the TRC. It shows that amnesty was not simply 'letting people go free' but was part of a process that could lead to genuine reconciliation. However, critics note that most victims' families did not receive similar attention or foundation support.",
+        "distractors": [
+          "The Biehl family opposed amnesty and demanded maximum punishment",
+          "The killers were given amnesty without any conditions",
+          "The case had no impact outside South Africa"
+        ]
+      },
+      {
+        "question": "Evaluate Archbishop Desmond Tutu's role as chair of the TRC. Was he the right person for the role?",
+        "answer": "Tutu's strengths as TRC chair: his moral authority as a Nobel Peace Prize laureate (1984) gave the Commission credibility; his theology of ubuntu (interconnectedness) provided a philosophical framework for restorative justice; his emotional empathy (he wept publicly during hearings) humanised the process and legitimised victims' pain; and his international profile ensured global attention. Criticisms: his Christian framework may have pressured non-Christian victims to 'forgive'; his emotional approach was sometimes seen as prioritising spectacle over systematic investigation; some felt his close relationship with the ANC compromised neutrality; and he was criticised for not being harder on perpetrators who refused to apply for amnesty. Overall, Tutu's pastoral leadership was essential for making the TRC a moral project rather than merely a legal one.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both what Tutu brought to the role (moral authority, ubuntu) and what critics said about his approach.",
+          "Was a religious leader the right choice for a process that affected people of all faiths and none?"
+        ],
+        "explanation": "Evaluating Tutu's role requires balancing his undeniable contributions with legitimate critiques. CAPS expects students to assess historical figures as complex, not as heroes or villains.",
+        "distractors": [
+          "Tutu was universally praised and faced no criticism",
+          "Tutu was a neutral legal figure with no personal views on apartheid",
+          "Tutu's religious background was irrelevant to how the TRC operated"
+        ]
+      },
+      {
+        "question": "Critically assess the argument that the TRC prioritised reconciliation at the expense of justice for victims.",
+        "answer": "Arguments that justice was sacrificed: perpetrators received amnesty while victims often received little or no reparation (the government was slow to implement the Reparation Committee's recommendations); many perpetrators did not apply for amnesty and were never prosecuted; the conditional amnesty process required victims to relive trauma without guaranteed outcomes; and structural injustices (land, wealth distribution) were not addressed. Arguments that justice was served: full disclosure created an official record that acknowledged suffering; the process gave victims a public voice for the first time; amnesty was conditional (not all applications were granted); and the alternative -- Nuremberg-style trials -- would have been legally difficult (evidence problems) and politically destabilising. A balanced conclusion recognises that the TRC achieved imperfect justice within real-world constraints.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Present BOTH sides of the argument before reaching your conclusion.",
+          "Consider: what would have happened if South Africa had chosen retributive justice instead?"
+        ],
+        "explanation": "This is a classic CAPS evaluation question. Students must demonstrate the ability to present multiple perspectives, weigh evidence, and reach a substantiated conclusion. There is no single 'right' answer, but the argument must be balanced and evidence-based.",
+        "distractors": [
+          "The TRC achieved perfect justice for all victims",
+          "Retributive justice would have been simple and effective",
+          "All perpetrators were prosecuted after the TRC ended"
+        ]
+      },
+      {
+        "question": "Discuss the legacy of the TRC for contemporary South Africa. Has the TRC's vision of reconciliation been achieved?",
+        "answer": "The TRC's legacy is contested. Positive legacy: it prevented a potential civil war during transition; it created an official historical record of apartheid's atrocities; it established the principle that truth is a prerequisite for reconciliation; it influenced transitional justice processes globally (used as a model in Rwanda, Colombia, Canada). Unfinished legacy: economic inequality between racial groups has widened since 1994; land redistribution has been slow; reparations were inadequate (government paid R30,000 once-off instead of the recommended R21,700 per year for six years); many South Africans feel that reconciliation was a top-down project that benefited elites, not ordinary people; the 'rainbow nation' narrative can obscure ongoing systemic racism. The TRC addressed political reconciliation but not economic justice, which remains South Africa's central challenge.",
+        "difficulty_permille": 875,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider the difference between political reconciliation (ending conflict) and economic reconciliation (addressing material inequality).",
+          "Think about whether the TRC's goals were achievable, or whether they set expectations that could never be met."
+        ],
+        "explanation": "This question connects the TRC to contemporary South Africa, a key CAPS requirement. Students must demonstrate understanding that historical processes have ongoing consequences and that evaluation requires both historical and contemporary evidence.",
+        "distractors": [
+          "The TRC fully resolved all apartheid-era grievances",
+          "The TRC had no influence on any other country's transitional justice process",
+          "Economic inequality has been fully addressed since 1994"
+        ]
+      }
+    ],
+    "hints": [
+      "TRC questions always require you to consider MULTIPLE perspectives: victims, perpetrators, the state, and the public.",
+      "The key debate is restorative vs retributive justice -- make sure you can argue both sides.",
+      "Always connect the TRC to its OUTCOMES: what actually happened as a result of its recommendations?"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "restorative justice",
+        "definition": "A justice approach focused on healing relationships between victims, offenders, and the community through truth-telling and making amends, rather than punishment",
+        "example_usage": "The TRC used restorative justice principles, seeking truth and reconciliation rather than retribution."
+      },
+      {
+        "term": "amnesty",
+        "definition": "A pardon granted to individuals who committed politically motivated human rights violations, conditional on full disclosure of their actions to the TRC",
+        "example_usage": "The Amnesty Committee received 7,112 applications but only granted approximately 1,500."
+      },
+      {
+        "term": "ubuntu",
+        "definition": "An African philosophy meaning 'I am because we are,' emphasising interconnectedness, community, and shared humanity",
+        "example_usage": "Archbishop Tutu argued that ubuntu required South Africans to seek healing rather than vengeance."
+      },
+      {
+        "term": "transitional justice",
+        "definition": "The set of judicial and non-judicial measures used by a society to address past human rights abuses and move toward democracy",
+        "example_usage": "The TRC is one of the most studied examples of transitional justice in the world."
+      },
+      {
+        "term": "reparations",
+        "definition": "Compensation (financial or symbolic) provided to victims of human rights violations to acknowledge their suffering",
+        "example_usage": "The TRC recommended R21,700 per year for six years, but the government paid only R30,000 once-off."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "The TRC gave blanket amnesty to all apartheid-era perpetrators.",
+        "correction": "Amnesty was conditional: applicants had to demonstrate that their acts were politically motivated AND make full disclosure. Of 7,112 applications, only about 1,500 were granted. Many were rejected because applicants lied, committed acts for personal gain, or refused to take responsibility.",
+        "why_students_think_this": "The word 'amnesty' is often understood as a blanket pardon. Students may conflate conditional amnesty with unconditional forgiveness."
+      },
+      {
+        "misconception": "The TRC solved South Africa's problems of racial injustice.",
+        "correction": "The TRC addressed political reconciliation (ending the cycle of violence) but not economic justice. Land, wealth, and educational inequality persist. The TRC itself acknowledged its limitations and recommended ongoing reparations and institutional reforms that were only partially implemented.",
+        "why_students_think_this": "The 'rainbow nation' narrative and Mandela's conciliatory image can create an impression that the transition resolved all issues."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.History.Gr12.TRC",
+    "title": "Assessment: The Truth and Reconciliation Commission",
+    "items": [
+      {
+        "question": "Name the chairperson of the TRC and the Act that established it.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Archbishop Desmond Tutu; Promotion of National Unity and Reconciliation Act (1995)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "He was a Nobel Peace Prize laureate."
+      },
+      {
+        "question": "Explain the difference between restorative and retributive justice.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Retributive justice focuses on punishing the offender (trials, imprisonment). Restorative justice focuses on healing through truth-telling, acknowledgement, and repairing relationships between victim, perpetrator, and community.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about the goals of each approach: punishment vs healing."
+      },
+      {
+        "question": "Analyse the conditions required for amnesty under the TRC. Why were some applications rejected?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Amnesty required: (1) full disclosure of all relevant facts, (2) demonstration that the act was politically motivated, (3) proportionality between the act and its political objective. Applications were rejected when perpetrators lied, acted for personal gain, or committed acts disproportionate to any political goal.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Remember: conditional amnesty, not blanket amnesty."
+      },
+      {
+        "question": "Evaluate the legacy of the TRC. Has it achieved reconciliation in South Africa?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Balanced answer showing: it prevented civil war, created an official record, influenced global transitional justice. But: economic inequality persists, reparations were inadequate, many feel reconciliation was superficial. Conclusion: political reconciliation achieved, economic reconciliation remains unfinished.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Distinguish between political reconciliation and economic justice."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 45,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What were the TRC's three committees?",
+      "back": "1. Human Rights Violations Committee (heard victims' testimonies). 2. Amnesty Committee (processed amnesty applications). 3. Reparation and Rehabilitation Committee (recommended reparations).",
+      "tags": ["CAPS.History.Gr12.TRC", "Grade12", "TRC"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What conditions were required for TRC amnesty?",
+      "back": "Full disclosure of all facts, proof of political motivation, and proportionality between the act and its political objective. Of 7,112 applications, only about 1,500 were granted.",
+      "tags": ["CAPS.History.Gr12.TRC", "Grade12", "TRC"],
+      "difficulty_permille": 350
+    },
+    {
+      "front": "What is restorative justice?",
+      "back": "A justice approach focused on healing through truth-telling and repairing relationships, rather than punishment. Rooted in ubuntu: 'I am because we are.' Used by the TRC as an alternative to Nuremberg-style trials.",
+      "tags": ["CAPS.History.Gr12.TRC", "Grade12", "TRC"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "Why is the Amy Biehl case significant for the TRC?",
+      "back": "American Fulbright scholar killed in 1993 by PAC-affiliated youths. Her parents supported her killers' amnesty applications and established a foundation in Guguletu. Symbolised the potential of restorative justice and reconciliation.",
+      "tags": ["CAPS.History.Gr12.TRC", "Grade12", "TRC"],
+      "difficulty_permille": 500
+    },
+    {
+      "front": "What criticisms were made of the TRC?",
+      "back": "Amnesty denied justice to victims; reparations were inadequate (R30,000 once-off vs recommended R21,700/year for 6 years); many perpetrators never applied; structural economic inequality was not addressed; 'rainbow nation' narrative obscured ongoing injustice.",
+      "tags": ["CAPS.History.Gr12.TRC", "Grade12", "TRC"],
+      "difficulty_permille": 650
+    }
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

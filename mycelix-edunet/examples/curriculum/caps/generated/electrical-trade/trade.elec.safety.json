@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Electrical Safety & SANS 10142?",
-        "answer": "Safety assessment and preparation",
+        "question": "You arrive at a site where a colleague has received an electric shock and is lying unconscious, still in contact with a live cable. Describe the correct rescue procedure in order.",
+        "answer": "(1) Do NOT touch the person -- you will become a second victim. (2) Switch off the supply at the nearest isolator or DB. If you cannot reach the isolator, use a dry non-conductive object (wooden broom handle, plastic chair) to push the person away from the live conductor. (3) Call emergency services (10177 or 112). (4) Once the person is clear of the source, check for breathing and pulse. (5) If not breathing, begin CPR (30 compressions : 2 breaths). (6) If breathing, place in recovery position. (7) Treat burns with clean water -- do not remove clothing stuck to burns. (8) Do not move the person if spinal injury is suspected. (9) Report the incident to the employer and Department of Employment and Labour as required by the OHS Act.",
         "difficulty_permille": 200,
         "bloom_level": "Remember",
         "hints": [
-          "Think safety first"
+          "The first priority is ALWAYS to remove the power source -- never touch a person who is still in contact with live electricity.",
+          "CPR ratio: 30 chest compressions to 2 rescue breaths."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "Electric shock rescue procedure must be memorised because you will not have time to look it up in an emergency. The number one cause of double electrocutions is rescuers touching the victim before isolating the power.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "Grab the person immediately and pull them away",
+          "Pour water on the person to break the circuit",
+          "Wait for emergency services before doing anything"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Electrical Safety & SANS 10142 in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "Explain the lockout/tagout (LOTO) procedure for isolating a circuit before working on it. Why is 'just switching off the breaker' insufficient?",
+        "answer": "Full LOTO procedure: (1) Notify all affected persons. (2) Switch off the circuit breaker at the DB. (3) Apply a physical padlock to the breaker so it cannot be switched back on (lockout). (4) Attach a tag with your name, date, and reason for isolation (tagout). (5) Test the circuit with an approved voltage tester to confirm it is dead -- test the tester on a known live source first, then test the circuit, then test the known source again (prove-test-prove method). (6) Only then begin work. Just switching off the breaker is insufficient because: someone else might switch it back on not knowing you are working on the circuit; the breaker might be mislabelled; or there might be back-feed from another source (e.g., solar inverter, generator).",
         "difficulty_permille": 400,
         "bloom_level": "Understand",
         "hints": [
-          "Think about SANS standards or Acts"
+          "The prove-test-prove method ensures your tester is working before and after testing the circuit.",
+          "Back-feed from solar systems is an increasingly common hazard in SA."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "LOTO is a legally required procedure under the OHS Act. 'Dead' circuits have killed electricians who trusted breaker positions without verifying. The prove-test-prove method is the gold standard for confirming isolation.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "Switching off the breaker is always sufficient",
+          "You only need lockout for industrial sites, not houses",
+          "Testing with a non-contact voltage detector is sufficient proof"
+        ]
+      },
+      {
+        "question": "A construction site has a temporary DB supplying power tools (angle grinders, drills, circular saws). Per SANS 10142, what specific safety requirements apply to temporary installations?",
+        "answer": "Temporary installation requirements per SANS 10142: (1) Earth leakage protection at 30mA sensitivity on ALL circuits -- no exceptions. (2) All socket outlets must be industrial-type (blue 16A or red 32A, IP44 minimum for outdoor use). (3) Cables must be protected from mechanical damage (armoured cable, or in conduit, or elevated to avoid vehicle traffic). (4) The temporary DB must be weatherproof (IP54 minimum) and mounted securely. (5) All power tools must be double-insulated (Class II) or earthed (Class I with tested earth continuity). (6) RCD-protected extension leads for any portable equipment. (7) Daily visual inspection of cables and connections. (8) A registered electrician must install and certify the temporary DB. (9) Maximum 3 months duration -- after that, it becomes a permanent installation requiring full compliance.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Temporary does not mean lower standards -- if anything, construction sites need MORE protection because conditions are harsher.",
+          "IP ratings: first digit = dust protection, second digit = water protection. IP44 = splash-proof."
+        ],
+        "explanation": "Construction site electrical incidents are disproportionately common in SA. Temporary installations are often neglected, but SANS 10142 applies equally to temporary and permanent installations.",
+        "distractors": [
+          "Temporary installations don't need earth leakage protection",
+          "Domestic plug sockets are fine for construction sites",
+          "Anyone can set up a temporary DB -- no electrician needed"
+        ]
+      },
+      {
+        "question": "Calculate the touch voltage a person would experience if they touched a faulty appliance with an earth fault of 5Ω and the main earth electrode resistance is 10Ω. Supply voltage is 230V. Would the earth leakage unit (30mA) protect them?",
+        "answer": "In an earth fault scenario, the fault current flows through the earth path: I_fault = V / (R_fault + R_earth) = 230 / (5 + 10) = 15.33A. Touch voltage across the earth electrode: V_touch = I_fault x R_earth = 15.33 x 10 = 153.3V. This is lethal (>50V AC is considered dangerous). However, the earth leakage unit will detect the imbalance (15.33A >> 30mA threshold) and trip within 30ms -- fast enough to prevent electrocution in most cases (the dangerous threshold is approximately 30mA for 1 second). The earth leakage IS protective here, but the high earth electrode resistance (10Ω) is concerning -- SANS 10142 prefers <5Ω. Recommendation: improve the earth electrode to reduce touch voltage even further.",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Use Ohm's law: I = V/R for the fault current, then V = IR for the touch voltage.",
+          "The earth leakage unit's 30ms trip time is critical -- longer exposure to even small currents can be fatal."
+        ],
+        "explanation": "This calculation demonstrates why earth leakage protection AND low earth resistance are BOTH necessary. The earth leakage trips quickly, but the touch voltage can still be dangerously high if earth resistance is excessive.",
+        "distractors": [
+          "The touch voltage is 230V regardless of earth resistance",
+          "Earth resistance doesn't affect safety because the breaker will trip",
+          "Any earth electrode resistance is acceptable as long as there is earth leakage"
+        ]
+      },
+      {
+        "question": "You find that a homeowner has installed a generator with a manual changeover arrangement that simply plugs into a wall socket ('back-feeding'). Explain why this is extremely dangerous and what the correct installation method is.",
+        "answer": "Back-feeding dangers: (1) The generator energises the entire house wiring, including the feed back to the Eskom transformer. The transformer STEPS UP the 230V to 11kV on the street lines, potentially killing Eskom lineworkers who believe the lines are dead during load-shedding. (2) There is no overcurrent protection -- the generator feeds through the plug socket (rated 16A) but could push current through any circuit. (3) No earth leakage protection between generator and DB. (4) If Eskom power returns while the generator is connected, the generator and house wiring can be destroyed by phase conflict. Correct installation: A certified changeover switch (manual or automatic) installed at the DB by a registered electrician. The changeover switch ensures that EITHER Eskom OR the generator supplies the DB, NEVER both simultaneously. The generator must be properly earthed and the installation requires a COC.",
+        "difficulty_permille": 800,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "The step-up transformer effect is the most dangerous aspect -- it can kill people you never meet.",
+          "A changeover switch is a 'break before make' device: it disconnects one source before connecting the other."
+        ],
+        "explanation": "Generator back-feeding has killed multiple Eskom workers in SA. It is illegal, violates SANS 10142, and voids the homeowner's insurance. Electricians have a duty to refuse to connect generators this way and to report existing back-feed installations.",
+        "distractors": [
+          "Back-feeding is acceptable for small generators under 3kW",
+          "The main breaker provides sufficient protection against back-feeding",
+          "Back-feeding is only dangerous if the generator is diesel, not petrol"
         ]
       }
     ],

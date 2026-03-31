@@ -1,0 +1,303 @@
+{
+  "node_id": "CAPS.History.Gr12.CW",
+  "lesson": {
+    "standard_code": "CAPS.History.Gr12.CW",
+    "title": "The Cold War (1945-1991)",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "The Cold War was an ideological, political, and military rivalry between the USA (capitalism/democracy) and the USSR (communism/one-party state) from 1945 to 1991. It began at the Yalta and Potsdam conferences (1945) where wartime allies disagreed over the post-war order. The Iron Curtain divided Europe: NATO (West) vs Warsaw Pact (East). The conflict played out through proxy wars -- Korea (1950-53), Vietnam (1955-75), and Angola (1975-2002, where the MPLA backed by Cuba/USSR fought UNITA backed by SA/USA). The Cuban Missile Crisis (1962) brought the world closest to nuclear war. Detente in the 1970s eased tensions temporarily. Gorbachev's glasnost (openness) and perestroika (restructuring) in the 1980s weakened Soviet control, leading to the fall of the Berlin Wall (1989) and the USSR's collapse (1991). South Africa was deeply affected: the apartheid government developed a nuclear weapons programme (dismantled 1989), fought a border war in Angola/Namibia (1966-1990), and framed anti-apartheid movements as communist threats to gain Western support.",
+    "examples": [
+      {
+        "problem": "Explain how the Yalta and Potsdam conferences contributed to the origins of the Cold War.",
+        "steps": [
+          {
+            "instruction": "Step 1: At Yalta (Feb 1945), the Big Three (Roosevelt, Churchill, Stalin) agreed to divide Germany into occupation zones and hold free elections in Eastern Europe.",
+            "result": "Agreements made while still allies"
+          },
+          {
+            "instruction": "Step 2: By Potsdam (July 1945), Truman had replaced Roosevelt, the atomic bomb had been tested, and trust had eroded. Stalin was already installing communist governments in Eastern Europe.",
+            "result": "Growing mistrust"
+          },
+          {
+            "instruction": "Step 3: Disagreements over reparations, Poland's borders, and the meaning of 'free elections' revealed irreconcilable differences between capitalism and communism.",
+            "result": "Ideological divide hardened"
+          }
+        ],
+        "answer": "The conferences showed that wartime cooperation was based on a common enemy (Nazi Germany), not shared values. Once Germany was defeated, ideological differences and mutual suspicion led to the division of Europe and the Cold War.",
+        "visual_description": null
+      },
+      {
+        "problem": "Analyse the role of the Angolan Civil War as a Cold War proxy conflict, with specific reference to South Africa's involvement.",
+        "steps": [
+          {
+            "instruction": "Step 1: After Portugal withdrew from Angola (1975), three liberation movements fought for control: MPLA (Marxist, backed by USSR and Cuba), FNLA, and UNITA (backed by USA and South Africa).",
+            "result": "Cold War powers backed opposing sides"
+          },
+          {
+            "instruction": "Step 2: South Africa's apartheid government intervened militarily (Operation Savannah, 1975) to prevent a communist government on its border and to maintain control over South West Africa (Namibia).",
+            "result": "SA's strategic and ideological motives"
+          },
+          {
+            "instruction": "Step 3: The Battle of Cuito Cuanavale (1988) was a turning point -- neither side won decisively, but it led to negotiations, Namibian independence (1990), and Cuban withdrawal.",
+            "result": "Military stalemate forced diplomatic resolution"
+          }
+        ],
+        "answer": "Angola exemplified how Cold War superpowers used African conflicts to advance their interests. South Africa's involvement linked apartheid's survival to Cold War geopolitics, and its withdrawal signalled the approaching end of both the Cold War and apartheid.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the concept of the 'Iron Curtain' using Churchill's 1946 speech as a source. Why did he use this metaphor?",
+        "answer": "Churchill used the metaphor 'Iron Curtain' in his Fulton, Missouri speech (1946) to describe the division of Europe into a free West and a Soviet-controlled East. The 'curtain' stretched 'from Stettin in the Baltic to Trieste in the Adriatic.' He used this image to warn the West that Stalin was imposing communist governments across Eastern Europe, cutting off those nations from the democratic world. The metaphor conveyed impenetrability and secrecy.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": [
+          "Consider why Churchill chose a physical metaphor (curtain/barrier) rather than simply saying 'division.'",
+          "Think about what was happening in Poland, Czechoslovakia, Hungary, and Romania by 1946."
+        ],
+        "explanation": "Churchill's speech is a key primary source. The metaphor captured the idea that Soviet control was absolute, that information and people could not freely cross, and that Europe was being permanently divided into ideological blocs.",
+        "distractors": [
+          "It described the Berlin Wall specifically",
+          "It referred to economic sanctions against the USSR",
+          "It was a military strategy document from NATO"
+        ]
+      },
+      {
+        "question": "Compare the roles of the USA and USSR in the Korean War (1950-1953). Why is Korea considered a proxy war?",
+        "answer": "Korea is a proxy war because the USA and USSR did not fight each other directly but supported opposing sides. North Korea (communist, backed by USSR/China) invaded South Korea (capitalist, backed by USA/UN). The USA sent troops under the UN flag; the USSR provided weapons and advisors; China sent 300,000 soldiers. The war ended in a stalemate along the 38th parallel with an armistice (1953), not a peace treaty. It demonstrated the Cold War pattern: superpowers fighting through local allies to avoid direct nuclear confrontation.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Define 'proxy war' first: a conflict where major powers fight indirectly through smaller states.",
+          "Consider why neither superpower wanted to escalate to direct confrontation (nuclear weapons)."
+        ],
+        "explanation": "Korea set the template for Cold War proxy conflicts. Both superpowers tested their resolve without risking nuclear war. The unresolved armistice means Korea remains technically at war, showing the lasting consequences of Cold War divisions.",
+        "distractors": [
+          "The USA and USSR fought each other directly in Korea",
+          "Korea was a colonial war against European powers",
+          "The war ended with Korean reunification"
+        ]
+      },
+      {
+        "question": "Using your knowledge of the Cuban Missile Crisis (1962), explain why it is considered the most dangerous moment of the Cold War. What role did 'brinkmanship' play?",
+        "answer": "The Cuban Missile Crisis was the most dangerous Cold War moment because the USA and USSR came closest to nuclear war. The USSR placed nuclear missiles in Cuba (90 miles from Florida) after the failed Bay of Pigs invasion. Kennedy imposed a naval blockade ('quarantine'). For 13 days, the world faced possible annihilation. Brinkmanship -- pushing confrontation to the edge of war to force the opponent to back down -- was the strategy both sides used. Khrushchev eventually withdrew the missiles in exchange for a US promise not to invade Cuba and a secret removal of US missiles from Turkey.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Brinkmanship means going to the 'brink' (edge) of war without actually fighting.",
+          "Consider: what would have happened if neither leader had backed down?"
+        ],
+        "explanation": "The crisis demonstrated that nuclear weapons made total war unthinkable (MAD -- Mutually Assured Destruction). It led to the Moscow-Washington hotline (1963) and the Partial Nuclear Test Ban Treaty, showing that the crisis itself pushed both sides toward detente.",
+        "distractors": [
+          "The crisis ended with a US invasion of Cuba",
+          "Nuclear weapons were actually launched but intercepted",
+          "The crisis had no lasting diplomatic consequences"
+        ]
+      },
+      {
+        "question": "Evaluate the impact of Gorbachev's policies of glasnost and perestroika on the end of the Cold War.",
+        "answer": "Glasnost (openness) allowed public criticism of the Soviet government and exposed corruption and economic failure. Perestroika (restructuring) introduced limited market reforms to revive the stagnant economy. Together, these policies weakened Communist Party control: glasnost enabled nationalist movements in Soviet republics (Baltic states, Ukraine); perestroika failed to improve the economy, causing shortages and disillusionment. Gorbachev's refusal to use military force to suppress Eastern European revolutions (unlike Hungary 1956 or Czechoslovakia 1968) allowed the fall of the Berlin Wall (1989) and the peaceful collapse of communist governments across Eastern Europe.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider: did Gorbachev intend to end the Cold War, or did his reforms have unintended consequences?",
+          "Compare Gorbachev's response to the 1989 revolutions with Soviet responses to Hungary (1956) and Czechoslovakia (1968)."
+        ],
+        "explanation": "Gorbachev is a complex historical figure: a reformer who wanted to save communism but whose reforms destroyed it. This illustrates the CAPS emphasis on understanding that historical outcomes are often unintended consequences of deliberate actions.",
+        "distractors": [
+          "Glasnost strengthened communist control by giving people a voice within the system",
+          "Perestroika successfully modernised the Soviet economy",
+          "Gorbachev used military force to prevent the fall of the Berlin Wall"
+        ]
+      },
+      {
+        "question": "Explain how the Cold War influenced South Africa's nuclear weapons programme and its decision to dismantle it in 1989.",
+        "answer": "South Africa developed six nuclear weapons during the 1970s-80s, motivated by Cold War geopolitics. The apartheid government faced a perceived communist threat from Soviet-backed liberation movements (ANC, SWAPO) and Cuban forces in Angola. Nuclear weapons served as a deterrent and a bargaining chip to force Western intervention if SA faced a conventional military defeat. By 1989, the Cold War was ending, Cuban forces were withdrawing from Angola, and Namibian independence was agreed. F.W. de Klerk ordered dismantlement before the transition to democracy, partly to prevent nuclear weapons falling into ANC hands and partly because the strategic justification had evaporated.",
+        "difficulty_permille": 750,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider SA's 'total onslaught' strategy: the belief that communism was coordinating a total attack on the apartheid state.",
+          "Think about why dismantlement happened specifically in 1989, not earlier or later."
+        ],
+        "explanation": "SA remains the only country to have voluntarily dismantled its nuclear arsenal. This decision was inseparable from Cold War dynamics: the weapons existed because of Cold War threats, and they were dismantled because those threats disappeared.",
+        "distractors": [
+          "SA never actually possessed nuclear weapons",
+          "The weapons were destroyed by international military action",
+          "SA dismantled its weapons because of UN sanctions alone"
+        ]
+      },
+      {
+        "question": "[Source-based] Study the photograph of the Berlin Wall being torn down on 9 November 1989. Explain (a) why the Wall was built in 1961, (b) what its fall symbolised, and (c) the limitations of using a photograph as a historical source.",
+        "answer": "(a) The Wall was built to stop East Germans fleeing to the West through Berlin. Between 1949-1961, approximately 3.5 million East Germans emigrated, draining the skilled workforce. The Wall physically divided families and became the most visible symbol of the Iron Curtain. (b) Its fall symbolised the end of the Cold War division of Europe, the failure of communism to contain its own people, and the triumph of popular pressure over authoritarian control. (c) Limitations: a photograph captures a single moment and angle chosen by the photographer; it cannot show context (why people are there, what happened before/after); it may be staged or selected for emotional impact; it does not represent the experience of all East/West Germans.",
+        "difficulty_permille": 875,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "For source analysis, always consider: Who took it? Why? What does it show? What does it NOT show?",
+          "Think about how photographs can be used as propaganda by both sides."
+        ],
+        "explanation": "Source-based questions are central to CAPS History. Students must demonstrate the ability to extract information from sources, contextualise them within broader historical events, and critically evaluate their reliability and limitations.",
+        "distractors": [
+          "Photographs are always reliable because they show exactly what happened",
+          "The Wall fell because of a planned government policy, not popular pressure",
+          "The Wall was built to keep West Germans out of East Berlin"
+        ]
+      }
+    ],
+    "hints": [
+      "Cold War questions often ask you to identify causes, consequences, and the role of ideology.",
+      "Always distinguish between direct causes (e.g., missile placement) and underlying causes (e.g., ideological rivalry).",
+      "For source-based questions, remember OPVL: Origin, Purpose, Value, Limitation."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "proxy war",
+        "definition": "A conflict where major powers support opposing sides without fighting each other directly",
+        "example_usage": "The Korean and Vietnam Wars were proxy wars between the USA and USSR."
+      },
+      {
+        "term": "detente",
+        "definition": "A period of reduced tension between the superpowers, especially in the 1970s",
+        "example_usage": "Detente led to arms limitation treaties like SALT I and SALT II."
+      },
+      {
+        "term": "glasnost",
+        "definition": "Gorbachev's policy of openness and transparency in Soviet government",
+        "example_usage": "Glasnost allowed Soviet citizens to criticise the government publicly for the first time."
+      },
+      {
+        "term": "brinkmanship",
+        "definition": "The strategy of pushing a dangerous situation to the edge of conflict to force the opponent to back down",
+        "example_usage": "The Cuban Missile Crisis was the most extreme example of Cold War brinkmanship."
+      },
+      {
+        "term": "Iron Curtain",
+        "definition": "Churchill's metaphor for the ideological and physical boundary dividing Europe into Western (capitalist) and Eastern (communist) blocs",
+        "example_usage": "The Iron Curtain separated democratic Western Europe from Soviet-controlled Eastern Europe."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "The Cold War was only between the USA and USSR and did not affect Africa.",
+        "correction": "Africa was a major Cold War battleground. Angola, Mozambique, Ethiopia, and the Congo all experienced proxy conflicts. South Africa's apartheid government used Cold War rhetoric to justify its policies and military interventions.",
+        "why_students_think_this": "Textbooks often focus on European and Asian theatres. Students may not connect SA's border war or Angola to Cold War dynamics."
+      },
+      {
+        "misconception": "The Cold War ended because the USA 'won' militarily.",
+        "correction": "The Cold War ended primarily because of internal Soviet economic failure, Gorbachev's reforms (glasnost/perestroika), and popular movements in Eastern Europe. There was no military victory.",
+        "why_students_think_this": "Hollywood and popular culture often portray the Cold War as a military contest rather than an ideological and economic one."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.History.Gr12.CW",
+    "title": "Assessment: The Cold War (1945-1991)",
+    "items": [
+      {
+        "question": "Name TWO conferences held in 1945 that contributed to the origins of the Cold War.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Yalta Conference (February 1945) and Potsdam Conference (July 1945)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Both were held in 1945 with the Big Three leaders."
+      },
+      {
+        "question": "Explain why the Korean War (1950-1953) is described as a 'proxy war.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The USA and USSR supported opposing sides (South and North Korea respectively) without fighting each other directly, using the conflict to advance their ideological interests while avoiding nuclear confrontation.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Define 'proxy war' and apply it to Korea."
+      },
+      {
+        "question": "Analyse South Africa's involvement in the Angolan Civil War as a Cold War proxy conflict.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "SA intervened to prevent the MPLA (Soviet/Cuban-backed) from controlling Angola, to protect its hold on Namibia, and to fight perceived communist expansion. The Battle of Cuito Cuanavale (1988) led to negotiations and Namibian independence.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider SA's strategic and ideological motivations."
+      },
+      {
+        "question": "Evaluate the role of Gorbachev's reforms in ending the Cold War. Were the consequences intended or unintended?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Gorbachev intended to reform and save communism, not end it. Glasnost enabled criticism and nationalist movements; perestroika failed economically. His refusal to use force allowed 1989 revolutions. The consequences were largely unintended.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Compare what Gorbachev intended with what actually happened."
+      },
+      {
+        "question": "[Source-based] Using the extract from Churchill's Fulton speech and your own knowledge, explain the significance of the 'Iron Curtain' metaphor for understanding Cold War tensions.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Churchill warned that Soviet control was creating a permanent division of Europe. The metaphor captured the impenetrability of the divide. Significance: it signalled the shift from wartime alliance to peacetime rivalry and helped shape Western public opinion against the USSR.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Extract information from the source, then add your own knowledge to explain why the speech mattered."
+      }
+    ],
+    "total_points": 13,
+    "estimated_minutes": 50,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Analyze", 1],
+      ["Evaluate", 2]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What were the two 1945 conferences that contributed to Cold War origins?",
+      "back": "Yalta (February 1945) and Potsdam (July 1945). Disagreements over Eastern Europe, reparations, and elections revealed the ideological divide.",
+      "tags": ["CAPS.History.Gr12.CW", "Grade12", "Cold War"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What is a proxy war? Give one Cold War example.",
+      "back": "A conflict where major powers support opposing sides without fighting directly. Example: Korean War (USA backed South Korea; USSR/China backed North Korea).",
+      "tags": ["CAPS.History.Gr12.CW", "Grade12", "Cold War"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What happened during the Cuban Missile Crisis (1962)?",
+      "back": "USSR placed nuclear missiles in Cuba. Kennedy imposed a naval blockade. After 13 days of brinkmanship, Khrushchev withdrew missiles in exchange for a US promise not to invade Cuba and secret removal of US missiles from Turkey.",
+      "tags": ["CAPS.History.Gr12.CW", "Grade12", "Cold War"],
+      "difficulty_permille": 350
+    },
+    {
+      "front": "What were glasnost and perestroika?",
+      "back": "Glasnost (openness): allowed public criticism of Soviet government. Perestroika (restructuring): introduced limited market reforms. Both policies by Gorbachev (1980s) unintentionally contributed to the collapse of the USSR.",
+      "tags": ["CAPS.History.Gr12.CW", "Grade12", "Cold War"],
+      "difficulty_permille": 400
+    },
+    {
+      "front": "What was South Africa's role in the Angolan Civil War?",
+      "back": "SA supported UNITA against the MPLA (Soviet/Cuban-backed) to prevent communist expansion and maintain control over Namibia. The Battle of Cuito Cuanavale (1988) led to negotiations and Namibian independence (1990).",
+      "tags": ["CAPS.History.Gr12.CW", "Grade12", "Cold War"],
+      "difficulty_permille": 500
+    },
+    {
+      "front": "Why did South Africa dismantle its nuclear weapons in 1989?",
+      "back": "The Cold War was ending, Cuban forces were withdrawing from Angola, and the strategic justification (communist threat) had evaporated. De Klerk also wanted to prevent weapons falling into ANC hands before the transition to democracy.",
+      "tags": ["CAPS.History.Gr12.CW", "Grade12", "Cold War"],
+      "difficulty_permille": 650
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

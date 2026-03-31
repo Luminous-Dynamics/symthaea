@@ -1,0 +1,275 @@
+{
+  "node_id": "CAPS.History.Gr12.APART",
+  "lesson": {
+    "standard_code": "CAPS.History.Gr12.APART",
+    "title": "Apartheid South Africa (1948-1994)",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Apartheid ('apartness' in Afrikaans) was a system of institutionalised racial segregation enforced by the National Party (NP) government from 1948 to 1994. After the NP's election victory in 1948, key legislation was enacted: the Population Registration Act (1950, classifying all South Africans by race), the Group Areas Act (1950, enforcing residential segregation), the Bantu Education Act (1953, creating inferior education for Black South Africans), and pass laws (controlling Black movement). Resistance intensified through the Defiance Campaign (1952), the Freedom Charter (1955), the Sharpeville Massacre (1960), and the formation of Umkhonto we Sizwe (MK, 1961). The Rivonia Trial (1964) sentenced Mandela and others to life imprisonment on Robben Island. International sanctions and sport boycotts isolated South Africa from the 1960s onwards. By the 1980s, the system was unsustainable: internal resistance (UDF, trade unions), economic crisis, and international pressure forced the NP to negotiate. CODESA (Convention for a Democratic South Africa, 1991-92) negotiated the transition, leading to the first democratic elections on 27 April 1994.",
+    "examples": [
+      {
+        "problem": "Analyse how the Bantu Education Act (1953) was designed to maintain apartheid's racial hierarchy.",
+        "steps": [
+          {
+            "instruction": "Step 1: Dr Hendrik Verwoerd (Minister of Native Affairs) stated: 'There is no place for [the Black person] in the European community above the level of certain forms of labour.' The Act was designed to prepare Black South Africans only for manual and service roles.",
+            "result": "Ideological foundation revealed"
+          },
+          {
+            "instruction": "Step 2: The Act transferred control of Black schools from churches and missions to the government, imposed a curriculum focused on practical skills and obedience, underfunded Black schools (spending per white pupil was 10x that of Black pupils), and made instruction in Afrikaans compulsory for certain subjects.",
+            "result": "Structural mechanisms of control"
+          },
+          {
+            "instruction": "Step 3: Long-term effects: generations of Black South Africans received inferior education, limiting economic and social mobility. This directly fuelled the Soweto Uprising (1976) and remains a source of inequality today.",
+            "result": "Lasting consequences"
+          }
+        ],
+        "answer": "Bantu Education was not merely a separate education system but a deliberate tool for maintaining white economic dominance by ensuring that Black South Africans could not compete for skilled positions. It demonstrates how apartheid operated through institutions, not just laws.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain how the Population Registration Act (1950) and the Group Areas Act (1950) worked together to enforce apartheid.",
+        "answer": "The Population Registration Act classified every South African into a racial category (White, Coloured, Indian, or Native/Bantu). The Group Areas Act then assigned each racial group to specific residential areas. Together, these laws meant that a person's race (determined by the state, sometimes arbitrarily) dictated where they could live, work, and access services. Forced removals displaced millions: District Six in Cape Town, Sophiatown in Johannesburg, and hundreds of other communities were destroyed. The Acts created the legal foundation for every other apartheid law.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about the logical sequence: you must first classify people before you can segregate them.",
+          "Research the 'pencil test' and other absurd methods used to classify race."
+        ],
+        "explanation": "These two Acts were the pillars of apartheid. Without racial classification, segregation could not be enforced. Without geographical separation, social control was impossible. Understanding their interaction reveals apartheid as a system, not just individual laws.",
+        "distractors": [
+          "The Group Areas Act applied only to employment, not housing",
+          "Racial classification was voluntary and self-determined",
+          "The Acts only affected Johannesburg, not other cities"
+        ]
+      },
+      {
+        "question": "Analyse the significance of the Freedom Charter (1955) for the anti-apartheid movement.",
+        "answer": "Adopted at the Congress of the People in Kliptown on 26 June 1955, the Freedom Charter declared: 'South Africa belongs to all who live in it, black and white.' It outlined a vision of a non-racial, democratic South Africa with equal rights, land redistribution, nationalisation of mines and banks, free education, and workers' rights. Its significance: it became the ideological foundation of the ANC and later the UDF; it demonstrated multiracial unity (ANC, SAIC, CPC, SACOD, and SACTU participated); it was used as evidence of 'communist conspiracy' in the Treason Trial (1956-61); and its principles influenced the 1996 Constitution.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider why the government viewed the Freedom Charter as a threat -- what did it say about the economy?",
+          "Think about how a document written in 1955 could still influence the 1996 Constitution."
+        ],
+        "explanation": "The Freedom Charter is one of the most important documents in SA history. It articulated a positive vision (what South Africa should be) rather than just opposing apartheid (what it should not be). CAPS expects students to analyse both its content and its political significance.",
+        "distractors": [
+          "The Freedom Charter called for a one-party communist state",
+          "It was written only by ANC members without broader participation",
+          "The government accepted the Charter as a basis for reform"
+        ]
+      },
+      {
+        "question": "Evaluate the effectiveness of international sanctions and sport boycotts in ending apartheid.",
+        "answer": "Sanctions were partially effective. Economic sanctions (arms embargo 1977, financial sanctions 1985, comprehensive sanctions 1986 by USA/EU) isolated SA's economy, caused capital flight, and raised the cost of maintaining apartheid. Sport boycotts (exclusion from Olympics from 1964, rugby/cricket isolation) hurt white South African identity and morale. However, sanctions had limitations: some countries (UK under Thatcher, Israel) maintained trade; sanctions were often circumvented through intermediaries; and they hurt Black workers disproportionately. Sanctions alone did not end apartheid but were one factor alongside internal resistance, economic crisis, and Cold War changes. The ANC and most liberation movements supported sanctions despite the economic pain.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both the economic and psychological impact of isolation.",
+          "Why did the ANC support sanctions even though they hurt Black workers most?"
+        ],
+        "explanation": "This question tests the CAPS skill of evaluating multiple factors. Students must avoid the extremes of 'sanctions ended apartheid' (too simple) and 'sanctions were ineffective' (ignores evidence). A balanced answer acknowledges partial effectiveness within a multi-causal explanation.",
+        "distractors": [
+          "All Western countries fully supported comprehensive sanctions from 1960",
+          "Sport boycotts had no psychological impact on white South Africans",
+          "The ANC opposed sanctions because they hurt Black workers"
+        ]
+      },
+      {
+        "question": "[Source-based] Study the political cartoon showing P.W. Botha standing on a crumbling wall labelled 'apartheid' while holding a sign saying 'Total Strategy.' (a) What is the cartoonist's message? (b) Is the cartoon a reliable source for understanding apartheid in the 1980s? Explain.",
+        "answer": "(a) The cartoonist is arguing that Botha's 'Total Strategy' (combining military force, limited reforms, and propaganda) could not save apartheid because the system itself was collapsing. The crumbling wall symbolises apartheid's unsustainability despite the government's efforts to maintain it through force. (b) Reliability: The cartoon is a valuable source for understanding opposition perspectives and public critique of government policy. However, it is an opinion piece, not factual reporting -- it represents the cartoonist's interpretation, likely from an anti-apartheid viewpoint. It simplifies a complex situation into a single image. It is most useful when analysed alongside other sources (government statements, economic data, protest records) to build a fuller picture.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Cartoons use visual metaphors: what does the crumbling wall represent? Why is Botha shown holding a sign?",
+          "For reliability, consider: Who drew it? For what audience? What perspective does it represent?"
+        ],
+        "explanation": "Source-based analysis of political cartoons is a core CAPS skill. Students must identify the message (what the cartoonist wants you to think), explain the visual devices used, and critically evaluate the source's reliability and limitations.",
+        "distractors": [
+          "Cartoons are always unreliable because they are not photographs",
+          "The cartoon proves that Botha's policies were universally opposed",
+          "Political cartoons have no historical value"
+        ]
+      },
+      {
+        "question": "Explain the significance of the Rivonia Trial (1963-1964) and Robben Island for the anti-apartheid struggle.",
+        "answer": "The Rivonia Trial saw Mandela and seven others (Sisulu, Mbeki, Kathrada, Goldberg, Mlangeni, Mhlaba, Motsoaledi) sentenced to life imprisonment for sabotage. Mandela's speech from the dock -- 'an ideal for which I am prepared to die' -- became iconic. Significance: it removed the ANC's top leadership but turned them into international symbols of resistance. Robben Island became 'the university' where political prisoners educated each other and maintained organisational structures. The trial and imprisonment galvanised the international anti-apartheid movement, leading to campaigns for Mandela's release. Rather than crushing resistance, the trial demonstrated the moral authority of the liberation movement.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider the government's intention (to crush resistance) versus the actual outcome (creating martyrs and international symbols).",
+          "Why is Mandela's speech from the dock considered one of the most important political speeches of the 20th century?"
+        ],
+        "explanation": "The Rivonia Trial is a case study in how repression can backfire. The government intended to destroy the ANC; instead, it created the most recognisable faces of the struggle. Robben Island's transformation from prison to 'university' illustrates the resilience of political movements.",
+        "distractors": [
+          "All the Rivonia accused were sentenced to death",
+          "The trial ended international interest in apartheid",
+          "Robben Island prisoners were allowed no contact with each other"
+        ]
+      },
+      {
+        "question": "Analyse the role of CODESA (1991-1992) in the transition from apartheid to democracy. Why was negotiation possible by the early 1990s when it had not been before?",
+        "answer": "CODESA (Convention for a Democratic South Africa) brought together the NP government, ANC, and 17 other parties to negotiate a democratic constitution. Negotiation became possible because: (1) the Cold War had ended, removing the NP's claim that the ANC was a Soviet proxy; (2) the economy was in crisis due to sanctions and internal instability; (3) F.W. de Klerk recognised that apartheid was unsustainable and unbanned the ANC/PAC/SACP (Feb 1990); (4) Mandela's release (Feb 1990) provided a negotiating partner with moral authority. CODESA I (1991) agreed on principles; CODESA II (1992) stalled over power-sharing. Violence (Boipatong Massacre, 1992) threatened the process. The Record of Understanding (1992) between Mandela and De Klerk revived talks, leading to the interim constitution and the 1994 elections.",
+        "difficulty_permille": 875,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both push factors (why apartheid had to end) and pull factors (why negotiation was chosen over revolution).",
+          "Think about the role of violence (Boipatong, third force) as both a threat to AND a motivation for negotiations."
+        ],
+        "explanation": "CODESA demonstrates that transitions to democracy are not inevitable or smooth. Multiple factors had to align, and the process was nearly derailed by violence. Understanding CODESA requires analysing both structural conditions (economy, Cold War) and individual agency (De Klerk, Mandela).",
+        "distractors": [
+          "CODESA involved only the ANC and NP, no other parties",
+          "The negotiations proceeded smoothly without interruption",
+          "The Cold War's end had no impact on South African politics"
+        ]
+      }
+    ],
+    "hints": [
+      "For source-based questions, always identify the type of source (cartoon, photograph, speech, statistic) and consider its purpose.",
+      "When analysing apartheid legislation, explain both the legal mechanism AND the lived impact on people.",
+      "CODESA questions require understanding of BOTH why negotiations happened AND why they almost failed."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "apartheid",
+        "definition": "Afrikaans for 'apartness'; the system of institutionalised racial segregation in South Africa from 1948 to 1994",
+        "example_usage": "Apartheid was not just social prejudice but a legal system enforced by the state through legislation."
+      },
+      {
+        "term": "Bantu Education",
+        "definition": "The 1953 Act that imposed government-controlled, inferior education on Black South Africans, designed to prepare them only for manual labour",
+        "example_usage": "Verwoerd said Bantu Education would teach Black people 'their place' in society."
+      },
+      {
+        "term": "CODESA",
+        "definition": "Convention for a Democratic South Africa (1991-92); multi-party negotiations that led to the transition from apartheid to democracy",
+        "example_usage": "CODESA brought together 19 parties to negotiate a democratic constitution."
+      },
+      {
+        "term": "Total Strategy",
+        "definition": "P.W. Botha's policy combining military force, limited reforms (e.g., Tricameral Parliament), and propaganda to maintain white rule against what he called the 'Total Onslaught' of communism",
+        "example_usage": "Total Strategy justified the militarisation of South African society and cross-border raids into neighbouring states."
+      },
+      {
+        "term": "forced removals",
+        "definition": "The displacement of communities from their homes to areas designated for their racial group under the Group Areas Act",
+        "example_usage": "Over 3.5 million people were forcibly removed under apartheid, including the destruction of District Six and Sophiatown."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Apartheid ended because the white government voluntarily chose to be moral.",
+        "correction": "Apartheid ended because of a combination of internal resistance (UDF, trade unions, MK), international sanctions and isolation, economic crisis, and the end of the Cold War. De Klerk's decision to negotiate was pragmatic as much as moral -- the system was unsustainable.",
+        "why_students_think_this": "The narrative of De Klerk and Mandela shaking hands can simplify the transition into a story of goodwill rather than a complex political process driven by multiple pressures."
+      },
+      {
+        "misconception": "All white South Africans supported apartheid.",
+        "correction": "While the NP won white elections, significant white opposition existed: the Black Sash (women's protest organisation), the End Conscription Campaign, white members of the ANC and SACP (e.g., Joe Slovo, Ruth First), liberal newspapers, and academics. Many Afrikaner intellectuals and clergy also opposed apartheid.",
+        "why_students_think_this": "The focus on the NP government and white privilege can obscure the diversity of white political opinion during apartheid."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.94,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.93,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.History.Gr12.APART",
+    "title": "Assessment: Apartheid South Africa (1948-1994)",
+    "items": [
+      {
+        "question": "Name TWO laws passed after 1948 that formed the legal foundation of apartheid.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Population Registration Act (1950) and Group Areas Act (1950). Other valid answers: Bantu Education Act (1953), Prohibition of Mixed Marriages Act (1949), Immorality Act (1950).",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about how apartheid classified people and where they could live."
+      },
+      {
+        "question": "Explain how Bantu Education was designed to maintain apartheid's racial hierarchy.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The Bantu Education Act (1953) placed Black education under government control, imposed an inferior curriculum focused on manual labour, underfunded Black schools (1:10 spending ratio), and prepared Black South Africans only for subservient roles in the economy.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Consider Verwoerd's stated purpose and the practical effects."
+      },
+      {
+        "question": "Analyse the factors that made negotiations possible by the early 1990s.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Cold War ending (communist threat narrative collapsed), economic crisis (sanctions, disinvestment), internal resistance (UDF, trade unions, townships ungovernable), military stalemate (Angola/Namibia), De Klerk's pragmatic recognition, Mandela's moral authority.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider both international and domestic factors."
+      },
+      {
+        "question": "[Source-based] Using the extract from Mandela's speech from the dock at the Rivonia Trial and your own knowledge, evaluate his justification for armed struggle.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Mandela argued that armed struggle was a last resort after the government made peaceful protest impossible (banning of ANC, Sharpeville). He distinguished between sabotage (targeting infrastructure) and terrorism (targeting people). His justification rested on the democratic principle that people have the right to resist tyranny. Evaluation should consider both perspectives: the government's view (treason) and the liberation movement's view (legitimate resistance).",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Extract key arguments from the speech, then evaluate them using your own knowledge of the context."
+      }
+    ],
+    "total_points": 10,
+    "estimated_minutes": 50,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "When did the National Party come to power, and what was its core policy?",
+      "back": "1948 election victory. Core policy: apartheid ('apartness') -- institutionalised racial segregation enforced through legislation.",
+      "tags": ["CAPS.History.Gr12.APART", "Grade12", "Apartheid"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What were the Population Registration Act and Group Areas Act (both 1950)?",
+      "back": "Population Registration Act: classified all South Africans by race. Group Areas Act: assigned each racial group to specific residential areas, enabling forced removals.",
+      "tags": ["CAPS.History.Gr12.APART", "Grade12", "Apartheid"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What was the Freedom Charter (1955)?",
+      "back": "Adopted at the Congress of the People in Kliptown. Declared 'South Africa belongs to all who live in it.' Outlined a vision of non-racial democracy, land redistribution, nationalised mines, free education. Became the ANC's ideological foundation.",
+      "tags": ["CAPS.History.Gr12.APART", "Grade12", "Apartheid"],
+      "difficulty_permille": 350
+    },
+    {
+      "front": "What happened at the Rivonia Trial (1963-64)?",
+      "back": "Mandela and 7 others sentenced to life imprisonment for sabotage. Mandela's 'I am prepared to die' speech became iconic. They were imprisoned on Robben Island. The trial turned them into international symbols of resistance.",
+      "tags": ["CAPS.History.Gr12.APART", "Grade12", "Apartheid"],
+      "difficulty_permille": 450
+    },
+    {
+      "front": "What was CODESA?",
+      "back": "Convention for a Democratic South Africa (1991-92). Multi-party negotiations for a democratic constitution. Nearly derailed by Boipatong Massacre (1992). Led to interim constitution and the first democratic elections on 27 April 1994.",
+      "tags": ["CAPS.History.Gr12.APART", "Grade12", "Apartheid"],
+      "difficulty_permille": 600
+    },
+    {
+      "front": "When were South Africa's first democratic elections?",
+      "back": "27 April 1994. The ANC won with 62.65% of the vote. Mandela became the first democratically elected president. The date is now celebrated as Freedom Day.",
+      "tags": ["CAPS.History.Gr12.APART", "Grade12", "Apartheid"],
+      "difficulty_permille": 200
+    }
+  ],
+  "quality": {
+    "coherence": 0.94,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

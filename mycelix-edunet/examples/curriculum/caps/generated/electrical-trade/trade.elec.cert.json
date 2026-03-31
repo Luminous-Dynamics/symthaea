@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Wireman's Licence & COC?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
+        "question": "You are conducting a COC inspection on a 15-year-old house being sold. List the FOUR mandatory tests you must perform, the instrument used for each, and the pass criteria per SANS 10142.",
+        "answer": "(1) Insulation resistance: megger at 500V DC, minimum 1MΩ per circuit. (2) Earth continuity: low-resistance ohmmeter, maximum 1Ω from any exposed metal part to the main earth terminal. (3) Polarity: test lamp or multimeter, verify live and neutral are correctly connected at all points (live on the switched terminal). (4) Earth leakage trip test: push test button on ELU, must trip within 30ms at rated sensitivity (typically 30mA). Additionally, visual inspection covers cable condition, DB labelling, correct breaker ratings, and absence of unapproved modifications.",
+        "difficulty_permille": 300,
         "bloom_level": "Remember",
         "hints": [
-          "Think safety first"
+          "The four tests can be remembered as: IEPE -- Insulation, Earth continuity, Polarity, Earth leakage.",
+          "Each test requires a specific instrument -- you cannot use a multimeter for insulation resistance testing."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "These four tests are non-negotiable for every COC. Failing to perform all four or recording false readings constitutes fraud and can result in criminal prosecution, loss of licence, and liability for any resulting injury or death.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "Visual inspection alone is sufficient for a COC",
+          "Only new installations need all four tests",
+          "A multimeter can replace a megger for insulation testing"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Wireman's Licence & COC in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "A property attorney contacts you because a house sale is delayed -- the existing COC is 3 years old. Is it still valid? Under what circumstances must a new COC be issued?",
+        "answer": "A COC is valid for 2 years from the date of issue for property transfers (per the Electrical Installation Regulations). Since the COC is 3 years old, it has expired and a new inspection and COC are required before the sale can proceed. A new COC must also be issued when: (1) any alteration or addition is made to the installation, (2) a change of electricity supply (e.g., prepaid conversion), (3) the installation has been out of use for more than 12 months, or (4) the local authority requests one. The seller is responsible for obtaining and paying for the COC.",
         "difficulty_permille": 400,
         "bloom_level": "Understand",
         "hints": [
-          "Think about SANS standards or Acts"
+          "The 2-year validity is specifically for property transfers under the Electrical Installation Regulations.",
+          "The seller, not the buyer, is legally responsible for the COC."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Understanding COC validity periods is essential for electricians who deal with estate agents and attorneys. Issuing a COC makes you legally liable for the safety of the installation -- you are certifying it complies with SANS 10142.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "A COC never expires once issued",
+          "The buyer is responsible for obtaining the COC",
+          "Only the local municipality can issue a COC"
+        ]
+      },
+      {
+        "question": "During a COC inspection, you find that a previous electrician added a 30A breaker to a circuit wired with 2.5mm² cable running to a double plug socket. What is wrong, and what must you do?",
+        "answer": "This is a serious violation. 2.5mm² cable has a maximum continuous current rating of approximately 24A (depending on installation method). A 30A breaker allows the cable to carry more current than it can safely handle, creating a fire risk -- the cable will overheat before the breaker trips. The plug socket is rated for 16A, compounding the mismatch. Action: (1) Do NOT issue a COC. (2) Record the non-compliance. (3) Inform the property owner that the breaker must be downrated to 20A maximum (standard for 2.5mm² plug circuits) or the cable must be upgraded to 4mm² minimum. (4) If the circuit was meant for a high-draw appliance, it should have been wired with appropriately sized cable from the start.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "The breaker protects the CABLE, not the appliance. It must be rated at or below the cable's current capacity.",
+          "A 16A socket on a 30A breaker means the socket could be destroyed before the breaker trips."
+        ],
+        "explanation": "Breaker-cable mismatches are one of the most dangerous non-compliances found during COC inspections. The breaker's job is to trip before the cable overheats -- if the breaker is oversized, it fails in this protective function.",
+        "distractors": [
+          "A 30A breaker provides better protection because it won't trip nuisance",
+          "The cable size doesn't matter as long as the breaker is the right rating",
+          "This is acceptable because the socket has its own internal fuse"
+        ]
+      },
+      {
+        "question": "What are the legal consequences of issuing a fraudulent COC (e.g., recording passing test results without actually performing the tests)?",
+        "answer": "Legal consequences: (1) Criminal prosecution under the Occupational Health and Safety Act (OHS Act 85 of 1993) -- issuing a false COC is a criminal offence carrying potential imprisonment. (2) Civil liability for any death, injury, or property damage caused by the installation -- the electrician who signed the COC is personally liable, including if someone is electrocuted or a fire occurs. (3) Cancellation of registration with the Department of Employment and Labour -- loss of wireman's licence, meaning you can no longer legally perform electrical work. (4) Professional blacklisting -- ECSA and industry bodies maintain records. (5) Insurance voidance -- if a fire occurs and the COC is found to be fraudulent, the property owner's insurance claim will be rejected, and they will pursue the electrician for all losses.",
+        "difficulty_permille": 600,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "A COC is a legal document. Falsifying it is equivalent to fraud.",
+          "Consider all stakeholders affected: the homeowner, their insurer, future occupants, and the electrician's own career."
+        ],
+        "explanation": "Fraudulent COCs are unfortunately common and contribute to South Africa's high rate of electrical fires. Understanding the severe consequences reinforces why proper testing is non-negotiable.",
+        "distractors": [
+          "There are no legal consequences -- it's just a guideline",
+          "Only the homeowner is liable, not the electrician",
+          "The worst that can happen is a fine"
+        ]
+      },
+      {
+        "question": "You complete a COC inspection and find 3 non-compliances: (a) no earth leakage unit installed, (b) exposed wiring in the garage, (c) a swimming pool pump wired without an isolator switch. Rank these by severity and explain your prioritisation.",
+        "answer": "Ranking by severity (highest risk first): (1) No earth leakage unit -- CRITICAL. This means there is no protection against electrocution. Any earth fault will result in continuous current flow through a person. SANS 10142 requires earth leakage protection (30mA) on ALL circuits. This must be rectified before any other work. (2) Swimming pool pump without isolator -- HIGH. Water and electricity near each other require additional safety measures. SANS 10142 requires an accessible isolator within sight of the pump and supplementary equipotential bonding. Pool environments have elevated electrocution risk. (3) Exposed wiring in garage -- MEDIUM. This is a fire and shock hazard, especially if the garage is used as a workshop or has vehicles. All wiring must be in conduit, trunking, or be a sheathed cable type appropriately secured. All three must be rectified before a COC can be issued. None are acceptable.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Prioritise by immediate risk to life. Earth leakage protects against the most common cause of electrical death.",
+          "Pool areas have specific SANS 10142 requirements due to the conductivity of water and wet skin."
+        ],
+        "explanation": "Risk assessment and prioritisation are professional electrician skills. When multiple non-compliances exist, addressing life-threatening issues first ensures that even partial work reduces the highest risks.",
+        "distractors": [
+          "Fix the cheapest issue first to save the homeowner money",
+          "The pool pump is the least important because it's outside",
+          "Issue the COC with conditions attached for future rectification"
         ]
       }
     ],
