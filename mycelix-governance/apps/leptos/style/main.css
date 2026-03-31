@@ -1,0 +1,1727 @@
+/* Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+
+/* ============================================================================
+   Civic Theme: Assembly (indigo-violet + copper)
+   A living organism, not a dashboard.
+   ============================================================================ */
+
+:root {
+    /* Base palette */
+    --bg: #08080c;
+    --bg-raised: #10101a;
+    --surface: rgba(24, 22, 42, 0.6);
+    --surface-solid: #18162a;
+    --surface-hover: rgba(40, 36, 60, 0.7);
+    --border: rgba(56, 52, 74, 0.3);
+    --border-strong: rgba(80, 74, 110, 0.4);
+
+    /* Text */
+    --text-primary: #e0dce8;
+    --text-secondary: #9088a0;
+    --text-muted: #786e8a;
+
+    /* Primary (indigo-violet) */
+    --primary: #8b7ec8;
+    --primary-hover: #7b6eb8;
+    --primary-dim: #5a4e8a;
+    --primary-glow: rgba(139, 126, 200, 0.08);
+
+    /* Accent (copper/bronze) */
+    --accent: #c49564;
+    --accent-hover: #b48554;
+
+    /* Proposal lifecycle */
+    --phase-discussion: #e8a855;
+    --phase-voting: #9b72cf;
+    --phase-timelock: #5b8dd9;
+    --phase-executed: #4ade80;
+    --phase-rejected: #6b7280;
+    --phase-emergency: #ef4444;
+
+    /* Currency colors */
+    --tend-color: #4ade80;
+    --sap-color: #c49564;
+    --mycel-color: #a78bfa;
+
+    /* Trust tiers */
+    --tier-observer: #6b7280;
+    --tier-basic: #60a5fa;
+    --tier-standard: #34d399;
+    --tier-elevated: #a78bfa;
+    --tier-guardian: #fbbf24;
+
+    /* Geometry */
+    --radius: 16px;
+    --radius-sm: 10px;
+    --radius-pill: 999px;
+
+    /* Thermodynamic coupling (set by JS) */
+    --device-energy: 1;
+    --network-health: 1;
+    --torpor-level: 0;
+    --homeostasis: 0;
+    --consciousness-warmth: 0.5;
+    --consciousness-animation-speed: 1;
+    --effective-glow: 0.5;
+
+    /* Derived */
+    --pulse-duration: calc(3s / var(--consciousness-animation-speed));
+}
+
+/* ============================================================================
+   Reset & Base
+   ============================================================================ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100dvh;
+    line-height: 1.6;
+}
+
+a {
+    color: var(--primary);
+    text-decoration: none;
+    transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+a:hover { color: var(--primary-hover); }
+
+.skip-to-content {
+    position: absolute;
+    top: -100px;
+    left: 0;
+    z-index: 999;
+    padding: 0.5rem 1rem;
+    background: var(--primary);
+    color: var(--bg);
+}
+
+.skip-to-content:focus {
+    top: 0;
+}
+
+/* ============================================================================
+   Navigation
+   ============================================================================ */
+
+.civic-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+}
+
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary) !important;
+}
+
+.logo-glyph { font-size: 1.5rem; }
+.logo-text { font-size: 1.1rem; letter-spacing: 0.05em; }
+
+.nav-links {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-link {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.25rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.nav-link:hover, .nav-link[aria-current="page"] {
+    color: var(--text-primary) !important;
+    border-bottom-color: var(--primary);
+}
+
+.nav-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* ============================================================================
+   Connection Badge
+   ============================================================================ */
+
+.connection-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.status-connected .status-dot { background: var(--phase-executed); }
+.status-connecting .status-dot {
+    background: var(--phase-discussion);
+    animation: pulse-dot 1.5s infinite;
+}
+.status-mock .status-dot { background: var(--phase-voting); }
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ============================================================================
+   Trust Tier Badges
+   ============================================================================ */
+
+.tier-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tier-observer { background: rgba(107, 114, 128, 0.2); color: var(--tier-observer); }
+.tier-basic { background: rgba(96, 165, 250, 0.15); color: var(--tier-basic); }
+.tier-standard { background: rgba(52, 211, 153, 0.15); color: var(--tier-standard); }
+.tier-elevated { background: rgba(167, 139, 250, 0.15); color: var(--tier-elevated); }
+.tier-guardian { background: rgba(251, 191, 36, 0.15); color: var(--tier-guardian); }
+
+/* ============================================================================
+   Main Content
+   ============================================================================ */
+
+.main-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+.not-found {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 4rem 0;
+}
+
+/* ============================================================================
+   Home Page
+   ============================================================================ */
+
+.home-page {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+}
+
+.civic-breath {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.breath-message {
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: var(--text-secondary);
+}
+
+.breath-message.homeostatic {
+    animation: breathe var(--pulse-duration) ease-in-out infinite;
+}
+
+.breath-growing {
+    color: var(--phase-discussion);
+    font-size: 1.2rem;
+}
+
+.breath-deciding {
+    color: var(--phase-voting);
+    font-size: 1.2rem;
+}
+
+.breath-tier {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.tier-label { margin-right: 0.25rem; }
+
+@keyframes breathe {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* ============================================================================
+   Proposal Cards
+   ============================================================================ */
+
+.proposal-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.proposal-card {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-primary) !important;
+}
+
+.proposal-card:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+}
+
+/* Phase-specific ambient glow */
+.phase-discussion {
+    box-shadow: 0 0 calc(20px * var(--effective-glow)) rgba(232, 168, 85, 0.08);
+}
+
+.phase-voting {
+    box-shadow: 0 0 calc(20px * var(--effective-glow)) rgba(155, 114, 207, 0.08);
+    transform: scale(0.99);
+}
+
+.phase-timelock {
+    box-shadow: 0 0 calc(15px * var(--effective-glow)) rgba(91, 141, 217, 0.06);
+}
+
+.phase-executed {
+    box-shadow: 0 0 calc(15px * var(--effective-glow)) rgba(74, 222, 128, 0.06);
+}
+
+.phase-rejected {
+    opacity: 0.7;
+}
+
+/* Proposal pulse animation */
+.proposal-pulse {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+}
+
+.phase-discussion-pulse {
+    background: var(--phase-discussion);
+    animation: pulse-line var(--pulse-duration) ease-in-out infinite;
+}
+
+.phase-voting-pulse {
+    background: var(--phase-voting);
+    animation: pulse-line calc(var(--pulse-duration) * 0.7) ease-in-out infinite;
+}
+
+.phase-timelock-pulse {
+    background: var(--phase-timelock);
+    animation: pulse-line calc(var(--pulse-duration) * 2) ease-in-out infinite;
+}
+
+.phase-executed-pulse {
+    background: var(--phase-executed);
+    opacity: 0.5;
+}
+
+@keyframes pulse-line {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+.proposal-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.proposal-id {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.proposal-type {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.proposal-standard { background: rgba(139, 126, 200, 0.15); color: var(--primary); }
+.proposal-emergency { background: rgba(239, 68, 68, 0.15); color: var(--phase-emergency); }
+.proposal-constitutional { background: rgba(251, 191, 36, 0.15); color: var(--tier-guardian); }
+.proposal-parameter { background: rgba(91, 141, 217, 0.15); color: var(--phase-timelock); }
+.proposal-funding { background: rgba(196, 149, 100, 0.15); color: var(--accent); }
+
+.proposal-status {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.proposal-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+    line-height: 1.4;
+}
+
+.proposal-description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+}
+
+.proposal-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   Proposal Detail
+   ============================================================================ */
+
+.proposal-organism {
+    position: relative;
+    padding: 2rem 0;
+}
+
+.proposal-header-detail {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.proposal-id-large {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+}
+
+.proposal-type-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.7rem;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+}
+
+.proposal-status-badge {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+}
+
+.proposal-title-large {
+    font-size: 1.6rem;
+    font-weight: 500;
+    line-height: 1.3;
+    margin-bottom: 1.5rem;
+}
+
+.proposal-body {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.proposal-author-detail {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.author-did { color: var(--primary); }
+
+.proposal-pulse-large {
+    position: absolute;
+    bottom: 0;
+    left: -1.5rem;
+    right: -1.5rem;
+    height: 3px;
+}
+
+/* ============================================================================
+   Voting Section
+   ============================================================================ */
+
+.voting-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+
+.section-subtitle {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.current-vote {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.vote-for { background: rgba(74, 222, 128, 0.1); color: var(--phase-executed); }
+.vote-against { background: rgba(239, 68, 68, 0.1); color: var(--phase-emergency); }
+.vote-abstain { background: rgba(107, 114, 128, 0.1); color: var(--text-muted); }
+
+.vote-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.vote-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vote-btn:hover {
+    background: var(--surface-hover);
+}
+
+.vote-btn.vote-for:hover { border-color: var(--phase-executed); }
+.vote-btn.vote-against:hover { border-color: var(--phase-emergency); }
+
+.gate-notice {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    background: rgba(139, 126, 200, 0.08);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* ============================================================================
+   Tier Gate
+   ============================================================================ */
+
+.tier-gate-blocked {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+}
+
+.gate-message {
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-secondary);
+}
+
+.gate-action {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.growth-bar {
+    height: 6px;
+    background: var(--surface-solid);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.growth-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-dim), var(--primary));
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.growth-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.gate-dimensions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.dim {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+/* ============================================================================
+   Create Proposal Form
+   ============================================================================ */
+
+.create-proposal-page {
+    max-width: 640px;
+}
+
+.proposal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-field label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.form-textarea {
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.submit-btn {
+    padding: 0.85rem 1.5rem;
+    background: var(--primary);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.submit-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+}
+
+.submit-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ============================================================================
+   Page Headers & Sections
+   ============================================================================ */
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 500;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.create-proposal-link {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+}
+
+.create-proposal-link:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary);
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 3rem 0;
+}
+
+/* ============================================================================
+   Charter / Constitution
+   ============================================================================ */
+
+.charter-preamble {
+    font-style: italic;
+    color: var(--text-secondary);
+    padding: 1rem 1.5rem;
+    border-left: 3px solid var(--primary-dim);
+    margin-bottom: 1rem;
+    line-height: 1.7;
+}
+
+.charter-rights {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.right-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: var(--radius-pill);
+    background: rgba(139, 126, 200, 0.1);
+    color: var(--primary);
+}
+
+/* ============================================================================
+   Toast Notifications
+   ============================================================================ */
+
+.toast-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    padding: 0.75rem 1.25rem;
+    background: var(--surface-solid);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    animation: toast-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 320px;
+}
+
+.toast-governance { border-left: 3px solid var(--primary); }
+.toast-finance { border-left: 3px solid var(--accent); }
+.toast-error { border-left: 3px solid var(--phase-emergency); }
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* ============================================================================
+   Accessibility & Reduced Motion
+   ============================================================================ */
+
+:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ============================================================================
+   Mobile
+   ============================================================================ */
+
+@media (max-width: 640px) {
+    .civic-nav {
+        padding: 0.5rem 1rem;
+    }
+
+    .main-content {
+        padding: 1.5rem 1rem;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .vote-actions {
+        flex-direction: column;
+    }
+
+    .gate-dimensions {
+        flex-wrap: wrap;
+    }
+
+    .nav-links {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .marketplace-grid { grid-template-columns: 1fr; }
+    .balance-grid { grid-template-columns: 1fr; }
+    .form-row { flex-direction: column; }
+}
+
+/* ============================================================================
+   Voting Page
+   ============================================================================ */
+
+.voice-weight-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.weight-visual {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.weight-value {
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: var(--primary);
+    display: block;
+}
+
+.weight-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.weight-dim, .mycel-dim {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.dim-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-width: 100px;
+}
+
+.dim-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--surface-solid);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.dim-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    transition: width 0.5s;
+}
+
+.dim-value {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    min-width: 40px;
+    text-align: right;
+}
+
+.vote-pending-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--phase-voting);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.vote-pending-link {
+    display: flex;
+    gap: 1rem;
+    color: var(--text-primary) !important;
+}
+
+.vote-pending-id {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.vote-record {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+}
+
+.vote-record-weight { margin-left: auto; color: var(--text-muted); font-family: monospace; }
+
+.delegation-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.delegation-domain { color: var(--text-muted); }
+
+/* ============================================================================
+   Council Tree
+   ============================================================================ */
+
+.council-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s;
+}
+
+.council-node:hover {
+    border-color: var(--border-strong);
+}
+
+.council-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.council-identity { display: flex; align-items: center; gap: 0.75rem; }
+.council-name { font-size: 1.05rem; font-weight: 500; }
+
+.council-type-badge {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-pill);
+    background: rgba(139, 126, 200, 0.12);
+    color: var(--primary);
+}
+
+.council-vitals {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.council-phi { font-family: monospace; }
+.council-purpose { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* ============================================================================
+   TEND Page
+   ============================================================================ */
+
+.tend-balance-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.balance-main {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.balance-hours {
+    font-size: 2rem;
+    font-weight: 300;
+}
+
+.tend-equilibrium .balance-hours { color: var(--text-primary); }
+.tend-positive .balance-hours { color: var(--tend-color); }
+.tend-negative .balance-hours { color: var(--accent); }
+
+.balance-state {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.balance-context {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.oracle-indicator {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.oracle-normal { background: rgba(74, 222, 128, 0.08); color: var(--tend-color); }
+.oracle-elevated { background: rgba(251, 191, 36, 0.08); color: var(--tier-guardian); }
+.oracle-high { background: rgba(239, 68, 68, 0.08); color: var(--phase-emergency); }
+.oracle-emergency { background: rgba(239, 68, 68, 0.15); color: var(--phase-emergency); }
+
+.oracle-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem; }
+
+.exchange-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.exchange-gave { border-left: 3px solid var(--tend-color); }
+.exchange-received { border-left: 3px solid var(--accent); }
+
+.exchange-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+}
+
+.exchange-direction { font-weight: 500; }
+.exchange-status { margin-left: auto; color: var(--text-muted); font-size: 0.75rem; }
+.exchange-description { font-size: 0.8rem; color: var(--text-secondary); }
+
+.marketplace-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.subsection-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.listing-card, .request-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.listing-title, .request-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+}
+
+.listing-desc, .request-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.listing-meta, .request-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   SAP Payments Page
+   ============================================================================ */
+
+.sap-balance-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.sap-amount {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--accent);
+}
+
+.demurrage-notice {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: rgba(196, 149, 100, 0.08);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.payment-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.payment-sent { border-left: 3px solid var(--phase-emergency); }
+.payment-received { border-left: 3px solid var(--tend-color); }
+
+.payment-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.payment-direction { font-weight: 500; }
+.payment-status { margin-left: auto; color: var(--text-muted); font-size: 0.75rem; }
+.payment-memo { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.3rem; }
+
+/* ============================================================================
+   MYCEL Recognition Page
+   ============================================================================ */
+
+.mycel-score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.mycel-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mycel-value {
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: var(--mycel-color);
+}
+
+.mycel-tier-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+}
+
+.mycel-newcomer { background: rgba(107, 114, 128, 0.15); color: var(--text-muted); }
+.mycel-apprentice { background: rgba(96, 165, 250, 0.15); color: var(--tier-basic); }
+.mycel-member { background: rgba(167, 139, 250, 0.15); color: var(--mycel-color); }
+.mycel-steward { background: rgba(52, 211, 153, 0.15); color: var(--tier-standard); }
+.mycel-elder { background: rgba(251, 191, 36, 0.15); color: var(--tier-guardian); }
+
+.dim-fill-participation { background: var(--primary); }
+.dim-fill-recognition { background: var(--mycel-color); }
+.dim-fill-validation { background: var(--tend-color); }
+.dim-fill-longevity { background: var(--accent); }
+
+.mycel-tenure {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 1rem;
+}
+
+.recognition-card {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+}
+
+.recognition-weight { margin-left: auto; color: var(--text-muted); font-family: monospace; }
+
+/* ============================================================================
+   Treasury Page
+   ============================================================================ */
+
+.treasury-organism {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.treasury-heart {
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    position: relative;
+}
+
+.heart-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.heart-value {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--tier-guardian);
+}
+
+.heart-ratio {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+}
+
+.heart-pulse-ring {
+    position: absolute;
+    inset: -1px;
+    border: 2px solid rgba(251, 191, 36, 0.15);
+    border-radius: var(--radius);
+    animation: heart-pulse var(--pulse-duration) ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes heart-pulse {
+    0%, 100% { border-color: rgba(251, 191, 36, 0.08); }
+    50% { border-color: rgba(251, 191, 36, 0.25); }
+}
+
+.flow-total, .flow-available-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+}
+
+.flow-label { font-size: 0.85rem; color: var(--text-secondary); }
+.flow-value { font-size: 1.1rem; font-weight: 500; }
+
+.flow-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface-solid);
+}
+
+.flow-reserve {
+    background: var(--tier-guardian);
+    opacity: 0.6;
+}
+
+.flow-available {
+    background: var(--tend-color);
+    opacity: 0.4;
+}
+
+.treasury-compost {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+}
+
+.compost-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.compost-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+}
+
+.compost-split {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+}
+
+.compost-local { color: var(--tend-color); }
+.compost-regional { color: var(--primary); }
+.compost-global { color: var(--accent); }
+
+/* ============================================================================
+   Budgeting Page
+   ============================================================================ */
+
+.budget-cycle-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.cycle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.cycle-name { font-size: 1.15rem; font-weight: 500; }
+
+.cycle-phase-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: var(--radius-pill);
+    background: rgba(139, 126, 200, 0.12);
+    color: var(--primary);
+    text-transform: uppercase;
+}
+
+.cycle-budget {
+    font-size: 1.2rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+}
+
+.cycle-phase-info { font-size: 0.8rem; color: var(--text-muted); }
+
+/* ============================================================================
+   Constitution Page
+   ============================================================================ */
+
+.charter-document { display: flex; flex-direction: column; gap: 2.5rem; }
+.charter-section-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.charter-preamble-text {
+    font-style: italic;
+    color: var(--text-secondary);
+    padding: 1.5rem;
+    border-left: 3px solid var(--primary-dim);
+    line-height: 1.8;
+    font-size: 1.05rem;
+}
+
+.article-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.article-title {
+    font-size: 1.05rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.article-content {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.rights-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.rights-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.right-immutable {
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--tier-guardian);
+    font-weight: 600;
+    border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.right-amendable {
+    background: rgba(139, 126, 200, 0.1);
+    color: var(--primary);
+}
+
+.charter-version {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   Execution Page
+   ============================================================================ */
+
+.timelock-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.timelock-pending { border-left: 3px solid var(--phase-timelock); }
+.timelock-vetoed { border-left: 3px solid var(--phase-emergency); }
+
+.timelock-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.timelock-proposal { font-family: monospace; }
+.timelock-status { font-size: 0.8rem; color: var(--text-muted); }
+.timelock-duration { font-size: 0.85rem; color: var(--text-secondary); }
+
+.veto-membrane {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: var(--radius-sm);
+}
+
+.veto-notice { font-size: 0.8rem; color: var(--phase-emergency); }
+
+/* ============================================================================
+   Staking Page
+   ============================================================================ */
+
+.stake-weight-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.weight-formula {
+    font-size: 1.1rem;
+    color: var(--primary);
+    font-family: monospace;
+}
+
+.weight-explanation {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.stake-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.stake-active { border-left: 3px solid var(--tend-color); }
+.stake-unbonding { border-left: 3px solid var(--phase-discussion); }
+.stake-slashed { border-left: 3px solid var(--phase-emergency); }
+
+.stake-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.3rem;
+}
+
+.stake-amount { font-weight: 500; }
+.stake-status { font-size: 0.8rem; color: var(--text-muted); }
+.stake-weight { font-size: 0.8rem; color: var(--text-secondary); font-family: monospace; }
+
+/* ============================================================================
+   Oracle Page
+   ============================================================================ */
+
+.oracle-state-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.vitality-bar {
+    height: 8px;
+    background: var(--surface-solid);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.vitality-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--phase-emergency), var(--phase-discussion), var(--tend-color));
+    border-radius: 4px;
+    transition: width 0.5s;
+}
+
+.vitality-value {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.oracle-tier-info {
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.oracle-explanation {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-row .form-field { flex: 1; }
+
+/* ============================================================================
+   Profile Page
+   ============================================================================ */
+
+.identity-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.identity-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.identity-did {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: var(--primary);
+}
+
+.identity-dimensions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.id-dim {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--primary-glow);
+    border-radius: var(--radius-sm);
+}
+
+.id-dim span:first-child { color: var(--text-secondary); }
+.id-dim span:last-child { font-family: monospace; color: var(--text-primary); }
+
+.balance-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.balance-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.balance-currency {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.3rem;
+}
+
+.balance-tend .balance-value { color: var(--tend-color); }
+.balance-sap .balance-value { color: var(--accent); }
+.balance-mycel .balance-value { color: var(--mycel-color); }
+
+.balance-value {
+    font-size: 1.5rem;
+    font-weight: 300;
+    display: block;
+}
+
+.balance-subtitle {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+}
+
+.governance-stats {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+}
+
+.gov-stat {
+    text-align: center;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--primary);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   Empty State Cards
+   ============================================================================ */
+
+.empty-state-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+
+.empty-state-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    line-height: 1.6;
+}
+
+.page-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.section-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+/* Nav finance links subtle differentiation */
+.nav-finance { opacity: 0.85; }
