@@ -1,0 +1,629 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 5",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade5",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 8,
+    "domains": [
+      "Numbers",
+      "Geometry",
+      "Operations",
+      "Measurement",
+      "Data",
+      "Patterns"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Curated from CAPS Mathematics Intermediate Phase (DBE, 2011 amended 2022). Grade 5."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr5.NUM",
+      "title": "Whole Numbers",
+      "description": "Place value to 999999. Properties of numbers. Common factors and common multiples. Divisibility rules",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "place-value",
+        "divisibility",
+        "common-factors",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.NUM",
+          "description": "Place value to 999999. Properties of numbers. Common factors and common multiples. Divisibility rules",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Whole Numbers",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Whole+Numbers",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.NUM"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Whole Numbers",
+          "url": "https://www.youtube.com/results?search_query=Whole+Numbers+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Whole Numbers",
+          "url": "https://en.wikipedia.org/wiki/Whole_Numbers",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.OPS",
+      "title": "Operations",
+      "description": "Multiply 3-digit by 2-digit. Division with remainders. Multistep problems. Estimation and checking",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Operations",
+      "tags": [
+        "multiplication",
+        "division",
+        "estimation",
+        "multistep",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.OPS",
+          "description": "Multiply 3-digit by 2-digit. Division with remainders. Multistep problems. Estimation and checking",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Operations",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Operations",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.OPS"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Operations",
+          "url": "https://www.youtube.com/results?search_query=Operations+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Operations",
+          "url": "https://en.wikipedia.org/wiki/Operations",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.FRC",
+      "title": "Common Fractions",
+      "description": "Add and subtract fractions with different denominators. Multiply fractions by whole numbers. Fractions of amounts",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "fractions",
+        "different-denominators",
+        "multiply-fractions",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.FRC",
+          "description": "Add and subtract fractions with different denominators. Multiply fractions by whole numbers. Fractions of amounts",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Common Fractions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Common+Fractions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.FRC"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Common Fractions",
+          "url": "https://www.youtube.com/results?search_query=Common+Fractions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Common Fractions",
+          "url": "https://en.wikipedia.org/wiki/Common_Fractions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.DEC",
+      "title": "Decimal Fractions",
+      "description": "Thousandths. Multiply and divide decimals by 10, 100, 1000. Rounding decimals. Percentages intro (50%, 25%, 10%)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "decimals",
+        "thousandths",
+        "percentages",
+        "rounding",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.DEC",
+          "description": "Thousandths. Multiply and divide decimals by 10, 100, 1000. Rounding decimals. Percentages intro (50%, 25%, 10%)",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Decimal Fractions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Decimal+Fractions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.DEC"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Decimal Fractions",
+          "url": "https://www.youtube.com/results?search_query=Decimal+Fractions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Decimal Fractions",
+          "url": "https://en.wikipedia.org/wiki/Decimal_Fractions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.PAT",
+      "title": "Patterns and Relationships",
+      "description": "Number patterns with two operations. Input-output tables. Flow diagrams. Sequences with constant difference",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Patterns",
+      "tags": [
+        "patterns",
+        "input-output",
+        "flow-diagrams",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.PAT",
+          "description": "Number patterns with two operations. Input-output tables. Flow diagrams. Sequences with constant difference",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Patterns and Relationships",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Patterns+and+Relationships",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.PAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Patterns and Relationships",
+          "url": "https://www.youtube.com/results?search_query=Patterns+and+Relationships+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Patterns and Relationships",
+          "url": "https://en.wikipedia.org/wiki/Patterns_and_Relationships",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.GEO",
+      "title": "Geometry",
+      "description": "Properties of 3D objects. Nets of cubes and prisms. Transformations: reflection, translation. Angles on straight line",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "geometry",
+        "3d-objects",
+        "nets",
+        "transformations",
+        "angles",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.GEO",
+          "description": "Properties of 3D objects. Nets of cubes and prisms. Transformations: reflection, translation. Angles on straight line",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.GEO"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Geometry",
+          "url": "https://www.youtube.com/results?search_query=Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Geometry",
+          "url": "https://en.wikipedia.org/wiki/Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.MEA",
+      "title": "Measurement",
+      "description": "Perimeter and area of irregular shapes. Volume of rectangular prisms. Convert between units. 24-hour time",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "perimeter",
+        "area",
+        "volume",
+        "24-hour-time",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.MEA",
+          "description": "Perimeter and area of irregular shapes. Volume of rectangular prisms. Convert between units. 24-hour time",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Measurement",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Measurement",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.MEA"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Measurement",
+          "url": "https://www.youtube.com/results?search_query=Measurement+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Measurement",
+          "url": "https://en.wikipedia.org/wiki/Measurement",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr5.DAT",
+      "title": "Data Handling and Probability",
+      "description": "Double bar graphs. Mean, median, mode. Probability as fraction. Experimental vs theoretical probability",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Data",
+      "tags": [
+        "data",
+        "double-bar-graph",
+        "median",
+        "probability",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade5"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr5.DAT",
+          "description": "Double bar graphs. Mean, median, mode. Probability as fraction. Experimental vs theoretical probability",
+          "grade_level": "Grade5"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Data Handling and Probability",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Data+Handling+and+Probability",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr5.DAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Data Handling and Probability",
+          "url": "https://www.youtube.com/results?search_query=Data+Handling+and+Probability+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Data Handling and Probability",
+          "url": "https://en.wikipedia.org/wiki/Data_Handling_and_Probability",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr5.NUM",
+      "to": "CAPS.Mathematics.Gr6.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Numbers feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.NUM",
+      "to": "CAPS.Mathematics.Gr6.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Numbers feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.OPS",
+      "to": "CAPS.Mathematics.Gr6.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Operations feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.OPS",
+      "to": "CAPS.Mathematics.Gr6.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Operations feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.FRC",
+      "to": "CAPS.Mathematics.Gr6.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Numbers feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.FRC",
+      "to": "CAPS.Mathematics.Gr6.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Numbers feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.DEC",
+      "to": "CAPS.Mathematics.Gr6.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Numbers feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.DEC",
+      "to": "CAPS.Mathematics.Gr6.OPS",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Numbers feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.PAT",
+      "to": "CAPS.Mathematics.Gr6.PAT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Patterns feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.GEO",
+      "to": "CAPS.Mathematics.Gr6.GEO",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Geometry feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.MEA",
+      "to": "CAPS.Mathematics.Gr6.MEA",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Measurement feeds into Grade 6"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr5.DAT",
+      "to": "CAPS.Mathematics.Gr6.DAT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 5 Data feeds into Grade 6"
+    }
+  ]
+}

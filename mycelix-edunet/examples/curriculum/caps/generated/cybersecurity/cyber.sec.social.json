@@ -1,0 +1,135 @@
+{
+  "node_id": "CYBER.SEC.THREATS",
+  "lesson": {
+    "standard_code": "CYBER.SEC.THREATS",
+    "title": "Social Engineering: Phishing, Pretexting, Tailgating & Awareness Training",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Social engineering exploits human psychology rather than technical vulnerabilities. Attackers manipulate people into divulging confidential information, granting access, or performing actions that compromise security. Key techniques: phishing (fraudulent emails/messages impersonating trusted entities to steal credentials), spear phishing (targeted phishing at specific individuals using personal information), pretexting (creating a fabricated scenario to build trust — e.g., impersonating IT support), tailgating/piggybacking (physically following an authorised person through a secure door), baiting (leaving infected USB drives in public places), and vishing (voice phishing via phone calls). Social engineering is the most common attack vector because humans are the weakest link — technical controls cannot fully prevent manipulation of human judgement.",
+    "examples": [
+      {
+        "problem": "Analyse this phishing email: 'Dear Valued Customer, Your FNB account has been suspended due to unusual activity. Click here to verify your identity immediately or your account will be permanently closed within 24 hours. FNB Security Team.'",
+        "steps": [
+          {"instruction": "Step 1: Check the sender address — legitimate banks use official domains (e.g., @fnb.co.za), not generic ones (@gmail.com, @fnb-security.com).", "result": "Sender suspicious"},
+          {"instruction": "Step 2: Identify urgency and fear tactics — 'suspended,' 'immediately,' 'permanently closed,' '24 hours' create pressure to act without thinking.", "result": "Urgency manipulation identified"},
+          {"instruction": "Step 3: Hover over the link (do not click) — it likely points to a fake website designed to capture login credentials.", "result": "Malicious link suspected"},
+          {"instruction": "Step 4: Note the generic greeting — 'Dear Valued Customer' instead of your actual name suggests a mass phishing campaign.", "result": "Generic addressing noted"},
+          {"instruction": "Step 5: Verify independently — call FNB directly using the number on your card, not any number in the email.", "result": "Independent verification recommended"}
+        ],
+        "answer": "Answer: Red flags include: (1) generic greeting, (2) urgency/fear tactics ('suspended,' '24 hours'), (3) request to click a link for 'verification,' (4) likely spoofed sender domain, (5) threat of permanent consequences. Never click links in suspicious emails — verify directly with the institution.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe a pretexting attack scenario targeting a company's reception desk.",
+        "steps": [
+          {"instruction": "Step 1: The attacker calls the reception desk, claiming to be an IT contractor who needs to remotely update the server.", "result": "Pretext established"},
+          {"instruction": "Step 2: They name-drop the IT manager (found on LinkedIn) and reference a recent system outage (found on the company's social media).", "result": "Credibility built through OSINT"},
+          {"instruction": "Step 3: They ask the receptionist to provide the VPN credentials 'temporarily' or to plug in a USB drive left at reception.", "result": "Access requested"},
+          {"instruction": "Step 4: The receptionist, believing the story, complies — granting the attacker network access.", "result": "Social engineering succeeds"}
+        ],
+        "answer": "Answer: Pretexting works by creating a believable scenario using publicly available information (LinkedIn, social media). The attacker exploits the receptionist's desire to be helpful and their trust in authority figures. Defence: verify identities through callback procedures and never provide credentials over the phone.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how Robert Cialdini's six principles of influence are exploited in social engineering.",
+        "steps": [
+          {"instruction": "Step 1: Reciprocity — 'I helped you, now help me' (attacker does a small favour, then asks for credentials).", "result": "Reciprocity exploited"},
+          {"instruction": "Step 2: Authority — impersonating a manager, IT admin, or auditor to compel compliance.", "result": "Authority exploited"},
+          {"instruction": "Step 3: Urgency/Scarcity — 'Act now or lose access' creates panic that bypasses rational thinking.", "result": "Scarcity exploited"},
+          {"instruction": "Step 4: Social proof — 'Everyone in the department has already done this' normalises the request.", "result": "Social proof exploited"},
+          {"instruction": "Step 5: Liking — building rapport through shared interests or flattery before making the request.", "result": "Liking exploited"},
+          {"instruction": "Step 6: Commitment/Consistency — getting a small 'yes' first, then escalating ('Since you already confirmed your department, could you also confirm your employee number?').", "result": "Commitment exploited"}
+        ],
+        "answer": "Answer: Cialdini's six principles — reciprocity, authority, scarcity, social proof, liking, and commitment — describe fundamental human psychological tendencies. Social engineers exploit these systematically to bypass technical controls by targeting the human element.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define phishing, spear phishing, and whaling. How do they differ?",
+        "answer": "Phishing: mass, untargeted fraudulent emails/messages sent to many recipients hoping some will respond. Spear phishing: targeted phishing directed at specific individuals using personal information for credibility. Whaling: spear phishing targeting high-value individuals — executives, board members, politicians. They differ in specificity and effort: phishing casts a wide net; spear phishing uses research; whaling targets the biggest fish with the most sophisticated approach.",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": ["Think of fishing: phishing = net, spear phishing = spear, whaling = harpoon.", "As targeting increases, so does the sophistication and potential damage."],
+        "explanation": "The progression from phishing to whaling shows how attackers invest more effort for higher-value targets. A CEO's credentials are worth more than a random employee's.",
+        "distractors": ["Spear phishing and phishing are the same thing.", "Whaling targets low-level employees.", "All three types use identical techniques."]
+      },
+      {
+        "question": "What is tailgating and how can organisations prevent it?",
+        "answer": "Tailgating (piggybacking) is following an authorised person through a secure door or entrance without presenting credentials. Prevention: (1) Security awareness training emphasising that allowing tailgating violates policy. (2) Mantrap/airlock entries that only allow one person at a time. (3) Security guards or reception staff verifying all entrants. (4) Turnstiles or badge-required gates. (5) A culture where challenging unknown individuals is expected and supported.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Tailgating exploits politeness — holding the door for someone feels rude to refuse.", "Technical controls (mantraps) are more reliable than human vigilance alone."],
+        "explanation": "Tailgating is particularly effective because it exploits social norms (politeness, not wanting to seem suspicious). Organisations must create a culture where politely verifying identity is the norm.",
+        "distractors": ["Tailgating only happens in spy movies.", "Firewalls prevent tailgating.", "Only physical security guards can stop tailgating."]
+      },
+      {
+        "question": "Design a basic security awareness training programme for a small company (50 employees). Include at least four components.",
+        "answer": "(1) Monthly phishing simulations — send fake phishing emails and track who clicks, providing immediate feedback and training to those who fall for it. (2) Quarterly training sessions — cover current threats, password hygiene, social engineering recognition, and incident reporting. (3) Visual reminders — posters near entrances ('Do not hold the door for strangers') and on monitors ('Think before you click'). (4) Incident reporting channel — a simple, blame-free way to report suspicious emails or calls (e.g., a 'Report Phishing' button in the email client). (5) Annual password policy review — enforce MFA and password manager adoption.",
+        "difficulty_permille": 500,
+        "bloom_level": "Create",
+        "hints": ["Effective training is ongoing, not a one-time event.", "Phishing simulations are the single most effective awareness tool."],
+        "explanation": "Security awareness transforms employees from the weakest link into the first line of defence. The goal is not to eliminate human error but to reduce it and ensure fast reporting when it occurs.",
+        "distractors": ["One annual PowerPoint presentation is sufficient.", "Only IT staff need security training.", "Training should be punitive to motivate compliance."]
+      },
+      {
+        "question": "What is vishing and how does it differ from phishing?",
+        "answer": "Vishing (voice phishing) uses phone calls instead of emails to manipulate victims. The attacker typically impersonates a bank, government agency, or IT support, creating urgency ('Your account has been compromised'). Differences: (1) Medium — phone vs email. (2) Real-time interaction — the attacker can adapt their script based on the victim's responses. (3) Caller ID spoofing makes vishing appear to come from legitimate numbers. (4) Emotional manipulation is more effective in live conversation than in text.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Vishing = voice + phishing.", "Real-time interaction is both the attacker's advantage (adaptability) and vulnerability (they can be questioned)."],
+        "explanation": "Vishing is increasingly common as people become better at spotting email phishing. Caller ID spoofing (making the call appear to come from your bank's number) makes it particularly convincing.",
+        "distractors": ["Vishing only targets elderly people.", "Caller ID cannot be spoofed.", "Vishing is less effective than email phishing."]
+      },
+      {
+        "question": "Explain the concept of OSINT (Open Source Intelligence) and how social engineers use it.",
+        "answer": "OSINT is intelligence gathered from publicly available sources: social media profiles, company websites, LinkedIn, public records, news articles, job postings, and domain registration data. Social engineers use OSINT to: (1) identify targets and their roles, (2) craft credible pretexts using real names, projects, and events, (3) find personal details for password guessing (pet names, birthdays, favourite teams), (4) map organisational structure to identify high-value targets and their gatekeepers.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Your LinkedIn profile is an attacker's reconnaissance goldmine.", "OSINT requires no hacking — it uses information you have voluntarily made public."],
+        "explanation": "OSINT turns public information into attack intelligence. The more you share online, the easier it is for social engineers to craft convincing, personalised attacks. This is why privacy settings and information hygiene matter.",
+        "distractors": ["OSINT requires illegal access to databases.", "Social media profiles are not useful for attackers.", "OSINT only applies to government intelligence agencies."]
+      }
+    ],
+    "hints": [
+      "The human is always the weakest link — social engineering bypasses firewalls by targeting people.",
+      "When in doubt, verify independently: call the organisation using a known number, not one provided in the suspicious message.",
+      "Urgency is the attacker's best tool — any message pressuring you to act immediately deserves extra scrutiny."
+    ],
+    "key_vocabulary": [
+      {"term": "phishing", "definition": "A social engineering attack using fraudulent emails or messages that impersonate trusted entities to steal credentials, install malware, or extract sensitive information", "example_usage": "The phishing email appeared to come from SARS but actually led to a credential-harvesting website."},
+      {"term": "pretexting", "definition": "Creating a fabricated scenario (pretext) to build trust and manipulate a target into revealing information or granting access", "example_usage": "The attacker used pretexting, claiming to be from the IT department, to obtain the employee's password."},
+      {"term": "tailgating", "definition": "Physically following an authorised person through a secure entrance without presenting credentials", "example_usage": "The intruder gained access to the server room by tailgating an employee carrying equipment."},
+      {"term": "vishing", "definition": "Voice phishing — social engineering attacks conducted over phone calls, often using caller ID spoofing", "example_usage": "The vishing call appeared to come from the bank's official number but was actually a scammer."},
+      {"term": "OSINT", "definition": "Open Source Intelligence — information gathered from publicly available sources used for reconnaissance in social engineering attacks", "example_usage": "The attacker used OSINT from LinkedIn to identify the CEO's executive assistant as the initial target."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students believe that only technically unsophisticated people fall for social engineering attacks.",
+        "correction": "Social engineering targets fundamental human psychology — trust, helpfulness, fear, urgency, authority — that affects everyone regardless of technical expertise. Security researchers, IT professionals, and even cybersecurity experts have fallen for well-crafted social engineering. The attacks that succeed against experts are simply more sophisticated (e.g., spear phishing using detailed OSINT, deepfake voice calls). No one is immune; the goal is to be more sceptical, not invulnerable.",
+        "why_students_think_this": "Students associate victims with gullibility or ignorance. In reality, social engineering exploits cognitive biases that are hardwired into all human brains — the same biases that make us functional social beings also make us vulnerable to manipulation."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What are the five most common social engineering techniques?", "back": "Phishing (fraudulent emails), spear phishing (targeted phishing), pretexting (fabricated scenarios), tailgating (physical following), vishing (voice phishing).", "tags": ["CYBER.SEC.THREATS", "Cybersecurity", "Social Engineering"], "difficulty_permille": 222},
+    {"front": "Name Cialdini's six principles of influence.", "back": "Reciprocity, Authority, Scarcity/Urgency, Social Proof, Liking, Commitment/Consistency.", "tags": ["CYBER.SEC.THREATS", "Cybersecurity", "Social Engineering"], "difficulty_permille": 333},
+    {"front": "What is the difference between phishing and spear phishing?", "back": "Phishing is mass, untargeted (sent to many). Spear phishing is targeted at specific individuals using personal information for credibility.", "tags": ["CYBER.SEC.THREATS", "Cybersecurity", "Social Engineering"], "difficulty_permille": 167},
+    {"front": "What is OSINT?", "back": "Open Source Intelligence — information gathered from publicly available sources (social media, LinkedIn, company websites) used for reconnaissance in social engineering.", "tags": ["CYBER.SEC.THREATS", "Cybersecurity", "Social Engineering"], "difficulty_permille": 278},
+    {"front": "What are three red flags of a phishing email?", "back": "Generic greeting ('Dear Customer'), urgency/threats ('act now or lose access'), suspicious sender domain, request to click links or provide credentials, grammatical errors.", "tags": ["CYBER.SEC.THREATS", "Cybersecurity", "Social Engineering"], "difficulty_permille": 167}
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

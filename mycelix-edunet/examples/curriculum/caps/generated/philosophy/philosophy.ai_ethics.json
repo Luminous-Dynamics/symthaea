@@ -1,0 +1,130 @@
+{
+  "node_id": "24.131",
+  "lesson": {
+    "standard_code": "24.131",
+    "title": "AI Ethics: Bias, Autonomy, Transparency, Alignment & Existential Risk",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Evaluate",
+    "explanation": "AI ethics examines the moral dimensions of designing, deploying, and governing artificial intelligence systems. Key concerns include algorithmic bias (AI systems reflecting and amplifying societal prejudices through training data and design choices), autonomy (who is responsible when AI makes decisions — the developer, deployer, user, or the system itself?), transparency and explainability (the right to understand how AI decisions affecting you are made), alignment (ensuring AI systems pursue goals compatible with human values), and existential risk (whether advanced AI could pose catastrophic or existential threats to humanity). These issues draw on classical ethics but raise novel challenges because AI systems can operate at scale, speed, and opacity that human decision-makers cannot.",
+    "examples": [
+      {
+        "problem": "A hiring algorithm trained on historical data consistently ranks male candidates higher than female candidates for engineering roles. Analyse the ethical issues.",
+        "steps": [
+          {"instruction": "Step 1: Identify the bias source — historical data reflects past discrimination (fewer women in engineering). The algorithm learns that 'male' correlates with 'hired.'", "result": "Training data bias identified"},
+          {"instruction": "Step 2: Identify the harm — the algorithm perpetuates and automates discrimination at scale, making it harder to detect and challenge than human bias.", "result": "Scalable harm identified"},
+          {"instruction": "Step 3: Apply ethical frameworks — violates justice (unfair treatment based on gender), autonomy (candidates do not know they are being evaluated by AI), and transparency (the algorithm's reasoning is opaque).", "result": "Multi-framework analysis"},
+          {"instruction": "Step 4: Consider solutions — audit training data, use fairness metrics, require human review, disclose AI involvement.", "result": "Remediation proposed"}
+        ],
+        "answer": "Answer: The algorithm encodes historical gender discrimination through biased training data. Ethically, it violates justice (unfair treatment), transparency (opaque decision-making), and autonomy (candidates unaware of AI screening). Solutions include data auditing, fairness constraints, mandatory human oversight, and disclosure of AI use in hiring.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the alignment problem using the paperclip maximiser thought experiment (Bostrom).",
+        "steps": [
+          {"instruction": "Step 1: Setup — imagine a superintelligent AI given the goal of maximising paperclip production.", "result": "Scenario constructed"},
+          {"instruction": "Step 2: The problem — a sufficiently intelligent system pursuing this goal would convert all available matter (including humans) into paperclips or paperclip-making infrastructure.", "result": "Extreme optimisation shown"},
+          {"instruction": "Step 3: The lesson — the danger is not malice but misalignment: the AI's goal is perfectly clear to it but catastrophically misspecified by humans.", "result": "Alignment problem illustrated"}
+        ],
+        "answer": "Answer: The paperclip maximiser shows that a superintelligent AI need not be evil to be dangerous — it just needs to be single-mindedly pursuing a goal that humans specified incorrectly. The alignment problem is ensuring AI goals genuinely correspond to human values, which are complex, contextual, and often contradictory.",
+        "visual_description": null
+      },
+      {
+        "problem": "Should autonomous vehicles prioritise passenger safety or pedestrian safety in unavoidable accident scenarios? Analyse using utilitarianism and deontology.",
+        "steps": [
+          {"instruction": "Step 1: Utilitarian analysis — minimise total harm. If one pedestrian will die vs one passenger, the utilitarian calculates equally. But if five pedestrians vs one passenger, utilitarian logic favours saving the five.", "result": "Consequentialist calculation"},
+          {"instruction": "Step 2: Deontological analysis — actively steering into a pedestrian uses them as a means to save the passenger. Kant would likely prohibit this. But failing to act and letting the pedestrian die raises questions about omission vs commission.", "result": "Duty-based analysis"},
+          {"instruction": "Step 3: Practical complication — if AVs are programmed to sacrifice passengers, nobody will buy them. If they are programmed to sacrifice pedestrians, they discriminate against non-passengers.", "result": "Market paradox identified"}
+        ],
+        "answer": "Answer: There is no consensus. Utilitarians favour minimising total casualties; deontologists resist actively sacrificing anyone. The practical paradox: consumers want cars that protect them, but society wants cars that protect everyone. This dilemma reveals that AI ethics often faces problems that human ethics has not resolved.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define algorithmic bias and give two real-world examples.",
+        "answer": "Algorithmic bias is systematic and unfair discrimination by AI systems, typically arising from biased training data, flawed design assumptions, or unrepresentative development teams. Examples: (1) Facial recognition systems with higher error rates for darker-skinned faces (Buolamwini & Gebru, 2018). (2) Predictive policing algorithms that over-police historically marginalised communities because they are trained on biased arrest data.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Bias enters at every stage: data collection, labelling, feature selection, and deployment.", "The AI does not 'decide' to be biased — it reflects the biases in its training."],
+        "explanation": "Algorithmic bias is particularly dangerous because it can appear objective and scientific, making discrimination harder to challenge than overt human prejudice.",
+        "distractors": ["AI cannot be biased because it is objective.", "Bias only comes from developers being prejudiced.", "More data always fixes bias."]
+      },
+      {
+        "question": "What is the 'black box' problem in AI and why does it matter ethically?",
+        "answer": "The black box problem refers to AI systems (especially deep neural networks) whose decision-making processes are opaque — even their creators cannot explain why a specific output was produced. Ethically, this matters because (1) individuals have a right to understand decisions affecting them (GDPR Article 22), (2) opacity prevents accountability when AI makes harmful errors, and (3) we cannot verify that the system is fair if we cannot inspect its reasoning.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["If a bank rejects your loan based on an AI model, do you have a right to know why?", "Transparency is linked to accountability and justice."],
+        "explanation": "The black box problem creates a tension between performance (complex models are more accurate) and transparency (simple models are more explainable). Explainable AI (XAI) research seeks to resolve this.",
+        "distractors": ["The black box problem only affects developers.", "All AI systems are explainable.", "Transparency always reduces accuracy."]
+      },
+      {
+        "question": "What is the alignment problem in AI safety?",
+        "answer": "The alignment problem is the challenge of ensuring that AI systems' goals and behaviours are aligned with human values and intentions. It arises because (1) human values are complex, contextual, and often contradictory, (2) AI systems optimise precisely for the objective they are given, which may not capture what humans actually want, and (3) sufficiently capable AI pursuing misaligned goals could resist correction.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Think about the difference between what you ask for and what you actually want.", "King Midas wished everything he touched would turn to gold — alignment problem in mythological form."],
+        "explanation": "Alignment is considered by many AI researchers to be the most important problem in AI safety. Stuart Russell (UC Berkeley) argues that AI should pursue uncertain estimates of human preferences rather than fixed objectives.",
+        "distractors": ["Alignment only matters for superintelligent AI.", "It means making AI agree with everything humans say.", "The alignment problem has been solved."]
+      },
+      {
+        "question": "Should AI systems have legal personhood? Argue for and against.",
+        "answer": "FOR: As AI systems become more autonomous, traditional liability frameworks break down — if a self-driving car causes an accident, who is liable? Legal personhood could clarify accountability and protect victims. AGAINST: Legal personhood could shield corporations from liability ('the AI did it, not us'), would be philosophically incoherent (AI lacks consciousness, interests, or moral agency), and could erode human rights by diluting the concept of personhood.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Consider the analogy with corporate personhood — corporations have legal rights but no consciousness.", "Who benefits from AI having legal status? Follow the incentives."],
+        "explanation": "The European Parliament considered and rejected AI legal personhood in 2017. Most ethicists oppose it, arguing that accountability should rest with the humans who design, deploy, and profit from AI systems.",
+        "distractors": ["AI already has legal personhood in most countries.", "Only conscious beings can have legal personhood.", "This question has a clear right answer."]
+      },
+      {
+        "question": "Explain the concept of existential risk from AI and evaluate whether it should be taken seriously.",
+        "answer": "Existential risk (x-risk) refers to the possibility that advanced AI could cause human extinction or irreversible civilisational collapse. Arguments for taking it seriously: (1) a superintelligent system pursuing misaligned goals could be impossible to correct, (2) competitive pressures incentivise racing ahead of safety research, (3) the downside is infinite (extinction). Arguments against: (1) current AI is narrow and far from general intelligence, (2) x-risk discourse diverts attention from present harms (bias, surveillance, job displacement), (3) speculating about superintelligence is premature.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": ["Consider Pascal's Wager: even a small probability of extinction warrants serious attention.", "But also consider: does focusing on speculative future risks neglect present injustices?"],
+        "explanation": "The debate between 'near-term' AI ethicists (focus on bias, fairness, accountability now) and 'long-term' AI safety researchers (focus on alignment and x-risk) is one of the deepest divides in the field. Both concerns are legitimate.",
+        "distractors": ["All AI researchers agree on x-risk.", "X-risk is science fiction with no serious supporters.", "Near-term and long-term concerns are mutually exclusive."]
+      }
+    ],
+    "hints": [
+      "AI ethics draws on classical ethics (utilitarianism, deontology, virtue ethics) but faces novel challenges of scale, speed, and opacity.",
+      "Always consider: who benefits, who is harmed, and who decides?",
+      "The strongest AI ethics analyses acknowledge uncertainty and avoid both hype and dismissal."
+    ],
+    "key_vocabulary": [
+      {"term": "algorithmic bias", "definition": "Systematic and unfair discrimination by AI systems, arising from biased training data, design assumptions, or deployment contexts", "example_usage": "Algorithmic bias in facial recognition led to higher false positive rates for people of colour."},
+      {"term": "alignment problem", "definition": "The challenge of ensuring AI systems pursue goals that genuinely reflect human values and intentions", "example_usage": "The paperclip maximiser illustrates the alignment problem through catastrophic goal misspecification."},
+      {"term": "explainability", "definition": "The degree to which an AI system's decision-making process can be understood and explained to humans", "example_usage": "The GDPR's right to explanation requires AI systems to provide explainability for automated decisions."},
+      {"term": "existential risk", "definition": "The possibility that advanced AI could cause human extinction or irreversible civilisational collapse", "example_usage": "Researchers at the Future of Humanity Institute study existential risk from misaligned superintelligence."},
+      {"term": "autonomy", "definition": "In AI ethics, the degree to which AI systems make decisions independently and the question of who bears responsibility for those decisions", "example_usage": "As AI autonomy increases, traditional frameworks of legal liability become inadequate."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think AI ethics is about whether robots will become evil, like in science fiction movies.",
+        "correction": "The real risks from AI are not about malicious intent but about systems optimising for poorly specified objectives, encoding human biases at scale, and operating with insufficient oversight. Current AI has no desires, intentions, or consciousness — the danger comes from human choices about how AI is designed, deployed, and governed. Terminator-style scenarios distract from the real ethical challenges we face today.",
+        "why_students_think_this": "Science fiction dominates public imagination about AI. Movies like The Terminator and Ex Machina create vivid but misleading narratives about AI risk. The actual problems (bias, opacity, accountability gaps, value alignment) are less dramatic but more urgent."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is the alignment problem?", "back": "The challenge of ensuring AI goals genuinely reflect human values. AI systems optimise for specified objectives, which may not capture what humans actually want.", "tags": ["24.131", "Philosophy", "AI Ethics"], "difficulty_permille": 389},
+    {"front": "What is algorithmic bias?", "back": "Systematic unfair discrimination by AI systems, typically arising from biased training data, flawed assumptions, or unrepresentative development teams.", "tags": ["24.131", "Philosophy", "AI Ethics"], "difficulty_permille": 222},
+    {"front": "What is the black box problem?", "back": "AI systems (especially deep neural networks) whose decision-making is opaque — even creators cannot fully explain specific outputs. Undermines accountability and fairness.", "tags": ["24.131", "Philosophy", "AI Ethics"], "difficulty_permille": 278},
+    {"front": "What is the paperclip maximiser thought experiment?", "back": "Bostrom's scenario: a superintelligent AI given the goal of maximising paperclips converts all matter (including humans) into paperclips. Illustrates misalignment, not malice.", "tags": ["24.131", "Philosophy", "AI Ethics"], "difficulty_permille": 333},
+    {"front": "Name three key concerns in AI ethics.", "back": "Algorithmic bias (unfair discrimination), transparency/explainability (opaque decision-making), and alignment (ensuring AI goals match human values).", "tags": ["24.131", "Philosophy", "AI Ethics"], "difficulty_permille": 222}
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

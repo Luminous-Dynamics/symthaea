@@ -1,0 +1,651 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 2",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade2",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 8,
+    "domains": [
+      "Operations",
+      "Numbers",
+      "Geometry",
+      "Patterns",
+      "Measurement",
+      "Data"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Curated from CAPS Mathematics Foundation Phase (DBE, 2011 amended 2022). Grade 2."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr2.NUM",
+      "title": "Whole Numbers",
+      "description": "Place value to 99. Count in 2s, 3s, 5s, 10s to 200. Compare and order numbers. Even and odd numbers",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "place-value",
+        "numbers",
+        "even-odd",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.NUM",
+          "description": "Place value to 99. Count in 2s, 3s, 5s, 10s to 200. Compare and order numbers. Even and odd numbers",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Whole Numbers",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Whole+Numbers",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.NUM"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Whole Numbers",
+          "url": "https://www.youtube.com/results?search_query=Whole+Numbers+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Whole Numbers",
+          "url": "https://en.wikipedia.org/wiki/Whole_Numbers",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.ADD",
+      "title": "Addition and Subtraction",
+      "description": "Add and subtract within 99. Mental strategies. Word problems. Number sentences",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Operations",
+      "tags": [
+        "addition",
+        "subtraction",
+        "word-problems",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 14,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.ADD",
+          "description": "Add and subtract within 99. Mental strategies. Word problems. Number sentences",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Addition and Subtraction",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Addition+and+Subtraction",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.ADD"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Addition and Subtraction",
+          "url": "https://www.youtube.com/results?search_query=Addition+and+Subtraction+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Addition and Subtraction",
+          "url": "https://en.wikipedia.org/wiki/Addition_and_Subtraction",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.MUL",
+      "title": "Multiplication",
+      "description": "Repeated addition. Multiply by 2, 5, 10. Array model. Sharing equally (division intro)",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Operations",
+      "tags": [
+        "multiplication",
+        "arrays",
+        "repeated-addition",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.MUL",
+          "description": "Repeated addition. Multiply by 2, 5, 10. Array model. Sharing equally (division intro)",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Multiplication",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Multiplication",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.MUL"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Multiplication",
+          "url": "https://www.youtube.com/results?search_query=Multiplication+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Multiplication",
+          "url": "https://en.wikipedia.org/wiki/Multiplication",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.FRC",
+      "title": "Fractions",
+      "description": "Halves and quarters of shapes and groups. Equal sharing",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "fractions",
+        "halves",
+        "quarters",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.FRC",
+          "description": "Halves and quarters of shapes and groups. Equal sharing",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Fractions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Fractions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.FRC"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Fractions",
+          "url": "https://www.youtube.com/results?search_query=Fractions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Fractions",
+          "url": "https://en.wikipedia.org/wiki/Fractions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.PAT",
+      "title": "Patterns and Sequences",
+      "description": "Number patterns with constant difference. Geometric patterns. Describe and extend patterns",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Patterns",
+      "tags": [
+        "patterns",
+        "sequences",
+        "constant-difference",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.PAT",
+          "description": "Number patterns with constant difference. Geometric patterns. Describe and extend patterns",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Patterns and Sequences",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Patterns+and+Sequences",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.PAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Patterns and Sequences",
+          "url": "https://www.youtube.com/results?search_query=Patterns+and+Sequences+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Patterns and Sequences",
+          "url": "https://en.wikipedia.org/wiki/Patterns_and_Sequences",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.SHP",
+      "title": "Space and Shape",
+      "description": "2D and 3D shapes. Symmetry. Views of objects. Directions and positions",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "shapes",
+        "3d-shapes",
+        "symmetry",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.SHP",
+          "description": "2D and 3D shapes. Symmetry. Views of objects. Directions and positions",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Space and Shape",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Space+and+Shape",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.SHP"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Space and Shape",
+          "url": "https://www.youtube.com/results?search_query=Space+and+Shape+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Space and Shape",
+          "url": "https://en.wikipedia.org/wiki/Space_and_Shape",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.MEA",
+      "title": "Measurement",
+      "description": "Length in cm and m. Mass in kg. Capacity in litres. Time: analogue clock to half-hour",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "centimetres",
+        "metres",
+        "clock",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.MEA",
+          "description": "Length in cm and m. Mass in kg. Capacity in litres. Time: analogue clock to half-hour",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Measurement",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Measurement",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.MEA"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Measurement",
+          "url": "https://www.youtube.com/results?search_query=Measurement+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Measurement",
+          "url": "https://en.wikipedia.org/wiki/Measurement",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr2.DAT",
+      "title": "Data Handling",
+      "description": "Collect data using tally marks. Draw and read pictographs and bar graphs",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Data",
+      "tags": [
+        "data",
+        "tally",
+        "bar-graphs",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 4,
+      "grade_levels": [
+        "Grade2"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr2.DAT",
+          "description": "Collect data using tally marks. Draw and read pictographs and bar graphs",
+          "grade_level": "Grade2"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Data Handling",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Data+Handling",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr2.DAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Data Handling",
+          "url": "https://www.youtube.com/results?search_query=Data+Handling+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Data Handling",
+          "url": "https://en.wikipedia.org/wiki/Data_Handling",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr2.NUM",
+      "to": "CAPS.Mathematics.Gr3.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Numbers feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.NUM",
+      "to": "CAPS.Mathematics.Gr3.ADD",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Numbers feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.NUM",
+      "to": "CAPS.Mathematics.Gr3.MUL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Numbers feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.ADD",
+      "to": "CAPS.Mathematics.Gr3.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Operations feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.ADD",
+      "to": "CAPS.Mathematics.Gr3.ADD",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Operations feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.ADD",
+      "to": "CAPS.Mathematics.Gr3.MUL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Operations feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.MUL",
+      "to": "CAPS.Mathematics.Gr3.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Operations feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.MUL",
+      "to": "CAPS.Mathematics.Gr3.ADD",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Operations feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.MUL",
+      "to": "CAPS.Mathematics.Gr3.MUL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Operations feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.FRC",
+      "to": "CAPS.Mathematics.Gr3.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Numbers feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.FRC",
+      "to": "CAPS.Mathematics.Gr3.ADD",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Numbers feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.FRC",
+      "to": "CAPS.Mathematics.Gr3.MUL",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Numbers feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.PAT",
+      "to": "CAPS.Mathematics.Gr3.PAT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Patterns feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.SHP",
+      "to": "CAPS.Mathematics.Gr3.GEO",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Geometry feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.MEA",
+      "to": "CAPS.Mathematics.Gr3.MEA",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Measurement feeds into Grade 3"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr2.DAT",
+      "to": "CAPS.Mathematics.Gr3.DAT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 2 Data feeds into Grade 3"
+    }
+  ]
+}

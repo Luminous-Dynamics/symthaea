@@ -1,0 +1,335 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr12.EVOLVE",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr12.EVOLVE",
+    "title": "Evolution by Natural Selection: Darwin, Speciation, and Molecular Evidence (35 marks)",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "Evolution is the change in allele frequencies in a population over generations. Darwin's theory of natural selection proposes that individuals with favourable variations are more likely to survive and reproduce, passing these traits to offspring. The five steps of natural selection are: overproduction, variation, struggle for survival, survival of the fittest, and reproduction of the fittest. Evidence for evolution includes: fossils (transitional forms), comparative anatomy (homologous structures), embryology (similar early development), biogeography (island species), and molecular evidence (DNA/protein sequence comparisons). Speciation occurs when populations become reproductively isolated: allopatric speciation (geographic isolation, e.g. formation of the Great Rift Valley) or sympatric speciation (reproductive isolation without geographic barriers). South African examples include the Cape sugarbirds co-evolving with Protea flowers.",
+    "examples": [
+      {
+        "problem": "Describe how natural selection can lead to antibiotic resistance in bacteria, using the five steps of natural selection.",
+        "steps": [
+          {
+            "instruction": "Step 1: Overproduction — Bacteria reproduce rapidly by binary fission, producing millions of offspring.",
+            "result": "overproduction"
+          },
+          {
+            "instruction": "Step 2: Variation — Random mutations create genetic variation. A few bacteria may have mutations conferring resistance to an antibiotic.",
+            "result": "variation"
+          },
+          {
+            "instruction": "Step 3: Struggle for survival — When antibiotic is administered, all bacteria are exposed to the same environmental pressure (selection pressure).",
+            "result": "struggle"
+          },
+          {
+            "instruction": "Step 4: Survival of the fittest — Resistant bacteria survive; non-resistant bacteria are killed. The resistant individuals are 'fittest' in this environment.",
+            "result": "differential survival"
+          },
+          {
+            "instruction": "Step 5: Reproduction — Resistant survivors reproduce, passing resistance genes to offspring. Over generations, the entire population becomes resistant.",
+            "result": "inheritance"
+          }
+        ],
+        "answer": "Answer: Natural selection drives antibiotic resistance through overproduction, variation (random mutations), selection pressure (antibiotic), differential survival (resistant survive), and inheritance (resistance genes passed on).",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how DNA sequence comparisons provide evidence for evolution and common ancestry.",
+        "steps": [
+          {
+            "instruction": "Step 1: All living organisms use DNA as genetic material, suggesting a common ancestor.",
+            "result": "universal DNA"
+          },
+          {
+            "instruction": "Step 2: The DNA sequences of closely related species are more similar than those of distantly related species. For example, human and chimpanzee DNA is ~98.7% identical; human and banana DNA shares ~60%.",
+            "result": "sequence similarity"
+          },
+          {
+            "instruction": "Step 3: Molecular clocks — Mutations accumulate at a roughly constant rate. By counting differences in DNA sequences, scientists can estimate when two species diverged from a common ancestor.",
+            "result": "molecular clock"
+          },
+          {
+            "instruction": "Step 4: The universal genetic code (same codons code for same amino acids in all organisms) is powerful evidence of common ancestry — independent origins would produce different codes.",
+            "result": "universal code"
+          }
+        ],
+        "answer": "Answer: DNA comparisons show more similarity between closely related species, supporting common ancestry. The universal genetic code and molecular clocks provide independent molecular evidence for evolution.",
+        "visual_description": null
+      },
+      {
+        "problem": "Distinguish between allopatric and sympatric speciation, giving a South African example.",
+        "steps": [
+          {
+            "instruction": "Step 1: Allopatric speciation — A population is physically separated by a geographic barrier (mountain, river, ocean). Each group evolves independently through natural selection and genetic drift, eventually becoming reproductively isolated (separate species).",
+            "result": "allopatric defined"
+          },
+          {
+            "instruction": "Step 2: Example — The Drakensberg mountains may have separated populations of certain frog species, leading to speciation on either side of the mountain range.",
+            "result": "SA example"
+          },
+          {
+            "instruction": "Step 3: Sympatric speciation — New species arise within the same geographic area, without physical separation. Reproductive isolation develops through behavioural differences, temporal isolation (different breeding seasons), or polyploidy (in plants).",
+            "result": "sympatric defined"
+          },
+          {
+            "instruction": "Step 4: Example — Different Protea species in the Cape Floristic Region may have undergone sympatric speciation through pollinator specialisation (different pollinators visit different Protea species).",
+            "result": "SA example"
+          }
+        ],
+        "answer": "Answer: Allopatric = geographic separation leads to speciation (e.g. mountain barriers). Sympatric = speciation without physical separation (e.g. pollinator specialisation in Proteas).",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "State Darwin's theory of evolution by natural selection in your own words.",
+        "answer": "Individuals in a population show genetic variation. Those with traits better suited to the environment are more likely to survive and reproduce, passing these advantageous traits to their offspring. Over many generations, the population changes as favourable traits become more common. This is 'survival of the fittest' — fitness meaning reproductive success, not physical strength.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Key ideas: variation, selection pressure, survival, reproduction, inheritance.",
+          "'Fittest' does not mean strongest — it means best adapted to the specific environment."
+        ],
+        "explanation": "Natural selection requires: heritable variation, differential survival based on environment, and reproduction of the fittest. It acts on phenotypes but changes allele frequencies (genotypes) over time.",
+        "distractors": [
+          "Evolution means organisms choose to change to survive",
+          "Only the physically strongest organisms survive",
+          "Evolution occurs within an individual's lifetime"
+        ]
+      },
+      {
+        "question": "Define 'homologous structures' and explain how they provide evidence for evolution. Give one example.",
+        "answer": "Homologous structures are anatomical features in different species that have the same basic structure and developmental origin but may have different functions. Example: the forelimbs of humans (grasping), whales (swimming), bats (flying), and cats (walking) all have the same bone arrangement (humerus, radius, ulna, carpals, metacarpals, phalanges) modified for different functions. This shared structure suggests these organisms inherited it from a common ancestor.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Homologous = same origin, different function. Analogous = different origin, same function.",
+          "Look for the SAME underlying bone pattern adapted for different uses."
+        ],
+        "explanation": "Homologous structures indicate divergent evolution from a common ancestor. The shared bone pattern of vertebrate forelimbs, despite different functions, is strong evidence for common ancestry.",
+        "distractors": [
+          "Homologous structures have different origins but the same function",
+          "Wings of insects and birds are homologous",
+          "Homologous structures prove organisms have the same function"
+        ]
+      },
+      {
+        "question": "The peppered moth (Biston betularia) in England changed from mostly light-coloured to mostly dark-coloured during the Industrial Revolution (1800s). Explain this change using natural selection.",
+        "answer": "Before industrialisation: Light-coloured moths were camouflaged on lichen-covered tree bark; dark moths were easily seen by predators and eaten (selected against). During industrialisation: Soot blackened tree trunks, killing lichens. Dark moths were now camouflaged on dark bark; light moths were visible and eaten by predators. Selection pressure shifted: dark moths had higher survival and reproductive success. Over generations, dark moth allele frequency increased (industrial melanism). After clean air legislation: Lichen returned, light moths regained their advantage, and their frequency increased again.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "The environment changed — how did this change the selection pressure?",
+          "Which colour was advantageous in each environment?"
+        ],
+        "explanation": "The peppered moth is a classic example of directional natural selection. Environmental change altered which phenotype was 'fittest', shifting allele frequencies in the population.",
+        "distractors": [
+          "The moths chose to change colour to match the trees",
+          "The soot directly caused the moths to become dark",
+          "Natural selection created new alleles for dark colour"
+        ]
+      },
+      {
+        "question": "Explain the difference between gradualism and punctuated equilibrium as models of evolutionary change. Which does the South African hominin fossil record better support? [NSC-style question]",
+        "answer": "Gradualism: Evolution occurs slowly and steadily over long periods through continuous, small changes. Predicts many intermediate/transitional fossils. Punctuated equilibrium: Species remain stable for long periods (stasis), with rapid bursts of evolutionary change occurring during speciation events, often triggered by environmental changes. Predicts fewer transitional fossils and sudden appearances of new species. The SA hominin fossil record shows elements of both: there are transitional forms (Australopithecus → Homo habilis → Homo erectus), but new species appear relatively suddenly in the fossil record with periods of stasis between them. The gaps in the record could reflect either punctuated equilibrium or incomplete fossilisation.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Gradualism = slow and steady. Punctuated equilibrium = long periods of no change + sudden bursts.",
+          "Does the fossil record show smooth transitions or sudden appearances of new species?"
+        ],
+        "explanation": "Both models may operate: gradualism in some lineages, punctuated equilibrium in others. The SA fossil record shows transitional forms (supporting gradualism) but also apparent jumps (consistent with punctuated equilibrium).",
+        "distractors": [
+          "Gradualism is the only accepted model of evolution",
+          "Punctuated equilibrium means evolution does not occur",
+          "The SA fossil record only shows gradualism"
+        ]
+      },
+      {
+        "question": "The Cape sugarbird (Promerops cafer) has co-evolved with Protea repens in the fynbos biome. The bird has a long, curved beak perfectly matched to the Protea flower shape. Evaluate the evidence for co-evolution between these species and predict what would happen to sugarbird populations if Protea repens went extinct. [NSC-style 8-mark question]",
+        "answer": "Evidence for co-evolution: 1) The sugarbird's long, curved beak is precisely adapted to reach nectar in the deep Protea inflorescence — this morphological match suggests reciprocal adaptation. 2) Protea flowers have evolved to produce copious nectar that attracts sugarbirds, which then transfer pollen between plants (mutualism). 3) Sugarbirds are endemic to the fynbos and depend heavily on Protea nectar and insects found in the flower heads. 4) The geographic distributions overlap closely. Prediction if Protea repens went extinct: Sugarbird populations would decline severely because they depend on Proteas for nectar (energy), insects (protein), and nesting sites (within Protea stands). They could not easily switch to other food sources because their beak is specialised. Population decline could lead to local extinction. However, other Protea species might partially sustain sugarbirds if available, though P. repens is the most common species. This highlights the fragility of co-evolved relationships and the importance of fynbos conservation.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Co-evolution = two species evolve in response to each other (reciprocal adaptation).",
+          "If one partner disappears, what happens to the other in a mutualistic relationship?"
+        ],
+        "explanation": "Cape sugarbirds and Proteas demonstrate co-evolution: reciprocal specialisation for pollination mutualism. Loss of one partner would devastate the other, showing why conserving fynbos biodiversity is critical.",
+        "distractors": [
+          "Sugarbirds would simply switch to a different food source",
+          "Co-evolution means one species benefits while the other is harmed",
+          "Protea extinction would not affect sugarbirds because they eat insects"
+        ]
+      }
+    ],
+    "hints": [
+      "Five steps of natural selection: Overproduction, Variation, Struggle, Survival, Reproduction (remember: OV-SSR).",
+      "Evidence for evolution: Fossils, Anatomy (homologous structures), Embryology, Biogeography, Molecular (DNA/protein).",
+      "Speciation requires reproductive isolation — if populations can still interbreed, they are the same species."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "natural selection",
+        "definition": "The process by which organisms with favourable traits are more likely to survive and reproduce, passing those traits to the next generation",
+        "example_usage": "Natural selection explains how bacteria develop antibiotic resistance over time."
+      },
+      {
+        "term": "speciation",
+        "definition": "The formation of new species from an existing species, usually through reproductive isolation",
+        "example_usage": "Geographic isolation of frog populations by the Drakensberg mountains may lead to allopatric speciation."
+      },
+      {
+        "term": "homologous structures",
+        "definition": "Anatomical features in different species that share the same basic structure and developmental origin but may have different functions",
+        "example_usage": "The human arm, whale flipper, and bat wing are homologous structures, all derived from a common ancestor's forelimb."
+      },
+      {
+        "term": "molecular clock",
+        "definition": "A method of estimating evolutionary divergence times based on the assumption that DNA mutations accumulate at a roughly constant rate",
+        "example_usage": "Molecular clock analysis suggests humans and chimpanzees diverged approximately 6-7 million years ago."
+      },
+      {
+        "term": "co-evolution",
+        "definition": "The reciprocal evolutionary adaptation of two interacting species, each influencing the other's evolution",
+        "example_usage": "Cape sugarbirds and Protea flowers have co-evolved for pollination mutualism in the fynbos."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think organisms evolve intentionally or 'choose' to adapt.",
+        "correction": "Evolution is NOT directed or purposeful. Mutations are RANDOM. Natural selection acts on existing variation — it does not create new traits on demand. Organisms do not 'try' to evolve or 'need' to change.",
+        "why_students_think_this": "Language like 'the cheetah evolved speed to catch prey' implies purpose. Use passive: 'faster cheetahs were more likely to catch prey and reproduce, so speed genes became more common'."
+      },
+      {
+        "misconception": "Students think evolution means one species transforms into another (e.g. apes become humans).",
+        "correction": "Evolution is a BRANCHING process, not a linear transformation. New species branch off from common ancestors. Apes did not become humans — humans and apes share a common ancestor, and both continue to exist as separate lineages.",
+        "why_students_think_this": "The 'march of progress' image (ape → human in a line) is misleading. Show evolution as a tree, not a ladder."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr12.EVOLVE",
+    "title": "Assessment: Evolution by Natural Selection (NSC exam format, 35 marks)",
+    "items": [
+      {
+        "question": "List four types of evidence that support the theory of evolution.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Fossil record, comparative anatomy (homologous structures), embryology, molecular evidence (DNA/protein sequences), biogeography",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: rocks, bones, embryos, DNA, islands."
+      },
+      {
+        "question": "Explain what is meant by 'survival of the fittest' in the context of natural selection.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "'Fittest' means best adapted to the SPECIFIC environment — not necessarily the strongest. Individuals whose traits give them a survival and reproductive advantage in their particular environment are more likely to reproduce and pass on their genes.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Fitness = reproductive success in a specific environment."
+      },
+      {
+        "question": "Using the peppered moth example, explain how a change in environment can lead to a change in allele frequency.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Before pollution: light moth allele common (camouflage on light bark). Pollution darkened trees: dark moth allele became advantageous (camouflage on dark bark). Dark moths survived and reproduced more, increasing dark allele frequency. This is directional selection.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "The selection pressure changed when the environment changed."
+      },
+      {
+        "question": "Compare allopatric and sympatric speciation in terms of geographic isolation and mechanism.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Allopatric: physical barrier separates populations; they evolve independently and become reproductively isolated. Sympatric: speciation occurs in the same area, through behavioural, temporal, or ecological isolation (e.g. pollinator specialisation in plants).",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Allo = other/different place. Sym = same place."
+      },
+      {
+        "question": "Evaluate the claim that human DNA being 98.7% identical to chimpanzee DNA proves evolution.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The high similarity strongly supports common ancestry (shared ancestor ~6-7 Mya). The 1.3% difference accounts for distinct human traits (language, bipedalism, brain size). Combined with fossil evidence, embryology, and anatomy, molecular data provides powerful convergent evidence. However, no single piece of evidence 'proves' evolution alone — it is the convergence of multiple independent lines that makes the case overwhelming.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Does one piece of evidence prove a theory, or is convergence of evidence stronger?"
+      }
+    ],
+    "total_points": 17,
+    "estimated_minutes": 22,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the five steps of natural selection?",
+      "back": "Overproduction, Variation, Struggle for survival, Survival of the fittest, Reproduction (inheritance of favourable traits).",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What are homologous structures?",
+      "back": "Anatomical features with the same basic structure and origin but different functions in different species (e.g. human arm, whale flipper, bat wing).",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the difference between allopatric and sympatric speciation?",
+      "back": "Allopatric: geographic barrier separates populations. Sympatric: speciation in the same area through behavioural/ecological isolation.",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is a molecular clock?",
+      "back": "A method estimating when species diverged by counting DNA/protein sequence differences, assuming mutations accumulate at a constant rate.",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What does 'fitness' mean in evolution?",
+      "back": "Reproductive success — the ability to survive AND reproduce in a specific environment. NOT physical strength.",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "How similar is human DNA to chimpanzee DNA?",
+      "back": "About 98.7% identical. This supports a common ancestor approximately 6-7 million years ago.",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is co-evolution?",
+      "back": "Reciprocal evolutionary adaptation between two interacting species. Example: Cape sugarbirds and Protea flowers in SA fynbos.",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Does evolution have a goal or direction?",
+      "back": "No. Evolution is NOT directed or purposeful. Mutations are random; natural selection is non-random but acts only on existing variation. There is no 'end goal'.",
+      "tags": ["CAPS.LifeSciences.Gr12.EVOLVE", "Grade12", "Evolution"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

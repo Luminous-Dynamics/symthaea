@@ -1,0 +1,131 @@
+{
+  "node_id": "CYBER.SEC.GRC",
+  "lesson": {
+    "standard_code": "CYBER.SEC.GRC",
+    "title": "Compliance & Governance: POPIA, GDPR, ISO 27001 & Security Frameworks",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Compliance and governance form the legal and organisational backbone of cybersecurity. Key regulations include POPIA (Protection of Personal Information Act, South Africa's data protection law since 2021), GDPR (EU General Data Protection Regulation, the global gold standard for data privacy), and frameworks like ISO 27001 (information security management system standard) and NIST CSF (Cybersecurity Framework). Governance involves establishing policies, roles (CISO, DPO), risk management processes, and audit mechanisms. Compliance is not optional — POPIA penalties include fines up to R10 million or imprisonment, while GDPR can impose fines up to 4% of global annual revenue. Organisations must demonstrate accountability through documented processes, training, and regular audits.",
+    "examples": [
+      {
+        "problem": "A South African online retailer collects customer names, addresses, and purchase history. What POPIA obligations apply?",
+        "steps": [
+          {"instruction": "Step 1: Identify the role — the retailer is a 'responsible party' (data controller) processing 'personal information' of 'data subjects' (customers).", "result": "Roles classified"},
+          {"instruction": "Step 2: Apply POPIA's 8 conditions for lawful processing: accountability, processing limitation, purpose specification, further processing limitation, information quality, openness, security safeguards, data subject participation.", "result": "Conditions listed"},
+          {"instruction": "Step 3: Key obligations: obtain consent for marketing, specify the purpose of data collection, implement reasonable security measures, appoint an Information Officer, and allow customers to access, correct, or delete their data.", "result": "Obligations specified"},
+          {"instruction": "Step 4: Register with the Information Regulator and respond to data subject requests within 30 days.", "result": "Administrative duties"}
+        ],
+        "answer": "Answer: The retailer must comply with POPIA's 8 conditions: obtain informed consent, specify data use purposes, implement security safeguards, appoint an Information Officer, register with the Information Regulator, and respect data subject rights (access, correction, deletion). Non-compliance risks fines up to R10 million.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare POPIA and GDPR on the right to data erasure.",
+        "steps": [
+          {"instruction": "Step 1: GDPR Article 17 — the 'right to be forgotten' allows data subjects to request erasure when data is no longer necessary, consent is withdrawn, or processing is unlawful.", "result": "GDPR position"},
+          {"instruction": "Step 2: POPIA Section 24 — data subjects can request correction or deletion of personal information that is inaccurate, irrelevant, excessive, misleading, or obtained unlawfully.", "result": "POPIA position"},
+          {"instruction": "Step 3: Key difference — GDPR's right is broader (any withdrawal of consent triggers it); POPIA requires a specific ground (inaccuracy, irrelevance, etc.).", "result": "Comparison made"}
+        ],
+        "answer": "Answer: Both laws provide data deletion rights, but GDPR's 'right to be forgotten' is broader — any withdrawal of consent can trigger it. POPIA's deletion right (Section 24) is narrower, requiring specific grounds like inaccuracy or unlawful collection. Both laws exempt deletions that conflict with legal obligations.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the structure of ISO 27001 and why organisations pursue certification.",
+        "steps": [
+          {"instruction": "Step 1: ISO 27001 defines requirements for an Information Security Management System (ISMS) — a systematic approach to managing sensitive information.", "result": "Standard defined"},
+          {"instruction": "Step 2: It uses the Plan-Do-Check-Act (PDCA) cycle: establish security objectives, implement controls, monitor effectiveness, and continuously improve.", "result": "PDCA cycle explained"},
+          {"instruction": "Step 3: Annex A contains 93 controls (ISO 27001:2022) organised into 4 themes: organisational, people, physical, and technological.", "result": "Control structure"},
+          {"instruction": "Step 4: Benefits of certification: demonstrates due diligence to regulators, builds customer trust, may be contractually required by enterprise clients, and reduces insurance premiums.", "result": "Business case"}
+        ],
+        "answer": "Answer: ISO 27001 provides a framework for managing information security through an ISMS using the PDCA cycle. Certification demonstrates due diligence, builds trust, satisfies contractual requirements, and provides a structured approach to risk management with 93 controls across 4 themes.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What are POPIA's 8 conditions for lawful processing of personal information?",
+        "answer": "(1) Accountability, (2) Processing limitation, (3) Purpose specification, (4) Further processing limitation, (5) Information quality, (6) Openness, (7) Security safeguards, (8) Data subject participation.",
+        "difficulty_permille": 250,
+        "bloom_level": "Remember",
+        "hints": ["Think of the data lifecycle: collection, use, storage, sharing, deletion.", "POPIA's conditions map to each stage of that lifecycle."],
+        "explanation": "These 8 conditions form the backbone of POPIA compliance. Every data processing activity must satisfy all applicable conditions.",
+        "distractors": ["POPIA has only 3 conditions.", "Security safeguards are optional under POPIA.", "POPIA does not require accountability."]
+      },
+      {
+        "question": "What is a Data Protection Officer (DPO) and when is one required under GDPR?",
+        "answer": "A DPO is an independent expert responsible for monitoring compliance with data protection regulations, advising the organisation, and serving as the contact point for data subjects and supervisory authorities. GDPR requires a DPO when: (1) the organisation is a public authority, (2) core activities involve large-scale systematic monitoring of individuals, or (3) core activities involve large-scale processing of special category data (health, biometrics, criminal records).",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": ["Under POPIA, the equivalent role is the Information Officer.", "The DPO must be independent — they cannot be instructed on how to perform their duties."],
+        "explanation": "The DPO role ensures organisations have internal accountability for data protection. Their independence is crucial — they report to the highest level of management and cannot be dismissed for performing their duties.",
+        "distractors": ["Every organisation needs a DPO.", "The DPO can be the CEO.", "POPIA does not have an equivalent role."]
+      },
+      {
+        "question": "Explain the difference between a security policy, a standard, and a procedure.",
+        "answer": "Policy: a high-level statement of management's intent and direction (e.g., 'All sensitive data must be encrypted'). Standard: specific, mandatory requirements that implement the policy (e.g., 'AES-256 encryption must be used for data at rest'). Procedure: step-by-step instructions for carrying out the standard (e.g., 'To encrypt a file: open BitLocker, select the drive, choose AES-256...').",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Policy = what and why. Standard = what specifically. Procedure = how.", "They form a hierarchy: policy > standard > procedure."],
+        "explanation": "This hierarchy ensures consistency: policies set direction, standards set measurable requirements, and procedures ensure everyone follows the same steps.",
+        "distractors": ["Policies include step-by-step instructions.", "Standards are optional guidelines.", "Procedures are the same as policies."]
+      },
+      {
+        "question": "A data breach exposes 50,000 South African customers' personal data. What are the organisation's obligations under POPIA?",
+        "answer": "Under POPIA Section 22: (1) Notify the Information Regulator as soon as reasonably possible after becoming aware of the breach. (2) Notify affected data subjects if the breach poses a risk to their rights. (3) Provide details: nature of the breach, categories of data compromised, recommended protective measures, and the organisation's remediation steps. (4) Document the breach and response actions. Failure to notify can result in enforcement action, fines, or criminal prosecution.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["POPIA's breach notification requirement is in Section 22.", "Compare with GDPR's 72-hour notification deadline — POPIA says 'as soon as reasonably possible.'"],
+        "explanation": "Breach notification requirements exist to empower data subjects to protect themselves (e.g., changing passwords, monitoring credit) and to enable regulatory oversight.",
+        "distractors": ["There is no obligation to notify under POPIA.", "Only breaches over 100,000 records require notification.", "The organisation can decide whether to notify."]
+      },
+      {
+        "question": "What is the NIST Cybersecurity Framework (CSF) and name its five core functions.",
+        "answer": "The NIST CSF is a voluntary framework for managing cybersecurity risk, widely adopted globally. Its five core functions are: (1) Identify — understand your assets, risks, and vulnerabilities. (2) Protect — implement safeguards (access control, training, encryption). (3) Detect — monitor for cybersecurity events (IDS, SIEM, logging). (4) Respond — contain, analyse, and mitigate incidents. (5) Recover — restore services, learn from incidents, improve.",
+        "difficulty_permille": 375,
+        "bloom_level": "Remember",
+        "hints": ["Think of the incident lifecycle: before, during, and after an attack.", "Mnemonic: I P D R R — I Prefer Detecting Real Risks."],
+        "explanation": "NIST CSF is framework-agnostic — it works alongside ISO 27001, COBIT, and CIS Controls. Many organisations use NIST CSF for strategy and ISO 27001 for certification.",
+        "distractors": ["NIST CSF is mandatory for all organisations.", "It has only three functions.", "NIST CSF replaces ISO 27001."]
+      }
+    ],
+    "hints": [
+      "POPIA applies to any South African organisation processing personal information — including schools, clinics, and small businesses.",
+      "Compliance is not a one-time event: it requires ongoing monitoring, training, and audit.",
+      "ISO 27001 certification requires an external audit by an accredited body."
+    ],
+    "key_vocabulary": [
+      {"term": "POPIA", "definition": "Protection of Personal Information Act (2013, enforced 2021) — South Africa's comprehensive data protection law governing the processing of personal information", "example_usage": "Under POPIA, the company appointed an Information Officer and registered with the Information Regulator."},
+      {"term": "GDPR", "definition": "General Data Protection Regulation (EU, 2018) — the global benchmark for data privacy, requiring consent, transparency, and data subject rights", "example_usage": "The GDPR fine of 4% of global revenue motivated the company to overhaul its data practices."},
+      {"term": "ISO 27001", "definition": "The international standard for Information Security Management Systems (ISMS), providing a framework for systematically managing information security risks", "example_usage": "ISO 27001 certification gave clients confidence in our security practices."},
+      {"term": "data subject", "definition": "An identified or identifiable natural person whose personal information is being processed", "example_usage": "Under POPIA, the data subject has the right to access, correct, and delete their personal information."},
+      {"term": "information officer", "definition": "Under POPIA, the person responsible for ensuring compliance with data protection requirements within an organisation", "example_usage": "The Information Officer filed the annual compliance report with the Information Regulator."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think POPIA only applies to large corporations and tech companies.",
+        "correction": "POPIA applies to ANY entity (public or private, regardless of size) that processes personal information of South African data subjects. This includes schools, medical practices, spaza shops, churches, and sole proprietors. Even collecting customer phone numbers for a WhatsApp group triggers POPIA obligations.",
+        "why_students_think_this": "Media coverage of POPIA focuses on large companies and dramatic fines, creating the impression that small organisations are exempt. In reality, POPIA makes no size distinction — the conditions apply universally, though implementation may be proportionate to scale."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What are POPIA's 8 conditions for lawful processing?", "back": "Accountability, Processing limitation, Purpose specification, Further processing limitation, Information quality, Openness, Security safeguards, Data subject participation.", "tags": ["CYBER.SEC.GRC", "Cybersecurity", "Compliance"], "difficulty_permille": 278},
+    {"front": "What are the five NIST CSF core functions?", "back": "Identify, Protect, Detect, Respond, Recover.", "tags": ["CYBER.SEC.GRC", "Cybersecurity", "Compliance"], "difficulty_permille": 222},
+    {"front": "What is the maximum GDPR fine?", "back": "Up to 4% of the organisation's global annual revenue or 20 million euros, whichever is greater.", "tags": ["CYBER.SEC.GRC", "Cybersecurity", "Compliance"], "difficulty_permille": 222},
+    {"front": "What is an Information Officer under POPIA?", "back": "The person responsible for ensuring POPIA compliance within an organisation. Must be registered with the Information Regulator.", "tags": ["CYBER.SEC.GRC", "Cybersecurity", "Compliance"], "difficulty_permille": 278},
+    {"front": "What is ISO 27001?", "back": "The international standard for Information Security Management Systems (ISMS). Uses Plan-Do-Check-Act cycle with 93 controls across 4 themes. Certification requires external audit.", "tags": ["CYBER.SEC.GRC", "Cybersecurity", "Compliance"], "difficulty_permille": 333}
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

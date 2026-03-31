@@ -1,0 +1,641 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 8",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade8",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 8,
+    "domains": [
+      "Measurement",
+      "Data",
+      "Numbers",
+      "Geometry",
+      "Patterns",
+      "Probability",
+      "Algebra"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Curated from CAPS Mathematics Senior Phase (DBE, 2011 amended 2022). Grade 8."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr8.NUM",
+      "title": "Rational Numbers",
+      "description": "All operations with rational numbers (fractions, decimals, integers). Convert between forms. Properties of rational numbers",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "rational-numbers",
+        "operations",
+        "fractions",
+        "decimals",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.NUM",
+          "description": "All operations with rational numbers (fractions, decimals, integers). Convert between forms. Properties of rational numbers",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Rational Numbers",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Rational+Numbers",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.NUM"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Rational Numbers",
+          "url": "https://www.youtube.com/results?search_query=Rational+Numbers+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Rational Numbers",
+          "url": "https://en.wikipedia.org/wiki/Rational_Numbers",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.EXP",
+      "title": "Exponents",
+      "description": "Exponents with integer exponents including zero and negative. Simplify exponential expressions. Scientific notation with large and small numbers",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "exponents",
+        "negative-exponents",
+        "scientific-notation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.EXP",
+          "description": "Exponents with integer exponents including zero and negative. Simplify exponential expressions. Scientific notation with large and small numbers",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Exponents",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Exponents",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.EXP"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Exponents",
+          "url": "https://www.youtube.com/results?search_query=Exponents+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Exponents",
+          "url": "https://en.wikipedia.org/wiki/Exponents",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.ALG",
+      "title": "Algebraic Expressions and Equations",
+      "description": "Expand brackets. Factorise common factor. Solve linear equations with variables on both sides. Inequalities on number line",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "algebra",
+        "expand",
+        "factorise",
+        "linear-equations",
+        "inequalities",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 12,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.ALG",
+          "description": "Expand brackets. Factorise common factor. Solve linear equations with variables on both sides. Inequalities on number line",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Algebraic Expressions and Equations",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebraic+Expressions+and+Equations",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.ALG"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebraic Expressions and Equations",
+          "url": "https://www.youtube.com/results?search_query=Algebraic+Expressions+and+Equations+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebraic Expressions and Equations",
+          "url": "https://en.wikipedia.org/wiki/Algebraic_Expressions_and_Equations",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.FN",
+      "title": "Functions and Relationships",
+      "description": "Input-output tables. Represent functions as equations and graphs. Linear functions y = mx + c. Gradient and y-intercept",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Patterns",
+      "tags": [
+        "functions",
+        "linear",
+        "gradient",
+        "y-intercept",
+        "graphs",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.FN",
+          "description": "Input-output tables. Represent functions as equations and graphs. Linear functions y = mx + c. Gradient and y-intercept",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Functions and Relationships",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Functions+and+Relationships",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.FN"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Functions and Relationships",
+          "url": "https://www.youtube.com/results?search_query=Functions+and+Relationships+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Functions and Relationships",
+          "url": "https://en.wikipedia.org/wiki/Functions_and_Relationships",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.GEO",
+      "title": "Geometry",
+      "description": "Angles in triangles and quadrilaterals. Parallel lines cut by transversal. Pythagoras theorem. Congruency and similarity intro",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "geometry",
+        "pythagoras",
+        "parallel-lines",
+        "congruency",
+        "similarity",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.GEO",
+          "description": "Angles in triangles and quadrilaterals. Parallel lines cut by transversal. Pythagoras theorem. Congruency and similarity intro",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.GEO"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Geometry",
+          "url": "https://www.youtube.com/results?search_query=Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Geometry",
+          "url": "https://en.wikipedia.org/wiki/Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.MEA",
+      "title": "Measurement",
+      "description": "Area and perimeter of composite shapes. Surface area and volume of cubes, prisms, cylinders. Effect of scaling on measurements",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "composite-shapes",
+        "surface-area",
+        "scaling",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.MEA",
+          "description": "Area and perimeter of composite shapes. Surface area and volume of cubes, prisms, cylinders. Effect of scaling on measurements",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Measurement",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Measurement",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.MEA"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Measurement",
+          "url": "https://www.youtube.com/results?search_query=Measurement+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Measurement",
+          "url": "https://en.wikipedia.org/wiki/Measurement",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.DAT",
+      "title": "Data Handling",
+      "description": "Frequency tables. Histograms from grouped data. Mean, median, mode. Identify outliers. Scatter plots and trend lines",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Data",
+      "tags": [
+        "data",
+        "frequency-tables",
+        "histograms",
+        "outliers",
+        "trend-lines",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.DAT",
+          "description": "Frequency tables. Histograms from grouped data. Mean, median, mode. Identify outliers. Scatter plots and trend lines",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Data Handling",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Data+Handling",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.DAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Data Handling",
+          "url": "https://www.youtube.com/results?search_query=Data+Handling+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Data Handling",
+          "url": "https://en.wikipedia.org/wiki/Data_Handling",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr8.PRB",
+      "title": "Probability",
+      "description": "Probability of events. Relative frequency. Compare experimental and theoretical probability. Tree diagrams for compound events",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Probability",
+      "tags": [
+        "probability",
+        "relative-frequency",
+        "compound-events",
+        "tree-diagrams",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade8"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr8.PRB",
+          "description": "Probability of events. Relative frequency. Compare experimental and theoretical probability. Tree diagrams for compound events",
+          "grade_level": "Grade8"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Probability",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Probability",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr8.PRB"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Probability",
+          "url": "https://www.youtube.com/results?search_query=Probability+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Probability",
+          "url": "https://en.wikipedia.org/wiki/Probability",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr8.NUM",
+      "to": "CAPS.Mathematics.Gr9.NUM.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Numbers feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.NUM",
+      "to": "CAPS.Mathematics.Gr9.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Numbers feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.EXP",
+      "to": "CAPS.Mathematics.Gr9.NUM.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Numbers feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.EXP",
+      "to": "CAPS.Mathematics.Gr9.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Numbers feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.ALG",
+      "to": "CAPS.Mathematics.Gr9.ALG.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Algebra feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.ALG",
+      "to": "CAPS.Mathematics.Gr9.ALG.2",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Algebra feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.FN",
+      "to": "CAPS.Mathematics.Gr9.PAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Patterns feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.GEO",
+      "to": "CAPS.Mathematics.Gr9.GEOM.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Geometry feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.MEA",
+      "to": "CAPS.Mathematics.Gr9.MEAS.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Measurement feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.DAT",
+      "to": "CAPS.Mathematics.Gr9.STAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Data feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.DAT",
+      "to": "CAPS.Mathematics.Gr9.PROB.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Data feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.PRB",
+      "to": "CAPS.Mathematics.Gr9.STAT.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Probability feeds into Grade 9"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr8.PRB",
+      "to": "CAPS.Mathematics.Gr9.PROB.1",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 8 Probability feeds into Grade 9"
+    }
+  ]
+}

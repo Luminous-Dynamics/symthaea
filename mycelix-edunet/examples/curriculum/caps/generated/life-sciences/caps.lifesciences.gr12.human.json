@@ -1,0 +1,327 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr12.HUMAN",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr12.HUMAN",
+    "title": "Human Reproduction: Menstrual Cycle, Pregnancy, STIs, and HIV/AIDS Prevention (35 marks)",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "The male reproductive system produces sperm in the testes (seminiferous tubules), which mature in the epididymis and are ejaculated via the vas deferens. The female reproductive system produces ova in the ovaries and has a uterus for embryo development. The menstrual cycle (~28 days) is controlled by hormones: FSH (stimulates follicle development), oestrogen (thickens endometrium, triggers LH surge), LH (triggers ovulation on ~day 14), and progesterone (maintains endometrium). Fertilisation occurs in the Fallopian tube; the embryo implants in the uterine wall. Pregnancy involves three trimesters with placental exchange of nutrients and wastes. STIs include bacterial (gonorrhoea, syphilis, chlamydia — treatable with antibiotics) and viral (HIV, HPV, herpes — not curable). South Africa has ~7.7 million people living with HIV (2024) — prevention includes condoms, PrEP, PMTCT, and male circumcision.",
+    "examples": [
+      {
+        "problem": "Describe the hormonal control of the menstrual cycle, explaining the roles of FSH, oestrogen, LH, and progesterone.",
+        "steps": [
+          {
+            "instruction": "Step 1: Days 1-5 (Menstruation) — Low hormone levels. The endometrium (uterine lining) breaks down and is shed as menstrual flow.",
+            "result": "menstruation"
+          },
+          {
+            "instruction": "Step 2: Days 5-14 (Follicular phase) — Pituitary gland releases FSH, which stimulates follicle development in the ovary. The growing follicle produces oestrogen, which thickens the endometrium and (at high levels) triggers a surge of LH from the pituitary.",
+            "result": "follicular phase"
+          },
+          {
+            "instruction": "Step 3: Day 14 (Ovulation) — The LH surge causes the mature follicle to rupture, releasing the ovum (egg) into the Fallopian tube.",
+            "result": "ovulation"
+          },
+          {
+            "instruction": "Step 4: Days 14-28 (Luteal phase) — The ruptured follicle becomes the corpus luteum, which produces progesterone. Progesterone maintains the thickened endometrium, preparing for possible implantation. If no fertilisation occurs, the corpus luteum degenerates, progesterone drops, and menstruation begins again.",
+            "result": "luteal phase"
+          }
+        ],
+        "answer": "Answer: FSH stimulates follicle growth → oestrogen thickens endometrium + triggers LH surge → LH causes ovulation → corpus luteum produces progesterone to maintain endometrium → if no pregnancy, progesterone drops → menstruation.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the role of the placenta during pregnancy.",
+        "steps": [
+          {
+            "instruction": "Step 1: The placenta is an organ that develops in the uterus wall during pregnancy, connecting the developing foetus to the mother's blood supply via the umbilical cord.",
+            "result": "structure"
+          },
+          {
+            "instruction": "Step 2: Nutrient exchange — Oxygen and glucose diffuse from maternal blood to foetal blood. Carbon dioxide and urea diffuse from foetal blood to maternal blood. The two blood systems do NOT mix.",
+            "result": "exchange function"
+          },
+          {
+            "instruction": "Step 3: Hormone production — The placenta produces hormones (progesterone, oestrogen, hCG) that maintain the pregnancy and prevent menstruation.",
+            "result": "endocrine function"
+          },
+          {
+            "instruction": "Step 4: Barrier function — The placenta acts as a partial barrier, preventing some pathogens from crossing. However, alcohol, drugs, nicotine, and some viruses (e.g. HIV without treatment) CAN cross the placenta and harm the foetus.",
+            "result": "barrier"
+          }
+        ],
+        "answer": "Answer: The placenta exchanges nutrients/wastes between mother and foetus (without blood mixing), produces pregnancy-maintaining hormones, and acts as a partial barrier against pathogens.",
+        "visual_description": null
+      },
+      {
+        "problem": "Discuss HIV/AIDS in South Africa: transmission, prevention, and the impact of antiretroviral treatment (ART).",
+        "steps": [
+          {
+            "instruction": "Step 1: SA has the largest HIV epidemic globally (~7.7 million people living with HIV, 2024). HIV is transmitted through: unprotected sexual intercourse (most common), mother-to-child (during birth/breastfeeding), infected blood/needles, and breast milk.",
+            "result": "prevalence and transmission"
+          },
+          {
+            "instruction": "Step 2: Prevention strategies: condom use (barrier method), PrEP (pre-exposure prophylaxis — ARV drugs taken by HIV-negative individuals), voluntary medical male circumcision (reduces risk by ~60%), abstinence, PMTCT programmes (Prevention of Mother-to-Child Transmission — ART during pregnancy reduces vertical transmission from ~25% to <2%).",
+            "result": "prevention"
+          },
+          {
+            "instruction": "Step 3: ART impact — South Africa has the world's largest ART programme (~5.7 million people on treatment). ART suppresses viral load to undetectable levels (U=U: Undetectable = Untransmittable), restores CD4+ T-cell count, improves life expectancy (from ~52 years in 2005 to ~65 years today), and prevents transmission.",
+            "result": "treatment impact"
+          }
+        ],
+        "answer": "Answer: SA has ~7.7M HIV-positive people. Prevention: condoms, PrEP, VMMC, PMTCT. ART has dramatically improved life expectancy and reduced transmission (U=U principle).",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the hormone that triggers ovulation and state which gland produces it.",
+        "answer": "LH (luteinising hormone) triggers ovulation. It is produced by the anterior pituitary gland.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "This hormone surges on about day 14 of the menstrual cycle.",
+          "The pituitary gland in the brain controls the menstrual cycle hormones."
+        ],
+        "explanation": "LH surge on day 14 causes the mature follicle to rupture, releasing the ovum. The LH surge is triggered by high oestrogen levels from the developing follicle (positive feedback).",
+        "distractors": [
+          "FSH triggers ovulation",
+          "Progesterone triggers ovulation",
+          "LH is produced by the ovary"
+        ]
+      },
+      {
+        "question": "Explain why a pregnancy test detects the hormone hCG in urine.",
+        "answer": "After implantation, the developing embryo (specifically the trophoblast/chorion that will become the placenta) produces human chorionic gonadotropin (hCG). hCG maintains the corpus luteum, which continues producing progesterone to sustain the endometrium. hCG is excreted in the mother's urine and can be detected by a pregnancy test about 10-14 days after fertilisation.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What structure produces hCG? What does hCG do to the corpus luteum?",
+          "Why does the corpus luteum need to be maintained in early pregnancy?"
+        ],
+        "explanation": "hCG is a 'rescue signal' from the embryo to the corpus luteum: 'keep producing progesterone!' Without hCG, the corpus luteum degenerates, progesterone drops, and menstruation occurs (pregnancy lost).",
+        "distractors": [
+          "hCG is produced by the pituitary gland",
+          "Pregnancy tests detect oestrogen",
+          "hCG is only produced after birth"
+        ]
+      },
+      {
+        "question": "A couple is trying to conceive. The woman's menstrual cycle is 28 days. On which days is she most likely to be fertile, and why?",
+        "answer": "The woman is most fertile from about day 10 to day 16. Ovulation occurs around day 14 (triggered by LH surge). The ovum survives ~24 hours after release. Sperm can survive ~3-5 days in the female reproductive tract. Therefore, intercourse from a few days before to one day after ovulation gives the highest chance of fertilisation.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "When does ovulation occur in a 28-day cycle?",
+          "Consider both ovum survival time and sperm survival time."
+        ],
+        "explanation": "The fertile window accounts for sperm longevity (3-5 days) and ovum survival (24 hours). Fertilisation occurs in the Fallopian tube, so sperm must be present when the ovum is released.",
+        "distractors": [
+          "The most fertile days are during menstruation (days 1-5)",
+          "The ovum survives for 7 days after ovulation",
+          "Sperm can only survive a few hours"
+        ]
+      },
+      {
+        "question": "Explain the negative feedback mechanism that controls oestrogen and FSH levels during the menstrual cycle. [NSC-style question]",
+        "answer": "Negative feedback: The anterior pituitary releases FSH, which stimulates ovarian follicle growth. Growing follicles produce oestrogen. Rising oestrogen levels inhibit (suppress) further FSH release from the pituitary (negative feedback). This prevents multiple follicles from developing and limits the number of eggs released. However, when oestrogen reaches a very high level (positive feedback switch), it triggers the LH surge that causes ovulation. After ovulation, the corpus luteum produces progesterone, which inhibits both FSH and LH, preventing new follicle development during the luteal phase.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "In negative feedback, a high level of hormone X inhibits the release of hormone Y.",
+          "There is a switch from negative to positive feedback at high oestrogen levels — this triggers ovulation."
+        ],
+        "explanation": "Negative feedback (oestrogen inhibits FSH) maintains cycle regularity. Positive feedback (high oestrogen triggers LH surge) enables ovulation. Progesterone in the luteal phase inhibits both FSH and LH.",
+        "distractors": [
+          "FSH stimulates oestrogen, which stimulates more FSH (positive feedback only)",
+          "Progesterone stimulates FSH release",
+          "Negative feedback causes ovulation"
+        ]
+      },
+      {
+        "question": "South Africa's PMTCT (Prevention of Mother-to-Child Transmission) programme has reduced vertical HIV transmission from ~25% to below 2%. Evaluate the biological and social factors that make this programme successful, and identify remaining challenges. [NSC-style 8-mark question]",
+        "answer": "Biological success factors: 1) ART during pregnancy reduces maternal viral load to undetectable levels, minimising virus crossing the placenta. 2) Elective caesarean section avoids blood exposure during vaginal delivery. 3) Nevirapine given to the newborn provides immediate protection. 4) Safe infant feeding options (exclusive breastfeeding with ART, or formula feeding). Social success factors: 5) Antenatal clinic attendance — early testing allows early treatment. 6) Community health workers educate pregnant women. 7) Free access to ART in SA public healthcare. Remaining challenges: 8) Late antenatal booking — some women only visit clinics in the third trimester. 9) Stigma — some women avoid HIV testing due to fear of disclosure. 10) Rural access — remote areas have fewer clinics and healthcare workers. 11) Breastfeeding decisions — economic pressures may force mixed feeding (formula + breast), which increases transmission risk. 12) Adolescent pregnancies — young mothers are less likely to access antenatal care consistently.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about both medical interventions (drugs, surgery) and social factors (access, stigma, education).",
+          "What biological mechanisms prevent virus transfer at each stage (pregnancy, birth, breastfeeding)?"
+        ],
+        "explanation": "PMTCT success combines antiretroviral biology (viral load suppression) with social infrastructure (antenatal clinics, education, free access). Remaining barriers are primarily social: stigma, late booking, and rural access.",
+        "distractors": [
+          "PMTCT has eliminated mother-to-child HIV transmission in SA",
+          "The programme only involves giving drugs to the baby after birth",
+          "Stigma is no longer a barrier to HIV testing in SA"
+        ]
+      }
+    ],
+    "hints": [
+      "Menstrual cycle hormones: FSH (Follicle), Oestrogen (Endometrium + LH trigger), LH (Ovulation), Progesterone (Pregnancy preparation).",
+      "HIV transmission: Sexual (most common), Mother-to-child, Blood/needles. NOT through casual contact, mosquitoes, or sharing food.",
+      "U=U: Undetectable viral load = Untransmittable. ART suppresses HIV to undetectable levels."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "ovulation",
+        "definition": "The release of a mature ovum (egg) from the ovary, triggered by a surge of LH, occurring around day 14 of the menstrual cycle",
+        "example_usage": "Ovulation is the most fertile period — the ovum can be fertilised for about 24 hours."
+      },
+      {
+        "term": "placenta",
+        "definition": "An organ connecting the foetus to the mother's uterine wall, enabling nutrient/waste exchange and producing pregnancy hormones",
+        "example_usage": "The placenta exchanges oxygen and glucose from mother to foetus without the two blood systems mixing."
+      },
+      {
+        "term": "ART (antiretroviral therapy)",
+        "definition": "A combination of drugs that suppress HIV replication, reducing viral load to undetectable levels and restoring immune function",
+        "example_usage": "South Africa has the world's largest ART programme, with ~5.7 million people on treatment."
+      },
+      {
+        "term": "negative feedback",
+        "definition": "A regulatory mechanism where the output of a process inhibits the process, maintaining homeostasis",
+        "example_usage": "Rising oestrogen levels inhibit FSH release from the pituitary — this is negative feedback."
+      },
+      {
+        "term": "PMTCT",
+        "definition": "Prevention of Mother-to-Child Transmission — a programme providing ART to HIV-positive pregnant women to prevent vertical transmission to the baby",
+        "example_usage": "SA's PMTCT programme has reduced mother-to-child HIV transmission from 25% to below 2%."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think a woman can get pregnant at any time during her menstrual cycle.",
+        "correction": "The fertile window is approximately days 10-16 in a 28-day cycle (around ovulation). However, cycles vary, and sperm can survive up to 5 days, so pregnancies can occur from intercourse outside this window. No 'safe period' is completely reliable for contraception.",
+        "why_students_think_this": "Students either assume fertility is constant or believe the 'safe period' method is reliable. Emphasise that cycles are variable and sperm survive several days."
+      },
+      {
+        "misconception": "Students think HIV can be transmitted through casual contact (handshakes, sharing food, mosquito bites).",
+        "correction": "HIV is transmitted through: unprotected sexual intercourse, mother-to-child (birth/breastfeeding), infected blood/needles. HIV CANNOT survive outside the body and is NOT transmitted by mosquitoes, casual contact, sharing utensils, hugging, or kissing.",
+        "why_students_think_this": "Fear and stigma around HIV lead to misinformation. Clearly state transmission routes and non-transmission routes to combat stigma."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr12.HUMAN",
+    "title": "Assessment: Human Reproduction (NSC exam format, 35 marks)",
+    "items": [
+      {
+        "question": "Name the four hormones controlling the menstrual cycle and state where each is produced.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "FSH (anterior pituitary), LH (anterior pituitary), oestrogen (ovarian follicle), progesterone (corpus luteum).",
+        "points": 4,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Two from the brain, two from the ovary."
+      },
+      {
+        "question": "Explain how the placenta facilitates exchange between mother and foetus.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Villi in the placenta increase surface area. Maternal and foetal blood flow close together but do NOT mix. O2 and glucose diffuse from mother to foetus; CO2 and urea diffuse from foetus to mother. Thin membrane allows efficient diffusion.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about surface area, diffusion distance, and concentration gradients."
+      },
+      {
+        "question": "List three methods of HIV prevention and explain the biological basis of each.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "1) Condoms — physical barrier prevents virus-containing fluids from contacting mucous membranes. 2) PrEP — ARV drugs block reverse transcriptase, preventing HIV from establishing infection. 3) VMMC — removes foreskin tissue rich in target cells (Langerhans cells), reducing infection risk by ~60%.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Each method works through a different biological mechanism."
+      },
+      {
+        "question": "Analyse the negative feedback relationship between progesterone and FSH/LH during the luteal phase.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "After ovulation, the corpus luteum produces progesterone. High progesterone inhibits FSH and LH release from the pituitary (negative feedback). This prevents new follicle development and additional ovulation. If no pregnancy, the corpus luteum degenerates, progesterone falls, and FSH rises again to start a new cycle.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "What would happen if FSH were NOT inhibited during the luteal phase?"
+      },
+      {
+        "question": "Evaluate the ethical considerations around contraception education in South African schools.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "For: reduces teenage pregnancy (SA has high rates), prevents STI/HIV transmission, empowers informed choices, reduces maternal mortality. Against: some cultural/religious groups oppose contraception education. Balance: education should be factual, age-appropriate, and respectful of diverse beliefs while prioritising health outcomes. SA's Constitution supports the right to reproductive health information.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider public health benefits vs cultural/religious concerns."
+      }
+    ],
+    "total_points": 19,
+    "estimated_minutes": 24,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the four menstrual cycle hormones?",
+      "back": "FSH and LH (from pituitary), oestrogen (from follicle), progesterone (from corpus luteum).",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What triggers ovulation?",
+      "back": "A surge of LH (luteinising hormone) on about day 14, triggered by high oestrogen levels.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does the placenta do?",
+      "back": "Exchanges nutrients/wastes between mother and foetus (without blood mixing), produces pregnancy hormones, and acts as a partial barrier.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What does U=U mean in HIV?",
+      "back": "Undetectable = Untransmittable. People on ART with undetectable viral load cannot transmit HIV sexually.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "How many people in SA live with HIV (approximate)?",
+      "back": "~7.7 million (2024) — the largest HIV epidemic globally. ~5.7 million are on ART.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is PMTCT?",
+      "back": "Prevention of Mother-to-Child Transmission. ART during pregnancy reduces vertical HIV transmission from ~25% to <2%.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "Where does fertilisation occur?",
+      "back": "In the Fallopian tube (oviduct). The fertilised egg (zygote) then travels to the uterus for implantation.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Can HIV be transmitted through mosquito bites?",
+      "back": "No. HIV is only transmitted through: unprotected sex, mother-to-child, infected blood/needles. NOT through casual contact, mosquitoes, or sharing food.",
+      "tags": ["CAPS.LifeSciences.Gr12.HUMAN", "Grade12", "Human Reproduction"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

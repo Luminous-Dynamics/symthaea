@@ -1,0 +1,131 @@
+{
+  "node_id": "CYBER.SEC.OPS",
+  "lesson": {
+    "standard_code": "CYBER.SEC.OPS",
+    "title": "Digital Forensics: Evidence Collection, Analysis & Chain of Custody",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Apply",
+    "explanation": "Digital forensics is the scientific process of identifying, preserving, analysing, and presenting digital evidence in a manner that is legally admissible. The forensic process follows strict phases: identification (recognising potential evidence sources — hard drives, RAM, network logs, mobile devices), preservation (creating forensic images using write-blockers to prevent evidence alteration), analysis (examining file systems, recovering deleted files, analysing metadata, timeline reconstruction), and presentation (documenting findings in reports suitable for legal proceedings). Chain of custody — the documented, unbroken record of who handled evidence and when — is critical; if broken, evidence may be ruled inadmissible in court.",
+    "examples": [
+      {
+        "problem": "A company suspects an employee has been exfiltrating confidential data. Describe the forensic acquisition process for their workstation.",
+        "steps": [
+          {"instruction": "Step 1: Document the scene — photograph the workstation, note running processes, record date/time and who is present.", "result": "Scene documented"},
+          {"instruction": "Step 2: Capture volatile evidence first — RAM dump (using tools like FTK Imager), running processes, network connections. Volatile data is lost when powered off.", "result": "Volatile data captured"},
+          {"instruction": "Step 3: Create a forensic image of the hard drive using a write-blocker to prevent any modification. Use dd, FTK Imager, or EnCase.", "result": "Bit-for-bit copy created"},
+          {"instruction": "Step 4: Verify the image integrity — compute MD5 and SHA-256 hashes of original and image. They must match exactly.", "result": "Hash verification complete"},
+          {"instruction": "Step 5: Secure the original evidence in a tamper-evident bag, log it in the chain of custody form.", "result": "Evidence secured"}
+        ],
+        "answer": "Answer: The forensic process follows the order of volatility: capture RAM first, then create a verified forensic image of storage media using write-blockers, hash-verify the copy, and maintain chain of custody throughout. Never work on the original evidence.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why a forensic investigator must never work directly on the original evidence.",
+        "steps": [
+          {"instruction": "Step 1: Working on original media modifies file access timestamps, altering evidence.", "result": "Timestamp contamination"},
+          {"instruction": "Step 2: Accidental writes, deletions, or malware execution could destroy evidence permanently.", "result": "Evidence destruction risk"},
+          {"instruction": "Step 3: Defence lawyers can argue that evidence was tampered with if the original was not preserved in its original state.", "result": "Legal inadmissibility"}
+        ],
+        "answer": "Answer: Working on originals risks contaminating timestamps, destroying evidence, and rendering it legally inadmissible. Forensic investigators always work on verified bit-for-bit copies (forensic images) and store originals in tamper-evident containers with documented chain of custody.",
+        "visual_description": null
+      },
+      {
+        "problem": "A deleted file has been recovered from an NTFS file system. Explain how this is possible.",
+        "steps": [
+          {"instruction": "Step 1: When a file is 'deleted' on NTFS, the Master File Table (MFT) entry is marked as available, but the actual data clusters on disk are not immediately overwritten.", "result": "Deletion mechanism explained"},
+          {"instruction": "Step 2: Forensic tools (Autopsy, Sleuth Kit, EnCase) scan for MFT entries marked as deleted and recover the associated data clusters.", "result": "Recovery method explained"},
+          {"instruction": "Step 3: Recovery is possible until the operating system allocates those clusters to new data. This is why forensic acquisition must happen quickly.", "result": "Time sensitivity noted"}
+        ],
+        "answer": "Answer: Deleting a file on NTFS only marks the MFT entry as available — the data remains on disk until overwritten. Forensic tools recover these 'deleted' files by scanning for orphaned MFT entries and their associated clusters. This is why secure deletion tools overwrite data multiple times.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define chain of custody and explain why it is important in digital forensics.",
+        "answer": "Chain of custody is the documented record of every person who handled evidence, when they handled it, what they did with it, and where it was stored. It is important because (1) it proves evidence has not been tampered with, (2) it is legally required for evidence to be admissible in court, and (3) any gap or inconsistency can be exploited by the defence to discredit the evidence.",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": ["Think of it like a logbook for evidence — every hand that touches it is recorded.", "A break in the chain = evidence thrown out."],
+        "explanation": "Chain of custody transforms a piece of data into legally valid evidence. Without it, even the most damning digital artefact may be inadmissible.",
+        "distractors": ["Chain of custody only applies to physical evidence.", "It is optional for internal investigations.", "Only the lead investigator needs to be documented."]
+      },
+      {
+        "question": "What is the order of volatility and why does it matter?",
+        "answer": "The order of volatility (RFC 3227) ranks evidence sources by how quickly they disappear: (1) CPU registers and cache, (2) RAM, (3) network connections and routing tables, (4) running processes, (5) disk (temporary files), (6) disk (permanent files), (7) remote logs, (8) archival media. It matters because investigators must capture the most volatile evidence first — RAM contents are lost at power-off.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["RAM before disk, disk before cloud.", "The first thing lost when you pull the plug is the most volatile."],
+        "explanation": "Ignoring volatility order means losing critical evidence. RAM often contains decryption keys, running malware, and active network sessions that are gone once the machine is powered off.",
+        "distractors": ["Always image the hard drive first.", "Volatile evidence can be recovered after shutdown.", "Order of volatility is a suggestion, not a requirement."]
+      },
+      {
+        "question": "Explain the difference between a forensic image and a regular backup.",
+        "answer": "A forensic image is a bit-for-bit, sector-by-sector copy of the entire storage medium, including deleted files, slack space, and unallocated space. A regular backup copies only active, accessible files. Forensic images preserve deleted data, file system metadata, and hidden partitions that regular backups miss. Forensic images are hash-verified (MD5/SHA-256) to prove integrity.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["A backup copies files. A forensic image copies everything, including empty space.", "Hash verification proves nothing was changed during imaging."],
+        "explanation": "The distinction is critical: deleted files, browser history fragments in slack space, and hidden partitions are often the most important evidence — and regular backups miss all of it.",
+        "distractors": ["A forensic image and a backup are the same thing.", "Forensic images only copy user files.", "Hash verification is optional for forensic images."]
+      },
+      {
+        "question": "Name three tools commonly used in digital forensics and describe what each does.",
+        "answer": "(1) Autopsy/Sleuth Kit — open-source forensic analysis suite for file system analysis, keyword search, timeline creation, and deleted file recovery. (2) FTK Imager — forensic imaging tool that creates verified forensic copies and captures RAM. (3) Wireshark — network traffic capture and analysis tool used for packet-level investigation of network-based incidents.",
+        "difficulty_permille": 375,
+        "bloom_level": "Remember",
+        "hints": ["Think about the three phases: acquisition (imaging), analysis (file system), network.", "Autopsy is the GUI front-end for Sleuth Kit."],
+        "explanation": "Forensic tools serve different phases: FTK Imager for acquisition, Autopsy for analysis, Wireshark for network forensics. Proficiency in all three is expected of forensic analysts.",
+        "distractors": ["Microsoft Word is a forensic tool.", "Only paid tools are admissible in court.", "One tool covers all forensic needs."]
+      },
+      {
+        "question": "What is anti-forensics and give two examples of techniques used by adversaries?",
+        "answer": "Anti-forensics refers to techniques used to destroy, hide, or manipulate digital evidence to obstruct investigation. Examples: (1) Data wiping tools (e.g., DBAN, BleachBit) that overwrite data with random patterns, preventing recovery. (2) Timestomping — altering file timestamps (creation, modification, access dates) to create false timelines and confuse investigators.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": ["Anti-forensics is the adversary's countermeasure to forensics.", "Think about what would make a forensic investigator's job harder."],
+        "explanation": "Awareness of anti-forensics is essential for investigators: if timestamps seem inconsistent with other evidence (log files, network records), timestomping may have occurred. Cross-referencing multiple evidence sources defeats many anti-forensic techniques.",
+        "distractors": ["Anti-forensics is always illegal.", "Encryption is anti-forensics.", "Anti-forensic techniques always succeed."]
+      }
+    ],
+    "hints": [
+      "The golden rule of forensics: never modify the original evidence.",
+      "Always follow the order of volatility: capture RAM before imaging the disk.",
+      "Hash verification (MD5 + SHA-256) proves evidence integrity — always compute hashes."
+    ],
+    "key_vocabulary": [
+      {"term": "chain of custody", "definition": "The documented record of every person who handled evidence, when, and what they did with it, ensuring evidence integrity for legal proceedings", "example_usage": "The chain of custody log showed the hard drive was in secure storage from seizure to analysis."},
+      {"term": "forensic image", "definition": "A bit-for-bit, sector-by-sector copy of an entire storage medium, including deleted files, slack space, and unallocated areas", "example_usage": "The forensic image was verified with SHA-256 hashes before analysis began."},
+      {"term": "write-blocker", "definition": "A hardware or software device that prevents any write operations to a storage medium during forensic acquisition", "example_usage": "The investigator connected the suspect's drive through a write-blocker before imaging."},
+      {"term": "order of volatility", "definition": "The ranking of digital evidence sources from most volatile (RAM, CPU cache) to least volatile (archival media), guiding the sequence of evidence collection", "example_usage": "Following the order of volatility, the team captured a RAM dump before powering down the server."},
+      {"term": "slack space", "definition": "The unused space between the end of a file and the end of the disk cluster allocated to it, which may contain remnants of previously deleted files", "example_usage": "Fragments of the deleted email were found in slack space on the suspect's hard drive."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think that deleting a file permanently removes it from a computer.",
+        "correction": "Deleting a file (even emptying the Recycle Bin) only marks the space as available — the data remains on disk until overwritten by new data. Forensic tools can recover 'deleted' files from unallocated space. Only secure deletion (overwriting with random data multiple times) or physical destruction reliably destroys data.",
+        "why_students_think_this": "The operating system hides deleted files from the user interface, creating the illusion of permanent removal. The distinction between logical deletion (marking as free) and physical deletion (overwriting data) is not intuitive."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is the first rule of digital forensics?", "back": "Never work on the original evidence. Always create a verified forensic image (bit-for-bit copy) and work on the copy.", "tags": ["CYBER.SEC.OPS", "Cybersecurity", "Digital Forensics"], "difficulty_permille": 111},
+    {"front": "What is chain of custody?", "back": "The documented record of who handled evidence, when, and what they did with it. Required for legal admissibility.", "tags": ["CYBER.SEC.OPS", "Cybersecurity", "Digital Forensics"], "difficulty_permille": 167},
+    {"front": "What is the order of volatility?", "back": "Most to least volatile: CPU registers/cache, RAM, network connections, running processes, temp files, permanent files, remote logs, archival media. Capture most volatile first.", "tags": ["CYBER.SEC.OPS", "Cybersecurity", "Digital Forensics"], "difficulty_permille": 333},
+    {"front": "Why can deleted files be recovered?", "back": "Deletion only marks the MFT entry as available — actual data clusters remain on disk until overwritten by new data. Forensic tools recover these orphaned clusters.", "tags": ["CYBER.SEC.OPS", "Cybersecurity", "Digital Forensics"], "difficulty_permille": 278},
+    {"front": "What is a write-blocker?", "back": "A hardware or software device that prevents any write operations to a storage medium during forensic acquisition, preserving evidence integrity.", "tags": ["CYBER.SEC.OPS", "Cybersecurity", "Digital Forensics"], "difficulty_permille": 222}
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

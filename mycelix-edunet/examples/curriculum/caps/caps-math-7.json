@@ -1,0 +1,629 @@
+{
+  "metadata": {
+    "title": "CAPS Mathematics Grade 7",
+    "framework": "CAPS (South Africa DBE)",
+    "source": "https://www.education.gov.za/Curriculum/CurriculumAssessmentPolicyStatements.aspx",
+    "grade_level": "Grade7",
+    "subject_area": "Mathematics",
+    "domain": "Mathematics",
+    "version": "2011 (amended 2022)",
+    "total_standards": 8,
+    "domains": [
+      "Patterns",
+      "Data",
+      "Algebra",
+      "Geometry",
+      "Numbers",
+      "Measurement"
+    ],
+    "created_at": "2026-03-30",
+    "notes": "Curated from CAPS Mathematics Senior Phase (DBE, 2011 amended 2022). Grade 7."
+  },
+  "nodes": [
+    {
+      "id": "CAPS.Mathematics.Gr7.NUM",
+      "title": "Integers and Rational Numbers",
+      "description": "Operations with integers. Rules for multiplying/dividing positive and negative numbers. Introduction to rational numbers",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "integers",
+        "rational-numbers",
+        "negative-numbers",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.NUM",
+          "description": "Operations with integers. Rules for multiplying/dividing positive and negative numbers. Introduction to rational numbers",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Integers and Rational Numbers",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Integers+and+Rational+Numbers",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.NUM"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Integers and Rational Numbers",
+          "url": "https://www.youtube.com/results?search_query=Integers+and+Rational+Numbers+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Integers and Rational Numbers",
+          "url": "https://en.wikipedia.org/wiki/Integers_and_Rational_Numbers",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.EXP",
+      "title": "Exponents",
+      "description": "Laws of exponents: product rule, quotient rule, power rule. Calculate with exponents including negative bases. Scientific notation intro",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Numbers",
+      "tags": [
+        "exponents",
+        "laws-of-exponents",
+        "scientific-notation",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.EXP",
+          "description": "Laws of exponents: product rule, quotient rule, power rule. Calculate with exponents including negative bases. Scientific notation intro",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Exponents",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Exponents",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.EXP"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Exponents",
+          "url": "https://www.youtube.com/results?search_query=Exponents+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Exponents",
+          "url": "https://en.wikipedia.org/wiki/Exponents",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.ALG",
+      "title": "Algebraic Expressions",
+      "description": "Variables and constants. Algebraic language. Evaluate expressions by substitution. Simplify by collecting like terms",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "algebra",
+        "variables",
+        "substitution",
+        "simplify",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.ALG",
+          "description": "Variables and constants. Algebraic language. Evaluate expressions by substitution. Simplify by collecting like terms",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Algebraic Expressions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Algebraic+Expressions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.ALG"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Algebraic Expressions",
+          "url": "https://www.youtube.com/results?search_query=Algebraic+Expressions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Algebraic Expressions",
+          "url": "https://en.wikipedia.org/wiki/Algebraic_Expressions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.EQN",
+      "title": "Equations",
+      "description": "Solve simple linear equations. Write equations from word problems. Number sentences with unknowns",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Algebra",
+      "tags": [
+        "equations",
+        "linear",
+        "word-problems",
+        "unknowns",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.EQN",
+          "description": "Solve simple linear equations. Write equations from word problems. Number sentences with unknowns",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Equations",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Equations",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.EQN"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Equations",
+          "url": "https://www.youtube.com/results?search_query=Equations+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Equations",
+          "url": "https://en.wikipedia.org/wiki/Equations",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.PAT",
+      "title": "Patterns and Functions",
+      "description": "Input-output relationships. Tables of values. Plot points on Cartesian plane. Linear relationships intro",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Patterns",
+      "tags": [
+        "patterns",
+        "cartesian-plane",
+        "linear",
+        "functions-intro",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.PAT",
+          "description": "Input-output relationships. Tables of values. Plot points on Cartesian plane. Linear relationships intro",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Patterns and Functions",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Patterns+and+Functions",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.PAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Patterns and Functions",
+          "url": "https://www.youtube.com/results?search_query=Patterns+and+Functions+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Patterns and Functions",
+          "url": "https://en.wikipedia.org/wiki/Patterns_and_Functions",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.GEO",
+      "title": "Geometry",
+      "description": "Properties of triangles and quadrilaterals. Angle relationships (complementary, supplementary). Congruency intro. Constructions with compass and ruler",
+      "node_type": "Concept",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Geometry",
+      "tags": [
+        "geometry",
+        "constructions",
+        "congruency",
+        "angle-relationships",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.GEO",
+          "description": "Properties of triangles and quadrilaterals. Angle relationships (complementary, supplementary). Congruency intro. Constructions with compass and ruler",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Geometry",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Geometry",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.GEO"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Geometry",
+          "url": "https://www.youtube.com/results?search_query=Geometry+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Geometry",
+          "url": "https://en.wikipedia.org/wiki/Geometry",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.MEA",
+      "title": "Measurement",
+      "description": "Circumference and area of circle (π). Surface area of prisms. Volume of cylinders. Speed, distance, time",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Measurement",
+      "tags": [
+        "measurement",
+        "circle",
+        "circumference",
+        "pi",
+        "speed",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.MEA",
+          "description": "Circumference and area of circle (π). Surface area of prisms. Volume of cylinders. Speed, distance, time",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Measurement",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Measurement",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.MEA"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Measurement",
+          "url": "https://www.youtube.com/results?search_query=Measurement+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Measurement",
+          "url": "https://en.wikipedia.org/wiki/Measurement",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    },
+    {
+      "id": "CAPS.Mathematics.Gr7.DAT",
+      "title": "Data Handling and Probability",
+      "description": "Mean, median, mode of grouped data. Scatter plots intro. Probability of combined events. Tree diagrams intro",
+      "node_type": "Skill",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Data",
+      "tags": [
+        "data",
+        "grouped-data",
+        "scatter-plots",
+        "tree-diagrams",
+        "caps",
+        "south-africa",
+        "matric"
+      ],
+      "estimated_hours": 6,
+      "grade_levels": [
+        "Grade7"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics",
+      "academic_standards": [
+        {
+          "framework": "CAPS (South Africa DBE)",
+          "code": "CAPS.Mathematics.Gr7.DAT",
+          "description": "Mean, median, mode of grouped data. Scatter plots intro. Probability of combined events. Tree diagrams intro",
+          "grade_level": "Grade7"
+        }
+      ],
+      "supplementary_resources": [
+        {
+          "title": "Khan Academy: Data Handling and Probability",
+          "url": "https://www.khanacademy.org/search?referer=%2F&page_search_query=Data+Handling+and+Probability",
+          "source": "KhanAcademy",
+          "content_type": "Video",
+          "relevance_score": 85,
+          "aligned_standard": "CAPS.Mathematics.Gr7.DAT"
+        },
+        {
+          "title": "Desmos Graphing Calculator",
+          "url": "https://www.desmos.com/calculator",
+          "source": {
+            "Custom": "Desmos"
+          },
+          "content_type": "Interactive",
+          "relevance_score": 75
+        },
+        {
+          "title": "YouTube: Data Handling and Probability",
+          "url": "https://www.youtube.com/results?search_query=Data+Handling+and+Probability+education",
+          "source": "YouTube",
+          "content_type": "Video",
+          "relevance_score": 70
+        },
+        {
+          "title": "Wikipedia: Data Handling and Probability",
+          "url": "https://en.wikipedia.org/wiki/Data_Handling_and_Probability",
+          "source": "Wikipedia",
+          "content_type": "Article",
+          "relevance_score": 60
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "CAPS.Mathematics.Gr7.NUM",
+      "to": "CAPS.Mathematics.Gr8.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Numbers feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.NUM",
+      "to": "CAPS.Mathematics.Gr8.ALG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Numbers feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.EXP",
+      "to": "CAPS.Mathematics.Gr8.NUM",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Numbers feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.EXP",
+      "to": "CAPS.Mathematics.Gr8.ALG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Numbers feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.ALG",
+      "to": "CAPS.Mathematics.Gr8.ALG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Algebra feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.ALG",
+      "to": "CAPS.Mathematics.Gr8.EQN",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Algebra feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.EQN",
+      "to": "CAPS.Mathematics.Gr8.ALG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Algebra feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.EQN",
+      "to": "CAPS.Mathematics.Gr8.EQN",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Algebra feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.PAT",
+      "to": "CAPS.Mathematics.Gr8.PAT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Patterns feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.GEO",
+      "to": "CAPS.Mathematics.Gr8.GEO",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Geometry feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.MEA",
+      "to": "CAPS.Mathematics.Gr8.MEA",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Measurement feeds into Grade 8"
+    },
+    {
+      "from": "CAPS.Mathematics.Gr7.DAT",
+      "to": "CAPS.Mathematics.Gr8.DAT",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Grade 7 Data feeds into Grade 8"
+    }
+  ]
+}
