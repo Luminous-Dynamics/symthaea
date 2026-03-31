@@ -10,7 +10,6 @@
 \usepackage{hyperref}
 \usepackage{natbib}
 \usepackage{xcolor}
-
 \setlength{\columnsep}{0.25in}
 
 \title{\textbf{The Conscious/Unconscious Distinction Matters,\\But Consciousness Theories Don't:\\Emergent Cooperation in a Thermodynamic Multi-Agent Engine}}
@@ -165,9 +164,47 @@ Cooperation scales: 55\% survival at $N$=12, 92\% at $N$=96 (20 seeds per condit
 
 We compared two emergent properties of our simulation against published clinical and ecological data. These constants were tuned for gameplay ($\sim$4-minute solo survival), not for biological fidelity.
 
-\textbf{Finding 6: Cooperative metabolic scaling.} Per-capita energy consumption across 10 population sizes ($N$=4--128, 20 seeds each) follows a power law $E_{pc} \propto N^{\beta}$ with $\beta = -0.178$ ($R^2 = 0.60$). This matches the $\beta = -0.19$ measured across 168 eusocial insect species \citep{hou2010} (whole-colony exponent 0.81, 95\% CI: 0.55--1.08). The isolated control (no social interaction) gives $\beta = 0.000$ exactly, matching \citet{waters2010}: isolated ant workers show isometric scaling. The cooperative scaling only emerges in the social context --- the same pattern as biology.
+\textbf{Finding 6: Cooperative metabolic scaling.} Per-capita energy consumption across 10 population sizes ($N$=4--128, 20 seeds each, Table~\ref{tab:scaling}) follows a power law $E_{pc} \propto N^{\beta}$ with $\beta = -0.178$ ($R^2 = 0.60$).
+
+\begin{table}[h]
+\centering
+\small
+\caption{Per-capita energy vs.\ population size (20 seeds each).}
+\label{tab:scaling}
+\begin{tabular}{rrrr}
+\toprule
+$N$ & Social (J) & Isolated (J) & Ratio \\
+\midrule
+4 & 553 & 208 & 2.66 \\
+12 & 400 & 208 & 1.92 \\
+24 & 297 & 208 & 1.43 \\
+48 & 289 & 208 & 1.39 \\
+96 & 298 & 208 & 1.43 \\
+128 & 348 & 208 & 1.67 \\
+\bottomrule
+\end{tabular}
+\end{table} This matches the $\beta = -0.19$ measured across 168 eusocial insect species \citep{hou2010} (whole-colony exponent 0.81, 95\% CI: 0.55--1.08). The isolated control (no social interaction) gives $\beta = 0.000$ exactly, matching \citet{waters2010}: isolated ant workers show isometric scaling. The cooperative scaling only emerges in the social context --- the same pattern as biology.
 
 \textbf{Finding 7: Consciousness energy threshold.} Gradually depleting agent energy while measuring $\Phi$ reveals a functional consciousness threshold at 45\% of maximum energy capacity. Below this fraction, $\Phi$ drops below the functional minimum (Red safety tier). This matches the 42\% of normal cortical metabolism identified by \citet{stender2015} as the boundary between vegetative and minimally conscious states (131 patients, 18F-FDG PET, 88\% classification accuracy). No hysteresis was observed in either our model or the clinical data \citep{stender2016}.
+
+Table~\ref{tab:bio} summarizes both comparisons.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Biological validation: emergent matches (not fitted).}
+\label{tab:bio}
+\begin{tabular}{lrrl}
+\toprule
+Metric & Model & Biology & Source \\
+\midrule
+Social $\beta$ & $-0.178$ & $-0.19$ & Hou 2010 \\
+Isolated $\beta$ & $0.000$ & $0.0$ & Waters 2010 \\
+Consciousness floor & 45\% & 42\% & Stender 2015 \\
+Hysteresis & 0\% & $\sim$0\% & Stender 2016 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 Neither parameter was calibrated to match biological data. The metabolic scaling emerges from the cost structure of epistemic offloading; the consciousness threshold emerges from the relationship between maintenance cost and safety tier boundaries.
 
