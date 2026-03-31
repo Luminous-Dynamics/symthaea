@@ -935,8 +935,8 @@ impl StreamingSynth {
             self.motif.record_note(note);
             self.density.record_onset(self.total_samples_rendered as f32 / self.sample_rate as f32);
 
-            // Collect for MIDI export — constrain to singable range for clean MIDI
-            let midi_freq = production::constrain_pitch_range(note.frequency, 440.0, 20.0);
+            // Collect for MIDI export — hard clamp to singable MIDI range
+            let midi_freq = note.frequency.clamp(196.0, 988.0); // G3 (MIDI 55) to B5 (MIDI 83)
             self.generated_notes.push(crate::Note {
                 frequency: midi_freq,
                 start_time: self.total_samples_rendered as f32 / self.sample_rate as f32,
