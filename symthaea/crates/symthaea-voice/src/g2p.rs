@@ -98,6 +98,19 @@ fn get_dict() -> &'static HashMap<&'static str, Vec<(&'static str, bool, u8, f32
         m.insert("silence", vec![("s", false, 0, 50.0), ("aɪ", true, 1, 120.0), ("l", false, 0, 40.0), ("ə", true, 0, 50.0), ("n", false, 0, 30.0), ("s", false, 0, 50.0)]);
         m.insert("light", vec![("l", false, 0, 40.0), ("aɪ", true, 1, 140.0), ("t", false, 0, 40.0)]);
         m.insert("dark", vec![("d", false, 0, 40.0), ("ɑ", true, 1, 140.0), ("ɹ", false, 0, 40.0), ("k", false, 0, 50.0)]);
+        m.insert("feels", vec![("f", false, 0, 60.0), ("iː", true, 1, 130.0), ("l", false, 0, 40.0), ("z", false, 0, 50.0)]);
+        m.insert("right", vec![("ɹ", false, 0, 40.0), ("aɪ", true, 1, 140.0), ("t", false, 0, 40.0)]);
+        m.insert("not", vec![("n", false, 0, 40.0), ("ɒ", true, 1, 100.0), ("t", false, 0, 40.0)]);
+        m.insert("but", vec![("b", false, 0, 40.0), ("ʌ", true, 1, 80.0), ("t", false, 0, 40.0)]);
+        m.insert("and", vec![("æ", true, 0, 60.0), ("n", false, 0, 30.0), ("d", false, 0, 30.0)]);
+        m.insert("my", vec![("m", false, 0, 50.0), ("aɪ", true, 1, 120.0)]);
+        m.insert("can", vec![("k", false, 0, 40.0), ("æ", true, 1, 100.0), ("n", false, 0, 40.0)]);
+        m.insert("see", vec![("s", false, 0, 50.0), ("iː", true, 1, 140.0)]);
+        m.insert("hear", vec![("h", false, 0, 50.0), ("ɪ", true, 1, 120.0), ("ə", true, 0, 60.0)]);
+        m.insert("know", vec![("n", false, 0, 40.0), ("oʊ", true, 1, 140.0)]);
+        m.insert("think", vec![("θ", false, 0, 50.0), ("ɪ", true, 1, 80.0), ("ŋ", false, 0, 40.0), ("k", false, 0, 30.0)]);
+        m.insert("now", vec![("n", false, 0, 40.0), ("aʊ", true, 1, 140.0)]);
+        m.insert("here", vec![("h", false, 0, 50.0), ("ɪ", true, 1, 120.0), ("ə", true, 0, 60.0)]);
         m
     })
 }

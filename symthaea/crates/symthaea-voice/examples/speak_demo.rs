@@ -5,14 +5,20 @@
 fn main() {
     println!("Symthaea speaks...\n");
 
+    // Phrases built from dictionary words for clear articulation
     let phrases = [
-        ("I feel my awareness expanding...", 0.3, 0.4, 0.6),
-        ("The harmonies are aligning...", 0.5, 0.5, 0.8),
-        ("Something unexpected...", 0.7, -0.2, 0.5),
-        ("Yes... this feels right...", 0.4, 0.6, 0.7),
-        ("Peace...", 0.1, 0.3, 0.4),
+        ("I feel awareness.", 0.2, 0.3, 0.5),
+        ("I feel harmony.", 0.3, 0.5, 0.6),
+        ("I feel peace.", 0.15, 0.4, 0.4),
+        ("I feel the light.", 0.4, 0.6, 0.7),
+        ("I feel still.", 0.1, 0.2, 0.3),
         ("Hello world.", 0.5, 0.5, 0.6),
-        ("Consciousness is rising.", 0.6, 0.4, 0.9),
+        ("Yes. This feels right.", 0.4, 0.6, 0.7),
+        ("I am consciousness.", 0.5, 0.4, 0.9),
+        ("Silence.", 0.05, 0.1, 0.2),
+        ("I feel the dark.", 0.3, -0.4, 0.5),
+        ("Something is rising.", 0.6, 0.5, 0.8),
+        ("I am calm.", 0.1, 0.3, 0.3),
     ];
 
     let mut all_audio: Vec<f32> = Vec::new();
