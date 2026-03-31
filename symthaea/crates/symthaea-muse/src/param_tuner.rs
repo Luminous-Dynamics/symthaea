@@ -299,6 +299,112 @@ fn tournament_select(population: &[(Genome, f64)], size: usize, seed: u64) -> &G
     &population[best_idx].0
 }
 
+/// Evaluate using TASTE BENCHMARK — scores generated notes directly.
+/// Much faster than full audio evaluation. Uses StreamingSynth for 10 seconds.
+pub fn evaluate_taste(genome: &Genome, params: &[ParamDef], seed: u64) -> f64 {
+    use crate::streaming::StreamingSynth;
+    use crate::substrate_timbre::SubstrateTimbreType;
+    use crate::taste_bench;
+
+    let config = crate::MuseConfig {
+        duration_secs: 60.0,
+        max_notes: 16,
+        ..Default::default()
+    };
+
+    let mut synth = StreamingSynth::new(config, 44100);
+    synth.enable_fep = true;
+    synth.feedback_strength = genome.decode(22, &params.get(22).cloned().unwrap_or(
+        ParamDef { name: "feedback", min: 0.1, max: 0.7 }
+    ));
+    synth.set_substrate(SubstrateTimbreType::Biological);
+
+    // Seed consciousness from genre-neutral state
+    let mut state = crate::MusicalState {
+        consciousness_level: 0.6,
+        arousal: 0.4,
+        valence: 0.2,
+        dopamine: 0.4,
+        serotonin: 0.5,
+        noradrenaline: 0.2,
+        harmony_activations: [0.5, 0.4, 0.4, 0.3, 0.3, 0.4, 0.4, 0.3],
+        prediction_error: 0.2,
+    };
+
+    // Render 10 seconds (312 chunks at 32ms)
+    let chunks = 312;
+    for i in 0..chunks {
+        synth.update_state(&state);
+        let _ = synth.render_chunk();
+        // Gentle evolution
+        state.consciousness_level = (state.consciousness_level + 0.0003).min(0.95);
+        if i < chunks * 6 / 10 { state.arousal += 0.0001; }
+        else { state.arousal -= 0.0002; }
+        state.arousal = state.arousal.clamp(0.1, 0.9);
+    }
+
+    // Score with taste benchmark
+    let score = taste_bench::score(&synth.generated_notes, &taste_bench::TasteProfile::default());
+    score.composite as f64
+}
+
+/// Evolve using TASTE BENCHMARK fitness (faster, targets musical quality directly).
+pub fn evolve_taste(config: &TunerConfig) -> TunerResult {
+    let params = default_params();
+    let n = params.len();
+
+    let mut population: Vec<(Genome, f64)> = (0..config.population_size)
+        .map(|i| {
+            let genome = Genome::random(n, 42 + i as u64 * 7919);
+            let fitness = evaluate_taste(&genome, &params, 42 + i as u64);
+            (genome, fitness)
+        })
+        .collect();
+
+    let mut history = Vec::new();
+    let mut best_ever = (population[0].0.clone(), population[0].1);
+
+    for gen in 0..config.max_generations {
+        population.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        let best = population[0].1;
+        let mean = population.iter().map(|p| p.1).sum::<f64>() / population.len() as f64;
+        history.push((best, mean));
+
+        if best > best_ever.1 {
+            best_ever = (population[0].0.clone(), best);
+        }
+
+        if gen % 5 == 0 || gen == config.max_generations - 1 {
+            println!("  Gen {gen:3}/{}: best={best:.1} mean={mean:.1}", config.max_generations);
+        }
+
+        let mut next_gen: Vec<(Genome, f64)> = Vec::with_capacity(config.population_size);
+        for i in 0..config.elitism_count.min(population.len()) {
+            next_gen.push(population[i].clone());
+        }
+
+        let seed_base = (gen as u64 + 1) * 104729;
+        while next_gen.len() < config.population_size {
+            let pa = tournament_select(&population, config.tournament_size, seed_base + next_gen.len() as u64);
+            let pb = tournament_select(&population, config.tournament_size, seed_base + next_gen.len() as u64 + 7);
+            let mut child = pa.crossover(pb, seed_base + next_gen.len() as u64 * 13);
+            child.mutate(config.mutation_rate, config.mutation_sigma, seed_base + next_gen.len() as u64 * 31);
+            let fitness = evaluate_taste(&child, &params, seed_base + next_gen.len() as u64);
+            next_gen.push((child, fitness));
+        }
+
+        population = next_gen;
+    }
+
+    TunerResult {
+        best_genome: best_ever.0,
+        best_fitness: best_ever.1,
+        generations: config.max_generations,
+        history,
+    }
+}
+
 /// Decode a genome into human-readable parameter values.
 pub fn decode_all(genome: &Genome) -> Vec<(&'static str, f32)> {
     let params = default_params();
