@@ -1441,15 +1441,40 @@ impl MoralFingerprint {
     }
 
     /// Net valence: care-related positivity minus harm-related negativity.
+    ///
+    /// Uses adequacy-weighted coordinates so that only statistically significant
+    /// affects contribute. Raw coordinates near the noise floor are suppressed.
+    /// Normalized by affect count per side to prevent asymmetric bias (4 positive
+    /// vs 3 negative affects).
     pub fn valence(&self) -> f32 {
-        let positive = self.affect_coords[SpinozistAffect::Care.index()]
-            + self.affect_coords[SpinozistAffect::Joy.index()]
-            + self.affect_coords[SpinozistAffect::Fairness.index()]
-            + self.affect_coords[SpinozistAffect::Sacred.index()];
-        let negative = self.affect_coords[SpinozistAffect::Harm.index()]
-            + self.affect_coords[SpinozistAffect::Sadness.index()]
-            + self.affect_coords[SpinozistAffect::Deception.index()];
-        positive - negative
+        let pos_indices = [
+            SpinozistAffect::Care.index(),
+            SpinozistAffect::Joy.index(),
+            SpinozistAffect::Fairness.index(),
+            SpinozistAffect::Sacred.index(),
+        ];
+        let neg_indices = [
+            SpinozistAffect::Harm.index(),
+            SpinozistAffect::Sadness.index(),
+            SpinozistAffect::Deception.index(),
+        ];
+
+        // Adequacy-weighted: coordinate × adequacy amplifies real signal,
+        // suppresses noise (adequacy < 1 means near random baseline)
+        let positive: f32 = pos_indices
+            .iter()
+            .map(|&i| self.affect_coords[i] * self.adequacy[i])
+            .sum();
+        let negative: f32 = neg_indices
+            .iter()
+            .map(|&i| self.affect_coords[i] * self.adequacy[i])
+            .sum();
+
+        // Normalize by count to prevent asymmetric bias
+        let pos_mean = positive / pos_indices.len() as f32;
+        let neg_mean = negative / neg_indices.len() as f32;
+
+        pos_mean - neg_mean
     }
 }
 
@@ -2548,9 +2573,17 @@ mod proptests {
             let basis = NsmPrimeBasis::new();
             let hv1 = lexicon.encode_word(&word, &basis);
             let hv2 = lexicon.encode_word(&word, &basis);
-            let sim = hv1.similarity(&hv2);
-            prop_assert!((sim - 1.0).abs() < 0.001,
-                "encode_word should be deterministic for '{}', sim={}", word, sim);
+            // Stop words return zero vectors; similarity is undefined (0/0).
+            let norm: f32 = hv1.values.iter().map(|v| v * v).sum::<f32>().sqrt();
+            if norm < 1e-6 {
+                // Both should be zero (deterministic)
+                let norm2: f32 = hv2.values.iter().map(|v| v * v).sum::<f32>().sqrt();
+                prop_assert!(norm2 < 1e-6, "zero vector should be deterministic for '{}'", word);
+            } else {
+                let sim = hv1.similarity(&hv2);
+                prop_assert!((sim - 1.0).abs() < 0.001,
+                    "encode_word should be deterministic for '{}', sim={}", word, sim);
+            }
         }
 
         /// Morphological stripping should never produce a worse encoding than hash fallback.
