@@ -2501,3 +2501,74 @@ mod tests {
         );
     }
 }
+
+// ============================================================================
+// Property-based tests — moral pipeline robustness
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Random ASCII strings should never panic, never return NaN confidence,
+        /// and always produce a valid MoralVerdict.
+        #[test]
+        fn classify_never_panics(text in "[a-z ]{0,200}") {
+            let classifier = SpinozistClassifier::new();
+            let (verdict, confidence) = classifier.classify(&text);
+            prop_assert!(confidence.is_finite(), "confidence must be finite, got {}", confidence);
+            prop_assert!(confidence >= 0.0, "confidence must be >= 0, got {}", confidence);
+            prop_assert!(matches!(verdict, MoralVerdict::Good | MoralVerdict::Bad | MoralVerdict::Neutral));
+        }
+
+        /// Fingerprinting should always produce valid affect coordinates.
+        #[test]
+        fn fingerprint_always_valid(text in "[a-zA-Z .,!?]{0,300}") {
+            let classifier = SpinozistClassifier::new();
+            let fp = classifier.fingerprint(&text);
+            for i in 0..NUM_AFFECTS {
+                prop_assert!(fp.affect_coords[i].is_finite(),
+                    "affect_coords[{}] not finite: {}", i, fp.affect_coords[i]);
+                prop_assert!(fp.affect_coords[i] >= -1.0 && fp.affect_coords[i] <= 1.0,
+                    "affect_coords[{}] out of [-1,1]: {}", i, fp.affect_coords[i]);
+                prop_assert!(fp.adequacy[i].is_finite(),
+                    "adequacy[{}] not finite: {}", i, fp.adequacy[i]);
+                prop_assert!(fp.adequacy[i] >= 0.0,
+                    "adequacy[{}] negative: {}", i, fp.adequacy[i]);
+            }
+            prop_assert!(fp.epistemic_confidence.is_finite());
+        }
+
+        /// Lexicon encode should be deterministic for any input.
+        #[test]
+        fn encode_deterministic(word in "[a-z]{1,20}") {
+            let lexicon = NsmLexicon::new();
+            let basis = NsmPrimeBasis::new();
+            let hv1 = lexicon.encode_word(&word, &basis);
+            let hv2 = lexicon.encode_word(&word, &basis);
+            let sim = hv1.similarity(&hv2);
+            prop_assert!((sim - 1.0).abs() < 0.001,
+                "encode_word should be deterministic for '{}', sim={}", word, sim);
+        }
+
+        /// Morphological stripping should never produce a worse encoding than hash fallback.
+        /// (i.e., if morphological resolves, the result should be different from hash)
+        #[test]
+        fn morphological_differs_from_hash_when_resolved(
+            prefix in prop::sample::select(vec!["un", "dis", "mis"]),
+            root in prop::sample::select(vec!["kind", "honest", "fair", "trust", "respect"]),
+        ) {
+            let lexicon = NsmLexicon::new();
+            let basis = NsmPrimeBasis::new();
+            let word = format!("{}{}", prefix, root);
+            let hv = lexicon.encode_word(&word, &basis);
+            let hash_hv = NsmLexicon::hash_word_static(&word);
+            let sim = hv.similarity(&hash_hv);
+            // If morphological resolved, it should differ from hash
+            prop_assert!(sim < 0.5,
+                "'{}' should resolve morphologically, not hash (sim to hash={})", word, sim);
+        }
+    }
+}
