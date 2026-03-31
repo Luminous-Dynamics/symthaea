@@ -871,10 +871,9 @@ impl StreamingSynth {
                 let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
                 let ctx = self.lead_voice.melodic_context(phrase_pos, self.chord_beat_counter);
 
-                // Phrasing: insert rests for breathing space (15-25% of the time)
-                if self.taste_melody.should_rest() {
-                    continue; // skip this note — silence is music too
-                }
+                // Phrasing: rests are handled via duration (longer notes = space)
+                // NOT via skipping — skipping breaks the melody state machine
+                let is_rest = self.taste_melody.should_rest();
 
                 // Taste-optimized melody with phrasing and dynamics
                 let taste_scale = crate::taste_melody::build_scale_with(
@@ -889,7 +888,11 @@ impl StreamingSynth {
                 note.duration = self.taste_melody.suggest_duration(
                     self.state.arousal, self.muse_stream.tempo(),
                 );
-                note.velocity = self.taste_melody.suggest_velocity(self.state.arousal);
+                note.velocity = if is_rest {
+                    0.0 // rest: silent note (still advances melody state)
+                } else {
+                    self.taste_melody.suggest_velocity(self.state.arousal)
+                };
 
                 // Apply key modulation from dramatic state
                 note.frequency = self.dramatic.apply_key_shift(note.frequency);
