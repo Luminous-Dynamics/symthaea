@@ -212,7 +212,7 @@ impl TasteMelody {
     /// Should this be a rest instead of a note?
     /// Must advance seed to avoid repeating the same decision.
     pub fn should_rest(&mut self) -> bool {
-        self.seed = self.seed.wrapping_mul(6364136223846793005u32 as u32).wrapping_add(1);
+        self.seed = self.seed.wrapping_mul(1664525).wrapping_add(1013904223);
         let r = (self.seed >> 16) % 100;
         // Rests at phrase boundaries for breathing
         if self.phrase_notes >= self.phrase_length.saturating_sub(1) {
