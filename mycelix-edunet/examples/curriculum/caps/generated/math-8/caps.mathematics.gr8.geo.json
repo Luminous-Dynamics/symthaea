@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "The angles of a triangle are x, 2x, and 3x. Find x.",
+        "answer": "x = 30 degrees",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Angles in triangle sum to 180"
         ],
-        "explanation": "Explanation.",
+        "explanation": "x + 2x + 3x = 180, 6x = 180, x = 30.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 60",
+          "x = 45",
+          "x = 20"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A right triangle has legs 3 cm and 4 cm. Find the hypotenuse.",
+        "answer": "5 cm",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Pythagoras: a^2 + b^2 = c^2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3^2 + 4^2 = 9 + 16 = 25. c = sqrt(25) = 5 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "7 cm",
+          "6 cm",
+          "12 cm"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Two parallel lines are cut by a transversal. A corresponding angle is 72 degrees. What is the other corresponding angle?",
+        "answer": "72 degrees",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Corresponding angles are equal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Corresponding angles between parallel lines are equal = 72 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "108 degrees",
+          "18 degrees",
+          "144 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A right triangle has hypotenuse 13 cm and one leg 5 cm. Find the other leg.",
+        "answer": "12 cm",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "a^2 + b^2 = c^2, solve for a"
         ],
-        "explanation": "Explanation.",
+        "explanation": "a^2 + 25 = 169, a^2 = 144, a = 12 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "8 cm",
+          "18 cm",
+          "10 cm"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Are triangles with sides 6,8,10 and 3,4,5 similar?",
+        "answer": "Yes (scale factor 2)",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Check if sides are in the same ratio"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6/3 = 8/4 = 10/5 = 2. All ratios equal, so the triangles are similar.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "No",
+          "Only if angles match",
+          "Cannot determine"
         ]
       }
     ],

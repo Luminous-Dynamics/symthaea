@@ -1,0 +1,327 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr12.DNA",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr12.DNA",
+    "title": "DNA, RNA and Protein Synthesis: Replication, Transcription, Translation, and Mutations (40 marks)",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "DNA (deoxyribonucleic acid) is a double-stranded helix of nucleotides, each containing a deoxyribose sugar, phosphate group, and nitrogenous base (A, T, G, C). Complementary base pairing (A-T, G-C) holds the two strands together via hydrogen bonds. DNA replication is semi-conservative: helicase unwinds and separates strands; DNA polymerase synthesises new complementary strands, producing two identical DNA molecules. Protein synthesis involves transcription (DNA → mRNA in the nucleus, using RNA polymerase) and translation (mRNA → protein at ribosomes in cytoplasm, using tRNA and codons/anticodons). Mutations are changes in DNA base sequence: point mutations (substitution, insertion, deletion) can alter the protein produced, with frameshift mutations (insertion/deletion) being most severe.",
+    "examples": [
+      {
+        "problem": "Describe the process of DNA replication, explaining why it is called 'semi-conservative'.",
+        "steps": [
+          {
+            "instruction": "Step 1: Helicase enzyme unwinds and separates the two DNA strands by breaking hydrogen bonds between complementary bases.",
+            "result": "strands separated"
+          },
+          {
+            "instruction": "Step 2: Each strand serves as a template. Free nucleotides in the nucleus pair with exposed bases following complementary base pairing rules: A-T and G-C.",
+            "result": "base pairing"
+          },
+          {
+            "instruction": "Step 3: DNA polymerase joins the new nucleotides together, forming the sugar-phosphate backbone of the new strand.",
+            "result": "new strand synthesised"
+          },
+          {
+            "instruction": "Step 4: Two identical DNA molecules are produced. Each consists of one ORIGINAL strand and one NEW strand — this is why it is called 'semi-conservative' (half is conserved from the original).",
+            "result": "semi-conservative explained"
+          }
+        ],
+        "answer": "Answer: DNA replication: helicase separates strands → DNA polymerase builds new strands using complementary base pairing → two identical DNA molecules, each with one old and one new strand (semi-conservative).",
+        "visual_description": null
+      },
+      {
+        "problem": "Given the DNA template strand: 3'-TAC GGA ATT CGC-5', determine the mRNA sequence, and identify the amino acids coded for (use the codon table).",
+        "steps": [
+          {
+            "instruction": "Step 1: Transcription — RNA polymerase reads the template strand (3'→5') and builds mRNA using complementary RNA base pairing (A→U, T→A, G→C, C→G).",
+            "result": "base pairing rules"
+          },
+          {
+            "instruction": "Step 2: Template: 3'-TAC GGA ATT CGC-5'. mRNA: 5'-AUG CCU UAA GCG-3'.",
+            "result": "mRNA sequence"
+          },
+          {
+            "instruction": "Step 3: Read mRNA in codons (groups of 3): AUG | CCU | UAA | GCG.",
+            "result": "codons identified"
+          },
+          {
+            "instruction": "Step 4: Translate: AUG = Methionine (start codon), CCU = Proline, UAA = STOP codon. GCG is not translated. Protein: Met-Pro.",
+            "result": "amino acids determined"
+          }
+        ],
+        "answer": "Answer: mRNA = AUG CCU UAA GCG. Amino acids: Methionine-Proline (UAA is a stop codon, ending translation).",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the difference between a point mutation (substitution) and a frameshift mutation (insertion/deletion), and predict which is more harmful.",
+        "steps": [
+          {
+            "instruction": "Step 1: Point mutation (substitution) — One base is replaced by another. Example: TAC → TAA. This changes only ONE codon, potentially changing one amino acid. The genetic code's degeneracy means some substitutions are 'silent' (no amino acid change).",
+            "result": "substitution described"
+          },
+          {
+            "instruction": "Step 2: Frameshift mutation — A base is inserted or deleted, shifting the reading frame of ALL codons downstream. Example: Inserting G into TAC-GGA → TAG-CGG-A... Every codon after the insertion is different.",
+            "result": "frameshift described"
+          },
+          {
+            "instruction": "Step 3: Frameshift mutations are typically MORE harmful because they change EVERY amino acid downstream of the mutation, usually producing a completely non-functional protein. Substitutions only affect one amino acid (or may be silent).",
+            "result": "relative severity"
+          }
+        ],
+        "answer": "Answer: Substitution changes one base/codon (may be silent). Frameshift (insertion/deletion) shifts all downstream codons, changing every amino acid — usually more severe.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "If a DNA strand has the base sequence 3'-A T G C C A T T G-5', write the complementary strand.",
+        "answer": "5'-T A C G G T A A C-3'. Complementary base pairing: A-T and G-C.",
+        "difficulty_permille": 125,
+        "bloom_level": "Apply",
+        "hints": [
+          "A pairs with T, G pairs with C.",
+          "Remember to write the complementary strand in the antiparallel direction (5' to 3')."
+        ],
+        "explanation": "DNA strands are antiparallel and complementary. Each base pairs specifically: adenine with thymine (2 hydrogen bonds), guanine with cytosine (3 hydrogen bonds).",
+        "distractors": [
+          "5'-U A C G G U A A C-3' (RNA bases, not DNA)",
+          "5'-A T G C C A T T G-3' (same strand, not complementary)",
+          "3'-T A C G G T A A C-5' (correct bases but wrong direction)"
+        ]
+      },
+      {
+        "question": "State three differences between DNA and mRNA.",
+        "answer": "1) DNA is double-stranded; mRNA is single-stranded. 2) DNA contains deoxyribose sugar; mRNA contains ribose sugar. 3) DNA has thymine (T); mRNA has uracil (U) instead. Additionally: DNA stays in the nucleus; mRNA travels to the cytoplasm.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Compare structure (strands), sugar, and bases.",
+          "Where does each molecule function in the cell?"
+        ],
+        "explanation": "DNA and mRNA differ in strand number (double vs single), sugar (deoxyribose vs ribose), bases (T vs U), and location (nucleus vs cytoplasm). mRNA is a temporary copy of a gene.",
+        "distractors": [
+          "DNA and mRNA have the same sugar",
+          "mRNA is double-stranded like DNA",
+          "DNA contains uracil"
+        ]
+      },
+      {
+        "question": "A DNA template strand reads: 3'-TAC AAA GCA ACT-5'. Transcribe this into mRNA and translate it into an amino acid sequence using the codon table. (AUG=Met, UUU=Phe, CGU=Arg, UGA=Stop)",
+        "answer": "mRNA: 5'-AUG UUU CGU UGA-3'. Codons: AUG | UUU | CGU | UGA. Amino acids: Met-Phe-Arg (UGA = stop codon). The polypeptide is three amino acids long.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Transcribe: replace T with A, A with U, G with C, C with G in the mRNA.",
+          "Read mRNA in triplets (codons) from the start codon AUG."
+        ],
+        "explanation": "Transcription converts DNA template to mRNA (A→U, T→A, G→C, C→G). Translation reads codons in triplets, starting at AUG and ending at a stop codon. Each codon specifies one amino acid.",
+        "distractors": [
+          "mRNA: AUG UUU CGU UGA → Met-Phe-Arg-Stop-Gly",
+          "mRNA: TAC AAA GCA ACT (this is DNA, not mRNA)",
+          "AUG codes for Valine instead of Methionine"
+        ]
+      },
+      {
+        "question": "Explain the roles of mRNA, tRNA, and rRNA (ribosomes) during translation. [NSC-style 8-mark question]",
+        "answer": "mRNA: Carries the genetic code (copied from DNA) from the nucleus to the ribosome in the cytoplasm. The code is in the form of codons (triplets of bases). tRNA: Each tRNA molecule has an anticodon (complementary to mRNA codon) and carries a specific amino acid. tRNA delivers amino acids to the ribosome in the correct sequence. rRNA (ribosomes): Ribosomes are the site of translation. They consist of a large and small subunit made of rRNA and protein. The ribosome holds the mRNA and has two binding sites for tRNA (A-site and P-site). It catalyses the formation of peptide bonds between amino acids, building the polypeptide chain. The ribosome moves along the mRNA, reading one codon at a time until a stop codon is reached.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think of the roles: mRNA = message, tRNA = transport, rRNA = factory/workbench.",
+          "NSC marking: typically 1 mark for each distinct fact. Aim for 8+ points of information."
+        ],
+        "explanation": "Translation requires all three RNA types working together: mRNA provides the code, tRNA delivers amino acids matching each codon, and ribosomes (rRNA) catalyse peptide bond formation, assembling the polypeptide.",
+        "distractors": [
+          "mRNA delivers amino acids to the ribosome",
+          "tRNA carries the genetic code from the nucleus",
+          "Ribosomes are found in the nucleus"
+        ]
+      },
+      {
+        "question": "Sickle cell anaemia is caused by a single point mutation in the gene for haemoglobin. The normal DNA codon CTC is mutated to CAC, changing the mRNA codon from GAG (glutamic acid) to GUG (valine). Explain how this single base change leads to a serious disease, and discuss why sickle cell allele frequency is high in malaria-endemic regions of Africa. [NSC-style 10-mark question]",
+        "answer": "Molecular level: The substitution of A for T (CTC→CAC) changes mRNA codon GAG→GUG, replacing hydrophilic glutamic acid with hydrophobic valine at position 6 of the beta-globin chain. This causes haemoglobin molecules to polymerise under low-oxygen conditions, forming rigid fibres that distort red blood cells into a sickle shape. Physiological consequences: Sickle cells block capillaries (causing pain crises), are destroyed prematurely (causing anaemia), and cannot carry oxygen efficiently. Organs (spleen, kidneys, brain) may be damaged by blocked blood flow. Heterozygous advantage: In malaria-endemic regions of sub-Saharan Africa, carriers (heterozygous HbAS) have a survival advantage — the malaria parasite Plasmodium cannot complete its life cycle in sickle cells. Homozygous normal (HbAA) individuals die more often from malaria; homozygous sickle cell (HbSS) individuals die from sickle cell disease. Heterozygotes survive both threats, maintaining the sickle cell allele at high frequency (balanced polymorphism/heterozygous advantage).",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Trace the effect from DNA → mRNA → amino acid → protein shape → cell shape → organ damage.",
+          "Why would a harmful allele persist in a population? Think about selection pressure from malaria."
+        ],
+        "explanation": "Sickle cell anaemia demonstrates how one base change cascades from DNA to protein to disease. Heterozygous advantage in malaria regions explains why the allele persists — a key example of natural selection maintaining genetic variation.",
+        "distractors": [
+          "Sickle cell is caused by a frameshift mutation, not a substitution",
+          "The sickle cell allele is common because it is dominant",
+          "Sickle cell anaemia only affects people in South Africa"
+        ]
+      }
+    ],
+    "hints": [
+      "Central dogma: DNA → (transcription) → mRNA → (translation) → Protein. Information flows in one direction.",
+      "Base pairing: DNA (A-T, G-C); RNA has U instead of T (A-U, G-C).",
+      "AUG is ALWAYS the start codon (codes for methionine). Stop codons: UAA, UAG, UGA."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "codon",
+        "definition": "A sequence of three bases on mRNA that codes for one specific amino acid (or a stop signal)",
+        "example_usage": "The codon AUG codes for methionine and signals the start of translation."
+      },
+      {
+        "term": "anticodon",
+        "definition": "A sequence of three bases on tRNA that is complementary to an mRNA codon",
+        "example_usage": "The tRNA with anticodon UAC carries methionine and pairs with the mRNA codon AUG."
+      },
+      {
+        "term": "transcription",
+        "definition": "The process of copying a gene's DNA sequence into mRNA, carried out by RNA polymerase in the nucleus",
+        "example_usage": "During transcription, RNA polymerase reads the template strand and builds a complementary mRNA molecule."
+      },
+      {
+        "term": "translation",
+        "definition": "The process of assembling a polypeptide (protein) from amino acids according to the mRNA code, occurring at ribosomes",
+        "example_usage": "Translation requires mRNA, tRNA, ribosomes, amino acids, and ATP."
+      },
+      {
+        "term": "frameshift mutation",
+        "definition": "A mutation caused by insertion or deletion of bases that shifts the reading frame of all downstream codons",
+        "example_usage": "A frameshift mutation typically produces a completely non-functional protein because every amino acid after the mutation is wrong."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think mRNA is made directly from the coding (sense) strand of DNA.",
+        "correction": "mRNA is synthesised from the TEMPLATE (antisense) strand. The mRNA sequence is identical to the CODING strand (except U replaces T). RNA polymerase reads the template strand 3'→5', building mRNA 5'→3'.",
+        "why_students_think_this": "The coding strand has the same sequence as mRNA, so students assume it is the template. Clarify: template strand is the one actually read by RNA polymerase."
+      },
+      {
+        "misconception": "Students think a single base substitution always changes the amino acid.",
+        "correction": "The genetic code is degenerate — most amino acids are coded by more than one codon. A substitution may produce a synonym codon for the SAME amino acid (silent/synonymous mutation). Example: GGU, GGC, GGA, GGG all code for glycine.",
+        "why_students_think_this": "Students learn that mutations change proteins, assuming every change is harmful. Emphasise degeneracy — it is a buffer against mutations."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr12.DNA",
+    "title": "Assessment: DNA, RNA and Protein Synthesis (NSC exam format, 40 marks)",
+    "items": [
+      {
+        "question": "Define the term 'semi-conservative replication'.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Each new DNA molecule consists of one original (conserved) strand and one newly synthesised strand.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Semi = half. What is half-conserved?"
+      },
+      {
+        "question": "Explain the role of helicase and DNA polymerase during DNA replication.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Helicase unwinds the double helix and breaks hydrogen bonds between base pairs, separating the two strands. DNA polymerase adds free nucleotides to each template strand according to base pairing rules (A-T, G-C), synthesising the new complementary strand.",
+        "points": 4,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Two enzymes, two jobs: unzip and build."
+      },
+      {
+        "question": "Given DNA template: 3'-TAC CGG AAT-5', write the mRNA and identify the amino acids. (AUG=Met, GCC=Ala, UUA=Leu)",
+        "item_type": "ShortAnswer",
+        "correct_answer": "mRNA: 5'-AUG GCC UUA-3'. Amino acids: Met-Ala-Leu.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Transcribe T→A, A→U, G→C, C→G."
+      },
+      {
+        "question": "Compare the effects of a substitution mutation and a deletion mutation on the polypeptide produced.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Substitution: changes one codon, may change one amino acid or be silent (degeneracy). Deletion: causes a frameshift, changing ALL downstream codons and amino acids — usually produces a non-functional protein.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Which type affects just one codon vs all downstream codons?"
+      },
+      {
+        "question": "Evaluate the statement: 'All mutations are harmful.' Use sickle cell anaemia in Africa as an example.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Incorrect. While the HbSS genotype causes sickle cell disease, heterozygous carriers (HbAS) have resistance to malaria. In malaria-endemic Africa, this gives carriers a survival advantage (heterozygous advantage). Some mutations are neutral (silent), and some are beneficial. Mutations are the raw material for evolution.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider silent mutations, neutral mutations, and heterozygous advantage."
+      }
+    ],
+    "total_points": 18,
+    "estimated_minutes": 22,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is semi-conservative replication?",
+      "back": "Each new DNA molecule has one original strand and one newly synthesised strand. 'Semi' = half conserved.",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is a codon?",
+      "back": "A triplet of three bases on mRNA that codes for one amino acid (or a stop signal). There are 64 codons total.",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What are the three stop codons?",
+      "back": "UAA, UAG, UGA. They signal the end of translation (no tRNA matches them).",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the difference between transcription and translation?",
+      "back": "Transcription: DNA → mRNA (in nucleus, by RNA polymerase). Translation: mRNA → protein (at ribosomes, using tRNA).",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is a frameshift mutation?",
+      "back": "An insertion or deletion of bases that shifts the reading frame of all downstream codons, usually producing a non-functional protein.",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What enzyme unwinds DNA during replication?",
+      "back": "Helicase — it breaks the hydrogen bonds between complementary bases, separating the two strands.",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "Why is the genetic code called 'degenerate'?",
+      "back": "Most amino acids are coded by more than one codon (e.g. GGU, GGC, GGA, GGG all code for glycine). This buffers against mutations.",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What causes sickle cell anaemia?",
+      "back": "A single base substitution (CTC→CAC) changes one amino acid (glutamic acid→valine) in haemoglobin, causing red blood cells to sickle under low oxygen.",
+      "tags": ["CAPS.LifeSciences.Gr12.DNA", "Grade12", "DNA & Protein Synthesis"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

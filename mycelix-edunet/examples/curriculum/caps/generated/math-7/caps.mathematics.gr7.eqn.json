@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Solve: x + 5 = 12",
+        "answer": "x = 7",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract 5 from both sides"
         ],
-        "explanation": "Explanation.",
+        "explanation": "x = 12 - 5 = 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 17",
+          "x = 5",
+          "x = 60"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Solve: 3x = 18",
+        "answer": "x = 6",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide both sides by 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "x = 18/3 = 6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 15",
+          "x = 21",
+          "x = 54"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Solve: 2x + 3 = 15",
+        "answer": "x = 6",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract 3, then divide by 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2x = 15 - 3 = 12, x = 12/2 = 6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 9",
+          "x = 7.5",
+          "x = 5"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Solve: 4x - 7 = 13",
+        "answer": "x = 5",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add 7, then divide by 4"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4x = 13 + 7 = 20, x = 20/4 = 5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 1.5",
+          "x = 3",
+          "x = 6"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Thabo thinks of a number, multiplies it by 5, and subtracts 3 to get 22. What is the number?",
+        "answer": "x = 5",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Write equation: 5x - 3 = 22, then solve"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5x - 3 = 22, 5x = 25, x = 5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 4",
+          "x = 6",
+          "x = 3.8"
         ]
       }
     ],

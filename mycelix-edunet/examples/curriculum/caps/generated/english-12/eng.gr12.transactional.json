@@ -1,0 +1,130 @@
+{
+  "node_id": "CAPS.English.Gr12.TRANSACTIONAL",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.TRANSACTIONAL",
+    "title": "Transactional Writing: Letters, Reports, Reviews, Speeches, Minutes & CV",
+    "grade_level": "Grade12",
+    "bloom_level": "Create",
+    "explanation": "Transactional writing serves a real-world purpose and follows specific format conventions. Gr12 CAPS covers: formal letters (complaint, application, request — with sender/recipient addresses, date, subject line, formal greeting and closing), informal letters (personal tone, first-name greeting), reports (headings, subheadings, findings, recommendations), reviews (book/film — opinion supported by evidence), speeches (greeting, rhetorical devices, call to action), minutes (meeting record with headings, attendance, resolutions), and CVs (personal details, education, experience, skills, references). Format, register, and audience awareness earn marks.",
+    "examples": [
+      {
+        "problem": "Write the opening of a formal letter of complaint to Eskom about repeated load-shedding affecting your studies.",
+        "steps": [
+          {"instruction": "Step 1: Include your address (top right) and the date below it.", "result": "Sender details placed"},
+          {"instruction": "Step 2: Add the recipient's address (left-aligned) and a subject line.", "result": "Recipient and subject added"},
+          {"instruction": "Step 3: Use formal greeting — 'Dear Sir/Madam' (if name unknown) or 'Dear Mr Surname'.", "result": "Greeting set"},
+          {"instruction": "Step 4: Open with a clear statement of purpose — state what you are complaining about and why.", "result": "Purpose stated"}
+        ],
+        "answer": "Answer: '12 Protea Street\\nSandton\\n2196\\n30 March 2026\\n\\nThe Customer Relations Manager\\nEskom Holdings SOC Ltd\\nMegawatt Park\\nSunninghill\\n2157\\n\\nDear Sir/Madam\\n\\nRE: COMPLAINT REGARDING EXCESSIVE LOAD-SHEDDING IN SANDTON AREA\\n\\nI write to express my serious concern about the increasingly frequent and prolonged periods of load-shedding affecting our neighbourhood...'",
+        "visual_description": null
+      },
+      {
+        "problem": "List the essential sections of a curriculum vitae (CV) in the correct order.",
+        "steps": [
+          {"instruction": "Step 1: Personal details — full name, contact number, email, address.", "result": "Identity section"},
+          {"instruction": "Step 2: Personal statement/objective — a brief summary of your goals (2-3 sentences).", "result": "Career objective"},
+          {"instruction": "Step 3: Education — most recent first, including institution, dates, and qualifications.", "result": "Academic history"},
+          {"instruction": "Step 4: Work experience — most recent first, with responsibilities and achievements.", "result": "Professional history"},
+          {"instruction": "Step 5: Skills, languages, interests, and references.", "result": "Supporting sections"}
+        ],
+        "answer": "Answer: (1) Personal Details, (2) Personal Statement/Career Objective, (3) Education (reverse chronological), (4) Work Experience (reverse chronological), (5) Skills & Competencies, (6) Languages, (7) Interests/Hobbies, (8) References (minimum two).",
+        "visual_description": null
+      },
+      {
+        "problem": "Write the opening of a speech to your school about the importance of mental health awareness.",
+        "steps": [
+          {"instruction": "Step 1: Greet the audience formally — acknowledge the principal, teachers, and fellow learners.", "result": "Greeting established"},
+          {"instruction": "Step 2: Open with a hook — a question, statistic, or anecdote to capture attention.", "result": "Audience engaged"},
+          {"instruction": "Step 3: State your topic and purpose clearly.", "result": "Direction given"}
+        ],
+        "answer": "Answer: 'Good morning, Mr Moyo, esteemed teachers, and fellow learners. Let me ask you something: when last did someone ask you — really ask you — how you are feeling? According to the South African Depression and Anxiety Group, one in four South African teenagers experiences a mental health challenge before the age of eighteen. Today, I want to talk about why breaking the silence around mental health could save the life of someone sitting in this very hall.'",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the difference between a formal and informal letter in terms of greeting, tone, and closing?",
+        "answer": "Formal: greeting 'Dear Sir/Madam' or 'Dear Mr/Ms Surname'; tone is objective and professional; closing 'Yours faithfully' (if name unknown) or 'Yours sincerely' (if name known). Informal: greeting uses first name ('Dear Thandi' or 'Hi Thandi'); tone is personal and conversational; closing 'Love,' 'Best wishes,' or 'Cheers.'",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": ["Formal = professional relationship. Informal = personal relationship.", "'Yours faithfully' goes with 'Dear Sir/Madam'; 'Yours sincerely' goes with a named recipient."],
+        "explanation": "The faithfully/sincerely distinction is a common exam question. Remember: if you do not know the name (Sir/Madam), you are faithful; if you know the name, you are sincere.",
+        "distractors": ["Formal letters always use 'Yours sincerely.'", "Informal letters do not need a greeting.", "Both types use the same tone."]
+      },
+      {
+        "question": "Write a brief book review (80-100 words) of any novel you have studied, including a recommendation.",
+        "answer": "Tsotsi by Athol Fugard is a gripping exploration of redemption in apartheid-era South Africa. The novel follows a young gangster whose discovery of an abandoned baby forces him to confront his buried humanity. Fugard's sparse, powerful prose captures the brutality of township life without sensationalism, while the psychological depth of Tsotsi's transformation keeps readers invested until the devastating conclusion. I recommend this novel to anyone interested in South African literature or stories of moral awakening — it proves that compassion can emerge from the darkest circumstances.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["A review includes: title and author, brief plot summary (no spoilers), evaluation of strengths/weaknesses, and a recommendation.", "Use evaluative language: 'gripping,' 'powerful,' 'compelling,' 'disappointing.'"],
+        "explanation": "A review is not a summary — it is an informed opinion. Balance description with evaluation and always include a clear recommendation.",
+        "distractors": ["A review is just a summary of the plot.", "Reviews should never give opinions.", "Reviews must be at least 500 words."]
+      },
+      {
+        "question": "What are three rhetorical devices you should use in a speech? Define each.",
+        "answer": "(1) Rhetorical question — a question asked for effect, not requiring an answer ('How long must we wait?'). (2) Repetition/anaphora — repeating a word or phrase for emphasis ('We will fight. We will endure. We will overcome.'). (3) Tricolon — a group of three parallel phrases for rhythm and impact ('of the people, by the people, for the people').",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["Think about techniques that sound powerful when spoken aloud.", "Three is a powerful number in rhetoric — things that come in threes are memorable."],
+        "explanation": "Speeches are meant to be heard, not read. Rhetorical devices exploit the rhythm, repetition, and emotional impact of spoken language.",
+        "distractors": ["Speeches should only use facts, not rhetorical devices.", "Alliteration and simile are only for poetry.", "Repetition is always a writing error."]
+      },
+      {
+        "question": "What information must the heading of meeting minutes include?",
+        "answer": "The heading must include: (1) name of the organisation or committee, (2) type of meeting (regular, special, AGM), (3) date, time, and venue of the meeting, (4) names of attendees and apologies (absent members who sent notice).",
+        "difficulty_permille": 250,
+        "bloom_level": "Remember",
+        "hints": ["Minutes are a formal record — they must be precise about who, when, and where.", "Apologies means noting who was absent, not that someone said sorry."],
+        "explanation": "Minutes serve as a legal record of decisions made. Accuracy in the heading ensures accountability and traceability.",
+        "distractors": ["Minutes only need the date.", "Minutes do not record who was absent.", "Minutes are informal notes."]
+      },
+      {
+        "question": "Write a formal letter closing that includes a call to action, appropriate sign-off, and your name.",
+        "answer": "I trust that this matter will receive your urgent attention. I look forward to receiving a written response within fourteen working days, failing which I shall be compelled to escalate this complaint to the relevant ombudsman.\\n\\nYours faithfully\\n\\nT. Nkosi",
+        "difficulty_permille": 375,
+        "bloom_level": "Create",
+        "hints": ["A call to action tells the reader what you expect them to do.", "Set a deadline to create urgency.", "Use 'Yours faithfully' if you addressed the letter to 'Dear Sir/Madam.'"],
+        "explanation": "Effective formal letter closings are assertive but professional. They state the expected outcome, set a timeline, and mention consequences — without being aggressive.",
+        "distractors": ["End with 'Thanks, bye!'", "Never set deadlines in formal letters.", "Always use 'Yours sincerely' regardless of the greeting."]
+      }
+    ],
+    "hints": [
+      "Format marks are free marks — learn the layout conventions for each text type.",
+      "Match your register to the audience: formal for authority figures, informal for friends and family.",
+      "In a speech, address the audience directly using 'you' and 'we' to create connection."
+    ],
+    "key_vocabulary": [
+      {"term": "register", "definition": "The level of formality in language use, determined by audience, purpose, and context", "example_usage": "A letter to a bank requires a formal register; a letter to a friend uses an informal register."},
+      {"term": "salutation", "definition": "The greeting at the beginning of a letter (e.g., 'Dear Sir/Madam' or 'Dear Mr Nkosi')", "example_usage": "The salutation sets the tone for the entire letter."},
+      {"term": "call to action", "definition": "A statement that urges the reader or audience to take a specific step", "example_usage": "The speech ended with a call to action: 'Sign the petition today.'"},
+      {"term": "minutes", "definition": "The official written record of proceedings and decisions at a formal meeting", "example_usage": "The secretary read the minutes of the previous meeting for approval."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students use 'Yours sincerely' and 'Yours faithfully' interchangeably in formal letters.",
+        "correction": "'Yours faithfully' is used when you do not know the recipient's name (i.e., you wrote 'Dear Sir/Madam'). 'Yours sincerely' is used when you know and have used the recipient's name (i.e., you wrote 'Dear Mr Nkosi'). The rule: no name = faithful; name = sincere.",
+        "why_students_think_this": "Both phrases seem equally formal, so students assume they are interchangeable. The distinction is a convention of formal letter-writing that is consistently tested in CAPS exams."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "When do you use 'Yours faithfully' vs 'Yours sincerely'?", "back": "'Yours faithfully' when you do NOT know the recipient's name (Dear Sir/Madam). 'Yours sincerely' when you DO know and have used the name (Dear Mr Nkosi).", "tags": ["CAPS.English.Gr12.TRANSACTIONAL", "Grade12", "Writing"], "difficulty_permille": 222},
+    {"front": "What are the essential sections of a CV?", "back": "Personal details, personal statement/objective, education (reverse chronological), work experience (reverse chronological), skills, languages, interests, references.", "tags": ["CAPS.English.Gr12.TRANSACTIONAL", "Grade12", "Writing"], "difficulty_permille": 278},
+    {"front": "What must the heading of meeting minutes include?", "back": "Organisation/committee name, type of meeting, date, time, venue, attendees, and apologies (absent members who notified).", "tags": ["CAPS.English.Gr12.TRANSACTIONAL", "Grade12", "Writing"], "difficulty_permille": 222},
+    {"front": "What is a tricolon?", "back": "A rhetorical device using three parallel words, phrases, or clauses for emphasis and rhythm (e.g., 'of the people, by the people, for the people').", "tags": ["CAPS.English.Gr12.TRANSACTIONAL", "Grade12", "Writing"], "difficulty_permille": 389}
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

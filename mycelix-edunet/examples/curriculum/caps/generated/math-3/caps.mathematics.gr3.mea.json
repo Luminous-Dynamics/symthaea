@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangle is 6 cm long and 4 cm wide. What is its perimeter?",
+        "answer": "20 cm",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Perimeter = 2 x length + 2 x width"
         ],
-        "explanation": "Explanation.",
+        "explanation": "P = 2 x 6 + 2 x 4 = 12 + 8 = 20 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "24 cm",
+          "10 cm",
+          "18 cm"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Count the squares inside a shape. If there are 12 squares, what is the area?",
+        "answer": "12 square units",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Each square counts as 1 square unit"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Counting 12 squares means the area is 12 square units.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "12 units",
+          "12 cm",
+          "24 square units"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What time is it when the hour hand is on 6 and the minute hand is on 3?",
+        "answer": "6:15",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The minute hand on 3 means 15 minutes past"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Hour hand on 6 and minute hand on 3 = 6:15.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3:06",
+          "6:30",
+          "3:30"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A square has sides of 5 cm. What is its perimeter?",
+        "answer": "20 cm",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A square has 4 equal sides"
         ],
-        "explanation": "Explanation.",
+        "explanation": "P = 4 x 5 = 20 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25 cm",
+          "10 cm",
+          "15 cm"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangle is 7 cm by 3 cm. What is its area?",
+        "answer": "21 square cm",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Area = length x width"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Area = 7 x 3 = 21 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10 square cm",
+          "20 square cm",
+          "24 square cm"
         ]
       }
     ],

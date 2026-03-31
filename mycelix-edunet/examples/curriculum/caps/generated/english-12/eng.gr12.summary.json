@@ -1,0 +1,126 @@
+{
+  "node_id": "CAPS.English.Gr12.SUMMARY",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.SUMMARY",
+    "title": "Summary Writing: Key Points, Paraphrasing & Word Limit Techniques",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Summary writing tests your ability to extract essential information from a passage and express it concisely in your own words. In CAPS Gr12, summaries are typically limited to a specific number of words (often 70-80) or a set number of points (usually 7). Key skills: identify main ideas (not supporting details or examples), paraphrase without changing meaning, combine related points, eliminate repetition, use one word where the original used several, and count words accurately. Summaries are written in continuous prose (not bullet points unless specified), use reported speech (third person), and must stay within the word limit.",
+    "examples": [
+      {
+        "problem": "The original passage states: 'Many young people in South Africa face significant challenges when looking for employment. They lack the necessary skills because the education system does not adequately prepare them for the workplace. Furthermore, they do not have work experience, which employers increasingly demand.' Summarise in ONE sentence.",
+        "steps": [
+          {"instruction": "Step 1: Identify the main ideas — (1) youth unemployment challenges, (2) inadequate education, (3) lack of experience.", "result": "Three points found"},
+          {"instruction": "Step 2: Combine related ideas — education and experience are both causes of unemployment.", "result": "Points merged"},
+          {"instruction": "Step 3: Paraphrase concisely — replace wordy phrases with shorter equivalents.", "result": "Condensed"}
+        ],
+        "answer": "Answer: South African youth struggle to find work because the education system fails to equip them with workplace skills and they lack the experience employers require.",
+        "visual_description": null
+      },
+      {
+        "problem": "Reduce 'at this point in time' to fewer words.",
+        "steps": [
+          {"instruction": "Step 1: Identify the core meaning — it means 'now'.", "result": "Single word found"},
+          {"instruction": "Step 2: Replace the five-word phrase with one word.", "result": "Reduction complete"}
+        ],
+        "answer": "Answer: 'now' (or 'currently'). Replacing wordy phrases is a key summary skill.",
+        "visual_description": null
+      },
+      {
+        "problem": "A passage contains these two sentences: 'Exercise improves cardiovascular health. It also strengthens the heart and improves blood circulation.' Should both sentences appear in the summary?",
+        "steps": [
+          {"instruction": "Step 1: Check for repetition — 'cardiovascular health', 'strengthens the heart', and 'improves blood circulation' all relate to the same idea.", "result": "Overlap detected"},
+          {"instruction": "Step 2: Combine into one point — exercise improves heart health.", "result": "Merged"},
+          {"instruction": "Step 3: In a summary, this counts as one point, not two or three.", "result": "Duplication eliminated"}
+        ],
+        "answer": "Answer: No — these sentences express the same idea (heart/cardiovascular health). In your summary, combine them into one point: 'Exercise improves cardiovascular health.' Including both would waste your word count on repetition.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List four steps for writing an effective summary.",
+        "answer": "(1) Read the passage carefully and identify the main ideas. (2) Number or underline the key points. (3) Paraphrase each point in your own words. (4) Combine related points, eliminate repetition, and check the word count.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about the process from first reading to final draft.", "The word limit is a hard constraint — plan to stay under it."],
+        "explanation": "Summary writing is a process, not a one-step activity. Underlining key points before writing prevents you from including unnecessary details.",
+        "distractors": ["Copy the most important sentences word for word.", "Start writing immediately without reading the whole passage.", "Include as many details as possible."]
+      },
+      {
+        "question": "Why must summaries be in your own words? What happens if you copy directly from the passage?",
+        "answer": "Summaries must be paraphrased because the task tests your understanding, not your ability to copy. Lifting phrases directly from the passage (without quotation marks) is plagiarism and loses marks. Paraphrasing demonstrates comprehension and the ability to process and restructure information.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about what skill the examiner is testing.", "Paraphrasing proves you understood the meaning, not just the words."],
+        "explanation": "The CAPS mark allocation specifically penalises direct lifting. Examiners check whether you have processed the information or simply copied it.",
+        "distractors": ["You can copy up to half the words directly.", "Paraphrasing means rearranging the original words.", "Summaries should use the author's exact words for accuracy."]
+      },
+      {
+        "question": "Replace the following wordy expressions with single words or shorter phrases: (a) 'in spite of the fact that', (b) 'a large number of', (c) 'in the event that', (d) 'due to the fact that'.",
+        "answer": "(a) although/despite, (b) many, (c) if, (d) because.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Strip each phrase to its core meaning.", "These wordy phrases are common in formal writing but waste words in summaries."],
+        "explanation": "Word economy is essential in summary writing. Replacing a five-word phrase with one word frees space for additional points.",
+        "distractors": ["These phrases cannot be shortened.", "Always use the longer version for formality.", "'Due to the fact that' should be 'due to' (still wordy)."]
+      },
+      {
+        "question": "A passage about climate change mentions: rising sea levels, melting ice caps, increased flooding, coastal erosion, and loss of low-lying islands. How many summary points do these represent?",
+        "answer": "Two points at most: (1) rising sea levels (caused by melting ice caps) and (2) the consequences (flooding, coastal erosion, loss of islands). The ice caps melting causes sea level rise, which in turn causes the other effects — they form a single causal chain, not five separate points.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Look for cause-and-effect relationships between the ideas.", "Related effects of the same cause can often be grouped into one summary point."],
+        "explanation": "Good summary writers distinguish between separate main ideas and multiple details supporting one idea. Grouping related details avoids wasting points on repetition.",
+        "distractors": ["Five separate ideas = five summary points.", "Each sentence in the original = one point.", "Only the first and last ideas matter."]
+      },
+      {
+        "question": "Summarise the following in no more than 40 words: 'Regular physical activity has been shown by numerous scientific studies to have a wide range of health benefits. These include reducing the risk of heart disease, lowering blood pressure, helping to maintain a healthy body weight, improving mental health and mood, and strengthening bones and muscles.'",
+        "answer": "Scientific research shows that regular exercise reduces heart disease risk, lowers blood pressure, maintains healthy weight, improves mental health, and strengthens bones and muscles. (22 words)",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["Remove the wordy introduction ('has been shown by numerous scientific studies to have a wide range of').", "Replace 'physical activity' with 'exercise' (one word instead of two)."],
+        "explanation": "The original is 46 words. The summary reduces it by eliminating the verbose framing ('has been shown...to have a wide range of') and condensing 'physical activity' to 'exercise' while preserving all five health benefits.",
+        "distractors": ["Exercise is healthy. (3 words — too brief, loses specific points)", "Just copy the second sentence.", "Include the phrase 'numerous scientific studies' for credibility."]
+      }
+    ],
+    "hints": [
+      "Read the passage twice: once for general understanding, once to identify and number key points.",
+      "Replace wordy phrases with single words: 'due to the fact that' = 'because'; 'a large number of' = 'many'.",
+      "Count your words carefully — hyphenated words count as one word, and titles count."
+    ],
+    "key_vocabulary": [
+      {"term": "paraphrase", "definition": "To restate information in your own words while keeping the original meaning", "example_usage": "The student paraphrased the paragraph instead of copying it directly."},
+      {"term": "key point", "definition": "A main idea or essential piece of information in a passage, as opposed to a supporting detail or example", "example_usage": "The summary included only the seven key points, omitting examples and anecdotes."},
+      {"term": "word economy", "definition": "Using the fewest words necessary to convey meaning clearly and completely", "example_usage": "Good summary writing requires word economy — 'because' instead of 'due to the fact that.'"},
+      {"term": "direct lifting", "definition": "Copying words or phrases directly from the original passage without paraphrasing, which loses marks in summary writing", "example_usage": "The examiner penalised the candidate for direct lifting of three consecutive phrases."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students believe that a summary should include examples and supporting details from the original passage.",
+        "correction": "A summary includes only main ideas, not examples, anecdotes, statistics, or supporting details. If the passage gives three examples to illustrate one point, your summary states the point once and omits the examples.",
+        "why_students_think_this": "Students confuse 'important information' with 'all information.' They include details because they seem relevant, not realising that a summary deliberately excludes illustration in favour of core meaning."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What does 'paraphrase' mean?", "back": "To restate information in your own words while preserving the original meaning.", "tags": ["CAPS.English.Gr12.SUMMARY", "Grade12", "Writing"], "difficulty_permille": 111},
+    {"front": "What is 'direct lifting' and why is it penalised?", "back": "Copying words or phrases directly from the original passage. It is penalised because the summary task tests comprehension and the ability to process information, not copying ability.", "tags": ["CAPS.English.Gr12.SUMMARY", "Grade12", "Writing"], "difficulty_permille": 222},
+    {"front": "Replace with one word: 'in spite of the fact that'", "back": "Although (or 'despite').", "tags": ["CAPS.English.Gr12.SUMMARY", "Grade12", "Writing"], "difficulty_permille": 167},
+    {"front": "Should a summary include examples from the passage?", "back": "No. A summary includes only main ideas. Examples, anecdotes, and supporting details are omitted to stay within the word limit.", "tags": ["CAPS.English.Gr12.SUMMARY", "Grade12", "Writing"], "difficulty_permille": 222}
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

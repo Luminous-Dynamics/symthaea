@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is the value of the 5 in 53?",
+        "answer": "50",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The 5 is in the tens place"
         ],
-        "explanation": "Explanation.",
+        "explanation": "In 53, the 5 is in the tens column, so its value is 50.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "500",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Write the next number in the pattern: 10, 15, 20, ___",
+        "answer": "25",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count by 5s"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern counts in 5s. 20 + 5 = 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "22",
+          "30",
+          "21"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Which is greater: 67 or 76?",
+        "answer": "76",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Compare the tens digit first"
         ],
-        "explanation": "Explanation.",
+        "explanation": "76 has 7 tens, 67 has 6 tens. 7 tens is more, so 76 > 67.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "67",
+          "They are equal",
+          "60"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Round 47 to the nearest 10.",
+        "answer": "50",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at the ones digit: 7 is 5 or more, so round up"
         ],
-        "explanation": "Explanation.",
+        "explanation": "47 has 7 in the ones. 7 >= 5, so round up to 50.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "40",
+          "45",
+          "47"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Count in 3s starting from 3. What is the 5th number?",
+        "answer": "15",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "3, 6, 9, 12, ..."
         ],
-        "explanation": "Explanation.",
+        "explanation": "Counting in 3s: 3, 6, 9, 12, 15. The 5th number is 15.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "12",
+          "18",
+          "14"
         ]
       }
     ],

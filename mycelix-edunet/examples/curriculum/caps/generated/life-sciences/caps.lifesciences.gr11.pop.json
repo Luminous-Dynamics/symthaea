@@ -1,0 +1,326 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr11.POP",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr11.POP",
+    "title": "Population Ecology: Growth Curves, Carrying Capacity, Human Population, and SA Demographics",
+    "grade_level": "Grade11",
+    "bloom_level": "Understand",
+    "explanation": "A population is a group of organisms of the same species living in the same area. Population size is affected by birth rate, death rate, immigration, and emigration. Two growth patterns exist: exponential (J-curve) growth occurs when resources are unlimited and the population grows without limit; logistic (S-curve) growth occurs when environmental resistance (limited food, predation, disease) slows growth as the population approaches carrying capacity (K) — the maximum population an environment can sustain. South Africa's population (~62 million, 2024) shows a demographic transition: birth rates have declined due to urbanisation, education, and access to contraception, but HIV/AIDS has significantly impacted life expectancy and population structure.",
+    "examples": [
+      {
+        "problem": "Distinguish between exponential growth (J-curve) and logistic growth (S-curve), with examples.",
+        "steps": [
+          {
+            "instruction": "Step 1: Exponential growth (J-curve) — Population grows at an increasing rate without limit. Occurs when resources are abundant, no predators, no disease. Example: bacteria in a fresh nutrient broth.",
+            "result": "J-curve described"
+          },
+          {
+            "instruction": "Step 2: Logistic growth (S-curve) — Population initially grows exponentially, then slows as environmental resistance increases, eventually levelling off at carrying capacity (K). Example: a herd of springbok in the Kalahari limited by available grazing.",
+            "result": "S-curve described"
+          },
+          {
+            "instruction": "Step 3: Key difference — J-curve has no upper limit (unsustainable, often leads to crash); S-curve stabilises at K. Most natural populations follow S-curves.",
+            "result": "comparison"
+          }
+        ],
+        "answer": "Answer: Exponential growth (J-curve) = unlimited growth, no carrying capacity. Logistic growth (S-curve) = growth slows and levels off at carrying capacity (K). Natural populations typically show S-curves.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe how HIV/AIDS has affected the South African population structure.",
+        "steps": [
+          {
+            "instruction": "Step 1: SA has one of the highest HIV prevalence rates globally (~13% of the total population, ~19% of adults aged 15-49 as of 2023).",
+            "result": "prevalence stated"
+          },
+          {
+            "instruction": "Step 2: HIV/AIDS has reduced life expectancy — from ~62 years in 1990 to ~52 years in 2005 (before widespread ARV access). With ARV rollout, life expectancy has recovered to ~65 years.",
+            "result": "life expectancy impact"
+          },
+          {
+            "instruction": "Step 3: The population pyramid shows a narrowing in the 25-45 age group (working-age adults most affected), creating an hourglass shape rather than the expected broad base.",
+            "result": "pyramid shape"
+          },
+          {
+            "instruction": "Step 4: Consequences include increased orphan numbers (~3.7 million), reduced economic productivity, and strain on healthcare and social services.",
+            "result": "socioeconomic impact"
+          }
+        ],
+        "answer": "Answer: HIV/AIDS has reduced life expectancy, narrowed the working-age population, increased orphan numbers, and strained SA's healthcare system. ARV rollout has partially reversed these effects.",
+        "visual_description": null
+      },
+      {
+        "problem": "Define carrying capacity and list four factors that determine carrying capacity in an ecosystem.",
+        "steps": [
+          {
+            "instruction": "Step 1: Carrying capacity (K) is the maximum population size that an environment can sustain indefinitely, given the available resources.",
+            "result": "K defined"
+          },
+          {
+            "instruction": "Step 2: Factor 1 — Food and water availability. As population grows, food per individual decreases (intraspecific competition).",
+            "result": "food"
+          },
+          {
+            "instruction": "Step 3: Factor 2 — Predation. More individuals attract more predators, increasing death rate.",
+            "result": "predation"
+          },
+          {
+            "instruction": "Step 4: Factor 3 — Disease. Higher population density increases disease transmission rates.",
+            "result": "disease"
+          },
+          {
+            "instruction": "Step 5: Factor 4 — Space/habitat. Limited territory and nesting sites restrict population growth.",
+            "result": "space"
+          }
+        ],
+        "answer": "Answer: Carrying capacity (K) is the maximum sustainable population. Determined by food, predation, disease, and space availability.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the following terms: population, community, ecosystem.",
+        "answer": "Population: organisms of the same species living in the same area at the same time. Community: all the different populations living together in the same area. Ecosystem: the community of organisms and their physical environment, interacting as a system.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of levels of organisation: population → community → ecosystem.",
+          "An ecosystem includes both biotic (living) and abiotic (non-living) components."
+        ],
+        "explanation": "These terms represent increasing levels of ecological organisation. A population is one species; a community is multiple species; an ecosystem adds the physical environment.",
+        "distractors": [
+          "A population includes organisms of different species",
+          "A community is one species in many areas",
+          "An ecosystem only includes living organisms"
+        ]
+      },
+      {
+        "question": "A population of 500 impala in a game reserve has a birth rate of 80 per year and a death rate of 30 per year. No immigration or emigration occurs. Calculate the population growth rate and the population size after one year.",
+        "answer": "Growth rate = (births - deaths) / total population = (80 - 30) / 500 = 50/500 = 0.10 or 10% per year. Population after one year = 500 + 50 = 550 impala.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Growth rate (r) = (births - deaths) / N. Express as a decimal or percentage.",
+          "Population change = births - deaths (when no immigration/emigration)."
+        ],
+        "explanation": "Population growth rate r = (B - D)/N = 50/500 = 0.10 (10%). New population = 500 + 50 = 550. This is a simplified calculation assuming constant rates.",
+        "distractors": [
+          "Growth rate = 80/500 = 16%",
+          "Population after one year = 580",
+          "Growth rate = 30/500 = 6%"
+        ]
+      },
+      {
+        "question": "Sketch a logistic growth curve (S-curve) and label the following: lag phase, exponential growth phase, decelerating phase, carrying capacity (K).",
+        "answer": "The S-curve starts with a lag phase (slow initial growth as population establishes), followed by exponential growth phase (rapid increase as birth rate exceeds death rate), then a decelerating phase (growth slows as resources become limiting), and finally levels off at carrying capacity (K) where birth rate equals death rate.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "The curve has four distinct phases — draw it as an S shape with K as a horizontal dotted line.",
+          "At K, the population fluctuates slightly above and below the carrying capacity."
+        ],
+        "explanation": "The S-curve reflects environmental resistance increasing as population grows. At K, resources limit further growth and the population stabilises (birth rate ≈ death rate).",
+        "distractors": [
+          "The S-curve keeps increasing above K indefinitely",
+          "The lag phase shows the fastest growth",
+          "Carrying capacity means the population stops reproducing"
+        ]
+      },
+      {
+        "question": "Explain what is meant by 'density-dependent' and 'density-independent' factors, giving two examples of each.",
+        "answer": "Density-dependent factors: Their effect increases as population density increases. Examples: competition for food (more individuals = less food each), disease transmission (closer contact = faster spread). Density-independent factors: Their effect does not depend on population density. Examples: drought (kills regardless of population size), wildfire (destroys habitat regardless of how many animals are present).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Does the factor have a greater effect when the population is crowded?",
+          "Natural disasters typically affect populations regardless of their density."
+        ],
+        "explanation": "Density-dependent factors (competition, disease, predation) regulate population near K. Density-independent factors (weather, fire, floods) can cause sudden population changes regardless of density.",
+        "distractors": [
+          "Drought is density-dependent because it affects more animals in large populations",
+          "Disease is density-independent because any animal can get sick",
+          "All limiting factors are density-dependent"
+        ]
+      },
+      {
+        "question": "South Africa's total fertility rate has decreased from 6.0 children per woman in 1960 to approximately 2.3 in 2024. Analyse the demographic, social, and economic factors that have contributed to this decline.",
+        "answer": "Factors: 1) Urbanisation — people moved from rural areas (where children provide farm labour) to cities (where raising children is expensive). 2) Female education — educated women delay childbearing and have fewer children. 3) Access to contraception — government family planning programmes since 1974. 4) Economic factors — high unemployment (~33%) and cost of living discourage large families. 5) HIV/AIDS awareness — campaigns promoting condom use reduced unplanned pregnancies. 6) Women's empowerment — increased participation in the workforce. SA's fertility rate is approaching replacement level (2.1), meaning population growth is slowing but still positive due to population momentum (large cohort of reproductive-age women).",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider the role of education, economics, and access to family planning.",
+          "Why might urbanisation lead to smaller families?"
+        ],
+        "explanation": "SA's fertility decline follows the demographic transition model: modernisation, education, contraception, and urbanisation all reduce birth rates. The decline is significant but SA still faces population momentum.",
+        "distractors": [
+          "The fertility rate declined because the government imposed a one-child policy",
+          "SA's population is shrinking because the fertility rate is below replacement",
+          "Education has no impact on fertility rates"
+        ]
+      }
+    ],
+    "hints": [
+      "Carrying capacity (K) is not fixed — it can change if environmental conditions change (e.g. drought lowers K).",
+      "SA population pyramid: broad base (high birth rate), narrowing in working-age group (HIV impact), widening again with ARV rollout.",
+      "Population growth rate r = (births - deaths + immigration - emigration) / N."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "carrying capacity (K)",
+        "definition": "The maximum population size that an environment can sustain indefinitely with the available resources",
+        "example_usage": "The Kruger National Park has a carrying capacity of approximately 7,000 elephants."
+      },
+      {
+        "term": "exponential growth",
+        "definition": "Unrestricted population growth where the population increases at an accelerating rate, producing a J-shaped curve",
+        "example_usage": "Bacteria in a fresh petri dish show exponential growth for the first few hours."
+      },
+      {
+        "term": "demographic transition",
+        "definition": "The shift from high birth/death rates to low birth/death rates as a country develops economically",
+        "example_usage": "South Africa is in the later stages of the demographic transition, with declining birth rates."
+      },
+      {
+        "term": "population pyramid",
+        "definition": "A bar graph showing the age and sex distribution of a population, used to predict future growth patterns",
+        "example_usage": "SA's population pyramid shows the impact of HIV/AIDS on the working-age population."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think carrying capacity is a fixed number that never changes.",
+        "correction": "Carrying capacity (K) can change over time. Drought, habitat destruction, or resource depletion can LOWER K. Conservation efforts, increased food production, or habitat restoration can RAISE K.",
+        "why_students_think_this": "Textbooks often present K as a single number on a graph. Students need to understand it as a dynamic value that responds to environmental changes."
+      },
+      {
+        "misconception": "Students think exponential growth can continue indefinitely in nature.",
+        "correction": "Exponential growth is always temporary. Environmental resistance (food shortages, disease, predation, competition) eventually slows growth. Sustained exponential growth leads to a population crash.",
+        "why_students_think_this": "The J-curve graph appears to go up forever. Students need to see what happens AFTER the J-curve: either transition to an S-curve or a population crash."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr11.POP",
+    "title": "Assessment: Population Ecology",
+    "items": [
+      {
+        "question": "Define carrying capacity and give one example from a South African ecosystem.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Carrying capacity (K) is the maximum population an environment can sustain. Example: Kruger NP can sustain ~7,000 elephants based on available vegetation.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think of a specific reserve and how many of one species it can support."
+      },
+      {
+        "question": "Explain why a population of rabbits introduced to a new island with no predators would initially show exponential growth but eventually stabilise.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Initially: abundant food, no predators, no disease = unlimited growth (J-curve). Eventually: food competition, disease, limited space = environmental resistance increases, growth slows to S-curve stabilising at K.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "What happens as the population gets larger? Think about food per individual."
+      },
+      {
+        "question": "A population has 1,200 individuals, 200 births, 80 deaths, 30 immigrants, and 10 emigrants per year. Calculate the growth rate.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Growth = (200 - 80 + 30 - 10) / 1,200 = 140/1,200 = 0.117 or 11.7% per year",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "r = (B - D + I - E) / N"
+      },
+      {
+        "question": "Analyse how HIV/AIDS has affected South Africa's population pyramid.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "HIV/AIDS caused a narrowing in the 25-45 age group (most affected), creating a chimney/hourglass shape. Increased orphan numbers (broad base of young dependents). ARV rollout has partially restored the working-age cohort.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Which age group is most affected by HIV? How does this change the pyramid shape?"
+      },
+      {
+        "question": "Evaluate whether South Africa should implement policies to reduce population growth, considering both ecological and socioeconomic factors.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "SA's fertility is already declining (2.3). Rather than restrictive policies, focus on: education (especially girls), access to family planning, economic development, and addressing HIV/AIDS. Water scarcity and urbanisation are ecological pressures, but the priority is raising quality of life, not imposing limits.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider SA's current fertility rate, human rights, and resource constraints."
+      }
+    ],
+    "total_points": 16,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is carrying capacity (K)?",
+      "back": "The maximum population size an environment can sustain indefinitely with available resources.",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the difference between a J-curve and an S-curve?",
+      "back": "J-curve = exponential growth (no upper limit). S-curve = logistic growth (levels off at carrying capacity K).",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is SA's approximate population and HIV prevalence?",
+      "back": "~62 million people (2024); ~13% total HIV prevalence, ~19% among adults aged 15-49.",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is demographic transition?",
+      "back": "The shift from high birth/death rates to low birth/death rates as a country develops. SA is in the later stages.",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What are density-dependent factors?",
+      "back": "Factors whose effect increases with population density: competition for food, disease transmission, predation, waste accumulation.",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What are density-independent factors?",
+      "back": "Factors that affect populations regardless of density: drought, floods, wildfire, extreme weather.",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "How do you calculate population growth rate?",
+      "back": "r = (Births - Deaths + Immigration - Emigration) / Total population (N).",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is population momentum?",
+      "back": "Population continues to grow even after fertility drops to replacement level, because a large cohort of reproductive-age individuals continues having children.",
+      "tags": ["CAPS.LifeSciences.Gr11.POP", "Grade11", "Population Ecology"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

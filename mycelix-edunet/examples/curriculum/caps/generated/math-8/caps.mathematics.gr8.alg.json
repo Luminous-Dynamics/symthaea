@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Expand: 3(x + 4)",
+        "answer": "3x + 12",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply each term inside by 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 x x = 3x, 3 x 4 = 12. So 3(x + 4) = 3x + 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3x + 4",
+          "x + 12",
+          "7x"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Factorise: 6x + 9",
+        "answer": "3(2x + 3)",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find the HCF of 6 and 9"
         ],
-        "explanation": "Explanation.",
+        "explanation": "HCF of 6 and 9 is 3. 6x/3 = 2x, 9/3 = 3. Answer: 3(2x + 3).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6(x + 9)",
+          "3(2x + 9)",
+          "9(x + 1)"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Expand and simplify: 2(x + 3) + 3(x - 1)",
+        "answer": "5x + 3",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Expand each bracket, then collect like terms"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2x + 6 + 3x - 3 = 5x + 3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5x + 9",
+          "6x + 3",
+          "5x - 3"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Solve: 3(x - 2) = 12",
+        "answer": "x = 6",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Expand, then solve"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3x - 6 = 12, 3x = 18, x = 6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = 4",
+          "x = 2",
+          "x = 10"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Factorise: x^2 - 9",
+        "answer": "(x + 3)(x - 3)",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Difference of two squares: a^2 - b^2 = (a+b)(a-b)"
         ],
-        "explanation": "Explanation.",
+        "explanation": "x^2 - 9 = x^2 - 3^2 = (x + 3)(x - 3).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "(x - 9)(x + 1)",
+          "(x + 9)(x - 1)",
+          "(x - 3)^2"
         ]
       }
     ],

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "If you cut a pizza into 2 equal pieces, what fraction is one piece?",
+        "answer": "1/2",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Two equal pieces means halves"
         ],
-        "explanation": "Explanation.",
+        "explanation": "One piece out of 2 equal pieces is one half, written 1/2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1/4",
+          "1/3",
+          "2/2"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is half of 8?",
+        "answer": "4",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Share 8 into 2 equal groups"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 divided by 2 = 4. Half of 8 is 4.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "6",
+          "2"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is a quarter of 12?",
+        "answer": "3",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Share 12 into 4 equal groups"
         ],
-        "explanation": "Explanation.",
+        "explanation": "12 divided by 4 = 3. A quarter of 12 is 3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "2",
+          "6"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A chocolate bar is cut into 4 equal pieces. Sipho eats 1 piece. What fraction is left?",
+        "answer": "3/4",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "4 pieces minus 1 piece eaten"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4 - 1 = 3 pieces left out of 4, so 3/4 remains.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1/4",
+          "2/4",
+          "1/2"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Shade half of a group of 10 circles. How many circles are shaded?",
+        "answer": "5",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Half of 10 means dividing by 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "10 divided by 2 = 5 circles should be shaded.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "6",
+          "3"
         ]
       }
     ],

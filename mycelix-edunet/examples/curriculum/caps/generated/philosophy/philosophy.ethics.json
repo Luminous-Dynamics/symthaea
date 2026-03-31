@@ -1,0 +1,129 @@
+{
+  "node_id": "24.01",
+  "lesson": {
+    "standard_code": "24.01",
+    "title": "Ethics: Utilitarianism, Deontology, Virtue Ethics & Applied Ethics",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Evaluate",
+    "explanation": "Ethics is the branch of philosophy concerned with questions of right and wrong, good and bad. Three major frameworks dominate: Utilitarianism (Bentham, Mill) judges actions by their consequences — the right action maximises overall happiness or well-being for the greatest number. Deontology (Kant) judges actions by whether they follow moral rules or duties — some actions are right or wrong regardless of consequences (e.g., lying is wrong even if it produces good outcomes). Virtue Ethics (Aristotle) focuses on character rather than rules or consequences — the right action is what a virtuous person would do, cultivating traits like courage, honesty, and temperance. Applied ethics uses these frameworks to address real-world dilemmas in medicine, business, technology, and the environment.",
+    "examples": [
+      {
+        "problem": "A doctor has five patients who will die without organ transplants and one healthy patient whose organs could save all five. Should the doctor sacrifice the one to save the five? Analyse using utilitarianism and deontology.",
+        "steps": [
+          {"instruction": "Step 1: Utilitarian analysis — five lives saved vs one lost. Net utility: +4 lives. A strict utilitarian might argue the sacrifice is justified.", "result": "Consequentialist calculation"},
+          {"instruction": "Step 2: Deontological analysis — Kant's categorical imperative: 'Act so that you treat humanity never merely as a means but always also as an end.' Killing the healthy patient treats them as a mere means to save others.", "result": "Duty-based rejection"},
+          {"instruction": "Step 3: Note the tension — utilitarianism says yes (greater good), deontology says no (inviolable rights). This thought experiment (from Judith Jarvis Thomson) reveals the limits of each framework.", "result": "Framework tension exposed"}
+        ],
+        "answer": "Answer: Utilitarianism favours sacrificing the one (maximises lives saved), but deontology prohibits it (violates the patient's right not to be killed, treats them as a mere means). Most ethicists reject the sacrifice, suggesting that some deontological constraints override utilitarian calculations.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain Kant's categorical imperative using the example of lying.",
+        "steps": [
+          {"instruction": "Step 1: State the first formulation — 'Act only according to that maxim by which you can at the same time will that it should become a universal law.'", "result": "Universal law formulation"},
+          {"instruction": "Step 2: Apply to lying — if lying were a universal law, everyone would lie, and trust (which makes lying effective) would collapse. Lying is self-defeating when universalised.", "result": "Universalisability test fails"},
+          {"instruction": "Step 3: Conclusion — lying is always wrong according to Kant, because the maxim 'lie when convenient' cannot be consistently universalised.", "result": "Absolute prohibition"}
+        ],
+        "answer": "Answer: Kant's categorical imperative prohibits lying because if everyone lied (universal law), the concept of truth would collapse, making lying itself impossible. Lying fails the universalisability test and therefore violates moral duty.",
+        "visual_description": null
+      },
+      {
+        "problem": "How would Aristotle's virtue ethics approach the question of whether to cheat on an exam?",
+        "steps": [
+          {"instruction": "Step 1: Identify the relevant virtues — honesty, integrity, justice, temperance.", "result": "Virtues identified"},
+          {"instruction": "Step 2: Ask: 'What would a virtuous person do?' — a person of good character would not cheat.", "result": "Character standard applied"},
+          {"instruction": "Step 3: Consider the effect on character — cheating develops the vice of dishonesty and erodes the habit of integrity, regardless of whether you get caught.", "result": "Habituation considered"}
+        ],
+        "answer": "Answer: Virtue ethics condemns cheating not primarily because of rules (deontology) or consequences (utilitarianism) but because it corrupts the cheater's character. Each act of dishonesty makes dishonesty easier, moving the person further from the virtuous mean.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define utilitarianism and name its two major proponents.",
+        "answer": "Utilitarianism is the ethical theory that the right action is the one that produces the greatest happiness (or well-being) for the greatest number. Its major proponents are Jeremy Bentham (who proposed the hedonic calculus) and John Stuart Mill (who distinguished higher and lower pleasures).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about consequences and happiness.", "Bentham = quantity of pleasure; Mill = quality of pleasure."],
+        "explanation": "Bentham treated all pleasures as equal; Mill argued that intellectual pleasures are higher than bodily ones ('better to be Socrates dissatisfied than a fool satisfied').",
+        "distractors": ["Utilitarianism was founded by Kant.", "It focuses on duties, not consequences.", "It only considers individual happiness, not group happiness."]
+      },
+      {
+        "question": "What is the trolley problem and why is it significant in ethics?",
+        "answer": "The trolley problem (Philippa Foot, 1967): a runaway trolley will kill five people. You can divert it to a side track where it will kill one person. Should you divert it? It is significant because most people say yes (utilitarian reasoning), but when the scenario changes to pushing a person off a bridge to stop the trolley, most say no (deontological intuition) — revealing that our moral intuitions are inconsistent.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["The key is the difference between diverting harm and actively causing harm.", "It tests whether you are a consequentialist or a deontologist."],
+        "explanation": "The trolley problem is philosophy's most famous thought experiment because it reveals the tension between our utilitarian calculations and our deontological intuitions about harming innocent people.",
+        "distractors": ["The trolley problem proves utilitarianism is correct.", "It was invented by Kant.", "It has a definitive correct answer."]
+      },
+      {
+        "question": "Explain Aristotle's concept of the 'golden mean' with two examples.",
+        "answer": "The golden mean is the virtuous middle point between two vices — one of excess and one of deficiency. Examples: (1) Courage is the mean between cowardice (deficiency) and recklessness (excess). (2) Generosity is the mean between stinginess (deficiency) and wastefulness (excess).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Every virtue sits between two extremes.", "The mean is not arithmetic — it depends on the situation."],
+        "explanation": "The golden mean is context-dependent: what counts as courageous for a soldier differs from what counts as courageous for a teacher. Practical wisdom (phronesis) determines the right amount in each situation.",
+        "distractors": ["The golden mean always lies exactly at the midpoint.", "Aristotle rejected moderation.", "The mean only applies to physical traits."]
+      },
+      {
+        "question": "Compare how a utilitarian and a deontologist would evaluate lying to protect someone from a murderer.",
+        "answer": "A utilitarian would justify the lie because the consequence (saving a life) produces greater overall happiness than the consequence of truth-telling (death). A strict Kantian deontologist would say lying is wrong even to save a life, because the moral law prohibits lying universally — Kant himself argued this in his 1797 essay 'On a Supposed Right to Lie from Philanthropy.' This is one of the most controversial implications of Kantian ethics.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["Utilitarians focus on outcomes; deontologists focus on the act itself.", "Kant was famously absolute about lying — even in extreme cases."],
+        "explanation": "This scenario reveals the deepest tension between the two frameworks. Many philosophers, including W.D. Ross, developed 'prima facie duties' to soften Kant's absolutism while preserving rule-based ethics.",
+        "distractors": ["Both frameworks would justify the lie.", "Kant would approve of lying in this case.", "Utilitarians would oppose lying here."]
+      },
+      {
+        "question": "What is applied ethics? Give three domains where it is practised.",
+        "answer": "Applied ethics is the application of ethical theories and principles to real-world moral problems. Three domains: (1) Bioethics — euthanasia, genetic engineering, organ donation. (2) Business ethics — corporate responsibility, fair wages, whistleblowing. (3) Environmental ethics — climate justice, animal rights, resource allocation.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Applied ethics bridges theory and practice.", "Think about professions and industries that face moral dilemmas."],
+        "explanation": "Applied ethics uses the tools of normative ethics (utilitarianism, deontology, virtue ethics) to analyse specific cases and guide decision-making in professional contexts.",
+        "distractors": ["Applied ethics has no connection to ethical theory.", "It only applies to medicine.", "Applied ethics gives definitive answers to all moral questions."]
+      }
+    ],
+    "hints": [
+      "When comparing ethical frameworks, use the same scenario to show how each framework produces different conclusions.",
+      "Utilitarianism asks 'What produces the best outcome?' Deontology asks 'What is my duty?' Virtue ethics asks 'What kind of person should I be?'",
+      "Remember that no ethical framework is without critics — the strongest analysis acknowledges limitations."
+    ],
+    "key_vocabulary": [
+      {"term": "categorical imperative", "definition": "Kant's supreme moral principle: act only according to maxims you could will to become universal laws, and treat people never merely as means but always as ends", "example_usage": "Kant argued that stealing violates the categorical imperative because universal stealing is self-defeating."},
+      {"term": "utilitarianism", "definition": "The ethical theory that the right action maximises overall happiness or well-being for the greatest number of people", "example_usage": "A utilitarian would evaluate the policy by measuring its total impact on well-being."},
+      {"term": "virtue ethics", "definition": "The ethical approach focusing on developing good character traits (virtues) rather than following rules or calculating consequences", "example_usage": "Aristotle's virtue ethics asks not 'what should I do?' but 'what kind of person should I be?'"},
+      {"term": "deontology", "definition": "The ethical theory that actions are right or wrong based on whether they follow moral duties or rules, regardless of consequences", "example_usage": "A deontologist would say lying is wrong even if it saves a life."},
+      {"term": "applied ethics", "definition": "The branch of ethics that applies moral theories and principles to specific real-world issues and professions", "example_usage": "The hospital's ethics committee used applied ethics to evaluate the organ donation policy."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think utilitarianism is simply 'the ends justify the means' and therefore morally bankrupt.",
+        "correction": "While utilitarianism does evaluate actions by their consequences, sophisticated forms (rule utilitarianism, preference utilitarianism) include safeguards against tyranny of the majority. Mill himself argued for individual rights as promoting long-term utility. The 'ends justify the means' caricature ignores these nuances.",
+        "why_students_think_this": "The trolley problem and organ harvesting scenario make utilitarianism seem monstrous. But these are extreme edge cases — in everyday life, utilitarian reasoning (consider who is affected and how) is how most people actually make decisions."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.94,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.93,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What are the three major ethical frameworks?", "back": "Utilitarianism (consequences), deontology (duties/rules), and virtue ethics (character/virtues).", "tags": ["24.01", "Philosophy", "Ethics"], "difficulty_permille": 167},
+    {"front": "State Kant's categorical imperative (first formulation).", "back": "Act only according to that maxim by which you can at the same time will that it should become a universal law.", "tags": ["24.01", "Philosophy", "Ethics"], "difficulty_permille": 333},
+    {"front": "What is Aristotle's golden mean?", "back": "The virtuous middle point between two vices: one of excess and one of deficiency. E.g., courage is the mean between cowardice and recklessness.", "tags": ["24.01", "Philosophy", "Ethics"], "difficulty_permille": 278},
+    {"front": "Who are the founders of utilitarianism?", "back": "Jeremy Bentham (hedonic calculus, quantity of pleasure) and John Stuart Mill (higher/lower pleasures, quality of pleasure).", "tags": ["24.01", "Philosophy", "Ethics"], "difficulty_permille": 222},
+    {"front": "What is the trolley problem?", "back": "A thought experiment: divert a trolley to kill 1 instead of 5. It reveals tension between utilitarian (save more lives) and deontological (do not actively kill) reasoning.", "tags": ["24.01", "Philosophy", "Ethics"], "difficulty_permille": 278}
+  ],
+  "quality": {
+    "coherence": 0.94,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

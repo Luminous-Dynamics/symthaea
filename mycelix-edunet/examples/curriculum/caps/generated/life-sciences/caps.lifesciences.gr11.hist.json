@@ -1,0 +1,319 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr11.HIST",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr11.HIST",
+    "title": "History of Life on Earth: Fossil Evidence, Mass Extinctions, Human Evolution, and Out of Africa",
+    "grade_level": "Grade11",
+    "bloom_level": "Understand",
+    "explanation": "The fossil record provides evidence for how life has changed over 3.8 billion years. Fossils form through mineralisation, mould/cast, preservation in amber or ice, and carbonisation. Relative dating (stratigraphy) and absolute dating (radiometric — e.g. carbon-14, potassium-argon) determine fossil age. Earth has experienced five mass extinctions, including the Permian-Triassic (252 Mya, 96% species lost) and the Cretaceous-Paleogene (66 Mya, dinosaur extinction). South Africa is central to human evolution: the Cradle of Humankind (Sterkfontein, Maropeng) has yielded Australopithecus africanus fossils (Mrs Ples, Little Foot). The 'Out of Africa' hypothesis, supported by mitochondrial DNA evidence, proposes that modern Homo sapiens evolved in Africa ~300,000 years ago and migrated globally.",
+    "examples": [
+      {
+        "problem": "Describe two methods of fossil dating and explain the difference between them.",
+        "steps": [
+          {
+            "instruction": "Step 1: Relative dating (stratigraphy) — Determines the relative age of fossils based on their position in rock layers (strata). Deeper layers = older fossils. Does NOT give an exact age.",
+            "result": "relative dating explained"
+          },
+          {
+            "instruction": "Step 2: Absolute dating (radiometric) — Uses radioactive decay of isotopes to determine the actual age in years. Carbon-14 (half-life ~5,730 years) is used for recent fossils (<50,000 years); potassium-argon dating is used for older volcanic rocks.",
+            "result": "absolute dating explained"
+          },
+          {
+            "instruction": "Step 3: Key difference — Relative dating only tells us 'older than' or 'younger than'; absolute dating gives a numerical age (e.g. 2.3 million years old).",
+            "result": "comparison"
+          }
+        ],
+        "answer": "Answer: Relative dating uses rock layer position (older fossils are deeper); absolute dating uses radioactive isotope decay to give a numerical age. Relative = sequence; absolute = exact years.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the significance of the Cradle of Humankind for understanding human evolution.",
+        "steps": [
+          {
+            "instruction": "Step 1: Location — The Cradle of Humankind is a UNESCO World Heritage Site near Johannesburg, Gauteng. It includes caves at Sterkfontein, Swartkrans, and Kromdraai.",
+            "result": "location identified"
+          },
+          {
+            "instruction": "Step 2: Key fossils — 'Mrs Ples' (Australopithecus africanus, ~2.1 Mya) and 'Little Foot' (Australopithecus, ~3.67 Mya) were discovered at Sterkfontein. These are among the most complete early hominin fossils ever found.",
+            "result": "key fossils"
+          },
+          {
+            "instruction": "Step 3: Significance — These fossils provide evidence that early hominins (human ancestors) lived in southern Africa millions of years before Homo sapiens evolved, supporting Africa as the 'cradle' of humanity.",
+            "result": "significance explained"
+          }
+        ],
+        "answer": "Answer: The Cradle of Humankind near Johannesburg has yielded key hominin fossils (Mrs Ples, Little Foot) that support Africa as the birthplace of humanity.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the Out of Africa hypothesis, including the evidence that supports it.",
+        "steps": [
+          {
+            "instruction": "Step 1: The hypothesis proposes that modern Homo sapiens evolved in Africa approximately 300,000 years ago and then migrated out of Africa to populate the rest of the world, replacing other hominin species.",
+            "result": "hypothesis stated"
+          },
+          {
+            "instruction": "Step 2: Fossil evidence — The oldest Homo sapiens fossils are found in Africa (Jebel Irhoud, Morocco, ~300,000 years old; Omo, Ethiopia, ~195,000 years old). Fossils outside Africa are younger.",
+            "result": "fossil evidence"
+          },
+          {
+            "instruction": "Step 3: Genetic evidence — Mitochondrial DNA (mtDNA) analysis shows that African populations have the greatest genetic diversity (longest evolutionary history). All non-African populations can be traced to a common African ancestor ('Mitochondrial Eve', ~200,000 years ago).",
+            "result": "genetic evidence"
+          }
+        ],
+        "answer": "Answer: Out of Africa proposes Homo sapiens evolved in Africa ~300,000 years ago and migrated globally. Supported by oldest fossils in Africa and greatest mtDNA diversity in African populations.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name three ways in which fossils can form.",
+        "answer": "1) Mineralisation/petrification — minerals replace organic material in bones/wood. 2) Mould and cast — organism decays, leaving a mould in rock; minerals fill the mould to form a cast. 3) Preservation in amber — insects trapped in tree resin that hardens over millions of years.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what happens to organisms after death in different environments.",
+          "Consider: in rock, in resin, in ice, as carbon impressions."
+        ],
+        "explanation": "Fossils form through various processes depending on the environment: mineral replacement in rock, moulds/casts in sediment, preservation in amber or ice, and carbonisation (leaf impressions).",
+        "distractors": [
+          "Fossils only form in volcanic rock",
+          "All fossils are bones — soft tissues never fossilise",
+          "Fossils form within a few hundred years"
+        ]
+      },
+      {
+        "question": "Carbon-14 has a half-life of 5,730 years. If a fossil originally contained 80 g of carbon-14 and now contains 10 g, how old is the fossil?",
+        "answer": "After 1 half-life: 80 → 40 g. After 2 half-lives: 40 → 20 g. After 3 half-lives: 20 → 10 g. The fossil is 3 × 5,730 = 17,190 years old.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Each half-life halves the amount of radioactive isotope remaining.",
+          "Count how many times you must halve 80 to reach 10."
+        ],
+        "explanation": "80 → 40 → 20 → 10 = three halvings = three half-lives. 3 × 5,730 years = 17,190 years. This method works for fossils up to ~50,000 years old.",
+        "distractors": [
+          "5,730 years (one half-life)",
+          "11,460 years (two half-lives)",
+          "22,920 years (four half-lives)"
+        ]
+      },
+      {
+        "question": "Explain why the Permian-Triassic extinction (252 Mya) is called 'The Great Dying'.",
+        "answer": "The Permian-Triassic extinction killed approximately 96% of all marine species and 70% of terrestrial vertebrate species — making it the most severe mass extinction in Earth's history. Causes likely included massive volcanic eruptions (Siberian Traps), global warming, ocean acidification, and anoxia (oxygen depletion). Life took millions of years to recover, and the extinction paved the way for the rise of dinosaurs in the Triassic.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "What percentage of species were lost?",
+          "Multiple causes likely combined — volcanic eruptions triggered a cascade of environmental changes."
+        ],
+        "explanation": "The Permian-Triassic extinction eliminated 96% of marine species through volcanic-triggered cascading effects: CO2 release → warming → ocean acidification → anoxia. It reshaped life on Earth.",
+        "distractors": [
+          "The Permian-Triassic extinction only affected dinosaurs",
+          "Only 10% of species were lost",
+          "An asteroid caused the Permian-Triassic extinction"
+        ]
+      },
+      {
+        "question": "Compare Australopithecus africanus with Homo sapiens in terms of brain size, posture, and tool use.",
+        "answer": "Australopithecus africanus: brain ~450 cm3, bipedal but still partly arboreal (long arms), no evidence of stone tool manufacture (may have used natural objects). Homo sapiens: brain ~1,350 cm3 (3× larger), fully bipedal with reduced arms, sophisticated tool manufacture and use (stone, bone, metal). Both were bipedal, showing upright walking evolved before large brains.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Brain size tripled from Australopithecus to Homo sapiens.",
+          "Bipedalism evolved BEFORE large brains — this is a key insight."
+        ],
+        "explanation": "Comparing these species shows evolution is not linear — bipedalism preceded brain enlargement. A. africanus walked upright with a small brain; H. sapiens has a large brain and complex culture.",
+        "distractors": [
+          "Australopithecus had a larger brain than Homo sapiens",
+          "Homo sapiens evolved directly from Australopithecus africanus",
+          "Both species used sophisticated stone tools"
+        ]
+      },
+      {
+        "question": "A creationist argues that the fossil record is incomplete and therefore evolution is wrong. Evaluate this argument using evidence from the South African fossil record and address the concept of 'transitional fossils'.",
+        "answer": "The argument is flawed. While the fossil record is incomplete (fossilisation is rare and requires specific conditions), it contains abundant transitional fossils showing gradual change. SA examples: the Cradle of Humankind shows a series of hominin species (Australopithecus → Homo habilis → Homo erectus → Homo sapiens) with intermediate features. Transitional fossils like Tiktaalik (fish to tetrapod) and Archaeopteryx (dinosaur to bird) demonstrate gradual transitions. Additionally, fossil evidence is supported by independent lines of evidence: comparative anatomy, embryology, and DNA analysis. Gaps in the fossil record do not disprove evolution — they reflect the rarity of fossilisation.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Absence of evidence is not evidence of absence. Why might there be gaps?",
+          "What other evidence besides fossils supports evolution?"
+        ],
+        "explanation": "The incomplete fossil record reflects fossilisation rarity, not absence of evolution. SA's hominin fossils show gradual change. Multiple independent evidence lines (DNA, anatomy, embryology) converge on evolution.",
+        "distractors": [
+          "The fossil record must be 100% complete to support evolution",
+          "There are no transitional fossils anywhere in the world",
+          "DNA evidence contradicts fossil evidence"
+        ]
+      }
+    ],
+    "hints": [
+      "SA's Cradle of Humankind is one of the most important palaeontological sites in the world — know Mrs Ples and Little Foot.",
+      "Five mass extinctions: Ordovician, Devonian, Permian-Triassic (worst), Triassic-Jurassic, Cretaceous-Paleogene (dinosaurs).",
+      "Out of Africa evidence: oldest fossils + greatest genetic diversity in Africa. All humans share African ancestry."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "fossil",
+        "definition": "The preserved remains or traces of organisms that lived in the past, found in sedimentary rock",
+        "example_usage": "Mrs Ples is a fossil of Australopithecus africanus found at Sterkfontein."
+      },
+      {
+        "term": "radiometric dating",
+        "definition": "A method of determining the absolute age of rocks/fossils by measuring the decay of radioactive isotopes",
+        "example_usage": "Potassium-argon dating showed that Little Foot is approximately 3.67 million years old."
+      },
+      {
+        "term": "mass extinction",
+        "definition": "A rapid, widespread decrease in biodiversity where a large percentage of species become extinct in a short geological time period",
+        "example_usage": "The Cretaceous-Paleogene mass extinction killed the non-avian dinosaurs 66 million years ago."
+      },
+      {
+        "term": "hominin",
+        "definition": "Any member of the human lineage after the split from the common ancestor shared with chimpanzees, including all Australopithecus and Homo species",
+        "example_usage": "Australopithecus africanus is an early hominin that walked upright in southern Africa."
+      },
+      {
+        "term": "transitional fossil",
+        "definition": "A fossil that shows intermediate characteristics between an ancestral group and its descendants",
+        "example_usage": "Australopithecus has both ape-like (small brain) and human-like (bipedal) features, making it a transitional form."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think humans evolved directly from modern chimpanzees.",
+        "correction": "Humans and chimpanzees share a COMMON ANCESTOR that lived approximately 6-7 million years ago. Neither evolved from the other — they are evolutionary cousins on separate branches.",
+        "why_students_think_this": "Popular culture often portrays evolution as a straight line from ape to human. Emphasise: evolution is a branching tree, not a ladder."
+      },
+      {
+        "misconception": "Students believe the fossil record should be complete if evolution is true.",
+        "correction": "Fossilisation is extremely rare — it requires specific conditions (rapid burial, mineral-rich water, absence of oxygen). Most organisms decompose without leaving fossils. An incomplete record is expected, not a weakness.",
+        "why_students_think_this": "Students expect scientific evidence to be 100% complete. Explain that even with gaps, the pattern of change is clear and supported by multiple independent evidence lines."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr11.HIST",
+    "title": "Assessment: History of Life on Earth",
+    "items": [
+      {
+        "question": "Name the five mass extinctions in chronological order.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Ordovician-Silurian (444 Mya), Late Devonian (372 Mya), Permian-Triassic (252 Mya), Triassic-Jurassic (201 Mya), Cretaceous-Paleogene (66 Mya)",
+        "points": 3,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "The worst one was the Permian-Triassic; the most famous killed the dinosaurs."
+      },
+      {
+        "question": "Explain the difference between relative and absolute dating of fossils.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Relative dating determines the sequence (older/younger) based on rock layer position. Absolute dating gives a numerical age using radioactive isotope decay (e.g. carbon-14).",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "One gives a sequence, the other gives a number."
+      },
+      {
+        "question": "Calculate the age of a fossil if it originally contained 120 g of carbon-14 and now contains 15 g. (Half-life of C-14 = 5,730 years.)",
+        "item_type": "ShortAnswer",
+        "correct_answer": "120 → 60 → 30 → 15 = 3 half-lives. Age = 3 × 5,730 = 17,190 years.",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Count the number of halvings needed."
+      },
+      {
+        "question": "Compare Australopithecus africanus and Homo sapiens in terms of brain size, diet, and bipedalism.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "A. africanus: ~450 cm3 brain, omnivorous (fruits, roots, possibly some meat), bipedal but partially arboreal. H. sapiens: ~1,350 cm3 brain, varied diet with cooked food, fully bipedal.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Use a table to organise your comparison."
+      },
+      {
+        "question": "Evaluate the evidence supporting the Out of Africa hypothesis.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Oldest H. sapiens fossils are in Africa (Jebel Irhoud, Omo). African populations show greatest mtDNA diversity (longer evolutionary time). Genetic diversity decreases with distance from Africa. Archaeological evidence shows migration routes.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both fossil and genetic evidence."
+      }
+    ],
+    "total_points": 17,
+    "estimated_minutes": 22,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the Cradle of Humankind?",
+      "back": "A UNESCO World Heritage Site near Johannesburg containing caves (Sterkfontein, Swartkrans) where key hominin fossils like Mrs Ples and Little Foot were found.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does the Out of Africa hypothesis propose?",
+      "back": "Modern Homo sapiens evolved in Africa ~300,000 years ago and migrated to populate the rest of the world, replacing other hominin species.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is the half-life of carbon-14?",
+      "back": "Approximately 5,730 years. Used to date fossils up to ~50,000 years old.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Which mass extinction killed the dinosaurs?",
+      "back": "The Cretaceous-Paleogene extinction, 66 Mya, caused by an asteroid impact (Chicxulub, Mexico) and volcanic activity.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "Which mass extinction was the most severe in Earth's history?",
+      "back": "The Permian-Triassic extinction (252 Mya) — 'The Great Dying' — killed 96% of marine species and 70% of terrestrial vertebrates.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is a transitional fossil?",
+      "back": "A fossil showing intermediate features between an ancestral group and its descendants (e.g. Australopithecus: ape-like brain + human-like bipedalism).",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What evidence supports the Out of Africa hypothesis?",
+      "back": "1) Oldest H. sapiens fossils are in Africa. 2) African populations have the greatest mitochondrial DNA diversity. 3) Genetic diversity decreases with distance from Africa.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Did humans evolve from chimpanzees?",
+      "back": "No. Humans and chimpanzees share a common ancestor (~6-7 Mya). They are evolutionary cousins, not a parent-child relationship.",
+      "tags": ["CAPS.LifeSciences.Gr11.HIST", "Grade11", "History of Life"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

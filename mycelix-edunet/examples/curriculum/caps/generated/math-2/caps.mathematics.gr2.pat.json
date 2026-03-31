@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What comes next: 5, 10, 15, 20, ___?",
+        "answer": "25",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "We add 5 each time"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern adds 5 each time. 20 + 5 = 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "22",
+          "30",
+          "24"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What comes next: 2, 4, 6, 8, 10, ___?",
+        "answer": "12",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count by 2s"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern adds 2 each time. 10 + 2 = 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "11",
+          "14",
+          "13"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Find the rule: 3, 6, 9, 12. What is being added each time?",
+        "answer": "3",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at the difference between numbers"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6 - 3 = 3, 9 - 6 = 3. The rule is add 3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2",
+          "4",
+          "6"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Continue the pattern: square, circle, triangle, square, circle, ___",
+        "answer": "Triangle",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The shapes repeat every 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern repeats: square, circle, triangle. Next is triangle.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Square",
+          "Circle",
+          "Star"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Fill in the missing number: 10, 20, ___, 40, 50",
+        "answer": "30",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count by 10s"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern adds 10 each time. 20 + 10 = 30.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25",
+          "35",
+          "15"
         ]
       }
     ],

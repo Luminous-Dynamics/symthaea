@@ -1,0 +1,327 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr10.CELL",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr10.CELL",
+    "title": "Cell Biology: Prokaryotic and Eukaryotic Cells, Organelles, Membrane Transport, and Mitosis",
+    "grade_level": "Grade10",
+    "bloom_level": "Understand",
+    "explanation": "The cell is the basic unit of life. Prokaryotic cells (bacteria) lack a membrane-bound nucleus and organelles, while eukaryotic cells (animals, plants, fungi) have a true nucleus and membrane-bound organelles. Key organelles include: nucleus (DNA storage), mitochondria (aerobic respiration/ATP), ribosomes (protein synthesis), endoplasmic reticulum (transport), Golgi apparatus (packaging), and in plant cells, chloroplasts (photosynthesis), a cell wall (support), and a large central vacuole. The cell membrane is a phospholipid bilayer that controls movement of substances via diffusion, osmosis, and active transport. Mitosis produces two genetically identical daughter cells for growth and repair.",
+    "examples": [
+      {
+        "problem": "Compare a prokaryotic cell (bacterium) with a eukaryotic animal cell by listing four differences.",
+        "steps": [
+          {
+            "instruction": "Step 1: Nucleus — Prokaryotes have no membrane-bound nucleus (DNA is in a nucleoid region); eukaryotes have a membrane-bound nucleus.",
+            "result": "nucleus difference"
+          },
+          {
+            "instruction": "Step 2: Size — Prokaryotes are smaller (1-10 micrometres); eukaryotes are larger (10-100 micrometres).",
+            "result": "size difference"
+          },
+          {
+            "instruction": "Step 3: Organelles — Prokaryotes lack membrane-bound organelles (no mitochondria, ER, Golgi); eukaryotes have these organelles.",
+            "result": "organelle difference"
+          },
+          {
+            "instruction": "Step 4: DNA — Prokaryotes have a single circular chromosome and may have plasmids; eukaryotes have multiple linear chromosomes in the nucleus.",
+            "result": "DNA difference"
+          }
+        ],
+        "answer": "Answer: Prokaryotes lack a nucleus, are smaller, have no membrane-bound organelles, and have circular DNA. Eukaryotes have a nucleus, are larger, have organelles, and have linear chromosomes.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the difference between diffusion, osmosis, and active transport across the cell membrane.",
+        "steps": [
+          {
+            "instruction": "Step 1: Diffusion is the net movement of molecules from a region of high concentration to low concentration (down the concentration gradient). No energy required.",
+            "result": "diffusion defined"
+          },
+          {
+            "instruction": "Step 2: Osmosis is the movement of water molecules through a semi-permeable membrane from a dilute solution (high water concentration) to a concentrated solution (low water concentration). No energy required.",
+            "result": "osmosis defined"
+          },
+          {
+            "instruction": "Step 3: Active transport moves molecules from low concentration to high concentration (against the gradient). This requires energy from ATP and carrier proteins in the membrane.",
+            "result": "active transport defined"
+          }
+        ],
+        "answer": "Answer: Diffusion = passive movement of molecules down the gradient; osmosis = passive movement of water through a semi-permeable membrane; active transport = movement against the gradient using ATP energy.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the four main stages of mitosis and state the purpose of this type of cell division.",
+        "steps": [
+          {
+            "instruction": "Step 1: Prophase — Chromosomes condense and become visible. Nuclear membrane begins to break down. Centrioles move to opposite poles and spindle fibres form.",
+            "result": "prophase described"
+          },
+          {
+            "instruction": "Step 2: Metaphase — Chromosomes line up along the equator (middle) of the cell. Spindle fibres attach to the centromeres of each chromosome.",
+            "result": "metaphase described"
+          },
+          {
+            "instruction": "Step 3: Anaphase — Centromeres split and sister chromatids are pulled to opposite poles by the shortening spindle fibres.",
+            "result": "anaphase described"
+          },
+          {
+            "instruction": "Step 4: Telophase — Chromatids arrive at the poles, nuclear membranes reform, chromosomes uncoil. Cytokinesis (cytoplasm division) follows, producing two identical daughter cells.",
+            "result": "telophase described"
+          }
+        ],
+        "answer": "Answer: Mitosis has four stages (prophase, metaphase, anaphase, telophase) and produces two genetically identical daughter cells for growth, repair, and asexual reproduction.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name two organelles found in plant cells but NOT in animal cells.",
+        "answer": "Chloroplasts (for photosynthesis) and a cell wall (for structural support). Plants also have a large central vacuole.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what plants can do that animals cannot (e.g. photosynthesis).",
+          "Consider what gives a plant cell its rigid, rectangular shape."
+        ],
+        "explanation": "Plant cells have chloroplasts (contain chlorophyll for photosynthesis), a cellulose cell wall (rigid support), and a large central vacuole (stores water, maintains turgor pressure).",
+        "distractors": [
+          "Mitochondria and ribosomes",
+          "Nucleus and cell membrane",
+          "Golgi apparatus and lysosomes"
+        ]
+      },
+      {
+        "question": "A learner places red blood cells in distilled water. Predict and explain what will happen to the cells.",
+        "answer": "The red blood cells will swell and burst (lyse/haemolyse). Distilled water is a hypotonic solution — water moves into the cell by osmosis (from high water concentration outside to low water concentration inside). Since animal cells have no cell wall, they cannot withstand the pressure and burst.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Compare the water concentration inside and outside the cell.",
+          "Remember that animal cells lack a cell wall — what happens when too much water enters?"
+        ],
+        "explanation": "In a hypotonic solution, water enters the cell by osmosis. Animal cells have only a cell membrane (no cell wall), so they swell and burst. This is called haemolysis in red blood cells.",
+        "distractors": [
+          "The cells will shrink because water moves out",
+          "Nothing will happen because the membrane is impermeable",
+          "The cells will become turgid like plant cells"
+        ]
+      },
+      {
+        "question": "Explain why a plant cell placed in a concentrated salt solution becomes plasmolysed.",
+        "answer": "The salt solution is hypertonic (higher solute concentration outside). Water moves out of the cell by osmosis, from the vacuole through the semi-permeable membrane. The cytoplasm and cell membrane shrink away from the cell wall (plasmolysis). The cell wall remains rigid because it is fully permeable.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Which direction does water move in a hypertonic solution?",
+          "The cell wall is rigid — what happens to the membrane inside it when water leaves?"
+        ],
+        "explanation": "In a hypertonic solution, water leaves the cell by osmosis. In plant cells, the membrane pulls away from the rigid cell wall as the cytoplasm shrinks — this is plasmolysis. The cell becomes flaccid.",
+        "distractors": [
+          "The cell wall shrinks along with the membrane",
+          "Water moves into the cell, causing it to burst",
+          "Plasmolysis only occurs in animal cells"
+        ]
+      },
+      {
+        "question": "During which phase of mitosis do chromatids separate and move to opposite poles? Explain the role of spindle fibres in this process.",
+        "answer": "Anaphase. The centromeres split, and the spindle fibres (made of microtubules) shorten, pulling the sister chromatids apart to opposite poles of the cell. This ensures each daughter cell receives an identical set of chromosomes.",
+        "difficulty_permille": 500,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about the stage name: 'ana' means 'up' or 'apart'.",
+          "Spindle fibres attach to the centromere — what happens when they shorten?"
+        ],
+        "explanation": "In anaphase, spindle fibres shorten and pull sister chromatids apart by their centromeres to opposite poles. This is essential for ensuring each daughter cell gets a complete, identical set of chromosomes.",
+        "distractors": [
+          "Prophase — this is when chromosomes first become visible",
+          "Metaphase — this is when chromosomes line up in the middle",
+          "Telophase — this is when the nuclear membrane reforms"
+        ]
+      },
+      {
+        "question": "A cancerous tumour grows rapidly because cell division is uncontrolled. Explain how cancer relates to the normal cell cycle and why cancer treatment often targets mitosis.",
+        "answer": "In normal cells, the cell cycle is regulated by checkpoints that ensure DNA is correctly copied before division. In cancer cells, these checkpoints fail (often due to mutations in genes controlling the cell cycle), causing uncontrolled mitosis. Cancer treatments like chemotherapy target rapidly dividing cells by disrupting spindle fibre formation (e.g. taxol) or DNA replication, preventing mitosis from completing. This is why chemotherapy also affects other rapidly dividing cells (hair follicles, gut lining).",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What normally stops a cell from dividing too much?",
+          "Chemotherapy drugs often interfere with spindle fibres — which phase of mitosis would this disrupt?"
+        ],
+        "explanation": "Cancer results from loss of cell cycle control. Mutations disable checkpoints, causing uncontrolled mitosis. Treatments target mitosis (spindle disruption or DNA replication interference), affecting all rapidly dividing cells.",
+        "distractors": [
+          "Cancer cells divide by meiosis, not mitosis",
+          "Chemotherapy only affects cancer cells, not normal cells",
+          "Cancer is caused by too much apoptosis (cell death)"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember: PRO-MET-ANA-TELO for the stages of mitosis (Prophase, Metaphase, Anaphase, Telophase).",
+      "Osmosis is a special case of diffusion — it is the diffusion of WATER only, through a semi-permeable membrane.",
+      "Plant cells have three extra structures: cell wall, chloroplasts, and large central vacuole."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "organelle",
+        "definition": "A specialised structure within a cell that performs a specific function",
+        "example_usage": "Mitochondria are organelles that produce ATP through aerobic respiration."
+      },
+      {
+        "term": "semi-permeable membrane",
+        "definition": "A membrane that allows certain molecules (e.g. water) to pass through but not others (e.g. large solute molecules)",
+        "example_usage": "The cell membrane is semi-permeable, allowing water to move by osmosis."
+      },
+      {
+        "term": "osmosis",
+        "definition": "The net movement of water molecules from a region of high water concentration to a region of low water concentration through a semi-permeable membrane",
+        "example_usage": "Red blood cells burst in distilled water due to osmosis."
+      },
+      {
+        "term": "mitosis",
+        "definition": "A type of cell division that produces two genetically identical daughter cells, used for growth and repair",
+        "example_usage": "Skin cells undergo mitosis to replace damaged cells."
+      },
+      {
+        "term": "plasmolysis",
+        "definition": "The shrinking of the cell membrane away from the cell wall in a plant cell placed in a hypertonic solution, as water leaves by osmosis",
+        "example_usage": "Lettuce leaves wilt because the cells undergo plasmolysis when placed in salty water."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think that osmosis can involve the movement of solute molecules, not just water.",
+        "correction": "Osmosis is specifically the movement of WATER molecules through a semi-permeable membrane. Solute molecules may move by diffusion or active transport, but this is not osmosis.",
+        "why_students_think_this": "Students confuse osmosis with general diffusion. Emphasise that osmosis = water + semi-permeable membrane."
+      },
+      {
+        "misconception": "Students believe that mitosis produces four cells (confusing it with meiosis).",
+        "correction": "Mitosis produces TWO genetically identical daughter cells. Meiosis (Gr12) produces four genetically different cells. Remember: miTWOsis = TWO cells.",
+        "why_students_think_this": "Students mix up mitosis and meiosis because both are types of cell division. The mnemonic 'miTWOsis' helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr10.CELL",
+    "title": "Assessment: Cell Biology — Prokaryotic/Eukaryotic Cells, Organelles, Membrane Transport, Mitosis",
+    "items": [
+      {
+        "question": "Name the organelle responsible for aerobic respiration and state its product.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Mitochondrion (mitochondria); produces ATP (adenosine triphosphate)",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "This organelle is sometimes called the 'powerhouse' of the cell."
+      },
+      {
+        "question": "Explain why a plant cell does not burst when placed in distilled water, but an animal cell does.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Plant cells have a rigid cell wall that resists further expansion once the cell is fully turgid. Animal cells only have a cell membrane, which cannot withstand the osmotic pressure, so they burst (lyse).",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about structural differences between plant and animal cells."
+      },
+      {
+        "question": "Draw and label a diagram of an animal cell undergoing metaphase of mitosis.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Diagram should show: chromosomes lined up at the equator/cell plate, spindle fibres attached to centromeres, centrioles at opposite poles, no nuclear membrane.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "In metaphase, chromosomes line up in the MIDDLE of the cell."
+      },
+      {
+        "question": "Distinguish between active transport and diffusion in terms of energy requirement, direction of movement, and role of proteins.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Active transport: requires ATP energy, moves substances against the concentration gradient (low to high), uses carrier proteins. Diffusion: no energy required (passive), moves substances down the concentration gradient (high to low), does not necessarily require proteins.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider what 'active' implies about energy."
+      },
+      {
+        "question": "Explain why uncontrolled mitosis leads to tumour formation and how this relates to the normal cell cycle.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Normal cells have cell cycle checkpoints that regulate when division occurs. Mutations in checkpoint genes cause cells to divide uncontrollably, forming a mass of cells (tumour). Malignant tumours can invade other tissues (cancer).",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "What normally controls how often a cell divides?"
+      }
+    ],
+    "total_points": 16,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the main difference between prokaryotic and eukaryotic cells?",
+      "back": "Prokaryotic cells lack a membrane-bound nucleus and organelles; eukaryotic cells have a true nucleus and membrane-bound organelles.",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the function of mitochondria?",
+      "back": "Mitochondria are the site of aerobic respiration — they produce ATP (energy) from glucose and oxygen.",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is osmosis?",
+      "back": "The net movement of water molecules from a region of high water concentration to low water concentration through a semi-permeable membrane.",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What are the four stages of mitosis in order?",
+      "back": "Prophase, Metaphase, Anaphase, Telophase (remember: PMAT).",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What happens during plasmolysis?",
+      "back": "In a hypertonic solution, water leaves a plant cell by osmosis. The cell membrane shrinks away from the cell wall as the cytoplasm contracts.",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is active transport?",
+      "back": "The movement of molecules across a membrane from low to high concentration (against the gradient), requiring ATP energy and carrier proteins.",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the difference between turgid and flaccid in plant cells?",
+      "back": "Turgid: cell is firm because the vacuole is full of water, pushing the membrane against the cell wall. Flaccid: cell is limp because it has lost water.",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "How many daughter cells does mitosis produce, and are they genetically identical?",
+      "back": "Mitosis produces TWO genetically identical daughter cells (same chromosome number as parent).",
+      "tags": ["CAPS.LifeSciences.Gr10.CELL", "Grade10", "Cell Biology"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

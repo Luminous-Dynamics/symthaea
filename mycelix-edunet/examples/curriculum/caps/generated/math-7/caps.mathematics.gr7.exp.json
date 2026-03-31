@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 2^3 x 2^4",
+        "answer": "2^7 = 128",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Product rule: add the exponents"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2^3 x 2^4 = 2^(3+4) = 2^7 = 128.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2^12",
+          "2^7 = 64",
+          "4^7"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 5^6 / 5^2",
+        "answer": "5^4 = 625",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Quotient rule: subtract exponents"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5^(6-2) = 5^4 = 625.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5^3",
+          "5^8",
+          "1^4"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: (3^2)^3",
+        "answer": "3^6 = 729",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Power rule: multiply the exponents"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(3^2)^3 = 3^(2x3) = 3^6 = 729.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3^5",
+          "9^3",
+          "3^8"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is 7^0?",
+        "answer": "1",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Any number to the power 0 equals 1"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Any non-zero number raised to the power 0 = 1.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0",
+          "7",
+          "70"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: (2x)^3",
+        "answer": "8x^3",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Apply exponent to both the number and variable"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(2x)^3 = 2^3 x x^3 = 8x^3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6x^3",
+          "2x^3",
+          "6x"
         ]
       }
     ],

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Which is longer: a pencil or a bus?",
+        "answer": "A bus",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think about which one is bigger"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A bus is much longer than a pencil.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "A pencil",
+          "They are the same",
+          "A book"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "question": "Which is heavier: a feather or a brick?",
+        "answer": "A brick",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think about picking each one up"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A brick is much heavier than a feather.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "A feather",
+          "They are the same",
+          "A ball"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Put in order from shortest to tallest: lamp, tree, cup",
+        "answer": "Cup, lamp, tree",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Compare how tall each one is"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A cup is the shortest, then a lamp, and a tree is the tallest.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Tree, lamp, cup",
+          "Lamp, cup, tree",
+          "Cup, tree, lamp"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "A ribbon is 5 hands long. A rope is 8 hands long. How much longer is the rope?",
+        "answer": "3 hands",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract: 8 - 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 - 5 = 3. The rope is 3 hands longer.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2 hands",
+          "4 hands",
+          "13 hands"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Which container holds more water: a teacup or a bucket?",
+        "answer": "A bucket",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think about which one is bigger"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A bucket is much bigger than a teacup, so it holds more water.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "A teacup",
+          "They are the same",
+          "A glass"
         ]
       }
     ],

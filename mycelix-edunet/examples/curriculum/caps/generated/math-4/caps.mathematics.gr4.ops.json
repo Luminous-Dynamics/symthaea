@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 34 x 12?",
+        "answer": "408",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Use long multiplication: 34 x 10 + 34 x 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "34 x 10 = 340, 34 x 2 = 68. 340 + 68 = 408.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "368",
+          "418",
+          "448"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 144 / 12?",
+        "answer": "12",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think: 12 x ? = 144"
         ],
-        "explanation": "Explanation.",
+        "explanation": "12 x 12 = 144, so 144 / 12 = 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "11",
+          "13",
+          "14"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "A school has 156 learners split equally into 6 classes. How many learners per class?",
+        "answer": "26",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide: 156 / 6"
         ],
-        "explanation": "Explanation.",
+        "explanation": "156 / 6 = 26 learners per class.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "24",
+          "28",
+          "25"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 253 x 4?",
+        "answer": "1012",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply each digit by 4, carrying where needed"
         ],
-        "explanation": "Explanation.",
+        "explanation": "253 x 4: 3x4=12(carry 1), 5x4+1=21(carry 2), 2x4+2=10. Answer: 1012.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1002",
+          "1112",
+          "912"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 875 / 5?",
+        "answer": "175",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide step by step: 8/5, then 37/5, then 25/5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "875 / 5 = 175.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "165",
+          "185",
+          "170"
         ]
       }
     ],

@@ -1,0 +1,335 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr11.ANIMAL",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr11.ANIMAL",
+    "title": "Animal Nutrition and Gas Exchange: Digestive System, Heart Structure, and Breathing Mechanism",
+    "grade_level": "Grade11",
+    "bloom_level": "Understand",
+    "explanation": "The human digestive system mechanically and chemically breaks down food into absorbable nutrients. Ingestion occurs in the mouth (teeth mechanically break food; salivary amylase digests starch). The oesophagus moves food by peristalsis to the stomach, where pepsin (in acidic HCl, pH 2) digests proteins. The small intestine is the main site of digestion (pancreatic enzymes, bile) and absorption (villi increase surface area). The large intestine absorbs water. The heart is a double pump with four chambers: the right side pumps deoxygenated blood to the lungs (pulmonary circulation); the left side pumps oxygenated blood to the body (systemic circulation). The left ventricle has the thickest wall. Gas exchange occurs in the lungs: alveoli provide a large surface area for O2 and CO2 exchange by diffusion. Breathing is driven by the diaphragm and intercostal muscles.",
+    "examples": [
+      {
+        "problem": "Describe the path of a piece of bread through the human digestive system, naming the enzymes and their actions.",
+        "steps": [
+          {
+            "instruction": "Step 1: Mouth — Teeth mechanically break bread (mastication). Salivary amylase begins digesting starch into maltose. The tongue shapes food into a bolus.",
+            "result": "mouth digestion"
+          },
+          {
+            "instruction": "Step 2: Oesophagus — Peristalsis (wave-like muscle contractions) pushes the bolus to the stomach. No chemical digestion occurs here.",
+            "result": "oesophagus"
+          },
+          {
+            "instruction": "Step 3: Stomach — HCl creates an acidic environment (pH 2). Pepsin (activated from pepsinogen by HCl) digests proteins into peptides. Churning mixes food into chyme.",
+            "result": "stomach digestion"
+          },
+          {
+            "instruction": "Step 4: Small intestine — Pancreatic amylase completes starch → maltose. Maltase converts maltose → glucose. Trypsin digests proteins → amino acids. Lipase digests fats → fatty acids + glycerol. Bile (from liver, stored in gallbladder) emulsifies fats. Nutrients are absorbed through villi into blood/lymph.",
+            "result": "small intestine"
+          },
+          {
+            "instruction": "Step 5: Large intestine — Water and minerals are absorbed. Bacteria produce vitamin K. Undigested material forms faeces, stored in rectum, expelled through anus.",
+            "result": "large intestine"
+          }
+        ],
+        "answer": "Answer: Bread follows: mouth (amylase → starch digestion) → oesophagus (peristalsis) → stomach (pepsin → protein digestion) → small intestine (complete digestion + absorption via villi) → large intestine (water absorption) → anus.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the structure of the human heart and explain double circulation.",
+        "steps": [
+          {
+            "instruction": "Step 1: The heart has four chambers — right atrium (receives deoxygenated blood from body via vena cavae), right ventricle (pumps to lungs via pulmonary artery), left atrium (receives oxygenated blood from lungs via pulmonary veins), left ventricle (pumps to body via aorta).",
+            "result": "four chambers described"
+          },
+          {
+            "instruction": "Step 2: Valves prevent backflow: tricuspid (right AV), bicuspid/mitral (left AV), semi-lunar valves (in aorta and pulmonary artery).",
+            "result": "valves"
+          },
+          {
+            "instruction": "Step 3: Double circulation: Blood passes through the heart TWICE per complete circuit. Pulmonary circulation: right ventricle → lungs → left atrium. Systemic circulation: left ventricle → body → right atrium.",
+            "result": "double circulation"
+          },
+          {
+            "instruction": "Step 4: The left ventricle wall is the thickest because it must pump blood at high pressure to the entire body. The septum separates oxygenated and deoxygenated blood.",
+            "result": "structural adaptations"
+          }
+        ],
+        "answer": "Answer: The heart has four chambers with valves. Double circulation means blood passes through the heart twice: once to the lungs (pulmonary) and once to the body (systemic). The left ventricle has the thickest wall.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the mechanism of inhalation (breathing in).",
+        "steps": [
+          {
+            "instruction": "Step 1: The diaphragm contracts and flattens (moves downward).",
+            "result": "diaphragm"
+          },
+          {
+            "instruction": "Step 2: The external intercostal muscles contract, pulling the ribs upward and outward.",
+            "result": "intercostal muscles"
+          },
+          {
+            "instruction": "Step 3: These movements increase the volume of the thoracic (chest) cavity.",
+            "result": "volume increases"
+          },
+          {
+            "instruction": "Step 4: Increased volume decreases pressure inside the lungs (below atmospheric pressure). Air rushes IN through the nose/mouth to equalise pressure (Boyle's Law: volume up → pressure down).",
+            "result": "air enters"
+          }
+        ],
+        "answer": "Answer: Inhalation: diaphragm contracts (flattens) + external intercostal muscles contract (ribs up and out) → thoracic volume increases → lung pressure decreases → air rushes in.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the enzyme that digests starch in the mouth and state the product of this digestion.",
+        "answer": "Salivary amylase digests starch into maltose (a disaccharide). Maltose is later broken down into glucose by maltase in the small intestine.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "The enzyme's name gives a clue — 'amylase' acts on 'amylose' (a component of starch).",
+          "The mouth has an alkaline pH (~7) suitable for amylase activity."
+        ],
+        "explanation": "Salivary amylase begins carbohydrate digestion in the mouth. It requires a slightly alkaline pH. When food reaches the stomach's acidic environment, amylase is denatured and stops working.",
+        "distractors": [
+          "Pepsin digests starch in the mouth",
+          "Amylase produces amino acids",
+          "Lipase digests starch in the mouth"
+        ]
+      },
+      {
+        "question": "Explain why the small intestine has villi and microvilli on its inner surface.",
+        "answer": "Villi and microvilli massively increase the surface area of the small intestine for absorption of digested nutrients. Each villus contains a network of blood capillaries (to absorb amino acids and glucose) and a lacteal (lymph vessel to absorb fatty acids and glycerol). The thin epithelial wall (one cell thick) ensures a short diffusion distance for efficient absorption.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "How does increasing surface area help with absorption?",
+          "Each villus has a blood supply and a lacteal — what does each absorb?"
+        ],
+        "explanation": "Villi increase surface area by approximately 600 times. Combined with thin walls and rich blood supply, this maximises the rate of nutrient absorption from the small intestine.",
+        "distractors": [
+          "Villi are for mechanical digestion of food",
+          "Microvilli produce digestive enzymes only",
+          "Villi decrease surface area to slow absorption"
+        ]
+      },
+      {
+        "question": "A patient has a blocked coronary artery. Explain what a coronary artery is and predict the consequences of a complete blockage.",
+        "answer": "Coronary arteries are blood vessels on the surface of the heart that supply the heart muscle (myocardium) with oxygenated blood and nutrients. If a coronary artery is completely blocked (e.g. by a blood clot or atherosclerotic plaque), the heart muscle downstream receives no oxygen. Without oxygen, the muscle cells cannot perform aerobic respiration, they die (necrosis), and the heart cannot pump effectively. This is a myocardial infarction (heart attack), which can be fatal.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "The heart is a muscle — it needs its own blood supply to function.",
+          "What happens to muscle cells deprived of oxygen?"
+        ],
+        "explanation": "Coronary arteries supply the heart muscle with oxygen. Blockage causes oxygen deprivation, muscle cell death, and heart attack. Risk factors include smoking, high cholesterol, and lack of exercise.",
+        "distractors": [
+          "Coronary arteries supply blood to the lungs",
+          "A blocked coronary artery only affects blood flow to the legs",
+          "The heart does not need its own blood supply because blood passes through it"
+        ]
+      },
+      {
+        "question": "Compare inhalation and exhalation in terms of the actions of the diaphragm, intercostal muscles, thoracic volume, and air pressure.",
+        "answer": "Inhalation: diaphragm contracts (flattens), external intercostal muscles contract (ribs up and out), thoracic volume increases, lung pressure decreases below atmospheric → air rushes IN. Exhalation: diaphragm relaxes (domes upward), internal intercostal muscles contract (ribs down and in), thoracic volume decreases, lung pressure increases above atmospheric → air is pushed OUT.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Inhalation is ACTIVE (muscles contract); quiet exhalation is PASSIVE (muscles relax).",
+          "Apply Boyle's Law: volume up → pressure down, and vice versa."
+        ],
+        "explanation": "Breathing relies on pressure changes caused by muscle action. Inhalation = active (muscles contract, volume up, pressure down). Quiet exhalation = passive (muscles relax, volume down, pressure up).",
+        "distractors": [
+          "The diaphragm contracts during exhalation",
+          "Air is sucked into the lungs by the lungs themselves",
+          "Thoracic volume increases during exhalation"
+        ]
+      },
+      {
+        "question": "A marathon runner in the Comrades ultramarathon (89 km between Durban and Pietermaritzburg) needs to increase oxygen delivery to muscles. Explain the cardiovascular and respiratory adjustments that occur during intense exercise.",
+        "answer": "Cardiovascular: 1) Heart rate increases (from ~70 to ~180 bpm) to pump more blood per minute (increased cardiac output). 2) Blood vessels to muscles vasodilate (widen), increasing blood flow to deliver more O2 and glucose. 3) Blood vessels to non-essential organs (digestive system) vasoconstrict, redirecting blood to muscles. Respiratory: 4) Breathing rate increases (from ~15 to ~40+ breaths/min) and breathing deepens (increased tidal volume), increasing the volume of air exchanged per minute (ventilation rate). 5) More O2 reaches the alveoli; diffusion rate increases due to steeper concentration gradient (muscles rapidly consume O2). These adjustments are controlled by the medulla oblongata in the brainstem, which detects increased CO2 in the blood.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about what muscles need during exercise: more O2 and glucose, faster CO2 removal.",
+          "How does the body redirect blood flow? (vasodilation vs vasoconstriction)"
+        ],
+        "explanation": "During the Comrades, the body increases cardiac output (heart rate + stroke volume), redirects blood to muscles (vasodilation), and increases ventilation rate. The medulla monitors blood CO2 levels to coordinate these responses.",
+        "distractors": [
+          "Heart rate decreases during exercise to conserve energy",
+          "Blood vessels to muscles constrict during exercise",
+          "Breathing rate only increases after exercise stops"
+        ]
+      }
+    ],
+    "hints": [
+      "Digestion summary: mouth (amylase→starch), stomach (pepsin→protein), small intestine (all three food groups fully digested + absorbed).",
+      "Heart: Right side = deoxygenated blood to lungs; Left side = oxygenated blood to body. Left ventricle = thickest wall.",
+      "Breathing uses Boyle's Law: volume ↑ → pressure ↓ → air flows IN (inhalation)."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "peristalsis",
+        "definition": "Wave-like contractions of smooth muscle in the walls of the digestive tract that push food along",
+        "example_usage": "Peristalsis moves the bolus from the oesophagus to the stomach."
+      },
+      {
+        "term": "villus (plural: villi)",
+        "definition": "Finger-like projections lining the small intestine that increase surface area for nutrient absorption",
+        "example_usage": "Each villus contains blood capillaries and a lacteal for absorbing digested nutrients."
+      },
+      {
+        "term": "alveolus (plural: alveoli)",
+        "definition": "Tiny air sacs in the lungs where gas exchange occurs by diffusion between air and blood",
+        "example_usage": "The alveoli have a combined surface area of about 70 m2 — the size of a tennis court."
+      },
+      {
+        "term": "double circulation",
+        "definition": "A circulatory system where blood passes through the heart twice per complete circuit (pulmonary + systemic)",
+        "example_usage": "Mammals have double circulation: blood goes to lungs (to pick up O2) and then to the body (to deliver O2)."
+      },
+      {
+        "term": "cardiac output",
+        "definition": "The volume of blood pumped by the heart per minute, calculated as heart rate x stroke volume",
+        "example_usage": "During the Comrades ultramarathon, a runner's cardiac output increases from ~5 L/min to ~25 L/min."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think digestion only occurs in the stomach.",
+        "correction": "Digestion begins in the MOUTH (amylase digests starch) and is completed in the SMALL INTESTINE (all food groups fully digested). The stomach mainly digests protein. The small intestine is the most important digestive organ.",
+        "why_students_think_this": "Students associate eating with 'stomach' in everyday language. Emphasise that the small intestine does most of the work."
+      },
+      {
+        "misconception": "Students think the lungs actively suck in air during inhalation.",
+        "correction": "The lungs are passive — they have no muscles. Air enters because the DIAPHRAGM and INTERCOSTAL muscles increase thoracic volume, decreasing lung pressure below atmospheric pressure. Air flows IN due to the pressure difference.",
+        "why_students_think_this": "Students feel as if they actively 'suck' air in. Explain that muscles change volume and pressure; air flow follows passively (Boyle's Law)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr11.ANIMAL",
+    "title": "Assessment: Animal Nutrition and Gas Exchange",
+    "items": [
+      {
+        "question": "Name the four chambers of the heart and state whether each contains oxygenated or deoxygenated blood.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Right atrium (deoxygenated), right ventricle (deoxygenated), left atrium (oxygenated), left ventricle (oxygenated)",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Right side = deoxygenated (to lungs); left side = oxygenated (to body)."
+      },
+      {
+        "question": "Explain the role of bile in digestion.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Bile is produced by the liver, stored in the gallbladder, and released into the small intestine. It emulsifies fats (breaks large fat globules into small droplets), increasing the surface area for lipase to act on.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Bile is NOT an enzyme. It acts physically, not chemically."
+      },
+      {
+        "question": "Describe how alveoli are adapted for efficient gas exchange.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Large surface area (300 million alveoli), thin walls (one cell thick for short diffusion distance), rich blood capillary network (maintains steep concentration gradient), moist surface (gases dissolve for diffusion).",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Link each structural feature to how it helps gas exchange."
+      },
+      {
+        "question": "Compare mechanical and chemical digestion, giving examples from the mouth and stomach.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Mechanical: physical breakdown (teeth chewing in mouth, churning in stomach) — increases surface area. Chemical: enzyme-catalysed breakdown (amylase in mouth breaks starch→maltose, pepsin in stomach breaks protein→peptides) — breaks chemical bonds.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Mechanical = physical size reduction; chemical = breaking bonds with enzymes."
+      },
+      {
+        "question": "Evaluate why the left ventricle wall is thicker than the right ventricle wall.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The left ventricle pumps oxygenated blood to the ENTIRE body (systemic circulation) — a long distance requiring high pressure. The right ventricle only pumps to the nearby lungs (pulmonary circulation) — a short distance requiring lower pressure. Thicker muscle generates more force for higher pressure.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Compare the distances each ventricle must pump blood."
+      }
+    ],
+    "total_points": 16,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "Where does most chemical digestion and absorption occur?",
+      "back": "The small intestine — it receives pancreatic enzymes and bile, and has villi for nutrient absorption.",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is peristalsis?",
+      "back": "Wave-like contractions of smooth muscle in the digestive tract walls that push food along.",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is double circulation?",
+      "back": "Blood passes through the heart TWICE per circuit: pulmonary (right heart → lungs) and systemic (left heart → body).",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Why is the left ventricle wall thicker than the right?",
+      "back": "It pumps blood to the entire body (long distance, high pressure needed), while the right ventricle only pumps to the nearby lungs.",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "How does inhalation occur?",
+      "back": "Diaphragm contracts (flattens) + external intercostals contract (ribs up/out) → thoracic volume increases → lung pressure drops → air rushes IN.",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What are the adaptations of alveoli for gas exchange?",
+      "back": "Large surface area, thin walls (1 cell thick), rich blood supply (capillary network), moist inner surface.",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What does bile do?",
+      "back": "Bile emulsifies fats (breaks large fat droplets into smaller ones), increasing surface area for lipase. Produced by liver, stored in gallbladder. NOT an enzyme.",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the role of pepsin?",
+      "back": "Pepsin is a protease enzyme in the stomach that digests proteins into peptides. It works in acidic conditions (pH 2, created by HCl).",
+      "tags": ["CAPS.LifeSciences.Gr11.ANIMAL", "Grade11", "Animal Nutrition"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is -3 + 5?",
+        "answer": "2",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Start at -3, move 5 to the right"
         ],
-        "explanation": "Explanation.",
+        "explanation": "-3 + 5 = 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-8",
+          "8",
+          "-2"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is -7 - 4?",
+        "answer": "-11",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Moving further into negatives"
         ],
-        "explanation": "Explanation.",
+        "explanation": "-7 - 4 = -11.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-3",
+          "11",
+          "-74"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Order from smallest to largest: 3, -5, 0, -2, 7",
+        "answer": "-5, -2, 0, 3, 7",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Negative numbers are smaller than positive"
         ],
-        "explanation": "Explanation.",
+        "explanation": "From most negative to most positive: -5, -2, 0, 3, 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-2, -5, 0, 3, 7",
+          "0, -2, -5, 3, 7",
+          "7, 3, 0, -2, -5"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is the absolute value of -15?",
+        "answer": "15",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Absolute value is the distance from zero"
         ],
-        "explanation": "Explanation.",
+        "explanation": "|-15| = 15. The distance from -15 to 0 is 15.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-15",
+          "0",
+          "1/15"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Write 2 450 000 in words.",
+        "answer": "Two million four hundred and fifty thousand",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Break into millions, thousands, ones"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2 million + 450 thousand = two million four hundred and fifty thousand.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Two hundred and forty-five thousand",
+          "Twenty-four million five hundred",
+          "Two million forty-five thousand"
         ]
       }
     ],

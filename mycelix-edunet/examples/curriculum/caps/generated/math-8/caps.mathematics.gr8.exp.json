@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: x^5 / x^2",
+        "answer": "x^3",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract exponents when dividing same base"
         ],
-        "explanation": "Explanation.",
+        "explanation": "x^(5-2) = x^3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x^7",
+          "x^10",
+          "x^2.5"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "What is 3^(-2)?",
+        "answer": "1/9",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Negative exponent means reciprocal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3^(-2) = 1/3^2 = 1/9.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-9",
+          "9",
+          "-6"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: (2^3)^2",
+        "answer": "2^6 = 64",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply exponents"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(2^3)^2 = 2^(3x2) = 2^6 = 64.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2^5",
+          "2^9",
+          "4^3"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 5^0 x 3^2",
+        "answer": "9",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Any number to power 0 is 1"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5^0 = 1. 1 x 3^2 = 1 x 9 = 9.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0",
+          "15",
+          "45"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: (4x^3y^2)^2",
+        "answer": "16x^6y^4",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Apply exponent to each factor"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4^2 = 16, (x^3)^2 = x^6, (y^2)^2 = y^4. Answer: 16x^6y^4.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "8x^6y^4",
+          "4x^6y^4",
+          "16x^5y^4"
         ]
       }
     ],

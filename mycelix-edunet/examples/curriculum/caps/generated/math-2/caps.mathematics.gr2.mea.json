@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "How many centimetres are in 1 metre?",
+        "answer": "100",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "There are 100 cm in a metre"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1 metre = 100 centimetres.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10",
+          "50",
+          "1000"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A pencil is 15 cm long and a pen is 12 cm long. How much longer is the pencil?",
+        "answer": "3 cm",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract: 15 - 12"
         ],
-        "explanation": "Explanation.",
+        "explanation": "15 - 12 = 3 cm. The pencil is 3 cm longer.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2 cm",
+          "4 cm",
+          "27 cm"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What time does the clock show when the big hand is on 12 and the small hand is on 3?",
+        "answer": "3 o'clock",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The small hand points to the hour"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The small hand on 3 means it is 3 o'clock.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "12 o'clock",
+          "6 o'clock",
+          "9 o'clock"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A bag of flour weighs 2 kg. How many kilograms do 3 bags weigh?",
+        "answer": "6 kg",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply: 3 bags times 2 kg"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 x 2 = 6 kg.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5 kg",
+          "8 kg",
+          "4 kg"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A bottle holds 1 litre. How many bottles fill a 5-litre bucket?",
+        "answer": "5",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "How many times does 1 go into 5?"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 divided by 1 = 5 bottles.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "6",
+          "10"
         ]
       }
     ],

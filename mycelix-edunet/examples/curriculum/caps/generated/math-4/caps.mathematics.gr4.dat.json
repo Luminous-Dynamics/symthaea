@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "The marks are: 5, 8, 3, 6, 8. What is the mode?",
+        "answer": "8",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The mode is the number that appears most often"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 appears twice, more than any other number. The mode is 8.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "6",
+          "3"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "In a bar graph, the tallest bar reaches 25. What does this represent?",
+        "answer": "25 is the highest value in the data set",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The height of the bar shows the value"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The tallest bar shows the category with the most items: 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "The total",
+          "The average",
+          "The smallest value"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "A pie chart has 4 equal sections. What fraction does each section represent?",
+        "answer": "1/4",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "4 equal parts of a whole circle"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The whole pie is divided into 4 equal parts. Each is 1/4 or 25%.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1/2",
+          "1/3",
+          "1/5"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Find the range of: 12, 18, 7, 23, 15",
+        "answer": "16",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Range = highest minus lowest"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Highest = 23, lowest = 7. Range = 23 - 7 = 16.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "15",
+          "18",
+          "11"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "The ages of 5 children are: 8, 10, 9, 11, 7. What is the mean?",
+        "answer": "9",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add all ages and divide by 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 + 10 + 9 + 11 + 7 = 45. 45 / 5 = 9.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10",
+          "8",
+          "11"
         ]
       }
     ],

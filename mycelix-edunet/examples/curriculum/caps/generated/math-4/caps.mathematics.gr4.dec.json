@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Write 3/10 as a decimal.",
+        "answer": "0.3",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Tenths go in the first decimal place"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3/10 = 0.3. Three tenths.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3.0",
+          "0.03",
+          "0.33"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Write 0.25 as a fraction.",
+        "answer": "25/100 or 1/4",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "0.25 means 25 hundredths"
         ],
-        "explanation": "Explanation.",
+        "explanation": "0.25 = 25/100 = 1/4 in simplest form.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25/10",
+          "2/5",
+          "1/25"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Which is greater: 0.7 or 0.65?",
+        "answer": "0.7",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Compare tenths first"
         ],
-        "explanation": "Explanation.",
+        "explanation": "0.7 = 0.70, which is greater than 0.65.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0.65",
+          "They are equal",
+          "Neither"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 0.4 + 0.3?",
+        "answer": "0.7",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add tenths: 4 tenths + 3 tenths"
         ],
-        "explanation": "Explanation.",
+        "explanation": "0.4 + 0.3 = 0.7 (4 tenths + 3 tenths = 7 tenths).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0.07",
+          "7.0",
+          "0.43"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Write 47/100 as a decimal.",
+        "answer": "0.47",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Hundredths go in the second decimal place"
         ],
-        "explanation": "Explanation.",
+        "explanation": "47/100 = 0.47.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4.7",
+          "0.047",
+          "47.0"
         ]
       }
     ],

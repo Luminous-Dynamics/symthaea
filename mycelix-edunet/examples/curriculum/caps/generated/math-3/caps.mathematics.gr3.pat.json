@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What is the rule? 3, 6, 12, 24, ...",
+        "answer": "Multiply by 2",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Each number is double the one before"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 x 2 = 6, 6 x 2 = 12, 12 x 2 = 24. The rule is multiply by 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Add 3",
+          "Add 6",
+          "Multiply by 3"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Continue: 5, 10, 15, 20, ___",
+        "answer": "25",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add 5 each time"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The rule is +5. 20 + 5 = 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "22",
+          "30",
+          "24"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "In the 4 times table, what is the 6th number?",
+        "answer": "24",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "4, 8, 12, 16, 20, ..."
         ],
-        "explanation": "Explanation.",
+        "explanation": "4 x 6 = 24.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "20",
+          "28",
+          "22"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What pattern do you see in: 9, 18, 27, 36?",
+        "answer": "Add 9 (9 times table)",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find the difference between consecutive numbers"
         ],
-        "explanation": "Explanation.",
+        "explanation": "18-9=9, 27-18=9, 36-27=9. These are multiples of 9.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Add 10",
+          "Multiply by 2",
+          "Add 8"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Find the missing number: 7, 14, ___, 28, 35",
+        "answer": "21",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The pattern adds 7 each time"
         ],
-        "explanation": "Explanation.",
+        "explanation": "14 + 7 = 21. These are the multiples of 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "20",
+          "22",
+          "24"
         ]
       }
     ],

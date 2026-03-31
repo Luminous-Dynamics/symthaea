@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What is 6 x 7?",
+        "answer": "42",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think of the 6 times table"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6 x 7 = 42.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "36",
+          "48",
+          "40"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What is 8 x 9?",
+        "answer": "72",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "8 x 9: think 8 x 10 - 8"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 x 10 = 80, minus 8 = 72.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "63",
+          "81",
+          "64"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What is 24 x 3?",
+        "answer": "72",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Break it up: 20 x 3 and 4 x 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "20 x 3 = 60, 4 x 3 = 12. 60 + 12 = 72.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "62",
+          "82",
+          "68"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What is 56 / 8?",
+        "answer": "7",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think: 8 x ? = 56"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 x 7 = 56, so 56 / 8 = 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6",
+          "8",
+          "9"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "There are 9 rows of desks with 4 desks in each row. How many desks?",
+        "answer": "36",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply: 9 x 4"
         ],
-        "explanation": "Explanation.",
+        "explanation": "9 x 4 = 36 desks.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "32",
+          "40",
+          "34"
         ]
       }
     ],

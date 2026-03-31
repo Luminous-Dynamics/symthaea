@@ -1,0 +1,330 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr10.BIODIV",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr10.BIODIV",
+    "title": "Biodiversity and Classification: Five Kingdoms, Binomial Nomenclature, and South African Indigenous Species",
+    "grade_level": "Grade10",
+    "bloom_level": "Understand",
+    "explanation": "Biodiversity is the variety of life on Earth. South Africa is the third most biodiverse country in the world, with over 95,000 known species. Classification organises organisms into groups based on shared characteristics. The hierarchy is: Domain, Kingdom, Phylum, Class, Order, Family, Genus, Species. The five-kingdom system classifies life into Monera (bacteria), Protista (unicellular eukaryotes), Fungi, Plantae, and Animalia. Binomial nomenclature (devised by Linnaeus) gives each species a two-part Latin name: Genus (capitalised) and species (lowercase), written in italics — e.g. Protea cynaroides (South Africa's national flower, the King Protea).",
+    "examples": [
+      {
+        "problem": "Classify the African elephant using the full taxonomic hierarchy, from Domain to Species.",
+        "steps": [
+          {
+            "instruction": "Step 1: Domain: Eukarya (cells have a nucleus)",
+            "result": "domain identified"
+          },
+          {
+            "instruction": "Step 2: Kingdom: Animalia (multicellular, heterotrophic, no cell wall)",
+            "result": "kingdom identified"
+          },
+          {
+            "instruction": "Step 3: Phylum: Chordata (has a backbone/vertebral column), Class: Mammalia (has hair/fur, produces milk)",
+            "result": "phylum and class"
+          },
+          {
+            "instruction": "Step 4: Order: Proboscidea (trunk-bearing), Family: Elephantidae",
+            "result": "order and family"
+          },
+          {
+            "instruction": "Step 5: Genus: Loxodonta, Species: africana. Binomial name: Loxodonta africana",
+            "result": "genus and species"
+          }
+        ],
+        "answer": "Answer: Domain Eukarya, Kingdom Animalia, Phylum Chordata, Class Mammalia, Order Proboscidea, Family Elephantidae, Genus Loxodonta, Species africana.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare the five kingdoms in terms of cell type, cell wall, and nutrition.",
+        "steps": [
+          {
+            "instruction": "Step 1: Monera — Prokaryotic, cell wall (peptidoglycan), autotrophic or heterotrophic. Examples: E. coli, Mycobacterium tuberculosis.",
+            "result": "Monera described"
+          },
+          {
+            "instruction": "Step 2: Protista — Eukaryotic, some have cell walls (cellulose), autotrophic (algae) or heterotrophic (amoeba). Examples: Plasmodium (causes malaria).",
+            "result": "Protista described"
+          },
+          {
+            "instruction": "Step 3: Fungi — Eukaryotic, cell wall (chitin), heterotrophic (decomposers/parasites). Examples: mushrooms, Penicillium.",
+            "result": "Fungi described"
+          },
+          {
+            "instruction": "Step 4: Plantae — Eukaryotic, cell wall (cellulose), autotrophic (photosynthesis). Examples: Protea cynaroides, Welwitschia mirabilis.",
+            "result": "Plantae described"
+          },
+          {
+            "instruction": "Step 5: Animalia — Eukaryotic, no cell wall, heterotrophic. Examples: Loxodonta africana (African elephant), Panthera leo (lion).",
+            "result": "Animalia described"
+          }
+        ],
+        "answer": "Answer: Five kingdoms differ in cell type (prokaryotic/eukaryotic), cell wall composition (none/peptidoglycan/chitin/cellulose), and nutrition (autotrophic/heterotrophic).",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why binomial nomenclature is important for scientists worldwide, using the example of the Cape mountain zebra.",
+        "steps": [
+          {
+            "instruction": "Step 1: The Cape mountain zebra has different common names in different languages (e.g. 'Kaapse bergsebra' in Afrikaans, 'idwara' in isiXhosa).",
+            "result": "common name problem identified"
+          },
+          {
+            "instruction": "Step 2: Its binomial name, Equus zebra zebra, is the same in every country and language.",
+            "result": "universal name"
+          },
+          {
+            "instruction": "Step 3: This prevents confusion — a scientist in Japan and a scientist in South Africa both know exactly which species is being discussed.",
+            "result": "international communication"
+          }
+        ],
+        "answer": "Answer: Binomial nomenclature provides a universal, unambiguous scientific name (Equus zebra zebra) that is the same worldwide, preventing confusion caused by multiple common names.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Write the binomial name of the King Protea correctly, following the rules of binomial nomenclature.",
+        "answer": "Protea cynaroides — Genus capitalised, species lowercase, both italicised (or underlined when handwritten).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "The genus name always starts with a capital letter; the species name is lowercase.",
+          "When handwriting, underline each word separately instead of italicising."
+        ],
+        "explanation": "Binomial nomenclature rules: Genus is capitalised, species is lowercase, both are italicised in print or underlined when handwritten. The King Protea is Protea cynaroides.",
+        "distractors": [
+          "protea cynaroides (both lowercase)",
+          "Protea Cynaroides (both capitalised)",
+          "PROTEA CYNAROIDES (all caps)"
+        ]
+      },
+      {
+        "question": "A learner finds an organism with eukaryotic cells, chitin cell walls, and it absorbs nutrients from dead matter. To which kingdom does it belong?",
+        "answer": "Kingdom Fungi. Eukaryotic cells + chitin cell walls + heterotrophic nutrition by absorption (saprophytic) = fungi. Examples include mushrooms and moulds.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Which kingdom has chitin in its cell walls? (Not cellulose like plants)",
+          "Organisms that decompose dead matter are called saprophytes."
+        ],
+        "explanation": "Fungi are eukaryotic with chitin cell walls and heterotrophic nutrition (absorption). They are key decomposers in ecosystems, recycling nutrients from dead organic matter.",
+        "distractors": [
+          "Kingdom Plantae — plants have cellulose walls, not chitin",
+          "Kingdom Monera — these are prokaryotic",
+          "Kingdom Animalia — animals have no cell walls"
+        ]
+      },
+      {
+        "question": "South Africa is described as a 'megadiverse' country. Give three reasons why South Africa has such high biodiversity.",
+        "answer": "1) South Africa spans a wide range of climatic zones (from subtropical in KwaZulu-Natal to Mediterranean in the Western Cape). 2) It has diverse topography (mountains, coastlines, plateaus, river valleys) creating many different habitats. 3) The Cape Floristic Region alone contains over 9,000 plant species (most per unit area in the world), including many endemics like Protea and Erica species found nowhere else.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about how geography, climate, and isolation create different habitats.",
+          "The Cape Floristic Region is a UNESCO World Heritage Site — why?"
+        ],
+        "explanation": "SA's megadiversity results from varied climates, diverse topography, and unique regions like the Cape Floristic Kingdom. Endemic species (found only in SA) contribute significantly to global biodiversity.",
+        "distractors": [
+          "SA has high biodiversity only because it is a large country",
+          "SA's biodiversity is declining so it is no longer megadiverse",
+          "Only the Kruger National Park contributes to SA's biodiversity"
+        ]
+      },
+      {
+        "question": "Explain why viruses are not included in the five-kingdom classification system.",
+        "answer": "Viruses are not considered living organisms because they are not made of cells (they are just DNA or RNA surrounded by a protein coat), they cannot reproduce on their own (they must hijack a host cell's machinery), and they do not carry out metabolic processes. Since the classification system is based on living organisms with cells, viruses are excluded.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "What are the characteristics of life? Do viruses have all of them?",
+          "Can a virus reproduce without a host cell?"
+        ],
+        "explanation": "Viruses are acellular (not made of cells), cannot reproduce independently, and lack metabolism. They are biological entities but do not meet all criteria for life, so they are excluded from the five-kingdom system.",
+        "distractors": [
+          "Viruses are classified in Kingdom Monera with bacteria",
+          "Viruses are considered living because they have DNA",
+          "Viruses are excluded because they are too small to classify"
+        ]
+      },
+      {
+        "question": "The Welwitschia mirabilis is a living fossil found in the Namib Desert. It is classified in Kingdom Plantae. A learner argues it should be in Kingdom Fungi because it looks like it is decomposing. Evaluate this claim using the characteristics of the two kingdoms.",
+        "answer": "The claim is incorrect. Welwitschia mirabilis is a plant because: it has eukaryotic cells with cellulose cell walls (fungi have chitin walls), it is autotrophic and performs photosynthesis (fungi are heterotrophic absorbers), and it has vascular tissue (xylem and phloem) for transport. Its weathered appearance is due to harsh desert conditions, not decomposition. It is a gymnosperm (cone-bearing plant) that can live over 1,000 years, endemic to the Namib Desert of Namibia and southern Angola.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Compare cell wall composition, nutrition method, and cell structure between plants and fungi.",
+          "Does the organism photosynthesise? If yes, it cannot be a fungus."
+        ],
+        "explanation": "Welwitschia is classified as a plant based on cellulose cell walls, photosynthesis, and vascular tissue. Fungi have chitin walls and are heterotrophic. Physical appearance alone is insufficient for classification.",
+        "distractors": [
+          "Welwitschia is a fungus because it grows in the desert",
+          "Welwitschia has chitin cell walls like fungi",
+          "Classification is based on appearance, so it could be a fungus"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember the classification hierarchy: Dear King Philip Came Over For Good Spaghetti (Domain, Kingdom, Phylum, Class, Order, Family, Genus, Species).",
+      "SA has the entire Cape Floristic Kingdom — one of only six floral kingdoms on Earth, and the smallest but most species-rich.",
+      "Binomial name format: Genus species (italicised/underlined). Only the genus is capitalised."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "biodiversity",
+        "definition": "The variety of living organisms in an area, including diversity within species, between species, and of ecosystems",
+        "example_usage": "The Kruger National Park has high biodiversity with over 500 bird species and 147 mammal species."
+      },
+      {
+        "term": "binomial nomenclature",
+        "definition": "The two-part naming system for species using a Latin Genus name (capitalised) and species name (lowercase), written in italics",
+        "example_usage": "The springbok is scientifically named Antidorcas marsupialis using binomial nomenclature."
+      },
+      {
+        "term": "taxonomy",
+        "definition": "The science of classifying and naming organisms based on shared characteristics",
+        "example_usage": "Taxonomy places the blue crane (Grus paradisea) in the family Gruidae."
+      },
+      {
+        "term": "endemic",
+        "definition": "A species found naturally only in a particular area and nowhere else in the world",
+        "example_usage": "The Table Mountain ghost frog (Heleophryne rosei) is endemic to Table Mountain in Cape Town."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think classification is based on where an organism lives or what it looks like externally.",
+        "correction": "Classification is based on shared structural, cellular, and genetic characteristics — not habitat or superficial appearance. A whale lives in the sea but is a mammal (Class Mammalia), not a fish.",
+        "why_students_think_this": "Students use everyday experience (dolphins look like fish, bats look like birds) instead of scientific criteria. Emphasise: cell type, nutrition, reproduction, and DNA evidence."
+      },
+      {
+        "misconception": "Students write binomial names incorrectly — both words capitalised, not italicised, or as one word.",
+        "correction": "Correct format: Genus species (e.g. Protea cynaroides). Genus capitalised, species lowercase, both italicised (or underlined). Two separate words.",
+        "why_students_think_this": "Students treat the binomial name like an ordinary name. Emphasise the rules every time a scientific name is written."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr10.BIODIV",
+    "title": "Assessment: Biodiversity and Classification",
+    "items": [
+      {
+        "question": "List the five kingdoms of life and give one example organism for each.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Monera (E. coli), Protista (Amoeba), Fungi (mushroom), Plantae (Protea cynaroides), Animalia (Loxodonta africana)",
+        "points": 3,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: bacteria, single-celled eukaryotes, decomposers, green organisms, animals."
+      },
+      {
+        "question": "Explain why the Cape Floristic Region is considered a biodiversity hotspot.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "It has over 9,000 plant species in a small area (highest plant species density in the world), with over 70% endemic species found nowhere else. It is also under threat from urbanisation and invasive species.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "A hotspot has high endemism AND is under threat."
+      },
+      {
+        "question": "Classify the blue crane (Grus paradisea) from Kingdom to Species.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Kingdom: Animalia, Phylum: Chordata, Class: Aves, Order: Gruiformes, Family: Gruidae, Genus: Grus, Species: paradisea",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "The blue crane is a bird — which class do birds belong to?"
+      },
+      {
+        "question": "Explain why viruses are excluded from the five-kingdom classification system.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Viruses are acellular (not made of cells), cannot reproduce independently, and do not metabolise. The classification system is for living cellular organisms.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider the characteristics of living things."
+      },
+      {
+        "question": "Evaluate the importance of conserving South Africa's biodiversity for future generations.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "SA's biodiversity provides ecosystem services (clean water, pollination, soil fertility), medicinal resources (traditional medicine uses indigenous plants), ecotourism revenue, food security, and genetic resources for agriculture. Loss of biodiversity is irreversible — extinct species cannot be recovered.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Think about economic, ecological, medicinal, and cultural value."
+      }
+    ],
+    "total_points": 17,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the five kingdoms of life?",
+      "back": "Monera (bacteria), Protista (unicellular eukaryotes), Fungi, Plantae, and Animalia.",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is binomial nomenclature?",
+      "back": "A two-part naming system: Genus (capitalised) + species (lowercase), both italicised. Example: Protea cynaroides.",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does 'endemic' mean?",
+      "back": "A species found naturally in only one specific area and nowhere else. Example: the Table Mountain ghost frog is endemic to Table Mountain.",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is the taxonomic hierarchy from broadest to most specific?",
+      "back": "Domain, Kingdom, Phylum, Class, Order, Family, Genus, Species (Dear King Philip Came Over For Good Spaghetti).",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "Why is South Africa called a 'megadiverse' country?",
+      "back": "SA is the third most biodiverse country: diverse climates, varied topography, and the entire Cape Floristic Kingdom with 9,000+ plant species.",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What cell wall material distinguishes fungi from plants?",
+      "back": "Fungi have chitin cell walls; plants have cellulose cell walls.",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the binomial name of the African elephant?",
+      "back": "Loxodonta africana (African savanna elephant) or Loxodonta cyclotis (African forest elephant).",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the Cape Floristic Region?",
+      "back": "One of six floral kingdoms on Earth, located in SA's Western Cape. Has 9,000+ plant species — the highest concentration per unit area globally. A UNESCO World Heritage Site.",
+      "tags": ["CAPS.LifeSciences.Gr10.BIODIV", "Grade10", "Biodiversity"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

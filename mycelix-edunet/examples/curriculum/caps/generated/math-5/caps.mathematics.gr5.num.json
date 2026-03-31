@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is the value of the 3 in 305 642?",
+        "answer": "300 000",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The 3 is in the hundred-thousands place"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 is in the hundred-thousands place = 300 000.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3000",
+          "30 000",
+          "3 000 000"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Find the HCF (highest common factor) of 12 and 18.",
+        "answer": "6",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "List factors of each, find the biggest common one"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Factors of 12: 1,2,3,4,6,12. Factors of 18: 1,2,3,6,9,18. HCF = 6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "9",
+          "12"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Find the LCM (lowest common multiple) of 4 and 6.",
+        "answer": "12",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "List multiples of each until you find a match"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Multiples of 4: 4,8,12... Multiples of 6: 6,12... LCM = 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "24",
+          "6",
+          "10"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Is 51 prime or composite?",
+        "answer": "Composite",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Check if any number besides 1 and 51 divides it"
         ],
-        "explanation": "Explanation.",
+        "explanation": "51 = 3 x 17, so it is composite (not prime).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Prime",
+          "Neither",
+          "Even"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Write 360 000 in scientific notation.",
+        "answer": "3.6 x 10^5",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Move the decimal so there is one digit before it"
         ],
-        "explanation": "Explanation.",
+        "explanation": "360 000 = 3.6 x 100 000 = 3.6 x 10^5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "36 x 10^4",
+          "3.6 x 10^4",
+          "0.36 x 10^6"
         ]
       }
     ],

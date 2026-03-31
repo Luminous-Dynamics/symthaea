@@ -1,0 +1,327 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr11.BIODIV2",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr11.BIODIV2",
+    "title": "Microbiology: Viruses, Bacteria, Protists, Fungi, and Antibiotic Resistance",
+    "grade_level": "Grade11",
+    "bloom_level": "Understand",
+    "explanation": "Microorganisms include viruses, bacteria, protists, and fungi. Viruses are acellular (not cells) — consisting of DNA or RNA enclosed in a protein coat (capsid). They are obligate intracellular parasites, reproducing only inside host cells (lytic or lysogenic cycle). Bacteria are prokaryotic, with peptidoglycan cell walls, circular DNA, and no membrane-bound organelles; they reproduce by binary fission. Protists are diverse unicellular eukaryotes (e.g. Plasmodium causing malaria). Fungi are eukaryotic with chitin walls, reproducing by spores. Antibiotic resistance is a growing global crisis: bacteria evolve resistance through natural selection when antibiotics are overused or courses are incomplete. SA faces major challenges with drug-resistant TB (XDR-TB).",
+    "examples": [
+      {
+        "problem": "Describe the structure of a virus and explain why viruses are not considered living organisms.",
+        "steps": [
+          {
+            "instruction": "Step 1: Structure — A virus consists of genetic material (either DNA or RNA, never both) surrounded by a protein coat called a capsid. Some viruses (e.g. HIV) have an additional lipid envelope.",
+            "result": "structure described"
+          },
+          {
+            "instruction": "Step 2: Viruses are NOT cells — they have no cytoplasm, no organelles, no ribosomes, and no cell membrane.",
+            "result": "acellular nature"
+          },
+          {
+            "instruction": "Step 3: Viruses cannot reproduce independently — they must hijack a host cell's machinery to replicate their genetic material and assemble new virus particles.",
+            "result": "obligate parasitism"
+          },
+          {
+            "instruction": "Step 4: Viruses do not carry out metabolism (no respiration, no nutrition). Therefore they do not meet all seven characteristics of life.",
+            "result": "not living"
+          }
+        ],
+        "answer": "Answer: Viruses have DNA/RNA in a protein capsid, are acellular, cannot reproduce independently, and lack metabolism — so they are not considered living.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how antibiotic resistance develops in a bacterial population, using the example of TB in South Africa.",
+        "steps": [
+          {
+            "instruction": "Step 1: A population of Mycobacterium tuberculosis (TB bacteria) naturally contains genetic variation — a few bacteria may have random mutations that make them slightly resistant to an antibiotic (e.g. rifampicin).",
+            "result": "genetic variation"
+          },
+          {
+            "instruction": "Step 2: When a patient takes antibiotics, most bacteria are killed. However, if the course is not completed, the few resistant bacteria survive.",
+            "result": "selection pressure"
+          },
+          {
+            "instruction": "Step 3: These resistant bacteria reproduce rapidly (binary fission), passing the resistance gene to all offspring. The population is now dominated by resistant bacteria.",
+            "result": "natural selection"
+          },
+          {
+            "instruction": "Step 4: In SA, multi-drug resistant TB (MDR-TB) and extensively drug-resistant TB (XDR-TB) have become major public health crises, especially in communities with high HIV co-infection rates.",
+            "result": "SA context"
+          }
+        ],
+        "answer": "Answer: Antibiotic resistance develops through natural selection: resistant bacteria survive antibiotic treatment, reproduce, and dominate the population. In SA, incomplete TB treatment has led to MDR-TB and XDR-TB.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare the lytic and lysogenic cycles of viral replication.",
+        "steps": [
+          {
+            "instruction": "Step 1: Lytic cycle — The virus attaches to a host cell, injects its DNA, hijacks the cell's machinery to make new viruses, and the cell bursts (lyses), releasing many new viruses. This causes disease symptoms.",
+            "result": "lytic cycle"
+          },
+          {
+            "instruction": "Step 2: Lysogenic cycle — The viral DNA integrates into the host cell's chromosome (becomes a prophage). It is replicated with the host DNA during cell division without causing symptoms.",
+            "result": "lysogenic cycle"
+          },
+          {
+            "instruction": "Step 3: Under stress (e.g. UV radiation), the prophage can be triggered to enter the lytic cycle, producing new viruses and killing the cell. HIV uses a similar strategy (retrovirus).",
+            "result": "switch between cycles"
+          }
+        ],
+        "answer": "Answer: Lytic cycle = immediate replication and cell lysis; lysogenic cycle = viral DNA integrates into host chromosome and replicates silently until triggered to become lytic.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "State three differences between bacteria and viruses.",
+        "answer": "1) Bacteria are cells (prokaryotic); viruses are acellular (not cells). 2) Bacteria can reproduce independently by binary fission; viruses need a host cell to replicate. 3) Bacteria have ribosomes and carry out metabolism; viruses have no ribosomes and no metabolism.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about whether each can reproduce on its own.",
+          "Consider whether each has cellular structures like ribosomes."
+        ],
+        "explanation": "Bacteria and viruses differ fundamentally: bacteria are living cells that metabolise and reproduce independently; viruses are non-living particles that require host cells.",
+        "distractors": [
+          "Both bacteria and viruses are cells",
+          "Viruses are larger than bacteria",
+          "Bacteria cannot reproduce without a host cell"
+        ]
+      },
+      {
+        "question": "Plasmodium falciparum causes malaria, which kills approximately 600,000 people annually, mostly in sub-Saharan Africa. Describe how this protist is transmitted to humans.",
+        "answer": "Plasmodium is transmitted by the female Anopheles mosquito (vector). When the mosquito bites an infected person, it takes up Plasmodium in the blood. The parasite develops inside the mosquito. When the mosquito bites another person, it injects Plasmodium sporozoites into the bloodstream. The parasite then infects liver cells and red blood cells, causing the fever cycles characteristic of malaria.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "A vector is an organism that transmits a pathogen between hosts.",
+          "Which type of mosquito transmits malaria? (Male or female?)"
+        ],
+        "explanation": "Malaria is vector-borne: female Anopheles mosquitoes transmit Plasmodium between humans. The parasite has a complex life cycle involving both the mosquito and human host.",
+        "distractors": [
+          "Malaria is transmitted by direct contact between people",
+          "Male Anopheles mosquitoes transmit malaria",
+          "Plasmodium is a bacterium treated with antibiotics"
+        ]
+      },
+      {
+        "question": "Explain why antibiotics are effective against bacterial infections but NOT against viral infections.",
+        "answer": "Antibiotics work by targeting specific structures or processes in bacterial cells — e.g. penicillin inhibits peptidoglycan cell wall synthesis, causing bacteria to burst. Viruses lack cell walls, ribosomes, and metabolic processes, so antibiotics have no target to act on. Antiviral drugs (not antibiotics) are needed for viral infections; these target specific stages of viral replication.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "What structures do antibiotics target? Do viruses have these structures?",
+          "Penicillin disrupts cell wall formation — do viruses have cell walls?"
+        ],
+        "explanation": "Antibiotics target bacterial-specific structures (cell wall, ribosomes, DNA replication). Since viruses lack these structures and use host cell machinery, antibiotics are ineffective against them.",
+        "distractors": [
+          "Antibiotics work against both bacteria and viruses",
+          "Viruses are too small for antibiotics to find",
+          "Antibiotics kill viruses by dissolving their capsids"
+        ]
+      },
+      {
+        "question": "South Africa has high rates of HIV/AIDS. Explain how HIV (a retrovirus) replicates differently from a typical DNA virus.",
+        "answer": "HIV is a retrovirus — it contains RNA (not DNA) as its genetic material. After entering a host cell (CD4+ T-helper cell), HIV uses the enzyme reverse transcriptase to convert its RNA into DNA. This viral DNA is then integrated into the host cell's chromosome by the enzyme integrase. The host cell's machinery then transcribes the viral DNA into new RNA and translates viral proteins. New HIV particles are assembled and bud from the cell. This is unique because the flow of information is RNA → DNA (reverse of the normal DNA → RNA → protein).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "A retrovirus reverses the normal flow of genetic information.",
+          "What enzyme does HIV use to convert RNA to DNA?"
+        ],
+        "explanation": "HIV uniquely uses reverse transcriptase (RNA → DNA), then integrase to insert viral DNA into the host genome. This reversal of the central dogma is why it is called a 'retro' virus.",
+        "distractors": [
+          "HIV replicates its RNA directly without converting to DNA",
+          "HIV is a DNA virus like most other viruses",
+          "Reverse transcriptase converts DNA to RNA"
+        ]
+      },
+      {
+        "question": "A hospital in Gauteng reports a cluster of infections caused by bacteria resistant to all available antibiotics. As a health official, evaluate the causes of this 'superbug' crisis and propose three measures to combat antibiotic resistance in South African hospitals.",
+        "answer": "Causes: 1) Over-prescription of antibiotics by doctors. 2) Patients not completing antibiotic courses, allowing resistant bacteria to survive. 3) Use of antibiotics in livestock farming (agricultural overuse). 4) Poor infection control in hospitals allowing resistant bacteria to spread. Measures: 1) Strict antibiotic stewardship programmes — prescribe only when necessary, use narrow-spectrum antibiotics first. 2) Enforce completion of full antibiotic courses through patient education and DOTS (Directly Observed Treatment, Short-course) programmes. 3) Improve hospital hygiene — handwashing, sterilisation of equipment, isolation of infected patients. Additional: invest in new antibiotic development and rapid diagnostic tests to identify resistant strains.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about what behaviours select for resistant bacteria.",
+          "SA already uses DOTS for TB treatment — could this approach be expanded?"
+        ],
+        "explanation": "Antibiotic resistance is driven by overuse, incomplete courses, and agricultural use. Combating it requires stewardship, patient education, hygiene, and investment in new antibiotics. SA's DOTS programme for TB is a model for ensuring treatment completion.",
+        "distractors": [
+          "The solution is to develop stronger antibiotics and use them more widely",
+          "Antibiotic resistance is not a problem in South Africa",
+          "Bacteria become resistant because they choose to evolve"
+        ]
+      }
+    ],
+    "hints": [
+      "Viruses are NOT cells — they are particles. Remember: no metabolism, no independent reproduction.",
+      "Antibiotic resistance = natural selection in action. The antibiotic is the selection pressure, and resistant bacteria have a survival advantage.",
+      "HIV attacks CD4+ T-helper cells, destroying the immune system over time, leading to AIDS."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "pathogen",
+        "definition": "A microorganism that causes disease in its host (includes certain bacteria, viruses, protists, and fungi)",
+        "example_usage": "Mycobacterium tuberculosis is a bacterial pathogen that causes TB."
+      },
+      {
+        "term": "antibiotic resistance",
+        "definition": "The ability of bacteria to survive exposure to antibiotics that would normally kill them, due to genetic mutations selected by natural selection",
+        "example_usage": "XDR-TB in South Africa is resistant to most available antibiotics."
+      },
+      {
+        "term": "binary fission",
+        "definition": "Asexual reproduction in bacteria where a single cell divides into two identical daughter cells",
+        "example_usage": "Under ideal conditions, E. coli can undergo binary fission every 20 minutes."
+      },
+      {
+        "term": "capsid",
+        "definition": "The protein coat surrounding the genetic material (DNA or RNA) of a virus",
+        "example_usage": "The capsid of the influenza virus has a characteristic spherical shape."
+      },
+      {
+        "term": "vector",
+        "definition": "An organism that transmits a pathogen from one host to another without being affected itself",
+        "example_usage": "The female Anopheles mosquito is the vector for malaria (Plasmodium)."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think antibiotics can treat viral infections like flu or COVID-19.",
+        "correction": "Antibiotics ONLY work against bacteria. Viruses lack the structures antibiotics target (cell walls, ribosomes). Viral infections require antiviral drugs or are managed by the immune system (with vaccine prevention).",
+        "why_students_think_this": "Doctors sometimes prescribe antibiotics when patients have viral infections (to prevent secondary bacterial infections), leading students to believe antibiotics treat viruses."
+      },
+      {
+        "misconception": "Students think individual bacteria 'decide' to become resistant or 'learn' to resist antibiotics.",
+        "correction": "Resistance arises from random genetic mutations that ALREADY exist in the population BEFORE antibiotic exposure. Antibiotics select for these pre-existing resistant individuals. Bacteria do not 'choose' to become resistant.",
+        "why_students_think_this": "Students anthropomorphise bacteria. Emphasise: the mutation happens first (random); the antibiotic then selects for it (non-random natural selection)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr11.BIODIV2",
+    "title": "Assessment: Microbiology — Viruses, Bacteria, Protists, Fungi, Antibiotic Resistance",
+    "items": [
+      {
+        "question": "Draw and label a diagram of a bacteriophage virus.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Labels: head (capsid containing DNA), collar, tail sheath, base plate, tail fibres",
+        "points": 3,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "A bacteriophage looks like a lunar lander."
+      },
+      {
+        "question": "Explain why viruses are described as 'obligate intracellular parasites'.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Obligate = must; intracellular = inside cells; parasites = depend on host. Viruses MUST be inside a living host cell to reproduce because they lack ribosomes and metabolic machinery.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Break down each word: obligate, intracellular, parasite."
+      },
+      {
+        "question": "Describe how antibiotic resistance develops through natural selection, using a named example.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "In a TB bacterial population, some bacteria have mutations conferring resistance. Antibiotic treatment kills sensitive bacteria but resistant ones survive, reproduce, and pass on resistance genes. Natural selection favours the resistant strain.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Key steps: variation, selection pressure, survival, reproduction."
+      },
+      {
+        "question": "Compare the lytic and lysogenic cycles of viral replication.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Lytic: virus immediately replicates and lyses host cell. Lysogenic: viral DNA integrates into host chromosome as prophage, replicating silently until triggered to become lytic.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Lytic = lysis (cell bursting). Lysogenic = DNA integration."
+      },
+      {
+        "question": "Evaluate the statement: 'Taking antibiotics for a cold will help you recover faster.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Incorrect. Colds are caused by viruses (e.g. rhinovirus). Antibiotics only work against bacteria. Taking antibiotics unnecessarily contributes to antibiotic resistance — a global health threat. Recovery from viral colds depends on the immune system.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "What type of organism causes a cold? What do antibiotics target?"
+      }
+    ],
+    "total_points": 17,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is a virus made of?",
+      "back": "Genetic material (DNA or RNA) enclosed in a protein coat (capsid). Some have a lipid envelope. They are NOT cells.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does 'obligate intracellular parasite' mean?",
+      "back": "An organism that MUST be inside a living host cell to reproduce. Viruses are obligate intracellular parasites.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "How do bacteria reproduce?",
+      "back": "Binary fission — asexual reproduction where one cell divides into two identical daughter cells.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Why don't antibiotics work against viruses?",
+      "back": "Antibiotics target bacterial structures (cell walls, ribosomes). Viruses lack these structures and use host cell machinery instead.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is antibiotic resistance?",
+      "back": "When bacteria evolve (through natural selection) to survive exposure to antibiotics. Caused by overuse, incomplete courses, and agricultural use of antibiotics.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is a retrovirus?",
+      "back": "A virus (e.g. HIV) that contains RNA and uses reverse transcriptase to convert RNA → DNA, which integrates into the host genome.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is XDR-TB?",
+      "back": "Extensively Drug-Resistant Tuberculosis — TB bacteria resistant to most available antibiotics. A major public health crisis in South Africa.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What organism causes malaria and how is it transmitted?",
+      "back": "Plasmodium (a protist) is transmitted by the female Anopheles mosquito (vector) through blood-feeding bites.",
+      "tags": ["CAPS.LifeSciences.Gr11.BIODIV2", "Grade11", "Microbiology"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

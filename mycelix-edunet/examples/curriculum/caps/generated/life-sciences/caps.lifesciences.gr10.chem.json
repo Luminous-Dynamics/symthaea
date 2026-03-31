@@ -1,0 +1,327 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr10.CHEM",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr10.CHEM",
+    "title": "Chemistry of Life: Water Properties, Carbohydrates, Lipids, Proteins, and Nucleic Acids",
+    "grade_level": "Grade10",
+    "bloom_level": "Understand",
+    "explanation": "All living organisms are built from chemical compounds. Water is the most abundant molecule in cells and has unique properties: it is a polar molecule forming hydrogen bonds, giving it high specific heat capacity, high boiling point, and making it an excellent solvent for biochemical reactions. Organic molecules are carbon-based: carbohydrates (monosaccharides, disaccharides, polysaccharides) provide energy; lipids (fats, oils, phospholipids) store energy and form cell membranes; proteins are polymers of amino acids joined by peptide bonds, serving as enzymes, structural components, and transporters; nucleic acids (DNA and RNA) store and transmit genetic information.",
+    "examples": [
+      {
+        "problem": "Explain why water is described as a 'universal solvent' and give two examples of its importance in living organisms.",
+        "steps": [
+          {
+            "instruction": "Step 1: Water is a polar molecule — oxygen is slightly negative (delta-), hydrogens are slightly positive (delta+).",
+            "result": "polarity explained"
+          },
+          {
+            "instruction": "Step 2: This polarity allows water to dissolve ionic and polar substances by surrounding them with water molecules (hydration shells).",
+            "result": "solvent mechanism"
+          },
+          {
+            "instruction": "Step 3: Example 1 — Blood plasma (mostly water) transports dissolved glucose, salts, and hormones around the body.",
+            "result": "biological example 1"
+          },
+          {
+            "instruction": "Step 4: Example 2 — Cytoplasm is an aqueous solution where metabolic reactions (e.g. glycolysis) take place.",
+            "result": "biological example 2"
+          }
+        ],
+        "answer": "Answer: Water's polarity allows it to dissolve many substances. In organisms, it transports nutrients in blood and provides a medium for metabolic reactions in cytoplasm.",
+        "visual_description": null
+      },
+      {
+        "problem": "Distinguish between a monosaccharide, a disaccharide, and a polysaccharide, giving one example of each.",
+        "steps": [
+          {
+            "instruction": "Step 1: A monosaccharide is a single sugar unit — the simplest carbohydrate. Example: glucose (C6H12O6).",
+            "result": "monosaccharide defined"
+          },
+          {
+            "instruction": "Step 2: A disaccharide is formed when two monosaccharides join by a condensation reaction (releasing water). Example: sucrose (glucose + fructose).",
+            "result": "disaccharide defined"
+          },
+          {
+            "instruction": "Step 3: A polysaccharide is a long chain of many monosaccharides. Example: starch (energy storage in plants like mielies/maize).",
+            "result": "polysaccharide defined"
+          }
+        ],
+        "answer": "Answer: Monosaccharide = single sugar (glucose); disaccharide = two sugars bonded (sucrose); polysaccharide = many sugars bonded (starch).",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the structure of a protein and explain the role of peptide bonds.",
+        "steps": [
+          {
+            "instruction": "Step 1: Proteins are polymers made of amino acid monomers. There are 20 different amino acids.",
+            "result": "building blocks identified"
+          },
+          {
+            "instruction": "Step 2: Each amino acid has an amino group (-NH2), a carboxyl group (-COOH), and a variable R-group that determines its properties.",
+            "result": "amino acid structure"
+          },
+          {
+            "instruction": "Step 3: A peptide bond forms between the amino group of one amino acid and the carboxyl group of another via a condensation reaction (water removed).",
+            "result": "peptide bond formation"
+          },
+          {
+            "instruction": "Step 4: The sequence of amino acids (primary structure) determines how the protein folds into its 3D shape, which determines its function (e.g. enzyme amylase breaks down starch).",
+            "result": "structure-function relationship"
+          }
+        ],
+        "answer": "Answer: Proteins are chains of amino acids linked by peptide bonds formed through condensation reactions. The amino acid sequence determines the protein's shape and function.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List three properties of water that are important for life and link each to hydrogen bonding.",
+        "answer": "1) High specific heat capacity — hydrogen bonds absorb heat energy, stabilising body temperature. 2) High boiling point — hydrogen bonds require energy to break, keeping water liquid at body temperature. 3) Excellent solvent — polar water molecules form hydration shells around ions and polar molecules.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what makes water 'sticky' at the molecular level.",
+          "Hydrogen bonds form between the delta+ hydrogen of one water molecule and the delta- oxygen of another."
+        ],
+        "explanation": "Hydrogen bonds between water molecules give water its unique properties: high specific heat (temperature buffering), high boiling point (remains liquid), and solvent ability (dissolves polar/ionic substances).",
+        "distractors": [
+          "Water has a low boiling point because hydrogen bonds are weak",
+          "Water is a good solvent because it is non-polar",
+          "Water has low specific heat because hydrogen bonds break easily"
+        ]
+      },
+      {
+        "question": "A food label on a packet of biltong shows it contains 55 g protein, 2 g fat, and 1 g carbohydrate per 100 g. Which organic molecule is most abundant and what is its monomer?",
+        "answer": "Protein is most abundant at 55 g per 100 g. Its monomer is an amino acid.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Compare the masses of each organic molecule listed.",
+          "Recall that proteins are built from smaller units called amino acids."
+        ],
+        "explanation": "Biltong (dried meat) is protein-rich. Proteins are polymers of amino acids joined by peptide bonds. The 55 g protein far exceeds the 2 g fat and 1 g carbohydrate.",
+        "distractors": [
+          "Fat is most abundant because it provides the most energy per gram",
+          "Carbohydrate is most abundant because it is the primary energy source",
+          "The monomer of protein is a nucleotide"
+        ]
+      },
+      {
+        "question": "Draw a table comparing carbohydrates, lipids, proteins, and nucleic acids in terms of: elements present, monomer, one function in the body.",
+        "answer": "Carbohydrates: C, H, O; monosaccharide (e.g. glucose); energy source. Lipids: C, H, O (some have P); glycerol + fatty acids; energy storage and insulation. Proteins: C, H, O, N (some have S); amino acid; enzymes and structural support. Nucleic acids: C, H, O, N, P; nucleotide; storing genetic information.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Remember: lipids have proportionally less oxygen than carbohydrates.",
+          "Nucleic acids are the only group that always contains phosphorus."
+        ],
+        "explanation": "Each organic molecule class has a characteristic elemental composition and monomer. The functions range from energy provision (carbohydrates) to genetic information storage (nucleic acids).",
+        "distractors": [
+          "Lipids contain nitrogen as a key element",
+          "The monomer of carbohydrates is an amino acid",
+          "Nucleic acids are primarily for energy storage"
+        ]
+      },
+      {
+        "question": "Explain why the shape of an enzyme is important for its function, using the lock-and-key model. Use the enzyme amylase found in saliva as your example.",
+        "answer": "Amylase has a specific 3D shape with an active site that is complementary to starch (its substrate), like a key fitting into a lock. Only starch molecules fit into amylase's active site, where the enzyme catalyses the hydrolysis of starch into maltose. If the enzyme's shape changes (e.g. by high temperature denaturing the protein), the substrate can no longer fit, and the reaction stops.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "The active site has a specific shape that matches only one substrate.",
+          "Denaturation changes the shape of the active site permanently."
+        ],
+        "explanation": "Enzymes are proteins with specific 3D shapes. The active site is complementary to the substrate. Amylase specifically breaks down starch. High temperatures break hydrogen bonds holding the enzyme's shape, denaturing it.",
+        "distractors": [
+          "Enzymes change shape to fit any substrate (induced fit means any molecule works)",
+          "Amylase works on all types of food, not just starch",
+          "Denaturation makes enzymes work faster"
+        ]
+      },
+      {
+        "question": "A Grade 10 learner says: 'Fats are bad for you and have no use in the body.' Evaluate this statement by describing three functions of lipids in living organisms.",
+        "answer": "The statement is incorrect. Lipids serve essential functions: 1) Phospholipids form the cell membrane (phospholipid bilayer), controlling what enters and leaves the cell. 2) Fat stored under the skin (subcutaneous fat) provides insulation against heat loss — important for mammals. 3) Fat around organs (e.g. kidneys) provides cushioning and protection. Additionally, fat is a concentrated energy store, providing more than double the energy per gram compared to carbohydrates.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about the structure of cell membranes — what molecule forms the bilayer?",
+          "Consider both structural and metabolic roles of lipids."
+        ],
+        "explanation": "Lipids are essential: phospholipids form membranes, subcutaneous fat insulates, fat cushions organs, and lipids store concentrated energy. The misconception that 'all fat is bad' ignores these vital biological roles.",
+        "distractors": [
+          "Fats only provide energy and have no structural role",
+          "Phospholipids are carbohydrates, not lipids",
+          "Lipids store less energy than carbohydrates per gram"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember the acronym CHNOPS for the key elements in biological molecules: Carbon, Hydrogen, Nitrogen, Oxygen, Phosphorus, Sulphur.",
+      "Condensation reactions join monomers (releasing water); hydrolysis reactions break polymers (adding water).",
+      "Water's unique properties all stem from its polarity and hydrogen bonding between molecules."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "hydrogen bond",
+        "definition": "A weak attraction between the delta+ hydrogen of one polar molecule and the delta- oxygen (or nitrogen) of another",
+        "example_usage": "Hydrogen bonds between water molecules give water its high boiling point."
+      },
+      {
+        "term": "polymer",
+        "definition": "A large molecule made of many repeating smaller units (monomers) joined together",
+        "example_usage": "Starch is a polymer of glucose monomers."
+      },
+      {
+        "term": "condensation reaction",
+        "definition": "A chemical reaction that joins two molecules together with the removal of a water molecule",
+        "example_usage": "Two amino acids join by a condensation reaction to form a dipeptide and release water."
+      },
+      {
+        "term": "enzyme",
+        "definition": "A biological catalyst (protein) that speeds up chemical reactions without being used up",
+        "example_usage": "Amylase is an enzyme in saliva that breaks down starch into maltose."
+      },
+      {
+        "term": "denaturation",
+        "definition": "The permanent change in shape of a protein (especially an enzyme) due to high temperature or extreme pH, causing loss of function",
+        "example_usage": "Boiling an egg denatures the proteins, turning the clear albumen white."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think water is a 'universal solvent' that dissolves everything.",
+        "correction": "Water dissolves polar and ionic substances well, but cannot dissolve non-polar substances like oil (lipids). This is why oil and water do not mix.",
+        "why_students_think_this": "The term 'universal solvent' is misleading. Students need to understand it means water dissolves MORE substances than any other liquid, not ALL substances."
+      },
+      {
+        "misconception": "Students confuse condensation and hydrolysis reactions, thinking condensation adds water.",
+        "correction": "Condensation REMOVES water to join monomers; hydrolysis ADDS water to break polymers. Remember: 'hydro' = water, 'lysis' = splitting.",
+        "why_students_think_this": "The word 'condensation' in everyday language (e.g. water condensing on a cold glass) is associated with water appearing, creating confusion."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr10.CHEM",
+    "title": "Assessment: Chemistry of Life — Water, Carbohydrates, Lipids, Proteins, Nucleic Acids",
+    "items": [
+      {
+        "question": "Name two properties of water that are due to hydrogen bonding.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "High specific heat capacity and high boiling point (or: excellent solvent, high surface tension)",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about what happens when you heat water."
+      },
+      {
+        "question": "Distinguish between a monosaccharide and a polysaccharide. Give one example of each.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "A monosaccharide is a single sugar unit (e.g. glucose). A polysaccharide is many sugar units bonded together (e.g. starch or glycogen).",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Mono = one, poly = many."
+      },
+      {
+        "question": "Describe how a peptide bond is formed between two amino acids.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "A condensation reaction occurs between the carboxyl group (-COOH) of one amino acid and the amino group (-NH2) of another, releasing a water molecule and forming a peptide bond (-CO-NH-).",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "What type of reaction joins monomers together?"
+      },
+      {
+        "question": "Compare the structure and function of DNA and RNA in a table.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "DNA: double-stranded helix, deoxyribose sugar, bases A-T-G-C, stores genetic information. RNA: single-stranded, ribose sugar, bases A-U-G-C, carries genetic instructions for protein synthesis.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider differences in structure (strands, sugar, bases) and function."
+      },
+      {
+        "question": "A learner claims that all lipids are unhealthy. Evaluate this claim with reference to three functions of lipids in the human body.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The claim is incorrect. Lipids form cell membranes (phospholipid bilayer), insulate the body (subcutaneous fat), cushion organs, and store energy. They are essential for survival.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Think about cell structure, temperature regulation, and energy."
+      }
+    ],
+    "total_points": 16,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What type of bond gives water its unique properties?",
+      "back": "Hydrogen bonds — weak attractions between the delta+ hydrogen of one water molecule and the delta- oxygen of another.",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is the monomer of a protein?",
+      "back": "An amino acid. There are 20 different amino acids, joined by peptide bonds.",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is a condensation reaction?",
+      "back": "A reaction that joins two molecules together with the removal of a water molecule (e.g. two amino acids forming a dipeptide).",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "Name the four classes of organic molecules found in living organisms.",
+      "back": "Carbohydrates, lipids, proteins, and nucleic acids.",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What is the difference between DNA and RNA in terms of structure?",
+      "back": "DNA is double-stranded with deoxyribose sugar and thymine; RNA is single-stranded with ribose sugar and uracil instead of thymine.",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "Why is water called a 'polar molecule'?",
+      "back": "Water has an uneven charge distribution: the oxygen end is slightly negative (delta-) and the hydrogen ends are slightly positive (delta+).",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What happens when an enzyme is denatured?",
+      "back": "The 3D shape of the active site changes permanently (hydrogen bonds break), so the substrate no longer fits and the enzyme loses its function.",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What is the structural difference between a saturated and unsaturated fatty acid?",
+      "back": "Saturated fatty acids have only single bonds between carbon atoms (solid at room temperature). Unsaturated fatty acids have one or more double bonds, causing kinks in the chain (liquid at room temperature).",
+      "tags": ["CAPS.LifeSciences.Gr10.CHEM", "Grade10", "Chemistry of Life"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

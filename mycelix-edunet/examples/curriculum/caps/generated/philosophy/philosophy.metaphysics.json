@@ -1,0 +1,129 @@
+{
+  "node_id": "24.118",
+  "lesson": {
+    "standard_code": "24.118",
+    "title": "Metaphysics: Existence, Identity, Free Will & the Mind-Body Problem",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Metaphysics investigates the fundamental nature of reality: What exists? What is the nature of existence? Key domains include ontology (what kinds of things exist — physical objects, minds, numbers, abstract entities), the problem of identity (what makes you the same person over time — body, memory, psychological continuity), free will vs determinism (are our choices genuinely free or predetermined by prior causes), and the mind-body problem (how do mental states relate to physical brain states). Major positions on mind-body include dualism (Descartes: mind and body are separate substances), physicalism (mind is reducible to brain processes), and functionalism (mental states are defined by their functional roles).",
+    "examples": [
+      {
+        "problem": "Explain the Ship of Theseus paradox and its relevance to personal identity.",
+        "steps": [
+          {"instruction": "Step 1: State the paradox — if every plank of a ship is gradually replaced, is it still the same ship? If the old planks are reassembled into a ship, which is the original?", "result": "Paradox presented"},
+          {"instruction": "Step 2: Apply to personal identity — your cells are replaced over time, your memories change, your personality evolves. What makes you the 'same person' you were ten years ago?", "result": "Applied to persons"},
+          {"instruction": "Step 3: Consider competing theories — physical continuity (same body), psychological continuity (connected memories and personality), or narrative identity (the story you tell about yourself).", "result": "Theories compared"}
+        ],
+        "answer": "Answer: The Ship of Theseus challenges our notion of identity through change. Applied to persons, it asks whether identity requires physical continuity, psychological continuity, or something else entirely. If all your atoms are replaced, your identity must depend on patterns and relationships rather than material substance.",
+        "visual_description": null
+      },
+      {
+        "problem": "Present the hard problem of consciousness (Chalmers, 1995).",
+        "steps": [
+          {"instruction": "Step 1: Distinguish easy problems (explaining behaviour, neural correlates, attention) from the hard problem.", "result": "Easy vs hard distinguished"},
+          {"instruction": "Step 2: State the hard problem: why is there subjective experience at all? Why does brain activity feel like something from the inside?", "result": "Hard problem stated"},
+          {"instruction": "Step 3: Note the explanatory gap — even a complete neuroscience would explain correlations between brain states and experiences, but would not explain WHY those brain states produce subjective experience.", "result": "Explanatory gap identified"}
+        ],
+        "answer": "Answer: The hard problem asks why physical processes in the brain give rise to subjective experience (qualia). We can explain the neural correlates of seeing red, but not why there is 'something it is like' to see red. This gap between objective description and subjective experience resists reductive explanation.",
+        "visual_description": null
+      },
+      {
+        "problem": "Outline the free will vs determinism debate and the compatibilist response.",
+        "steps": [
+          {"instruction": "Step 1: Hard determinism — every event (including human decisions) is caused by prior events and natural laws. Free will is an illusion.", "result": "Determinism stated"},
+          {"instruction": "Step 2: Libertarianism (metaphysical, not political) — humans have genuine free will that is not reducible to physical causation.", "result": "Libertarian position"},
+          {"instruction": "Step 3: Compatibilism (Hume, Frankfurt) — free will is compatible with determinism. You act freely when you act according to your own desires without external coercion, even if those desires are themselves caused.", "result": "Compatibilist synthesis"}
+        ],
+        "answer": "Answer: Determinists deny free will (causes determine everything), libertarians affirm it (we have uncaused agency), and compatibilists redefine it (freedom is acting on your desires without coercion, regardless of whether those desires are causally determined). Most contemporary philosophers are compatibilists.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is dualism and what is its main objection?",
+        "answer": "Dualism (Descartes) holds that mind and body are two distinct substances — the mind is non-physical. The main objection is the interaction problem: how can a non-physical mind causally affect a physical body (e.g., deciding to raise your arm)? If the mind has no physical properties, there is no mechanism for causal interaction.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Descartes proposed the pineal gland as the point of interaction — this is widely rejected.", "If the mind is non-physical, how does it push physical neurons around?"],
+        "explanation": "The interaction problem has led most contemporary philosophers to reject substance dualism in favour of physicalism or property dualism.",
+        "distractors": ["Dualism says the mind is the brain.", "The interaction problem has been solved.", "Dualism is the dominant position in contemporary philosophy."]
+      },
+      {
+        "question": "Explain the thought experiment of philosophical zombies and what it is meant to show.",
+        "answer": "A philosophical zombie (p-zombie) is a hypothetical being physically identical to a human but lacking any subjective experience — it behaves exactly like you but there is 'nothing it is like' to be it. If p-zombies are conceivable, then consciousness is not reducible to physical properties (because the physical facts are identical, yet consciousness differs). This argues against physicalism.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["The key question: is it logically possible for a physical duplicate of you to lack consciousness?", "If yes, consciousness is something 'over and above' the physical."],
+        "explanation": "Physicalists respond that p-zombies are not genuinely conceivable — that our intuition of their possibility is an illusion. The debate remains open.",
+        "distractors": ["P-zombies are real creatures.", "This thought experiment supports physicalism.", "P-zombies behave differently from conscious beings."]
+      },
+      {
+        "question": "What is the difference between ontology and epistemology?",
+        "answer": "Ontology studies what exists (the nature and categories of being). Epistemology studies what we can know (the nature and limits of knowledge). Ontology asks 'What is real?' Epistemology asks 'How do we know what is real?'",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Onto- = being. Episteme- = knowledge.", "One is about reality, the other about our access to reality."],
+        "explanation": "These two branches are deeply connected: what we can know depends on what exists, and claims about what exists require epistemological justification.",
+        "distractors": ["They are the same branch of philosophy.", "Ontology is part of epistemology.", "Epistemology does not deal with reality."]
+      },
+      {
+        "question": "Explain Locke's memory theory of personal identity and one objection to it.",
+        "answer": "Locke argued that personal identity consists in psychological continuity, specifically memory: you are the same person as your past self if you can remember their experiences. Objection (Thomas Reid's 'brave officer' paradox): an old general remembers being a young officer, the young officer remembers being a schoolboy, but the old general does not remember being the schoolboy. By Locke's theory, the general IS the officer and the officer IS the boy, but the general is NOT the boy — violating the transitivity of identity.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["Identity must be transitive: if A=B and B=C, then A=C.", "Memory is fallible and fades — can identity depend on something so unreliable?"],
+        "explanation": "Modern psychological continuity theories (Parfit) address this by requiring overlapping chains of memory connections rather than direct memories, preserving transitivity.",
+        "distractors": ["Locke's theory has no objections.", "Reid supported Locke's theory.", "Memory theory requires perfect recall."]
+      },
+      {
+        "question": "What is functionalism in philosophy of mind?",
+        "answer": "Functionalism holds that mental states (beliefs, desires, pain) are defined not by their physical composition but by their functional role — the causal relations between inputs (stimuli), outputs (behaviour), and other mental states. Pain is whatever plays the 'pain role' (caused by damage, causes withdrawal behaviour, produces distress). This allows for multiple realisability: silicon, carbon, or any substrate could have mental states if it instantiates the right functional organisation.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": ["Functionalism is like defining a mousetrap by what it does, not what it is made of.", "It is the dominant theory in contemporary philosophy of mind."],
+        "explanation": "Functionalism is attractive because it is substrate-independent — it supports the possibility of artificial consciousness. Its main challenge is whether it can account for qualia (subjective experience).",
+        "distractors": ["Functionalism requires a specific physical substrate.", "It is the same as behaviourism.", "It denies the existence of mental states."]
+      }
+    ],
+    "hints": [
+      "Metaphysics asks the deepest questions: What is real? What is identity? Are we free?",
+      "Thought experiments (p-zombies, Ship of Theseus, brain-in-a-vat) are tools for testing intuitions — take them seriously.",
+      "Most metaphysical debates have no consensus answers — your job is to understand and evaluate the arguments."
+    ],
+    "key_vocabulary": [
+      {"term": "dualism", "definition": "The metaphysical position that mind and body are two fundamentally different substances (Descartes)", "example_usage": "Cartesian dualism faces the problem of explaining how a non-physical mind interacts with a physical body."},
+      {"term": "physicalism", "definition": "The metaphysical position that everything that exists is physical, including mental states", "example_usage": "Physicalism holds that consciousness is identical to or emerges from brain processes."},
+      {"term": "determinism", "definition": "The doctrine that every event, including human action, is the inevitable result of prior causes and natural laws", "example_usage": "If determinism is true, your decision to read this sentence was fixed by the state of the universe at the Big Bang."},
+      {"term": "qualia", "definition": "The subjective, experiential qualities of conscious experience — what it is like to see red, feel pain, or taste chocolate", "example_usage": "The hard problem of consciousness asks why physical brain processes give rise to qualia."},
+      {"term": "compatibilism", "definition": "The position that free will is compatible with determinism: you are free if you act on your own desires without external coercion", "example_usage": "A compatibilist would say a prisoner is unfree (coerced), but a person choosing coffee over tea is free (acting on desire)."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think the free will debate is about whether people make choices — 'of course I choose what to eat for breakfast.'",
+        "correction": "The debate is not about whether you make choices (you obviously do), but about whether those choices are genuinely open (you could have chosen otherwise) or fully determined by prior causes (genetics, upbringing, brain chemistry). The compatibilist position redefines freedom as acting on your desires, which preserves 'choice' while accepting causal determination.",
+        "why_students_think_this": "Everyday experience strongly suggests we are free — we deliberate, weigh options, and feel the difference between voluntary and coerced action. The philosophical question goes deeper: even our deliberation might be causally determined."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is the hard problem of consciousness?", "back": "Why do physical brain processes give rise to subjective experience (qualia)? Why is there 'something it is like' to be conscious? (Chalmers, 1995)", "tags": ["24.118", "Philosophy", "Metaphysics"], "difficulty_permille": 389},
+    {"front": "What is the Ship of Theseus paradox?", "back": "If every part of a ship is gradually replaced, is it still the same ship? Tests our concept of identity through change.", "tags": ["24.118", "Philosophy", "Metaphysics"], "difficulty_permille": 222},
+    {"front": "What is compatibilism?", "back": "The position that free will is compatible with determinism. Freedom means acting on your own desires without external coercion, even if those desires are causally determined.", "tags": ["24.118", "Philosophy", "Metaphysics"], "difficulty_permille": 389},
+    {"front": "What is a philosophical zombie (p-zombie)?", "back": "A hypothetical being physically identical to a human but with no subjective experience. If conceivable, it argues that consciousness is not reducible to physical properties.", "tags": ["24.118", "Philosophy", "Metaphysics"], "difficulty_permille": 444},
+    {"front": "What is functionalism?", "back": "Mental states are defined by their functional roles (causal relations between inputs, outputs, and other mental states), not by their physical substrate. Allows for multiple realisability.", "tags": ["24.118", "Philosophy", "Metaphysics"], "difficulty_permille": 333}
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

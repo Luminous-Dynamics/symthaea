@@ -1,0 +1,331 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr11.PLANT",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr11.PLANT",
+    "title": "Plant Physiology: Photosynthesis (Light and Dark Reactions), Transpiration, Xylem and Phloem Transport",
+    "grade_level": "Grade11",
+    "bloom_level": "Understand",
+    "explanation": "Photosynthesis converts light energy into chemical energy in glucose. It occurs in chloroplasts and has two stages: light reactions (thylakoid membranes) where water is split using light energy, producing ATP, NADPH, and O2; and dark reactions/Calvin cycle (stroma) where CO2 is fixed into glucose using ATP and NADPH. The overall equation is 6CO2 + 6H2O → C6H12O6 + 6O2 (light energy + chlorophyll). Transpiration is the loss of water vapour from leaves through stomata, creating a transpiration pull that draws water upward through xylem vessels. Factors affecting transpiration include temperature, humidity, wind, and light intensity. Phloem transports dissolved sugars (translocation) from sources (leaves) to sinks (roots, growing points) using the pressure-flow model.",
+    "examples": [
+      {
+        "problem": "Describe what happens during the light reactions of photosynthesis.",
+        "steps": [
+          {
+            "instruction": "Step 1: Location — Light reactions occur in the thylakoid membranes of the chloroplast.",
+            "result": "location"
+          },
+          {
+            "instruction": "Step 2: Chlorophyll absorbs light energy (mainly red and blue wavelengths, reflecting green — this is why leaves appear green).",
+            "result": "light absorption"
+          },
+          {
+            "instruction": "Step 3: Photolysis — Water molecules are split using light energy: 2H2O → 4H+ + 4e- + O2. Oxygen is released as a by-product.",
+            "result": "water splitting"
+          },
+          {
+            "instruction": "Step 4: The light energy is used to produce ATP (from ADP + Pi) and NADPH (from NADP+ + H+). These are energy carriers used in the dark reactions.",
+            "result": "products formed"
+          }
+        ],
+        "answer": "Answer: In light reactions (thylakoids), chlorophyll absorbs light, water is split (photolysis) releasing O2, and ATP + NADPH are produced for the dark reactions.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the process of transpiration and how it drives water transport in xylem.",
+        "steps": [
+          {
+            "instruction": "Step 1: Transpiration is the evaporation and loss of water vapour from leaves, mainly through open stomata on the leaf surface.",
+            "result": "transpiration defined"
+          },
+          {
+            "instruction": "Step 2: As water evaporates from mesophyll cells in the leaf, it creates a water potential gradient — water moves from xylem vessels into the leaf cells by osmosis.",
+            "result": "pull created"
+          },
+          {
+            "instruction": "Step 3: This creates a continuous 'transpiration pull' (tension) in the xylem, drawing water upward from the roots. Water molecules stick together (cohesion) and to xylem walls (adhesion), forming an unbroken water column.",
+            "result": "cohesion-tension theory"
+          },
+          {
+            "instruction": "Step 4: Root pressure (osmotic pressure in root cells) also pushes water upward, but transpiration pull is the main driving force.",
+            "result": "root pressure contribution"
+          }
+        ],
+        "answer": "Answer: Transpiration (water loss from leaves) creates a tension that pulls water upward through xylem. Cohesion between water molecules maintains a continuous column from roots to leaves.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the Calvin cycle (dark reactions) and explain how CO2 is converted to glucose.",
+        "steps": [
+          {
+            "instruction": "Step 1: Location — The Calvin cycle occurs in the stroma of the chloroplast. It does not directly require light, but depends on ATP and NADPH from light reactions.",
+            "result": "location"
+          },
+          {
+            "instruction": "Step 2: Carbon fixation — CO2 from the atmosphere is fixed (attached) to a 5-carbon molecule (RuBP) by the enzyme RuBisCO, forming two 3-carbon molecules (GP/3-PGA).",
+            "result": "carbon fixation"
+          },
+          {
+            "instruction": "Step 3: Reduction — GP is reduced to G3P (glyceraldehyde-3-phosphate) using ATP and NADPH from the light reactions.",
+            "result": "reduction"
+          },
+          {
+            "instruction": "Step 4: Regeneration — Some G3P is used to regenerate RuBP (using ATP), allowing the cycle to continue. Other G3P molecules are used to build glucose (C6H12O6).",
+            "result": "regeneration and glucose"
+          }
+        ],
+        "answer": "Answer: In the Calvin cycle (stroma), CO2 is fixed to RuBP by RuBisCO → GP → reduced to G3P using ATP + NADPH → G3P used to make glucose and regenerate RuBP.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Write the balanced equation for photosynthesis, identifying the reactants and products.",
+        "answer": "6CO2 + 6H2O → (light energy + chlorophyll) → C6H12O6 + 6O2. Reactants: carbon dioxide and water. Products: glucose and oxygen.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Photosynthesis is the reverse of aerobic respiration.",
+          "Light energy and chlorophyll are needed as conditions, not reactants."
+        ],
+        "explanation": "The equation shows that CO2 and H2O are converted to glucose and O2 using light energy captured by chlorophyll. This is an endothermic reaction (energy is absorbed).",
+        "distractors": [
+          "C6H12O6 + 6O2 → 6CO2 + 6H2O (this is respiration)",
+          "6CO2 + 6O2 → C6H12O6 + 6H2O",
+          "CO2 + H2O → CH2O + O2 (unbalanced)"
+        ]
+      },
+      {
+        "question": "A learner covers a leaf with aluminium foil for 48 hours, then tests it for starch using iodine. Predict the result and explain why.",
+        "answer": "The covered leaf will NOT turn blue-black with iodine (it stays brown/yellow). Without light, photosynthesis cannot occur, so no glucose is produced and therefore no starch is stored. Any existing starch is used up in respiration during the 48 hours. This proves light is necessary for photosynthesis.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "What does photosynthesis require that the covered leaf cannot access?",
+          "Iodine turns blue-black in the presence of starch."
+        ],
+        "explanation": "Covering the leaf removes light, preventing photosynthesis. No glucose is made, no starch is stored. Existing starch is consumed by respiration. This is a standard CAPS practical demonstrating that light is essential.",
+        "distractors": [
+          "The leaf turns blue-black because starch is always present",
+          "The covered leaf photosynthesises using stored energy",
+          "The leaf turns green because of chlorophyll"
+        ]
+      },
+      {
+        "question": "List four factors that affect the rate of transpiration and explain how each affects water loss.",
+        "answer": "1) Temperature — higher temperature increases evaporation rate from mesophyll cells, increasing transpiration. 2) Humidity — lower humidity increases the water potential gradient between leaf and air, increasing transpiration. 3) Wind — wind removes the layer of humid air around the leaf (boundary layer), increasing transpiration. 4) Light intensity — higher light causes stomata to open wider (for CO2 uptake), increasing transpiration.",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what conditions make wet clothes dry faster — the same principles apply to leaves.",
+          "Stomata open in response to light for photosynthesis."
+        ],
+        "explanation": "Transpiration rate depends on conditions affecting evaporation (temperature, humidity, wind) and stomatal opening (light). Hot, dry, windy, bright conditions maximise transpiration.",
+        "distractors": [
+          "Higher humidity increases transpiration",
+          "Darkness causes stomata to open, increasing transpiration",
+          "Wind has no effect on transpiration"
+        ]
+      },
+      {
+        "question": "Compare the transport of water in xylem with the transport of sugars in phloem in a table, covering: substance transported, direction, driving force, cell type, and whether cells are alive or dead.",
+        "answer": "Xylem: water + minerals, upward only (roots to leaves), driven by transpiration pull (cohesion-tension), dead hollow lignified cells (vessels/tracheids). Phloem: dissolved sugars (sucrose), bidirectional (source to sink), driven by pressure flow (mass flow/osmotic pressure), living sieve tube elements with companion cells.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Xylem goes UP (transpiration pull), phloem goes BOTH ways (source to sink).",
+          "Why does phloem need living cells but xylem does not?"
+        ],
+        "explanation": "Xylem and phloem are fundamentally different: xylem uses passive tension to move water upward through dead cells; phloem uses active loading to move sugars through living cells from production sites to usage sites.",
+        "distractors": [
+          "Both xylem and phloem transport water",
+          "Xylem cells are alive and phloem cells are dead",
+          "Phloem only transports sugars downward"
+        ]
+      },
+      {
+        "question": "South African farmers in the Western Cape often irrigate their vineyards. Using your knowledge of transpiration and photosynthesis, explain why water stress (drought) reduces grape yield and sugar content.",
+        "answer": "During drought: 1) Stomata close to conserve water, reducing transpiration. 2) Closed stomata also prevent CO2 from entering the leaf, reducing the rate of photosynthesis (Calvin cycle limited by CO2 supply). 3) Less photosynthesis means less glucose/sucrose produced, reducing sugar content in grapes. 4) Less glucose also means less energy for growth, reducing cell division and grape size (lower yield). 5) Additionally, reduced transpiration decreases the cooling effect on leaves, potentially causing heat damage to photosynthetic enzymes. This is why irrigation timing is critical in the dry Western Cape summer.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What happens to stomata during water stress? What are the consequences for gas exchange?",
+          "Link stomatal closure → CO2 limitation → reduced photosynthesis → reduced sugar production."
+        ],
+        "explanation": "Water stress causes stomatal closure (conserving water but blocking CO2 entry), reducing photosynthesis, sugar production, and growth. This cascade explains why irrigation is essential for Western Cape viticulture.",
+        "distractors": [
+          "Drought increases sugar content because less water dilutes the sugars",
+          "Stomata remain open during drought to maximise photosynthesis",
+          "Water stress only affects the roots, not the leaves"
+        ]
+      }
+    ],
+    "hints": [
+      "Light reactions = thylakoids (need light, produce ATP + NADPH + O2). Dark reactions/Calvin cycle = stroma (use ATP + NADPH, fix CO2 into glucose).",
+      "Transpiration pull = cohesion-tension theory. Water molecules stick together (cohesion) and are pulled up by evaporation from leaves.",
+      "Source = where sugar is made/stored (mature leaf). Sink = where sugar is used/stored (root, fruit, growing tip)."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "photolysis",
+        "definition": "The splitting of water molecules using light energy during the light reactions: 2H2O → 4H+ + 4e- + O2",
+        "example_usage": "Photolysis in the thylakoid membrane releases oxygen as a by-product of photosynthesis."
+      },
+      {
+        "term": "Calvin cycle",
+        "definition": "The light-independent reactions of photosynthesis occurring in the stroma, where CO2 is fixed into glucose using ATP and NADPH",
+        "example_usage": "The Calvin cycle uses the enzyme RuBisCO to fix CO2 into organic molecules."
+      },
+      {
+        "term": "transpiration",
+        "definition": "The loss of water vapour from plant leaves through stomata, creating a pull that drives water transport in xylem",
+        "example_usage": "On hot days, indigenous Yellowwood trees lose large quantities of water through transpiration."
+      },
+      {
+        "term": "translocation",
+        "definition": "The transport of dissolved sugars through phloem from sources (where sugar is produced) to sinks (where sugar is used or stored)",
+        "example_usage": "Sucrose is translocated from leaves to growing roots through the phloem."
+      },
+      {
+        "term": "stomata",
+        "definition": "Tiny pores on the leaf surface (usually underside) surrounded by guard cells, which control gas exchange and water loss",
+        "example_usage": "Stomata open in light to allow CO2 entry for photosynthesis, but this also allows water loss."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think the dark reactions only occur at night (in the dark).",
+        "correction": "The 'dark reactions' (Calvin cycle) do NOT require darkness — they simply do not directly use light energy. They occur continuously as long as ATP and NADPH are available from the light reactions. The term 'light-independent reactions' is more accurate.",
+        "why_students_think_this": "The name 'dark reactions' implies they need darkness. Use the preferred term 'light-independent reactions' to avoid confusion."
+      },
+      {
+        "misconception": "Students think plants only photosynthesise during the day and only respire at night.",
+        "correction": "Plants respire 24 hours a day (just like animals). During the day, plants BOTH photosynthesise AND respire, but photosynthesis rate exceeds respiration rate, so there is a net uptake of CO2 and release of O2.",
+        "why_students_think_this": "Students learn about photosynthesis and respiration separately and assume they alternate. Emphasise: respiration is continuous; photosynthesis adds to it during daylight hours."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr11.PLANT",
+    "title": "Assessment: Plant Physiology — Photosynthesis, Transpiration, Transport",
+    "items": [
+      {
+        "question": "Write the balanced equation for photosynthesis and label each substance as reactant or product.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "6CO2 (reactant) + 6H2O (reactant) → C6H12O6 (product) + 6O2 (product). Requires light energy and chlorophyll.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Six of each reactant, one glucose, six oxygen."
+      },
+      {
+        "question": "Distinguish between the light reactions and the Calvin cycle in terms of location, inputs, and outputs.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Light reactions: thylakoids; inputs = light + H2O; outputs = ATP + NADPH + O2. Calvin cycle: stroma; inputs = CO2 + ATP + NADPH; outputs = glucose (G3P) + ADP + NADP+.",
+        "points": 4,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Make a two-column table: light reactions vs Calvin cycle."
+      },
+      {
+        "question": "Describe an experiment to show that light is necessary for photosynthesis using the starch test.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Cover part of a leaf with foil (dark) for 48 hours. Test both covered and uncovered parts with iodine after destarching in boiling ethanol. Uncovered part turns blue-black (starch present); covered part stays brown (no starch).",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "You need a control (uncovered) and experimental (covered) part of the same leaf."
+      },
+      {
+        "question": "Analyse how the cohesion-tension theory explains water transport from roots to leaves in a tall Yellowwood tree.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Transpiration from leaves creates tension (negative pressure). Cohesion (H-bonds between water molecules) and adhesion (water to xylem walls) maintain an unbroken water column. Root pressure pushes water into xylem from below. Together, these forces move water up to 30+ metres.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Three forces work together: transpiration pull, cohesion, adhesion."
+      },
+      {
+        "question": "Evaluate the impact of climate change on photosynthesis rates in SA's indigenous forests.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Increased CO2 may initially boost photosynthesis (more substrate for Calvin cycle). However, rising temperatures may denature photosynthetic enzymes (especially RuBisCO), increase transpiration leading to stomatal closure (reducing CO2 entry), and alter rainfall patterns causing water stress. Net effect likely negative for SA forests.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both the benefit of more CO2 and the harm of higher temperatures."
+      }
+    ],
+    "total_points": 17,
+    "estimated_minutes": 22,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "Where do the light reactions of photosynthesis occur?",
+      "back": "In the thylakoid membranes of the chloroplast. They produce ATP, NADPH, and O2.",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "Where does the Calvin cycle occur?",
+      "back": "In the stroma of the chloroplast. CO2 is fixed into glucose using ATP and NADPH from light reactions.",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is photolysis?",
+      "back": "The splitting of water using light energy: 2H2O → 4H+ + 4e- + O2. Occurs in thylakoid membranes.",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What drives water transport upward in xylem?",
+      "back": "Transpiration pull (cohesion-tension): water evaporates from leaves, pulling water up through xylem. Cohesion keeps the water column intact.",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What four factors affect transpiration rate?",
+      "back": "Temperature (higher = more), humidity (lower = more), wind (more = more), light intensity (more = stomata open wider).",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is translocation?",
+      "back": "The transport of dissolved sugars through phloem from source (leaf) to sink (root, fruit, growing tip) via the pressure-flow model.",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What enzyme fixes CO2 in the Calvin cycle?",
+      "back": "RuBisCO (ribulose bisphosphate carboxylase/oxygenase) — the most abundant enzyme on Earth.",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Do plants respire at night?",
+      "back": "Yes! Plants respire 24/7. During the day, photosynthesis rate exceeds respiration rate (net O2 release). At night, only respiration occurs (net CO2 release).",
+      "tags": ["CAPS.LifeSciences.Gr11.PLANT", "Grade11", "Plant Physiology"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

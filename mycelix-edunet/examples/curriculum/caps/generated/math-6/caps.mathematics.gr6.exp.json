@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is 5 squared (5^2)?",
+        "answer": "25",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "5 x 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5^2 = 5 x 5 = 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10",
+          "32",
+          "50"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is the cube of 3 (3^3)?",
+        "answer": "27",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "3 x 3 x 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3^3 = 3 x 3 x 3 = 27.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "9",
+          "18",
+          "81"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is the square root of 64?",
+        "answer": "8",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "? x ? = 64"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 x 8 = 64, so the square root of 64 is 8.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6",
+          "7",
+          "32"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is the cube root of 125?",
+        "answer": "5",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "? x ? x ? = 125"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 x 5 x 5 = 125, so the cube root of 125 is 5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25",
+          "3",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 2^3 x 2^2",
+        "answer": "2^5 = 32",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "When multiplying same bases, add exponents"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2^3 x 2^2 = 2^(3+2) = 2^5 = 32.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2^6",
+          "4^5",
+          "2^1"
         ]
       }
     ],
@@ -201,7 +171,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.Mathematics.Gr6.EXP",
-    "title": "Assessment: Squares and cubes. Square roots and cube roots. Exponent notation intro (2³ = 8). Calculate with exponents",
+    "title": "Assessment: Squares and cubes. Square roots and cube roots. Exponent notation intro (2\u00b3 = 8). Calculate with exponents",
     "items": [
       {
         "question": "Explain Grade 6 Mathematics.",

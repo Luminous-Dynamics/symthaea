@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "If f(x) = 2x + 1, find f(3).",
+        "answer": "7",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Replace x with 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "f(3) = 2(3) + 1 = 6 + 1 = 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "9",
+          "6"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Complete the table for y = -x + 4: x = 0, 1, 2, 3",
+        "answer": "y = 4, 3, 2, 1",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute each x-value"
         ],
-        "explanation": "Explanation.",
+        "explanation": "-0+4=4, -1+4=3, -2+4=2, -3+4=1.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "y = 0, 1, 2, 3",
+          "y = 4, 5, 6, 7",
+          "y = -4, -3, -2, -1"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "What is the y-intercept of y = 3x - 5?",
+        "answer": "-5",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Set x = 0"
         ],
-        "explanation": "Explanation.",
+        "explanation": "When x = 0: y = 3(0) - 5 = -5. The y-intercept is -5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "5",
+          "-3"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A function table shows: x=1,y=4; x=2,y=7; x=3,y=10. Find the equation.",
+        "answer": "y = 3x + 1",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Gradient = 3, substitute to find c"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Gradient = (7-4)/(2-1) = 3. y = 3x + c. 4 = 3(1) + c, c = 1. y = 3x + 1.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "y = 4x",
+          "y = x + 3",
+          "y = 2x + 2"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Where does y = 2x - 4 cross the x-axis and y-axis?",
+        "answer": "x-intercept (2, 0); y-intercept (0, -4)",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Set y=0 for x-intercept, x=0 for y-intercept"
         ],
-        "explanation": "Explanation.",
+        "explanation": "y=0: 0=2x-4, x=2. x=0: y=-4. Intercepts: (2,0) and (0,-4).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "(4,0) and (0,2)",
+          "(-2,0) and (0,4)",
+          "(0,2) and (-4,0)"
         ]
       }
     ],

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What is the value of the 4 in 432?",
+        "answer": "400",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The 4 is in the hundreds place"
         ],
-        "explanation": "Explanation.",
+        "explanation": "In 432, the digit 4 is in the hundreds place, so its value is 400.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "40",
+          "4000"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Round 467 to the nearest 10.",
+        "answer": "470",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at the ones digit: 7 >= 5, so round up"
         ],
-        "explanation": "Explanation.",
+        "explanation": "467: the ones digit is 7 (>= 5), so round up to 470.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "460",
+          "500",
+          "465"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Round 834 to the nearest 100.",
+        "answer": "800",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at the tens digit: 3 < 5, so round down"
         ],
-        "explanation": "Explanation.",
+        "explanation": "834: the tens digit is 3 (< 5), so round down to 800.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "900",
+          "830",
+          "840"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Which is greater: 589 or 598?",
+        "answer": "598",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Compare tens when hundreds are equal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Both have 5 hundreds. 598 has 9 tens vs 8 tens. 598 > 589.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "589",
+          "They are equal",
+          "600"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Write 706 in expanded form.",
+        "answer": "700 + 0 + 6",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Break the number into hundreds, tens, and ones"
         ],
-        "explanation": "Explanation.",
+        "explanation": "706 = 700 + 0 + 6 (7 hundreds, 0 tens, 6 ones).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "70 + 6",
+          "7 + 0 + 6",
+          "760"
         ]
       }
     ],

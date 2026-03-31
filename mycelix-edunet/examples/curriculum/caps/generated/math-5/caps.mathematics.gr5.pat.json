@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "If the rule is: output = input x 2 + 1, what is the output when input = 7?",
+        "answer": "15",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute 7: 7 x 2 + 1"
         ],
-        "explanation": "Explanation.",
+        "explanation": "7 x 2 + 1 = 14 + 1 = 15.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "14",
+          "16",
+          "13"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Find the rule: Input 2 gives 7, input 4 gives 13, input 6 gives 19.",
+        "answer": "Multiply by 3 and add 1",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Try: 2 x 3 + 1 = 7, 4 x 3 + 1 = 13"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2x3+1=7, 4x3+1=13, 6x3+1=19. Rule: 3n + 1.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Add 5",
+          "Multiply by 4 subtract 1",
+          "Multiply by 2 add 3"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Complete the table: Input 1,2,3,4. Output 5,8,11,___",
+        "answer": "14",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The rule is multiply by 3 and add 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern adds 3 each time. 11 + 3 = 14. Rule: 3n + 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "12",
+          "15",
+          "13"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "A number sequence starts: 1, 1, 2, 3, 5, 8, ___. What comes next?",
+        "answer": "13",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Each number is the sum of the two before it"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 + 8 = 13. This is the Fibonacci sequence.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "11",
+          "14",
+          "16"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "If y = 2x - 3, find y when x = 10.",
+        "answer": "17",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute x = 10 into the formula"
         ],
-        "explanation": "Explanation.",
+        "explanation": "y = 2(10) - 3 = 20 - 3 = 17.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "23",
+          "15",
+          "7"
         ]
       }
     ],

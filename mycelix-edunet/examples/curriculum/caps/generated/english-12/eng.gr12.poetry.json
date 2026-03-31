@@ -1,0 +1,129 @@
+{
+  "node_id": "CAPS.English.Gr12.POETRY",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.POETRY",
+    "title": "Poetry Analysis: Imagery, Figurative Language, Sound Devices & Structure",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Poetry analysis requires you to examine both content (what the poem says) and form (how it says it). Key areas: imagery (visual, auditory, tactile, olfactory, gustatory pictures created by words), figurative language (metaphor, simile, personification, hyperbole, oxymoron), sound devices (alliteration, assonance, onomatopoeia, consonance, sibilance), structural devices (enjambment, caesura, stanza breaks, rhyme scheme, metre), and tone/mood. The critical skill is explaining the EFFECT of each device — not merely naming it. Always link technique to meaning using the formula: technique + quotation + effect on meaning.",
+    "examples": [
+      {
+        "problem": "Analyse the effect of enjambment in these lines: 'I measured every grief I met / With analytic eyes' (Emily Dickinson).",
+        "steps": [
+          {"instruction": "Step 1: Define enjambment — the continuation of a sentence across a line break without punctuation.", "result": "Device identified"},
+          {"instruction": "Step 2: Note the line break after 'met' — it creates a momentary pause before the method is revealed.", "result": "Effect on pacing"},
+          {"instruction": "Step 3: The enjambment mirrors the act of measuring — deliberate, methodical, flowing from one thought to the next.", "result": "Form reflects content"}
+        ],
+        "answer": "Answer: The enjambment from 'met' to 'With analytic eyes' creates a flowing, methodical rhythm that mirrors the speaker's systematic examination of grief. The line break briefly suspends the reader in the act of meeting grief before revealing the detached, clinical approach — reinforcing the tension between emotional experience and intellectual control.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify and explain the figurative language in: 'The fog comes on little cat feet' (Carl Sandburg).",
+        "steps": [
+          {"instruction": "Step 1: Identify the device — the fog is compared to a cat without using 'like' or 'as', so this is a metaphor.", "result": "Metaphor identified"},
+          {"instruction": "Step 2: Analyse the comparison — cats move silently and stealthily, which mirrors how fog arrives unnoticed.", "result": "Comparison explored"},
+          {"instruction": "Step 3: Note the effect — the metaphor transforms an impersonal weather phenomenon into something alive and deliberate.", "result": "Effect explained"}
+        ],
+        "answer": "Answer: Sandburg uses metaphor, comparing fog to a cat. 'Little cat feet' suggests the fog arrives silently, stealthily, and softly — personalising an impersonal natural phenomenon and creating an intimate, quiet atmosphere.",
+        "visual_description": null
+      },
+      {
+        "problem": "Determine the rhyme scheme of: 'Shall I compare thee to a summer's day? (A) / Thou art more lovely and more temperate: (B) / Rough winds do shake the darling buds of May, (A) / And summer's lease hath all too short a date: (B)'",
+        "steps": [
+          {"instruction": "Step 1: Mark the end rhyme of each line — day/May rhyme (A), temperate/date rhyme (B).", "result": "End rhymes identified"},
+          {"instruction": "Step 2: Assign letters — ABAB pattern.", "result": "Scheme labelled"},
+          {"instruction": "Step 3: This alternating rhyme scheme is typical of the Shakespearean sonnet.", "result": "Form identified"}
+        ],
+        "answer": "Answer: The rhyme scheme is ABAB (alternating rhyme). 'Day' rhymes with 'May' (A) and 'temperate' with 'date' (B). This pattern is characteristic of the Shakespearean/English sonnet form.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the following: simile, metaphor, personification. Give one example of each.",
+        "answer": "Simile: a comparison using 'like' or 'as' (e.g., 'Her smile was like sunshine'). Metaphor: a direct comparison without 'like' or 'as' (e.g., 'He is a lion in battle'). Personification: giving human qualities to non-human things (e.g., 'The wind howled in protest').",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Simile uses 'like' or 'as'; metaphor does not.", "Personification always involves non-human things acting human."],
+        "explanation": "These three devices are the foundation of figurative language. At Gr12, you must not only identify them but also explain their effect on meaning.",
+        "distractors": ["A metaphor always uses 'like.'", "Personification only applies to animals.", "Simile and metaphor are the same."]
+      },
+      {
+        "question": "What is the difference between alliteration, assonance, and consonance?",
+        "answer": "Alliteration: repetition of initial consonant sounds ('Peter Piper picked'). Assonance: repetition of vowel sounds within words ('the rain in Spain'). Consonance: repetition of consonant sounds anywhere in words, especially at the end ('odds and ends').",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Alliteration = beginning. Assonance = vowels. Consonance = consonants (anywhere).", "Alliteration is a specific type of consonance (only at the start of words)."],
+        "explanation": "Sound devices create rhythm, mood, and emphasis. Sibilance (repeated 's' sounds) is a specific form of consonance that often creates a sinister or soothing effect.",
+        "distractors": ["Assonance is repetition of consonants.", "Alliteration can occur in the middle of words.", "Consonance and alliteration are identical."]
+      },
+      {
+        "question": "Explain the effect of the caesura in: 'To be, or not to be — that is the question.'",
+        "answer": "The caesura (pause created by the dash) separates the two opposing options ('to be' vs 'not to be') from the reflective conclusion. It creates a dramatic pause that mirrors Hamlet's hesitation and the weight of his existential dilemma — the pause IS the struggle between life and death.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["A caesura is a strong pause within a line, usually marked by punctuation.", "Consider how the pause mirrors the content — what is the speaker doing at that moment?"],
+        "explanation": "Caesura forces the reader/audience to pause, creating emphasis and reflecting internal conflict. In performance, the actor's pause communicates what words cannot.",
+        "distractors": ["A caesura is the same as a line break.", "Caesura only occurs at the end of a line.", "The dash is decorative and has no effect."]
+      },
+      {
+        "question": "What is the difference between tone and mood in poetry?",
+        "answer": "Tone is the poet's attitude toward the subject (e.g., bitter, nostalgic, reverent). Mood is the emotional atmosphere the poem creates in the reader (e.g., melancholy, hopeful, unsettling). Tone comes from the writer; mood is felt by the reader. They often overlap but can diverge — a poet might use a light, ironic tone to create an unsettling mood.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Tone = writer's attitude. Mood = reader's feeling.", "They are related but not identical — a sarcastic tone can create an uncomfortable mood."],
+        "explanation": "Understanding this distinction helps you write more precise analysis. Instead of saying 'the poem is sad,' specify whether the poet's tone is mournful and the mood is elegiac.",
+        "distractors": ["Tone and mood are the same thing.", "Mood refers to the character's emotions.", "Tone can only be serious or humorous."]
+      },
+      {
+        "question": "Analyse the effect of the oxymoron in: 'a terrible beauty is born' (W.B. Yeats, Easter 1916).",
+        "answer": "The oxymoron 'terrible beauty' captures the paradox of the Easter Rising — the rebellion was both horrifying (terrible: violence, death) and magnificent (beauty: courage, sacrifice for freedom). By fusing contradictory words, Yeats expresses his conflicted response to political violence: admiration for the rebels' idealism alongside horror at the cost.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["An oxymoron combines two contradictory terms.", "Consider what the contradiction reveals about the poet's complex response."],
+        "explanation": "Oxymorons express ideas that contain genuine contradictions — they are not errors but deliberate choices that capture the complexity of human experience.",
+        "distractors": ["This is a metaphor, not an oxymoron.", "The oxymoron shows the poet is confused.", "'Terrible beauty' simply means very beautiful."]
+      }
+    ],
+    "hints": [
+      "Never just name a device — always explain its EFFECT on meaning, mood, or the reader.",
+      "Use the formula: technique + quotation + effect.",
+      "Read poems aloud to hear sound devices, rhythm, and the impact of enjambment and caesura."
+    ],
+    "key_vocabulary": [
+      {"term": "enjambment", "definition": "The continuation of a sentence or clause across a line break without terminal punctuation", "example_usage": "The enjambment creates a sense of urgency as the thought spills over into the next line."},
+      {"term": "caesura", "definition": "A strong pause within a line of poetry, usually marked by punctuation", "example_usage": "The caesura in 'I came. I saw. I conquered.' creates a staccato rhythm of decisive action."},
+      {"term": "rhyme scheme", "definition": "The pattern of end rhymes in a poem, labelled with letters (e.g., ABAB, AABB, ABBA)", "example_usage": "The ABAB rhyme scheme gives the poem a regular, musical quality."},
+      {"term": "oxymoron", "definition": "A figure of speech combining two contradictory terms (e.g., 'bittersweet', 'living death')", "example_usage": "The oxymoron 'deafening silence' emphasises the oppressive absence of sound."},
+      {"term": "sibilance", "definition": "Repetition of 's' and 'sh' sounds, often creating a sinister, soothing, or secretive effect", "example_usage": "The sibilance in 'the snake slithered silently' mimics the sound of the creature's movement."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students identify poetic devices without explaining their effect, believing that naming the device earns full marks.",
+        "correction": "Identifying a device is only the first step and usually earns 1 mark. Full marks require explaining the effect: HOW does the device contribute to meaning, tone, or mood? For example, do not just say 'alliteration'; say 'the alliteration of the harsh /k/ sound in 'cracked and crumbling concrete' creates a brittle, destructive atmosphere that mirrors the decay of the building.'",
+        "why_students_think_this": "In earlier grades, identification alone may have earned marks. At Gr12, the emphasis shifts from recognition to analysis — you must show critical thinking."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is enjambment?", "back": "The continuation of a sentence across a line break without terminal punctuation, creating flow or urgency.", "tags": ["CAPS.English.Gr12.POETRY", "Grade12", "Poetry"], "difficulty_permille": 222},
+    {"front": "What is the formula for analysing a poetic device?", "back": "Technique + quotation + effect on meaning/mood/reader.", "tags": ["CAPS.English.Gr12.POETRY", "Grade12", "Poetry"], "difficulty_permille": 167},
+    {"front": "What is sibilance?", "back": "Repetition of 's' and 'sh' sounds, often creating a sinister, soothing, or secretive atmosphere.", "tags": ["CAPS.English.Gr12.POETRY", "Grade12", "Poetry"], "difficulty_permille": 333},
+    {"front": "What is a caesura?", "back": "A strong pause within a line of poetry, usually marked by punctuation (comma, dash, full stop), creating emphasis or reflecting hesitation.", "tags": ["CAPS.English.Gr12.POETRY", "Grade12", "Poetry"], "difficulty_permille": 278},
+    {"front": "What is the difference between tone and mood?", "back": "Tone is the poet's attitude toward the subject. Mood is the emotional atmosphere the poem creates in the reader.", "tags": ["CAPS.English.Gr12.POETRY", "Grade12", "Poetry"], "difficulty_permille": 333}
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

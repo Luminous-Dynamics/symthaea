@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "How many millimetres in 1 centimetre?",
+        "answer": "10",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "'Milli' means thousandth, there are 10 mm in 1 cm"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1 cm = 10 mm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "100",
+          "1000",
+          "1"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 3 km to metres.",
+        "answer": "3000 m",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "1 km = 1000 m"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 x 1000 = 3000 metres.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "300 m",
+          "30 m",
+          "30000 m"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangle is 8 cm long and 5 cm wide. What is its area?",
+        "answer": "40 square cm",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Area = length x width"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Area = 8 x 5 = 40 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "13 square cm",
+          "26 square cm",
+          "45 square cm"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "A box is 4 cm long, 3 cm wide, and 2 cm tall. What is its volume?",
+        "answer": "24 cubic cm",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Volume = length x width x height"
         ],
-        "explanation": "Explanation.",
+        "explanation": "V = 4 x 3 x 2 = 24 cubic cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "9 cubic cm",
+          "20 cubic cm",
+          "12 cubic cm"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 2500 m to km.",
+        "answer": "2.5 km",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide by 1000"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2500 / 1000 = 2.5 km.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25 km",
+          "250 km",
+          "0.25 km"
         ]
       }
     ],
@@ -201,7 +171,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.Mathematics.Gr4.MEA",
-    "title": "Assessment: Convert between mm, cm, m, km. Area of rectangle. Volume by counting cubes. Temperature in °C",
+    "title": "Assessment: Convert between mm, cm, m, km. Area of rectangle. Volume by counting cubes. Temperature in \u00b0C",
     "items": [
       {
         "question": "Explain Grade 4 Mathematics.",

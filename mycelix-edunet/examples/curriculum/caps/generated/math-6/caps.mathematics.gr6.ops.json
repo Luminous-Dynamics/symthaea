@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is 12 + 3 x 4?",
+        "answer": "24",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "BODMAS: multiplication before addition"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 x 4 = 12 first, then 12 + 12 = 24.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "60",
+          "48",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is (8 + 2) x 5?",
+        "answer": "50",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Brackets first"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(8 + 2) = 10, then 10 x 5 = 50.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "42",
+          "18",
+          "45"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is 24 / 4 + 3 x 2?",
+        "answer": "12",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "BODMAS: divide and multiply first, then add"
         ],
-        "explanation": "Explanation.",
+        "explanation": "24/4 = 6, 3x2 = 6, then 6 + 6 = 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "18",
+          "6",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 5 + 2 x (8 - 3)",
+        "answer": "15",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Brackets first, then multiply, then add"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(8-3) = 5, 2 x 5 = 10, 5 + 10 = 15.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "35",
+          "25",
+          "45"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is 100 - 4^2 x 3?",
+        "answer": "52",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "BODMAS: exponent first, then multiply, then subtract"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4^2 = 16, 16 x 3 = 48, 100 - 48 = 52.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "288",
+          "12",
+          "36"
         ]
       }
     ],

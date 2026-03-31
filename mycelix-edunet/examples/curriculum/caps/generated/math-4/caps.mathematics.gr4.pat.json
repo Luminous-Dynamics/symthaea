@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is the rule? 2, 6, 18, 54, ...",
+        "answer": "Multiply by 3",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Each number is 3 times the previous"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2x3=6, 6x3=18, 18x3=54. The rule is multiply by 3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Add 4",
+          "Multiply by 2",
+          "Add 12"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is the next number: 1, 4, 9, 16, ___?",
+        "answer": "25",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "These are square numbers: 1x1, 2x2, 3x3, 4x4, ..."
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern is n squared. 5 x 5 = 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "20",
+          "24",
+          "36"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "If the rule is 'add 7', and the start is 3, what is the 4th term?",
+        "answer": "24",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "3, 10, 17, ..."
         ],
-        "explanation": "Explanation.",
+        "explanation": "3, 3+7=10, 10+7=17, 17+7=24. The 4th term is 24.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "21",
+          "28",
+          "31"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Input-output: If input is 5 and output is 17, and input 3 gives output 11, what is the rule?",
+        "answer": "Multiply by 3 and add 2",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Try: 5 x 3 + 2 = 17, 3 x 3 + 2 = 11"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 x 3 + 2 = 17 and 3 x 3 + 2 = 11. Rule: multiply by 3, add 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Add 12",
+          "Multiply by 4 subtract 3",
+          "Multiply by 2 add 7"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Find the missing number: 2, 5, 11, 23, ___",
+        "answer": "47",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The rule is: multiply by 2 then add 1"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2x2+1=5, 5x2+1=11, 11x2+1=23, 23x2+1=47.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "45",
+          "35",
+          "46"
         ]
       }
     ],

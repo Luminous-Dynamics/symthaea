@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 3/5 to a percentage.",
+        "answer": "60%",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide 3 by 5, then multiply by 100"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3/5 = 0.6 = 60%.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "30%",
+          "35%",
+          "53%"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 0.45 to a percentage.",
+        "answer": "45%",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply by 100"
         ],
-        "explanation": "Explanation.",
+        "explanation": "0.45 x 100 = 45%.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4.5%",
+          "450%",
+          "0.45%"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is 25% of 200?",
+        "answer": "50",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "25/100 x 200"
         ],
-        "explanation": "Explanation.",
+        "explanation": "25% of 200 = 0.25 x 200 = 50.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25",
+          "75",
+          "100"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 7/8 to a decimal.",
+        "answer": "0.875",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide 7 by 8"
         ],
-        "explanation": "Explanation.",
+        "explanation": "7 / 8 = 0.875.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0.78",
+          "0.87",
+          "0.7"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "A shirt costs R250 and is on sale for 20% off. What is the sale price?",
+        "answer": "R200",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find 20% of 250, then subtract"
         ],
-        "explanation": "Explanation.",
+        "explanation": "20% of 250 = 50. Sale price = 250 - 50 = R200.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "R230",
+          "R150",
+          "R50"
         ]
       }
     ],

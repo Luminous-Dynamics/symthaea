@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 3 x 2?",
+        "answer": "6",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "3 groups of 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 x 2 means 2 + 2 + 2 = 6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "8",
+          "4"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 4 x 5?",
+        "answer": "20",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "4 groups of 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4 x 5 = 20. Count by 5s: 5, 10, 15, 20.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "15",
+          "25",
+          "10"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 6 x 10?",
+        "answer": "60",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "When you multiply by 10, add a zero"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6 x 10 = 60.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "16",
+          "66",
+          "50"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "There are 5 bags with 2 marbles in each bag. How many marbles in total?",
+        "answer": "10",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply: 5 x 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 x 2 = 10 marbles.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "7",
+          "12",
+          "8"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Share 15 sweets equally among 3 children. How many does each child get?",
+        "answer": "5",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide: 15 shared into 3 equal groups"
         ],
-        "explanation": "Explanation.",
+        "explanation": "15 / 3 = 5 sweets each.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "6",
+          "4"
         ]
       }
     ],

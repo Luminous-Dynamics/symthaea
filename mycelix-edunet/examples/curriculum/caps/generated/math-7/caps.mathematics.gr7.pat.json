@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Plot the point (3, 2) on a coordinate plane. In which quadrant is it?",
+        "answer": "Quadrant 1 (first quadrant)",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Both x and y are positive"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(3,2) has positive x and positive y, placing it in Quadrant 1.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Quadrant 2",
+          "Quadrant 3",
+          "Quadrant 4"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "If y = x + 3, complete the table for x = 0, 1, 2, 3.",
+        "answer": "y = 3, 4, 5, 6",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute each x into y = x + 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "0+3=3, 1+3=4, 2+3=5, 3+3=6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "y = 0, 1, 2, 3",
+          "y = 3, 6, 9, 12",
+          "y = 4, 5, 6, 7"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is the gradient (slope) of the relationship y = 2x + 1?",
+        "answer": "2",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The coefficient of x is the gradient"
         ],
-        "explanation": "Explanation.",
+        "explanation": "In y = mx + c, m is the gradient. Here m = 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1",
+          "3",
+          "2x"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "A straight-line graph passes through (0,1) and (2,5). What is the gradient?",
+        "answer": "2",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Gradient = (y2-y1)/(x2-x1)"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Gradient = (5-1)/(2-0) = 4/2 = 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "1",
+          "4"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Where does the graph y = 3x - 6 cross the x-axis?",
+        "answer": "x = 2",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Set y = 0 and solve for x"
         ],
-        "explanation": "Explanation.",
+        "explanation": "0 = 3x - 6, 3x = 6, x = 2. The x-intercept is (2, 0).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "x = -2",
+          "x = 6",
+          "x = 3"
         ]
       }
     ],

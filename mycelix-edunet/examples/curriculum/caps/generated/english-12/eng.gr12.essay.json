@@ -1,0 +1,132 @@
+{
+  "node_id": "CAPS.English.Gr12.ESSAY",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.ESSAY",
+    "title": "Essay Writing: Argumentative, Discursive, Narrative & Descriptive",
+    "grade_level": "Grade12",
+    "bloom_level": "Create",
+    "explanation": "Essay writing in Gr12 requires mastery of four types: argumentative (taking a position and defending it with evidence), discursive (exploring multiple perspectives on an issue), narrative (telling a story with plot, character, and setting), and descriptive (creating vivid sensory impressions). Every essay needs a clear introduction with a thesis or hook, well-structured body paragraphs with topic sentences and supporting evidence, logical transitions, and a conclusion that synthesises your argument or narrative arc. Plan before writing: brainstorm, outline, draft, revise.",
+    "examples": [
+      {
+        "problem": "Write the introduction for an argumentative essay on the topic: 'Social media does more harm than good to teenagers.'",
+        "steps": [
+          {"instruction": "Step 1: Open with a hook — a striking fact or question to engage the reader.", "result": "Hook created"},
+          {"instruction": "Step 2: Provide brief context — mention the prevalence of social media among teens.", "result": "Context established"},
+          {"instruction": "Step 3: State your thesis clearly — take a definitive position.", "result": "Thesis stated"},
+          {"instruction": "Step 4: Preview your main arguments (mental health, cyberbullying, reduced face-to-face interaction).", "result": "Roadmap given"}
+        ],
+        "answer": "Answer: 'In 2025, the average South African teenager spends over three hours daily scrolling through social media feeds. While platforms like Instagram and TikTok promise connection, they increasingly deliver anxiety, cyberbullying, and social isolation. Social media does more harm than good to teenagers because it damages mental health, enables harassment, and erodes genuine human connection.'",
+        "visual_description": null
+      },
+      {
+        "problem": "Outline a discursive essay on: 'Should university education be free?'",
+        "steps": [
+          {"instruction": "Step 1: Introduction — present the debate neutrally, acknowledge both sides.", "result": "Balanced opening"},
+          {"instruction": "Step 2: Body paragraph 1 — Arguments FOR (access, equality, reduced student debt).", "result": "Supporting arguments"},
+          {"instruction": "Step 3: Body paragraph 2 — Arguments AGAINST (funding burden, quality concerns, taxpayer cost).", "result": "Counter-arguments"},
+          {"instruction": "Step 4: Body paragraph 3 — Weigh both sides, consider alternatives (bursaries, sliding scale).", "result": "Evaluation"},
+          {"instruction": "Step 5: Conclusion — offer a balanced judgement, not simply picking one side.", "result": "Synthesis"}
+        ],
+        "answer": "Answer: A discursive essay presents multiple viewpoints fairly before reaching a nuanced conclusion. Unlike an argumentative essay, it does not aggressively advocate for one side.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify three errors in this narrative essay opening: 'It was a dark and stormy night. I was walking home. I was scared. Something happened.'",
+        "steps": [
+          {"instruction": "Step 1: Identify the cliche — 'dark and stormy night' is overused and lacks originality.", "result": "Cliche identified"},
+          {"instruction": "Step 2: Note the flat, repetitive sentence structure — all short simple sentences starting with 'I'.", "result": "Monotonous structure"},
+          {"instruction": "Step 3: 'Something happened' is vague — narrative writing must use specific, vivid details.", "result": "Lack of sensory detail"}
+        ],
+        "answer": "Answer: Errors are (1) cliche opening, (2) repetitive simple sentence structure, and (3) vague language lacking sensory detail. A better version: 'Rain hammered the tin roofs of Soweto as I hurried along the unlit path, my heart slamming against my ribs at every shadow that shifted behind the spaza shop.'",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Write a thesis statement for an argumentative essay on: 'Renewable energy should replace coal in South Africa within twenty years.'",
+        "answer": "South Africa must transition from coal to renewable energy within twenty years because coal devastates air quality in communities like Mpumalanga, accelerates climate change, and is now more expensive than solar and wind alternatives.",
+        "difficulty_permille": 250,
+        "bloom_level": "Create",
+        "hints": ["A thesis statement must take a clear position and preview your main reasons.", "Consider health, environmental, and economic angles."],
+        "explanation": "A strong thesis is specific, arguable, and previews the essay's structure by listing 2-3 supporting reasons.",
+        "distractors": ["Renewable energy is good for the environment.", "Coal should be replaced.", "South Africa has a lot of sunshine."]
+      },
+      {
+        "question": "Identify the essay type best suited to the topic 'The day that changed my life' and explain why.",
+        "answer": "Narrative essay — this topic invites a personal story structured around a specific event with plot development, character, setting, and reflection.",
+        "difficulty_permille": 125,
+        "bloom_level": "Analyze",
+        "hints": ["Consider whether the topic asks for a story, an argument, a description, or a balanced discussion.", "Personal topics with 'my' usually call for narrative or descriptive approaches."],
+        "explanation": "The phrase 'the day that changed my life' signals a personal chronological account — the hallmark of narrative writing.",
+        "distractors": ["Argumentative, because you must argue why the day was important.", "Discursive, because you must discuss multiple days.", "Descriptive only, with no plot needed."]
+      },
+      {
+        "question": "Rewrite the following in the passive voice: 'The government must address unemployment urgently.'",
+        "answer": "Unemployment must be addressed urgently by the government.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["In passive voice, the object of the action becomes the subject of the sentence.", "The pattern is: object + auxiliary verb + past participle + by + agent."],
+        "explanation": "Passive voice shifts focus from the doer (government) to the action (addressing unemployment). This is useful in essays when you want to emphasise the issue rather than the agent.",
+        "distractors": ["The government urgently must address unemployment.", "Unemployment is being addressed by the government urgently.", "Urgently, the government addresses unemployment."]
+      },
+      {
+        "question": "Write a concluding paragraph for a discursive essay on 'Should school uniforms be compulsory?'",
+        "answer": "In weighing both sides, it becomes clear that while school uniforms promote equality and reduce peer pressure, they can also stifle self-expression and impose financial strain on low-income families. A compromise — such as a basic dress code with affordable options — may address the concerns of both camps without sacrificing individual identity.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["A discursive conclusion should synthesise both sides, not simply repeat them.", "Consider offering a middle-ground solution."],
+        "explanation": "The conclusion of a discursive essay weighs the arguments presented, acknowledges complexity, and may propose a balanced solution.",
+        "distractors": ["In conclusion, school uniforms should be compulsory.", "Both sides have good points.", "I think uniforms are bad because they are uncomfortable."]
+      },
+      {
+        "question": "Write a descriptive paragraph (80-100 words) about a bustling market scene using at least three different senses.",
+        "answer": "The Warwick Junction market pulsed with life under the Durban sun. Pyramids of golden mangoes and ruby tomatoes blazed under striped awnings while vendors called out prices in rapid-fire isiZulu. The scent of roasting mealies mingled with diesel fumes from the taxi rank. A woman balanced a basket of beadwork on her head, her bangles clicking with each step. Beneath my sandals, the concrete radiated warmth from the morning heat. Somewhere, a radio crackled with a gospel chorus that rose above the haggling.",
+        "difficulty_permille": 625,
+        "bloom_level": "Create",
+        "hints": ["Use sight, sound, smell, touch, and taste — aim for at least three.", "Use figurative language: simile, metaphor, personification."],
+        "explanation": "Descriptive writing engages multiple senses to create an immersive experience. Strong descriptions use specific nouns and active verbs rather than relying on adjectives.",
+        "distractors": ["The market was very busy and there were lots of things to buy.", "People were walking around the market and it was loud.", "The market had food and clothes for sale."]
+      }
+    ],
+    "hints": [
+      "Always plan your essay before writing — spend 5-10 minutes on a mind map or outline.",
+      "Each body paragraph should have a topic sentence, evidence or examples, and a linking sentence.",
+      "Vary your sentence length: mix short punchy sentences with longer complex ones for rhythm."
+    ],
+    "key_vocabulary": [
+      {"term": "thesis statement", "definition": "A sentence that clearly states the writer's position or main argument, usually at the end of the introduction", "example_usage": "My thesis statement argued that renewable energy is economically superior to coal."},
+      {"term": "discursive", "definition": "An essay type that explores multiple perspectives on an issue before reaching a balanced conclusion", "example_usage": "The discursive essay examined both the benefits and drawbacks of social media."},
+      {"term": "topic sentence", "definition": "The opening sentence of a body paragraph that states the paragraph's main idea", "example_usage": "Each topic sentence introduced a new reason supporting my argument."},
+      {"term": "coherence", "definition": "The logical flow and connection between ideas within and between paragraphs", "example_usage": "Using transitional phrases like 'furthermore' and 'however' improves coherence."},
+      {"term": "register", "definition": "The level of formality in language, matched to audience and purpose", "example_usage": "An argumentative essay requires a formal register, avoiding slang and contractions."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students believe a discursive essay and an argumentative essay are the same thing.",
+        "correction": "An argumentative essay takes one clear side and defends it throughout. A discursive essay presents multiple viewpoints fairly and reaches a balanced conclusion.",
+        "why_students_think_this": "Both essay types discuss issues and use evidence, so students conflate them. The key difference is stance: argumentative = one-sided advocacy; discursive = balanced exploration."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What are the four main essay types in CAPS English Gr12?", "back": "Argumentative, discursive, narrative, and descriptive.", "tags": ["CAPS.English.Gr12.ESSAY", "Grade12", "Writing"], "difficulty_permille": 111},
+    {"front": "What is the difference between an argumentative and a discursive essay?", "back": "Argumentative takes one clear position and defends it; discursive explores multiple perspectives and reaches a balanced conclusion.", "tags": ["CAPS.English.Gr12.ESSAY", "Grade12", "Writing"], "difficulty_permille": 333},
+    {"front": "What must a thesis statement do?", "back": "Clearly state the writer's position and preview the main arguments that will be developed in the essay.", "tags": ["CAPS.English.Gr12.ESSAY", "Grade12", "Writing"], "difficulty_permille": 222},
+    {"front": "What is a topic sentence?", "back": "The opening sentence of a body paragraph that states the paragraph's main idea.", "tags": ["CAPS.English.Gr12.ESSAY", "Grade12", "Writing"], "difficulty_permille": 167},
+    {"front": "Name three features of effective descriptive writing.", "back": "Sensory detail (sight, sound, smell, touch, taste), figurative language (simile, metaphor), and specific nouns and active verbs.", "tags": ["CAPS.English.Gr12.ESSAY", "Grade12", "Writing"], "difficulty_permille": 444}
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

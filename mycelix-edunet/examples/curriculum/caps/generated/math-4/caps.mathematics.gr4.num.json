@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is the value of the 7 in 7304?",
+        "answer": "7000",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The 7 is in the thousands place"
         ],
-        "explanation": "Explanation.",
+        "explanation": "In 7304, the 7 is in the thousands column = 7000.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "700",
+          "70",
+          "7"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Round 4567 to the nearest 100.",
+        "answer": "4600",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at the tens digit: 6 >= 5, round up"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The tens digit is 6 (>= 5), so round up to 4600.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4500",
+          "4570",
+          "5000"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Is 36 an even or odd number?",
+        "answer": "Even",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Even numbers end in 0, 2, 4, 6, or 8"
         ],
-        "explanation": "Explanation.",
+        "explanation": "36 ends in 6, so it is even.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Odd",
+          "Neither",
+          "Both"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "List all the factors of 12.",
+        "answer": "1, 2, 3, 4, 6, 12",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find all numbers that divide evenly into 12"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1x12, 2x6, 3x4. Factors: 1, 2, 3, 4, 6, 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1, 2, 3, 12",
+          "2, 4, 6",
+          "1, 12"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What are the first 5 multiples of 6?",
+        "answer": "6, 12, 18, 24, 30",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply 6 by 1, 2, 3, 4, 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6x1=6, 6x2=12, 6x3=18, 6x4=24, 6x5=30.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6, 12, 18, 24, 36",
+          "1, 2, 3, 4, 5",
+          "6, 12, 24, 36, 48"
         ]
       }
     ],

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "A histogram shows heights: 140-150 cm (5 learners), 150-160 cm (8 learners), 160-170 cm (3 learners). How many learners in total?",
+        "answer": "16",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add the frequencies"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 + 8 + 3 = 16 learners.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "13",
+          "18",
+          "11"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Find the range of: 15, 22, 8, 31, 12",
+        "answer": "23",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Range = highest - lowest"
         ],
-        "explanation": "Explanation.",
+        "explanation": "31 - 8 = 23.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "19",
+          "22",
+          "31"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "A pie chart shows 25% for soccer. If 80 learners were surveyed, how many chose soccer?",
+        "answer": "20",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "25% of 80"
         ],
-        "explanation": "Explanation.",
+        "explanation": "25/100 x 80 = 20 learners.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "25",
+          "15",
+          "40"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "The data set is: 4, 7, 7, 9, 13. Find the median.",
+        "answer": "7",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The median is the middle value when data is ordered"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Already ordered: 4, 7, 7, 9, 13. The middle (3rd) value is 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "9",
+          "8",
+          "40"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Scores: 60, 70, 80, 90, 100. What is the mean?",
+        "answer": "80",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add all and divide by 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "60+70+80+90+100 = 400. 400/5 = 80.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "70",
+          "90",
+          "75"
         ]
       }
     ],

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangle is 12 cm by 8 cm. An inner rectangle 4 cm by 3 cm is removed. What is the remaining area?",
+        "answer": "84 square cm",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract inner area from outer"
         ],
-        "explanation": "Explanation.",
+        "explanation": "12x8 = 96, 4x3 = 12. 96 - 12 = 84 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "96 square cm",
+          "72 square cm",
+          "108 square cm"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Find the perimeter of an L-shape made from two rectangles: 10x4 and 6x4 (sharing a 4 cm side).",
+        "answer": "40 cm",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Trace around the outside of the L-shape"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Outer edges: 10 + 4 + 6 + 4 + 4 + 8 = ... Trace carefully. Perimeter = 40 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "36 cm",
+          "44 cm",
+          "32 cm"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A cylinder has radius 5 cm and height 12 cm. Find its surface area. (pi = 3.14)",
+        "answer": "533.8 square cm",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "SA = 2(pi)(r^2) + 2(pi)(r)(h)"
         ],
-        "explanation": "Explanation.",
+        "explanation": "SA = 2(3.14)(25) + 2(3.14)(5)(12) = 157 + 376.8 = 533.8 sq cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "376.8 sq cm",
+          "942 sq cm",
+          "314 sq cm"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangular prism is 8 cm x 5 cm x 3 cm. Find its surface area.",
+        "answer": "158 square cm",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "SA = 2(lw + lh + wh)"
         ],
-        "explanation": "Explanation.",
+        "explanation": "SA = 2(40 + 24 + 15) = 2(79) = 158 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "120 square cm",
+          "79 square cm",
+          "190 square cm"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "A composite shape is a semicircle (diameter 10 cm) on top of a rectangle (10 cm x 6 cm). Find total area. (pi = 3.14)",
+        "answer": "99.25 square cm",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Area = rectangle + semicircle"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Rectangle: 10 x 6 = 60. Semicircle: (1/2)(3.14)(5^2) = 39.25. Total: 99.25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "139.25 sq cm",
+          "60 sq cm",
+          "78.5 sq cm"
         ]
       }
     ],

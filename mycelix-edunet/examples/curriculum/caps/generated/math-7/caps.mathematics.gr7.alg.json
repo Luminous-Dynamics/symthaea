@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Evaluate 3x + 2 when x = 4.",
+        "answer": "14",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Replace x with 4"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3(4) + 2 = 12 + 2 = 14.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10",
+          "12",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 5a + 3a - 2a",
+        "answer": "6a",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Combine like terms"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5a + 3a - 2a = 6a.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6",
+          "8a",
+          "10a"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 2x + 3y + 4x - y",
+        "answer": "6x + 2y",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Group x-terms and y-terms"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2x + 4x = 6x, 3y - y = 2y. Answer: 6x + 2y.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6x + 4y",
+          "6xy",
+          "2x + 6y"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Evaluate 2a^2 - 3b when a = 3 and b = 2.",
+        "answer": "12",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute a = 3 and b = 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2(3)^2 - 3(2) = 2(9) - 6 = 18 - 6 = 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6",
+          "15",
+          "0"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Write an expression for: five more than three times a number n.",
+        "answer": "3n + 5",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Three times n means 3n; five more means + 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Three times n is 3n, plus five gives 3n + 5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5n + 3",
+          "3(n + 5)",
+          "8n"
         ]
       }
     ],

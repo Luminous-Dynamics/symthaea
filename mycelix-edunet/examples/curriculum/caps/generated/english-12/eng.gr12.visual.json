@@ -1,0 +1,128 @@
+{
+  "node_id": "CAPS.English.Gr12.VISUAL",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.VISUAL",
+    "title": "Visual Literacy: Advertisements, Cartoons, Graphs & Infographics",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Visual literacy means reading images as critically as you read text. In Gr12, you analyse advertisements (target audience, persuasion techniques, layout, colour, typography, slogans), editorial cartoons (satire, caricature, symbolism, social commentary), graphs and charts (trends, distortion, misleading scales), and infographics (data presentation, visual hierarchy, credibility). Key skills include identifying the purpose, target audience, and persuasive techniques (bandwagon, appeal to authority, emotional appeal, testimonial) and evaluating whether visual texts are fair, accurate, and ethical.",
+    "examples": [
+      {
+        "problem": "An advertisement shows a celebrity holding a bottle of water against a mountain backdrop with the slogan 'Pure as Nature Intended.' Analyse the persuasive techniques used.",
+        "steps": [
+          {"instruction": "Step 1: Identify appeal to authority/testimonial — the celebrity endorses the product, implying trustworthiness.", "result": "Testimonial identified"},
+          {"instruction": "Step 2: Analyse the visual — the mountain backdrop creates associations with purity, health, and naturalness.", "result": "Visual symbolism analysed"},
+          {"instruction": "Step 3: Examine the slogan — 'Pure as Nature Intended' uses personification (nature having intention) and implies the water is unprocessed and wholesome.", "result": "Language technique identified"},
+          {"instruction": "Step 4: Identify the target audience — health-conscious consumers willing to pay a premium.", "result": "Audience identified"}
+        ],
+        "answer": "Answer: The advertisement uses (1) testimonial/celebrity endorsement for credibility, (2) visual symbolism (mountains = purity), (3) personification and emotive language in the slogan, and (4) appeals to the health-conscious consumer's desire for natural products.",
+        "visual_description": null
+      },
+      {
+        "problem": "A bar graph shows Company A's profits from R10 million to R12 million, but the y-axis starts at R9.5 million instead of zero. Explain the distortion.",
+        "steps": [
+          {"instruction": "Step 1: Note the truncated y-axis — starting at R9.5M rather than zero.", "result": "Distortion identified"},
+          {"instruction": "Step 2: Calculate the actual increase — R2M on a R10M base = 20% growth.", "result": "Real figure calculated"},
+          {"instruction": "Step 3: Observe the visual effect — the bar appears to double in height, suggesting growth far greater than 20%.", "result": "Misleading impression explained"}
+        ],
+        "answer": "Answer: By truncating the y-axis (starting at R9.5M instead of R0), the graph visually exaggerates the growth. The bars suggest profits roughly doubled, when the actual increase is only 20%. This is a common technique used to mislead viewers.",
+        "visual_description": null
+      },
+      {
+        "problem": "An editorial cartoon shows a politician standing on a pile of textbooks to reach a microphone, while children below have no books. What is the cartoonist's message?",
+        "steps": [
+          {"instruction": "Step 1: Identify the symbolism — textbooks represent education resources; the microphone represents political power/voice.", "result": "Symbols decoded"},
+          {"instruction": "Step 2: Note the irony — the politician uses educational resources for self-promotion rather than distributing them to children.", "result": "Irony identified"},
+          {"instruction": "Step 3: Identify the social commentary — criticism of politicians who exploit education budgets for political gain.", "result": "Message decoded"}
+        ],
+        "answer": "Answer: The cartoonist criticises politicians who exploit education resources for personal political gain. The textbooks elevate the politician's voice while children — the intended beneficiaries — are left without learning materials. The irony exposes misplaced priorities.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name four persuasive techniques commonly used in advertisements.",
+        "answer": "Bandwagon (everyone is doing it), appeal to authority (expert endorsement), emotional appeal (fear, love, nostalgia), and testimonial (celebrity or customer endorsement).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Think about what makes you want to buy something.", "Consider how ads use people, emotions, and social pressure."],
+        "explanation": "Persuasive techniques exploit psychological tendencies — the desire to belong (bandwagon), trust experts (authority), feel emotions (pathos), and follow role models (testimonial).",
+        "distractors": ["Alliteration, metaphor, simile, personification", "Introduction, body, conclusion, bibliography", "Colour, size, shape, texture"]
+      },
+      {
+        "question": "Explain why the choice of colour in an advertisement is significant. Give two examples.",
+        "answer": "Colour creates psychological associations and moods. Red suggests passion, urgency, or danger (used in sales and fast food). Blue suggests trust, calm, and professionalism (used by banks and tech companies). Green suggests nature, health, and sustainability (used by organic products).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Different colours trigger different emotional responses.", "Think about which colours brands like Coca-Cola, Facebook, and Woolworths use."],
+        "explanation": "Colour psychology is a deliberate advertising strategy. Advertisers choose colours to align with their brand values and the emotional response they want from their target audience.",
+        "distractors": ["Colour is purely decorative and has no meaning.", "All advertisements should use bright colours.", "Colour only matters in print, not digital advertising."]
+      },
+      {
+        "question": "How can you tell if a graph is being used to mislead readers? List three warning signs.",
+        "answer": "(1) Truncated axis — the y-axis does not start at zero, exaggerating differences. (2) Missing labels — axes without units or titles hide context. (3) Cherry-picked time range — showing only a favourable period while omitting unfavourable data.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Always check where the axes start.", "Look for missing information that would change your interpretation.", "Consider what data might have been left out."],
+        "explanation": "Graphs can be technically accurate yet visually misleading. Critical readers check the scale, labels, source, and whether the data range is representative.",
+        "distractors": ["If a graph is colourful, it is trustworthy.", "All graphs from official sources are accurate.", "Pie charts cannot be misleading."]
+      },
+      {
+        "question": "What is the difference between denotation and connotation in visual literacy?",
+        "answer": "Denotation is what an image literally shows (e.g., a dove). Connotation is the associated meaning or symbolism (e.g., a dove connotes peace, innocence, hope). In visual literacy, connotation is where meaning and persuasion reside.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Denotation = dictionary meaning. Connotation = emotional/cultural associations.", "Think about what a skull-and-crossbones literally is vs what it means."],
+        "explanation": "Advertisers and cartoonists rely on connotation — they choose images whose cultural associations reinforce their message without stating it explicitly.",
+        "distractors": ["They are the same thing.", "Denotation is opinion and connotation is fact.", "Connotation only applies to words, not images."]
+      },
+      {
+        "question": "Analyse why an infographic might be more effective than a written report for presenting statistics about water usage in South Africa.",
+        "answer": "An infographic is more effective because (1) it uses visual hierarchy to prioritise key statistics, making them immediately accessible, (2) icons and colour coding allow quick comparison between regions, (3) it suits mobile-first audiences who may not read a full report, and (4) it is shareable on social media, increasing reach. However, it sacrifices depth and nuance that a written report provides.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["Consider the audience — who is more likely to engage with an infographic vs a report?", "Think about the strengths AND limitations of visual data presentation."],
+        "explanation": "Infographics democratise data by making it accessible, but they risk oversimplification. Effective visual literacy means recognising both the power and limits of visual formats.",
+        "distractors": ["Infographics are always better than reports.", "Written reports are always more accurate.", "Infographics cannot contain statistics."]
+      }
+    ],
+    "hints": [
+      "When analysing an advert, ask: WHO is the target audience, WHAT techniques are used, and WHY?",
+      "For cartoons, identify the symbols first — then decode the message and social commentary.",
+      "Always check graph axes, labels, and source before drawing conclusions."
+    ],
+    "key_vocabulary": [
+      {"term": "target audience", "definition": "The specific group of people an advertisement or text is designed to reach and persuade", "example_usage": "The bright colours and slang suggest the target audience is teenagers."},
+      {"term": "connotation", "definition": "The emotional, cultural, or symbolic meaning associated with a word or image beyond its literal definition", "example_usage": "The colour white connotes purity and cleanliness in the detergent advertisement."},
+      {"term": "caricature", "definition": "An exaggerated portrayal of a person's features or traits for comic or satirical effect, common in editorial cartoons", "example_usage": "The cartoonist's caricature of the president exaggerated his large ears."},
+      {"term": "visual hierarchy", "definition": "The arrangement of visual elements to guide the viewer's eye from most to least important information", "example_usage": "The headline in bold red text sits at the top of the visual hierarchy."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think visual literacy only applies to advertisements and is not a serious analytical skill.",
+        "correction": "Visual literacy is critical thinking applied to images, graphs, social media, news photographs, and data visualisations. In the digital age, most information reaches us visually — the ability to decode, question, and evaluate visual texts is as important as reading written texts.",
+        "why_students_think_this": "Students associate images with entertainment rather than persuasion. They may not realise that every visual choice (colour, layout, framing, what is included or excluded) is deliberate and carries meaning."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is the difference between denotation and connotation?", "back": "Denotation is the literal meaning of a word or image. Connotation is the emotional, cultural, or symbolic associations beyond the literal meaning.", "tags": ["CAPS.English.Gr12.VISUAL", "Grade12", "Visual Literacy"], "difficulty_permille": 222},
+    {"front": "Name three ways a graph can be misleading.", "back": "Truncated y-axis (not starting at zero), missing labels or units, and cherry-picked time ranges that exclude unfavourable data.", "tags": ["CAPS.English.Gr12.VISUAL", "Grade12", "Visual Literacy"], "difficulty_permille": 333},
+    {"front": "What is a caricature?", "back": "An exaggerated portrayal of a person's features or traits for comic or satirical effect, commonly used in editorial cartoons.", "tags": ["CAPS.English.Gr12.VISUAL", "Grade12", "Visual Literacy"], "difficulty_permille": 222},
+    {"front": "What four questions should you ask when analysing an advertisement?", "back": "WHO is the target audience? WHAT persuasive techniques are used? WHY were specific visual choices made? HOW effective is the advertisement at achieving its purpose?", "tags": ["CAPS.English.Gr12.VISUAL", "Grade12", "Visual Literacy"], "difficulty_permille": 278}
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

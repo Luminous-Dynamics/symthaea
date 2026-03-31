@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "What is 3 + 4?",
+        "answer": "7",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count on from 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Start at 3 and count 4 more: 4, 5, 6, 7.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "6",
+          "8"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "What is 9 + 6?",
+        "answer": "15",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Break 6 into 1 and 5 to make 10 first"
         ],
-        "explanation": "Explanation.",
+        "explanation": "9 + 1 = 10, then 10 + 5 = 15.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "14",
+          "16",
+          "13"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "What is 14 - 8?",
+        "answer": "6",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think: 8 + ? = 14"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Count up from 8 to 14: that is 6 steps.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "7",
+          "8"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Fill in the missing number: 7 + ___ = 13",
+        "answer": "6",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think: what do I add to 7 to get 13?"
         ],
-        "explanation": "Explanation.",
+        "explanation": "13 - 7 = 6, so the missing number is 6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "7",
+          "4"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Sam has 8 apples. He gets 7 more. How many does he have now?",
+        "answer": "15",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add the two amounts together"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 + 7 = 15 apples in total.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "14",
+          "16",
+          "13"
         ]
       }
     ],

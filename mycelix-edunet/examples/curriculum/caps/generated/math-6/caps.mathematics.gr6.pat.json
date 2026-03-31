@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "If the rule is y = 3x + 1, find y when x = 4.",
+        "answer": "13",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute x = 4"
         ],
-        "explanation": "Explanation.",
+        "explanation": "y = 3(4) + 1 = 12 + 1 = 13.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "12",
+          "15",
+          "7"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Find the rule: Input 1 gives 5, input 2 gives 8, input 3 gives 11.",
+        "answer": "y = 3x + 2",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The difference is 3, so try 3x + something"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3(1)+2=5, 3(2)+2=8, 3(3)+2=11. Rule: y = 3x + 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "y = 2x + 3",
+          "y = x + 4",
+          "y = 5x"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Complete: If y = 2x - 1, and x = 0, 1, 2, 3, find the four y-values.",
+        "answer": "-1, 1, 3, 5",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute each x-value"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2(0)-1=-1, 2(1)-1=1, 2(2)-1=3, 2(3)-1=5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0, 2, 4, 6",
+          "1, 3, 5, 7",
+          "-2, 0, 2, 4"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "A pattern starts at 100 and decreases by 7 each term. What is the 6th term?",
+        "answer": "65",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "100, 93, 86, 79, 72, 65"
         ],
-        "explanation": "Explanation.",
+        "explanation": "100 - 5(7) = 100 - 35 = 65. The 6th term is 65.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "58",
+          "72",
+          "63"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "If f(x) = x^2 - 4, what is f(5)?",
+        "answer": "21",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Substitute x = 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "f(5) = 5^2 - 4 = 25 - 4 = 21.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "29",
+          "16",
+          "1"
         ]
       }
     ],

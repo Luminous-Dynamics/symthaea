@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A bar graph shows 8 children chose soccer and 5 chose netball. How many more chose soccer?",
+        "answer": "3",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract: 8 - 5"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 - 5 = 3 more children chose soccer.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2",
+          "4",
+          "13"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "In a class survey: cats 7, dogs 9, rabbits 4. What is the mode?",
+        "answer": "Dogs",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The mode is the most common answer"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Dogs received the most votes (9), so dogs is the mode.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Cats",
+          "Rabbits",
+          "9"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A pictograph uses 1 picture = 2 learners. If swimming has 6 pictures, how many learners chose swimming?",
+        "answer": "12",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply the number of pictures by 2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6 pictures x 2 = 12 learners.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6",
+          "8",
+          "14"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "The scores on a test were: 5, 7, 3, 5, 5. What is the mode?",
+        "answer": "5",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Which number appears most often?"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 appears 3 times, more than any other number. The mode is 5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "7",
+          "25"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A bar graph shows: Mon 4, Tue 6, Wed 3, Thu 7, Fri 5. Which day had the most sales?",
+        "answer": "Thursday",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find the tallest bar"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Thursday has the tallest bar with 7 sales.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Friday",
+          "Tuesday",
+          "Monday"
         ]
       }
     ],

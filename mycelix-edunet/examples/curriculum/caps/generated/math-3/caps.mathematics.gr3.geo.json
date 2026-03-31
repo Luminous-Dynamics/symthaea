@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "How many sides does a pentagon have?",
+        "answer": "5",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "'Penta' means five"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A pentagon has 5 sides.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "6",
+          "3"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "What type of angle is exactly 90 degrees?",
+        "answer": "Right angle",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "It looks like the corner of a book"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A 90-degree angle is called a right angle.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Acute angle",
+          "Obtuse angle",
+          "Straight angle"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "Is an angle of 45 degrees acute or obtuse?",
+        "answer": "Acute",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Acute angles are less than 90 degrees"
         ],
-        "explanation": "Explanation.",
+        "explanation": "45 < 90, so it is an acute angle.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Obtuse",
+          "Right",
+          "Straight"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangle has a length of 5 cm and width of 3 cm. How many right angles does it have?",
+        "answer": "4",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "All corners of a rectangle are right angles"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A rectangle always has 4 right angles (90 degrees each).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2",
+          "3",
+          "1"
         ]
       },
       {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
+        "question": "How many lines of symmetry does an equilateral triangle have?",
+        "answer": "3",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "All 3 sides are equal, so you can fold along 3 different lines"
         ],
-        "explanation": "Explanation.",
+        "explanation": "An equilateral triangle has 3 lines of symmetry.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 3 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1",
+          "2",
+          "0"
         ]
       }
     ],

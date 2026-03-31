@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is the sum of interior angles in a triangle?",
+        "answer": "180 degrees",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "This is a fundamental geometry fact"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The angles in any triangle always add up to 180 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "90 degrees",
+          "360 degrees",
+          "270 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "A triangle has angles 50 degrees and 70 degrees. Find the third angle.",
+        "answer": "60 degrees",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "180 - 50 - 70"
         ],
-        "explanation": "Explanation.",
+        "explanation": "180 - 50 - 70 = 60 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "80 degrees",
+          "120 degrees",
+          "40 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is the sum of interior angles in a quadrilateral?",
+        "answer": "360 degrees",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A quadrilateral can be split into 2 triangles"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Sum of angles in a quadrilateral = 360 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "180 degrees",
+          "270 degrees",
+          "540 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Two parallel lines are cut by a transversal. One alternate angle is 55 degrees. What is the other?",
+        "answer": "55 degrees",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Alternate angles are equal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Alternate angles between parallel lines are equal = 55 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "125 degrees",
+          "35 degrees",
+          "180 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "A co-interior angle (same-side interior) is 115 degrees. What is the other co-interior angle?",
+        "answer": "65 degrees",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Co-interior angles add to 180"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Co-interior angles are supplementary: 180 - 115 = 65 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "115 degrees",
+          "45 degrees",
+          "75 degrees"
         ]
       }
     ],

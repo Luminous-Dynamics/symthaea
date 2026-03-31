@@ -1,0 +1,129 @@
+{
+  "node_id": "24.244",
+  "lesson": {
+    "standard_code": "24.244",
+    "title": "Formal Logic: Propositional Logic, Validity, Soundness & Syllogisms",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Apply",
+    "explanation": "Formal logic is the study of valid reasoning. Propositional logic deals with propositions (statements that are true or false) connected by logical operators: AND (conjunction, ^), OR (disjunction, v), NOT (negation, ~), IF...THEN (conditional, ->), and IF AND ONLY IF (biconditional, <->). An argument is valid if the conclusion necessarily follows from the premises — it is impossible for the premises to be true and the conclusion false. An argument is sound if it is both valid AND has true premises. Syllogisms are deductive arguments with two premises and a conclusion, following patterns like: All A are B, All B are C, therefore All A are C (Barbara).",
+    "examples": [
+      {
+        "problem": "Determine whether this argument is valid: Premise 1: If it rains, the ground is wet. Premise 2: The ground is wet. Conclusion: It rained.",
+        "steps": [
+          {"instruction": "Step 1: Symbolise — Let P = 'it rains', Q = 'the ground is wet'. P1: P -> Q. P2: Q. Conclusion: P.", "result": "Formalised"},
+          {"instruction": "Step 2: Check the form — this is 'affirming the consequent' (Q is true, therefore P is true).", "result": "Fallacy identified"},
+          {"instruction": "Step 3: Find a counterexample — the ground could be wet from a sprinkler (Q is true, but P is false).", "result": "Invalidity demonstrated"}
+        ],
+        "answer": "Answer: INVALID. This commits the fallacy of affirming the consequent. The ground being wet does not prove it rained — a sprinkler could have caused it. Valid form would be modus ponens: P -> Q, P, therefore Q.",
+        "visual_description": null
+      },
+      {
+        "problem": "Construct a truth table for P -> Q (material conditional).",
+        "steps": [
+          {"instruction": "Step 1: List all combinations of P and Q: TT, TF, FT, FF.", "result": "Four rows created"},
+          {"instruction": "Step 2: Apply the rule: P -> Q is false ONLY when P is true and Q is false.", "result": "Rule applied"},
+          {"instruction": "Step 3: Fill in: T->T = T, T->F = F, F->T = T, F->F = T.", "result": "Table complete"}
+        ],
+        "answer": "Answer: P=T Q=T: T | P=T Q=F: F | P=F Q=T: T | P=F Q=F: T. The conditional is false only when the antecedent is true and the consequent is false.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify the syllogistic form and determine validity: All mammals are warm-blooded. All whales are mammals. Therefore, all whales are warm-blooded.",
+        "steps": [
+          {"instruction": "Step 1: Identify the form — All M are P, All S are M, therefore All S are P.", "result": "Barbara (AAA-1)"},
+          {"instruction": "Step 2: Check validity — this is the classic valid syllogism Barbara (first figure, all universal affirmatives).", "result": "Valid"},
+          {"instruction": "Step 3: Check soundness — both premises are factually true, so the argument is also sound.", "result": "Sound"}
+        ],
+        "answer": "Answer: This is a valid syllogism in the form Barbara (AAA-1). It is also sound because both premises are true. The middle term 'mammals' connects the major term 'warm-blooded' to the minor term 'whales.'",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the difference between validity and soundness?",
+        "answer": "An argument is valid if the conclusion logically follows from the premises (the structure is correct). An argument is sound if it is valid AND all its premises are actually true. All sound arguments are valid, but not all valid arguments are sound.",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": ["Validity is about structure; soundness is about structure plus truth.", "A valid argument can have false premises."],
+        "explanation": "Example of valid but unsound: All fish can fly (false). Salmon are fish. Therefore, salmon can fly. The logic is correct, but the first premise is false.",
+        "distractors": ["Valid means true and sound means logical.", "Soundness does not require validity.", "All valid arguments are sound."]
+      },
+      {
+        "question": "Symbolise and evaluate: 'If you study hard, you will pass. You did not pass. Therefore, you did not study hard.'",
+        "answer": "P -> Q, ~Q, therefore ~P. This is modus tollens — a VALID argument form. By denying the consequent, we can validly deny the antecedent.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["This is the reverse of affirming the consequent.", "Modus tollens: if P then Q, not Q, therefore not P."],
+        "explanation": "Modus tollens is valid because if P guarantees Q, and Q did not happen, P could not have happened. Contrast with the invalid 'denying the antecedent' (not P, therefore not Q).",
+        "distractors": ["This is invalid because you might have studied and still failed.", "This is affirming the consequent.", "This is denying the antecedent."]
+      },
+      {
+        "question": "Identify the logical fallacy: 'Everyone is buying this phone, so it must be the best one.'",
+        "answer": "Argumentum ad populum (appeal to popularity/bandwagon fallacy). The popularity of a product does not logically entail its quality.",
+        "difficulty_permille": 250,
+        "bloom_level": "Analyze",
+        "hints": ["Popularity does not equal quality or truth.", "This fallacy assumes the majority cannot be wrong."],
+        "explanation": "Ad populum exploits social conformity. A million people buying a phone tells us about marketing success, not about whether the phone is objectively the best.",
+        "distractors": ["This is a valid inductive argument.", "This is an appeal to authority.", "This is a straw man fallacy."]
+      },
+      {
+        "question": "Construct a truth table for ~(P ^ Q) and verify it equals (~P v ~Q) — De Morgan's Law.",
+        "answer": "P=T Q=T: ~(T^T)=~T=F, (~T v ~T)=(F v F)=F. P=T Q=F: ~(T^F)=~F=T, (~T v ~F)=(F v T)=T. P=F Q=T: ~(F^T)=~F=T, (~F v ~T)=(T v F)=T. P=F Q=F: ~(F^F)=~F=T, (~F v ~F)=(T v T)=T. All rows match, confirming De Morgan's Law: ~(P ^ Q) is equivalent to (~P v ~Q).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["Build columns step by step: first P^Q, then negate it.", "For the right side: first ~P and ~Q, then their disjunction."],
+        "explanation": "De Morgan's Laws are fundamental equivalences: the negation of a conjunction equals the disjunction of negations, and vice versa.",
+        "distractors": ["~(P ^ Q) = ~P ^ ~Q", "~(P v Q) = ~P v ~Q", "The truth tables will not match."]
+      },
+      {
+        "question": "Is this syllogism valid? Some students are athletes. Some athletes are scholars. Therefore, some students are scholars.",
+        "answer": "INVALID. The middle term 'athletes' is not distributed in either premise (both are particular/Some statements). This commits the fallacy of the undistributed middle. Counterexample: some students play football, some rugby players are scholars — that does not mean any student is a scholar.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["For a valid syllogism, the middle term must be distributed at least once.", "'Some' statements do not distribute either term."],
+        "explanation": "The undistributed middle is one of the most common syllogistic fallacies. The two 'some' premises create two separate groups that may not overlap.",
+        "distractors": ["Valid because both premises mention athletes.", "Valid because it follows the form of Barbara.", "Sound but not valid."]
+      }
+    ],
+    "hints": [
+      "Learn the four valid conditional argument forms: modus ponens, modus tollens, hypothetical syllogism, disjunctive syllogism.",
+      "When in doubt, try to find a counterexample — a scenario where the premises are true but the conclusion is false.",
+      "Truth tables are mechanical and reliable: if you build them correctly, they never lie."
+    ],
+    "key_vocabulary": [
+      {"term": "validity", "definition": "A property of arguments where the conclusion necessarily follows from the premises — it is structurally impossible for the premises to be true and the conclusion false", "example_usage": "The argument is valid because the conclusion follows from the premises, even though the premises are false."},
+      {"term": "soundness", "definition": "A property of arguments that are both valid in form and have all true premises", "example_usage": "The argument is sound because it is valid and both premises are factually correct."},
+      {"term": "modus ponens", "definition": "A valid argument form: If P then Q; P; therefore Q", "example_usage": "If it rains, the ground is wet. It is raining. Therefore, the ground is wet — that is modus ponens."},
+      {"term": "syllogism", "definition": "A deductive argument consisting of two premises and a conclusion, where the conclusion follows from the premises through a shared middle term", "example_usage": "All humans are mortal. Socrates is human. Therefore, Socrates is mortal — a classic syllogism."},
+      {"term": "fallacy", "definition": "An error in reasoning that makes an argument logically invalid, though it may appear convincing", "example_usage": "The politician committed the straw man fallacy by misrepresenting her opponent's position."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think that if a conclusion is true, the argument must be valid.",
+        "correction": "Validity is about the logical STRUCTURE of the argument, not the truth of its conclusion. An invalid argument can accidentally reach a true conclusion, and a valid argument can have a false conclusion (if its premises are false). Validity guarantees truth-preservation: IF the premises are true, THEN the conclusion must be true.",
+        "why_students_think_this": "In everyday language, 'valid' means 'reasonable' or 'true.' In formal logic, it has a precise technical meaning about the relationship between premises and conclusion."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is modus ponens?", "back": "If P then Q; P is true; therefore Q is true. A valid deductive argument form.", "tags": ["24.244", "Philosophy", "Logic"], "difficulty_permille": 222},
+    {"front": "What is modus tollens?", "back": "If P then Q; Q is false; therefore P is false. A valid deductive argument form.", "tags": ["24.244", "Philosophy", "Logic"], "difficulty_permille": 278},
+    {"front": "What is the difference between validity and soundness?", "back": "Validity: the conclusion follows logically from the premises (structure). Soundness: the argument is valid AND all premises are true (structure + truth).", "tags": ["24.244", "Philosophy", "Logic"], "difficulty_permille": 333},
+    {"front": "State De Morgan's Laws.", "back": "~(P ^ Q) is equivalent to (~P v ~Q). ~(P v Q) is equivalent to (~P ^ ~Q). The negation of a conjunction is the disjunction of negations, and vice versa.", "tags": ["24.244", "Philosophy", "Logic"], "difficulty_permille": 500},
+    {"front": "What is the fallacy of affirming the consequent?", "back": "If P then Q; Q is true; therefore P is true. INVALID: Q could be true for reasons other than P.", "tags": ["24.244", "Philosophy", "Logic"], "difficulty_permille": 333}
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

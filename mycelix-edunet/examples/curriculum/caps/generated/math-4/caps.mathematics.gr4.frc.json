@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 4/8",
+        "answer": "1/2",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide top and bottom by 4"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4/8: GCF is 4. 4/4 = 1, 8/4 = 2. So 4/8 = 1/2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2/4",
+          "1/4",
+          "2/8"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Are 2/3 and 4/6 equivalent fractions?",
+        "answer": "Yes",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply 2/3 by 2/2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2/3 x 2/2 = 4/6. They are equivalent.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "No",
+          "Only if simplified",
+          "Cannot tell"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 1/4 + 2/4?",
+        "answer": "3/4",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Same denominator, so add the numerators"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1/4 + 2/4 = 3/4. The denominator stays 4.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3/8",
+          "1/2",
+          "2/4"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is 5/6 - 2/6?",
+        "answer": "3/6 or 1/2",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Same denominator, subtract numerators"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5/6 - 2/6 = 3/6 = 1/2 in simplest form.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3/12",
+          "7/6",
+          "2/6"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "Put in order from smallest to largest: 1/2, 1/3, 1/4",
+        "answer": "1/4, 1/3, 1/2",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The bigger the denominator, the smaller the fraction"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1/4 < 1/3 < 1/2. More parts means each part is smaller.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1/2, 1/3, 1/4",
+          "1/3, 1/4, 1/2",
+          "1/3, 1/2, 1/4"
         ]
       }
     ],

@@ -1,0 +1,323 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr10.TISSUE",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr10.TISSUE",
+    "title": "Animal and Plant Tissues: Epithelial, Connective, Muscle, Nervous, Meristematic, and Vascular Tissues",
+    "grade_level": "Grade10",
+    "bloom_level": "Understand",
+    "explanation": "A tissue is a group of similar cells working together to perform a specific function. Animal tissues include: epithelial tissue (covers surfaces, lines organs — e.g. skin), connective tissue (supports and connects — e.g. bone, blood, cartilage), muscle tissue (contracts for movement — skeletal, smooth, cardiac), and nervous tissue (transmits electrical impulses — neurons). Plant tissues include: meristematic tissue (actively dividing cells at root and shoot tips for growth), epidermal tissue (protective outer layer with cuticle), parenchyma (storage and photosynthesis), and vascular tissue — xylem (transports water upward, dead cells) and phloem (transports sugars, living cells).",
+    "examples": [
+      {
+        "problem": "Name the four main types of animal tissue and give one function of each.",
+        "steps": [
+          {
+            "instruction": "Step 1: Epithelial tissue — covers body surfaces and lines internal organs. Functions include protection (skin), secretion (glands), and absorption (intestinal lining).",
+            "result": "epithelial identified"
+          },
+          {
+            "instruction": "Step 2: Connective tissue — supports, connects, and separates different tissues and organs. Examples: bone (support), blood (transport), cartilage (cushioning).",
+            "result": "connective identified"
+          },
+          {
+            "instruction": "Step 3: Muscle tissue — contracts to produce movement. Three types: skeletal (voluntary), smooth (involuntary, e.g. gut), cardiac (heart, involuntary).",
+            "result": "muscle identified"
+          },
+          {
+            "instruction": "Step 4: Nervous tissue — transmits electrical impulses (nerve signals). Made up of neurons (nerve cells) and supporting glial cells.",
+            "result": "nervous identified"
+          }
+        ],
+        "answer": "Answer: Epithelial (protection/lining), connective (support/transport), muscle (movement), nervous (impulse transmission).",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare xylem and phloem tissue in terms of structure, contents transported, and whether cells are alive or dead.",
+        "steps": [
+          {
+            "instruction": "Step 1: Xylem — Made of dead, hollow, lignified cells (tracheids and vessels). Transports water and dissolved minerals from roots to leaves (upward only).",
+            "result": "xylem described"
+          },
+          {
+            "instruction": "Step 2: Phloem — Made of living sieve tube elements and companion cells. Transports dissolved sugars (sucrose) from leaves to all parts of the plant (bidirectional — translocation).",
+            "result": "phloem described"
+          },
+          {
+            "instruction": "Step 3: Key structural difference — Xylem cells have thick, lignified walls and no cell contents; phloem sieve tubes have thin walls with sieve plates and living cytoplasm.",
+            "result": "structural comparison"
+          }
+        ],
+        "answer": "Answer: Xylem = dead, lignified cells transporting water upward. Phloem = living cells transporting sugars bidirectionally.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the role of meristematic tissue in plant growth and where it is found.",
+        "steps": [
+          {
+            "instruction": "Step 1: Meristematic tissue consists of actively dividing (mitotic), undifferentiated cells.",
+            "result": "cell characteristics"
+          },
+          {
+            "instruction": "Step 2: Apical meristem is found at root tips and shoot tips — responsible for primary growth (increasing length).",
+            "result": "location and function"
+          },
+          {
+            "instruction": "Step 3: Lateral meristem (cambium) is found between xylem and phloem in woody plants — responsible for secondary growth (increasing girth/thickness).",
+            "result": "secondary growth"
+          }
+        ],
+        "answer": "Answer: Meristematic tissue contains actively dividing cells. Apical meristems (tips) enable primary growth; lateral meristems (cambium) enable secondary growth.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "State the function of epithelial tissue and give two places where it is found in the human body.",
+        "answer": "Epithelial tissue covers and protects surfaces and lines internal organs. Found lining the small intestine (absorption) and covering the skin (protection).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think of surfaces that are covered or lined in your body.",
+          "Epithelial tissue can be specialised for protection, absorption, or secretion."
+        ],
+        "explanation": "Epithelial tissue forms continuous sheets covering body surfaces (skin) and lining organs (intestine, lungs). It functions in protection, absorption, filtration, and secretion.",
+        "distractors": [
+          "Epithelial tissue is only found in the skin",
+          "Epithelial tissue contracts to produce movement",
+          "Epithelial tissue transmits nerve impulses"
+        ]
+      },
+      {
+        "question": "Blood is classified as a connective tissue. Explain why, even though it is a liquid.",
+        "answer": "Connective tissue connects and supports other tissues and has cells scattered in a matrix. Blood has cells (red blood cells, white blood cells, platelets) suspended in a liquid matrix called plasma. The plasma is the extracellular matrix, making blood a connective tissue that transports substances throughout the body.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "What is the defining feature of connective tissue? Think about the relationship between cells and their matrix.",
+          "The matrix of connective tissue can be solid (bone), semi-solid (cartilage), or liquid."
+        ],
+        "explanation": "Connective tissue is defined by cells scattered in an extracellular matrix. Blood fits this definition: cells (RBCs, WBCs, platelets) in a liquid matrix (plasma). The matrix does not have to be solid.",
+        "distractors": [
+          "Blood is actually epithelial tissue because it lines blood vessels",
+          "Blood is not a tissue because it is liquid",
+          "Blood is muscle tissue because the heart pumps it"
+        ]
+      },
+      {
+        "question": "Draw a labelled diagram of a cross-section of a dicotyledonous stem, showing the arrangement of xylem, phloem, cambium, and epidermis.",
+        "answer": "The cross-section should show (from outside to inside): epidermis (outer protective layer), cortex (parenchyma), vascular bundles arranged in a ring (with phloem on the outside, cambium in the middle, and xylem on the inside of each bundle), and pith (central parenchyma).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "In a dicot stem, vascular bundles are arranged in a ring. Phloem is always on the outside, xylem on the inside.",
+          "Remember: cambium is between xylem and phloem, producing new vascular tissue."
+        ],
+        "explanation": "Dicot stems have vascular bundles in a ring pattern. Each bundle has phloem (outer), cambium (middle), and xylem (inner). This arrangement is important for secondary growth.",
+        "distractors": [
+          "Xylem is on the outside and phloem is on the inside",
+          "Vascular bundles are scattered randomly (that is monocot)",
+          "Cambium is on the outside of the epidermis"
+        ]
+      },
+      {
+        "question": "Compare skeletal muscle, smooth muscle, and cardiac muscle in terms of appearance (striations), control (voluntary/involuntary), and location in the body.",
+        "answer": "Skeletal muscle: striated (striped), voluntary, attached to bones (e.g. biceps). Smooth muscle: non-striated, involuntary, found in walls of organs (e.g. stomach, intestines, blood vessels). Cardiac muscle: striated with intercalated discs, involuntary, found only in the heart wall.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Only one type of muscle is under voluntary (conscious) control.",
+          "Cardiac muscle has a unique feature — intercalated discs — that allows coordinated contraction."
+        ],
+        "explanation": "The three muscle types differ in structure and control: skeletal (striated, voluntary), smooth (non-striated, involuntary), cardiac (striated with intercalated discs, involuntary). Location relates to function.",
+        "distractors": [
+          "Cardiac muscle is voluntary because you can feel your heartbeat",
+          "Smooth muscle is striated like skeletal muscle",
+          "Skeletal muscle is found in the walls of the digestive system"
+        ]
+      },
+      {
+        "question": "A Protea plant (South Africa's national flower) survives in nutrient-poor fynbos soils. Explain how the specialised root tissues (including proteoid roots) help it absorb nutrients more efficiently than typical roots.",
+        "answer": "Protea species develop proteoid (cluster) roots — dense clusters of fine rootlets that massively increase the surface area for absorption. The root epidermal tissue produces root hairs that further increase surface area. These roots secrete organic acids that solubilise phosphorus from the nutrient-poor, acidic fynbos soils. The xylem tissue then transports the absorbed water and dissolved minerals to the rest of the plant. This tissue-level adaptation explains how Proteas thrive in the Western Cape's infertile soils.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about how increasing surface area helps absorption.",
+          "Fynbos soils are very low in phosphorus — how might roots chemically unlock this nutrient?"
+        ],
+        "explanation": "Proteas have evolved proteoid roots as an adaptation to nutrient-poor fynbos soils. These cluster roots increase surface area and secrete acids to solubilise phosphorus, demonstrating how tissue specialisation enables survival in challenging environments.",
+        "distractors": [
+          "Proteas survive because they have large leaves that absorb nutrients from the air",
+          "Proteoid roots reduce surface area to conserve water",
+          "Fynbos soils are actually nutrient-rich"
+        ]
+      }
+    ],
+    "hints": [
+      "Tissues are groups of similar cells with a common function — cells → tissues → organs → organ systems.",
+      "In vascular bundles, remember: Phloem is on the Outside, Xylem is on the Inside (P-O, X-I).",
+      "Meristematic tissue = mitotically active, undifferentiated cells. Found at tips (apical) and sides (lateral)."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "tissue",
+        "definition": "A group of similar cells working together to perform a specific function",
+        "example_usage": "Muscle tissue contracts to enable movement of the body."
+      },
+      {
+        "term": "xylem",
+        "definition": "Vascular tissue made of dead, lignified cells that transports water and minerals from roots to leaves",
+        "example_usage": "Water moves up through the xylem in the trunk of a yellowwood tree."
+      },
+      {
+        "term": "phloem",
+        "definition": "Vascular tissue made of living sieve tube elements that transports dissolved sugars (sucrose) throughout the plant",
+        "example_usage": "Sugars made in the leaves during photosynthesis are transported via phloem to the roots."
+      },
+      {
+        "term": "meristematic tissue",
+        "definition": "Plant tissue consisting of actively dividing, undifferentiated cells found at growth points (tips and cambium)",
+        "example_usage": "The apical meristem at the shoot tip allows the Marula tree to grow taller."
+      },
+      {
+        "term": "connective tissue",
+        "definition": "Animal tissue that supports, connects, and separates other tissues; has cells in an extracellular matrix",
+        "example_usage": "Bone, cartilage, and blood are all types of connective tissue."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think xylem and phloem both transport water.",
+        "correction": "Xylem transports water and dissolved minerals; phloem transports dissolved sugars (sucrose). They carry different substances in different directions.",
+        "why_students_think_this": "Both are vascular tissues found together in bundles, leading students to assume they carry the same substance. Emphasise: xylem = water (up), phloem = food/sugar (up and down)."
+      },
+      {
+        "misconception": "Students think all connective tissue is solid, so blood cannot be connective tissue.",
+        "correction": "The extracellular matrix of connective tissue can be solid (bone), semi-solid (cartilage), gel-like (areolar), or liquid (blood plasma). Blood IS connective tissue.",
+        "why_students_think_this": "The word 'connective' suggests something solid holding things together. Students need to learn that it is the cell-in-matrix pattern that defines connective tissue, not the matrix state."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.89,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr10.TISSUE",
+    "title": "Assessment: Animal and Plant Tissues",
+    "items": [
+      {
+        "question": "Name the four main types of animal tissue.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Epithelial, connective, muscle, and nervous tissue",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think: cover, connect, move, signal."
+      },
+      {
+        "question": "Explain the difference between xylem and phloem in terms of what each transports and whether the cells are alive or dead.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Xylem: transports water and minerals, cells are dead and lignified. Phloem: transports dissolved sugars, cells are living (sieve tubes with companion cells).",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "One carries water up, the other carries sugar in both directions."
+      },
+      {
+        "question": "Draw a labelled diagram of a transverse section through a dicotyledonous root, showing epidermis, cortex, endodermis, xylem, and phloem.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Diagram shows: epidermis (with root hairs), cortex, endodermis (with Casparian strip), central vascular cylinder with star-shaped xylem and phloem between the xylem arms.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "In a root, xylem forms a star shape in the centre."
+      },
+      {
+        "question": "Compare the three types of muscle tissue in a table.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Skeletal: striated, voluntary, multinucleated, attached to bones. Smooth: non-striated, involuntary, spindle-shaped, organ walls. Cardiac: striated with intercalated discs, involuntary, branched, heart only.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider: striations, voluntary/involuntary control, location."
+      },
+      {
+        "question": "Explain how the tissue structure of xylem is suited to its function of water transport.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Xylem cells are dead and hollow (no cell contents to obstruct flow), have lignified walls (provide strength and prevent collapse), and are arranged end-to-end with no end walls (forming continuous tubes for efficient water flow).",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Link each structural feature to how it helps move water."
+      }
+    ],
+    "total_points": 16,
+    "estimated_minutes": 20,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "Name the four types of animal tissue.",
+      "back": "Epithelial, connective, muscle, and nervous tissue.",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What does xylem transport and in which direction?",
+      "back": "Xylem transports water and dissolved minerals upward from roots to leaves.",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What does phloem transport?",
+      "back": "Phloem transports dissolved sugars (mainly sucrose) from leaves to all parts of the plant (bidirectional — translocation).",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What is meristematic tissue?",
+      "back": "Plant tissue made of actively dividing, undifferentiated cells. Found at root/shoot tips (apical) and in cambium (lateral).",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "What are the three types of muscle tissue?",
+      "back": "Skeletal (striated, voluntary), smooth (non-striated, involuntary), and cardiac (striated with intercalated discs, involuntary).",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "Why are xylem cells dead?",
+      "back": "Dead, hollow xylem cells have no cell contents to obstruct water flow. Their lignified walls provide strength to prevent collapse under tension.",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What is the Casparian strip?",
+      "back": "A waterproof band of suberin in the endodermis of roots that forces water to pass through cell membranes (not between cells), controlling mineral uptake.",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "What are intercalated discs in cardiac muscle?",
+      "back": "Specialised junctions between cardiac muscle cells that allow rapid transmission of electrical impulses, ensuring the heart contracts in a coordinated wave.",
+      "tags": ["CAPS.LifeSciences.Gr10.TISSUE", "Grade10", "Tissues"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.89,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "3 children like cats, 5 like dogs. How many children in total?",
+        "answer": "8",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add the two groups"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3 + 5 = 8 children.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "7",
+          "9",
+          "2"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "A picture graph shows 4 stars for Monday and 2 stars for Tuesday. Which day has more?",
+        "answer": "Monday",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Compare the number of stars"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Monday has 4 stars and Tuesday has 2. 4 is more than 2.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Tuesday",
+          "They are equal",
+          "Wednesday"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "In a class, 6 children chose red, 3 chose blue, and 1 chose green. Which colour is most popular?",
+        "answer": "Red",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find the colour with the most votes"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Red has 6 votes, which is more than blue (3) or green (1).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Blue",
+          "Green",
+          "Yellow"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "A picture graph uses 1 smiley face for each child. If there are 5 smiley faces, how many children?",
+        "answer": "5",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Each smiley face represents 1 child"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 smiley faces means 5 children, since each face = 1 child.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10",
+          "4",
+          "6"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Sort these into 2 groups (round, not round): ball, box, coin, book. How many round things?",
+        "answer": "2",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A ball and a coin are round"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The ball and the coin are round, so there are 2 round things.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1",
+          "3",
+          "4"
         ]
       }
     ],

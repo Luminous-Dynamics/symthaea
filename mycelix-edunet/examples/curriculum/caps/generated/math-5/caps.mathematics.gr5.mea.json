@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangle is 12 cm by 5 cm. What is its perimeter?",
+        "answer": "34 cm",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "P = 2(l + w)"
         ],
-        "explanation": "Explanation.",
+        "explanation": "P = 2(12 + 5) = 2 x 17 = 34 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "17 cm",
+          "60 cm",
+          "24 cm"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Find the area of a rectangle: length 9 m, width 4 m.",
+        "answer": "36 square m",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Area = length x width"
         ],
-        "explanation": "Explanation.",
+        "explanation": "9 x 4 = 36 square metres.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "13 square m",
+          "26 square m",
+          "45 square m"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "A rectangular prism is 5 cm x 3 cm x 2 cm. What is its volume?",
+        "answer": "30 cubic cm",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "V = l x w x h"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 x 3 x 2 = 30 cubic cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "10 cubic cm",
+          "16 cubic cm",
+          "25 cubic cm"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "An irregular shape has an area of about 18 full squares and 6 half squares on a grid. Estimate the total area.",
+        "answer": "21 square units",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count full squares + half of partial squares"
         ],
-        "explanation": "Explanation.",
+        "explanation": "18 + (6 x 0.5) = 18 + 3 = 21 square units.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "24 square units",
+          "18 square units",
+          "12 square units"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 4500 ml to litres.",
+        "answer": "4.5 litres",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "1 litre = 1000 ml"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4500 / 1000 = 4.5 litres.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "45 litres",
+          "0.45 litres",
+          "450 litres"
         ]
       }
     ],

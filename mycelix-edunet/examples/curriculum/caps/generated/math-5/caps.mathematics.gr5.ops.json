@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 245 x 13?",
+        "answer": "3185",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Long multiply: 245 x 10 + 245 x 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "245 x 10 = 2450, 245 x 3 = 735. 2450 + 735 = 3185.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3085",
+          "3285",
+          "3195"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 672 / 8?",
+        "answer": "84",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide step by step"
         ],
-        "explanation": "Explanation.",
+        "explanation": "672 / 8 = 84. Check: 84 x 8 = 672.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "82",
+          "86",
+          "78"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 345 x 27?",
+        "answer": "9315",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "345 x 20 + 345 x 7"
         ],
-        "explanation": "Explanation.",
+        "explanation": "345 x 20 = 6900, 345 x 7 = 2415. 6900 + 2415 = 9315.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "9215",
+          "9415",
+          "8315"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 1456 / 7? Give the answer with remainder if needed.",
+        "answer": "208",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "7 x 200 = 1400, then divide the rest"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1456 / 7 = 208. Check: 208 x 7 = 1456.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "207 r 5",
+          "209",
+          "206"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "A farmer packs 1248 eggs into boxes of 12. How many boxes?",
+        "answer": "104",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide: 1248 / 12"
         ],
-        "explanation": "Explanation.",
+        "explanation": "1248 / 12 = 104 boxes.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "100",
+          "124",
+          "108"
         ]
       }
     ],

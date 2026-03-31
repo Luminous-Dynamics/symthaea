@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is the area of a triangle with base 10 cm and height 6 cm?",
+        "answer": "30 square cm",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Area = 1/2 x base x height"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A = 1/2 x 10 x 6 = 30 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "60 square cm",
+          "16 square cm",
+          "36 square cm"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Find the volume of a triangular prism: base area 12 square cm, length 5 cm.",
+        "answer": "60 cubic cm",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "V = base area x length"
         ],
-        "explanation": "Explanation.",
+        "explanation": "V = 12 x 5 = 60 cubic cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "17 cubic cm",
+          "120 cubic cm",
+          "30 cubic cm"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 3.5 km to metres.",
+        "answer": "3500 m",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "1 km = 1000 m"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3.5 x 1000 = 3500 m.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "350 m",
+          "35 m",
+          "35000 m"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "A triangle has base 8 m and height 5 m. What is its area?",
+        "answer": "20 square m",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A = 1/2 x b x h"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A = 1/2 x 8 x 5 = 20 square m.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "40 square m",
+          "13 square m",
+          "25 square m"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 4500 g to kg.",
+        "answer": "4.5 kg",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "1 kg = 1000 g"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4500 / 1000 = 4.5 kg.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "45 kg",
+          "0.45 kg",
+          "450 kg"
         ]
       }
     ],

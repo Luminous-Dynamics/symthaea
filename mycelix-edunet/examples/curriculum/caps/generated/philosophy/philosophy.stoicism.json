@@ -1,0 +1,129 @@
+{
+  "node_id": "24.01",
+  "lesson": {
+    "standard_code": "24.01",
+    "title": "Stoic Philosophy: Seneca, Epictetus, Marcus Aurelius & Practical Wisdom",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Apply",
+    "explanation": "Stoicism is a practical philosophy founded in Athens (~300 BCE) that teaches resilience, virtue, and inner peace through rational self-mastery. Its core insight: we cannot control external events (health, wealth, others' actions), but we can control our responses (judgements, attitudes, actions). The dichotomy of control (Epictetus) divides all things into what is 'up to us' (our choices, values, responses) and what is 'not up to us' (outcomes, others' behaviour, natural events). The three great Roman Stoics — Seneca (statesman and playwright), Epictetus (former slave), and Marcus Aurelius (emperor) — demonstrated that Stoicism works across all stations of life. Virtue (wisdom, courage, justice, temperance) is the sole good; everything else is 'preferred' or 'dispreferred' but ultimately indifferent.",
+    "examples": [
+      {
+        "problem": "Apply the dichotomy of control to exam anxiety.",
+        "steps": [
+          {"instruction": "Step 1: Identify what is NOT up to you — the difficulty of the paper, the marking, other students' performance, the outcome.", "result": "External factors listed"},
+          {"instruction": "Step 2: Identify what IS up to you — your preparation, your effort, your attitude during the exam, how you respond to difficult questions.", "result": "Internal factors listed"},
+          {"instruction": "Step 3: Direct your energy only toward what you control. Prepare thoroughly (your choice), then release attachment to the outcome (not your choice).", "result": "Stoic response applied"}
+        ],
+        "answer": "Answer: Exam anxiety comes from trying to control outcomes (marks, results) that are not entirely up to us. The Stoic approach: prepare as well as you can (within your control), then accept whatever result follows with equanimity. This does not mean not caring — it means caring about the right things (effort, learning) rather than the wrong things (grades, comparison).",
+        "visual_description": null
+      },
+      {
+        "problem": "Interpret Marcus Aurelius' meditation: 'The impediment to action advances action. What stands in the way becomes the way.'",
+        "steps": [
+          {"instruction": "Step 1: Identify the paradox — obstacles are not just overcome; they become the path itself.", "result": "Paradox noted"},
+          {"instruction": "Step 2: Apply the Stoic framework — every obstacle is an opportunity to practise virtue (patience, courage, creativity, perseverance).", "result": "Virtue lens applied"},
+          {"instruction": "Step 3: Practical meaning — when you cannot change the situation, change your response. The obstacle trains you.", "result": "Practical application"}
+        ],
+        "answer": "Answer: Marcus argues that obstacles are not barriers to progress but the material of progress. A difficult teacher teaches you patience; a rejection teaches you resilience; poverty teaches you resourcefulness. The Stoic does not wait for obstacles to be removed — they use them as training grounds for virtue.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain Epictetus' statement: 'It is not things that disturb us, but our judgements about things.'",
+        "steps": [
+          {"instruction": "Step 1: The claim — events are neutral; our interpretation creates our emotional response.", "result": "Core thesis"},
+          {"instruction": "Step 2: Example — being stuck in traffic is a neutral event. One person judges it as infuriating (becomes angry), another judges it as an opportunity to listen to a podcast (remains calm). Same event, different responses.", "result": "Illustration given"},
+          {"instruction": "Step 3: Implication — by changing our judgements, we can change our emotional lives without changing external circumstances.", "result": "Therapeutic application"}
+        ],
+        "answer": "Answer: Epictetus argues that our emotions arise not from events themselves but from our interpretations of events. This is the foundation of cognitive behavioural therapy (CBT): by identifying and revising irrational judgements, we gain emotional freedom. The Stoic is not emotionless — they cultivate accurate judgements that produce appropriate responses.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the dichotomy of control and who articulated it most clearly?",
+        "answer": "The dichotomy of control (Epictetus, Enchiridion, opening passage) divides all things into two categories: things that are 'up to us' (our opinions, desires, aversions, actions) and things that are 'not up to us' (our body, reputation, property, outcomes). Freedom and happiness come from focusing only on what we control.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Epictetus was a former slave — his philosophy reflects surviving circumstances you cannot change.", "The opening of the Enchiridion: 'Some things are within our power, while others are not.'"],
+        "explanation": "This is the foundational principle of Stoic practice. Its power lies in its simplicity: stop trying to control the uncontrollable.",
+        "distractors": ["Marcus Aurelius invented the dichotomy.", "It means controlling everything.", "Epictetus rejected the concept."]
+      },
+      {
+        "question": "Name the four Stoic cardinal virtues and briefly define each.",
+        "answer": "(1) Wisdom (sophia) — the knowledge of what is truly good, bad, and indifferent. (2) Courage (andreia) — enduring hardship and facing fear in pursuit of what is right. (3) Justice (dikaiosyne) — treating others fairly and contributing to the common good. (4) Temperance (sophrosyne) — self-control, moderation, and discipline in desires.",
+        "difficulty_permille": 250,
+        "bloom_level": "Remember",
+        "hints": ["These four virtues come from Plato and were adopted by the Stoics.", "They correspond to: knowing the right thing, doing the right thing under pressure, doing the right thing for others, and restraining oneself from the wrong thing."],
+        "explanation": "For the Stoics, virtue is the only true good and vice the only true evil. Health, wealth, and reputation are 'preferred indifferents' — nice to have but not necessary for a good life.",
+        "distractors": ["The Stoics had only two virtues.", "Happiness is a Stoic virtue.", "The virtues change depending on circumstances."]
+      },
+      {
+        "question": "How does Stoicism relate to modern cognitive behavioural therapy (CBT)?",
+        "answer": "CBT was directly influenced by Stoicism, particularly Epictetus' insight that our judgements (not events) cause our disturbance. CBT teaches patients to identify automatic negative thoughts (cognitive distortions), evaluate their accuracy, and replace them with more rational interpretations — essentially the Stoic practice of examining and correcting judgements. Aaron Beck and Albert Ellis, founders of CBT and REBT, both cited Stoic philosophy as a primary inspiration.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Ellis explicitly named Epictetus as an influence on Rational Emotive Behaviour Therapy.", "Both Stoicism and CBT hold that changing your thinking changes your emotional experience."],
+        "explanation": "This connection shows that Stoicism is not merely ancient theory — its core psychological insight is clinically validated and used in modern therapy.",
+        "distractors": ["CBT has no connection to philosophy.", "Stoicism is anti-therapy because it suppresses emotions.", "Freud was influenced by Stoicism."]
+      },
+      {
+        "question": "Compare the lives of Seneca, Epictetus, and Marcus Aurelius. What does their diversity demonstrate about Stoicism?",
+        "answer": "Seneca was a wealthy Roman statesman and playwright who struggled with his own hypocrisy (preaching simplicity while living lavishly). Epictetus was born a slave, gained freedom, and taught philosophy in poverty. Marcus Aurelius was the most powerful person in the world as Roman Emperor, yet wrote private meditations about humility and impermanence. Their diversity demonstrates that Stoicism is universal: it works for the enslaved and the emperor, the rich and the poor.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["A slave, a statesman, and an emperor all practised the same philosophy.", "This is a powerful argument for Stoicism's universality."],
+        "explanation": "No other philosophy can claim practitioners from such extreme social positions, all finding the same core insights useful. This is evidence of Stoicism's substrate independence — its principles work regardless of external circumstances.",
+        "distractors": ["All three Stoics lived similar lives.", "Seneca was also a slave.", "Marcus Aurelius rejected Stoicism."]
+      },
+      {
+        "question": "The Stoics advocated premeditatio malorum (premeditation of evils). Explain this practice and why it is counterintuitive.",
+        "answer": "Premeditatio malorum is the deliberate mental rehearsal of worst-case scenarios: imagining losing your possessions, loved ones, health, or life. It is counterintuitive because it seems morbid and anxiety-inducing. But the Stoic purpose is the opposite: by regularly contemplating loss, you (1) build psychological resilience so that actual adversity does not devastate you, (2) cultivate gratitude for what you currently have, and (3) reduce the shock of inevitable misfortune.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["Modern equivalent: scenario planning and contingency preparation.", "Seneca: 'We suffer more in imagination than in reality' — but structured imagination reduces suffering."],
+        "explanation": "Research in psychology supports this: mental rehearsal of negative events reduces their emotional impact when they occur (exposure therapy uses a similar principle). The Stoics intuited what modern psychology has confirmed.",
+        "distractors": ["It means worrying constantly about the future.", "The practice increases anxiety.", "Only pessimists use this technique."]
+      }
+    ],
+    "hints": [
+      "Stoicism is practical philosophy — always ask 'how does this apply to my life?'",
+      "The dichotomy of control is the foundation: master this and the rest follows.",
+      "Stoics are not emotionless — they cultivate appropriate emotions based on accurate judgements."
+    ],
+    "key_vocabulary": [
+      {"term": "dichotomy of control", "definition": "The Stoic division of all things into what is 'up to us' (our judgements and choices) and 'not up to us' (external events and outcomes)", "example_usage": "The dichotomy of control freed Epictetus from despair during slavery."},
+      {"term": "amor fati", "definition": "Love of fate — the Stoic practice of embracing everything that happens, including suffering, as necessary and meaningful", "example_usage": "Amor fati does not mean passivity; it means accepting what you cannot change while acting on what you can."},
+      {"term": "premeditatio malorum", "definition": "The deliberate mental rehearsal of worst-case scenarios to build resilience, reduce shock, and cultivate gratitude", "example_usage": "Seneca practised premeditatio malorum each morning, imagining exile, poverty, and death."},
+      {"term": "preferred indifferent", "definition": "Something naturally desirable (health, wealth, reputation) that is not necessary for virtue or happiness — worth pursuing but not worth being disturbed by losing", "example_usage": "Health is a preferred indifferent: the Stoic prefers it but does not lose equanimity if it is taken away."},
+      {"term": "virtue (arete)", "definition": "Excellence of character, comprising wisdom, courage, justice, and temperance — the sole good in Stoic ethics", "example_usage": "For the Stoics, a virtuous person in prison is happier than a vicious person in a palace."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think Stoicism means suppressing emotions and being cold or unfeeling.",
+        "correction": "Stoicism does not suppress emotions — it cultivates appropriate emotions based on accurate judgements. The Stoics distinguished between patheia (irrational passions based on false judgements) and eupatheiai (healthy emotions based on true judgements, such as joy, reasonable caution, and rational wishing). Marcus Aurelius loved his family deeply; Seneca grieved openly. What Stoics reject is being enslaved by irrational reactions.",
+        "why_students_think_this": "The English word 'stoic' (lowercase) means 'enduring pain without complaint,' which is a caricature of the philosophical tradition. The popular image of the emotionless Stoic misrepresents a philosophy that actually aims for emotional wisdom, not emotional absence."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.94,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.93,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is the dichotomy of control?", "back": "The Stoic division between what is 'up to us' (judgements, choices, attitudes) and 'not up to us' (external events, outcomes, others' actions). Focus only on what you control.", "tags": ["24.01", "Philosophy", "Stoicism"], "difficulty_permille": 167},
+    {"front": "Name the three great Roman Stoics.", "back": "Seneca (statesman), Epictetus (former slave), and Marcus Aurelius (emperor). Their diversity proves Stoicism works across all stations of life.", "tags": ["24.01", "Philosophy", "Stoicism"], "difficulty_permille": 111},
+    {"front": "What are the four Stoic cardinal virtues?", "back": "Wisdom (knowing what is good), Courage (enduring hardship rightly), Justice (treating others fairly), Temperance (self-control and moderation).", "tags": ["24.01", "Philosophy", "Stoicism"], "difficulty_permille": 222},
+    {"front": "What is premeditatio malorum?", "back": "The Stoic practice of mentally rehearsing worst-case scenarios to build resilience, reduce shock, and cultivate gratitude for what you have.", "tags": ["24.01", "Philosophy", "Stoicism"], "difficulty_permille": 333},
+    {"front": "How does Stoicism connect to CBT?", "back": "CBT's core insight (our interpretations, not events, cause our distress) comes directly from Epictetus. Aaron Beck and Albert Ellis cited Stoicism as a primary influence.", "tags": ["24.01", "Philosophy", "Stoicism"], "difficulty_permille": 333}
+  ],
+  "quality": {
+    "coherence": 0.94,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

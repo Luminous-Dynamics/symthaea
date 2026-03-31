@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 34 + 25?",
+        "answer": "59",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add the ones: 4 + 5. Then the tens: 30 + 20"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4 + 5 = 9, 30 + 20 = 50, so 34 + 25 = 59.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "58",
+          "60",
+          "49"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 67 - 23?",
+        "answer": "44",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract ones: 7 - 3. Then tens: 60 - 20"
         ],
-        "explanation": "Explanation.",
+        "explanation": "7 - 3 = 4, 60 - 20 = 40, so 67 - 23 = 44.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "43",
+          "45",
+          "34"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 48 + 36?",
+        "answer": "84",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add ones first: 8 + 6 = 14. Carry the 1 ten"
         ],
-        "explanation": "Explanation.",
+        "explanation": "8 + 6 = 14 (write 4, carry 1). 4 + 3 + 1 = 8. Answer: 84.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "74",
+          "82",
+          "94"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "Thandi has 52 sweets. She gives away 27. How many are left?",
+        "answer": "25",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract: 52 - 27"
         ],
-        "explanation": "Explanation.",
+        "explanation": "52 - 27: borrow from 5 tens. 12 - 7 = 5, 4 - 2 = 2. Answer: 25.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "35",
+          "24",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "What is 45 + 38?",
+        "answer": "83",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add the ones, then carry to the tens"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 + 8 = 13 (write 3, carry 1). 4 + 3 + 1 = 8. Answer: 83.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "73",
+          "82",
+          "93"
         ]
       }
     ],

@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is (-3) x (-4)?",
+        "answer": "12",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Negative times negative = positive"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(-3) x (-4) = 12. Two negatives make a positive.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-12",
+          "-7",
+          "7"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is (-18) / 3?",
+        "answer": "-6",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Negative divided by positive = negative"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(-18) / 3 = -6.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6",
+          "-3",
+          "-9"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is (-5) + (-8)?",
+        "answer": "-13",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Adding two negatives: go further negative"
         ],
-        "explanation": "Explanation.",
+        "explanation": "(-5) + (-8) = -13.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-3",
+          "13",
+          "3"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is -2 x 3 x (-1)?",
+        "answer": "6",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply step by step, count negatives"
         ],
-        "explanation": "Explanation.",
+        "explanation": "-2 x 3 = -6, then -6 x (-1) = 6. Two negatives make positive.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-6",
+          "-5",
+          "1"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: -12 + 8 - 3 + 7",
+        "answer": "0",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add positives, add negatives, then combine"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Positives: 8 + 7 = 15. Negatives: -12 - 3 = -15. 15 + (-15) = 0.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "2",
+          "-2",
+          "10"
         ]
       }
     ],

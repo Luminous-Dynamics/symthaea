@@ -1,0 +1,129 @@
+{
+  "node_id": "24.01",
+  "lesson": {
+    "standard_code": "24.01",
+    "title": "Epistemology: Knowledge, Belief, Justification, Skepticism & Truth",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Epistemology is the study of knowledge itself: What can we know? How do we know it? What distinguishes knowledge from mere belief? The classical definition (from Plato's Theaetetus) holds that knowledge is justified true belief (JTB): you must believe something, it must be true, and you must have good reasons (justification) for believing it. Gettier (1963) challenged JTB with counterexamples where someone has justified true belief but still lacks knowledge — prompting decades of debate. Key positions include rationalism (knowledge through reason, Descartes), empiricism (knowledge through experience, Hume, Locke), and scepticism (questioning whether knowledge is possible at all).",
+    "examples": [
+      {
+        "problem": "Construct a Gettier case to show that justified true belief is not sufficient for knowledge.",
+        "steps": [
+          {"instruction": "Step 1: Set up a justified belief — Smith has strong evidence that Jones will get the job (the CEO told Smith so).", "result": "Justified belief established"},
+          {"instruction": "Step 2: Smith also knows Jones has ten coins in his pocket, so he believes 'The person who will get the job has ten coins in their pocket.'", "result": "Derived belief formed"},
+          {"instruction": "Step 3: Unbeknownst to Smith, HE gets the job — and he also happens to have ten coins in his pocket. His belief is true and justified, but by luck.", "result": "JTB present, knowledge absent"}
+        ],
+        "answer": "Answer: Smith has a justified true belief ('the person who will get the job has ten coins') but does not have knowledge because the belief is true by coincidence, not because of his justification. This shows JTB is necessary but not sufficient for knowledge.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain Descartes' method of doubt and the role of the cogito.",
+        "steps": [
+          {"instruction": "Step 1: Descartes sought an indubitable foundation for knowledge by systematically doubting everything that could possibly be false.", "result": "Method of doubt initiated"},
+          {"instruction": "Step 2: He doubted the senses (illusions exist), the external world (it could be a dream), and even mathematics (an evil demon could deceive him).", "result": "Radical doubt applied"},
+          {"instruction": "Step 3: The one thing he could not doubt: his own existence as a thinking being. 'Cogito, ergo sum' — I think, therefore I am.", "result": "Foundational certainty reached"}
+        ],
+        "answer": "Answer: Descartes used systematic doubt to strip away all uncertain beliefs until he reached an indubitable foundation: the act of doubting itself proves the doubter exists. 'Cogito, ergo sum' is the bedrock of Cartesian epistemology — even an evil demon cannot deceive a being that does not exist.",
+        "visual_description": null
+      },
+      {
+        "problem": "Compare rationalism and empiricism as sources of knowledge.",
+        "steps": [
+          {"instruction": "Step 1: Rationalism (Descartes, Leibniz, Spinoza) holds that reason is the primary source of knowledge. Some knowledge is innate or a priori (independent of experience).", "result": "Rationalism defined"},
+          {"instruction": "Step 2: Empiricism (Locke, Hume, Berkeley) holds that experience (sensory perception) is the primary source of knowledge. The mind starts as a 'tabula rasa' (blank slate).", "result": "Empiricism defined"},
+          {"instruction": "Step 3: Kant synthesised both: the mind has innate structures (categories) that organise sensory experience. Neither pure reason nor pure experience alone is sufficient.", "result": "Kantian synthesis"}
+        ],
+        "answer": "Answer: Rationalism grounds knowledge in reason (a priori); empiricism grounds it in experience (a posteriori). Kant argued that both contribute: the mind imposes structure (rationalism) on sensory data (empiricism), creating knowledge that is neither purely innate nor purely experiential.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "State the three conditions of the classical (JTB) definition of knowledge.",
+        "answer": "S knows that P if and only if: (1) P is true, (2) S believes that P, and (3) S is justified in believing that P. All three conditions are necessary; together they are traditionally held to be sufficient (though Gettier challenged sufficiency).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["JTB = Justified True Belief.", "Each condition rules out something: truth rules out false beliefs, belief rules out lucky guesses, justification rules out ungrounded beliefs."],
+        "explanation": "The JTB account has been central to epistemology since Plato. Gettier showed that these three conditions, while necessary, may not be sufficient.",
+        "distractors": ["Knowledge only requires belief and truth.", "Justification is optional for knowledge.", "Knowledge is just true belief."]
+      },
+      {
+        "question": "What is the difference between a priori and a posteriori knowledge? Give one example of each.",
+        "answer": "A priori knowledge is knowable independent of experience (e.g., '2 + 2 = 4' — you do not need to observe anything to know this). A posteriori knowledge depends on experience (e.g., 'water boils at 100 degrees Celsius' — you must observe or test this).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["A priori = before experience (from reason alone). A posteriori = after experience (from observation).", "Mathematical truths are paradigmatically a priori."],
+        "explanation": "This distinction, central since Kant, separates knowledge we can gain through pure thought from knowledge requiring empirical investigation.",
+        "distractors": ["A priori means something is more important.", "A posteriori knowledge is always uncertain.", "All knowledge is a posteriori."]
+      },
+      {
+        "question": "Explain Hume's problem of induction.",
+        "answer": "Hume argued that inductive reasoning (inferring general laws from particular observations) cannot be rationally justified. Just because the sun has risen every day so far does not logically guarantee it will rise tomorrow. Our expectation is based on habit and custom, not logical necessity. We cannot use induction to justify induction without circular reasoning.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Induction goes from specific observations to general conclusions.", "Hume asks: what justifies our belief that the future will resemble the past?"],
+        "explanation": "The problem of induction remains unsolved. Karl Popper's response (falsificationism) sidesteps the problem: science does not prove theories true, it attempts to prove them false.",
+        "distractors": ["Hume solved the problem of induction.", "Induction is the same as deduction.", "The problem only applies to science, not everyday life."]
+      },
+      {
+        "question": "What is scepticism and what is the strongest argument in its favour?",
+        "answer": "Scepticism is the philosophical position that knowledge is impossible or extremely limited. The strongest argument is the brain-in-a-vat (or Cartesian demon) scenario: you cannot prove you are not a brain being fed simulated experiences, because any evidence you gather could itself be simulated. Since you cannot rule this out, you cannot be certain of anything about the external world.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Think about Descartes' evil demon or The Matrix.", "The key insight: any evidence against scepticism could itself be part of the deception."],
+        "explanation": "Most philosophers do not accept radical scepticism but acknowledge that it reveals important limits on certainty. Responses include Moore's common sense, Wittgenstein's hinge propositions, and externalist epistemology.",
+        "distractors": ["Scepticism means doubting everything all the time.", "Scepticism was refuted by Descartes.", "Sceptics cannot function in daily life."]
+      },
+      {
+        "question": "Explain the concept of epistemic justification and distinguish between internalism and externalism.",
+        "answer": "Epistemic justification is what makes a belief more than a lucky guess — it is the 'good reasons' component of knowledge. Internalism holds that justification depends on factors internal to the believer's mind (evidence, reasoning they can access). Externalism holds that justification can depend on factors external to the believer's awareness (e.g., reliable processes that produce true beliefs, even if the believer cannot articulate why).",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": ["Internalism: justification comes from what you can reflect on. Externalism: justification comes from reliable processes.", "A dog might have externally justified beliefs (reliable perception) without internal reflection."],
+        "explanation": "This debate matters practically: should we trust beliefs produced by reliable but opaque AI systems? Externalists would say yes (if the process is reliable); internalists would say no (if the human cannot access the reasoning).",
+        "distractors": ["Internalism and externalism agree on everything.", "Only internalism counts as real justification.", "Externalism denies the importance of evidence."]
+      }
+    ],
+    "hints": [
+      "Epistemology asks: What can we know, how do we know it, and what justifies our beliefs?",
+      "The JTB definition is the starting point — Gettier cases show why it needs refinement.",
+      "Always connect abstract epistemological concepts to concrete examples."
+    ],
+    "key_vocabulary": [
+      {"term": "justified true belief", "definition": "The classical definition of knowledge: a belief that is true and supported by adequate evidence or reasons", "example_usage": "Gettier showed that justified true belief is necessary but not sufficient for knowledge."},
+      {"term": "a priori", "definition": "Knowledge or justification that is independent of sensory experience, derivable through reason alone", "example_usage": "Mathematical truths like 2+2=4 are a priori."},
+      {"term": "empiricism", "definition": "The epistemological position that knowledge comes primarily from sensory experience", "example_usage": "Locke's empiricism held that the mind begins as a blank slate."},
+      {"term": "scepticism", "definition": "The philosophical position that certain knowledge is impossible or that our claims to knowledge are unjustified", "example_usage": "Descartes used scepticism as a method to find indubitable knowledge."},
+      {"term": "cogito ergo sum", "definition": "Descartes' foundational principle: 'I think, therefore I am' — the act of thinking proves the thinker's existence", "example_usage": "The cogito survived every sceptical challenge Descartes could construct."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think that epistemological scepticism means refusing to believe anything in daily life.",
+        "correction": "Philosophical scepticism is a theoretical position about the limits of certainty, not a practical guide to living. Even Hume, history's greatest sceptic, acknowledged that when he left his study, nature compelled him to eat, drink, and act on ordinary beliefs. Scepticism is a tool for understanding the foundations of knowledge, not a lifestyle.",
+        "why_students_think_this": "The word 'sceptic' in everyday language means 'someone who doubts things.' Philosophical scepticism is more precise: it questions whether we can achieve absolute certainty, which is different from refusing to act on reasonable beliefs."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is the JTB definition of knowledge?", "back": "Knowledge is Justified True Belief: S knows P if P is true, S believes P, and S has justification for believing P.", "tags": ["24.01", "Philosophy", "Epistemology"], "difficulty_permille": 222},
+    {"front": "What did Gettier show?", "back": "That justified true belief is not sufficient for knowledge. A person can have JTB by luck/coincidence without genuinely knowing.", "tags": ["24.01", "Philosophy", "Epistemology"], "difficulty_permille": 333},
+    {"front": "What is cogito ergo sum?", "back": "Descartes' foundational principle: 'I think, therefore I am.' The act of doubting proves the existence of the doubter.", "tags": ["24.01", "Philosophy", "Epistemology"], "difficulty_permille": 167},
+    {"front": "Compare rationalism and empiricism.", "back": "Rationalism: knowledge primarily from reason (a priori). Empiricism: knowledge primarily from experience (a posteriori). Kant synthesised both.", "tags": ["24.01", "Philosophy", "Epistemology"], "difficulty_permille": 333},
+    {"front": "What is Hume's problem of induction?", "back": "We cannot rationally justify the inference from past observations to future expectations. That the sun rose every previous day does not logically guarantee it will rise tomorrow.", "tags": ["24.01", "Philosophy", "Epistemology"], "difficulty_permille": 444}
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

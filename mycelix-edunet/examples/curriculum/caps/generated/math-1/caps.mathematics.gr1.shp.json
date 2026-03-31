@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "How many sides does a triangle have?",
+        "answer": "3",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "The name 'triangle' gives a clue: tri = three"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A triangle has 3 sides.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "2",
+          "5"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "What shape has 4 equal sides and 4 corners?",
+        "answer": "Square",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "All sides are the same length"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A square has 4 equal sides and 4 corners.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Rectangle",
+          "Triangle",
+          "Circle"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "How many corners does a circle have?",
+        "answer": "0",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A circle is perfectly round"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A circle has no corners because it is round.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1",
+          "2",
+          "4"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Which shape has more sides: a rectangle or a triangle?",
+        "answer": "Rectangle",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count the sides of each shape"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A rectangle has 4 sides, a triangle has 3. 4 is more than 3.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Triangle",
+          "They are equal",
+          "Circle"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Name a shape you can see on the face of a dice.",
+        "answer": "Square",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at one flat face of a dice"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Each face of a dice is a square shape.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Circle",
+          "Triangle",
+          "Star"
         ]
       }
     ],

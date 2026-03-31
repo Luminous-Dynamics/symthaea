@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 3.45 x 10?",
+        "answer": "34.5",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Move the decimal point one place right"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3.45 x 10 = 34.5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "345",
+          "0.345",
+          "3450"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 67.8 / 100?",
+        "answer": "0.678",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Move the decimal point two places left"
         ],
-        "explanation": "Explanation.",
+        "explanation": "67.8 / 100 = 0.678.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6.78",
+          "6780",
+          "0.0678"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Write 0.125 as a fraction in simplest form.",
+        "answer": "1/8",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "0.125 = 125/1000, then simplify"
         ],
-        "explanation": "Explanation.",
+        "explanation": "125/1000 = 1/8 (divide both by 125).",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1/4",
+          "1/5",
+          "125/100"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "What is 2.5 x 1000?",
+        "answer": "2500",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Move the decimal point three places right"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2.5 x 1000 = 2500.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "250",
+          "25000",
+          "25"
         ]
       },
       {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
+        "question": "Round 3.456 to one decimal place.",
+        "answer": "3.5",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Look at the second decimal digit: 5 means round up"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The second decimal place is 5, so round up: 3.5.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 5 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3.4",
+          "3.46",
+          "4.0"
         ]
       }
     ],

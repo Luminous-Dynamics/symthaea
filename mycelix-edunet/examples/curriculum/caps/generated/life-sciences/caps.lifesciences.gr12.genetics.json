@@ -1,0 +1,319 @@
+{
+  "node_id": "CAPS.LifeSciences.Gr12.GENETICS",
+  "lesson": {
+    "standard_code": "CAPS.LifeSciences.Gr12.GENETICS",
+    "title": "Genetics and Inheritance: Meiosis, Punnett Squares, Sex-Linked Traits, and Blood Groups (40 marks)",
+    "grade_level": "Grade12",
+    "bloom_level": "Understand",
+    "explanation": "Meiosis is a type of cell division that produces four genetically unique haploid gametes (sex cells) from one diploid cell, halving the chromosome number. It involves two divisions (meiosis I separates homologous chromosomes; meiosis II separates chromatids) and introduces genetic variation through crossing over and independent assortment. Mendelian genetics uses Punnett squares to predict offspring ratios. Key concepts: dominant/recessive alleles, homozygous/heterozygous, genotype/phenotype. Incomplete dominance (e.g. snapdragons: red x white = pink) and co-dominance (e.g. ABO blood groups: IA and IB are co-dominant) extend Mendel's laws. Sex-linked traits are carried on the X chromosome (e.g. haemophilia, colour blindness) — males are more affected because they have only one X.",
+    "examples": [
+      {
+        "problem": "A heterozygous tall pea plant (Tt) is crossed with a homozygous short plant (tt). Draw a Punnett square and determine the phenotypic ratio of the offspring.",
+        "steps": [
+          {
+            "instruction": "Step 1: Parent genotypes — Tt (tall) x tt (short). Gametes: T and t from the tall parent; t and t from the short parent.",
+            "result": "gametes identified"
+          },
+          {
+            "instruction": "Step 2: Punnett square: T×t=Tt, T×t=Tt, t×t=tt, t×t=tt.",
+            "result": "cross completed"
+          },
+          {
+            "instruction": "Step 3: Genotypic ratio: 2 Tt : 2 tt = 1 Tt : 1 tt. Phenotypic ratio: 2 tall : 2 short = 1 tall : 1 short.",
+            "result": "ratios determined"
+          }
+        ],
+        "answer": "Answer: Phenotypic ratio = 1 tall : 1 short (50% tall, 50% short). This is a test cross pattern.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how the ABO blood group system demonstrates co-dominance and multiple alleles.",
+        "steps": [
+          {
+            "instruction": "Step 1: The ABO system has THREE alleles: IA, IB, and i. IA and IB are co-dominant (both expressed when present together); both are dominant over i (recessive).",
+            "result": "multiple alleles"
+          },
+          {
+            "instruction": "Step 2: Genotypes and phenotypes: IAIA or IAi = Type A. IBIB or IBi = Type B. IAIB = Type AB (co-dominance — both A and B antigens expressed). ii = Type O.",
+            "result": "co-dominance explained"
+          },
+          {
+            "instruction": "Step 3: Example cross: Type A (IAi) x Type B (IBi). Punnett square: IAIB (AB), IAi (A), IBi (B), ii (O). Ratio = 1 AB : 1 A : 1 B : 1 O.",
+            "result": "cross performed"
+          }
+        ],
+        "answer": "Answer: ABO shows co-dominance (IAIB = Type AB, both antigens present) and multiple alleles (3 alleles: IA, IB, i). Cross IAi x IBi gives 1 AB : 1 A : 1 B : 1 O.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why haemophilia is more common in males than females, using a genetic cross.",
+        "steps": [
+          {
+            "instruction": "Step 1: Haemophilia is X-linked recessive. The allele is carried on the X chromosome. Males have XY (only one X), females have XX (two X chromosomes).",
+            "result": "sex-linked inheritance"
+          },
+          {
+            "instruction": "Step 2: A carrier female (XHXh) crossed with a normal male (XHY). Punnett square: XHXH (normal female), XHXh (carrier female), XHY (normal male), XhY (haemophiliac male).",
+            "result": "cross performed"
+          },
+          {
+            "instruction": "Step 3: Males only need ONE copy of the recessive allele (Xh) to be affected because the Y chromosome has no corresponding allele. Females need TWO copies (XhXh) to be affected — they can be carriers (XHXh) without symptoms.",
+            "result": "male vulnerability explained"
+          }
+        ],
+        "answer": "Answer: Males are more affected because they have only one X chromosome — one recessive allele (XhY) causes the disease. Females need two copies (XhXh), so they are usually carriers.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the following terms: allele, genotype, phenotype, homozygous, heterozygous.",
+        "answer": "Allele: an alternative form of a gene (e.g. T for tall, t for short). Genotype: the genetic makeup (combination of alleles, e.g. Tt). Phenotype: the observable characteristic (e.g. tall). Homozygous: two identical alleles (TT or tt). Heterozygous: two different alleles (Tt).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Geno = genes (internal). Pheno = physical appearance (external).",
+          "Homo = same, hetero = different."
+        ],
+        "explanation": "These are foundational genetics terms. The genotype determines the phenotype: homozygous dominant (TT) and heterozygous (Tt) both show the dominant phenotype if dominance is complete.",
+        "distractors": [
+          "Genotype is the physical appearance of an organism",
+          "Heterozygous means having two identical alleles",
+          "An allele is the same as a gene"
+        ]
+      },
+      {
+        "question": "In guinea pigs, black fur (B) is dominant over white fur (b). Two heterozygous black guinea pigs are crossed. Determine the expected genotypic and phenotypic ratios.",
+        "answer": "Parents: Bb x Bb. Punnett square: BB, Bb, Bb, bb. Genotypic ratio: 1 BB : 2 Bb : 1 bb. Phenotypic ratio: 3 black : 1 white (75% black, 25% white).",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Draw the Punnett square with B and b gametes from each parent.",
+          "The classic 3:1 ratio comes from a monohybrid cross between two heterozygotes."
+        ],
+        "explanation": "A monohybrid cross (Bb x Bb) gives the classic Mendelian 3:1 phenotypic ratio. The 1:2:1 genotypic ratio (BB:Bb:bb) underlies this.",
+        "distractors": [
+          "Phenotypic ratio is 1:1 (half black, half white)",
+          "All offspring are black because black is dominant",
+          "Genotypic ratio is 1:3 (BB:Bb)"
+        ]
+      },
+      {
+        "question": "In snapdragons, red flowers (RR) crossed with white flowers (WW) produce pink flowers (RW). This is incomplete dominance. If two pink snapdragons are crossed, what are the expected phenotypic ratios?",
+        "answer": "Parents: RW x RW. Punnett square: RR (red), RW (pink), RW (pink), WW (white). Phenotypic ratio: 1 red : 2 pink : 1 white. This differs from complete dominance because the heterozygote shows a blended/intermediate phenotype.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "In incomplete dominance, the heterozygote is DIFFERENT from both homozygotes.",
+          "The genotypic and phenotypic ratios are the SAME (1:2:1) because each genotype has a unique phenotype."
+        ],
+        "explanation": "Incomplete dominance: neither allele is fully dominant. RW = intermediate phenotype (pink). The 1:2:1 ratio differs from the 3:1 complete dominance ratio because heterozygotes are distinguishable.",
+        "distractors": [
+          "3:1 red to white (no pink flowers)",
+          "All offspring are pink",
+          "1:1 red to white"
+        ]
+      },
+      {
+        "question": "A colour-blind man (XcY) marries a woman who is a carrier for colour blindness (XCXc). Determine the probability that their son will be colour-blind. [NSC-style question]",
+        "answer": "Cross: XCXc x XcY. Punnett square: XCXc (carrier daughter), XCY (normal son), XcXc (colour-blind daughter), XcY (colour-blind son). Probability of a son being colour-blind: 1/2 of sons = 50%. Overall probability of any child being a colour-blind son: 1/4 = 25%.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Write out the X and Y chromosomes with their alleles carefully.",
+          "Separate the question: probability of being male AND having the allele."
+        ],
+        "explanation": "For sex-linked traits, track the X chromosomes carefully. Sons get their X from mother only (Y from father). If mother is XCXc, half her sons get Xc (colour-blind) and half get XC (normal).",
+        "distractors": [
+          "All sons will be colour-blind",
+          "No sons will be colour-blind because the father is affected",
+          "25% of sons will be colour-blind"
+        ]
+      },
+      {
+        "question": "A paternity dispute arises in a South African court. The mother has blood type A (genotype IAi), and the child has blood type O (genotype ii). Man 1 has blood type AB (IAIB) and Man 2 has blood type B (IBi). Which man could be the father? Show your working using Punnett squares. [NSC-style 8-mark question]",
+        "answer": "Man 1 (IAIB) x Mother (IAi): Possible offspring: IAIA (A), IAi (A), IAIB (AB), IBi (B). NO Type O possible. Man 1 CANNOT be the father. Man 2 (IBi) x Mother (IAi): Possible offspring: IAIB (AB), IAi (A), IBi (B), ii (O). Type O IS possible. Man 2 COULD be the father. The child's genotype ii requires one i from each parent. Man 1 (IAIB) has no i allele to contribute, ruling him out. Man 2 (IBi) has an i allele and could contribute it.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "The child is type O (ii) — each parent must contribute one 'i' allele.",
+          "Check whether each man has an 'i' allele to give."
+        ],
+        "explanation": "ABO blood groups are used in paternity testing because the alleles follow strict inheritance rules. Type O (ii) requires both parents to carry at least one i allele. Man 1 (IAIB) has no i allele.",
+        "distractors": [
+          "Man 1 could be the father because he has type A like the mother",
+          "Neither man could be the father",
+          "Both men could be the father"
+        ]
+      }
+    ],
+    "hints": [
+      "Meiosis produces FOUR genetically DIFFERENT haploid cells (gametes). Mitosis produces TWO identical diploid cells.",
+      "Sex-linked traits: use XH and Xh notation. Males have only one X, so one recessive allele = affected.",
+      "ABO blood groups: IA and IB are CO-DOMINANT; both are DOMINANT over i. IAIB = type AB."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "meiosis",
+        "definition": "Cell division producing four genetically unique haploid gametes from one diploid cell, involving two divisions and crossing over",
+        "example_usage": "Meiosis in the testes produces sperm cells with 23 chromosomes each."
+      },
+      {
+        "term": "crossing over",
+        "definition": "The exchange of genetic material between homologous chromosomes during meiosis I, increasing genetic variation",
+        "example_usage": "Crossing over produces recombinant chromosomes with new combinations of alleles."
+      },
+      {
+        "term": "co-dominance",
+        "definition": "A pattern of inheritance where both alleles are fully expressed in the heterozygote",
+        "example_usage": "In ABO blood groups, IAIB individuals have both A and B antigens (type AB blood)."
+      },
+      {
+        "term": "sex-linked trait",
+        "definition": "A trait determined by a gene located on the X chromosome; males are more commonly affected because they have only one X",
+        "example_usage": "Colour blindness is sex-linked — about 8% of South African males are affected compared to <1% of females."
+      },
+      {
+        "term": "Punnett square",
+        "definition": "A diagram used to predict the genotypic and phenotypic ratios of offspring from a genetic cross",
+        "example_usage": "Using a Punnett square, we predict that Bb x Bb gives a 3:1 phenotypic ratio."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think dominant alleles are always more common in a population than recessive alleles.",
+        "correction": "Dominant/recessive describes how alleles interact in a heterozygote, NOT their frequency. The recessive allele for blood type O (i) is actually the most common allele globally.",
+        "why_students_think_this": "The word 'dominant' implies 'winning' or 'more powerful', suggesting it should be more common. Emphasise: dominance = expression pattern, not population frequency."
+      },
+      {
+        "misconception": "Students think sex-linked traits can be passed from father to son.",
+        "correction": "X-linked traits pass from father to DAUGHTERS only (the father gives his X to daughters, Y to sons). A son gets his X chromosome from his MOTHER. A colour-blind father cannot have a colour-blind son unless the mother is at least a carrier.",
+        "why_students_think_this": "Students think traits pass from father to son ('like father, like son'). Track the X and Y chromosomes carefully in every cross to see this is impossible for X-linked traits."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeSciences.Gr12.GENETICS",
+    "title": "Assessment: Genetics and Inheritance (NSC exam format, 40 marks)",
+    "items": [
+      {
+        "question": "State two ways in which meiosis differs from mitosis.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "1) Meiosis produces 4 haploid cells; mitosis produces 2 diploid cells. 2) Meiosis involves crossing over and independent assortment (genetic variation); mitosis produces identical cells.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Compare: number of divisions, number of daughter cells, ploidy, genetic variation."
+      },
+      {
+        "question": "Explain how crossing over during meiosis I increases genetic variation.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "During meiosis I, homologous chromosomes pair up (synapsis). Non-sister chromatids exchange genetic material at points called chiasmata. This produces recombinant chromosomes with new combinations of alleles not found in either parent.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "What is exchanged? Between which structures?"
+      },
+      {
+        "question": "A woman with blood type A (IAi) and a man with blood type B (IBi) have children. Draw a Punnett square and determine the possible blood types of their children.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "IAIB (AB), IAi (A), IBi (B), ii (O). Possible blood types: A, B, AB, or O in a 1:1:1:1 ratio.",
+        "points": 4,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Each parent contributes one allele. What combinations are possible?"
+      },
+      {
+        "question": "Analyse why sex-linked recessive disorders like haemophilia affect males more frequently than females.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Males (XY) have only one X chromosome. One recessive allele on that X (XhY) is expressed because there is no second X to carry a dominant allele. Females (XX) need two recessive alleles (XhXh) to be affected; with one (XHXh), the dominant allele masks the recessive, making them carriers.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Males have no 'backup' X chromosome to mask a recessive allele."
+      },
+      {
+        "question": "Evaluate whether it is possible for two parents with blood type A to have a child with blood type O. Justify your answer.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Yes, if both parents are heterozygous (IAi). Cross: IAi x IAi → IAIA (A), IAi (A), IAi (A), ii (O). There is a 25% chance of a type O child. Both parents carry the recessive i allele, and the child inherits i from each.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Can type A parents carry a recessive i allele?"
+      }
+    ],
+    "total_points": 17,
+    "estimated_minutes": 22,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "How many cells does meiosis produce, and are they identical?",
+      "back": "FOUR genetically UNIQUE haploid cells (gametes). Compare: mitosis produces TWO identical diploid cells.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 111
+    },
+    {
+      "front": "What is crossing over?",
+      "back": "Exchange of genetic material between homologous chromosomes during meiosis I, producing recombinant chromosomes with new allele combinations.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 222
+    },
+    {
+      "front": "What is co-dominance?",
+      "back": "Both alleles are fully expressed in the heterozygote. Example: IAIB = Type AB blood (both A and B antigens present).",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 333
+    },
+    {
+      "front": "What are the ABO blood group genotypes?",
+      "back": "Type A: IAIA or IAi. Type B: IBIB or IBi. Type AB: IAIB. Type O: ii.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 444
+    },
+    {
+      "front": "Why are males more affected by sex-linked disorders?",
+      "back": "Males have only one X chromosome (XY). One recessive allele on X is expressed because the Y has no matching gene. Females (XX) need two copies to be affected.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 555
+    },
+    {
+      "front": "What is incomplete dominance?",
+      "back": "The heterozygote shows an intermediate phenotype between two homozygotes. Example: red (RR) x white (WW) = pink (RW) in snapdragons.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 666
+    },
+    {
+      "front": "What phenotypic ratio does a monohybrid cross (Bb x Bb) produce?",
+      "back": "3:1 (three dominant phenotype : one recessive phenotype). Genotypic ratio: 1 BB : 2 Bb : 1 bb.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 777
+    },
+    {
+      "front": "Can a father pass an X-linked trait to his son?",
+      "back": "No. Fathers give their Y chromosome to sons (and X to daughters). Sons inherit their X from their MOTHER.",
+      "tags": ["CAPS.LifeSciences.Gr12.GENETICS", "Grade12", "Genetics"],
+      "difficulty_permille": 888
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T14:00:00"
+}

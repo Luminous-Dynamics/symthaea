@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "How many sides does a quadrilateral have?",
+        "answer": "4",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "'Quad' means four"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A quadrilateral is any shape with 4 sides.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "5",
+          "6"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What type of triangle has all sides equal?",
+        "answer": "Equilateral",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "'Equi' means equal, 'lateral' means sides"
         ],
-        "explanation": "Explanation.",
+        "explanation": "An equilateral triangle has 3 equal sides and 3 equal angles.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Isosceles",
+          "Scalene",
+          "Right-angled"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "A triangle has sides of 3 cm, 4 cm, and 5 cm. What type is it?",
+        "answer": "Scalene",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "All three sides have different lengths"
         ],
-        "explanation": "Explanation.",
+        "explanation": "All sides are different lengths, so it is a scalene triangle.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Equilateral",
+          "Isosceles",
+          "Right-angled"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "What is the difference between a square and a rectangle?",
+        "answer": "A square has all sides equal; a rectangle has opposite sides equal",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Think about the side lengths"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Both have 4 right angles, but a square has 4 equal sides while a rectangle only needs opposite sides equal.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "They are the same",
+          "A rectangle has no right angles",
+          "A square has 5 sides"
         ]
       },
       {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
+        "question": "A parallelogram has one angle of 60 degrees. What is the opposite angle?",
+        "answer": "60 degrees",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Opposite angles in a parallelogram are equal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "In a parallelogram, opposite angles are equal. So the opposite angle is also 60 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 4 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "120 degrees",
+          "90 degrees",
+          "30 degrees"
         ]
       }
     ],

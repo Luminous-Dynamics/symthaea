@@ -1,0 +1,128 @@
+{
+  "node_id": "CAPS.English.Gr12.LITERATURE",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.LITERATURE",
+    "title": "Literature Study: Novel, Poetry & Drama Analysis",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Literature study at Gr12 requires you to analyse novels, poetry, and drama with depth. For novels, examine plot structure, character development (round vs flat, static vs dynamic), setting (physical and social), themes, narrative perspective, and the writer's style. For drama, add stage directions, dramatic irony, soliloquy, and dialogue analysis. For all genres, identify figurative language (metaphor, simile, personification, hyperbole), symbolism, irony (verbal, situational, dramatic), and the writer's purpose. Always connect textual evidence to your interpretation using the PEE method: Point, Evidence, Explanation.",
+    "examples": [
+      {
+        "problem": "Explain how the setting of a novel can reflect its themes, using a South African example.",
+        "steps": [
+          {"instruction": "Step 1: Define setting — time, place, social environment, atmosphere.", "result": "Setting defined"},
+          {"instruction": "Step 2: Show how physical setting mirrors theme — e.g., in Tsotsi by Athol Fugard, the township setting reflects themes of poverty, violence, and redemption.", "result": "Connection established"},
+          {"instruction": "Step 3: Note how social setting reinforces theme — apartheid-era or post-apartheid inequality shapes characters' choices.", "result": "Social context linked"}
+        ],
+        "answer": "Answer: In Tsotsi, the Sophiatown township setting — with its shacks, shebeens, and dangerous streets — physically embodies the themes of poverty and moral decay. The cramped, violent environment both explains Tsotsi's criminal behaviour and makes his eventual transformation toward compassion more powerful by contrast.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify and explain the type of irony: In a play, the audience knows the letter contains a death threat, but the character opens it cheerfully, expecting birthday wishes.",
+        "steps": [
+          {"instruction": "Step 1: Determine what the audience knows vs what the character knows.", "result": "Knowledge gap identified"},
+          {"instruction": "Step 2: The audience knows more than the character — this is dramatic irony.", "result": "Type classified"},
+          {"instruction": "Step 3: Explain the effect — tension, suspense, and emotional engagement as the audience anticipates the character's reaction.", "result": "Effect analysed"}
+        ],
+        "answer": "Answer: This is dramatic irony — the audience possesses knowledge (the death threat) that the character lacks. This creates suspense and dread as we watch the character's misplaced cheerfulness, knowing the truth will devastate them.",
+        "visual_description": null
+      },
+      {
+        "problem": "Using the PEE method, explain how a writer uses a metaphor to develop a character.",
+        "steps": [
+          {"instruction": "Step 1: POINT — State what the metaphor reveals about the character.", "result": "Point made"},
+          {"instruction": "Step 2: EVIDENCE — Quote the metaphor directly from the text.", "result": "Evidence provided"},
+          {"instruction": "Step 3: EXPLANATION — Explain how the metaphor creates meaning and what it suggests about the character's inner life.", "result": "Analysis given"}
+        ],
+        "answer": "Answer: POINT: The metaphor reveals the character's emotional isolation. EVIDENCE: 'She was an island, surrounded by noise but untouched by any wave of warmth.' EXPLANATION: By comparing her to an island, the writer suggests she is physically present among people but emotionally unreachable — the 'waves of warmth' that cannot touch her imply that love and connection exist around her but cannot penetrate her defences.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the following terms: protagonist, antagonist, foil character.",
+        "answer": "Protagonist: the main character whose journey drives the story. Antagonist: the character or force that opposes the protagonist. Foil character: a character whose contrasting qualities highlight specific traits of the protagonist (e.g., Banquo as a foil to Macbeth).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["'Pro-' means for/forward; 'anti-' means against.", "A foil is like a mirror that shows differences."],
+        "explanation": "These terms help you discuss character relationships and their narrative functions in essays.",
+        "distractors": ["The protagonist is always the hero.", "The antagonist must be a villain.", "A foil character is the protagonist's best friend."]
+      },
+      {
+        "question": "Explain the difference between a static and a dynamic character, with an example of each.",
+        "answer": "A static character remains unchanged throughout the story (e.g., a loyal sidekick who stays loyal from start to finish). A dynamic character undergoes significant internal change (e.g., Tsotsi transforming from a heartless gangster to someone capable of compassion).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Dynamic = change; static = no change.", "Think about the character at the beginning vs the end of the story."],
+        "explanation": "Dynamic characters drive thematic development — their transformation embodies the story's message about human nature.",
+        "distractors": ["Static means boring and dynamic means exciting.", "All main characters are dynamic.", "Static characters only appear in comedies."]
+      },
+      {
+        "question": "Identify the figurative language in 'The wind whispered secrets through the jacaranda trees' and explain its effect.",
+        "answer": "Personification — the wind is given the human ability to 'whisper secrets.' This creates an intimate, mysterious atmosphere and suggests the natural world holds hidden knowledge, perhaps foreshadowing a revelation.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Which human quality is given to a non-human thing?", "Consider both the technique and its emotional/atmospheric effect."],
+        "explanation": "Personification makes abstract or natural forces relatable and emotionally resonant. It often creates atmosphere or foreshadows events.",
+        "distractors": ["This is a simile because the wind is compared to a person.", "This is a metaphor because the wind is called a person.", "This is onomatopoeia because 'whispered' sounds like whispering."]
+      },
+      {
+        "question": "Why are stage directions important in drama study? Give two reasons.",
+        "answer": "(1) Stage directions reveal characters' emotions and intentions that dialogue alone may not convey (e.g., '[clenching fists]' shows suppressed anger). (2) They create atmosphere and context for the scene (e.g., '[dim lighting, a single chair centre stage]' suggests isolation or interrogation).",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Stage directions tell actors HOW to perform — what does this reveal to readers?", "Consider what would be lost if we only had the dialogue."],
+        "explanation": "Stage directions are the playwright's voice — in a genre where the writer cannot narrate, they guide interpretation of tone, mood, and subtext.",
+        "distractors": ["Stage directions are only for actors, not for literary analysis.", "Stage directions always describe the set, never the characters.", "Stage directions are optional additions by the director."]
+      },
+      {
+        "question": "Analyse how verbal irony differs from sarcasm, providing an example of each.",
+        "answer": "Verbal irony is saying the opposite of what is meant (e.g., saying 'What lovely weather!' during a storm). Sarcasm is a form of verbal irony with a mocking or contemptuous tone intended to hurt or ridicule (e.g., 'Oh brilliant, you've broken another glass — what a talent!'). All sarcasm is verbal irony, but not all verbal irony is sarcasm.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["Sarcasm has a biting, personal edge — it targets someone.", "Verbal irony can be gentle, humorous, or neutral in tone."],
+        "explanation": "The distinction matters in literature: verbal irony often creates humour or highlights absurdity, while sarcasm reveals character traits like bitterness or defensiveness.",
+        "distractors": ["They are exactly the same thing.", "Sarcasm is physical and verbal irony is written.", "Verbal irony is always funny."]
+      }
+    ],
+    "hints": [
+      "Use the PEE method in every literature answer: Point, Evidence (quote), Explanation.",
+      "For character analysis, track how the character changes from beginning to end.",
+      "Always consider WHY the writer uses a particular technique — what effect does it create on the reader?"
+    ],
+    "key_vocabulary": [
+      {"term": "dramatic irony", "definition": "When the audience or reader knows something that a character does not, creating tension or humour", "example_usage": "The dramatic irony intensifies when Romeo believes Juliet is dead."},
+      {"term": "figurative language", "definition": "Language that uses figures of speech (metaphor, simile, personification) to create meaning beyond the literal", "example_usage": "The poem's figurative language transforms the river into a living character."},
+      {"term": "characterisation", "definition": "The methods a writer uses to develop a character — through dialogue, actions, appearance, thoughts, and what others say about them", "example_usage": "The writer uses direct characterisation when the narrator describes Tsotsi as 'empty.'"},
+      {"term": "theme", "definition": "The central idea or underlying message of a literary work, expressed as a universal truth about human experience", "example_usage": "A key theme of the novel is that redemption is possible even for those who have committed terrible acts."},
+      {"term": "soliloquy", "definition": "A speech in a play where a character speaks their thoughts aloud while alone on stage, revealing inner conflict", "example_usage": "Hamlet's 'To be or not to be' soliloquy reveals his contemplation of suicide."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think that theme and moral are the same thing.",
+        "correction": "A moral is a specific lesson ('crime does not pay'). A theme is broader and more nuanced ('the corrosive effects of unchecked ambition'). Themes are explored, not preached — literature raises questions rather than giving simple answers.",
+        "why_students_think_this": "Primary school stories often end with explicit morals. At Gr12 level, literature is ambiguous and multi-layered — themes resist reduction to simple lessons."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What are the three types of irony?", "back": "Verbal irony (saying the opposite of what you mean), situational irony (events contradict expectations), dramatic irony (audience knows more than the character).", "tags": ["CAPS.English.Gr12.LITERATURE", "Grade12", "Literature"], "difficulty_permille": 222},
+    {"front": "What is the PEE method?", "back": "Point (state your argument), Evidence (quote from the text), Explanation (analyse how the evidence supports your point).", "tags": ["CAPS.English.Gr12.LITERATURE", "Grade12", "Literature"], "difficulty_permille": 167},
+    {"front": "What is a dynamic character?", "back": "A character who undergoes significant internal change or growth during the course of the story.", "tags": ["CAPS.English.Gr12.LITERATURE", "Grade12", "Literature"], "difficulty_permille": 222},
+    {"front": "What is a soliloquy?", "back": "A speech in drama where a character speaks their thoughts aloud while alone on stage, revealing inner conflict to the audience.", "tags": ["CAPS.English.Gr12.LITERATURE", "Grade12", "Literature"], "difficulty_permille": 333}
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

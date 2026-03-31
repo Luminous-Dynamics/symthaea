@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "What is the size of a straight angle?",
+        "answer": "180 degrees",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A straight angle is a straight line"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A straight angle = 180 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "90 degrees",
+          "360 degrees",
+          "270 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Two angles on a straight line are supplementary. If one is 110 degrees, what is the other?",
+        "answer": "70 degrees",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Supplementary angles add to 180"
         ],
-        "explanation": "Explanation.",
+        "explanation": "180 - 110 = 70 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "80 degrees",
+          "90 degrees",
+          "110 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "An angle measures 35 degrees. What is its complement?",
+        "answer": "55 degrees",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Complementary angles add to 90"
         ],
-        "explanation": "Explanation.",
+        "explanation": "90 - 35 = 55 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "145 degrees",
+          "45 degrees",
+          "65 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "A triangle has angles of 40 degrees and 60 degrees. What is the third angle?",
+        "answer": "80 degrees",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Angles in a triangle add to 180"
         ],
-        "explanation": "Explanation.",
+        "explanation": "180 - 40 - 60 = 80 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "100 degrees",
+          "60 degrees",
+          "90 degrees"
         ]
       },
       {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
+        "question": "Two lines intersect. One angle is 130 degrees. What is the vertically opposite angle?",
+        "answer": "130 degrees",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Vertically opposite angles are equal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Vertically opposite angles are equal, so it is also 130 degrees.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 6 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "50 degrees",
+          "180 degrees",
+          "230 degrees"
         ]
       }
     ],

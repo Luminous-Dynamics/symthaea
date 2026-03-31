@@ -1,0 +1,127 @@
+{
+  "node_id": "CAPS.English.Gr12.COMPREHENSION",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.COMPREHENSION",
+    "title": "Reading Comprehension: Main Idea, Inference, Tone, Bias & Critical Analysis",
+    "grade_level": "Grade12",
+    "bloom_level": "Analyze",
+    "explanation": "Reading comprehension at Gr12 level demands more than surface understanding. You must identify the main idea (what the passage is fundamentally about), make inferences (reading between the lines using textual clues), detect tone (the writer's attitude — sarcastic, nostalgic, critical), recognise bias (one-sided language, loaded words, omitted perspectives), summarise accurately, and critically analyse the writer's purpose, audience, and effectiveness. Always support your answers with direct evidence from the text using quotation marks.",
+    "examples": [
+      {
+        "problem": "Read the extract: 'The mining company's glossy brochure promised jobs and prosperity, yet the river downstream ran orange with acid drainage and children in Emalahleni coughed through the night.' Identify the tone and explain how the writer creates it.",
+        "steps": [
+          {"instruction": "Step 1: Identify contrasting elements — 'glossy brochure' vs 'orange' river and coughing children.", "result": "Juxtaposition identified"},
+          {"instruction": "Step 2: Note the word choices — 'glossy' suggests superficiality, 'promised' implies unfulfilled commitment.", "result": "Diction analysed"},
+          {"instruction": "Step 3: Determine the overall attitude — the writer is critical and ironic.", "result": "Tone identified"}
+        ],
+        "answer": "Answer: The tone is critical and ironic. The writer juxtaposes the company's positive self-presentation ('glossy brochure,' 'promised jobs') with the grim reality ('acid drainage,' 'coughed through the night') to expose corporate dishonesty.",
+        "visual_description": null
+      },
+      {
+        "problem": "What inference can be drawn from: 'She placed the letter carefully in the drawer and turned the key twice'?",
+        "steps": [
+          {"instruction": "Step 1: Note the deliberate actions — 'carefully' and 'twice' suggest importance and secrecy.", "result": "Key words identified"},
+          {"instruction": "Step 2: Consider what is implied — the letter contains something private or valuable.", "result": "Inference drawn"},
+          {"instruction": "Step 3: Note what is NOT stated — we are not told the letter's contents, creating suspense.", "result": "Implication recognised"}
+        ],
+        "answer": "Answer: The inference is that the letter contains sensitive or private information that the character wants to protect. The deliberate actions ('carefully,' 'twice') suggest secrecy, anxiety, or the importance of its contents.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify two examples of bias in: 'Only a fool would oppose the new highway. Every sensible citizen supports progress.'",
+        "steps": [
+          {"instruction": "Step 1: Identify loaded language — 'fool' is an ad hominem attack on opponents.", "result": "Name-calling identified"},
+          {"instruction": "Step 2: Note the false dichotomy — opposing the highway is equated with opposing 'progress'.", "result": "False equivalence identified"},
+          {"instruction": "Step 3: Observe the sweeping generalisation — 'every sensible citizen' assumes universal agreement.", "result": "Bandwagon fallacy identified"}
+        ],
+        "answer": "Answer: (1) Name-calling bias: labelling opponents as 'fools' dismisses their views without addressing their arguments. (2) Bandwagon/appeal to popularity: 'every sensible citizen' implies that disagreeing means you are irrational.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define 'main idea' and explain how it differs from 'theme'.",
+        "answer": "The main idea is the central point or argument of a specific passage — what the writer is saying. Theme is the broader universal message or lesson (e.g., 'corruption destroys communities'). Main idea is specific to the text; theme is the underlying life truth.",
+        "difficulty_permille": 125,
+        "bloom_level": "Understand",
+        "hints": ["Main idea answers 'What is this passage about?'", "Theme answers 'What universal truth does this text reveal?'"],
+        "explanation": "Main idea is textual and specific; theme is universal and abstract. A passage about water pollution (main idea) may have the theme that greed harms the vulnerable.",
+        "distractors": ["They are the same thing.", "Main idea is always stated in the first sentence.", "Theme is the topic of the passage."]
+      },
+      {
+        "question": "Read: 'The minister arrived two hours late in a German sedan, stepped over the pothole that had swallowed Mrs Dlamini's taxi fare, and promised to fix the roads by Christmas.' What is the writer's purpose?",
+        "answer": "The writer's purpose is to satirise government officials who are disconnected from the communities they serve. The contrast between the luxury car and the pothole, and the ironic promise, expose hypocrisy.",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": ["Look at the contrast between the minister's wealth and the community's infrastructure.", "Consider the irony in 'promised to fix the roads.'"],
+        "explanation": "The writer uses situational irony and juxtaposition to criticise. The minister literally steps over the problem he promises to solve.",
+        "distractors": ["To inform readers about road conditions.", "To praise the minister for visiting.", "To describe Mrs Dlamini's experience."]
+      },
+      {
+        "question": "Explain the difference between a fact and an opinion in the context of reading comprehension, giving one example of each.",
+        "answer": "A fact is a verifiable statement (e.g., 'South Africa has nine provinces'). An opinion is a personal judgement or belief (e.g., 'The Western Cape is the best province to live in'). In comprehension, distinguishing them is essential for detecting bias.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Can the statement be proven true or false? If yes, it is a fact.", "Does it contain evaluative words like 'best,' 'should,' 'unfortunately'? Likely an opinion."],
+        "explanation": "Facts can be verified through evidence; opinions reflect personal judgement. Writers who blur this line are often pushing a bias.",
+        "distractors": ["Facts are always true and opinions are always false.", "Opinions cannot appear in formal writing.", "Facts are long sentences and opinions are short sentences."]
+      },
+      {
+        "question": "What does it mean to 'read between the lines' and why is this skill essential at Gr12 level?",
+        "answer": "Reading between the lines means making inferences — understanding what is implied but not directly stated, by using context clues, word choice, and prior knowledge. At Gr12, comprehension questions require analysis of subtext, motivation, and implied meaning, not just literal recall.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": ["Think about what the writer suggests without saying it explicitly.", "Consider character motivations, emotional undertones, and symbolic meaning."],
+        "explanation": "Inference is the bridge between what is written and what is meant. Gr12 exam questions frequently ask 'What is implied?' or 'What can we deduce?'",
+        "distractors": ["It means reading the text very quickly.", "It means only reading the first and last lines.", "It means ignoring what the text actually says."]
+      },
+      {
+        "question": "Analyse the effect of the rhetorical question in: 'How long must our children walk five kilometres to school while politicians drive past in convoys?'",
+        "answer": "The rhetorical question creates a sense of moral outrage and demands the reader's agreement without expecting a literal answer. The contrast between 'children walk five kilometres' and 'politicians drive past in convoys' highlights inequality and compels the reader to feel the injustice.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["A rhetorical question is asked for effect, not to receive an answer.", "Consider the emotional impact on the reader and the contrast created."],
+        "explanation": "Rhetorical questions engage readers by making them think and feel. They are a form of persuasion — the implied answer is 'not a moment longer.'",
+        "distractors": ["It asks the reader to calculate the distance.", "It is a genuine question expecting a time-based answer.", "It shows the writer does not know the answer."]
+      }
+    ],
+    "hints": [
+      "Always refer back to the text — use quotation marks when citing evidence.",
+      "For tone questions, look at word choice (diction), sentence structure, and imagery.",
+      "For inference questions, ask yourself: 'What is the writer suggesting without saying directly?'"
+    ],
+    "key_vocabulary": [
+      {"term": "inference", "definition": "A conclusion drawn from evidence and reasoning rather than from explicit statement in the text", "example_usage": "From the character's clenched fists, we can infer that she is angry."},
+      {"term": "tone", "definition": "The writer's attitude toward the subject or audience, conveyed through word choice and style", "example_usage": "The sarcastic tone is evident in the phrase 'what a splendid idea that turned out to be.'"},
+      {"term": "bias", "definition": "A prejudice or one-sided view that unfairly favours or opposes a particular perspective", "example_usage": "The article shows bias by only quoting supporters of the policy."},
+      {"term": "rhetoric", "definition": "The art of persuasion through language, including techniques like rhetorical questions, repetition, and emotive language", "example_usage": "The speaker's use of rhetoric moved the audience to action."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think comprehension answers must be in their own words entirely, and that quoting the text is wrong.",
+        "correction": "You should quote directly from the text to support your answers, placing the quoted words in quotation marks. However, your explanation and analysis must be in your own words.",
+        "why_students_think_this": "Some teachers emphasise paraphrasing, leading students to believe that any direct quotation is plagiarism. In comprehension, textual evidence (quotation) is actually required for full marks."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What is an inference in reading comprehension?", "back": "A conclusion drawn from evidence and reasoning rather than from explicit statement in the text.", "tags": ["CAPS.English.Gr12.COMPREHENSION", "Grade12", "Reading"], "difficulty_permille": 167},
+    {"front": "How do you identify tone in a passage?", "back": "Examine the writer's word choice (diction), imagery, sentence structure, and overall attitude toward the subject.", "tags": ["CAPS.English.Gr12.COMPREHENSION", "Grade12", "Reading"], "difficulty_permille": 333},
+    {"front": "What is bias in a text?", "back": "A prejudice or one-sided view that unfairly favours or opposes a perspective, often revealed through loaded language, omission, or selective evidence.", "tags": ["CAPS.English.Gr12.COMPREHENSION", "Grade12", "Reading"], "difficulty_permille": 278},
+    {"front": "What is the difference between main idea and theme?", "back": "Main idea is the specific central point of a passage. Theme is the universal truth or life lesson that the text conveys.", "tags": ["CAPS.English.Gr12.COMPREHENSION", "Grade12", "Reading"], "difficulty_permille": 389}
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

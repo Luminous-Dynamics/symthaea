@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A tally chart shows IIII for apples. How many apples?",
+        "answer": "4",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count each tally mark"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Each line is 1, so IIII = 4.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5",
+          "3",
+          "6"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "In a pictograph, 3 smiley faces represent 3 children who walk to school. 5 faces show children who take a bus. How many more take the bus?",
+        "answer": "2",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Subtract: 5 - 3"
         ],
-        "explanation": "Explanation.",
+        "explanation": "5 - 3 = 2 more children take the bus.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "3",
+          "1",
+          "8"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A class voted for favourite fruit: banana 7, apple 4, orange 3. How many children voted?",
+        "answer": "14",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add all the votes together"
         ],
-        "explanation": "Explanation.",
+        "explanation": "7 + 4 + 3 = 14 children voted.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "11",
+          "13",
+          "15"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "A pictograph shows each picture = 2 items. If there are 4 pictures for grapes, how many grapes?",
+        "answer": "8",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Each picture stands for 2 items"
         ],
-        "explanation": "Explanation.",
+        "explanation": "4 pictures times 2 = 8 grapes.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "4",
+          "6",
+          "10"
         ]
       },
       {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
+        "question": "From the data: cats 6, dogs 8, fish 2, birds 4. Which pet is least popular?",
+        "answer": "Fish",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Find the pet with the fewest votes"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Fish has only 2, which is fewer than the others.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 2 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "Birds",
+          "Cats",
+          "Dogs"
         ]
       }
     ],

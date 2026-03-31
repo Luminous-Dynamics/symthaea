@@ -2,7 +2,7 @@
   "node_id": "CAPS.Mathematics.Gr7.MEA",
   "lesson": {
     "standard_code": "CAPS.Mathematics.Gr7.MEA",
-    "title": "CAPS.Mathematics.Gr7.MEA: Circumference and area of circle (π). Surface area of pri...",
+    "title": "CAPS.Mathematics.Gr7.MEA: Circumference and area of circle (\u03c0). Surface area of pri...",
     "grade_level": "Grade7",
     "bloom_level": "Understand",
     "explanation": "Grade 7 mathematics content.",
@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is the circumference of a circle with radius 7 cm? (Use pi = 22/7)",
+        "answer": "44 cm",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "C = 2 x pi x r"
         ],
-        "explanation": "Explanation.",
+        "explanation": "C = 2 x 22/7 x 7 = 44 cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "22 cm",
+          "154 cm",
+          "49 cm"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "What is the area of a circle with radius 7 cm? (Use pi = 22/7)",
+        "answer": "154 square cm",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "A = pi x r^2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "A = 22/7 x 7^2 = 22/7 x 49 = 154 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "44 square cm",
+          "308 square cm",
+          "49 square cm"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Find the surface area of a cube with side 4 cm.",
+        "answer": "96 square cm",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "SA = 6 x side^2"
         ],
-        "explanation": "Explanation.",
+        "explanation": "SA = 6 x 4^2 = 6 x 16 = 96 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "64 square cm",
+          "24 square cm",
+          "48 square cm"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "A cylinder has radius 3 cm and height 10 cm. Find its volume. (Use pi = 3.14)",
+        "answer": "282.6 cubic cm",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "V = pi x r^2 x h"
         ],
-        "explanation": "Explanation.",
+        "explanation": "V = 3.14 x 9 x 10 = 282.6 cubic cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "94.2 cubic cm",
+          "188.4 cubic cm",
+          "314 cubic cm"
         ]
       },
       {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
+        "question": "Find the surface area of a rectangular prism: 5 cm x 3 cm x 2 cm.",
+        "answer": "62 square cm",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "SA = 2(lw + lh + wh)"
         ],
-        "explanation": "Explanation.",
+        "explanation": "SA = 2(15 + 10 + 6) = 2 x 31 = 62 square cm.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 7 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "30 square cm",
+          "52 square cm",
+          "31 square cm"
         ]
       }
     ],
@@ -201,7 +171,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.Mathematics.Gr7.MEA",
-    "title": "Assessment: Circumference and area of circle (π). Surface area of prisms. Volume of cylinders. Speed, distance, time",
+    "title": "Assessment: Circumference and area of circle (\u03c0). Surface area of prisms. Volume of cylinders. Speed, distance, time",
     "items": [
       {
         "question": "Explain Grade 7 Mathematics.",

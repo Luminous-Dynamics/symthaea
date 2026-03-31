@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "What is 2/3 + 3/4?",
+        "answer": "17/12 or 1 5/12",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Common denominator is 12"
         ],
-        "explanation": "Explanation.",
+        "explanation": "2/3 = 8/12, 3/4 = 9/12. 8/12 + 9/12 = 17/12 = 1 5/12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "5/7",
+          "5/12",
+          "6/7"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "What is 0.6 x 0.3?",
+        "answer": "0.18",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Multiply 6 x 3 = 18, count decimal places"
         ],
-        "explanation": "Explanation.",
+        "explanation": "6 x 3 = 18, two decimal places total, so 0.18.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "1.8",
+          "0.018",
+          "18"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Simplify: 3/5 / 2/3",
+        "answer": "9/10",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Dividing fractions: multiply by the reciprocal"
         ],
-        "explanation": "Explanation.",
+        "explanation": "3/5 x 3/2 = 9/10.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "6/15",
+          "2/5",
+          "6/5"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Convert 7/11 to a decimal (2 decimal places).",
+        "answer": "0.64",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Divide 7 by 11"
         ],
-        "explanation": "Explanation.",
+        "explanation": "7 / 11 = 0.6363... Rounded to 2 decimal places: 0.64.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "0.63",
+          "0.71",
+          "0.77"
         ]
       },
       {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
+        "question": "Evaluate: (-3/4) + (5/6)",
+        "answer": "1/12",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "LCD = 12"
         ],
-        "explanation": "Explanation.",
+        "explanation": "-3/4 = -9/12, 5/6 = 10/12. -9/12 + 10/12 = 1/12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 8 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "-1/12",
+          "2/10",
+          "-8/10"
         ]
       }
     ],

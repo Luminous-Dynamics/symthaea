@@ -1,0 +1,130 @@
+{
+  "node_id": "CAPS.English.Gr12.LANGUAGE",
+  "lesson": {
+    "standard_code": "CAPS.English.Gr12.LANGUAGE",
+    "title": "Language Structures and Conventions",
+    "grade_level": "Grade12",
+    "bloom_level": "Apply",
+    "explanation": "Language structures form the grammar backbone of English. At Gr12 level you must master: parts of speech (noun, verb, adjective, adverb, pronoun, preposition, conjunction, interjection), sentence types (simple, compound, complex, compound-complex), voice transformation (active to passive and back), speech conversion (direct to indirect and back, adjusting tense, pronouns, and time references), and concord (subject-verb agreement, including tricky cases with collective nouns, 'either/or', and indefinite pronouns). These skills are tested in Paper 1 and underpin all writing tasks.",
+    "examples": [
+      {
+        "problem": "Change from direct to indirect speech: 'I will finish the project tomorrow,' said Thabo.",
+        "steps": [
+          {"instruction": "Step 1: Change the reporting verb tense — 'said' stays, but the reported clause shifts back one tense.", "result": "'will' becomes 'would'"},
+          {"instruction": "Step 2: Change the pronoun — 'I' becomes 'he' (referring to Thabo).", "result": "Pronoun shifted"},
+          {"instruction": "Step 3: Change the time reference — 'tomorrow' becomes 'the following day'.", "result": "Time word adjusted"},
+          {"instruction": "Step 4: Remove quotation marks and add 'that' as a conjunction.", "result": "Structure completed"}
+        ],
+        "answer": "Answer: Thabo said that he would finish the project the following day.",
+        "visual_description": null
+      },
+      {
+        "problem": "Identify the sentence type: 'Although the rain fell heavily, the match continued and the spectators cheered.'",
+        "steps": [
+          {"instruction": "Step 1: Identify clauses — 'Although the rain fell heavily' (dependent), 'the match continued' (independent), 'the spectators cheered' (independent).", "result": "Three clauses found"},
+          {"instruction": "Step 2: Count independent clauses — two ('the match continued' and 'the spectators cheered').", "result": "Two main clauses"},
+          {"instruction": "Step 3: Count dependent clauses — one ('Although the rain fell heavily').", "result": "One subordinate clause"},
+          {"instruction": "Step 4: Classify — 2 independent + 1 dependent = compound-complex.", "result": "Type identified"}
+        ],
+        "answer": "Answer: Compound-complex sentence (two independent clauses joined by 'and', plus one dependent clause beginning with 'Although').",
+        "visual_description": null
+      },
+      {
+        "problem": "Correct the concord error: 'The team are playing their best.'",
+        "steps": [
+          {"instruction": "Step 1: Identify the subject — 'the team' is a collective noun.", "result": "Subject identified"},
+          {"instruction": "Step 2: Determine singular or plural treatment — in South African English, collective nouns acting as a unit take singular verbs.", "result": "Singular treatment"},
+          {"instruction": "Step 3: Apply concord — 'team' (singular) requires 'is playing' and 'its'.", "result": "Agreement corrected"}
+        ],
+        "answer": "Answer: 'The team is playing its best.' (In South African English, collective nouns functioning as a single unit take singular verbs.)",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Identify the part of speech of each underlined word: 'She (quickly) ran (across) the (beautiful) garden.'",
+        "answer": "quickly = adverb (modifies the verb 'ran'), across = preposition (shows relationship between 'ran' and 'garden'), beautiful = adjective (describes the noun 'garden').",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": ["Adverbs modify verbs, adjectives, or other adverbs.", "Prepositions show position, direction, or time relationships."],
+        "explanation": "Parts of speech are classified by the function a word performs in a sentence, not by the word itself (words can be different parts of speech in different contexts).",
+        "distractors": ["quickly = adjective, across = conjunction, beautiful = adverb", "quickly = verb, across = adverb, beautiful = noun", "quickly = preposition, across = adjective, beautiful = verb"]
+      },
+      {
+        "question": "Change to passive voice: 'The principal suspended three learners for vandalism.'",
+        "answer": "Three learners were suspended by the principal for vandalism.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["Move the object ('three learners') to the subject position.", "Use the appropriate form of 'to be' + past participle."],
+        "explanation": "Passive: Object becomes subject + was/were + past participle + by + agent. The focus shifts from who did it to what was done.",
+        "distractors": ["Three learners are suspended by the principal.", "The principal was suspended by three learners.", "Three learners had been suspended for vandalism."]
+      },
+      {
+        "question": "Convert to direct speech: She told him that she had already submitted her application the previous week.",
+        "answer": "'I have already submitted my application last week,' she told him.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["Shift tenses forward: past perfect becomes present perfect.", "Change pronouns: 'she/her' back to 'I/my'. Change 'the previous week' to 'last week'."],
+        "explanation": "Direct speech reverses all indirect speech changes: tense shifts forward, pronouns return to first person, and time expressions revert to their original form.",
+        "distractors": ["'She has already submitted her application last week,' she told him.", "'I had already submitted my application the previous week,' she told him.", "'I already submitted my application,' she told him."]
+      },
+      {
+        "question": "Choose the correct verb: 'Either the captain or the players (was/were) responsible for the defeat.'",
+        "answer": "'were' — when 'either...or' joins a singular and plural subject, the verb agrees with the nearer subject ('players' is plural, so 'were').",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["With 'either...or' and 'neither...nor', the verb agrees with the subject closest to it.", "The plural 'players' is nearest to the verb."],
+        "explanation": "This is the proximity rule: with correlative conjunctions, the verb agrees with the nearer subject. If the order were reversed ('Either the players or the captain'), the answer would be 'was'.",
+        "distractors": ["was — because 'either' implies a singular choice", "were — because both subjects are always plural with 'either'", "was — because 'captain' is the main subject"]
+      },
+      {
+        "question": "Combine into a complex sentence: 'The load-shedding ended. We could finally study for exams.'",
+        "answer": "After the load-shedding ended, we could finally study for exams. (Or: We could finally study for exams because the load-shedding ended.)",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": ["A complex sentence has one independent clause and at least one dependent clause.", "Use a subordinating conjunction: after, because, when, although, since."],
+        "explanation": "Subordinating conjunctions create dependent clauses, establishing logical relationships (time, cause, condition) between ideas.",
+        "distractors": ["The load-shedding ended and we could finally study.", "The load-shedding ended, we could finally study.", "The load-shedding ended; we could finally study."]
+      }
+    ],
+    "hints": [
+      "For speech conversion, remember the three shifts: tense, pronouns, and time/place words.",
+      "Collective nouns in SA English usually take singular verbs when the group acts as a unit.",
+      "A complex sentence always contains a subordinating conjunction (because, although, when, if, after)."
+    ],
+    "key_vocabulary": [
+      {"term": "concord", "definition": "The grammatical agreement between the subject and verb in number (singular/plural)", "example_usage": "The concord rule requires 'the dog runs' (singular), not 'the dog run.'"},
+      {"term": "subordinating conjunction", "definition": "A word that introduces a dependent clause and establishes its relationship to the main clause (e.g., because, although, when, if)", "example_usage": "'Although it was raining' is a dependent clause introduced by the subordinating conjunction 'although.'"},
+      {"term": "active voice", "definition": "A sentence construction where the subject performs the action (e.g., 'The cat caught the mouse')", "example_usage": "Active voice is more direct: 'The team won the match.'"},
+      {"term": "passive voice", "definition": "A sentence construction where the subject receives the action (e.g., 'The mouse was caught by the cat')", "example_usage": "Passive voice is used when the doer is unknown or unimportant."},
+      {"term": "indirect speech", "definition": "Reporting what someone said without quoting their exact words, requiring changes to tense, pronouns, and time references", "example_usage": "Direct: 'I am leaving.' Indirect: She said that she was leaving."}
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students believe that passive voice is always wrong or 'weaker' than active voice.",
+        "correction": "Passive voice is a legitimate and useful construction. It is preferred when the action matters more than the doer (e.g., 'The suspect was arrested' in news), when the doer is unknown, or for scientific and formal writing.",
+        "why_students_think_this": "Writing guides often say 'avoid passive voice,' but this is about overuse, not a blanket prohibition. Both voices serve distinct rhetorical purposes."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [
+    {"front": "What are the eight parts of speech?", "back": "Noun, verb, adjective, adverb, pronoun, preposition, conjunction, interjection.", "tags": ["CAPS.English.Gr12.LANGUAGE", "Grade12", "Grammar"], "difficulty_permille": 111},
+    {"front": "What are the four sentence types by structure?", "back": "Simple (1 independent clause), compound (2+ independent), complex (1 independent + 1+ dependent), compound-complex (2+ independent + 1+ dependent).", "tags": ["CAPS.English.Gr12.LANGUAGE", "Grade12", "Grammar"], "difficulty_permille": 278},
+    {"front": "What three changes must you make when converting direct to indirect speech?", "back": "Shift tense back one step, change pronouns (1st/2nd to 3rd person), and adjust time/place references (e.g., 'today' to 'that day').", "tags": ["CAPS.English.Gr12.LANGUAGE", "Grade12", "Grammar"], "difficulty_permille": 333},
+    {"front": "What is the proximity rule for concord?", "back": "With 'either...or' or 'neither...nor', the verb agrees with the subject nearest to it.", "tags": ["CAPS.English.Gr12.LANGUAGE", "Grade12", "Grammar"], "difficulty_permille": 444}
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

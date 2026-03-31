@@ -67,108 +67,78 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "What number comes after 29?",
+        "answer": "30",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count: 28, 29, ..."
         ],
-        "explanation": "Explanation.",
+        "explanation": "The number after 29 is 30.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "31",
+          "28",
+          "39"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "question": "Count backwards: 15, 14, 13, ___",
+        "answer": "12",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "We are going down by 1 each time"
         ],
-        "explanation": "Explanation.",
+        "explanation": "Counting backwards from 13, the next number is 12.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "11",
+          "14",
+          "10"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "Count in 2s: 2, 4, 6, 8, ___",
+        "answer": "10",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "We are adding 2 each time"
         ],
-        "explanation": "Explanation.",
+        "explanation": "The pattern adds 2 each time. 8 + 2 = 10.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "9",
+          "12",
+          "11"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "How many tens are in 50?",
+        "answer": "5",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Count by tens: 10, 20, 30, 40, 50"
         ],
-        "explanation": "Explanation.",
+        "explanation": "50 divided into groups of 10 gives 5 groups.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "50",
+          "10",
+          "4"
         ]
       },
       {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
+        "question": "What is the number that is 10 more than 37?",
+        "answer": "47",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what you know.,Try drawing a picture."
+          "Add 10 to 37"
         ],
-        "explanation": "Explanation.",
+        "explanation": "37 + 10 = 47. When you add 10, the tens digit goes up by 1.",
         "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
-        ]
-      },
-      {
-        "question": "Practice: Grade 1 Mathematics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what you know.,Try drawing a picture."
-        ],
-        "explanation": "Explanation.",
-        "distractors": [
-          "Distractor 1",
-          "Distractor 2",
-          "Distractor 3"
+          "46",
+          "38",
+          "57"
         ]
       }
     ],
