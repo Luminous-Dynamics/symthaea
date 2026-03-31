@@ -11,7 +11,7 @@ symthaea-vocal-tract = { path = "../symthaea-vocal-tract" }
 serde = { workspace = true }
 
 # Kokoro TTS (optional — requires ONNX Runtime + HuggingFace model download)
-ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic"], optional = true }
+ort = { version = "2.0.0-rc.10", features = ["half"], optional = true }
 hf-hub = { version = "0.4", optional = true }
 
 [dev-dependencies]
