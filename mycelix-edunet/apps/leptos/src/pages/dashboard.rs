@@ -14,7 +14,7 @@ use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
 use crate::components::suggestion_overlay::{SuggestionOverlay, CognitiveStateMirror};
 use crate::curriculum::{caps_graph, use_progress, ProgressStatus};
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::use_holochain;
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -76,95 +76,156 @@ pub enum ActivityKind {
 }
 
 // ---------------------------------------------------------------------------
-// Mock data generators
+// Real data generators — computed from localStorage, no mocks
 // ---------------------------------------------------------------------------
 
-fn mock_stats() -> LearnerStats {
+fn real_stats(progress: &crate::curriculum::ProgressStore, tracker: &crate::study_tracker::StudyTracker) -> LearnerStats {
+    // XP: 10 per problem answered + 50 per mastered topic + 25 per pomodoro
+    let problems_xp = progress.bkt_states.values().map(|b| b.attempts as u64 * 10).sum::<u64>();
+    let mastery_xp = progress.mastered_count() as u64 * 50;
+    let pomodoro_xp = (tracker.total_minutes as u64 / 25) * 25;
+    let total = problems_xp + mastery_xp + pomodoro_xp;
+
+    // Level = sqrt(total_xp / 100), XP to next = 100 * (level+1)^2
+    let level = ((total as f64 / 100.0).sqrt()) as u32;
+    let xp_for_current = 100 * level as u64 * level as u64;
+    let xp_for_next = 100 * (level as u64 + 1) * (level as u64 + 1);
+
     LearnerStats {
-        xp_total: 4_280,
-        xp_today: 120,
-        xp_this_week: 680,
-        level: 7,
-        xp_to_next_level: 500,
-        xp_in_current_level: 280,
+        xp_total: total,
+        xp_today: pomodoro_xp.min(200), // approximate
+        xp_this_week: total.min(2000) / 4, // approximate
+        level,
+        xp_to_next_level: (xp_for_next - xp_for_current) as u64,
+        xp_in_current_level: (total - xp_for_current) as u64,
     }
 }
 
-fn mock_streak() -> StreakInfo {
+fn real_streak(tracker: &crate::study_tracker::StudyTracker) -> StreakInfo {
+    let current = tracker.current_streak();
+    let longest = tracker.longest_streak();
+    let bonus = match current {
+        0..=6 => 1.0,
+        7..=13 => 1.1,
+        14..=29 => 1.25,
+        30..=99 => 1.5,
+        _ => 2.0,
+    };
     StreakInfo {
-        current_days: 12,
-        freeze_count: 1,
-        bonus_multiplier: 1.5,
-        longest_streak: 21,
+        current_days: current,
+        freeze_count: 0,
+        bonus_multiplier: bonus,
+        longest_streak: longest,
     }
 }
 
-fn mock_due_reviews() -> DueReviews {
+fn real_due_reviews(progress: &crate::curriculum::ProgressStore) -> DueReviews {
+    let now = js_sys::Date::now();
+    let due: Vec<_> = progress.srs_cards.values().filter(|c| now >= c.next_review_ms).collect();
+    let overdue = due.iter().filter(|c| now - c.next_review_ms > 24.0 * 60.0 * 60.0 * 1000.0).count() as u32;
     DueReviews {
-        total_due: 18,
-        overdue: 3,
-        new_available: 5,
+        total_due: due.len() as u32,
+        overdue,
+        new_available: progress.srs_cards.values().filter(|c| c.repetitions == 0).count() as u32,
     }
 }
 
-fn mock_skills() -> Vec<SkillMastery> {
-    vec![
-        SkillMastery { name: "Multiplication".into(), level: 0.85, domain: "Math".into() },
-        SkillMastery { name: "Fractions".into(), level: 0.72, domain: "Math".into() },
-        SkillMastery { name: "Word Problems".into(), level: 0.63, domain: "Math".into() },
-        SkillMastery { name: "Geometry".into(), level: 0.58, domain: "Math".into() },
-        SkillMastery { name: "Rounding".into(), level: 0.45, domain: "Math".into() },
-    ]
+fn real_skills(progress: &crate::curriculum::ProgressStore) -> Vec<SkillMastery> {
+    let graph = caps_graph();
+    let mut subjects: std::collections::HashMap<String, (f32, usize)> = std::collections::HashMap::new();
+    for n in &graph.nodes {
+        let bkt = progress.bkt(&n.id);
+        if bkt.attempts > 0 {
+            let entry = subjects.entry(n.subject_area.clone()).or_insert((0.0, 0));
+            entry.0 += bkt.p_mastery;
+            entry.1 += 1;
+        }
+    }
+    let mut skills: Vec<SkillMastery> = subjects.into_iter()
+        .filter(|(_, (_, count))| *count > 0)
+        .map(|(name, (total_mastery, count))| SkillMastery {
+            name: name.clone(),
+            level: total_mastery / count as f32,
+            domain: name,
+        })
+        .collect();
+    skills.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap_or(std::cmp::Ordering::Equal));
+    skills.truncate(5);
+    if skills.is_empty() {
+        // Show top subjects by node count for new users
+        let mut top: Vec<_> = graph.subjects().iter().take(5).map(|s| SkillMastery {
+            name: s.to_string(), level: 0.0, domain: s.to_string()
+        }).collect();
+        top
+    } else {
+        skills
+    }
 }
 
-fn mock_recommendations() -> Vec<Recommendation> {
-    vec![
-        Recommendation {
-            title: "Division Practice".into(),
-            reason: "You're great at multiplication -- try dividing next!".into(),
-            course_domain: "Math".into(),
-        },
-        Recommendation {
-            title: "Fraction Fun".into(),
-            reason: "Keep practicing fractions with pizza and pie slices".into(),
-            course_domain: "Math".into(),
-        },
-        Recommendation {
-            title: "Shape Explorer".into(),
-            reason: "Learn about triangles, circles, and more shapes".into(),
-            course_domain: "Math".into(),
-        },
-    ]
+fn real_recommendations(progress: &crate::curriculum::ProgressStore) -> Vec<Recommendation> {
+    let weakest = progress.weakest_topics(3);
+    let graph = caps_graph();
+    if weakest.is_empty() {
+        // New user — suggest starting points
+        vec![
+            Recommendation { title: "Start with your grade's top topic".into(), reason: "Begin your learning journey on the constellation".into(), course_domain: "Getting Started".into() },
+            Recommendation { title: "Try a flashcard session".into(), reason: "5 minutes of spaced repetition goes a long way".into(), course_domain: "Review".into() },
+        ]
+    } else {
+        weakest.iter().map(|(id, pct)| {
+            let title = graph.node(id).map(|n| n.title.clone()).unwrap_or_default();
+            Recommendation {
+                title,
+                reason: format!("{}% mastery — practice to strengthen", (pct * 100.0) as u32),
+                course_domain: graph.node(id).map(|n| n.subject_area.clone()).unwrap_or_default(),
+            }
+        }).collect()
+    }
 }
 
-fn mock_activity() -> Vec<ActivityEvent> {
-    vec![
-        ActivityEvent {
-            description: "Finished the Multiplication quiz".into(),
-            timestamp: "2 hours ago".into(),
+fn real_activity(tracker: &crate::study_tracker::StudyTracker, progress: &crate::curriculum::ProgressStore) -> Vec<ActivityEvent> {
+    let mut events = Vec::new();
+    let streak = tracker.current_streak();
+    let mastered = progress.mastered_count();
+    let hours = tracker.hours_studied();
+
+    if hours > 0.0 {
+        events.push(ActivityEvent {
+            description: format!("{:.0} hours of focused study", hours),
+            timestamp: "total".into(),
             kind: ActivityKind::CourseProgress,
-        },
-        ActivityEvent {
-            description: "Reviewed 12 flashcards (11 correct!)".into(),
-            timestamp: "5 hours ago".into(),
-            kind: ActivityKind::ReviewCompleted,
-        },
-        ActivityEvent {
-            description: "Earned the 'Fraction Star' badge".into(),
-            timestamp: "Yesterday".into(),
-            kind: ActivityKind::BadgeEarned,
-        },
-        ActivityEvent {
-            description: "Reached Level 7!".into(),
-            timestamp: "2 days ago".into(),
-            kind: ActivityKind::LevelUp,
-        },
-        ActivityEvent {
-            description: "10 days in a row! Amazing!".into(),
-            timestamp: "4 days ago".into(),
+        });
+    }
+    if mastered > 0 {
+        events.push(ActivityEvent {
+            description: format!("{} topics mastered", mastered),
+            timestamp: "cumulative".into(),
+            kind: ActivityKind::CourseProgress,
+        });
+    }
+    if streak >= 3 {
+        events.push(ActivityEvent {
+            description: format!("{}-day study streak!", streak),
+            timestamp: "current".into(),
             kind: ActivityKind::StreakMilestone,
-        },
-    ]
+        });
+    }
+    let problems_done: u32 = progress.bkt_states.values().map(|b| b.attempts).sum();
+    if problems_done > 0 {
+        events.push(ActivityEvent {
+            description: format!("{} practice problems completed", problems_done),
+            timestamp: "total".into(),
+            kind: ActivityKind::CourseProgress,
+        });
+    }
+    if events.is_empty() {
+        events.push(ActivityEvent {
+            description: "Start studying to see your activity here".into(),
+            timestamp: "now".into(),
+            kind: ActivityKind::CourseProgress,
+        });
+    }
+    events
 }
 
 // ---------------------------------------------------------------------------
@@ -592,9 +653,9 @@ fn XpLevelCard() -> impl IntoView {
     let stats = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
+            match hc.call_zome_default::<(), LearnerStats>("gamification", "get_learner_stats", &()).await {
                 Ok(s) => s,
-                Err(_) => mock_stats(),
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker").unwrap_or_default(); real_stats(&p, &t) },
             }
         }
     });
@@ -644,9 +705,9 @@ fn StreakCard() -> impl IntoView {
     let streak = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), StreakInfo>("gamification", "get_streak", &()).await {
+            match hc.call_zome_default::<(), StreakInfo>("gamification", "get_streak", &()).await {
                 Ok(s) => s,
-                Err(_) => mock_streak(),
+                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker").unwrap_or_default(); real_streak(&t) },
             }
         }
     });
@@ -695,9 +756,9 @@ fn DueReviewsCard() -> impl IntoView {
     let reviews = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), DueReviews>("srs", "get_due_summary", &()).await {
+            match hc.call_zome_default::<(), DueReviews>("srs", "get_due_summary", &()).await {
                 Ok(r) => r,
-                Err(_) => mock_due_reviews(),
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_due_reviews(&p) },
             }
         }
     });
@@ -738,9 +799,9 @@ fn SkillsCard() -> impl IntoView {
     let skills = LocalResource::new(move || {
         let hc = hc.clone();
         async move {
-            match hc.call_zome::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
+            match hc.call_zome_default::<(), Vec<SkillMastery>>("adaptive", "get_top_skills", &()).await {
                 Ok(s) => s,
-                Err(_) => mock_skills(),
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_skills(&p) },
             }
         }
     });
@@ -792,7 +853,7 @@ fn RecommendationsSection() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<Recommendation>>(
+                .call_zome_default::<(), Vec<Recommendation>>(
                     "adaptive",
                     "get_recommendations",
                     &(),
@@ -800,7 +861,7 @@ fn RecommendationsSection() -> impl IntoView {
                 .await
             {
                 Ok(r) => r,
-                Err(_) => mock_recommendations(),
+                Err(_) => { let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_recommendations(&p) },
             }
         }
     });
@@ -844,7 +905,7 @@ fn RecentActivitySection() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<ActivityEvent>>(
+                .call_zome_default::<(), Vec<ActivityEvent>>(
                     "gamification",
                     "get_recent_activity",
                     &(),
@@ -852,7 +913,7 @@ fn RecentActivitySection() -> impl IntoView {
                 .await
             {
                 Ok(a) => a,
-                Err(_) => mock_activity(),
+                Err(_) => { let t = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker").unwrap_or_default(); let p = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress").unwrap_or_default(); real_activity(&t, &p) },
             }
         }
     });
