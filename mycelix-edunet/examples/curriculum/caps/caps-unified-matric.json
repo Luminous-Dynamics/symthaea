@@ -7,7 +7,7 @@
     "subject_area": "Multi-Subject",
     "domain": "Multi-Subject",
     "version": "2024",
-    "total_standards": 2002,
+    "total_standards": 2036,
     "domains": [
       "Software Design and Engineering",
       "Energy & Change",
@@ -232,7 +232,7 @@
     ],
     "created_at": "2026-03-30",
     "notes": "Merged 116 curriculum documents with 0 bridge edges. 2002 unique nodes, 1848 edges.",
-    "total_edges": 1879
+    "total_edges": 1896
   },
   "nodes": [
     {
@@ -60081,6 +60081,584 @@
           "grade_level": "Adult"
         }
       ]
+    },
+    {
+      "id": "TRADE.ELEC.SAFETY",
+      "title": "Electrical Safety & Regulations",
+      "description": "Electrical safety principles, SANS 10142 wiring code, personal protective equipment, lockout/tagout procedures, and understanding electrical hazards.",
+      "subject_area": "Electrical Trade",
+      "subdomain": "Safety",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 8,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Electrical Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.ELEC.CIRCUITS",
+      "title": "Domestic Wiring & Circuits",
+      "description": "Single-phase domestic installations: DB boards, circuit breakers, earth leakage, plug circuits, lighting circuits, and geyser connections per SANS 10142.",
+      "subject_area": "Electrical Trade",
+      "subdomain": "Wiring",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Electrical Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.ELEC.THREE",
+      "title": "Three-Phase Systems",
+      "description": "Three-phase power supply, star/delta connections, motor installations, industrial distribution boards, power factor correction.",
+      "subject_area": "Electrical Trade",
+      "subdomain": "Industrial",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "Electrical Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.ELEC.SOLAR",
+      "title": "Solar PV Installation",
+      "description": "Photovoltaic system design, panel sizing, inverter selection, battery storage (lithium/lead-acid), grid-tied vs off-grid, Eskom feed-in requirements, IEC 62109.",
+      "subject_area": "Electrical Trade",
+      "subdomain": "Renewable",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Electrical Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.ELEC.CERT",
+      "title": "Wireman's Licence & COC",
+      "description": "Certificate of Compliance (COC) process, inspection procedures, testing equipment (multimeter, insulation tester, earth continuity), registration with DoEL.",
+      "subject_area": "Electrical Trade",
+      "subdomain": "Certification",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Evaluate",
+      "estimated_hours": 10,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "Electrical Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.PLUMB.BASIC",
+      "title": "Plumbing Fundamentals",
+      "description": "Water supply systems, pipe types (copper, PVC, PEX), fittings, soldering, compression joints, water pressure, and basic plumbing tools.",
+      "subject_area": "Plumbing Trade",
+      "subdomain": "Fundamentals",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 12,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Plumbing Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.PLUMB.DRAIN",
+      "title": "Drainage & Sanitation",
+      "description": "Drainage systems, soil pipes, waste pipes, traps, venting, septic tanks, connection to municipal sewer, SANS 10252.",
+      "subject_area": "Plumbing Trade",
+      "subdomain": "Drainage",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Plumbing Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.PLUMB.SOLAR",
+      "title": "Solar Water Heating",
+      "description": "Solar geyser installation, flat-plate vs evacuated tube collectors, thermosiphon vs pumped systems, SANS 10106, Eskom rebate programme.",
+      "subject_area": "Plumbing Trade",
+      "subdomain": "Solar",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 10,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Plumbing Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.WELD.ARC",
+      "title": "Arc Welding (SMAW/MMA)",
+      "description": "Shielded metal arc welding fundamentals, electrode selection, joint preparation, welding positions (1G-4G), safety, and defect identification.",
+      "subject_area": "Welding Trade",
+      "subdomain": "Arc",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 20,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Welding Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.WELD.MIG",
+      "title": "MIG/MAG Welding (GMAW)",
+      "description": "Gas metal arc welding, wire feed setup, shielding gas selection (CO2, Argon mix), thin sheet welding, positional welding, automotive applications.",
+      "subject_area": "Welding Trade",
+      "subdomain": "MIG",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Welding Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.WELD.TIG",
+      "title": "TIG Welding (GTAW)",
+      "description": "Gas tungsten arc welding for stainless steel and aluminium, filler rod selection, foot pedal control, pipe welding, high-quality finish work.",
+      "subject_area": "Welding Trade",
+      "subdomain": "TIG",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 20,
+      "difficulty": "Advanced",
+      "node_type": "topic",
+      "domain": "Welding Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.AUTO.ENGINE",
+      "title": "Petrol & Diesel Engines",
+      "description": "Four-stroke cycle, engine components, fuel injection systems, turbocharging, common faults diagnosis, compression testing, timing.",
+      "subject_area": "Automotive Trade",
+      "subdomain": "Engines",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Automotive Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.AUTO.ELEC",
+      "title": "Automotive Electrical Systems",
+      "description": "Batteries, alternators, starter motors, lighting, CAN bus, OBD2 diagnostics, wiring diagrams, sensor testing with multimeter.",
+      "subject_area": "Automotive Trade",
+      "subdomain": "Electrical",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Automotive Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.AUTO.BRAKE",
+      "title": "Braking & Suspension Systems",
+      "description": "Disc brakes, drum brakes, ABS, brake fluid, pad replacement, suspension types (McPherson, wishbone), shock absorbers, wheel alignment.",
+      "subject_area": "Automotive Trade",
+      "subdomain": "Chassis",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 12,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Automotive Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.BUILD.FOUND",
+      "title": "Foundations & Brickwork",
+      "description": "Setting out, excavation, strip footings, raft foundations, brick bonding patterns, mortar mixing, damp-proof course, SANS 10400.",
+      "subject_area": "Construction Trade",
+      "subdomain": "Brickwork",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 20,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Construction Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.BUILD.ROOF",
+      "title": "Roofing & Carpentry",
+      "description": "Roof truss types (king post, queen post, fink), timber selection, roof covering (tiles, IBR sheeting), flashing, guttering, ceiling installation.",
+      "subject_area": "Construction Trade",
+      "subdomain": "Roofing",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Construction Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.BUILD.READ",
+      "title": "Building Plan Reading",
+      "description": "Interpreting architectural drawings, floor plans, elevations, sections, site plans, symbols, scales, and municipal building approval process.",
+      "subject_area": "Construction Trade",
+      "subdomain": "Drawing",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 10,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Construction Trade",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.AGRI.CROP",
+      "title": "Crop Production Basics",
+      "description": "Soil preparation, seed selection, planting methods, irrigation, fertilisation, pest management (IPM), harvest timing. SA staples: maize, wheat, potatoes.",
+      "subject_area": "Agriculture",
+      "subdomain": "Crops",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Agriculture",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.AGRI.SMALL",
+      "title": "Small-Scale Farming & Food Gardens",
+      "description": "Backyard food production, container gardening, composting, companion planting, water harvesting, selling at markets, food sovereignty.",
+      "subject_area": "Agriculture",
+      "subdomain": "Smallholding",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 10,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Agriculture",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.IT.HARDWARE",
+      "title": "Computer Hardware & Repair",
+      "description": "PC assembly, component identification (CPU, RAM, GPU, PSU, storage), troubleshooting, thermal management, peripheral setup.",
+      "subject_area": "IT Support",
+      "subdomain": "Hardware",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 12,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "IT Support",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.IT.NETWORK",
+      "title": "Basic Networking",
+      "description": "IP addressing, subnetting, Wi-Fi setup, router configuration, Ethernet cabling (T568A/B), DNS, DHCP, firewall basics, network troubleshooting.",
+      "subject_area": "IT Support",
+      "subdomain": "Networking",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 15,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "IT Support",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.IT.SUPPORT",
+      "title": "Help Desk & Customer Service",
+      "description": "Ticketing systems, remote support tools, troubleshooting methodology, communication skills, SLA management, documentation.",
+      "subject_area": "IT Support",
+      "subdomain": "Support",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 8,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "IT Support",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.HOSP.FOOD",
+      "title": "Food Safety & Hygiene",
+      "description": "HACCP principles, food handling, storage temperatures, personal hygiene, cleaning schedules, health inspections, R638 regulations.",
+      "subject_area": "Hospitality",
+      "subdomain": "Food Safety",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 8,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Hospitality",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "TRADE.HOSP.SERVICE",
+      "title": "Restaurant Service & Management",
+      "description": "Table service, menu planning, costing, stock control, point-of-sale systems, customer experience, staff scheduling.",
+      "subject_area": "Hospitality",
+      "subdomain": "Service",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 12,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Hospitality",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.RIGHTS.CONST",
+      "title": "Know Your Constitutional Rights",
+      "description": "SA Bill of Rights (Chapter 2): equality, dignity, freedom of expression, privacy, fair labour practices, access to housing/healthcare/education/water. How to exercise and protect your rights.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Constitution",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 6,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.RIGHTS.ARREST",
+      "title": "Rights During Arrest & Detention",
+      "description": "Section 35 rights: right to silence, right to legal representation, right to be informed of charges, bail procedures, police conduct, what to do if rights are violated. Legal Aid SA contacts.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Criminal",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 4,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.EMPLOY.BCEA",
+      "title": "Employment Rights (BCEA & LRA)",
+      "description": "Basic Conditions of Employment Act: working hours, overtime, leave, minimum wage. Labour Relations Act: unfair dismissal, CCMA disputes, retrenchment procedures, union rights.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Employment",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 8,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.CONSUMER.CPA",
+      "title": "Consumer Protection (CPA)",
+      "description": "Consumer Protection Act: right to fair dealing, product warranties, cooling-off periods, defective goods returns, unfair contract terms, National Consumer Commission complaints.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Consumer",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 6,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.BUSINESS.REG",
+      "title": "Starting a Business in SA",
+      "description": "CIPC registration (Pty Ltd, sole proprietor, CC), BEE compliance, municipal permits, industry-specific licences, tax registration (SARS), UIF registration, workmen's compensation.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Business",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 8,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.TAX.PERSONAL",
+      "title": "Personal Tax Obligations",
+      "description": "SARS registration, income tax brackets, provisional tax, tax returns (eFiling), allowable deductions, medical tax credits, retirement fund contributions, penalties for non-compliance.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Tax",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 6,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.DATA.POPIA",
+      "title": "Data Protection (POPIA)",
+      "description": "Protection of Personal Information Act: 8 conditions for lawful processing, data subject rights, responsible parties, information officers, breach notification, Information Regulator complaints.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Privacy",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 5,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.PROPERTY.BASIC",
+      "title": "Property & Tenancy Law",
+      "description": "Rental Housing Act: lease agreements, deposits (Rental Housing Tribunal), eviction process (PIE Act), tenant rights, landlord obligations, sectional title schemes.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Property",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 6,
+      "difficulty": "Intermediate",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.CIVIL.SMALL",
+      "title": "Small Claims Court",
+      "description": "Claims up to R20,000 (no lawyer needed), how to file, evidence preparation, court procedure, enforcement of judgments, when to use magistrate's court instead.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Civil",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Apply",
+      "estimated_hours": 4,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
+    },
+    {
+      "id": "LEGAL.ROAD.TRAFFIC",
+      "title": "Traffic Law & Licensing",
+      "description": "Learner's licence, driving licence process, K53 test requirements, roadworthy certificates, traffic fines (AARTO), licence disc renewal, drunk driving penalties.",
+      "subject_area": "Legal Awareness",
+      "subdomain": "Traffic",
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Understand",
+      "estimated_hours": 5,
+      "difficulty": "Beginner",
+      "node_type": "topic",
+      "domain": "Legal Awareness",
+      "tags": [],
+      "supplementary_resources": []
     }
   ],
   "edges": [
@@ -73236,6 +73814,125 @@
       "edge_type": "AppliedIn",
       "strength_permille": 800,
       "rationale": "Physics problems motivate calculus. Asking 'how far does it travel?' requires integration. The physical world gives meaning to the abstract math."
+    },
+    {
+      "from": "TRADE.ELEC.SAFETY",
+      "to": "TRADE.ELEC.CIRCUITS",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Safety knowledge is prerequisite for all practical electrical work."
+    },
+    {
+      "from": "TRADE.ELEC.CIRCUITS",
+      "to": "TRADE.ELEC.THREE",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Single-phase domestic wiring before three-phase industrial."
+    },
+    {
+      "from": "TRADE.ELEC.CIRCUITS",
+      "to": "TRADE.ELEC.SOLAR",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Understanding domestic wiring before adding solar PV systems."
+    },
+    {
+      "from": "TRADE.ELEC.CIRCUITS",
+      "to": "TRADE.ELEC.CERT",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Must know wiring before pursuing certification."
+    },
+    {
+      "from": "TRADE.PLUMB.BASIC",
+      "to": "TRADE.PLUMB.DRAIN",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Basic plumbing before drainage systems."
+    },
+    {
+      "from": "TRADE.PLUMB.BASIC",
+      "to": "TRADE.PLUMB.SOLAR",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Basic plumbing before solar geyser installation."
+    },
+    {
+      "from": "TRADE.WELD.ARC",
+      "to": "TRADE.WELD.MIG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Arc welding fundamentals before MIG."
+    },
+    {
+      "from": "TRADE.WELD.MIG",
+      "to": "TRADE.WELD.TIG",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "MIG before TIG (higher skill level)."
+    },
+    {
+      "from": "TRADE.ELEC.CIRCUITS",
+      "to": "CAPS.PhysicalSciences.Gr12.P1.ELEC1",
+      "edge_type": "AppliedIn",
+      "strength_permille": 850,
+      "rationale": "Ohm's law, series/parallel circuits \u2014 the physics you learn IS the trade you practice."
+    },
+    {
+      "from": "TRADE.ELEC.SOLAR",
+      "to": "UNI.SUSTAINABILITY.SUST.RESOURCE",
+      "edge_type": "AppliedIn",
+      "strength_permille": 750,
+      "rationale": "Solar installation is sustainability in action \u2014 renewable energy at the household level."
+    },
+    {
+      "from": "TRADE.IT.NETWORK",
+      "to": "CYBER.FND.NET",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "Networking fundamentals are the foundation of network security."
+    },
+    {
+      "from": "LEGAL.RIGHTS.CONST",
+      "to": "UNI.CIVIC.CIV.RIGHTS",
+      "edge_type": "RelatedTo",
+      "strength_permille": 850,
+      "rationale": "Constitutional rights and civic literacy are two lenses on the same knowledge."
+    },
+    {
+      "from": "LEGAL.DATA.POPIA",
+      "to": "UNI.DIGITAL.DL.SAFE",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "POPIA is the legal framework behind digital safety practices."
+    },
+    {
+      "from": "LEGAL.TAX.PERSONAL",
+      "to": "UNI.FINANCIAL.FIN.TAX",
+      "edge_type": "RelatedTo",
+      "strength_permille": 900,
+      "rationale": "Tax law and financial literacy tax basics cover the same ground from different angles."
+    },
+    {
+      "from": "LEGAL.BUSINESS.REG",
+      "to": "UNI.FINANCIAL.FIN.PLAN",
+      "edge_type": "AppliedIn",
+      "strength_permille": 750,
+      "rationale": "Starting a business requires financial planning skills."
+    },
+    {
+      "from": "TRADE.HOSP.FOOD",
+      "to": "UNI.HEALTH.HL.NUTR",
+      "edge_type": "RelatedTo",
+      "strength_permille": 700,
+      "rationale": "Food safety and nutrition literacy overlap \u2014 understanding food is understanding health."
+    },
+    {
+      "from": "TRADE.AGRI.SMALL",
+      "to": "UNI.SUSTAINABILITY.SUST.ACTION",
+      "edge_type": "AppliedIn",
+      "strength_permille": 800,
+      "rationale": "Growing your own food is the most direct form of sustainable action."
     }
   ]
 }

@@ -31,6 +31,17 @@ const PATHWAYS: &[(&str, &str, &str)] = &[
     ("Economics", "Economics", "Micro, macro, behavioral, and policy"),
     ("Mathematics", "University Mathematics", "Calculus, linear algebra, differential equations, and beyond"),
     ("Physics", "University Physics", "Classical mechanics, E&M, quantum, and thermodynamics"),
+    // Trades
+    ("Electrical Trade", "Electrical Trade", "Safety, domestic wiring, three-phase, solar PV, wireman's licence"),
+    ("Plumbing Trade", "Plumbing Trade", "Water supply, drainage, solar geysers"),
+    ("Welding Trade", "Welding Trade", "Arc, MIG, TIG — from basics to aluminium"),
+    ("Automotive Trade", "Automotive Trade", "Engines, electrical, brakes, diagnostics"),
+    ("Construction Trade", "Construction Trade", "Foundations, brickwork, roofing, plan reading"),
+    ("Agriculture", "Agriculture", "Crop production, small-scale farming, food gardens"),
+    ("IT Support", "IT Support", "Hardware, networking, help desk"),
+    ("Hospitality", "Hospitality", "Food safety, restaurant service, management"),
+    // Legal
+    ("Legal Awareness", "Legal Awareness", "SA Constitution, employment law, consumer rights, tax, POPIA, business registration"),
 ];
 
 #[component]
