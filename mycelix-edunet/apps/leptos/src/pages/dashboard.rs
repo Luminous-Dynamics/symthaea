@@ -268,6 +268,9 @@ pub fn DashboardPage() -> impl IntoView {
             // Mastery heat map
             <MasteryHeatMap />
 
+            // Exam score prediction
+            <crate::study_tracker::ExamPrediction />
+
             // Subject mastery breakdown
             <SubjectMasteryBreakdown />
 

@@ -540,3 +540,96 @@ pub fn LearningVelocity() -> impl IntoView {
     }
 }
 
+// ============================================================
+// Exam Score Prediction
+// ============================================================
+
+/// Predict exam score based on BKT mastery per topic weighted by exam marks.
+#[component]
+pub fn ExamPrediction() -> impl IntoView {
+    let progress = crate::curriculum::use_progress();
+
+    view! {
+        {move || {
+            let p = progress.get();
+            let graph = crate::curriculum::caps_graph();
+
+            let mut p1_earned = 0.0_f64;
+            let mut p1_total = 0u16;
+            let mut p2_earned = 0.0_f64;
+            let mut p2_total = 0u16;
+
+            for node in &graph.nodes {
+                let is_gr12 = node.grade_levels.first().map(|g| g == "Grade12").unwrap_or(false);
+                if !is_gr12 { continue; }
+                let Some(ew) = &node.exam_weight else { continue; };
+                let bkt = p.bkt(&node.id);
+                let mastery = bkt.p_mastery as f64;
+                let marks = ew.marks;
+
+                if ew.paper == 1 {
+                    p1_total += marks;
+                    p1_earned += mastery * marks as f64;
+                } else {
+                    p2_total += marks;
+                    p2_earned += mastery * marks as f64;
+                }
+            }
+
+            let p1_pct = if p1_total > 0 { (p1_earned / p1_total as f64 * 100.0) as u32 } else { 0 };
+            let p2_pct = if p2_total > 0 { (p2_earned / p2_total as f64 * 100.0) as u32 } else { 0 };
+            let total_earned = p1_earned + p2_earned;
+            let total_marks = p1_total + p2_total;
+            let total_pct = if total_marks > 0 { (total_earned / total_marks as f64 * 100.0) as u32 } else { 0 };
+
+            let symbol = match total_pct {
+                80..=100 => ("A (Distinction)", "var(--mastery-green)"),
+                70..=79 => ("B (Meritorious)", "var(--info)"),
+                60..=69 => ("C (Substantial)", "var(--mastery-yellow)"),
+                50..=59 => ("D (Adequate)", "var(--warning)"),
+                40..=49 => ("E (Elementary)", "var(--warning)"),
+                30..=39 => ("F (Not achieved)", "var(--error)"),
+                _ => ("Not enough data", "var(--text-tertiary)"),
+            };
+
+            let has_data = p.bkt_states.values().any(|b| b.attempts > 0);
+
+            if !has_data {
+                return view! {
+                    <div class="dash-section">
+                        <h3>"Exam Prediction"</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary)">"Practice problems to get your predicted exam score"</p>
+                    </div>
+                }.into_any();
+            }
+
+            view! {
+                <div class="dash-section">
+                    <h3>"Predicted Exam Score"</h3>
+                    <div style="text-align: center; margin: 0.75rem 0">
+                        <div style=format!("font-size: 2.5rem; font-weight: 700; color: {}", symbol.1)>
+                            {total_pct}"%"
+                        </div>
+                        <div style=format!("font-size: 0.9rem; color: {}; margin-top: 0.25rem", symbol.1)>
+                            {symbol.0}
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem">
+                        <div style="padding: 0.5rem; background: var(--soil-rich); border-radius: 6px; text-align: center">
+                            <div style="font-size: 1.1rem; font-weight: 600">{p1_pct}"%"</div>
+                            <div style="font-size: 0.65rem; color: var(--text-tertiary)">"Paper 1 ("{p1_total}"m)"</div>
+                        </div>
+                        <div style="padding: 0.5rem; background: var(--soil-rich); border-radius: 6px; text-align: center">
+                            <div style="font-size: 1.1rem; font-weight: 600">{p2_pct}"%"</div>
+                            <div style="font-size: 0.65rem; color: var(--text-tertiary)">"Paper 2 ("{p2_total}"m)"</div>
+                        </div>
+                    </div>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary); text-align: center; margin-top: 0.5rem; font-style: italic">
+                        "Based on your practice performance. Keep studying to improve your prediction."
+                    </p>
+                </div>
+            }.into_any()
+        }}
+    }
+}
+
