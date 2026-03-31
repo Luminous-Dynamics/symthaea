@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in MIG/MAG Welding (GMAW)?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "Set up a MIG welder for 3mm mild steel. Specify wire diameter, shielding gas, flow rate, wire feed speed, and voltage. Explain MIG vs MAG.",
+        "answer": "Wire: 0.8mm. Gas: CO2 or 80%Ar/20%CO2. Flow: 12-15 L/min. Wire feed: 4-6 m/min. Voltage: 18-20V (short-circuit transfer). MIG = inert gas (pure Ar) for aluminium/stainless. MAG = active gas (CO2 or mix) for mild steel -- CO2 reacts with pool, improving penetration. Ar/CO2 mix gives less spatter but costs more. For SA mild steel, MAG with CO2 is most common.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["Correct MIG sounds like frying bacon. Crackling = voltage too low. Hissing = too high.", "Wire feed and voltage must be balanced together."],
+        "explanation": "Machine setup is the foundation of good MIG/MAG welding. Most production defects come from incorrect settings, not poor technique.",
+        "distractors": ["Use the thickest wire for maximum strength", "Shielding gas is optional indoors", "MIG and MAG are identical"]
       },
       {
-        "question": "Describe the key regulation or standard that governs MIG/MAG Welding (GMAW) in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "After welding a long seam on a 2mm enclosure, you see 8mm of warping. Explain the cause and three prevention techniques.",
+        "answer": "Cause: weld metal contracts as it cools, pulling plates inward (angular distortion). 2mm material has little stiffness to resist. Prevention: (1) Tack weld at 50-100mm intervals first to lock the joint. (2) Backstep welding: weld 100-150mm sections in reverse direction to distribute heat. (3) Pre-set: clamp panels 3-5° outward before welding so contraction pulls them straight. Additional: minimum heat input, alternate sides, weld centre-outward.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Think of distortion as metal 'pulling itself together' as weld cools.", "Thinner material distorts dramatically without countermeasures."],
+        "explanation": "Distortion control is critical in production MIG welding. Understanding thermal expansion/contraction physics enables prediction and prevention.",
+        "distractors": ["Heat the other side to fix it", "Thicker material distorts more", "Welding faster always reduces distortion"]
+      },
+      {
+        "question": "You are MIG welding 6mm 304 stainless steel. What specific setup and technique differences apply vs mild steel?",
+        "answer": "Key differences: (1) Gas: 98%Ar/2%CO2 or tri-mix -- pure CO2 causes carbon pickup and sensitisation (destroys corrosion resistance). (2) Wire: ER308LSi. (3) Reduce amperage 10-15% -- stainless has lower thermal conductivity. (4) Inter-pass temp <150°C. (5) Use DEDICATED stainless tools (brushes, discs, clamps) -- carbon steel contamination ruins corrosion resistance. (6) Back-purge with argon for critical root welds.",
+        "difficulty_permille": 600,
+        "bloom_level": "Apply",
+        "hints": ["Stainless welding = preserving corrosion resistance. Wrong gas/tools defeats the purpose.", "Cross-contamination from carbon steel is the most common failure cause."],
+        "explanation": "Stainless MIG welding is specialist work. All differences relate to maintaining corrosion resistance.",
+        "distractors": ["Use same CO2 as mild steel", "Stainless needs more heat", "Same wire brush for both metals"]
+      },
+      {
+        "question": "Your MIG welder produces excessive spatter, harsh arc, and porosity. Diagnose systematically using the four main parameters.",
+        "answer": "Four parameters: (1) Wire feed speed (WFS): too high = wire stubs into pool (harsh sound). Test: increase voltage -- if arc stabilises, WFS was too high. (2) Voltage: too low = stubbing and spatter. Adjust in 0.5V increments for smooth sizzle. (3) Gas flow: porosity = shielding failure. Check bottle, regulator (12-15 L/min), nozzle for spatter blockage, drafts. (4) Stick-out: 10-15mm correct; too long = unstable arc. Most likely for all three symptoms: gas flow problem (porosity) + voltage too low (spatter, harsh arc). Fix gas first, then balance WFS/voltage.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": ["Check gas FIRST -- most common porosity cause.", "Good MIG = frying bacon sound."],
+        "explanation": "Systematic troubleshooting: address most likely cause first (gas for porosity), then fine-tune electrical parameters.",
+        "distractors": ["Just increase everything", "Porosity is always from dirty metal", "Spatter is normal and unavoidable"]
+      },
+      {
+        "question": "A gate workshop uses CO2 at R800/cylinder. A supplier offers 80/20 Ar/CO2 at R1,400. Analyse the cost-benefit for decorative gate fabrication.",
+        "answer": "80/20 costs 75% more per cylinder but: (1) 50-70% less spatter = ~1 hour/day less grinding. At R200/hr labour, that's R200/day saved. (2) 10-15% faster welding, fewer rejects. (3) Smoother appearance = fewer cosmetic grinding passes (critical for visible gates). (4) Less fume. Break-even: extra cost ~R240/day (R600/cylinder / 2.5 days), saving ~R200/day in labour. Nearly break-even on cost alone, but quality improvement and health benefits tip in favour of 80/20 for decorative work. For heavy structural where appearance doesn't matter, CO2 remains more cost-effective.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "bloom_level": "Evaluate",
+        "hints": ["Cheapest gas is not always cheapest overall -- factor in labour and rework.", "For decorative work, less grinding = lower total cost."],
+        "explanation": "Gas selection is a business decision. Total welding cost = gas + wire + labour + rework.",
+        "distractors": ["Always use cheapest gas", "80/20 gives identical results to CO2", "Gas is the largest cost component"]
       }
     ],
     "key_vocabulary": [

@@ -1,0 +1,345 @@
+{
+  "node_id": "CAPS.LifeOrientation.Gr12.Social",
+  "lesson": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Social",
+    "title": "CAPS.LifeOrientation.Gr12.Social: Social & Environmental Justice",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Social justice means ensuring fair distribution of resources, opportunities, and privileges within a society. South Africa faces deep-rooted inequality: it has one of the world's highest Gini coefficients (0.63), meaning extreme wealth inequality. Poverty affects millions, with over 55% of the population living below the upper-bound poverty line. Discrimination takes many forms: racism, sexism, homophobia, xenophobia, ableism, and ageism. Gender-based violence (GBV) is a national crisis, with SA having among the world's highest rates of femicide. Xenophobia — hostility toward foreign nationals — has led to violent attacks against African migrants. The Constitution (Section 9) prohibits unfair discrimination on 17 listed grounds. Community-based projects and civil society organisations work to address these issues through advocacy, service delivery, and empowerment. Ubuntu ('I am because we are') calls us to recognise our shared humanity and work collectively for justice.",
+    "examples": [
+      {
+        "problem": "Explain the causes and consequences of poverty in South Africa.",
+        "steps": [
+          {
+            "instruction": "Step 1: Historical causes: apartheid dispossession, Bantu Education, migrant labour system, land inequality",
+            "result": "historical roots identified"
+          },
+          {
+            "instruction": "Step 2: Current causes: unemployment (35%+), poor education quality, lack of skills, spatial inequality (rural vs urban)",
+            "result": "present factors identified"
+          },
+          {
+            "instruction": "Step 3: Consequences: food insecurity, poor health outcomes, limited educational attainment, crime, social instability, perpetuation of inequality across generations",
+            "result": "effects documented"
+          }
+        ],
+        "answer": "Answer: Poverty in SA has historical roots (apartheid) and current drivers (unemployment, poor education). Its consequences — food insecurity, poor health, limited opportunity — create intergenerational cycles.",
+        "visual_description": null
+      },
+      {
+        "problem": "Analyse the causes of xenophobic violence in South Africa and suggest solutions.",
+        "steps": [
+          {
+            "instruction": "Step 1: Causes: competition for scarce resources (jobs, housing, services), frustration with government service delivery, scapegoating of foreign nationals, misinformation, historical patterns of violence",
+            "result": "causes identified"
+          },
+          {
+            "instruction": "Step 2: Impact: loss of life and property, displacement, damage to SA's international reputation, violation of constitutional rights, trauma",
+            "result": "consequences assessed"
+          },
+          {
+            "instruction": "Step 3: Solutions: government service delivery improvement, community dialogue, law enforcement against inciters, education about refugee rights, economic inclusion programmes, media responsibility",
+            "result": "solutions proposed"
+          }
+        ],
+        "answer": "Answer: Xenophobia is driven by resource competition and frustration, not legitimate grievances against foreigners. Solutions require addressing root causes (service delivery, unemployment) alongside education and law enforcement.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe the extent of gender-based violence in SA and explain what can be done to address it.",
+        "steps": [
+          {
+            "instruction": "Step 1: Scale: SA has among the world's highest rates of rape, domestic violence, and femicide. A woman is killed every 4 hours",
+            "result": "scope established"
+          },
+          {
+            "instruction": "Step 2: Root causes: patriarchal attitudes, toxic masculinity, alcohol abuse, normalisation of violence, poverty, failure of criminal justice system",
+            "result": "causes identified"
+          },
+          {
+            "instruction": "Step 3: Solutions: education to change attitudes from childhood, stricter enforcement of the Domestic Violence Act, support services for survivors, economic empowerment of women, addressing alcohol abuse, engaging men and boys as allies",
+            "result": "multi-level response"
+          }
+        ],
+        "answer": "Answer: GBV in SA is a crisis rooted in patriarchal attitudes, poverty, and systemic failures. Addressing it requires education, law enforcement, survivor support, and engaging men as allies for change.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List the grounds on which discrimination is prohibited under Section 9(3) of the Constitution.",
+        "answer": "Race, gender, sex, pregnancy, marital status, ethnic or social origin, colour, sexual orientation, age, disability, religion, conscience, belief, culture, language, and birth.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Section 9(3) lists 17 grounds.",
+          "Think about the different ways people can be treated unfairly."
+        ],
+        "explanation": "Section 9(3) provides broad protection against unfair discrimination. The list is not exhaustive — courts can add analogous grounds.",
+        "distractors": [
+          "Only race and gender are protected",
+          "The Constitution only prohibits government discrimination, not private",
+          "Discrimination based on language is not prohibited"
+        ]
+      },
+      {
+        "question": "Explain what the Gini coefficient measures and why SA's score is significant.",
+        "answer": "The Gini coefficient measures income inequality on a scale of 0 (perfect equality) to 1 (perfect inequality). SA's score of approximately 0.63 makes it one of the most unequal countries in the world, reflecting the legacy of apartheid and ongoing structural inequality.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "0 means everyone earns the same; 1 means one person has everything.",
+          "Consider what historical factors created SA's extreme inequality."
+        ],
+        "explanation": "SA's Gini coefficient of ~0.63 is among the world's highest. This extreme inequality is a legacy of apartheid land dispossession, education inequality, and economic exclusion.",
+        "distractors": [
+          "A high Gini coefficient means a country is wealthy",
+          "SA has average inequality compared to other countries",
+          "The Gini coefficient measures poverty, not inequality"
+        ]
+      },
+      {
+        "question": "A learner at your school is being bullied because of their sexual orientation. What should you do, and what constitutional rights are being violated?",
+        "answer": "Section 9 (equality, non-discrimination on grounds of sexual orientation), Section 10 (human dignity), Section 12 (freedom and security of person). Actions: support the learner, report to school management, involve school counsellor, report to police if criminal acts involved (assault, intimidation).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about which sections of the Bill of Rights protect this learner.",
+          "Consider both immediate support and formal reporting channels."
+        ],
+        "explanation": "The Constitution explicitly protects against discrimination based on sexual orientation. Schools have a duty to protect learners. Homophobic bullying violates multiple constitutional rights.",
+        "distractors": [
+          "Sexual orientation is a choice so it is not protected",
+          "Schools cannot interfere with learners' beliefs about homosexuality",
+          "It is not bullying if it is based on religious beliefs"
+        ]
+      },
+      {
+        "question": "Analyse the relationship between poverty, crime, and inequality in South Africa.",
+        "answer": "Poverty creates desperation; inequality creates resentment and relative deprivation. Together they drive property crime (theft, robbery), substance abuse, and violent crime. However, poverty does not automatically cause crime — most poor people are law-abiding. Other factors include weak policing, unemployment, family breakdown, and substance abuse. Addressing poverty and inequality is essential for reducing crime long-term.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Avoid the simplistic view that 'poor people commit crimes.'",
+          "Think about how inequality (the gap between rich and poor) drives resentment."
+        ],
+        "explanation": "The poverty-crime relationship is complex. Inequality (not just poverty) is a strong predictor of violent crime. Addressing root causes requires economic development, education, and social cohesion.",
+        "distractors": [
+          "Crime is purely a moral choice unrelated to poverty",
+          "All crime would disappear if everyone had money",
+          "Only poor communities have crime problems"
+        ]
+      },
+      {
+        "question": "Evaluate the effectiveness of government social grants in addressing poverty in South Africa.",
+        "answer": "Effective: reaches 18+ million people, reduces extreme poverty, improves nutrition and school attendance, supports local economies. Limitations: does not address structural causes (unemployment, education quality), creates dependency concerns, amounts are below the poverty line, not a substitute for job creation.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both the positive impact and the limitations.",
+          "Think about whether grants address the causes or symptoms of poverty."
+        ],
+        "explanation": "Social grants are SA's most effective poverty reduction tool, reaching over 18 million beneficiaries. However, they address symptoms while structural issues (unemployment, education) require additional interventions.",
+        "distractors": [
+          "Social grants have completely solved poverty in SA",
+          "Social grants only create dependency and should be abolished",
+          "Only employed people should receive government support"
+        ]
+      },
+      {
+        "question": "Design a community project that addresses one social justice issue in your area. Include objectives, activities, resources, and evaluation.",
+        "answer": "Project should include: identified social issue (e.g., food insecurity, GBV awareness), clear objectives (SMART goals), target community, specific activities (workshops, resource distribution, advocacy), required resources (funding, volunteers, venue), partnerships (local organisations, government), timeline, and evaluation plan (indicators of success).",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Choose a specific, actionable issue rather than trying to solve everything.",
+          "Include how you will measure whether the project made a difference."
+        ],
+        "explanation": "Effective community projects are specific, well-planned, and involve the community in design and implementation. They address a real need with measurable outcomes.",
+        "distractors": [
+          "Community projects only work if the government funds them",
+          "One school project cannot make any difference",
+          "Community projects should focus on awareness only, not action"
+        ]
+      }
+    ],
+    "hints": [
+      "Section 9 of the Constitution (Equality) prohibits unfair discrimination on 17 listed grounds.",
+      "SA's Gini coefficient (~0.63) makes it one of the most unequal countries in the world.",
+      "Ubuntu — 'I am because we are' — reminds us that social justice is everyone's responsibility."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "social justice",
+        "definition": "Fair distribution of resources, opportunities, and privileges in society, ensuring all people can live with dignity regardless of their background",
+        "example_usage": "Social justice in SA requires addressing the legacy of apartheid through education, employment, and land reform."
+      },
+      {
+        "term": "Gini coefficient",
+        "definition": "A measure of income inequality on a scale of 0 (perfect equality) to 1 (maximum inequality). SA's is approximately 0.63.",
+        "example_usage": "South Africa's Gini coefficient of 0.63 indicates extreme income inequality."
+      },
+      {
+        "term": "gender-based violence (GBV)",
+        "definition": "Violence directed at someone because of their gender, including domestic violence, sexual assault, femicide, and emotional abuse",
+        "example_usage": "South Africa has declared GBV a national crisis, with one of the world's highest femicide rates."
+      },
+      {
+        "term": "xenophobia",
+        "definition": "Fear, hatred, or prejudice against people from other countries or cultures",
+        "example_usage": "Xenophobic attacks on foreign nationals violate their constitutional rights and damage South Africa's reputation."
+      },
+      {
+        "term": "ubuntu",
+        "definition": "An African philosophy meaning 'I am because we are' — emphasising shared humanity, community, and mutual care",
+        "example_usage": "Ubuntu calls us to treat foreign nationals with the same dignity we expect for ourselves."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think inequality is only about money.",
+        "correction": "Inequality includes access to education, healthcare, clean water, safety, and opportunity. Spatial inequality (urban vs rural) and gender inequality are equally important dimensions.",
+        "why_students_think_this": "Media coverage of inequality often focuses on income statistics. Teaching about multiple dimensions of inequality gives a fuller picture."
+      },
+      {
+        "misconception": "Students believe xenophobia is justified because foreign nationals 'take our jobs.'",
+        "correction": "Research shows immigrants create more jobs than they take and contribute to economic growth. The real causes of unemployment are structural (education, skills, economic policy). Scapegoating diverts attention from the actual causes.",
+        "why_students_think_this": "Visible competition for informal sector jobs creates a false perception. Frustration with unemployment is real but misdirected. Education about economics and rights helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Social",
+    "title": "Assessment: Social & Environmental Justice",
+    "items": [
+      {
+        "question": "Define social justice and give two examples of social injustice in South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Social justice is the fair distribution of resources and opportunities. Examples: extreme wealth inequality (Gini 0.63), gender-based violence, lack of access to quality education in rural areas.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about fairness in how resources and opportunities are distributed"
+      },
+      {
+        "question": "Explain how apartheid continues to affect inequality in South Africa today.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Apartheid's legacy: unequal land ownership, inferior education system for Black South Africans, spatial segregation (townships far from economic centres), wealth accumulated by white minority. These structural inequalities persist despite political freedom.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about how historical dispossession affects present-day opportunity"
+      },
+      {
+        "question": "A xenophobic incident occurs in your community. Describe how you would respond as a responsible citizen.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Ensure safety first. Report to police (criminal offence under Equality Act). Assist affected people (shelter, food, medical). Organise community dialogue. Counter misinformation on social media. Work with community leaders and NGOs. Report to SAHRC.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Think about immediate safety, reporting, and long-term prevention"
+      },
+      {
+        "question": "Analyse the root causes of gender-based violence in South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Patriarchal attitudes and toxic masculinity, normalisation of violence, alcohol and substance abuse, poverty and unemployment, failure of criminal justice system (low conviction rates), historical normalisation of violence during apartheid.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Look beyond individual perpetrators to systemic and cultural factors"
+      },
+      {
+        "question": "Evaluate whether affirmative action (BBBEE) is an effective tool for addressing inequality in SA.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "For: addresses historical disadvantage, promotes diversity, creates Black middle class. Against: benefits a small elite ('tenderpreneurs'), fronting, does not reach the poorest, may reduce competitiveness. Evaluation should acknowledge complexity and suggest improvements.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both the intention and the outcomes of the policy"
+      },
+      {
+        "question": "Design an anti-discrimination awareness campaign for your school that addresses at least three forms of discrimination.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Campaign should address: racism, homophobia, xenophobia (or others). Include: assembly presentations, poster campaign, pledge wall, anonymous reporting system, peer mediation training, and follow-up evaluation. Root in constitutional values (Section 9).",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Make it practical, inclusive, and linked to constitutional rights"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is South Africa's Gini coefficient and what does it mean?",
+      "back": "Approximately 0.63 — one of the highest in the world, indicating extreme income inequality between rich and poor.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is gender-based violence (GBV)?",
+      "back": "Violence directed at someone because of their gender, including domestic violence, sexual assault, femicide, and emotional abuse. SA has among the world's highest rates.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What is xenophobia?",
+      "back": "Fear, hatred, or prejudice against people from other countries. In SA, it has led to violent attacks on African migrants and refugees.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 125
+    },
+    {
+      "front": "What does ubuntu mean?",
+      "back": "'I am because we are' — an African philosophy emphasising shared humanity, community solidarity, and mutual care.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "On how many grounds does Section 9(3) prohibit unfair discrimination?",
+      "back": "17 listed grounds including race, gender, sex, sexual orientation, age, disability, religion, language, and culture. The list is not exhaustive.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 225
+    },
+    {
+      "front": "How many South Africans receive social grants?",
+      "back": "Over 18 million people, making it the country's largest poverty reduction programme. Includes child support, old age pension, and disability grants.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What percentage of South Africans live below the upper-bound poverty line?",
+      "back": "Over 55%, reflecting the deep structural inequality inherited from apartheid and ongoing economic challenges.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 275
+    },
+    {
+      "front": "What is BBBEE?",
+      "back": "Broad-Based Black Economic Empowerment — government policy to redress economic inequality by promoting Black ownership, management, and skills development in business.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Social", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

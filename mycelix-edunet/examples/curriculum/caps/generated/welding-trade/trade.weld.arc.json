@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Arc Welding (SMAW/MMA)?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "You need to weld two 10mm mild steel plates in a butt joint. Select the appropriate electrode (AWS classification), diameter, polarity, and approximate amperage. Explain your choices.",
+        "answer": "Electrode: E7018 (low-hydrogen, basic-coated) for structural mild steel. Diameter: 3.2mm for root pass, 4.0mm for fill/cap passes. Polarity: DCEP (reverse polarity) for deeper penetration. Amperage: root 90-110A (3.2mm), fill/cap 130-160A (4.0mm). Rule of thumb: 30-40A per mm of electrode diameter. Joint prep: 60-70° V-groove, 1.5-2mm root face, 2-3mm gap.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["E7018: 70=tensile strength, 1=all-position, 8=low-hydrogen DCEP.", "Low-hydrogen electrodes must be stored in a rod oven at 120°C after opening."],
+        "explanation": "Electrode selection, amperage, and joint prep determine weld quality before striking an arc. E7018 is the most specified electrode in SA structural fabrication.",
+        "distractors": ["E6013 is better for structural work", "Larger electrodes are always better", "Polarity doesn't matter for SMAW"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Arc Welding (SMAW/MMA) in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "Visual inspection reveals: (a) undercut along the weld toe, (b) a crater crack at the stop point. Identify causes and corrective actions for each.",
+        "answer": "(a) Undercut: groove melted into base metal at weld toe. Causes: excessive amperage, fast travel speed, incorrect electrode angle, long arc. Fix: reduce amperage 10-15%, slow travel, pause at toes during weaving. Repair undercut >1mm with a cosmetic pass. (b) Crater crack: crack at the stop crater due to shrinkage stress. Fix: use backstep technique (reverse 10-15mm before breaking arc) or crater-fill technique. Grind out existing cracks and re-weld.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Undercut creates stress concentrations where fatigue cracks initiate.", "Crater cracks are 100% preventable with proper stopping technique."],
+        "explanation": "Visual inspection and defect identification are the first quality control steps. Understanding causes enables prevention rather than repair.",
+        "distractors": ["Undercut is acceptable up to 3mm", "Crater cracks are cosmetic only", "Grind the entire weld out to fix undercut"]
+      },
+      {
+        "question": "You are welding overhead (4G) on a structural beam. What adjustments do you make compared to flat position (1G)?",
+        "answer": "Adjustments: (1) Reduce amperage 10-15% -- gravity pulls the pool down. (2) Use 3.2mm max electrode for pool control. (3) Short arc length (1-2mm). (4) Narrow stringer beads, no wide weaving. (5) Slightly faster travel to keep pool small. (6) 5-10° push angle. Why hardest: gravity pulls molten pool down, demanding precise heat/speed/arc control. Slag inclusion risk increases as pool solidifies against gravity.",
+        "difficulty_permille": 600,
+        "bloom_level": "Apply",
+        "hints": ["Key principle: keep the weld pool SMALL in overhead.", "Overhead is mandatory for most structural welding qualifications."],
+        "explanation": "Positional welding separates qualified welders from beginners. SANS 2001-CS1 requires testing in the positions the welder will use.",
+        "distractors": ["Use same settings as flat position", "Overhead is impossible with SMAW", "Wide weave works better overhead"]
+      },
+      {
+        "question": "A client needs a repair weld on a cast iron engine block. What special considerations, electrode, and procedure apply?",
+        "answer": "Cast iron is brittle (2-4% carbon, low ductility). Electrode: ENiFe-CI (nickel-iron) -- NOT E7018, which causes brittle carbon pickup. Procedure: (1) Clean by grinding. (2) Preheat 200-300°C. (3) Low amperage (minimum to maintain arc). (4) Short runs (25-30mm), peen each pass with ball-peen hammer while hot (compresses weld, counters shrinkage). (5) Slow-cool wrapped in insulating blanket -- NEVER quench. This prevents martensite formation in the HAZ.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": ["Cardinal rule: minimum heat, slow cooling, peen after each pass.", "Cast iron fails when welders use wrong electrode or cool too fast."],
+        "explanation": "Cast iron repair is specialist SMAW work requiring metallurgy knowledge and practical technique.",
+        "distractors": ["Use E7018 -- steel electrodes work on everything", "Preheat is unnecessary for small repairs", "Quench with water for hardness"]
+      },
+      {
+        "question": "Compare E6013 and E7018 electrodes. A shop uses only E6013 for all work. Should they switch to E7018 for structural welding?",
+        "answer": "E6013: rutile coating, easy to use, 60ksi tensile, uncontrolled hydrogen. Good for general light fabrication and beginners. E7018: low-hydrogen basic coating, 70ksi, excellent ductility and impact toughness, requires DCEP and rod oven storage. Required for structural/code work. The shop MUST switch for structural welding: (1) E6013 doesn't meet SANS 2001-CS1 requirements. (2) Need rod oven investment (R3-5K). (3) Welder retraining on E7018 handling. (4) Higher electrode cost but superior weld integrity. E7018 exposed >4 hours to atmosphere must be re-baked at 350°C for 1 hour.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "bloom_level": "Evaluate",
+        "hints": ["The '8' in E7018 = low-hydrogen coating, critical for preventing hydrogen cracking.", "Hydrogen-induced cracking can appear hours after welding."],
+        "explanation": "Electrode selection must meet code requirements. Using E6013 on structural work is a code violation with potential for catastrophic failure.",
+        "distractors": ["E6013 and E7018 are interchangeable", "Low-hydrogen means zero hydrogen", "Rod ovens are unnecessary"]
       }
     ],
     "key_vocabulary": [

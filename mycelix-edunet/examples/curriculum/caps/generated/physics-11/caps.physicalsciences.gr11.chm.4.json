@@ -2,20 +2,20 @@
   "node_id": "CAPS.PhysicalSciences.Gr11.CHM.4",
   "lesson": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.CHM.4",
-    "title": "CAPS.PhysicalSciences.Gr11.CHM.4: Arrhenius, Brønsted-Lowry definitions. Strong/weak acids ...",
+    "title": "CAPS.PhysicalSciences.Gr11.CHM.4: Arrhenius, Br\u00f8nsted-Lowry definitions. Strong/weak acids ...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules. Types: London/dispersion forces (weakest, all molecules), dipole-dipole forces (polar molecules), hydrogen bonds (strongest IMF — when H is bonded to N, O, or F). Stronger IMFs = higher boiling point, higher viscosity, higher surface tension. Water has unusually high boiling point because of hydrogen bonding.",
+    "explanation": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules. Types: London/dispersion forces (weakest, all molecules), dipole-dipole forces (polar molecules), hydrogen bonds (strongest IMF \u2014 when H is bonded to N, O, or F). Stronger IMFs = higher boiling point, higher viscosity, higher surface tension. Water has unusually high boiling point because of hydrogen bonding.",
     "examples": [
       {
-        "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
+        "problem": "Calculate the pH of a 0.01 mol/dm\u00b3 HCl solution.",
         "steps": [
           {
-            "instruction": "Step 1: HCl is a strong acid → fully ionised → [H₃O⁺] = 0.01 mol/dm³",
+            "instruction": "Step 1: HCl is a strong acid \u2192 fully ionised \u2192 [H\u2083O\u207a] = 0.01 mol/dm\u00b3",
             "result": "identify acid type"
           },
           {
-            "instruction": "Step 2: pH = −log[H₃O⁺] = −log(0.01) = −log(10⁻²)",
+            "instruction": "Step 2: pH = \u2212log[H\u2083O\u207a] = \u2212log(0.01) = \u2212log(10\u207b\u00b2)",
             "result": "apply formula"
           },
           {
@@ -27,14 +27,14 @@
         "visual_description": null
       },
       {
-        "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
+        "problem": "Calculate the pH of a 0.01 mol/dm\u00b3 HCl solution.",
         "steps": [
           {
-            "instruction": "Step 1: HCl is a strong acid → fully ionised → [H₃O⁺] = 0.01 mol/dm³",
+            "instruction": "Step 1: HCl is a strong acid \u2192 fully ionised \u2192 [H\u2083O\u207a] = 0.01 mol/dm\u00b3",
             "result": "identify acid type"
           },
           {
-            "instruction": "Step 2: pH = −log[H₃O⁺] = −log(0.01) = −log(10⁻²)",
+            "instruction": "Step 2: pH = \u2212log[H\u2083O\u207a] = \u2212log(0.01) = \u2212log(10\u207b\u00b2)",
             "result": "apply formula"
           },
           {
@@ -46,14 +46,14 @@
         "visual_description": null
       },
       {
-        "problem": "Calculate the pH of a 0.01 mol/dm³ HCl solution.",
+        "problem": "Calculate the pH of a 0.01 mol/dm\u00b3 HCl solution.",
         "steps": [
           {
-            "instruction": "Step 1: HCl is a strong acid → fully ionised → [H₃O⁺] = 0.01 mol/dm³",
+            "instruction": "Step 1: HCl is a strong acid \u2192 fully ionised \u2192 [H\u2083O\u207a] = 0.01 mol/dm\u00b3",
             "result": "identify acid type"
           },
           {
-            "instruction": "Step 2: pH = −log[H₃O⁺] = −log(0.01) = −log(10⁻²)",
+            "instruction": "Step 2: pH = \u2212log[H\u2083O\u207a] = \u2212log(0.01) = \u2212log(10\u207b\u00b2)",
             "result": "apply formula"
           },
           {
@@ -67,121 +67,96 @@
     ],
     "practice_problems": [
       {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
-        "difficulty_permille": 125,
+        "question": "Calculate the pH of a 0.001 mol/dm^3 HNO3 solution.",
+        "answer": "pH = -log[H3O+] = -log(0.001) = -log(10^-3) = 3",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+          "HNO3 is a strong acid -- it ionises completely.",
+          "So [H3O+] = concentration of HNO3."
         ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "explanation": "HNO3 -> H+ + NO3- (complete ionisation). [H3O+] = 0.001 = 10^-3 mol/dm^3. pH = 3.",
         "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
+          "pH = 1",
+          "pH = 0.001",
+          "pH = 11"
         ]
       },
       {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
-        "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "question": "Classify acetic acid (CH3COOH) as strong or weak, and explain why.",
+        "answer": "Acetic acid is a WEAK acid. It only partially ionises in water: CH3COOH <=> CH3COO- + H+. The double arrow indicates equilibrium, meaning most molecules remain undissociated.",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
         "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+          "Strong acids ionise completely (single arrow). Weak acids ionise partially (equilibrium arrow).",
+          "Vinegar contains ~5% acetic acid."
         ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "explanation": "In a 0.1 mol/dm^3 acetic acid solution, only about 1.3% of molecules ionise. This is why vinegar (acetic acid) is safe to consume, while HCl (strong acid) is corrosive.",
         "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
+          "Strong acid",
+          "Neither strong nor weak",
+          "It does not ionise"
         ]
       },
       {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
-        "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
-        ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
-        "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
-        ]
-      },
-      {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
+        "question": "If [OH-] = 5 x 10^-4 mol/dm^3, calculate [H3O+] and the pH. (Kw = 10^-14)",
+        "answer": "[H3O+] = Kw/[OH-] = 10^-14 / 5x10^-4 = 2x10^-11 mol/dm^3. pH = -log(2x10^-11) = 10.7.",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+          "Use Kw = [H3O+][OH-] = 10^-14 at 25C.",
+          "Rearrange: [H3O+] = Kw/[OH-]."
         ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "explanation": "[H3O+] = 10^-14 / (5x10^-4) = 2x10^-11. pH = -log(2x10^-11) = 10.7. This is a basic solution (pH > 7).",
         "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
+          "pH = 3.3",
+          "pH = 7",
+          "pH = 13.7"
         ]
       },
       {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
-        "difficulty_permille": 625,
+        "question": "25 cm^3 of 0.1 mol/dm^3 NaOH is needed to neutralise 50 cm^3 of HCl. Calculate the concentration of HCl.",
+        "answer": "n(NaOH) = cV = 0.1 x 0.025 = 0.0025 mol. Ratio NaOH:HCl = 1:1. n(HCl) = 0.0025 mol. c(HCl) = n/V = 0.0025/0.05 = 0.05 mol/dm^3.",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+          "NaOH + HCl -> NaCl + H2O (1:1 ratio).",
+          "Convert cm^3 to dm^3 by dividing by 1000."
         ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "explanation": "n(NaOH) = 0.1 x 0.025 = 0.0025 mol. Since the ratio is 1:1, n(HCl) = 0.0025 mol. c(HCl) = 0.0025/0.050 = 0.05 mol/dm^3.",
         "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
+          "0.1 mol/dm^3",
+          "0.2 mol/dm^3",
+          "0.025 mol/dm^3"
         ]
       },
       {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "question": "Explain the difference between a concentrated acid and a strong acid, using examples.",
+        "answer": "Concentrated = high number of moles per dm^3 (quantity). Strong = ionises completely (property). A concentrated weak acid (e.g., 10 mol/dm^3 CH3COOH) has many molecules but most are undissociated. A dilute strong acid (e.g., 0.001 mol/dm^3 HCl) has few molecules but all are ionised.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
         "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
+          "Concentrated/dilute refers to amount. Strong/weak refers to degree of ionisation.",
+          "These are independent concepts."
         ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
+        "explanation": "This is a common confusion. Concentrated acetic acid (glacial) is a weak acid. Dilute HCl is a strong acid. Strength and concentration are independent properties.",
         "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
-        ]
-      },
-      {
-        "question": "If [OH⁻] = 2 × 10⁻³ mol/dm³, find the pH at 25°C.",
-        "answer": "pH = 11.3",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Find [H₃O⁺] first using Kw = [H₃O⁺][OH⁻] = 10⁻¹⁴.,Then use pH = −log[H₃O⁺]."
-        ],
-        "explanation": "[H₃O⁺] = Kw/[OH⁻] = 10⁻¹⁴/(2×10⁻³) = 5×10⁻¹². pH = −log(5×10⁻¹²) = 11.3.",
-        "distractors": [
-          "3.0",
-          "2.7",
-          "8.7"
+          "Strong and concentrated mean the same thing",
+          "Weak acids cannot be concentrated",
+          "All concentrated acids are strong"
         ]
       }
     ],
     "hints": [
-      "Remember: pH + pOH = 14 at 25°C. If you know [OH⁻], find pOH = −log[OH⁻], then pH = 14 − pOH.",
-      "Remember: pH + pOH = 14 at 25°C. If you know [OH⁻], find pOH = −log[OH⁻], then pH = 14 − pOH.",
-      "Remember: pH + pOH = 14 at 25°C. If you know [OH⁻], find pOH = −log[OH⁻], then pH = 14 − pOH."
+      "Remember: pH + pOH = 14 at 25\u00b0C. If you know [OH\u207b], find pOH = \u2212log[OH\u207b], then pH = 14 \u2212 pOH.",
+      "Remember: pH + pOH = 14 at 25\u00b0C. If you know [OH\u207b], find pOH = \u2212log[OH\u207b], then pH = 14 \u2212 pOH.",
+      "Remember: pH + pOH = 14 at 25\u00b0C. If you know [OH\u207b], find pOH = \u2212log[OH\u207b], then pH = 14 \u2212 pOH."
     ],
     "key_vocabulary": [
       {
         "term": "conjugate acid-base pair",
-        "definition": "Two species that differ by one proton (H⁺)",
-        "example_usage": "NH₃ and NH₄⁺ are a conjugate pair."
+        "definition": "Two species that differ by one proton (H\u207a)",
+        "example_usage": "NH\u2083 and NH\u2084\u207a are a conjugate pair."
       },
       {
         "term": "equivalence point",
@@ -191,14 +166,14 @@
       {
         "term": "hydrolysis",
         "definition": "The reaction of a salt with water to produce acidic or basic solution",
-        "example_usage": "NaCH₃COO is basic by hydrolysis (weak acid salt)."
+        "example_usage": "NaCH\u2083COO is basic by hydrolysis (weak acid salt)."
       }
     ],
     "misconceptions": [
       {
         "misconception": "Students think a weak acid has a high pH.",
         "correction": "A weak acid can still have a low pH if concentrated enough. 'Weak' refers to degree of ionisation, not pH.",
-        "why_students_think_this": "Concentrated CH₃COOH (weak) can have a lower pH than dilute HCl (strong)."
+        "why_students_think_this": "Concentrated CH\u2083COOH (weak) can have a lower pH than dilute HCl (strong)."
       }
     ],
     "generation_quality": {
@@ -211,10 +186,10 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.CHM.4",
-    "title": "Assessment: Arrhenius, Brønsted-Lowry definitions. Strong/weak acids and bases. pH scale (pH = −log[H⁺]). Neutralisation. Titrations. Indicators. Acid-base reactions with oxides, carbonates, metals",
+    "title": "Assessment: Arrhenius, Br\u00f8nsted-Lowry definitions. Strong/weak acids and bases. pH scale (pH = \u2212log[H\u207a]). Neutralisation. Titrations. Indicators. Acid-base reactions with oxides, carbonates, metals",
     "items": [
       {
-        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "question": "Sketch the titration curve for adding NaOH to CH\u2083COOH. Label the equivalence point and state which indicator to use.",
         "item_type": "ShortAnswer",
         "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
         "points": 1,
@@ -223,7 +198,7 @@
         "hint": "5"
       },
       {
-        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "question": "Sketch the titration curve for adding NaOH to CH\u2083COOH. Label the equivalence point and state which indicator to use.",
         "item_type": "ShortAnswer",
         "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
         "points": 2,
@@ -232,7 +207,7 @@
         "hint": "5"
       },
       {
-        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "question": "Sketch the titration curve for adding NaOH to CH\u2083COOH. Label the equivalence point and state which indicator to use.",
         "item_type": "ShortAnswer",
         "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
         "points": 2,
@@ -241,7 +216,7 @@
         "hint": "5"
       },
       {
-        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "question": "Sketch the titration curve for adding NaOH to CH\u2083COOH. Label the equivalence point and state which indicator to use.",
         "item_type": "ShortAnswer",
         "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
         "points": 3,
@@ -250,7 +225,7 @@
         "hint": "5"
       },
       {
-        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "question": "Sketch the titration curve for adding NaOH to CH\u2083COOH. Label the equivalence point and state which indicator to use.",
         "item_type": "ShortAnswer",
         "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
         "points": 3,
@@ -259,7 +234,7 @@
         "hint": "5"
       },
       {
-        "question": "Sketch the titration curve for adding NaOH to CH₃COOH. Label the equivalence point and state which indicator to use.",
+        "question": "Sketch the titration curve for adding NaOH to CH\u2083COOH. Label the equivalence point and state which indicator to use.",
         "item_type": "ShortAnswer",
         "correct_answer": "S-shaped curve starting ~pH 3, equivalence point above pH 7 (~pH 8.7). Use phenolphthalein (range 8.2-10).",
         "points": 4,
@@ -300,81 +275,81 @@
   "flashcards": [
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "What is the difference between a strong and weak acid?",
-      "back": "Strong acid: fully ionised (e.g., HCl → H⁺ + Cl⁻). Weak acid: partially ionised (e.g., CH₃COOH ⇌ H⁺ + CH₃COO⁻).",
+      "back": "Strong acid: fully ionised (e.g., HCl \u2192 H\u207a + Cl\u207b). Weak acid: partially ionised (e.g., CH\u2083COOH \u21cc H\u207a + CH\u2083COO\u207b).",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.4",
         "Grade11",
-        "Chemistry — Acids & Bases"
+        "Chemistry \u2014 Acids & Bases"
       ],
       "difficulty_permille": 888
     }

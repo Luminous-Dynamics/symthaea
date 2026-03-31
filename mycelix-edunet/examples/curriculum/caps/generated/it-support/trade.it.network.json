@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Basic Networking?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A small office has 40 devices. The network uses 192.168.1.0/24. A new department of 15 people is being added. Can the current subnet accommodate them? If the company grows to 300 devices, what subnet would you recommend?",
+        "answer": "Current subnet: /24 = subnet mask 255.255.255.0. Usable addresses: 2^8 - 2 = 254 (subtract network and broadcast addresses). 40 existing + 15 new = 55 devices. Yes, /24 can accommodate 55 devices (254 available). For 300 devices: a /24 only provides 254 addresses -- not enough. Options: (1) Use a /23 subnet (255.255.254.0): 2^9 - 2 = 510 usable addresses. Range: 192.168.0.0 - 192.168.1.255. Sufficient for 300 devices with room for growth. (2) Better approach: segment the network with VLANs. Create separate subnets per department (e.g., 192.168.10.0/24 for sales, 192.168.20.0/24 for admin, etc.). This improves security (departments can't see each other's traffic) and reduces broadcast traffic. Each /24 VLAN handles its department, and a router/layer-3 switch routes between VLANs.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": ["Formula for usable hosts: 2^(32-prefix) - 2. The -2 accounts for network address and broadcast address.", "VLANs are the professional approach for networks above 50 devices -- flat networks become slow due to broadcast traffic."],
+        "explanation": "Subnet planning is essential for growing businesses. Starting with a plan prevents painful network restructuring later.",
+        "distractors": ["/24 means 24 available addresses", "Just use a bigger subnet -- VLANs are unnecessary", "IP addresses never run out on a local network"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Basic Networking in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "question": "A user reports: 'The internet is down.' When you arrive, other users are browsing normally. Describe your troubleshooting steps following the OSI model from Layer 1 upward.",
+        "answer": "Layer 1 (Physical): Is the Ethernet cable plugged in? Check both ends (PC and wall socket). Look for a link light on the NIC. If Wi-Fi, is the wireless adapter enabled? Check for airplane mode. Layer 2 (Data Link): Open cmd, run 'ipconfig'. Does the NIC show 'Media disconnected'? If so, cable or NIC fault. Replace cable, test. If connected, check for valid MAC address (not all zeros). Layer 3 (Network): Check IP address. If 169.254.x.x (APIPA), the PC didn't receive a DHCP address. Try 'ipconfig /release' then 'ipconfig /renew'. If DHCP fails, check cable to switch port, try another port. Ping the default gateway (e.g., ping 192.168.1.1). If no response, network path issue. If gateway responds, ping an external IP: ping 8.8.8.8. Layer 4-7 (Transport/Application): If 8.8.8.8 responds but websites don't load, it's a DNS problem. Test: 'nslookup google.com'. If DNS fails, try setting DNS to 8.8.8.8 manually. If nslookup works, check browser proxy settings and try another browser. Most common causes for one user affected: loose cable (40%), DHCP issue (30%), DNS cache (15%), browser issue (15%).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["If other users are fine, the problem is local to this user's PC or connection -- not the router or ISP.", "The OSI model gives you a systematic bottom-up approach: always check physical first."],
+        "explanation": "Systematic troubleshooting using the OSI model prevents random guessing. Starting at Layer 1 catches the most common problems first.",
+        "distractors": ["Reboot the router first", "Reinstall the operating system", "Call the ISP immediately"]
+      },
+      {
+        "question": "A client wants to set up a guest Wi-Fi network in their restaurant that is isolated from the business network (POS system, accounting PC). How do you configure this securely?",
+        "answer": "Configuration: (1) Use a router/AP that supports VLAN or guest network isolation (most business-grade APs do: Ubiquiti, MikroTik, TP-Link Omada). (2) Create a separate SSID for guests (e.g., 'Restaurant-Guest') with WPA2/WPA3 password. Change the password weekly or use a captive portal. (3) Enable AP isolation (client isolation): prevents guest devices from communicating with each other (stops a guest from scanning/attacking another guest). (4) Create a VLAN for guest traffic: assign guest SSID to VLAN 20 (for example) with its own subnet (e.g., 192.168.20.0/24). Business devices stay on VLAN 1 (192.168.1.0/24). (5) Firewall rules: allow VLAN 20 → Internet ONLY. Block VLAN 20 → VLAN 1 completely. This prevents guests from accessing the POS system, shared drives, or printers. (6) Bandwidth limiting: set a bandwidth cap per guest device (e.g., 5 Mbps down, 1 Mbps up) to prevent one user consuming all bandwidth. (7) DNS filtering: use OpenDNS or Cloudflare Family to block inappropriate content. (8) Display the Wi-Fi password on the receipt or a QR code at each table.",
+        "difficulty_permille": 600,
+        "bloom_level": "Apply",
+        "hints": ["The POS system is the critical asset. If a guest gains access to the POS network, they could steal card data or manipulate transactions.", "VLAN isolation is the key security measure -- it creates a logical separation even though the same physical AP serves both networks."],
+        "explanation": "Guest Wi-Fi without isolation is a security liability. POPIA (SA's data protection law) requires businesses to protect personal data -- an unsecured guest network that accesses the business network is a compliance risk.",
+        "distractors": ["Just give guests the same password as the business Wi-Fi", "A separate SSID without VLAN provides sufficient isolation", "Guest networks don't need passwords in a restaurant"]
+      },
+      {
+        "question": "You need to crimp a Cat6 Ethernet cable using T568B standard. List the wire colour order from pin 1 to pin 8, and describe the crimping procedure including testing.",
+        "answer": "T568B wire order (pin 1 to 8): 1-Orange/White, 2-Orange, 3-Green/White, 4-Blue, 5-Blue/White, 6-Green, 7-Brown/White, 8-Brown. Procedure: (1) Strip 30mm of outer jacket using cable stripper (don't cut inner wires). (2) Untwist each pair and arrange wires in T568B order. Hold firmly between thumb and index finger. (3) Trim wires to equal length (~14mm from jacket). Cut STRAIGHT across with the crimper's blade. (4) Insert wires into RJ45 plug, ensuring: each wire enters its own channel, wires reach the end of the plug, outer jacket enters the plug by 5-8mm (the strain relief clamps on the jacket, not the wires). (5) Insert into crimper and squeeze firmly -- the gold contacts pierce through the wire insulation. (6) Test with a cable tester: all 8 LEDs should light in sequence (1-2-3-4-5-6-7-8) on both units. If wires are crossed, the LEDs will light out of order. A miswire on pins 1-2 or 3-6 means no connection (these are the data pairs for 100Mbps). For a straight-through cable (PC to switch), use T568B on BOTH ends.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["Memory aid for T568B: 'Orange starts, green breaks up blue.' Pairs: orange, green, blue, brown.", "The outer jacket MUST enter the plug -- if only bare wires enter, the cable will fail at the strain relief point within weeks."],
+        "explanation": "Cable crimping is a fundamental networking skill. A poorly crimped cable causes intermittent network issues that are difficult to diagnose later.",
+        "distractors": ["Wire order doesn't matter as long as both ends match", "T568A and T568B are identical", "Cable testing is optional if the plug looks correct"]
+      },
+      {
+        "question": "A small business has 100/20 Mbps fibre (Vumatel) but employees complain of slow internet. Speed tests from the router show 95/18 Mbps. Speed tests from PCs show 15-30 Mbps. Diagnose the bottleneck.",
+        "answer": "The router speed test shows the fibre connection is fine (95/18 is within spec of 100/20). The problem is between the router and the PCs. Bottleneck diagnosis: (1) Wi-Fi congestion: if most PCs connect via Wi-Fi, check how many devices are on the same band/channel. 15-30 Mbps on a crowded 2.4GHz network with 20+ devices is typical. Solution: move devices to 5GHz band, add access points, or use Wi-Fi 6 APs. (2) Old/cheap router: consumer routers (R500-800) have weak Wi-Fi radios and limited processor capacity for NAT with many simultaneous connections. Solution: upgrade to a business AP (Ubiquiti U6-Lite ~R2,000). (3) Ethernet cabling: if PCs are wired, check if the cabling is Cat5 (100 Mbps max) instead of Cat5e/Cat6 (1 Gbps). Also check switch ports -- a 100 Mbps switch limits all wired connections. (4) DNS: slow DNS resolution makes pages feel slow even if bandwidth is adequate. Test: compare speed with DNS set to 1.1.1.1 (Cloudflare) vs default ISP DNS. (5) Single user hogging bandwidth: one person streaming or downloading saturates the connection for everyone. Solution: QoS (Quality of Service) rules on the router to limit per-device bandwidth.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["If the router tests fast but PCs test slow, the problem is the LAN, not the WAN.", "In SA, most 'slow internet' complaints in offices are actually Wi-Fi problems, not fibre problems."],
+        "explanation": "Distinguishing between WAN (fibre) and LAN (internal network) performance is a critical IT support skill. Calling the ISP when the problem is internal wastes everyone's time.",
+        "distractors": ["Call the ISP to complain about slow speeds", "The fibre connection must be faulty", "Upgrade to a faster fibre package"]
       }
     ],
     "key_vocabulary": [

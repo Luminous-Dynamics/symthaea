@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.PHY.2: Newton's first, second (Fnet = ma), and third laws. Free-...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Vectors have both magnitude and direction. To add vectors: use the head-to-tail method or resolve into components. Resolution: Fx = F cos θ, Fy = F sin θ (where θ is measured from the horizontal). The resultant = √(Rx² + Ry²) at angle tan⁻¹(Ry/Rx). On inclined planes: weight resolves into a component parallel to the slope (mg sin θ) and perpendicular (mg cos θ).",
+    "explanation": "Vectors have both magnitude and direction. To add vectors: use the head-to-tail method or resolve into components. Resolution: Fx = F cos \u03b8, Fy = F sin \u03b8 (where \u03b8 is measured from the horizontal). The resultant = \u221a(Rx\u00b2 + Ry\u00b2) at angle tan\u207b\u00b9(Ry/Rx). On inclined planes: weight resolves into a component parallel to the slope (mg sin \u03b8) and perpendicular (mg cos \u03b8).",
     "examples": [
       {
         "problem": "Solve a Vectors in Two Dimensions problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A 10 kg box is pushed with a horizontal force of 60 N on a frictionless surface. Calculate the acceleration.",
+        "answer": "a = F_net/m = 60/10 = 6 m/s^2",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use Newton's second law: F_net = ma.",
+          "On a frictionless surface, the applied force is the net force."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "F_net = ma. 60 = 10a. a = 6 m/s^2 in the direction of the applied force.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "600 m/s^2",
+          "0.167 m/s^2",
+          "50 m/s^2"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "A 5 kg block is pulled along a rough surface with a force of 40 N. The coefficient of kinetic friction is 0.3. Calculate the acceleration. (g = 10 m/s^2)",
+        "answer": "a = 5 m/s^2",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "First find friction: f = mu x N = mu x mg.",
+          "Then F_net = F_applied - f = ma."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "N = mg = 50 N. f = 0.3 x 50 = 15 N. F_net = 40 - 15 = 25 N. a = 25/5 = 5 m/s^2.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "8 m/s^2",
+          "3 m/s^2",
+          "7 m/s^2"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "State Newton's third law and explain why a person does not fly backward when pushing against a wall.",
+        "answer": "Newton's 3rd law: for every action there is an equal and opposite reaction (forces act on DIFFERENT objects). When you push the wall, the wall pushes you back with equal force. You do not fly backward because friction between your feet and the floor provides a balancing force, keeping you in equilibrium.",
+        "difficulty_permille": 350,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "The action-reaction pair acts on different objects.",
+          "What other forces act on the person?"
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The reaction force from the wall acts on you, but friction from the floor prevents you from accelerating. If you stood on ice (no friction), you would slide backward.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "The wall's reaction force is smaller",
+          "Newton's 3rd law does not apply to stationary objects",
+          "The person has too much mass to move"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "Two blocks (3 kg and 5 kg) are connected by a light string on a frictionless horizontal surface. A 40 N force is applied to the 5 kg block. Find the acceleration and the tension in the string.",
+        "answer": "a = F/(m1 + m2) = 40/8 = 5 m/s^2. T = m1 x a = 3 x 5 = 15 N.",
+        "difficulty_permille": 550,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Treat the system as a whole to find acceleration: F = (m1+m2)a.",
+          "Then isolate the 3 kg block: T = m1 x a."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "System: 40 = 8a, a = 5 m/s^2. For the 3 kg block: only tension acts, so T = 3 x 5 = 15 N.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "a = 8 m/s^2, T = 24 N",
+          "a = 5 m/s^2, T = 25 N",
+          "a = 5 m/s^2, T = 40 N"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
+        "question": "A 2 kg block rests on a 30-degree frictionless incline. It is connected by a string over a pulley to a 3 kg hanging mass. Find the acceleration and the direction of motion. (g = 10 m/s^2)",
+        "answer": "Weight component of 2 kg along slope = 2(10)sin(30) = 10 N (down slope). Weight of 3 kg = 30 N (downward). Net force = 30 - 10 = 20 N. a = 20/(2+3) = 4 m/s^2. The 3 kg mass moves down, pulling the 2 kg block up the incline.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "For the block on the incline, only the component along the slope matters.",
+          "The system accelerates in the direction of the larger net force."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The 3 kg weight (30 N) exceeds the 2 kg block's weight component along the slope (10 N), so the 3 kg mass falls, accelerating the system at 4 m/s^2.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "a = 6 m/s^2 down the incline",
+          "a = 2 m/s^2",
+          "The system does not move"
         ]
       }
     ],
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.2",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 888
     }

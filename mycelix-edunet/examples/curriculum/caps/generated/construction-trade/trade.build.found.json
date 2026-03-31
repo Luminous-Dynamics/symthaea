@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Foundations & Brickwork?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "Calculate the concrete volume needed for a strip footing: 24m total length, 600mm wide, 200mm deep. If the mix ratio is 1:2:3 (cement:sand:stone), how many 50kg bags of cement are needed? Assume 1m³ of concrete requires approximately 6.5 bags of cement for a 1:2:3 mix.",
+        "answer": "Volume = length x width x depth = 24 x 0.6 x 0.2 = 2.88 m³. Add 10% for wastage: 2.88 x 1.10 = 3.17 m³. Cement bags: 3.17 x 6.5 = 20.6 bags. Order 21 bags. Sand: approximately 0.65 m³ per m³ of concrete x 3.17 = 2.06 m³. Stone: approximately 0.95 m³ per m³ x 3.17 = 3.01 m³. Always order 10% extra to account for wastage, spillage, and uneven excavation. For SANS 10400-H compliance, the concrete should achieve minimum 15 MPa (mix design may need adjustment based on aggregate quality).",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["Always convert mm to metres before calculating volume.", "10% wastage allowance is industry standard for concrete work."],
+        "explanation": "Material quantity calculation is essential for quoting and prevents under-ordering (delays) and over-ordering (wasted money).",
+        "distractors": ["No wastage allowance is needed for foundations", "Use the same formula for raft foundations", "Any concrete mix is acceptable"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Foundations & Brickwork in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
+        "question": "The building plans show a DPC (damp-proof course) at 150mm above natural ground level. Explain what a DPC is, why it is positioned at this height, and what happens if it is omitted.",
+        "answer": "A DPC is a waterproof layer (usually polyethylene sheeting or bituminous felt) placed horizontally in the wall to prevent moisture rising from the ground through the brickwork by capillary action (rising damp). Position at 150mm above ground: this prevents splash-back from rain hitting the ground from bridging over the DPC. SANS 10400-K specifies this minimum height. If omitted: ground moisture wicks up through the brickwork, causing: (1) damp patches and mould on interior walls, (2) plaster deterioration (salts crystallise as moisture evaporates, pushing plaster off the wall -- known as efflorescence), (3) structural damage to mortar joints over time, (4) unhealthy living conditions (mould spores cause respiratory illness), (5) reduced property value. The DPC must extend across the full wall width and be lapped at joints (minimum 150mm overlap). Any penetration through the DPC (e.g., pipes) must be sealed.",
+        "difficulty_permille": 300,
         "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "hints": ["Capillary action: water rises through small gaps in porous materials (bricks, mortar) against gravity.", "The DPC must be CONTINUOUS -- any gap allows moisture through."],
+        "explanation": "The DPC is one of the simplest but most important building elements. Its omission causes problems that are expensive to fix retrospectively.",
+        "distractors": ["DPC is optional in dry climates", "DPC goes at ground level, not above it", "Concrete blocks don't need DPC because they're waterproof"]
+      },
+      {
+        "question": "A client wants to build a double-storey house but the soil report shows reactive clay soil. Explain why a standard strip footing may be inadequate and recommend an alternative foundation type per SANS 10400-H.",
+        "answer": "Reactive clay expands when wet and shrinks when dry (seasonal volume change). This causes differential movement: parts of the foundation rise and fall at different rates, cracking walls and distorting door/window frames. Standard strip footings (600mm wide x 200mm deep) are too shallow to resist these forces. Alternative: (1) Raft foundation (reinforced concrete slab covering the entire building footprint, 250-350mm thick with edge thickening to 450mm). The raft distributes loads over a larger area and resists bending from uneven soil movement. (2) Deep strip footing (excavated to stable soil below the active clay zone, typically 1.0-1.5m deep, depending on soil report). (3) Piled foundation (bored piles to bedrock or stable soil, with pile caps and ground beams). This is the most expensive but suitable for severe conditions. SANS 10400-H classifies sites by soil type: C1 (stable) through C4 (very reactive). The soil report determines the classification and appropriate foundation type. A structural engineer must design the foundation for Class C3 and C4 sites.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["Reactive clay: think of it as a sponge -- it swells when wet and shrinks when dry.", "The foundation must be stiff enough to bridge over areas of uneven soil movement."],
+        "explanation": "Foundation selection based on soil conditions is a critical construction decision. Building on reactive clay without appropriate foundations leads to structural cracking within the first few years.",
+        "distractors": ["Standard strip footings work on all soil types", "Reactive clay only causes problems in very wet climates", "The builder can choose any foundation type without an engineer"]
+      },
+      {
+        "question": "You are building a single-brick-wall (220mm) garden wall, 1.8m high and 6m long, using English bond. Calculate how many bricks you need (assume 55 bricks per m² for a single-brick wall, including wastage).",
+        "answer": "Wall area = length x height = 6 x 1.8 = 10.8 m². Bricks needed = 10.8 x 55 = 594 bricks. Order 600 (round up to the nearest pallet increment). Additional materials: mortar (class II, 1:4 cement:sand), approximately 0.5 bags cement per m² of single-brick wall = 5.4 bags (order 6). Piers: a 1.8m high wall over 6m long requires piers at 3m centres for stability (SANS 10400-K). Each pier adds approximately 40 bricks. With 2 intermediate piers: 594 + 80 = 674 bricks. Order 700. A coping (top course) of soldier course or concrete capping protects the wall from water ingress.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": ["English bond alternates stretcher and header courses, providing a full-brick (220mm) thick wall.", "Freestanding walls above 1m need piers for lateral stability per SANS 10400-K."],
+        "explanation": "Material estimation and knowledge of structural requirements (piers, coping) are essential for quoting and building compliant garden walls.",
+        "distractors": ["A 1.8m wall doesn't need piers", "Stretcher bond is adequate for a 220mm wall", "Coping is purely decorative"]
+      },
+      {
+        "question": "During construction, a municipal inspector finds that the foundations were poured without the required reinforcement steel (rebar). The plans specify Y10 bars at 200mm centres. What are the consequences and what must happen?",
+        "answer": "Consequences: (1) The inspector will issue a stop-work order. Construction cannot continue until the foundation complies with approved plans. (2) The unreinforced concrete must be demolished and removed. You cannot add rebar to cured concrete. (3) New foundations must be excavated, formed, reinforced per the approved plans (Y10 = 10mm diameter high-tensile rebar at 200mm centres), and poured with the inspector present for sign-off. (4) The contractor bears all costs for demolition, waste removal, and reconstruction. (5) The delay affects the project timeline and budget. (6) Repeated non-compliance can result in the builder's registration being revoked by the NHBRC (National Home Builders Registration Council). Why reinforcement matters: concrete is strong in compression but weak in tension. Rebar handles tensile forces from soil movement, loading, and thermal expansion. An unreinforced foundation will crack under differential settlement, especially on expansive clay soil.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": ["Concrete without steel is like bone without ligaments -- it cannot resist bending or stretching.", "Municipal inspections exist at key stages specifically to catch this type of non-compliance before it's hidden by further construction."],
+        "explanation": "Understanding the consequences of non-compliance motivates correct practice. Foundation reinforcement is inspected before concrete is poured because it cannot be verified afterwards.",
+        "distractors": ["Rebar can be added after the concrete has set", "The inspector can approve unreinforced foundations for single-storey", "Demolition is unnecessary -- just add rebar to the next layer"]
       }
     ],
     "key_vocabulary": [

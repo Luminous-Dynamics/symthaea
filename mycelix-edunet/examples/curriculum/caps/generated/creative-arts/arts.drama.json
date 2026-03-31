@@ -1,0 +1,326 @@
+{
+  "node_id": "CAPS.CreativeArts.Drama",
+  "lesson": {
+    "standard_code": "CAPS.CreativeArts.Drama",
+    "title": "CAPS.CreativeArts.Drama: Drama & Performance",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Drama is the art of storytelling through live performance. It combines voice, body, space, and emotion to create meaning. The fundamental skills of drama include improvisation (creating scenes spontaneously without a script), voice projection (using breath support and resonance to be heard without shouting), articulation (clear pronunciation), characterisation (creating a believable character through physical movement, voice, and psychology), and spatial awareness (using the stage effectively). South African theatre has a powerful tradition of protest and social commentary. Athol Fugard's plays ('Master Harold... and the Boys,' 'Sizwe Banzi Is Dead,' 'The Island') exposed the inhumanity of apartheid to the world. The Market Theatre in Johannesburg became the 'Theatre of the Struggle,' staging banned works during apartheid. Protest theatre used minimal sets and maximum physicality, born from necessity — performers needed to move quickly if police raided. Township theatre traditions, including slapstick comedy, musical theatre, and community storytelling, continue to thrive. Contemporary SA theatre includes the National Arts Festival in Makhanda (Grahamstown) and the work of artists like Yael Farber and Brett Bailey.",
+    "examples": [
+      {
+        "problem": "Demonstrate three voice projection techniques for performing in a space without a microphone.",
+        "steps": [
+          {
+            "instruction": "Step 1: Diaphragmatic breathing — breathe deeply into the belly, not the chest. The diaphragm provides the air support needed for projection",
+            "result": "breath support"
+          },
+          {
+            "instruction": "Step 2: Open the mouth and throat — drop the jaw, lift the soft palate. Sound needs space to resonate. Imagine sending your voice to the back wall",
+            "result": "resonance"
+          },
+          {
+            "instruction": "Step 3: Articulate consonants clearly — consonants carry meaning across distance. Exaggerate final consonants (t, d, k, p) to ensure clarity",
+            "result": "clarity through articulation"
+          }
+        ],
+        "answer": "Answer: Voice projection relies on diaphragmatic breathing for power, open resonance for volume, and clear articulation for intelligibility. Project, do not shout.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how Athol Fugard used theatre to challenge apartheid, using one specific play as an example.",
+        "steps": [
+          {
+            "instruction": "Step 1: 'Sizwe Banzi Is Dead' (1972, co-created with John Kani and Winston Ntshona) — about a Black man who takes a dead man's pass book to survive the apartheid system",
+            "result": "play identified"
+          },
+          {
+            "instruction": "Step 2: The play exposed the dehumanising pass law system by showing how it reduced people to numbers and documents, forcing desperate survival choices",
+            "result": "political content"
+          },
+          {
+            "instruction": "Step 3: Performed by Black actors telling their own stories on stage — itself a political act during apartheid. Toured internationally, bringing global attention to apartheid's injustice",
+            "result": "theatrical and political significance"
+          }
+        ],
+        "answer": "Answer: Fugard (with Kani and Ntshona) used 'Sizwe Banzi Is Dead' to expose the pass law system, giving voice to the voiceless and bringing apartheid's reality to global audiences through the power of live performance.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List five fundamental skills of drama performance.",
+        "answer": "Voice projection, improvisation, characterisation, spatial awareness, and physical expression (movement and gesture).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what an actor needs to do on stage.",
+          "Consider voice, body, space, and creativity."
+        ],
+        "explanation": "These five skills form the foundation of all dramatic performance, from community theatre to professional production.",
+        "distractors": [
+          "Memorising lines, wearing costumes, having a big stage",
+          "Singing, dancing, juggling, comedy, magic",
+          "Writing scripts, directing, lighting, sound, set design"
+        ]
+      },
+      {
+        "question": "Explain the difference between improvisation and scripted performance.",
+        "answer": "Improvisation is creating dialogue and action spontaneously, without a script, based on a given scenario or suggestion. Scripted performance uses a written text that actors memorise and interpret. Improvisation builds spontaneity, listening, and quick thinking; scripted work allows for deeper character development and polished delivery.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about what is planned versus what is spontaneous.",
+          "Consider the skills needed for each."
+        ],
+        "explanation": "Both improvisation and scripted performance are essential drama skills. Improvisation develops the spontaneity that makes scripted performance feel alive.",
+        "distractors": [
+          "Improvisation is easier than scripted performance",
+          "Professional actors never improvise",
+          "Scripts are unnecessary if you can improvise"
+        ]
+      },
+      {
+        "question": "Create a character for a 2-minute improvisation. Describe their physicality, voice, and motivation.",
+        "answer": "Example: A nervous first-day teacher. Physicality: fidgeting hands, shifting weight, occasionally straightening clothes. Voice: slightly higher pitch, occasional voice cracks, over-formal language. Motivation: desperate to be taken seriously by students but terrified of failure.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with a motivation (what does the character want?), then build the physical and vocal expression outward.",
+          "Think about how emotions show in the body and voice."
+        ],
+        "explanation": "Characterisation starts with understanding what the character wants (motivation), then expressing that through physical movement, vocal quality, and behaviour.",
+        "distractors": [
+          "Just use your normal voice and body",
+          "Characterisation is only about wearing a costume",
+          "Copy a character from a movie exactly"
+        ]
+      },
+      {
+        "question": "Analyse how protest theatre in SA differed from conventional Western theatre during apartheid.",
+        "answer": "Protest theatre: minimal or no sets (for mobility), direct address to audience, physical storytelling, devised collaboratively, performed in community halls and churches (not formal theatres), often in indigenous languages, explicitly political, blurred line between performer and character. Western theatre: formal stage, fourth wall, elaborate sets, scripted by individual playwrights, performed in purpose-built theatres.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider the practical constraints that shaped protest theatre.",
+          "Think about space, resources, audience, and purpose."
+        ],
+        "explanation": "SA protest theatre was shaped by necessity: performers needed portable productions, performed in unconventional spaces, and used theatre as a weapon against injustice.",
+        "distractors": [
+          "Protest theatre was just bad theatre with political messages",
+          "There was no difference between SA and Western theatre",
+          "Protest theatre had no artistic value"
+        ]
+      },
+      {
+        "question": "Evaluate the relevance of protest theatre in post-apartheid South Africa.",
+        "answer": "Still relevant: inequality, GBV, corruption, xenophobia, and service delivery failures provide material. Theatre continues to challenge power. However, the context has changed: freedom of expression exists, new forms (spoken word, comedy, digital) complement traditional theatre. Protest is no longer against a totalitarian state but against ongoing social injustice. The Market Theatre and National Arts Festival continue this tradition.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider what social issues still need challenging in SA.",
+          "Think about whether the forms and contexts of protest have changed."
+        ],
+        "explanation": "Protest theatre remains relevant because social injustice persists, though the forms and targets have evolved. Contemporary SA theatre addresses new challenges through new theatrical languages.",
+        "distractors": [
+          "Protest theatre died with apartheid",
+          "There is nothing left to protest in democratic SA",
+          "Only old people care about protest theatre"
+        ]
+      },
+      {
+        "question": "Devise a 5-minute theatre piece on a current social issue in your community, specifying characters, setting, conflict, and resolution.",
+        "answer": "Piece should include: clear social issue (e.g., load-shedding, GBV, youth unemployment), 2-3 characters with distinct voices and physicalities, specific setting, escalating conflict, and a resolution that challenges the audience to think (not necessarily a happy ending). Include stage directions for movement and voice.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Start with the social issue, then find the human story within it.",
+          "Less is more: 5 minutes means tight focus on one conflict."
+        ],
+        "explanation": "Devising original theatre is the ultimate creative challenge, combining all drama skills: characterisation, voice, space, improvisation, and social awareness.",
+        "distractors": [
+          "Copy a scene from a TV show",
+          "Use as many characters as possible",
+          "Avoid controversial topics to keep it safe"
+        ]
+      }
+    ],
+    "hints": [
+      "Drama is about presence: voice, body, and emotional truth in the moment.",
+      "South African theatre has a uniquely powerful tradition of using performance to challenge injustice.",
+      "Improvisation is not about being funny — it is about listening, responding, and creating collaboratively."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "improvisation",
+        "definition": "Creating dialogue and action spontaneously without a script, based on a given scenario, developing listening and quick-thinking skills",
+        "example_usage": "The actors improvised a scene about meeting a stranger at a taxi rank."
+      },
+      {
+        "term": "voice projection",
+        "definition": "Using breath support and resonance to make the voice carry to the back of the performance space without shouting",
+        "example_usage": "Good voice projection means the audience in the last row can hear every word clearly."
+      },
+      {
+        "term": "characterisation",
+        "definition": "The process of creating a believable character through physical movement, voice quality, behaviour, and understanding of motivation",
+        "example_usage": "Her characterisation of the grandmother was so convincing that the audience forgot it was an actor."
+      },
+      {
+        "term": "protest theatre",
+        "definition": "Theatre that directly challenges political or social injustice; in SA, associated with anti-apartheid performance using minimal sets and physical storytelling",
+        "example_usage": "The Market Theatre in Johannesburg was the home of protest theatre during apartheid."
+      },
+      {
+        "term": "devised theatre",
+        "definition": "Theatre created collaboratively by performers rather than scripted by a single playwright, often through improvisation and workshopping",
+        "example_usage": "Many of Fugard's most famous plays were devised collaboratively with John Kani and Winston Ntshona."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think drama is just about acting in plays or being funny.",
+        "correction": "Drama develops transferable skills: public speaking, empathy, confidence, teamwork, creative thinking, and emotional intelligence. These skills are valuable in every career, from law to business to teaching.",
+        "why_students_think_this": "Drama is often associated with entertainment rather than education. Highlighting the skills dimension helps students see its broader value."
+      },
+      {
+        "misconception": "Students believe you need to be extroverted to do drama.",
+        "correction": "Many accomplished actors and theatre practitioners are introverts. Drama provides a safe framework for expression through character, which can actually be liberating for introverts. The skills of observation and deep listening are introverted strengths.",
+        "why_students_think_this": "The visible, performative aspect of drama seems to favour extroverts. Emphasising that acting is not the same as being the centre of attention helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.88,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.CreativeArts.Drama",
+    "title": "Assessment: Drama & Performance",
+    "items": [
+      {
+        "question": "Name three techniques for effective voice projection on stage.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Diaphragmatic breathing, open resonance (dropped jaw, lifted soft palate), clear articulation of consonants.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Breathing, resonance, and clarity"
+      },
+      {
+        "question": "Explain why improvisation is considered a fundamental skill in drama training.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Improvisation develops: listening, spontaneity, quick thinking, collaboration, confidence, and the ability to respond authentically in the moment. These skills make scripted performance more alive and natural.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about what skills improvisation develops"
+      },
+      {
+        "question": "Demonstrate a character transformation: describe how you would change your physicality, voice, and behaviour to play a confident business leader versus a shy teenager.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Business leader: upright posture, open body, firm handshake, lower voice pitch, measured pace, direct eye contact. Shy teenager: hunched shoulders, crossed arms, fidgeting, softer/higher voice, rapid speech, avoiding eye contact.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Focus on body, voice, and behaviour for each character"
+      },
+      {
+        "question": "Analyse the significance of the Market Theatre in South African cultural history.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The Market Theatre (est. 1976, Johannesburg) staged banned anti-apartheid works, operated as a non-racial space during segregation, launched careers (Fugard, Kani, Ntshona), and became internationally known as the 'Theatre of the Struggle.' It demonstrated theatre's power as political resistance.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider its role during apartheid and its legacy"
+      },
+      {
+        "question": "Evaluate whether physical theatre (minimal dialogue, emphasis on movement) is more or less effective than text-based theatre for communicating social messages.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Physical theatre: crosses language barriers, primal emotional impact, accessible to diverse audiences, powerful for expressing oppression/violence. Text-based: greater nuance and complexity, can articulate specific arguments, builds character depth. Both are effective for different purposes; best work often combines them.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider what each form does best"
+      },
+      {
+        "question": "Create a concept for a community theatre production addressing a current issue in your area. Include theme, target audience, performance style, venue, and intended impact.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Concept should specify: social issue, target community, theatrical approach (physical/scripted/devised), accessible venue (community hall, school, church), how the production engages the audience (post-show discussion, audience participation), and intended outcomes.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Think about who your audience is and where they gather"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is improvisation in drama?",
+      "back": "Creating dialogue and action spontaneously without a script, based on a given scenario. Develops listening, spontaneity, and collaboration.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 125
+    },
+    {
+      "front": "What are the three components of voice projection?",
+      "back": "Diaphragmatic breathing (power), open resonance (volume), clear articulation of consonants (clarity). Project, do not shout.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "Who is Athol Fugard?",
+      "back": "South Africa's most internationally renowned playwright. Wrote 'Master Harold... and the Boys,' co-created 'Sizwe Banzi Is Dead' and 'The Island' with John Kani and Winston Ntshona. Used theatre to challenge apartheid.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is the Market Theatre?",
+      "back": "Theatre in Johannesburg (est. 1976) known as the 'Theatre of the Struggle.' Staged banned anti-apartheid works and operated as a non-racial space during segregation.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is characterisation?",
+      "back": "Creating a believable character through physicality (posture, movement, gesture), voice (pitch, pace, accent), and psychology (motivation, wants, fears).",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is devised theatre?",
+      "back": "Theatre created collaboratively by performers through improvisation and workshopping, rather than from a pre-written script by a single playwright.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 225
+    },
+    {
+      "front": "What is the fourth wall?",
+      "back": "The imaginary wall between performers and audience. 'Breaking the fourth wall' means addressing the audience directly. Protest theatre often broke this convention.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is spatial awareness in drama?",
+      "back": "Understanding and using the performance space effectively: positioning relative to other actors and the audience, using levels, and creating stage pictures that communicate meaning.",
+      "tags": ["CAPS.CreativeArts.Drama", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

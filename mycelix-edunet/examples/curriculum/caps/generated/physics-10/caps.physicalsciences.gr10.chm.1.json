@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "An atom has 11 protons, 12 neutrons, and 11 electrons. Identify the element, atomic number, and mass number.",
+        "answer": "Sodium (Na). Z = 11 (protons). A = 11 + 12 = 23.",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Atomic number = number of protons = identifies the element.",
+          "Mass number = protons + neutrons."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Z = 11 identifies sodium. A = protons + neutrons = 11 + 12 = 23. Written as Na-23 or ^23_11 Na.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Magnesium, Z=12, A=23",
+          "Sodium, Z=23, A=11",
+          "Neon, Z=10, A=22"
         ]
       },
       {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "Write the electron configuration of potassium (K, Z = 19).",
+        "answer": "2, 8, 8, 1",
+        "difficulty_permille": 300,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Fill energy levels: 2, 8, 18, 32. But for K (Z=19), the 4th shell starts before 3rd is full at 18.",
+          "Energy levels: 1st = max 2, 2nd = max 8, 3rd = max 8 (for elements up to Z=20)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "K has 19 electrons: 2 in first shell, 8 in second, 8 in third, 1 in fourth. Configuration: 2, 8, 8, 1.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "2, 8, 9",
+          "2, 8, 8, 1, 0",
+          "2, 8, 1"
         ]
       },
       {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain the difference between isotopes of carbon: C-12 and C-14.",
+        "answer": "Both have 6 protons (same element). C-12 has 6 neutrons (A = 12), C-14 has 8 neutrons (A = 14). They have the same chemical properties but different physical properties (mass). C-14 is radioactive and used in carbon dating.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Isotopes have the same atomic number but different mass numbers.",
+          "Same protons, different neutrons."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Isotopes are atoms of the same element with different numbers of neutrons. C-12 is stable; C-14 is radioactive (half-life ~5730 years).",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "They have different numbers of protons",
+          "They have different numbers of electrons",
+          "They are different elements"
         ]
       },
       {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "question": "Explain the trend in atomic radius going across Period 3 (Na to Ar).",
+        "answer": "Atomic radius decreases from Na to Ar. This is because the number of protons increases (stronger nuclear charge) while electrons are added to the same energy level (poor shielding), so electrons are pulled closer to the nucleus.",
+        "difficulty_permille": 550,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Going across a period, protons increase but the shielding effect stays roughly the same.",
+          "More protons pulling on roughly the same number of inner shells = smaller radius."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Na (Z=11) has a larger radius than Cl (Z=17) because Cl has 6 more protons pulling on electrons in the same 3rd shell. The effective nuclear charge increases across the period.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Atomic radius increases across the period",
+          "Atomic radius stays constant",
+          "Atomic radius first increases then decreases"
         ]
       },
       {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "Why does ionisation energy generally increase across a period but decrease down a group?",
+        "answer": "Across a period: nuclear charge increases while shielding is similar, so electrons are held more tightly (more energy needed to remove). Down a group: new energy levels are added, increasing distance from nucleus and shielding, so outermost electrons are held less tightly (less energy to remove).",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Ionisation energy = energy to remove the outermost electron.",
+          "Consider nuclear charge, distance, and shielding."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Ionisation energy depends on: effective nuclear charge, distance of electron from nucleus, and shielding by inner electrons. Across a period, charge dominates. Down a group, distance and shielding dominate.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Atomic Structure",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "IE decreases across a period",
+          "IE increases down a group",
+          "IE is constant across a period"
         ]
       }
     ],
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.1",
         "Grade10",
-        "Chemistry — Atomic"
+        "Chemistry \u2014 Atomic"
       ],
       "difficulty_permille": 888
     }

@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Roofing & Carpentry?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A house has a roof span of 8m with a 26° pitch. Calculate the rafter length (from wall plate to ridge), the ridge height above the wall plate, and recommend the appropriate truss type.",
+        "answer": "Half-span = 8/2 = 4m. Rafter length = half-span / cos(26°) = 4 / 0.8988 = 4.45m. Ridge height = half-span x tan(26°) = 4 x 0.4877 = 1.95m above wall plate. For an 8m span at 26°, a fink (W) truss is the most common and economical choice. It uses internal web members in a W-pattern to transfer roof loads to the wall plates. Fink trusses are factory-manufactured to engineered specifications and can span up to 10m without intermediate support. At 900mm centres (typical for concrete tile roofing), the roof would need: 8m wall length / 0.9m spacing + 1 = approximately 10 trusses per side.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": ["Rafter length uses cos (adjacent/hypotenuse). Ridge height uses tan (opposite/adjacent).", "26° is a typical pitch for concrete tile roofing in SA."],
+        "explanation": "Roof geometry calculations are essential for ordering trusses and estimating material quantities. The pitch determines both the truss design and the covering material options.",
+        "distractors": ["Use the full span for calculations, not half-span", "All trusses are the same regardless of span", "Rafter length equals the horizontal span"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Roofing & Carpentry in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "question": "Compare concrete roof tiles, IBR metal sheeting, and fibre cement corrugated sheeting for a new house in Johannesburg. Consider weight, cost, minimum pitch, lifespan, and noise.",
+        "answer": "Concrete tiles: Weight ~50 kg/m² (heaviest, needs stronger trusses). Cost moderate. Minimum pitch 26° (17° with waterproofing membrane). Lifespan 50+ years. Noise: excellent -- mass absorbs sound. Best for: traditional houses where appearance and sound insulation matter. IBR (inverted box rib) metal: Weight ~5 kg/m² (lightest). Cost cheapest. Minimum pitch 5° (3° with sealed joints). Lifespan 25-40 years (depends on coating: chromadek/colorcoat lasts longer). Noise: worst -- very loud in rain and hail (Joburg hailstorms!). Mitigation: insulation + ceiling essential. Best for: budget builds, industrial, flat-pitch roofs. Fibre cement: Weight ~15 kg/m². Cost moderate. Minimum pitch 15°. Lifespan 30-40 years. Noise: moderate. Best for: mid-range builds. Note: older fibre cement contained asbestos (removed pre-2008) -- never cut or disturb old fibre cement without testing. For Johannesburg specifically, the hail risk makes concrete tiles the most durable choice, though IBR with proper insulation is acceptable.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["Johannesburg has frequent hailstorms. Metal roofing dents; concrete tiles chip but are replaceable individually.", "Roof weight determines truss design and spacing -- heavier coverings need stronger trusses at closer centres."],
+        "explanation": "Roof covering selection involves balancing cost, performance, aesthetics, and local climate conditions. SA builders must consider regional factors like Joburg hail and coastal corrosion.",
+        "distractors": ["IBR is the best option for all situations because it's cheapest", "All roof coverings work at any pitch", "Fibre cement is always asbestos-containing"]
+      },
+      {
+        "question": "SANS 10400-XA requires minimum R3.7 thermal resistance for ceilings in Joburg (Climatic Zone 2). A client has 50mm glass wool insulation (R1.3). What additional insulation is needed, and where should it be installed?",
+        "answer": "Required: R3.7. Existing: R1.3. Additional needed: R3.7 - R1.3 = R2.4. Options: (1) Add 100mm glass wool blanket (R2.5) over the existing insulation in the roof space. Total: R1.3 + R2.5 = R3.8 (meets requirement). (2) Add 50mm rigid polyisocyanurate (PIR) board (R2.5) -- more expensive but thinner. Installation: lay the new insulation OVER the existing layer, perpendicular to the ceiling joists to avoid thermal bridging (heat escaping through the timber). Do not compress the existing insulation (compression reduces R-value). Ensure no gaps at edges, joins, or around downlights. Downlight covers (fire hoods) must be used where insulation contacts recessed lights. Ventilation: maintain eave ventilation to prevent moisture buildup in the roof space. Block insulation from covering ventilation openings.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["R-values are additive: layering insulation adds R-values together.", "Thermal bridging occurs where timber (poor insulator) penetrates the insulation layer."],
+        "explanation": "SANS 10400-XA compliance is mandatory for all new builds and major renovations. Ceiling insulation is the most cost-effective energy saving measure in SA homes.",
+        "distractors": ["Compressing insulation makes it more effective", "50mm insulation is always sufficient", "Insulation is only needed in cold climates"]
+      },
+      {
+        "question": "During a roof inspection, you find that the timber trusses are SA pine but show no CCA treatment stamps, and several have green-brown fungal growth. What are the risks and required actions?",
+        "answer": "Risks: (1) Untreated SA pine is susceptible to termite attack (subterranean termites are common in SA) and wood-boring beetles. (2) Fungal growth indicates moisture exposure. Fungal decay (wet rot, dry rot) weakens timber by breaking down cellulose fibres, reducing load-bearing capacity. A truss that has lost structural integrity could collapse under roof load. Actions: (1) Test timber strength: probe affected areas with a screwdriver. Soft, crumbly wood = significant decay. (2) Measure moisture content with a pin moisture meter: >20% = decay risk, >28% = active decay likely. (3) Identify the moisture source: roof leak, inadequate ventilation, blocked gutter overflowing into roof space. Fix the source FIRST. (4) Replace severely affected trusses (cannot be repaired). (5) Treat all timber with borate-based preservative (brush-applied, penetrates existing timber). (6) Ensure roof space ventilation (eave vents, ridge vent) to keep moisture below 18%. SANS 10400-H requires H3 CCA-treated timber for roof structures in termite-risk areas (most of SA).",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": ["CCA treatment leaves a green tint on timber. No green tint + no stamp = likely untreated.", "Fix the moisture source before treating the timber -- otherwise treatment is wasted."],
+        "explanation": "Roof timber condition directly affects structural safety. Untreated timber in SA's climate is a serious risk. SANS 10400 requires treated timber for good reason.",
+        "distractors": ["Untreated timber is fine if the roof doesn't leak", "Painting the timber is equivalent to CCA treatment", "Fungal growth is cosmetic and doesn't affect strength"]
+      },
+      {
+        "question": "A valley (internal angle where two roof planes meet) is leaking during heavy rain. Describe the correct valley flashing installation per good practice, and identify three common causes of valley leaks.",
+        "answer": "Correct installation: (1) Valley board (treated timber) supports the flashing between the rafters/trusses. (2) Valley flashing: galvanised steel or aluminium sheet, minimum 450mm wide (225mm each side of the valley centre line). For concrete tiles, use a purpose-made valley trough. (3) Tiles/sheets should overhang the flashing by at least 75mm but not more than 150mm. (4) Flashing overlaps at joints: minimum 150mm, sealed with appropriate sealant, lapped in the direction of water flow (upper sheet overlaps lower). (5) Valley extends into the gutter at the bottom. Three common leak causes: (1) Insufficient flashing width: heavy rain overflows the edge of narrow flashing, especially where two large roof planes channel water into the valley. (2) Debris accumulation: leaves and dirt dam up in the valley, forcing water sideways under tiles. Solution: regular cleaning. (3) Tiles cut too close to valley centre: reduces the overlap, allowing wind-driven rain to enter. Always cut tiles to leave 75mm minimum overhang on each side.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["Valleys carry the highest concentration of water on a roof -- they are the most common leak point.", "Wind-driven rain travels sideways, not just downward -- flashings must account for this."],
+        "explanation": "Valley waterproofing requires attention to detail. Most roof leaks occur at junctions (valleys, wall-roof intersections, chimneys) rather than in the middle of roof planes.",
+        "distractors": ["Valley flashing is optional if tiles fit tightly", "Any width of flashing is acceptable", "Valleys never need maintenance once installed"]
       }
     ],
     "key_vocabulary": [

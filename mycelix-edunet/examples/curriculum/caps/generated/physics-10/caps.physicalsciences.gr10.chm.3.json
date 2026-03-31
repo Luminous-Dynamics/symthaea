@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "question": "List the three types of intermolecular forces in order of increasing strength.",
+        "answer": "London/dispersion forces (weakest) < dipole-dipole forces < hydrogen bonds (strongest IMF).",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "London forces are present in ALL molecules.",
+          "Hydrogen bonds require H bonded to N, O, or F."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "London forces depend on electron cloud size (more electrons = stronger). Dipole-dipole occurs in polar molecules. Hydrogen bonding is a special strong dipole-dipole interaction.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "H-bonds < dipole-dipole < London",
+          "All three are equal in strength",
+          "Dipole-dipole < London < H-bonds"
         ]
       },
       {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "question": "Explain why water (H2O, M = 18) has a much higher boiling point (100 C) than hydrogen sulfide (H2S, M = 34, bp = -60 C).",
+        "answer": "Water has hydrogen bonding (H bonded to highly electronegative O), which is much stronger than the dipole-dipole forces in H2S. Despite H2S having a larger molecular mass, water's stronger IMFs require more energy to overcome, giving it a higher boiling point.",
+        "difficulty_permille": 450,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "What type of IMF does each molecule have?",
+          "Sulfur is not electronegative enough for hydrogen bonding."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "H2O has hydrogen bonds (H-O...H). H2S has only dipole-dipole forces (S is not electronegative enough for H-bonding). Hydrogen bonds are about 10x stronger than typical dipole-dipole forces.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "H2S has hydrogen bonds too",
+          "Molecular mass determines boiling point",
+          "Both have the same type of IMF"
         ]
       },
       {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Why do noble gases (He, Ne, Ar) have very low boiling points?",
+        "answer": "Noble gases are monatomic, non-polar, and can only have London/dispersion forces (the weakest IMF). Small noble gases like He have very few electrons, so their London forces are extremely weak, requiring very little energy to overcome.",
+        "difficulty_permille": 350,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Noble gases are individual atoms with no bonds.",
+          "What type of IMF can non-polar atoms have?"
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "He boils at -269 C, Ne at -246 C, Ar at -186 C. Boiling points increase down the group as electron count (and London force strength) increases.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Noble gases have no IMFs at all",
+          "Noble gases have hydrogen bonds",
+          "Noble gases are ionic"
         ]
       },
       {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "question": "Explain why ethanol (C2H5OH) is miscible with water but hexane (C6H14) is not.",
+        "answer": "Ethanol has an -OH group that can form hydrogen bonds with water (like dissolves like). Hexane is a non-polar hydrocarbon with only London forces. Since hexane cannot form hydrogen bonds with water, it is immiscible.",
+        "difficulty_permille": 550,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Like dissolves like: polar dissolves polar, non-polar dissolves non-polar.",
+          "The -OH group in ethanol is the key."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Solubility depends on IMF compatibility. Ethanol's -OH group hydrogen-bonds with water. Hexane's London forces cannot compete with water's hydrogen bonds, so water molecules prefer to stick together.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Hexane is too heavy to dissolve",
+          "All liquids mix with water",
+          "Ethanol is non-polar"
         ]
       },
       {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "Arrange the following in order of increasing boiling point and justify: CH4, NH3, H2O.",
+        "answer": "CH4 (-161 C) < NH3 (-33 C) < H2O (100 C). CH4 has only London forces (non-polar). NH3 has hydrogen bonding (H bonded to N). H2O has stronger hydrogen bonding (O is more electronegative than N, and each O can form 2 H-bonds vs N's 1).",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Identify the dominant IMF for each molecule.",
+          "Compare the strength of H-bonding in NH3 vs H2O."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The progression shows the impact of IMF type and strength on boiling point. CH4 (London only) << NH3 (H-bonds via N) << H2O (H-bonds via O, stronger and more per molecule).",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Intermolecular Forces",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "H2O < NH3 < CH4",
+          "All three have similar boiling points",
+          "NH3 > H2O > CH4"
         ]
       }
     ],
@@ -295,81 +270,81 @@
   "flashcards": [
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "What is the key idea in Intermolecular Forces?",
-      "back": "Intermolecular forces (IMFs) are forces between molecules — NOT the same as chemical bonds within molecules",
+      "back": "Intermolecular forces (IMFs) are forces between molecules \u2014 NOT the same as chemical bonds within molecules",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.3",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 888
     }

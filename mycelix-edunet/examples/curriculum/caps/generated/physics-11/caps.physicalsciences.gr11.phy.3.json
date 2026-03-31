@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.PHY.3: Momentum (p = mv). Newton's second law in terms of moment...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Newton's 1st Law: An object remains at rest or moves at constant velocity unless acted on by a net force. 2nd Law: Fnet = ma — acceleration is proportional to net force and inversely proportional to mass. 3rd Law: For every action, there is an equal and opposite reaction (forces act on different objects). Draw free-body diagrams showing all forces. Friction: f = μN where μ is the coefficient of friction and N is the normal force.",
+    "explanation": "Newton's 1st Law: An object remains at rest or moves at constant velocity unless acted on by a net force. 2nd Law: Fnet = ma \u2014 acceleration is proportional to net force and inversely proportional to mass. 3rd Law: For every action, there is an equal and opposite reaction (forces act on different objects). Draw free-body diagrams showing all forces. Friction: f = \u03bcN where \u03bc is the coefficient of friction and N is the normal force.",
     "examples": [
       {
         "problem": "Solve a Newton's Laws and Application problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A 1500 kg car travels at 20 m/s. Calculate its momentum.",
+        "answer": "p = mv = 1500 x 20 = 30000 kg.m/s",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Momentum p = mv.",
+          "Units: kg.m/s."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "p = (1500)(20) = 30000 kg.m/s in the direction of motion.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "75 kg.m/s",
+          "300000 kg.m/s",
+          "1520 kg.m/s"
         ]
       },
       {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "A 0.15 kg cricket ball is bowled at 40 m/s and hit back at 30 m/s. Calculate the change in momentum and the impulse.",
+        "answer": "Taking bowling direction as positive: Delta p = m(v_f - v_i) = 0.15(-30 - 40) = 0.15(-70) = -10.5 kg.m/s. Impulse = -10.5 N.s.",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Choose a positive direction carefully.",
+          "If the ball reverses direction, the final velocity is negative."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Delta p = 0.15(-30 - 40) = -10.5 kg.m/s. The negative sign indicates the impulse is in the direction the ball was hit (opposite to bowling direction). Impulse = change in momentum.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "-1.5 kg.m/s",
+          "+10.5 kg.m/s",
+          "-70 kg.m/s"
         ]
       },
       {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain why airbags reduce injuries in car crashes using the impulse-momentum theorem.",
+        "answer": "F_net x Delta t = Delta p. In a crash, Delta p is fixed (momentum change is the same). An airbag increases the time (Delta t) over which the person decelerates, which reduces the average force (F_net) on the body, reducing injuries.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Impulse = F x t = change in momentum.",
+          "If momentum change is constant, increasing time decreases force."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Without an airbag: stopping in 0.01 s. With airbag: stopping in 0.1 s. For the same momentum change, the force is 10x smaller with the airbag.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Airbags reduce the momentum change",
+          "Airbags increase the collision force",
+          "Time does not affect force"
         ]
       },
       {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "A 2 kg ball moving at 5 m/s collides head-on with a stationary 3 kg ball. After collision, the 2 kg ball bounces back at 1 m/s. Find the velocity of the 3 kg ball after collision.",
+        "answer": "By conservation of momentum: m1v1 + m2v2 = m1v1' + m2v2'. 2(5) + 3(0) = 2(-1) + 3(v2'). 10 = -2 + 3v2'. v2' = 4 m/s.",
+        "difficulty_permille": 550,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Total momentum before = total momentum after.",
+          "The 2 kg ball bounces back, so its final velocity is negative."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "10 + 0 = -2 + 3v2'. 12 = 3v2'. v2' = 4 m/s in the original direction of the 2 kg ball.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "2.67 m/s",
+          "5 m/s",
+          "3.33 m/s"
         ]
       },
       {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "A bullet (m = 0.02 kg) is fired at 400 m/s into a stationary wooden block (m = 2 kg) and embeds in it. Calculate the velocity of the block+bullet system after impact and the kinetic energy lost.",
+        "answer": "v = m1v1/(m1+m2) = 0.02(400)/2.02 = 3.96 m/s. KE_before = 1/2(0.02)(400^2) = 1600 J. KE_after = 1/2(2.02)(3.96^2) = 15.8 J. KE lost = 1584.2 J (99% lost to heat/deformation).",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "This is a perfectly inelastic collision (objects stick together).",
+          "Momentum is conserved, but kinetic energy is NOT conserved in inelastic collisions."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Momentum conserved: 8 = 2.02v, v = 3.96 m/s. Kinetic energy is mostly converted to heat and deformation. Only ~1% of KE remains as motion.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Newton's Laws and Application",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "v = 4 m/s, KE lost = 0 J",
+          "v = 200 m/s, KE lost = 800 J",
+          "v = 3.96 m/s, KE lost = 800 J"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.PHY.3",
-    "title": "Assessment: Momentum (p = mv). Newton's second law in terms of momentum (FnetΔt = Δp). Impulse-momentum theorem. Conservation of momentum in isolated systems. Elastic and inelastic collisions",
+    "title": "Assessment: Momentum (p = mv). Newton's second law in terms of momentum (Fnet\u0394t = \u0394p). Impulse-momentum theorem. Conservation of momentum in isolated systems. Elastic and inelastic collisions",
     "items": [
       {
         "question": "Explain Newton's Laws and Application.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.3",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 888
     }

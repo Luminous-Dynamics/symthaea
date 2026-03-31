@@ -5,13 +5,13 @@
     "title": "CAPS.PhysicalSciences.Gr11.PHY.6: Electrical machines: generators (AC and DC) and motors. F...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (ε) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = ε − Ir. For electrodynamics: Faraday's law ε = −NΔΦ/Δt (changing magnetic flux induces an EMF). AC: Vrms = Vmax/√2, Pavg = Vrms × Irms.",
+    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (\u03b5) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = \u03b5 \u2212 Ir. For electrodynamics: Faraday's law \u03b5 = \u2212N\u0394\u03a6/\u0394t (changing magnetic flux induces an EMF). AC: Vrms = Vmax/\u221a2, Pavg = Vrms \u00d7 Irms.",
     "examples": [
       {
-        "problem": "A battery with ε = 12 V and r = 0.5 Ω is connected to a 5.5 Ω resistor. Find the current and terminal voltage.",
+        "problem": "A battery with \u03b5 = 12 V and r = 0.5 \u03a9 is connected to a 5.5 \u03a9 resistor. Find the current and terminal voltage.",
         "steps": [
           {
-            "instruction": "Step 1: ε = I(R + r) → 12 = I(5.5 + 0.5) = 6I",
+            "instruction": "Step 1: \u03b5 = I(R + r) \u2192 12 = I(5.5 + 0.5) = 6I",
             "result": "apply formula"
           },
           {
@@ -19,7 +19,7 @@
             "result": "solve for current"
           },
           {
-            "instruction": "Step 3: V_terminal = ε − Ir = 12 − 2(0.5) = 11 V",
+            "instruction": "Step 3: V_terminal = \u03b5 \u2212 Ir = 12 \u2212 2(0.5) = 11 V",
             "result": "or V = IR = 2(5.5) = 11 V"
           }
         ],
@@ -27,10 +27,10 @@
         "visual_description": null
       },
       {
-        "problem": "A battery with ε = 12 V and r = 0.5 Ω is connected to a 5.5 Ω resistor. Find the current and terminal voltage.",
+        "problem": "A battery with \u03b5 = 12 V and r = 0.5 \u03a9 is connected to a 5.5 \u03a9 resistor. Find the current and terminal voltage.",
         "steps": [
           {
-            "instruction": "Step 1: ε = I(R + r) → 12 = I(5.5 + 0.5) = 6I",
+            "instruction": "Step 1: \u03b5 = I(R + r) \u2192 12 = I(5.5 + 0.5) = 6I",
             "result": "apply formula"
           },
           {
@@ -38,7 +38,7 @@
             "result": "solve for current"
           },
           {
-            "instruction": "Step 3: V_terminal = ε − Ir = 12 − 2(0.5) = 11 V",
+            "instruction": "Step 3: V_terminal = \u03b5 \u2212 Ir = 12 \u2212 2(0.5) = 11 V",
             "result": "or V = IR = 2(5.5) = 11 V"
           }
         ],
@@ -46,10 +46,10 @@
         "visual_description": null
       },
       {
-        "problem": "A battery with ε = 12 V and r = 0.5 Ω is connected to a 5.5 Ω resistor. Find the current and terminal voltage.",
+        "problem": "A battery with \u03b5 = 12 V and r = 0.5 \u03a9 is connected to a 5.5 \u03a9 resistor. Find the current and terminal voltage.",
         "steps": [
           {
-            "instruction": "Step 1: ε = I(R + r) → 12 = I(5.5 + 0.5) = 6I",
+            "instruction": "Step 1: \u03b5 = I(R + r) \u2192 12 = I(5.5 + 0.5) = 6I",
             "result": "apply formula"
           },
           {
@@ -57,7 +57,7 @@
             "result": "solve for current"
           },
           {
-            "instruction": "Step 3: V_terminal = ε − Ir = 12 − 2(0.5) = 11 V",
+            "instruction": "Step 3: V_terminal = \u03b5 \u2212 Ir = 12 \u2212 2(0.5) = 11 V",
             "result": "or V = IR = 2(5.5) = 11 V"
           }
         ],
@@ -67,121 +67,96 @@
     ],
     "practice_problems": [
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "question": "Explain the principle of operation of an AC generator.",
+        "answer": "A coil rotates in a magnetic field. As the coil rotates, the magnetic flux through it changes continuously. By Faraday's law, this changing flux induces an EMF (epsilon = -N x Delta Phi / Delta t). The EMF alternates direction as the coil rotates, producing alternating current (AC).",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Faraday's law: changing magnetic flux induces an EMF.",
+          "The coil rotates, so flux continuously changes."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "The EMF is maximum when the coil is parallel to the field (flux changing fastest) and zero when perpendicular (flux momentarily constant). This produces a sinusoidal AC output.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "The generator uses static magnetic fields",
+          "AC generators produce constant voltage",
+          "No rotation is needed"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "An AC supply has a peak voltage of 311 V. Calculate the RMS voltage and explain its significance.",
+        "answer": "V_rms = V_max / sqrt(2) = 311 / 1.414 = 220 V. The RMS voltage is the equivalent DC voltage that would deliver the same power to a resistor. SA mains electricity is rated at 220-230 V RMS.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": [
+          "V_rms = V_max / sqrt(2).",
+          "RMS stands for root-mean-square."
+        ],
+        "explanation": "The peak voltage of SA mains is about 311 V, but the effective (RMS) voltage is 220 V. This is what voltmeters read and what power calculations use.",
+        "distractors": [
+          "440 V",
+          "155.5 V",
+          "311 V"
+        ]
+      },
+      {
+        "question": "State Faraday's law of electromagnetic induction and give the formula.",
+        "answer": "Faraday's law: the induced EMF in a coil is equal to the negative rate of change of magnetic flux through the coil. epsilon = -N(Delta Phi / Delta t), where N is the number of turns and Delta Phi is the change in magnetic flux.",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "The law relates EMF to changing magnetic flux.",
+          "The negative sign indicates Lenz's law (opposing the change)."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "Faraday's law is the foundation of all generators and transformers. The negative sign (Lenz's law) means the induced current opposes the change that caused it.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "epsilon = NIR",
+          "epsilon = BIl",
+          "epsilon = N x Phi"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain the difference between an AC generator and a DC generator in terms of output and the component that creates the difference.",
+        "answer": "An AC generator uses slip rings, producing alternating current (sinusoidal output). A DC generator uses a split-ring commutator, which reverses the connections every half turn, converting AC to pulsating DC (always in one direction).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Both generators work on the same principle (rotating coil in magnetic field).",
+          "The key difference is the connection to the external circuit."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "The commutator acts as a mechanical rectifier, flipping the output connections each half-cycle so current always flows in the same direction (though it still pulsates).",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "AC generators have stronger magnets",
+          "DC generators do not use coils",
+          "There is no difference"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A household appliance is rated 2200 W and operates on 220 V RMS. Calculate (a) the RMS current, (b) the peak current, and (c) the resistance of the appliance.",
+        "answer": "(a) I_rms = P/V_rms = 2200/220 = 10 A. (b) I_max = I_rms x sqrt(2) = 10 x 1.414 = 14.1 A. (c) R = V/I = 220/10 = 22 ohm.",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "P = V_rms x I_rms for AC circuits.",
+          "Peak values = RMS values x sqrt(2)."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "(a) I_rms = 2200/220 = 10 A. (b) I_peak = 10 x 1.414 = 14.14 A. (c) R = V/I = 220/10 = 22 ohm. The circuit breaker must handle at least 14 A peak.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
-        ]
-      },
-      {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
-        ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
-        "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
-        ]
-      },
-      {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
-        ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
-        "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
-        ]
-      },
-      {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
-        ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
-        "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "(a) 5 A, (b) 7.07 A, (c) 44 ohm",
+          "(a) 10 A, (b) 10 A, (c) 22 ohm",
+          "(a) 20 A, (b) 28.3 A, (c) 11 ohm"
         ]
       }
     ],
     "hints": [
-      "Use ε = I(R + r). With two different setups, you get two equations with two unknowns (ε and r).",
-      "Use ε = I(R + r). With two different setups, you get two equations with two unknowns (ε and r).",
-      "Use ε = I(R + r). With two different setups, you get two equations with two unknowns (ε and r)."
+      "Use \u03b5 = I(R + r). With two different setups, you get two equations with two unknowns (\u03b5 and r).",
+      "Use \u03b5 = I(R + r). With two different setups, you get two equations with two unknowns (\u03b5 and r).",
+      "Use \u03b5 = I(R + r). With two different setups, you get two equations with two unknowns (\u03b5 and r)."
     ],
     "key_vocabulary": [
       {
         "term": "EMF",
         "definition": "The maximum potential difference a battery can provide (when no current flows)",
-        "example_usage": "ε = 12 V for this battery."
+        "example_usage": "\u03b5 = 12 V for this battery."
       },
       {
         "term": "internal resistance",
@@ -192,8 +167,8 @@
     "misconceptions": [
       {
         "misconception": "Students think the terminal voltage equals the EMF.",
-        "correction": "Terminal voltage = ε − Ir. It's less than the EMF when current flows due to energy lost in the battery.",
-        "why_students_think_this": "Internal resistance causes a voltage drop inside the battery. Only when I = 0 does V_terminal = ε."
+        "correction": "Terminal voltage = \u03b5 \u2212 Ir. It's less than the EMF when current flows due to energy lost in the battery.",
+        "why_students_think_this": "Internal resistance causes a voltage drop inside the battery. Only when I = 0 does V_terminal = \u03b5."
       }
     ],
     "generation_quality": {
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.PHY.6",
-    "title": "Assessment: Electrical machines: generators (AC and DC) and motors. Faraday's law. Alternating current (peak, RMS values: Vrms = Vmax/√2). Transformers",
+    "title": "Assessment: Electrical machines: generators (AC and DC) and motors. Faraday's law. Alternating current (peak, RMS values: Vrms = Vmax/\u221a2). Transformers",
     "items": [
       {
         "question": "Explain why the headlights of a car dim slightly when the starter motor is engaged.",
@@ -295,81 +270,81 @@
   "flashcards": [
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.6",
         "Grade11",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 888
     }

@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Automotive Electrical Systems?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A vehicle won't start. Battery voltage reads 12.6V (fully charged). When you turn the key, you hear a single click but the engine doesn't crank. Describe your diagnostic steps.",
+        "answer": "Single click with good battery = starter circuit problem. Steps: (1) Check battery terminals: clean and tight? Corrosion causes high resistance. Remove, clean with wire brush, refit. (2) Measure voltage at the starter motor while cranking (helper turns key). If 12V+ at starter but no crank = starter motor fault (solenoid or motor). If <10V = voltage drop in the circuit. (3) Perform voltage drop test: measure across each connection in the circuit while cranking. >0.5V across any single connection = bad connection. Check: battery positive to starter, earth strap from battery negative to chassis, chassis to engine block. (4) If the starter solenoid clicks but motor doesn't spin, the solenoid contacts are likely burnt -- either replace the solenoid or the starter assembly. (5) If bypassing the ignition switch (jumper from battery to starter solenoid trigger) makes the starter work, the ignition switch or starter relay is faulty.",
+        "difficulty_permille": 400,
+        "bloom_level": "Analyze",
+        "hints": ["Single click = solenoid engaging but motor not turning (or not enough current reaching motor).", "Voltage drop testing is more useful than resistance testing because it tests under LOAD."],
+        "explanation": "The 'single click' no-start is one of the most common automotive faults. Systematic voltage drop testing identifies the exact failure point without guessing.",
+        "distractors": ["Replace the battery first", "The alternator must be faulty", "Multiple clicks means the same thing as a single click"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Automotive Electrical Systems in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "question": "An OBD2 scanner shows DTC P0171 (System Too Lean, Bank 1). The vehicle idles rough and has poor fuel economy. What does this code mean, and what are the five most likely causes?",
+        "answer": "P0171 means the engine control unit (ECU) detects insufficient fuel relative to air on Bank 1 (the cylinder bank containing cylinder 1). The ECU has added maximum fuel trim correction and still cannot achieve target air/fuel ratio (14.7:1 stoichiometric). Five most likely causes: (1) Vacuum leak: cracked intake manifold gasket, loose hose, or torn PCV valve hose. Unmetered air enters after the MAF sensor, leaning the mixture. Test: spray brake cleaner around intake connections while idling -- RPM change indicates a leak. (2) Dirty/faulty MAF sensor: underreports airflow, ECU injects too little fuel. Test: compare MAF reading to specification at idle (typically 2-5 g/s). Clean with MAF cleaner spray. (3) Weak fuel pump: insufficient fuel pressure. Test: connect fuel pressure gauge -- should be 300-400 kPa for port injection. (4) Clogged fuel injector(s): restricted injector delivers less fuel. Test: compare injector flow rates or use a noid light for pulse testing. (5) Exhaust leak before the O2 sensor: ambient oxygen enters the exhaust, the O2 sensor reads lean, and the ECU adds fuel unnecessarily. Test: visual/audible inspection of the exhaust manifold and downpipe.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["P0171 = too lean = too much air or too little fuel. Think about what can cause either.", "Always check for vacuum leaks FIRST -- they're the most common cause and cheapest to fix."],
+        "explanation": "OBD2 codes point you in the right direction but do not diagnose the specific part. P0171 has multiple possible causes; testing narrows it down.",
+        "distractors": ["Just replace the O2 sensor", "Clear the code and hope it doesn't come back", "P0171 always means the fuel pump is bad"]
+      },
+      {
+        "question": "Measure the alternator output: engine running at 2000 RPM, battery voltage reads 13.2V. All electrical loads are off. Is this acceptable? What is the complete alternator test procedure?",
+        "answer": "13.2V is BORDERLINE LOW. Acceptable alternator output at 2000 RPM with no load should be 13.8-14.4V. At 13.2V, the alternator may not fully charge the battery, especially in winter or with high electrical loads. Complete test procedure: (1) No-load test: engine at 2000 RPM, all loads off. Measure battery voltage: 13.8-14.4V = PASS. (2) Load test: turn on headlights, heated rear window, blower fan. Voltage should not drop below 13.2V. (3) Ripple test: use an oscilloscope or AC voltage setting on multimeter across the battery. AC voltage >0.5V indicates failed diodes in the rectifier. (4) Maximum output test: with loads on, measure alternator output current with a clamp meter. Compare to alternator rating (e.g., 90A alternator should produce 60-70A under load). (5) Drive belt check: belt slipping reduces alternator speed. Check tension and condition. Possible causes of 13.2V: worn brushes (most common), slipping drive belt, failing voltage regulator, or high-resistance connection.",
+        "difficulty_permille": 600,
+        "bloom_level": "Apply",
+        "hints": ["14.4V is the target because it's the voltage at which a lead-acid battery is fully charged.", "AC ripple above 0.5V = failed diode(s), requiring alternator rebuild or replacement."],
+        "explanation": "Alternator testing requires measuring under both no-load and loaded conditions. A borderline reading at no-load will fail under load.",
+        "distractors": ["13.2V is fine -- anything above 12V means the alternator works", "Just replace the battery if the voltage is low", "You need a factory diagnostic tool to test the alternator"]
+      },
+      {
+        "question": "A client's vehicle has aftermarket LED headlights installed. The dashboard shows a bulb-out warning and the high-beam flasher flickers rapidly. Explain the cause and the correct solution.",
+        "answer": "Cause: LED headlights draw much less current than the original halogen bulbs (LEDs: 20-30W vs halogen: 55-60W per bulb). The vehicle's body control module (BCM) monitors current draw on each circuit. When it detects low current (from LEDs), it interprets this as a burnt-out bulb and triggers the warning. The fast flasher occurs because the flasher relay/BCM is also current-sensing. Solution: (1) Install CAN-bus compatible LED bulbs with built-in resistor circuits (these draw enough current to satisfy the BCM while still using LED technology). (2) Alternatively, install load resistors (50W 6-ohm) in parallel with each LED bulb. CAUTION: load resistors generate significant heat -- they must be mounted on a metal bracket away from plastic and wiring, or they can melt components or cause fire. (3) For some vehicles, the BCM can be reprogrammed via diagnostic software to accept the lower current draw. This is the cleanest solution but requires access to dealer-level software. Do NOT just ignore the warning -- it may mask a real bulb failure elsewhere.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["CAN-bus vehicles monitor everything. Low current = 'fault' to the computer.", "Load resistors convert electricity to heat -- they get very hot and must be mounted carefully."],
+        "explanation": "Modern vehicles are heavily computerised. Aftermarket modifications must account for the CAN-bus monitoring system, or they create nuisance warnings and potential fire risks.",
+        "distractors": ["LEDs always work as plug-and-play replacements", "Remove the warning bulb from the dashboard", "Load resistors can be zip-tied to plastic trim"]
+      },
+      {
+        "question": "Using a multimeter, test a suspected faulty coolant temperature sensor (NTC type). Describe what you expect to measure at 20°C and at 80°C, and explain how this sensor affects engine performance.",
+        "answer": "NTC (Negative Temperature Coefficient) means resistance DECREASES as temperature INCREASES. At 20°C (cold engine): expect 2,000-3,000 ohms (check specific vehicle manual). At 80°C (normal operating temp): expect 200-400 ohms. Test: disconnect the sensor connector, measure resistance across the two pins with a multimeter set to ohms. Compare to the specification chart in the service manual. A faulty sensor (stuck high resistance = always reads cold) causes: rich running, high fuel consumption, black smoke, carbon fouling of spark plugs, failed emissions. A sensor stuck low resistance (always reads hot) causes: lean running on cold start, hard starting in cold weather, possible engine damage. The ECU uses this sensor to determine: fuel injection pulse width (more fuel when cold), ignition timing, idle speed, fan activation, and EGR operation. It is one of the most important engine sensors.",
+        "difficulty_permille": 450,
+        "bloom_level": "Apply",
+        "hints": ["NTC = resistance goes DOWN as temperature goes UP. Think: 'N for Negative correlation with Temperature.'", "A faulty coolant temp sensor affects almost every engine management function."],
+        "explanation": "Temperature sensor testing is a core automotive electrical skill. Understanding NTC behaviour allows diagnosis with just a multimeter and a specification chart.",
+        "distractors": ["Resistance increases with temperature for all sensors", "The coolant sensor only controls the dashboard gauge", "You need a factory scanner to test the sensor"]
       }
     ],
     "key_vocabulary": [

@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Computer Hardware & Repair?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A client reports their PC randomly shuts down after 20-30 minutes of gaming but works fine for web browsing. Describe your diagnostic process, the most likely cause, and the repair.",
+        "answer": "Symptoms point to thermal throttling/shutdown under load. Diagnostic: (1) Open Task Manager (or HWiNFO) and monitor CPU/GPU temperatures during a stress test (e.g., Prime95 for CPU, FurMark for GPU). Normal gaming temps: CPU 70-85°C, GPU 70-80°C. If temp reaches 95-100°C, thermal shutdown activates. (2) Open the case and visually inspect: dust buildup on heatsink fins, CPU fan spinning? GPU fans spinning? (3) Check if the heatsink is properly seated (wiggle test -- it should NOT move). Most likely cause: dried/degraded thermal paste between CPU and heatsink. After 3-5 years, thermal paste dries out and loses conductivity. Dust clogging the heatsink fins compounds the problem. Repair: (1) Remove the heatsink. (2) Clean old thermal paste from both CPU and heatsink with isopropyl alcohol (90%+) and a lint-free cloth. (3) Apply a pea-sized dot of quality thermal paste (e.g., Arctic MX-4) to the CPU centre. (4) Reseat the heatsink firmly. (5) Clean dust from all fans and heatsink fins with compressed air. (6) Retest under load. Temps should drop 15-25°C.",
+        "difficulty_permille": 400,
+        "bloom_level": "Analyze",
+        "hints": ["'Works fine for browsing but crashes under load' = classic thermal problem. Low load = low heat. High load = overheating.", "Never run a PC without a heatsink -- even 5 seconds without cooling can permanently damage a CPU."],
+        "explanation": "Thermal management is the #1 hardware maintenance issue. Understanding heat flow (CPU → paste → heatsink → fan → case → room) helps diagnose where the thermal chain is broken.",
+        "distractors": ["Replace the CPU -- it must be faulty", "The PSU is failing under load", "Reinstall Windows to fix the shutdown"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Computer Hardware & Repair in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "question": "A client's laptop has a 256GB SSD that is 95% full. The laptop is extremely slow, programs take minutes to open. Explain why a nearly full SSD causes slowdowns and describe your remediation steps.",
+        "answer": "Why full SSDs are slow: SSDs use NAND flash memory with a process called garbage collection and wear levelling. These processes need free blocks to move data around. When the SSD is >90% full, there are very few free blocks. The controller must read-erase-rewrite constantly, dramatically increasing write latency. Unlike HDDs, SSDs perform best at 70-80% capacity. Remediation: (1) Free up space immediately: empty Recycle Bin, run Disk Cleanup (including Windows Update Cleanup, Temporary Files), uninstall unused programs (Control Panel → Programs). (2) Move large files (videos, photos, downloads) to an external drive or cloud storage. (3) Disable hibernation if not needed (`powercfg -h off` saves the RAM-size of space). (4) Check for Windows.old folder (previous Windows installation, can be 10-20 GB). (5) Use WinDirStat or TreeSize to find large unknown files. (6) If the drive cannot be freed sufficiently, upgrade to a larger SSD (500GB or 1TB) by cloning with Macrium Reflect or Clonezilla. (7) After freeing space, run `TRIM` command to inform the SSD of freed blocks: `Optimize drives` in Windows. Target: keep the SSD below 80% capacity permanently.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["SSDs have NO moving parts but still slow down when full -- the slowdown is electronic/firmware, not mechanical.", "Windows Update Cleanup alone can recover 5-10 GB on older installations."],
+        "explanation": "SSD capacity management is a routine IT support task. Educating clients about the 80% rule prevents repeat calls.",
+        "distractors": ["Defragment the SSD (this harms SSDs -- never defrag an SSD)", "The SSD is faulty and needs replacement", "Just delete System32 to free space"]
+      },
+      {
+        "question": "A client brings in a desktop PC that shows no display output. No beeps, power LED on, fans spinning. Describe the systematic troubleshooting process.",
+        "answer": "No display + no beeps + power on = likely RAM or GPU issue (motherboard POST failure). Systematic process: (1) External checks: monitor connected to correct port (GPU, not motherboard if dedicated GPU installed)? Monitor working (test with another device)? Display cable seated? (2) Reseat RAM: power off, unplug, open case, remove all RAM sticks, clean contacts with eraser, reinstall ONE stick in the primary slot (slot A1, usually closest to CPU). Try to boot. If display appears, add sticks one at a time to find the faulty one. (3) If still no display with RAM reseated: remove the dedicated GPU and connect the monitor to the motherboard's onboard port (if CPU has integrated graphics). If display appears, the GPU is faulty. (4) Clear CMOS: remove the CMOS battery for 30 seconds (or use the jumper) to reset BIOS to defaults. Reinstall and boot. (5) Minimal boot: disconnect all drives, peripherals, extra cards. Boot with only CPU, 1 RAM stick, and onboard video. (6) If still no POST: likely motherboard or CPU failure. Test CPU in another compatible board if available, or test another CPU in this board. (7) Check PSU: even with fans spinning, the +12V rail may be sagging. Test with a PSU tester or known-good PSU.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["No beeps = POST not reaching the beep code stage. This means the CPU, RAM, or motherboard hasn't initialised enough to generate error beeps.", "Reseating RAM fixes the problem in ~40% of 'no display' cases -- always try this first."],
+        "explanation": "No-display troubleshooting is one of the most common hardware tasks. The systematic approach (reseat RAM → test GPU → clear CMOS → minimal boot → swap components) avoids guessing and unnecessary part replacement.",
+        "distractors": ["Replace the motherboard immediately", "The hard drive is causing the display issue", "Fans spinning means everything is working"]
+      },
+      {
+        "question": "A client asks you to recommend a PC build for basic office work (Word, Excel, email, web browsing) on a R8,000 budget. Specify the key components and justify each choice.",
+        "answer": "Budget office build (R8,000, SA prices ~2026): CPU: AMD Ryzen 3 5300G or Intel i3-12100 (R2,000-2,500). Both have integrated graphics (no GPU needed for office work). 4 cores handle office tasks easily. RAM: 8GB DDR4 3200MHz (R400-600). Single stick, upgradeable to 16GB later. Sufficient for office work. Storage: 256GB NVMe SSD (R500-700). Fast boot and application loading. Use cloud storage for large files. Motherboard: B450 or B550 (AMD) or B660 (Intel) micro-ATX (R1,200-1,500). Basic but reliable. PSU: 400W 80+ certified (R600-800). Office PCs use 100-150W, so 400W provides ample headroom. Case: Basic micro-ATX (R400-600). Ventilation matters even for office PCs. Monitor: 21.5\" 1080p (R1,500-2,000). NOT included in R8,000 PC budget -- recommend using existing monitor if available. OS: Windows 11 Home (R2,000 retail) or Linux Mint (free). If budget is tight, use Linux Mint for full office capability (LibreOffice). Total: approximately R5,100-6,300 for the PC unit, leaving R1,700-2,900 for peripherals or a monitor. Justification: integrated graphics eliminates the single most expensive component (GPU). SSD over HDD transforms the user experience for R200-300 more.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["For office work, the CPU's integrated graphics replaces a dedicated GPU -- this saves R2,000-3,000.", "An SSD is the single biggest upgrade for perceived performance in an office PC."],
+        "explanation": "Budget-appropriate recommendations build client trust. Recommending a gaming GPU for an office worker wastes their money; recommending too little leaves them frustrated.",
+        "distractors": ["Every PC needs a dedicated GPU", "4GB RAM is sufficient for modern office work", "An HDD is better because it has more storage per rand"]
+      },
+      {
+        "question": "You suspect a client's PSU is failing. The PC reboots randomly under load, and you occasionally smell a faint burning odour. Describe the safe testing procedure and the risks of a failing PSU.",
+        "answer": "Safety first: a failing PSU can damage other components or cause fire. If you smell burning, power off immediately and unplug. Testing procedure: (1) Visual inspection: open the case, look at the PSU for bulging/leaking capacitors, burn marks, or scorched components (do NOT open the PSU case -- capacitors retain lethal charge even when unplugged). (2) Paperclip test (basic): disconnect all PSU cables from components. Short the green wire (PS_ON) to any black wire (ground) on the 24-pin connector with a paperclip. Plug in and switch on. If the PSU fan doesn't spin, it's dead. If it spins, proceed to voltage testing. (3) Voltage testing with multimeter: reconnect to motherboard. Measure +12V (yellow wire to black): should be 11.4-12.6V. +5V (red to black): should be 4.75-5.25V. +3.3V (orange to black): should be 3.135-3.465V. Measure UNDER LOAD (run a stress test while measuring). Sag beyond these ranges = failing PSU. (4) Best test: swap with a known-good PSU of equal or greater wattage. If symptoms disappear, the original PSU is confirmed faulty. Risks of a failing PSU: can deliver incorrect voltages that damage the motherboard, CPU, RAM, or storage drives. Can cause data corruption on drives. In worst cases, can cause fire. Never ignore a burning smell.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["PSU capacitors hold lethal voltage EVEN WHEN UNPLUGGED. Never open a PSU case.", "Random reboots under load + burning smell = replace the PSU immediately, don't wait for more testing."],
+        "explanation": "PSU testing is a safety-critical procedure. A failing PSU can take other components with it, so early diagnosis prevents cascading damage.",
+        "distractors": ["Open the PSU to look for the burnt component", "A burning smell is normal for new PSUs", "PSU failures only affect the PSU itself"]
       }
     ],
     "key_vocabulary": [

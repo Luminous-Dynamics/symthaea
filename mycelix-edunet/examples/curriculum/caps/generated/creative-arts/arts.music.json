@@ -1,0 +1,330 @@
+{
+  "node_id": "CAPS.CreativeArts.Music",
+  "lesson": {
+    "standard_code": "CAPS.CreativeArts.Music",
+    "title": "CAPS.CreativeArts.Music: Music Fundamentals",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Music is organised sound. Every piece of music, from a traditional Zulu song to an amapiano track, is built from the same fundamental elements. Rhythm is the pattern of sounds and silences in time — the beat, tempo (speed), and metre (grouping of beats: 2/4, 3/4, 4/4, 6/8). Melody is a sequence of pitches (notes) that form a musical line — the part you can sing or hum. Harmony is the combination of pitches sounding simultaneously — chords that support the melody. Dynamics refer to volume: pianissimo (pp, very soft) to fortissimo (ff, very loud), with crescendo (getting louder) and diminuendo (getting softer). Tempo is the speed: adagio (slow), andante (walking pace), allegro (fast). Musical notation uses the staff (five lines), clefs (treble and bass), note values (semibreve, minim, crotchet, quaver), rests, and time signatures. South African music encompasses extraordinary diversity: jazz (Hugh Masekela, Miriam Makeba, Abdullah Ibrahim), kwaito (Arthur Mafokate), amapiano (Kabza De Small, DJ Maphorisa), maskandi (Ladysmith Black Mambazo), and choral traditions (SABC choir competitions).",
+    "examples": [
+      {
+        "problem": "Identify the musical elements in a typical amapiano track.",
+        "steps": [
+          {
+            "instruction": "Step 1: Rhythm — distinctive log-drum percussion pattern with syncopated bass kicks, typically in 4/4 time at ~110-115 BPM",
+            "result": "rhythm described"
+          },
+          {
+            "instruction": "Step 2: Melody — piano/keys provide melodic hooks, often using pentatonic or minor scale patterns, supported by vocal melodies or chants",
+            "result": "melody identified"
+          },
+          {
+            "instruction": "Step 3: Harmony — bass lines and pad chords create harmonic foundation, often using simple chord progressions (I-IV-V or minor progressions)",
+            "result": "harmony identified"
+          },
+          {
+            "instruction": "Step 4: Dynamics and texture — tracks typically build from sparse to layered, adding elements gradually (dynamics through arrangement)",
+            "result": "dynamics and texture"
+          }
+        ],
+        "answer": "Answer: Amapiano uses syncopated 4/4 rhythm with log-drum percussion, piano-driven melodies, bass-driven harmony, and dynamic build-up through layered arrangement.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how isicathamiya (Ladysmith Black Mambazo style) uses harmony differently from Western pop music.",
+        "steps": [
+          {
+            "instruction": "Step 1: Isicathamiya uses close harmonies — voices tightly grouped, often in thirds and sixths, with a call-and-response structure",
+            "result": "harmony style described"
+          },
+          {
+            "instruction": "Step 2: The bass voice provides a foundational drone or rhythmic pattern while upper voices create interweaving melodic lines",
+            "result": "voice roles"
+          },
+          {
+            "instruction": "Step 3: Dynamics are carefully controlled — the name 'isicathamiya' means 'to walk softly' — with subtle crescendos and diminuendos",
+            "result": "dynamic control"
+          }
+        ],
+        "answer": "Answer: Isicathamiya features close a cappella harmonies in a call-and-response structure, with careful dynamic control and interweaving vocal parts, distinct from Western pop's instrument-driven harmony.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the five fundamental elements of music.",
+        "answer": "Rhythm, melody, harmony, dynamics, and tempo (also commonly listed: texture, form, and timbre).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what makes music different from random noise.",
+          "Consider: the beat, the tune, the chords, the volume, and the speed."
+        ],
+        "explanation": "These elements are present in all music worldwide, though their relative importance varies across genres and cultures.",
+        "distractors": [
+          "Guitar, drums, bass, vocals, keyboard",
+          "Verse, chorus, bridge, intro, outro",
+          "Rock, jazz, classical, pop, hip-hop"
+        ]
+      },
+      {
+        "question": "Explain the difference between rhythm and tempo.",
+        "answer": "Rhythm is the pattern of long and short sounds and silences in music (the groove). Tempo is the speed at which the music is played (measured in BPM — beats per minute). The same rhythm can be played at different tempos.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Rhythm is the pattern; tempo is the speed.",
+          "Think of a drumbeat pattern (rhythm) that you can play faster or slower (tempo)."
+        ],
+        "explanation": "Rhythm and tempo are related but distinct. Rhythm determines the pattern; tempo determines how fast that pattern unfolds.",
+        "distractors": [
+          "Rhythm and tempo are the same thing",
+          "Tempo is only relevant in classical music",
+          "Rhythm only applies to drums"
+        ]
+      },
+      {
+        "question": "Clap or tap the rhythm of a well-known South African song (e.g., 'Shosholoza' or 'Nkosi Sikelel' iAfrika') and identify the time signature.",
+        "answer": "'Shosholoza' is in 4/4 time with a steady, march-like rhythm. 'Nkosi Sikelel' iAfrika' is in 4/4 time with a hymn-like rhythm. Students should demonstrate the beat pattern by clapping on beats 1 and 3 (strong beats).",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Count the beats in each bar. Most SA songs are in 4/4 (four beats per bar).",
+          "Find the strong beats (usually 1 and 3) and clap on those."
+        ],
+        "explanation": "Identifying time signatures requires feeling the grouping of beats. Most popular music worldwide, including SA genres, uses 4/4 time.",
+        "distractors": [
+          "South African songs do not have time signatures",
+          "You need an instrument to identify time signatures",
+          "All songs are in 3/4 time"
+        ]
+      },
+      {
+        "question": "Analyse the differences between maskandi and amapiano in terms of musical elements.",
+        "answer": "Maskandi: acoustic guitar-driven, complex fingerpicking patterns, Zulu vocal melodies, traditional rhythms, storytelling lyrics, organic texture. Amapiano: electronic production, log-drum percussion, piano/synth melodies, bass-heavy, danceable 4/4 rhythm, layered electronic texture. Both are distinctly South African but use very different instrumentation, production, and rhythmic approaches.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Compare instrumentation, rhythm, production, and cultural context.",
+          "Think about acoustic vs electronic, rural vs urban traditions."
+        ],
+        "explanation": "Comparing genres reveals how the same musical elements (rhythm, melody, harmony) can be expressed very differently depending on cultural context, technology, and artistic intention.",
+        "distractors": [
+          "They are basically the same type of music",
+          "Maskandi is not real music because it is traditional",
+          "Amapiano has no musical elements because it is electronic"
+        ]
+      },
+      {
+        "question": "Evaluate the global impact of South African music, using specific artists as examples.",
+        "answer": "Hugh Masekela brought SA jazz to the world ('Grazing in the Grass,' anti-apartheid advocacy). Miriam Makeba was the first African Grammy winner, using music for political activism. Ladysmith Black Mambazo won multiple Grammys, bringing isicathamiya to global audiences (Paul Simon's 'Graceland'). Amapiano is currently gaining worldwide recognition. SA music has consistently influenced global genres while maintaining cultural distinctiveness.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider SA artists who achieved international recognition.",
+          "Think about how SA music has influenced or been adopted by global audiences."
+        ],
+        "explanation": "South African music has had disproportionate global influence, from Makeba's activism to amapiano's current worldwide spread. This reflects the richness and resilience of SA musical traditions.",
+        "distractors": [
+          "SA music has had no international impact",
+          "Only Western music influences global culture",
+          "SA music became important only after 1994"
+        ]
+      },
+      {
+        "question": "Compose a simple 8-bar melody using a pentatonic scale, specifying the rhythm, tempo, and dynamics.",
+        "answer": "Composition should specify: scale (e.g., C pentatonic: C D E G A), time signature (e.g., 4/4), tempo (e.g., andante, 100 BPM), dynamic markings (e.g., mp with crescendo to mf in bar 5-6), and the actual notes with rhythmic values for 8 bars.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Start simple: use the pentatonic scale (5 notes, no wrong notes).",
+          "Think about where the melody should rise and fall, get louder and softer."
+        ],
+        "explanation": "Composing a melody applies all fundamental concepts: pitch selection (scale), rhythm (note values), tempo, and dynamics. The pentatonic scale is forgiving for beginners.",
+        "distractors": [
+          "You need years of training to compose anything",
+          "Only use crotchets for simplicity",
+          "Dynamics do not matter in a simple melody"
+        ]
+      }
+    ],
+    "hints": [
+      "Music has the same building blocks everywhere: rhythm, melody, harmony, dynamics, and tempo. Genres differ in how they emphasise and combine these elements.",
+      "South African music genres (jazz, kwaito, amapiano, maskandi, isicathamiya) each have distinctive rhythmic and melodic identities.",
+      "You do not need to read notation to understand musical elements — listen actively and identify what you hear."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "rhythm",
+        "definition": "The pattern of sounds and silences in time; the arrangement of note durations that creates a musical groove or feel",
+        "example_usage": "The syncopated rhythm of amapiano creates its distinctive danceable feel."
+      },
+      {
+        "term": "melody",
+        "definition": "A sequence of musical notes that form a recognisable musical phrase or tune",
+        "example_usage": "The opening melody of 'Nkosi Sikelel' iAfrika' is one of the most recognisable in the world."
+      },
+      {
+        "term": "harmony",
+        "definition": "The combination of musical notes sounding simultaneously to form chords that support the melody",
+        "example_usage": "Isicathamiya is known for its close vocal harmonies."
+      },
+      {
+        "term": "dynamics",
+        "definition": "The volume of music, ranging from very soft (pianissimo) to very loud (fortissimo), with gradual changes (crescendo, diminuendo)",
+        "example_usage": "The choir used a crescendo to build excitement before the final chorus."
+      },
+      {
+        "term": "time signature",
+        "definition": "A notation indicating how many beats are in each bar and which note value gets one beat (e.g., 4/4 means four crotchet beats per bar)",
+        "example_usage": "Most popular music, including amapiano, uses a 4/4 time signature."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think you must be able to read sheet music to be a musician.",
+        "correction": "Many of the world's greatest musicians, including many SA jazz and traditional musicians, learned by ear. Musical literacy (notation) is a useful tool but not a prerequisite for musical ability. Hugh Masekela learned trumpet by listening before studying notation.",
+        "why_students_think_this": "Formal music education often prioritises notation. Acknowledging oral/aural traditions validates different learning paths."
+      },
+      {
+        "misconception": "Students believe that electronic music (like amapiano) requires less skill than playing an instrument.",
+        "correction": "Electronic music production requires deep understanding of rhythm, harmony, melody, arrangement, mixing, and sound design. The tools are different (software vs instrument) but the musical knowledge is the same. Producing a professional amapiano track requires years of practice.",
+        "why_students_think_this": "The visibility of physical instrument playing versus the invisible skill of production creates this perception."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.CreativeArts.Music",
+    "title": "Assessment: Music Fundamentals",
+    "items": [
+      {
+        "question": "Define rhythm, melody, and harmony.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Rhythm: pattern of sounds and silences in time. Melody: sequence of pitches forming a tune. Harmony: simultaneous pitches forming chords.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "The beat, the tune, and the chords"
+      },
+      {
+        "question": "Explain how dynamics contribute to the emotional impact of a piece of music.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Dynamics create emotional contrast and intensity. Soft passages create intimacy or tension; loud passages create excitement or power. Crescendos build anticipation. A sudden change (subito forte) creates surprise.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about how volume changes affect how music makes you feel"
+      },
+      {
+        "question": "Listen to (or recall) a South African song and identify the time signature, tempo, and at least two other musical elements.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer should name a specific song and correctly identify its time signature, approximate tempo, and two other elements (melody type, harmony, dynamics, texture, instrumentation).",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Count the beats, estimate the speed, and describe what you hear"
+      },
+      {
+        "question": "Compare the musical characteristics of SA jazz and amapiano.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "SA jazz: acoustic instruments, complex harmonies, improvisation, swing/African rhythms, roots in marabi/kwela. Amapiano: electronic, log-drum percussion, simpler harmonies, repetitive grooves, roots in deep house/kwaito. Both blend African and global influences.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Compare instrumentation, rhythm, harmony, and cultural roots"
+      },
+      {
+        "question": "Evaluate the importance of preserving traditional South African musical forms (e.g., maskandi, isicathamiya) in a modern context.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "For: cultural identity, historical continuity, unique artistic value, tourism/economy, foundation for new genres. Against: traditions evolve naturally, forced preservation can fossilise art. Evaluation: preservation through evolution (living tradition) is ideal — as Ladysmith Black Mambazo demonstrates.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both preservation and evolution"
+      },
+      {
+        "question": "Create a 16-bar piece combining elements from two different SA musical traditions.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Composition should specify: which traditions are combined, tempo, time signature, instrumentation or voices, rhythmic pattern, melodic outline, and how the traditions interact.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Think about what each tradition contributes and how they complement each other"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is rhythm?",
+      "back": "The pattern of sounds and silences in time — the arrangement of long and short notes that creates a musical groove.",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is the difference between melody and harmony?",
+      "back": "Melody is a single line of notes played sequentially (horizontal). Harmony is multiple notes sounding together as chords (vertical).",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What does 4/4 time mean?",
+      "back": "Four crotchet (quarter note) beats per bar. The most common time signature in popular music worldwide.",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is isicathamiya?",
+      "back": "A cappella singing style from Zulu tradition, meaning 'to walk softly.' Made famous internationally by Ladysmith Black Mambazo. Features close harmonies and call-and-response.",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 225
+    },
+    {
+      "front": "What is amapiano?",
+      "back": "A South African electronic dance music genre combining deep house, jazz, and lounge music. Characterised by log-drum percussion, piano melodies, and bass-heavy production (~110-115 BPM).",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "Who was Hugh Masekela?",
+      "back": "South African jazz trumpeter and activist (1939-2018). Known for 'Grazing in the Grass.' Used music to fight apartheid from exile and became one of Africa's most celebrated musicians.",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What do pp, mp, mf, and ff mean in dynamics?",
+      "back": "pp = pianissimo (very soft), mp = mezzo piano (moderately soft), mf = mezzo forte (moderately loud), ff = fortissimo (very loud).",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What is a pentatonic scale?",
+      "back": "A five-note scale (e.g., C D E G A). Used worldwide in folk and popular music. No 'wrong notes' when improvising, making it ideal for beginners.",
+      "tags": ["CAPS.CreativeArts.Music", "Adult", "Creative Arts"],
+      "difficulty_permille": 225
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

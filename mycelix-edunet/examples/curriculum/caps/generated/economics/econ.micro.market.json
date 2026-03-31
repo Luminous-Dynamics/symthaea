@@ -1,0 +1,223 @@
+{
+  "node_id": "ECON.MICRO.MARKET",
+  "lesson": {
+    "standard_code": "ECON.MICRO.MARKET",
+    "title": "Market Structures: Perfect competition, monopoly, oligopoly, and monopolistic competition",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Market structure describes the competitive environment in which firms operate. Perfect competition has many small firms selling identical products (e.g., small-scale farming). Monopoly has one firm dominating the market (e.g., Eskom in electricity generation). Oligopoly features a few large firms (e.g., SA banking sector: Standard Bank, FNB, Absa, Nedbank). Monopolistic competition has many firms selling differentiated products (e.g., restaurants in Johannesburg). In SA, the Competition Commission monitors anti-competitive behaviour, with notable cases against bread price-fixing (Pioneer Foods, Tiger Brands) and construction cartels.",
+    "examples": [
+      {
+        "problem": "Classify the SA cellular network market (Vodacom, MTN, Cell C, Telkom) and explain why prices remain high.",
+        "steps": [
+          {
+            "instruction": "Step 1: Count the firms -- four major players dominate",
+            "result": "few firms = oligopoly"
+          },
+          {
+            "instruction": "Step 2: High barriers to entry (spectrum licences, infrastructure costs in billions of Rands)",
+            "result": "barriers identified"
+          },
+          {
+            "instruction": "Step 3: Firms are interdependent -- each watches competitors' pricing",
+            "result": "strategic interaction"
+          },
+          {
+            "instruction": "Step 4: Prices remain high due to limited competition and potential tacit collusion",
+            "result": "market outcome"
+          }
+        ],
+        "answer": "Answer: The SA cellular market is an oligopoly. High barriers to entry and interdependence among firms keep prices elevated.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why Eskom can charge higher electricity prices than would prevail under perfect competition.",
+        "steps": [
+          {
+            "instruction": "Step 1: Eskom is a state-owned monopoly in electricity generation",
+            "result": "identify market structure"
+          },
+          {
+            "instruction": "Step 2: As a monopolist, Eskom is a price maker (not a price taker)",
+            "result": "pricing power"
+          },
+          {
+            "instruction": "Step 3: Monopolies restrict output and charge above marginal cost to maximise revenue",
+            "result": "monopoly pricing"
+          }
+        ],
+        "answer": "Answer: As a monopoly, Eskom faces no competition and can set prices above marginal cost, leading to higher electricity prices than a competitive market would produce.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List four characteristics of perfect competition and give one SA example.",
+        "answer": "Many buyers and sellers, homogeneous products, free entry and exit, perfect information. Example: small-scale maize farming in the Free State.",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about a market where no single seller can influence the price.",
+          "Agricultural commodities often approximate perfect competition."
+        ],
+        "explanation": "Perfect competition is a theoretical benchmark. Small-scale farming comes closest because individual farmers cannot influence the market price of maize.",
+        "distractors": [
+          "Eskom electricity",
+          "Vodacom cellular",
+          "Woolworths clothing"
+        ]
+      },
+      {
+        "question": "The SA bread price-fixing scandal involved Pioneer Foods and Tiger Brands agreeing to raise bread prices simultaneously. Which market structure does this behaviour characterise, and why is it illegal?",
+        "answer": "Oligopoly with collusion. It is illegal because it eliminates competition, raises prices for consumers, and violates the Competition Act.",
+        "difficulty_permille": 450,
+        "bloom_level": "Analyze",
+        "hints": [
+          "When firms secretly agree on prices, this is called collusion or cartel behaviour.",
+          "The SA Competition Commission investigates such behaviour."
+        ],
+        "explanation": "Bread-making in SA is an oligopoly (few large firms). Collusion creates a cartel that acts like a monopoly, harming consumers through inflated prices. The Competition Commission fined the firms over R1 billion.",
+        "distractors": [
+          "Perfect competition -- many small bakeries",
+          "Monopoly -- only one bread maker",
+          "Monopolistic competition -- differentiated products"
+        ]
+      },
+      {
+        "question": "Explain why there are so many different restaurant types in Johannesburg but only four major banks.",
+        "answer": "Restaurants operate under monopolistic competition (low barriers, differentiated products), while banking is an oligopoly (high barriers: capital requirements, regulations, branch networks).",
+        "difficulty_permille": 550,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider the barriers to entry in each market.",
+          "How easy is it to open a restaurant vs. start a bank?"
+        ],
+        "explanation": "Restaurant entry requires modest capital, so many enter (monopolistic competition). Banking requires billions in capital, regulatory approval, and established trust, creating high barriers (oligopoly).",
+        "distractors": [
+          "Both are monopolistic competition",
+          "Restaurants are a monopoly",
+          "Banks operate under perfect competition"
+        ]
+      },
+      {
+        "question": "A firm in a perfectly competitive market earns economic profit in the short run. Predict what will happen in the long run.",
+        "answer": "New firms will enter the market (attracted by profits), increasing supply, driving the price down until economic profit is zero in the long run.",
+        "difficulty_permille": 650,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "In perfect competition, there are no barriers to entry.",
+          "What happens to supply when new firms enter?"
+        ],
+        "explanation": "Free entry means profits attract new firms. As supply increases, the market price falls until P = ATC and economic profit = 0. This is the long-run equilibrium of perfect competition.",
+        "distractors": [
+          "The firm will maintain profits indefinitely",
+          "The government will regulate prices down",
+          "Other firms will leave the market"
+        ]
+      },
+      {
+        "question": "Evaluate whether breaking up Eskom into competing electricity generators would benefit SA consumers.",
+        "answer": "Breaking up Eskom could introduce competition, potentially lowering prices and improving efficiency. However, electricity generation has natural monopoly characteristics (high fixed costs, economies of scale), so multiple small generators may be less efficient. A regulated oligopoly or competitive bidding system may be a better solution.",
+        "difficulty_permille": 850,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider the concept of natural monopoly -- some industries have such high fixed costs that one firm is most efficient.",
+          "Think about both the benefits of competition and the costs of duplicating infrastructure."
+        ],
+        "explanation": "This is a genuine policy debate in SA. The Independent Power Producer (IPP) programme introduces some competition while maintaining grid infrastructure as a natural monopoly.",
+        "distractors": [
+          "It would definitely lower prices",
+          "Competition is always better than monopoly",
+          "Eskom should remain exactly as it is"
+        ]
+      }
+    ],
+    "hints": [
+      "Market structure is determined by: number of firms, barriers to entry, product differentiation, and pricing power.",
+      "In SA, the Competition Commission enforces the Competition Act to prevent anti-competitive behaviour.",
+      "Remember the spectrum: Perfect Competition -> Monopolistic Competition -> Oligopoly -> Monopoly (increasing market power)."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "oligopoly",
+        "definition": "A market structure with a few large firms that are interdependent in their pricing and output decisions",
+        "example_usage": "The SA banking sector is an oligopoly dominated by four major banks."
+      },
+      {
+        "term": "monopoly",
+        "definition": "A market structure with a single seller that has no close substitutes and high barriers to entry",
+        "example_usage": "Eskom operates as a monopoly in SA electricity generation."
+      },
+      {
+        "term": "barriers to entry",
+        "definition": "Obstacles that make it difficult for new firms to enter a market (e.g., high capital costs, regulations, patents)",
+        "example_usage": "High spectrum licence costs are a barrier to entry in SA telecommunications."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think monopoly always means illegal.",
+        "correction": "Monopoly itself is not illegal -- it is the abuse of monopoly power (e.g., predatory pricing, restricting output) that is illegal under the Competition Act.",
+        "why_students_think_this": "Media coverage of competition cases focuses on the negative aspects, creating the impression that being a monopoly is inherently wrong."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.MICRO.MARKET",
+    "title": "Assessment: Market structures, SA competition policy, oligopoly behaviour",
+    "items": [
+      {
+        "question": "Compare perfect competition and monopoly in terms of number of firms, barriers to entry, and pricing power.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Perfect competition: many firms, no barriers, price taker. Monopoly: one firm, high barriers, price maker.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Use a comparison table format."
+      },
+      {
+        "question": "Explain why the SA Competition Commission fined bread companies over R1 billion.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "The firms colluded to fix bread prices, acting as a cartel. This eliminated competition and raised prices for consumers, violating the Competition Act.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "What is collusion and why is it harmful?"
+      }
+    ],
+    "total_points": 6,
+    "estimated_minutes": 12,
+    "bloom_distribution": [
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the four main market structures?",
+      "back": "Perfect competition (many firms, identical products), Monopolistic competition (many firms, differentiated products), Oligopoly (few firms, interdependent), Monopoly (one firm, no substitutes).",
+      "tags": ["ECON.MICRO.MARKET", "Economics", "Market Structures"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is a cartel?",
+      "back": "A group of firms in an oligopoly that secretly agree to fix prices or restrict output to increase profits. Illegal under the SA Competition Act.",
+      "tags": ["ECON.MICRO.MARKET", "Economics", "Market Structures"],
+      "difficulty_permille": 400
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

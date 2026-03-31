@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.4: Speed of sound. Pitch and loudness. Ultrasound applicatio...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (λ) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = fλ, period T = 1/f.",
+    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (\u03bb) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = f\u03bb, period T = 1/f.",
     "examples": [
       {
         "problem": "Solve a Sound problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Sound",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A lightning flash is seen and the thunder is heard 4 seconds later. How far away is the storm? (Speed of sound = 340 m/s)",
+        "answer": "d = v x t = 340 x 4 = 1360 m (about 1.4 km)",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Light travels almost instantly, so the delay is the time for sound to travel.",
+          "Use d = v x t."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "d = (340)(4) = 1360 m. Since light is much faster than sound (3 x 10^8 m/s vs 340 m/s), we treat the light travel time as zero.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "85 m",
+          "680 m",
+          "2720 m"
         ]
       },
       {
-        "question": "Practice: Sound",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "A guitar string vibrates at 440 Hz (the note A). If the speed of sound in air is 340 m/s, calculate the wavelength of this sound wave.",
+        "answer": "lambda = v/f = 340/440 = 0.77 m",
+        "difficulty_permille": 300,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Rearrange v = f x lambda to get lambda = v/f.",
+          "Substitute v = 340 m/s and f = 440 Hz."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "lambda = 340/440 = 0.773 m, approximately 0.77 m.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "149600 m",
+          "1.29 m",
+          "0.44 m"
         ]
       },
       {
-        "question": "Practice: Sound",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain why sound cannot travel through a vacuum but light can.",
+        "answer": "Sound is a mechanical (longitudinal) wave that requires a medium (particles to vibrate). A vacuum has no particles, so sound cannot propagate. Light is an electromagnetic wave that does not need a medium and can travel through a vacuum.",
+        "difficulty_permille": 400,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Sound needs particles to compress and rarefy.",
+          "Light consists of oscillating electric and magnetic fields."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "This is why astronauts cannot hear each other in space without radios. Sound requires a physical medium; light does not.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Sound can travel through a vacuum",
+          "Light also needs a medium",
+          "Both require air"
         ]
       },
       {
-        "question": "Practice: Sound",
-        "answer": "Answer",
+        "question": "A factory worker is exposed to 95 dB of noise for 8 hours daily. The safe limit is 85 dB. Explain the health risk and suggest one control measure.",
+        "answer": "95 dB exceeds the 85 dB safe limit, risking noise-induced hearing loss over time. Control measure: provide ear protection (earplugs or earmuffs) to reduce exposure, or enclose the noise source.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Every 10 dB increase represents a doubling of perceived loudness.",
+          "The safe exposure time halves for every 3 dB above 85 dB."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "At 95 dB, the safe exposure time is only about 1 hour per day. Eight hours of exposure can cause permanent hearing damage. Ear protection or engineering controls are essential.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "95 dB is safe",
+          "Only exposure above 130 dB is harmful",
+          "Hearing loss from noise is always reversible"
         ]
       },
       {
-        "question": "Practice: Sound",
-        "answer": "Answer",
-        "difficulty_permille": 625,
+        "question": "An ultrasound scanner sends a pulse into the body. The pulse reflects off an organ 0.00004 s after being sent. If the speed of sound in body tissue is 1540 m/s, calculate the depth of the organ.",
+        "answer": "d = v x t / 2 = 1540 x 0.00004 / 2 = 0.0308 m = 3.08 cm",
+        "difficulty_permille": 650,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "The pulse travels to the organ and back, so divide total distance by 2.",
+          "Use d = vt/2."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Total distance = 1540 x 0.00004 = 0.0616 m. Depth = 0.0616/2 = 0.0308 m = 3.08 cm. The factor of 2 accounts for the return trip.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Sound",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Sound",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "6.16 cm",
+          "0.0616 m",
+          "1.54 cm"
         ]
       }
     ],
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.4",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 888
     }

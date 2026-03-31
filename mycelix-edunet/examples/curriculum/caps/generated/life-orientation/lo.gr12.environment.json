@@ -1,0 +1,326 @@
+{
+  "node_id": "CAPS.LifeOrientation.Gr12.Environment",
+  "lesson": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Environment",
+    "title": "CAPS.LifeOrientation.Gr12.Environment: Environmental Responsibility",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Section 24 of the SA Constitution guarantees everyone the right to an environment that is not harmful to their health or well-being, and to have the environment protected through reasonable legislation. Environmental responsibility means understanding how human activity impacts the natural world and taking action to protect it. Key issues in SA include air pollution (especially in Mpumalanga Highveld from coal power stations), water pollution and scarcity (the Vaal River system, acid mine drainage), waste management (landfill overflow, illegal dumping), deforestation, biodiversity loss, and climate change. The National Environmental Management Act (NEMA, 1998) provides the legal framework. Sustainable living means meeting present needs without compromising future generations' ability to meet theirs. Practical actions include reducing, reusing, and recycling waste; conserving water and electricity; supporting sustainable businesses; and participating in community clean-ups.",
+    "examples": [
+      {
+        "problem": "Explain how Section 24 of the Constitution protects environmental rights and give a real SA case where it was applied.",
+        "steps": [
+          {
+            "instruction": "Step 1: Section 24(a) guarantees the right to an environment not harmful to health or well-being",
+            "result": "right stated"
+          },
+          {
+            "instruction": "Step 2: Section 24(b) requires the state to protect the environment through legislation for present and future generations",
+            "result": "state obligation"
+          },
+          {
+            "instruction": "Step 3: Example: the Earthlife Africa vs Thabametsi case (2017) where the court required climate change impact assessments before approving new coal power stations",
+            "result": "real-world application"
+          }
+        ],
+        "answer": "Answer: Section 24 gives everyone environmental rights and requires the state to protect the environment. Courts have enforced this, e.g., requiring climate assessments for coal projects.",
+        "visual_description": null
+      },
+      {
+        "problem": "Analyse the water crisis in South Africa and suggest three ways individuals can conserve water.",
+        "steps": [
+          {
+            "instruction": "Step 1: SA is a water-scarce country (30th driest in the world). Climate change is worsening drought. Cape Town's 'Day Zero' (2018) nearly ran out of water",
+            "result": "context established"
+          },
+          {
+            "instruction": "Step 2: Causes: growing population, aging infrastructure, pollution of rivers and dams, climate change, poor management",
+            "result": "causes identified"
+          },
+          {
+            "instruction": "Step 3: Conservation: shorter showers (2 min), fix leaking taps, collect rainwater, reuse greywater for gardens, water-wise landscaping",
+            "result": "practical solutions"
+          }
+        ],
+        "answer": "Answer: SA faces serious water scarcity due to climate, infrastructure, and pollution. Individuals can help through shorter showers, fixing leaks, and rainwater collection.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "State the environmental right in Section 24 of the Constitution.",
+        "answer": "Everyone has the right to (a) an environment that is not harmful to their health or well-being; and (b) to have the environment protected for present and future generations through reasonable legislation.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Section 24 is in the Bill of Rights (Chapter 2).",
+          "It has two parts: a personal right and a state obligation."
+        ],
+        "explanation": "Section 24 is the environmental clause of the Bill of Rights. It creates both an individual right and a duty on the state to protect the environment.",
+        "distractors": [
+          "Section 24 only applies to nature reserves",
+          "Environmental rights are not in the Constitution",
+          "Only the government has environmental rights"
+        ]
+      },
+      {
+        "question": "Explain the concept of sustainable development using a South African example.",
+        "answer": "Sustainable development meets present needs without compromising future generations. Example: SA's Renewable Energy Independent Power Producer Programme (REIPPP) develops wind and solar farms to meet energy needs while reducing carbon emissions, unlike coal which depletes resources and pollutes.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about the balance between economic growth and environmental protection.",
+          "Consider energy production as an example."
+        ],
+        "explanation": "Sustainable development balances economic, social, and environmental needs. SA's renewable energy programme is an example of moving from coal dependence to sustainable alternatives.",
+        "distractors": [
+          "Sustainable development means stopping all economic activity",
+          "Only rich countries can afford sustainable development",
+          "Sustainable development is the same as recycling"
+        ]
+      },
+      {
+        "question": "Your community has a problem with illegal dumping. Propose a plan to address it.",
+        "answer": "Plan: identify dumping sites, report to municipality, organise community clean-ups, establish waste collection points, educate residents about proper waste disposal and recycling, advocate for regular municipal waste collection, install signage warning of fines.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about both immediate clean-up and long-term prevention.",
+          "Consider who is responsible and what community members can do."
+        ],
+        "explanation": "Illegal dumping requires both clean-up and prevention. Community action, municipal service improvement, and education all play roles.",
+        "distractors": [
+          "Just call the police and they will fix it",
+          "Ignore it because it is the government's problem",
+          "Move to a different area"
+        ]
+      },
+      {
+        "question": "Analyse the environmental and health impacts of coal mining in Mpumalanga.",
+        "answer": "Environmental: air pollution (SO2, particulates), acid mine drainage polluting rivers, land degradation, water contamination. Health: respiratory diseases (asthma, bronchitis, lung cancer), higher child mortality near coal plants, contaminated drinking water. The Mpumalanga Highveld has some of the world's worst air quality.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider both air and water pollution.",
+          "Think about the health effects on nearby communities."
+        ],
+        "explanation": "Coal mining creates a cycle of environmental damage: air pollution from burning, water pollution from acid mine drainage, and land degradation from mining operations, all affecting community health.",
+        "distractors": [
+          "Coal mining has no environmental impact if done carefully",
+          "Only miners are affected by coal pollution",
+          "Mpumalanga's air quality is among the best in the world"
+        ]
+      },
+      {
+        "question": "Evaluate the argument: 'South Africa should not worry about climate change because it contributes very little to global emissions.'",
+        "answer": "SA is actually the 12th-largest emitter globally (due to coal dependence) and the largest in Africa. Even if emissions were small, SA is highly vulnerable to climate change impacts: drought, flooding, food insecurity, and rising sea levels. Additionally, sustainable development creates jobs and economic opportunities.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Check the facts: is SA really a small emitter?",
+          "Consider vulnerability to climate impacts regardless of contribution."
+        ],
+        "explanation": "The argument is flawed on multiple levels: SA is a major emitter, is highly vulnerable to climate impacts, and the transition to clean energy offers economic benefits.",
+        "distractors": [
+          "SA should focus only on economic growth and ignore climate",
+          "Climate change is not a real problem",
+          "Only developed countries should take climate action"
+        ]
+      },
+      {
+        "question": "Design an environmental sustainability project for your school that addresses waste reduction, energy conservation, and water saving.",
+        "answer": "Project should include: waste audit and recycling programme, school food garden using composted waste, rainwater harvesting tanks, solar panels or energy-saving lighting, environmental awareness campaigns, monitoring and evaluation, student green team to manage the project.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Address waste, energy, and water as interconnected issues.",
+          "Make the project practical and sustainable beyond a single event."
+        ],
+        "explanation": "An effective school environmental project integrates waste, energy, and water management with education and ongoing student involvement.",
+        "distractors": [
+          "Just have one Earth Day event per year",
+          "Only the principal can make environmental decisions",
+          "Environmental projects are too expensive for schools"
+        ]
+      }
+    ],
+    "hints": [
+      "Section 24 of the Constitution is the foundation for all environmental rights in SA.",
+      "NEMA (National Environmental Management Act, 1998) is the main environmental law in SA.",
+      "Sustainable development balances economic growth, social well-being, and environmental protection."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "sustainable development",
+        "definition": "Development that meets the needs of the present without compromising the ability of future generations to meet their own needs (Brundtland, 1987)",
+        "example_usage": "South Africa's renewable energy programme is an example of sustainable development."
+      },
+      {
+        "term": "acid mine drainage",
+        "definition": "Acidic water that flows from abandoned mines, contaminating rivers and groundwater with heavy metals",
+        "example_usage": "Acid mine drainage from Witwatersrand gold mines pollutes the Vaal River system."
+      },
+      {
+        "term": "carbon footprint",
+        "definition": "The total amount of greenhouse gases produced by human activities, measured in tonnes of CO2 equivalent",
+        "example_usage": "South Africa has a large carbon footprint because most electricity comes from coal."
+      },
+      {
+        "term": "NEMA",
+        "definition": "National Environmental Management Act (1998): SA's primary environmental legislation, setting principles for environmental management and requiring environmental impact assessments",
+        "example_usage": "Under NEMA, any new development must undergo an environmental impact assessment."
+      },
+      {
+        "term": "biodiversity",
+        "definition": "The variety of plant and animal life in a particular habitat or ecosystem; SA is one of 17 megadiverse countries",
+        "example_usage": "The Cape Floral Kingdom has more plant species per square kilometre than almost anywhere on Earth."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think environmental issues are only about nature and wildlife, not about people.",
+        "correction": "Environmental issues directly affect human health, livelihoods, and rights. Air pollution causes respiratory disease. Water pollution affects drinking water. Climate change impacts food security. Environmental justice means the poorest communities often suffer most.",
+        "why_students_think_this": "Environmental education sometimes focuses on animals and plants rather than the human health and justice dimensions."
+      },
+      {
+        "misconception": "Students believe individual actions cannot make a difference to large environmental problems.",
+        "correction": "Collective individual action creates systemic change. Consumer choices drive business practices. Voting and advocacy shape policy. Community clean-ups improve local environments. Every person's water and energy conservation contributes to national sustainability.",
+        "why_students_think_this": "The scale of global environmental problems feels overwhelming. Teaching the power of collective action and local impact helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Environment",
+    "title": "Assessment: Environmental Responsibility",
+    "items": [
+      {
+        "question": "Quote the environmental right from Section 24 of the Constitution.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Everyone has the right to an environment that is not harmful to their health or well-being, and to have the environment protected for present and future generations.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Section 24 has two parts: (a) and (b)"
+      },
+      {
+        "question": "Explain the concept of environmental justice using a South African example.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Environmental justice means that environmental burdens (pollution, waste) should not fall disproportionately on poor or marginalised communities. Example: informal settlements near industrial areas or landfills suffer worse air quality and health outcomes.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about who suffers most from environmental problems"
+      },
+      {
+        "question": "Calculate the water savings if each of 50 learners in a class reduces their shower time by 3 minutes (assuming 10 litres per minute).",
+        "item_type": "ShortAnswer",
+        "correct_answer": "50 learners x 3 minutes x 10 litres = 1500 litres per day. Over a school year (200 days) = 300 000 litres saved.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Multiply number of learners by time saved by flow rate"
+      },
+      {
+        "question": "Analyse the conflict between job creation and environmental protection in the South African mining sector.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Mining provides jobs and revenue but causes pollution, habitat destruction, and health problems. The tension is real but not irresolvable: renewable energy creates new jobs, mining can be done more responsibly, and a just transition can protect workers.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider both economic needs and environmental costs"
+      },
+      {
+        "question": "Evaluate South Africa's progress towards sustainable energy and recommend next steps.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Progress: REIPPP has attracted R200+ billion in renewable investment, reduced cost of solar/wind, created jobs. Challenges: still 80%+ coal-dependent, Eskom financial crisis, load-shedding. Recommendations: accelerate renewable rollout, just transition for coal workers, grid modernisation.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both achievements and remaining challenges"
+      },
+      {
+        "question": "Create a proposal for a community recycling cooperative that creates jobs while reducing waste.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Proposal should include: collection system, sorting facility, partnerships with recyclers, job creation plan, community education, financial model (revenue from recyclables), environmental impact metrics, and expansion plan.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Combine environmental and economic objectives"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What does Section 24 of the Constitution guarantee?",
+      "back": "The right to an environment not harmful to health or well-being, and the right to have the environment protected for present and future generations.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is NEMA?",
+      "back": "National Environmental Management Act (1998) — SA's primary environmental law requiring environmental impact assessments and setting management principles.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is sustainable development?",
+      "back": "Development that meets present needs without compromising future generations' ability to meet their needs (Brundtland Commission, 1987).",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is acid mine drainage?",
+      "back": "Acidic, heavy-metal-laden water flowing from abandoned mines that contaminates rivers and groundwater. A major problem in SA's gold mining regions.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "Why is SA considered a megadiverse country?",
+      "back": "SA is one of 17 megadiverse countries, containing ~10% of the world's plant species and significant animal diversity. The Cape Floral Kingdom is a UNESCO World Heritage Site.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "What are the 3 R's of waste management?",
+      "back": "Reduce (use less), Reuse (use again), Recycle (convert into new products). Applied in this order of priority.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is SA's main source of electricity and why is it a problem?",
+      "back": "Coal (over 80% of electricity). It causes air pollution, contributes to climate change, and acid mine drainage. SA is the 12th largest CO2 emitter globally.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 225
+    },
+    {
+      "front": "What is environmental justice?",
+      "back": "The principle that environmental burdens (pollution, waste) should not fall disproportionately on poor or marginalised communities.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Environment", "Grade12", "Life Orientation"],
+      "difficulty_permille": 275
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

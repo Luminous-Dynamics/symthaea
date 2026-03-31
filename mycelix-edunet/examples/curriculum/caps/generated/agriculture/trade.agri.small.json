@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Small-Scale Farming & Food Gardens?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "Design a 3m x 6m raised bed garden to feed a family of 6 for the Gauteng summer season (Oct-Mar). Choose 8 vegetables, plan their layout using companion planting principles, and calculate the expected yield.",
+        "answer": "Layout (18 m² total): Row 1 (north side): 6 tomato plants at 600mm spacing (companion: basil between each tomato -- repels aphids). Row 2: 12 pepper plants at 400mm spacing. Row 3: Swiss chard (10 plants) and spinach (10 plants) -- partial shade from tomatoes is beneficial. Row 4: 4 butternut squash at corners (trailing variety spreads along edges). Row 5: beans (climbing, on trellis at south wall) with 2 maize plants as living trellis (Three Sisters principle). Row 6: onions (20 plants) and carrots (30 plants) -- companion plants (onion repels carrot fly, carrots repel onion fly). Centre: herbs (parsley, coriander, spring onions) as borders. Expected yield from 18 m²: tomatoes 40-60 kg, peppers 15-20 kg, leafy greens 20-30 kg, squash 15-20 kg, beans 5-10 kg, root vegetables 10-15 kg. Total: approximately 105-155 kg of fresh vegetables over 5-6 months. This covers a significant portion of a family's vegetable needs.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": ["Companion planting: tomatoes+basil, beans+maize, onions+carrots. Avoid: tomatoes near cabbage, beans near onions.", "Tall plants (tomatoes, maize, beans on trellis) go on the SOUTH side to avoid shading shorter plants."],
+        "explanation": "Garden design combines practical knowledge (spacing, yield estimates) with ecological principles (companion planting, succession). A well-designed small garden produces a surprising amount of food.",
+        "distractors": ["Just plant everything randomly", "18 m² is too small to feed anyone", "All vegetables can be planted next to each other"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Small-Scale Farming & Food Gardens in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "question": "Build a simple compost system using materials available in a township household. Describe the layering method, what can and cannot be composted, and the expected timeline from raw materials to usable compost.",
+        "answer": "System: a 1m x 1m x 1m enclosure made from wooden pallets (free from local shops), wire mesh, or stacked bricks with gaps for airflow. Layering method (lasagne composting): (1) Bottom layer: twigs and small branches (10cm) for drainage and airflow. (2) Brown layer (carbon-rich, 15cm): dry leaves, cardboard (torn small), newspaper, sawdust, dry grass. (3) Green layer (nitrogen-rich, 10cm): kitchen scraps (fruit/veg peelings, tea bags, coffee grounds), fresh grass cuttings, garden weeds (not seeded). (4) Repeat brown-green layers. (5) Top with brown layer to prevent flies. (6) Water each layer like a wrung-out sponge. Can compost: all plant-based kitchen waste, eggshells, paper, cardboard, garden waste, animal manure (chicken, cow -- not dog/cat). Cannot compost: meat, dairy, oils, cooked food (attracts rats), diseased plants, weeds with seeds, glossy/plastic-coated paper. Timeline: actively turned pile (turned weekly with a garden fork) = 2-3 months. Passive pile (no turning) = 4-6 months. Ready when: dark brown/black colour, earthy smell, original materials unrecognisable, crumbly texture.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["The brown:green ratio should be approximately 3:1 by volume. Too much green = smelly anaerobic mess. Too much brown = slow decomposition.", "Moisture is critical: too dry = decomposition stops. Too wet = anaerobic (smells). Aim for 'wrung-out sponge' moisture."],
+        "explanation": "Composting converts waste into free, high-quality soil amendment. In townships where purchasing compost is expensive, home composting is both practical and empowering.",
+        "distractors": ["Any waste can be composted including meat", "Compost piles don't need any management", "Composting attracts rats regardless of what you put in"]
+      },
+      {
+        "question": "A community wants to collect rainwater from a school building with a 200 m² roof in Pretoria (average annual rainfall 674mm). How much water can they collect annually? Design a storage system for a 100 m² food garden.",
+        "answer": "Annual rainwater collection = roof area x rainfall x runoff coefficient. For corrugated iron roof: coefficient = 0.80 (20% lost to evaporation, splash, first-flush). Collection = 200 x 0.674 x 0.80 = 107.8 m³ = 107,800 litres per year. Monthly average: 107,800 / 12 = 8,983 L/month. Storage design: Pretoria's rainfall is seasonal (80% Oct-Mar, dry Apr-Sep). The garden needs water year-round. Summer demand (100 m² garden, 5mm/day avg): 100 x 5 = 500 L/day = 15,000 L/month. Winter demand (reduced): ~200 L/day = 6,000 L/month. Summer surplus: rainfall exceeds demand. Winter deficit: 6,000 L/month needed but minimal rainfall. Storage to bridge dry season (Apr-Sep, 6 months): 6 x 6,000 = 36,000 L. Recommend: 3x JoJo tanks of 10,000 L each (total 30,000 L) plus connection to municipal water for shortfall. The 3 tanks provide approximately 5 months of winter irrigation with careful management. First-flush diverter: install to discard the first 20L of rain (which washes bird droppings and dust off the roof).",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["1mm of rain on 1 m² of roof = 1 litre of water (before losses).", "Pretoria's dry season (Apr-Sep) receives only 20% of annual rainfall -- storage must bridge this gap."],
+        "explanation": "Rainwater harvesting is a practical solution for food gardens in SA, where municipal water is expensive and availability is uncertain. Combining roof collection with storage enables year-round food production.",
+        "distractors": ["All rain that falls on the roof is collected", "One 1,000L tank is sufficient for any garden", "Rainwater doesn't need any treatment for irrigation"]
+      },
+      {
+        "question": "A community member wants to sell surplus vegetables at a local market. Calculate the profit potential from a 50 m² garden producing tomatoes, spinach, and onions over one summer season. Include input costs.",
+        "answer": "Production estimates (50 m²): Tomatoes (20 m²): yield 4-6 kg/m² = 80-120 kg. Market price R15-25/kg = R1,200-3,000. Spinach (15 m²): 3 harvests of 2 kg/m² = 90 kg. Price R12-18/bunch (500g) = 180 bunches x R15 = R2,700. Onions (15 m²): yield 3-4 kg/m² = 45-60 kg. Price R8-12/kg = R360-720. Total revenue: R4,260-6,420. Input costs: Seeds/seedlings: R300-500. Compost (homemade): R0 or R200 if purchased. Fertiliser (organic): R150. Water: R200-400 (municipal). Pest control (organic sprays): R100. Total inputs: R750-1,250. Profit: R3,010-5,170 for one season (5-6 months). Per month: R500-860. This is modest but significant for a low-income household. Key to maximising profit: succession planting (plant new seedlings every 3-4 weeks for continuous harvest), value-adding (sell at weekend markets rather than to middlemen), and growing what your community buys most.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["Profit depends on WHAT you grow (high-value crops like tomatoes and herbs) and WHERE you sell (direct to consumer vs middleman).", "Succession planting prevents the feast-famine cycle of one big harvest followed by nothing."],
+        "explanation": "Understanding farm economics -- even at small scale -- is essential for food garden sustainability. Many community gardens fail because they don't plan for costs and market access.",
+        "distractors": ["Selling surplus isn't worth the effort", "Input costs are always too high for small gardens", "Any vegetable is equally profitable"]
+      },
+      {
+        "question": "Your garden soil is compacted grey clay. Explain THREE methods to improve it for vegetable production without purchasing expensive amendments.",
+        "answer": "(1) Compost incorporation: dig 100-150mm of homemade compost into the top 300mm of soil. Compost adds organic matter that improves clay structure by creating aggregates (small clumps) that allow water and air penetration. Source compost from kitchen waste, garden waste, and collected leaves (free). Apply 2-3 times per year. (2) Cover cropping/green manure: plant a quick-growing legume (cowpeas, lab-lab) during the off-season. Before it seeds, cut it down and dig it in. The roots break up compaction; the decomposing plant material adds nitrogen and organic matter. Cowpea seed is cheap (R20-30/kg) and widely available. (3) Mulching: cover the soil surface with 50-100mm of dry grass clippings, leaves, or straw. Mulch moderates soil temperature, retains moisture (reduces watering by 30-50%), suppresses weeds, and slowly breaks down to add organic matter. Earthworms colonise mulched soil, further improving structure. Additional free method: no-dig gardening -- build UP rather than digging DOWN. Layer cardboard, compost, and mulch on top of the clay. Plant into the top layer. Roots gradually penetrate as the clay improves below.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["Clay soil holds nutrients well but drains poorly. The goal is to improve STRUCTURE (drainage, aeration) while keeping the nutrient-holding capacity.", "Gypsum (garden lime) can also help flocculate clay, but it costs money. Compost is free."],
+        "explanation": "Soil improvement is the most important long-term investment in any garden. Working with free/cheap local materials makes it accessible to all communities.",
+        "distractors": ["Just add sand to fix clay soil (this actually makes it worse -- like concrete)", "Chemical fertiliser fixes soil structure", "Compacted soil cannot be improved"]
       }
     ],
     "key_vocabulary": [

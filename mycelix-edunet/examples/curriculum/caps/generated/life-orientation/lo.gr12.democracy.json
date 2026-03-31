@@ -1,0 +1,353 @@
+{
+  "node_id": "CAPS.LifeOrientation.Gr12.Democracy",
+  "lesson": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Democracy",
+    "title": "CAPS.LifeOrientation.Gr12.Democracy: Democracy & Human Rights in South Africa",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "South Africa's constitutional democracy is built on the supreme law of the land: the Constitution (1996). The Bill of Rights (Chapter 2) enshrines fundamental rights including equality, human dignity, freedom of expression, and the right to education. Democracy means government by the people, through free and fair elections, separation of powers (legislature, executive, judiciary), and an independent judiciary. Responsible citizenship means participating in elections, paying taxes, obeying laws, and holding leaders accountable. South Africa's history of apartheid shows what happens when human rights are violated systematically. Understanding diversity means respecting differences in culture, language, religion, gender, and sexual orientation. Chapter 9 institutions (e.g., the Human Rights Commission, Public Protector) exist to safeguard democracy.",
+    "examples": [
+      {
+        "problem": "Explain the difference between a right and a responsibility in a democracy, using South African examples.",
+        "steps": [
+          {
+            "instruction": "Step 1: Define a right as something guaranteed to citizens by the Constitution, e.g., the right to vote (Section 19)",
+            "result": "rights defined"
+          },
+          {
+            "instruction": "Step 2: Define a responsibility as a duty citizens have toward society, e.g., voting in elections, paying taxes, obeying laws",
+            "result": "responsibilities defined"
+          },
+          {
+            "instruction": "Step 3: Show the link: rights come with responsibilities. The right to freedom of expression (Section 16) does not include the right to incite violence or hate speech",
+            "result": "connection explained"
+          }
+        ],
+        "answer": "Answer: Rights are constitutional guarantees (e.g., right to vote, right to education). Responsibilities are duties citizens must fulfil (e.g., voting, obeying laws, respecting others' rights). The two are interconnected.",
+        "visual_description": null
+      },
+      {
+        "problem": "Describe how the South African government uses separation of powers to protect democracy.",
+        "steps": [
+          {
+            "instruction": "Step 1: Legislature (Parliament) makes laws. National Assembly and National Council of Provinces",
+            "result": "legislative branch"
+          },
+          {
+            "instruction": "Step 2: Executive (President and Cabinet) implements laws and runs government departments",
+            "result": "executive branch"
+          },
+          {
+            "instruction": "Step 3: Judiciary (Constitutional Court, Supreme Court of Appeal, High Courts) interprets laws and can declare laws unconstitutional",
+            "result": "judicial branch"
+          },
+          {
+            "instruction": "Step 4: Each branch checks the others. Courts can overturn unconstitutional laws. Parliament can impeach the President",
+            "result": "checks and balances"
+          }
+        ],
+        "answer": "Answer: The three branches (legislature, executive, judiciary) operate independently and check each other's power, preventing any one branch from becoming too powerful.",
+        "visual_description": null
+      },
+      {
+        "problem": "A community discovers that their local municipality has been misusing funds meant for housing. Explain how citizens can use democratic processes to address this.",
+        "steps": [
+          {
+            "instruction": "Step 1: Report to the Public Protector (Chapter 9 institution) which investigates government misconduct",
+            "result": "formal complaint"
+          },
+          {
+            "instruction": "Step 2: Engage ward councillors and attend municipal council meetings to raise concerns directly",
+            "result": "local government engagement"
+          },
+          {
+            "instruction": "Step 3: Organise peaceful protests (Section 17 right to assembly) and petition drives",
+            "result": "civic action"
+          },
+          {
+            "instruction": "Step 4: Contact media and civil society organisations to bring public attention to the issue",
+            "result": "accountability through transparency"
+          }
+        ],
+        "answer": "Answer: Citizens can use the Public Protector, engage local government, protest peacefully, and use media to hold officials accountable through democratic channels.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List five rights from the South African Bill of Rights and explain why each is important.",
+        "answer": "Right to equality (Section 9), human dignity (Section 10), life (Section 11), freedom of expression (Section 16), education (Section 29). Each protects individuals from abuse of power and ensures a just society.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Look at Chapter 2 of the Constitution.",
+          "Think about which rights affect your daily life as a learner."
+        ],
+        "explanation": "The Bill of Rights contains 27 rights. Key ones include equality, dignity, life, expression, and education. These form the foundation of democratic South Africa.",
+        "distractors": [
+          "The right to drive a car at age 16",
+          "The right to unlimited wealth",
+          "The right to never pay taxes"
+        ]
+      },
+      {
+        "question": "Explain the role of the South African Human Rights Commission.",
+        "answer": "The SAHRC is a Chapter 9 institution that promotes, protects, and monitors human rights in SA. It investigates complaints, educates the public, and reports to Parliament on the state of human rights.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about who investigates human rights violations.",
+          "Chapter 9 institutions are independent bodies that support democracy."
+        ],
+        "explanation": "The SAHRC was established under Section 184 of the Constitution. It can investigate complaints, conduct research, and make recommendations to Parliament.",
+        "distractors": [
+          "The SAHRC is part of the police force",
+          "The SAHRC can arrest people who violate rights",
+          "The SAHRC is controlled by the ruling party"
+        ]
+      },
+      {
+        "question": "Discuss how apartheid violated the human rights of South Africans. Give three specific examples.",
+        "answer": "Pass laws restricted freedom of movement (Section 21). Group Areas Act violated the right to equality (Section 9). Bantu Education Act denied equal education (Section 29). The entire system violated human dignity (Section 10).",
+        "difficulty_permille": 375,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about apartheid laws and match them to specific rights in the Bill of Rights.",
+          "Consider how different racial groups were treated under apartheid."
+        ],
+        "explanation": "Apartheid systematically violated multiple constitutional rights through legislation like the Pass Laws, Group Areas Act, and Bantu Education Act, affecting freedom of movement, equality, and education.",
+        "distractors": [
+          "Apartheid only affected political rights, not social rights",
+          "Apartheid only violated the rights of one racial group",
+          "Human rights were not recognised during apartheid so they could not be violated"
+        ]
+      },
+      {
+        "question": "Evaluate whether South Africa's democracy is working effectively. Provide arguments for and against.",
+        "answer": "For: regular free elections, independent judiciary, free press, strong Constitution. Against: corruption, service delivery protests, high inequality, unemployment, some threats to judicial independence. Overall assessment should weigh both sides.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both the strengths and weaknesses of SA's democracy.",
+          "Think about what you see in the news and in your community."
+        ],
+        "explanation": "SA's democracy has strong foundations (Constitution, courts, elections) but faces challenges (corruption, inequality, service delivery). A balanced evaluation considers both.",
+        "distractors": [
+          "SA's democracy is perfect because we have a Constitution",
+          "SA's democracy has completely failed",
+          "Democracy only works in wealthy countries"
+        ]
+      },
+      {
+        "question": "Explain how diversity strengthens democracy in South Africa.",
+        "answer": "Diversity brings multiple perspectives to decision-making, enriches cultural life, promotes tolerance, and ensures that policies consider all communities. The Constitution protects 11 official languages and cultural rights.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about how different viewpoints improve decision-making.",
+          "Consider South Africa's 'Rainbow Nation' ideal."
+        ],
+        "explanation": "A diverse democracy benefits from varied perspectives. SA's Constitution actively protects diversity through language rights, cultural rights, and the promotion of equality.",
+        "distractors": [
+          "Diversity weakens democracy because people disagree",
+          "Only one culture should dominate in a democracy",
+          "Diversity is irrelevant to governance"
+        ]
+      },
+      {
+        "question": "Design a community awareness campaign to educate young people about their voting rights and responsibilities.",
+        "answer": "Campaign should include: target audience (18-25 year olds), key messages (why voting matters, how to register, where to vote), methods (social media, school visits, community radio), timeline (before elections), and evaluation (voter registration numbers).",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Think about how to reach young people where they are.",
+          "Consider what barriers prevent young people from voting."
+        ],
+        "explanation": "An effective campaign addresses the target audience's concerns, uses appropriate media channels, and has measurable outcomes. Youth voter turnout in SA has been declining.",
+        "distractors": [
+          "Just tell people to vote without explaining why",
+          "Only use newspapers since everyone reads them",
+          "Focus only on one political party"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember: the Constitution is the supreme law of South Africa. Any law or action that contradicts it can be declared invalid.",
+      "Chapter 9 institutions (Human Rights Commission, Public Protector, etc.) are independent bodies that protect democracy.",
+      "Rights and responsibilities are two sides of the same coin in a democracy."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "constitutional democracy",
+        "definition": "A system of government where the constitution is the supreme law, and government power is limited by constitutional rules",
+        "example_usage": "South Africa is a constitutional democracy because the Constitution is the highest law in the land."
+      },
+      {
+        "term": "Bill of Rights",
+        "definition": "Chapter 2 of the South African Constitution, which lists the fundamental rights of all people in South Africa",
+        "example_usage": "The Bill of Rights guarantees the right to equality for all South Africans."
+      },
+      {
+        "term": "separation of powers",
+        "definition": "The division of government into three branches (legislature, executive, judiciary) to prevent abuse of power",
+        "example_usage": "Separation of powers means the courts can declare a law unconstitutional even if Parliament passed it."
+      },
+      {
+        "term": "responsible citizenship",
+        "definition": "Fulfilling one's duties as a citizen, including voting, obeying laws, paying taxes, and holding leaders accountable",
+        "example_usage": "Responsible citizenship includes reporting corruption and participating in local government."
+      },
+      {
+        "term": "Chapter 9 institutions",
+        "definition": "Independent bodies established by Chapter 9 of the Constitution to strengthen democracy (e.g., Public Protector, SAHRC)",
+        "example_usage": "The Public Protector is a Chapter 9 institution that investigates government misconduct."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think democracy means the majority can do whatever it wants.",
+        "correction": "In a constitutional democracy, majority rule is limited by the Bill of Rights. Even a 100% vote in Parliament cannot remove fundamental rights.",
+        "why_students_think_this": "Students confuse 'majority rule' with unlimited power. They need to understand that the Constitution protects minorities from the tyranny of the majority."
+      },
+      {
+        "misconception": "Students believe that rights are absolute and have no limits.",
+        "correction": "Section 36 (the limitation clause) allows rights to be limited if it is reasonable and justifiable in an open and democratic society. For example, freedom of expression does not include hate speech.",
+        "why_students_think_this": "Students hear 'you have the right to...' without learning about the limitation clause. Teaching the balance between rights helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Democracy",
+    "title": "Assessment: Democracy & Human Rights in South Africa",
+    "items": [
+      {
+        "question": "Name three Chapter 9 institutions and state the function of each.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Human Rights Commission (promotes and protects human rights), Public Protector (investigates government misconduct), Electoral Commission (ensures free and fair elections)",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about independent bodies that support democracy"
+      },
+      {
+        "question": "Explain the relationship between rights and responsibilities in a democracy.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Rights are guaranteed freedoms; responsibilities are duties that come with those rights. E.g., the right to vote comes with the responsibility to make informed choices. Rights cannot exist without citizens fulfilling their responsibilities.",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Rights and responsibilities are interconnected"
+      },
+      {
+        "question": "Using a specific example, show how separation of powers protects democracy in South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Example: The Constitutional Court declared the Nkandla spending unconstitutional, overruling the executive. This shows how the judiciary checks executive power.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Think of a real case where one branch checked another"
+      },
+      {
+        "question": "Compare how human rights were treated during apartheid versus in democratic South Africa.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "During apartheid: rights were denied based on race (Pass Laws, Group Areas Act, Bantu Education). In democratic SA: the Constitution guarantees equal rights for all, with Chapter 9 institutions to protect them. However, challenges remain.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Compare specific laws and protections in each era"
+      },
+      {
+        "question": "Evaluate the effectiveness of South Africa's democracy 30 years after 1994. Is it fulfilling its constitutional promises?",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Strengths: free elections, strong courts, free press. Weaknesses: corruption, inequality, unemployment, service delivery failures. Evaluation should weigh evidence from both sides and reach a reasoned conclusion.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both achievements and challenges"
+      },
+      {
+        "question": "Propose a plan for how your school can promote active citizenship and respect for human rights.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Plan should include: awareness campaigns, human rights day activities, learner representative council engagement, community service projects, anti-discrimination policies, and partnerships with organisations like the SAHRC.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Think about practical steps your school can take"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the supreme law of South Africa?",
+      "back": "The Constitution of the Republic of South Africa (1996). Any law or action inconsistent with it is invalid.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is the Bill of Rights?",
+      "back": "Chapter 2 of the Constitution, listing fundamental rights such as equality, dignity, life, freedom of expression, and education.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "Name the three branches of government in SA.",
+      "back": "Legislature (Parliament makes laws), Executive (President and Cabinet implement laws), Judiciary (courts interpret laws and check constitutionality).",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is the Public Protector?",
+      "back": "A Chapter 9 institution that investigates government misconduct, corruption, and maladministration. Its findings are binding.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What does Section 36 of the Constitution allow?",
+      "back": "The limitation of rights, but only if the limitation is reasonable and justifiable in an open and democratic society based on human dignity, equality, and freedom.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 400
+    },
+    {
+      "front": "What is responsible citizenship?",
+      "back": "Fulfilling duties such as voting, obeying laws, paying taxes, respecting others' rights, and holding leaders accountable.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "How does diversity strengthen democracy?",
+      "back": "Multiple perspectives improve decision-making, promote tolerance, and ensure policies consider all communities. SA's Constitution protects 11 official languages and cultural rights.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 500
+    },
+    {
+      "front": "Name three apartheid laws that violated human rights.",
+      "back": "Pass Laws (restricted movement), Group Areas Act (forced racial separation), Bantu Education Act (inferior education for Black South Africans).",
+      "tags": ["CAPS.LifeOrientation.Gr12.Democracy", "Grade12", "Life Orientation"],
+      "difficulty_permille": 350
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

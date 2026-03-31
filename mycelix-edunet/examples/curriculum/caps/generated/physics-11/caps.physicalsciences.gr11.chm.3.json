@@ -5,13 +5,13 @@
     "title": "CAPS.PhysicalSciences.Gr11.CHM.3: Open and closed systems. Reversible reactions. Dynamic eq...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Reaction rate measures how fast reactants are consumed or products formed. Rate = −Δ[reactant]/Δt = +Δ[product]/Δt. Factors: concentration (more collisions), temperature (faster molecules, more exceed Ea), surface area (more exposed particles), catalysts (lower Ea, provide alternative pathway). Collision theory: reactions only occur when particles collide with sufficient energy (≥ Ea) and correct orientation.",
+    "explanation": "Reaction rate measures how fast reactants are consumed or products formed. Rate = \u2212\u0394[reactant]/\u0394t = +\u0394[product]/\u0394t. Factors: concentration (more collisions), temperature (faster molecules, more exceed Ea), surface area (more exposed particles), catalysts (lower Ea, provide alternative pathway). Collision theory: reactions only occur when particles collide with sufficient energy (\u2265 Ea) and correct orientation.",
     "examples": [
       {
-        "problem": "For N₂(g) + 3H₂(g) ⇌ 2NH₃(g) (ΔH < 0), predict the effect of increasing temperature.",
+        "problem": "For N\u2082(g) + 3H\u2082(g) \u21cc 2NH\u2083(g) (\u0394H < 0), predict the effect of increasing temperature.",
         "steps": [
           {
-            "instruction": "Step 1: The forward reaction is exothermic (ΔH < 0)",
+            "instruction": "Step 1: The forward reaction is exothermic (\u0394H < 0)",
             "result": "identify reaction type"
           },
           {
@@ -19,7 +19,7 @@
             "result": "apply principle"
           },
           {
-            "instruction": "Step 3: Equilibrium shifts LEFT (reverse), producing more N₂ and H₂",
+            "instruction": "Step 3: Equilibrium shifts LEFT (reverse), producing more N\u2082 and H\u2082",
             "result": "determine shift"
           },
           {
@@ -27,14 +27,14 @@
             "result": "effect on Kc"
           }
         ],
-        "answer": "Answer: Equilibrium shifts left. [NH₃] decreases. Kc decreases.",
+        "answer": "Answer: Equilibrium shifts left. [NH\u2083] decreases. Kc decreases.",
         "visual_description": null
       },
       {
-        "problem": "For N₂(g) + 3H₂(g) ⇌ 2NH₃(g) (ΔH < 0), predict the effect of increasing temperature.",
+        "problem": "For N\u2082(g) + 3H\u2082(g) \u21cc 2NH\u2083(g) (\u0394H < 0), predict the effect of increasing temperature.",
         "steps": [
           {
-            "instruction": "Step 1: The forward reaction is exothermic (ΔH < 0)",
+            "instruction": "Step 1: The forward reaction is exothermic (\u0394H < 0)",
             "result": "identify reaction type"
           },
           {
@@ -42,7 +42,7 @@
             "result": "apply principle"
           },
           {
-            "instruction": "Step 3: Equilibrium shifts LEFT (reverse), producing more N₂ and H₂",
+            "instruction": "Step 3: Equilibrium shifts LEFT (reverse), producing more N\u2082 and H\u2082",
             "result": "determine shift"
           },
           {
@@ -50,14 +50,14 @@
             "result": "effect on Kc"
           }
         ],
-        "answer": "Answer: Equilibrium shifts left. [NH₃] decreases. Kc decreases.",
+        "answer": "Answer: Equilibrium shifts left. [NH\u2083] decreases. Kc decreases.",
         "visual_description": null
       },
       {
-        "problem": "For N₂(g) + 3H₂(g) ⇌ 2NH₃(g) (ΔH < 0), predict the effect of increasing temperature.",
+        "problem": "For N\u2082(g) + 3H\u2082(g) \u21cc 2NH\u2083(g) (\u0394H < 0), predict the effect of increasing temperature.",
         "steps": [
           {
-            "instruction": "Step 1: The forward reaction is exothermic (ΔH < 0)",
+            "instruction": "Step 1: The forward reaction is exothermic (\u0394H < 0)",
             "result": "identify reaction type"
           },
           {
@@ -65,7 +65,7 @@
             "result": "apply principle"
           },
           {
-            "instruction": "Step 3: Equilibrium shifts LEFT (reverse), producing more N₂ and H₂",
+            "instruction": "Step 3: Equilibrium shifts LEFT (reverse), producing more N\u2082 and H\u2082",
             "result": "determine shift"
           },
           {
@@ -73,121 +73,96 @@
             "result": "effect on Kc"
           }
         ],
-        "answer": "Answer: Equilibrium shifts left. [NH₃] decreases. Kc decreases.",
+        "answer": "Answer: Equilibrium shifts left. [NH\u2083] decreases. Kc decreases.",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
-        ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
-        "distractors": [
-          "9",
-          "900",
-          "0.9"
-        ]
-      },
-      {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "For the reaction N2(g) + 3H2(g) <=> 2NH3(g), write the expression for Kc.",
+        "answer": "Kc = [NH3]^2 / ([N2][H2]^3)",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Kc = products / reactants, each raised to the power of their coefficient.",
+          "Only gases and aqueous species appear in the expression."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "Kc = [NH3]^2 / ([N2] x [H2]^3). The exponents match the stoichiometric coefficients.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "Kc = [N2][H2]^3 / [NH3]^2",
+          "Kc = [NH3] / [N2][H2]",
+          "Kc = 2[NH3] / [N2] x 3[H2]"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "For N2 + 3H2 <=> 2NH3 (Delta H < 0), predict the effect of increasing pressure on the equilibrium position.",
+        "answer": "Increasing pressure shifts equilibrium toward the side with fewer gas moles. Reactants: 1+3=4 moles. Products: 2 moles. Equilibrium shifts RIGHT (toward NH3), increasing yield.",
+        "difficulty_permille": 400,
+        "bloom_level": "Analyze",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Le Chatelier's principle: the system opposes the change.",
+          "Higher pressure favours fewer gas moles."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "By shifting right (4 moles -> 2 moles), the system reduces the total moles of gas, partially counteracting the pressure increase. Kc is unchanged (only temperature changes Kc).",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "Shifts left",
+          "No effect",
+          "Shifts right but Kc changes"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "A catalyst is added to the Haber process. Does it change the equilibrium position or Kc? Explain.",
+        "answer": "A catalyst does NOT change the equilibrium position or Kc. It speeds up both the forward and reverse reactions equally, so equilibrium is reached faster but at the same composition.",
+        "difficulty_permille": 350,
+        "bloom_level": "Understand",
+        "hints": [
+          "A catalyst lowers Ea for both directions equally.",
+          "Kc depends only on temperature."
+        ],
+        "explanation": "The catalyst helps the Haber process by reaching equilibrium faster, but the same yield of NH3 is obtained. To increase yield, change temperature or pressure.",
+        "distractors": [
+          "Catalyst shifts equilibrium right",
+          "Catalyst increases Kc",
+          "Catalyst only speeds forward reaction"
+        ]
+      },
+      {
+        "question": "At equilibrium, [N2] = 0.1, [H2] = 0.3, [NH3] = 0.2 (all in mol/dm^3). Calculate Kc.",
+        "answer": "Kc = (0.2)^2 / ((0.1)(0.3)^3) = 0.04 / (0.1 x 0.027) = 0.04/0.0027 = 14.8",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Substitute the equilibrium concentrations into the Kc expression.",
+          "Be careful with the exponents: [H2]^3 = (0.3)^3 = 0.027."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "Kc = [NH3]^2/([N2][H2]^3) = 0.04/(0.1 x 0.027) = 0.04/0.0027 = 14.8. A large Kc means products are favoured at equilibrium.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "0.067",
+          "1.48",
+          "148"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "The Haber process operates at 450C and 200 atm with an iron catalyst. The reaction is exothermic. Explain why a high temperature is used even though it reduces yield.",
+        "answer": "Lower temperature would increase yield (Le Chatelier: exothermic reaction favoured at low T), but would make the reaction too slow. The 450C compromise gives acceptable rate AND reasonable yield. The iron catalyst helps achieve equilibrium faster at this temperature. Unreacted N2 and H2 are recycled.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "There is a trade-off between rate and yield.",
+          "Industrial processes must consider both thermodynamics (yield) and kinetics (rate)."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "At 450C and 200 atm, yield is ~15%. The recycling of unreacted gases makes the process economically viable despite the relatively low per-pass yield.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
-        ]
-      },
-      {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
-        ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
-        "distractors": [
-          "9",
-          "900",
-          "0.9"
-        ]
-      },
-      {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
-        ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
-        "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "High temperature increases yield",
+          "The catalyst eliminates the temperature trade-off",
+          "200 atm reduces yield"
         ]
       }
     ],
     "hints": [
-      "For Le Chatelier: the system shifts to oppose the change. Add reactant → shifts right. Increase temp on exothermic → shifts left.",
-      "For Le Chatelier: the system shifts to oppose the change. Add reactant → shifts right. Increase temp on exothermic → shifts left.",
-      "For Le Chatelier: the system shifts to oppose the change. Add reactant → shifts right. Increase temp on exothermic → shifts left."
+      "For Le Chatelier: the system shifts to oppose the change. Add reactant \u2192 shifts right. Increase temp on exothermic \u2192 shifts left.",
+      "For Le Chatelier: the system shifts to oppose the change. Add reactant \u2192 shifts right. Increase temp on exothermic \u2192 shifts left.",
+      "For Le Chatelier: the system shifts to oppose the change. Add reactant \u2192 shifts right. Increase temp on exothermic \u2192 shifts left."
     ],
     "key_vocabulary": [
       {
@@ -221,54 +196,54 @@
     "title": "Assessment: Open and closed systems. Reversible reactions. Dynamic equilibrium. Le Chatelier's principle (concentration, temperature, pressure). Equilibrium constant Kc. Equilibrium calculations",
     "items": [
       {
-        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450°C) despite the reaction being exothermic.",
+        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450\u00b0C) despite the reaction being exothermic.",
         "item_type": "ShortAnswer",
-        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH₃ but make the reaction too slow. 450°C is a compromise between yield and rate.",
+        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH\u2083 but make the reaction too slow. 450\u00b0C is a compromise between yield and rate.",
         "points": 1,
         "bloom_level": "Remember",
         "rubric": null,
         "hint": "5"
       },
       {
-        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450°C) despite the reaction being exothermic.",
+        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450\u00b0C) despite the reaction being exothermic.",
         "item_type": "ShortAnswer",
-        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH₃ but make the reaction too slow. 450°C is a compromise between yield and rate.",
+        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH\u2083 but make the reaction too slow. 450\u00b0C is a compromise between yield and rate.",
         "points": 2,
         "bloom_level": "Understand",
         "rubric": null,
         "hint": "5"
       },
       {
-        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450°C) despite the reaction being exothermic.",
+        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450\u00b0C) despite the reaction being exothermic.",
         "item_type": "ShortAnswer",
-        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH₃ but make the reaction too slow. 450°C is a compromise between yield and rate.",
+        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH\u2083 but make the reaction too slow. 450\u00b0C is a compromise between yield and rate.",
         "points": 2,
         "bloom_level": "Apply",
         "rubric": null,
         "hint": "5"
       },
       {
-        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450°C) despite the reaction being exothermic.",
+        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450\u00b0C) despite the reaction being exothermic.",
         "item_type": "ShortAnswer",
-        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH₃ but make the reaction too slow. 450°C is a compromise between yield and rate.",
+        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH\u2083 but make the reaction too slow. 450\u00b0C is a compromise between yield and rate.",
         "points": 3,
         "bloom_level": "Analyze",
         "rubric": null,
         "hint": "5"
       },
       {
-        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450°C) despite the reaction being exothermic.",
+        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450\u00b0C) despite the reaction being exothermic.",
         "item_type": "ShortAnswer",
-        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH₃ but make the reaction too slow. 450°C is a compromise between yield and rate.",
+        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH\u2083 but make the reaction too slow. 450\u00b0C is a compromise between yield and rate.",
         "points": 3,
         "bloom_level": "Evaluate",
         "rubric": null,
         "hint": "5"
       },
       {
-        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450°C) despite the reaction being exothermic.",
+        "question": "Explain why the Haber process uses high pressure (200 atm) but moderate temperature (450\u00b0C) despite the reaction being exothermic.",
         "item_type": "ShortAnswer",
-        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH₃ but make the reaction too slow. 450°C is a compromise between yield and rate.",
+        "correct_answer": "High pressure shifts equilibrium right (fewer gas moles on product side). Low temperature would favour NH\u2083 but make the reaction too slow. 450\u00b0C is a compromise between yield and rate.",
         "points": 4,
         "bloom_level": "Create",
         "rubric": null,
@@ -311,7 +286,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 111
     },
@@ -321,7 +296,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 222
     },
@@ -331,7 +306,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 333
     },
@@ -341,7 +316,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 444
     },
@@ -351,7 +326,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 555
     },
@@ -361,7 +336,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 666
     },
@@ -371,7 +346,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 777
     },
@@ -381,7 +356,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.3",
         "Grade11",
-        "Chemistry — Equilibrium"
+        "Chemistry \u2014 Equilibrium"
       ],
       "difficulty_permille": 888
     }

@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.1: Vectors and scalars. Reference frames. Position, displace...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "Kinematics describes motion without considering forces. Key concepts: displacement (change in position, can be negative), velocity (rate of change of displacement), acceleration (rate of change of velocity). Equations of motion: v = u + at, s = ut + ½at², v² = u² + 2as. Motion graphs: x-t graphs show position over time (gradient = velocity), v-t graphs show velocity (gradient = acceleration, area = displacement).",
+    "explanation": "Kinematics describes motion without considering forces. Key concepts: displacement (change in position, can be negative), velocity (rate of change of displacement), acceleration (rate of change of velocity). Equations of motion: v = u + at, s = ut + \u00bdat\u00b2, v\u00b2 = u\u00b2 + 2as. Motion graphs: x-t graphs show position over time (gradient = velocity), v-t graphs show velocity (gradient = acceleration, area = displacement).",
     "examples": [
       {
         "problem": "Solve a Motion in One Dimension problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A car accelerates uniformly from rest to 20 m/s in 8 seconds. Calculate the acceleration.",
+        "answer": "a = (v - u)/t = (20 - 0)/8 = 2.5 m/s^2",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use the equation v = u + at.",
+          "The car starts from rest, so u = 0."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Using v = u + at: 20 = 0 + a(8), so a = 20/8 = 2.5 m/s^2.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "5 m/s^2",
+          "1.25 m/s^2",
+          "160 m/s^2"
         ]
       },
       {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "A cyclist travels 100 m in 20 s, then 150 m in 30 s. Calculate the average speed for the entire journey.",
+        "answer": "Average speed = total distance / total time = 250/50 = 5 m/s",
+        "difficulty_permille": 300,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Average speed uses total distance and total time, not individual speeds.",
+          "Add the distances and the times separately first."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Total distance = 100 + 150 = 250 m. Total time = 20 + 30 = 50 s. Average speed = 250/50 = 5 m/s.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "5.5 m/s",
+          "6.25 m/s",
+          "7 m/s"
         ]
       },
       {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 375,
+        "question": "A ball is dropped from a building 45 m high. How long does it take to reach the ground? (g = 10 m/s^2, ignore air resistance)",
+        "answer": "t = 3 s",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use s = ut + 1/2 at^2 with u = 0 (dropped, not thrown).",
+          "Substitute s = 45, a = 10, u = 0 and solve for t."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "s = ut + 1/2 at^2. 45 = 0 + 1/2(10)t^2. 45 = 5t^2. t^2 = 9. t = 3 s.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "4.5 s",
+          "2 s",
+          "9 s"
         ]
       },
       {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "A car travelling at 30 m/s brakes and decelerates at 5 m/s^2. Calculate the stopping distance.",
+        "answer": "s = 90 m",
+        "difficulty_permille": 550,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use v^2 = u^2 + 2as with v = 0 (the car stops).",
+          "Deceleration means a is negative: a = -5 m/s^2."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "v^2 = u^2 + 2as. 0 = (30)^2 + 2(-5)s. 0 = 900 - 10s. s = 90 m.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "45 m",
+          "180 m",
+          "60 m"
         ]
       },
       {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "A velocity-time graph shows a straight line from (0, 4) to (6, 16). Calculate (a) the acceleration and (b) the displacement in those 6 seconds.",
+        "answer": "(a) a = 2 m/s^2. (b) s = 60 m.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Acceleration = gradient of v-t graph = rise/run.",
+          "Displacement = area under the v-t graph (trapezium)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "(a) a = (16 - 4)/(6 - 0) = 12/6 = 2 m/s^2. (b) Area = 1/2(4 + 16)(6) = 1/2(20)(6) = 60 m.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Motion in One Dimension",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "(a) 2 m/s^2, (b) 96 m",
+          "(a) 12 m/s^2, (b) 60 m",
+          "(a) 2 m/s^2, (b) 48 m"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.1",
-    "title": "Assessment: Vectors and scalars. Reference frames. Position, displacement, speed, velocity, acceleration. Equations of motion: v = u + at, s = ut + ½at², v² = u² + 2as. Graphs of motion (x-t, v-t, a-t)",
+    "title": "Assessment: Vectors and scalars. Reference frames. Position, displacement, speed, velocity, acceleration. Equations of motion: v = u + at, s = ut + \u00bdat\u00b2, v\u00b2 = u\u00b2 + 2as. Graphs of motion (x-t, v-t, a-t)",
     "items": [
       {
         "question": "Explain Motion in One Dimension.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.1",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 888
     }

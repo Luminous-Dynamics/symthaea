@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Drainage & Sanitation Systems?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
+        "question": "A new house requires a 110mm sewer line running 18m from the last inspection chamber to the municipal connection. The entry point at the municipal sewer is 600mm below the inspection chamber outlet. Calculate the gradient and determine if it meets SANS 10252-2 requirements.",
+        "answer": "Gradient = fall / run = 600mm / 18,000mm = 1:30. SANS 10252-2 specifies minimum gradient for 110mm sewer pipe as 1:60 (approximately 17mm per metre). The calculated gradient of 1:30 (33mm per metre) exceeds the minimum requirement -- this is acceptable. However, excessively steep gradients (above 1:10) can cause the water to run ahead of the solids, leaving solids stranded in the pipe. At 1:30, this is not a concern. The ideal gradient for 110mm pipe is between 1:40 and 1:60. To set this gradient on site: place a string line from the inspection chamber outlet to the municipal connection, measuring the fall with a spirit level, or use a laser level.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
         "hints": [
-          "Think safety first"
+          "Gradient is expressed as a ratio: 1:60 means 1mm of fall for every 60mm of horizontal run.",
+          "Too flat = blockages (water doesn't carry solids). Too steep = water outruns solids (also causes blockages)."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "Gradient calculation is the most fundamental drainage skill. Getting it wrong causes chronic blockages that are expensive to fix once the pipe is buried. Always check gradient with a level during installation, not after backfilling.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "Any downhill slope is sufficient for drainage",
+          "Steeper is always better for sewer lines",
+          "Gradient is measured from the municipal connection upward"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Drainage & Sanitation Systems in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
+        "question": "A restaurant owner complains about frequent drain blockages in the kitchen. You inspect and find no grease trap installed. Explain why a grease trap is mandatory per SANS 10252-2, how it works, and what size is needed for a 120-seat restaurant.",
+        "answer": "SANS 10252-2 requires grease traps on all commercial kitchen drains to prevent fats, oils, and grease (FOG) from entering the sewer system, where they solidify and cause blockages. How it works: wastewater enters the trap and slows down. Grease (lighter than water) floats to the surface, food solids settle to the bottom, and relatively clean water exits through a submerged outlet pipe to the sewer. Sizing for 120 seats: rule of thumb for SA is 4L per seat = 120 x 4 = 480L minimum grease trap capacity. Select a 500L above-ground unit or 1000L below-ground unit (below-ground needs larger capacity due to longer cleaning intervals). Maintenance: the trap must be cleaned at least weekly (more often for busy kitchens). A maintenance logbook is required by most municipalities. Grease trap waste must be disposed of by a licensed waste contractor -- it cannot be dumped down another drain.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
         "hints": [
-          "Think about SANS standards or Acts"
+          "Municipal by-laws often impose fines for discharging FOG into the sewer system.",
+          "Below-ground grease traps need a pump-out access point for cleaning."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Grease traps are legally required for all commercial food establishments in SA. Plumbers who work on restaurant fit-outs must know the sizing rules and maintenance requirements to advise clients correctly.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "Grease traps are optional if the restaurant has a garbage disposal",
+          "Hot water dissolves grease, so no trap is needed if you flush with hot water",
+          "A 50L trap is sufficient for any restaurant"
+        ]
+      },
+      {
+        "question": "You are installing drainage for a new bathroom. The bath (50mm waste), basin (40mm waste), and toilet (110mm soil) must connect to a single 110mm stack. Draw the connection sequence and explain why a trap and vent are needed on each fixture.",
+        "answer": "Connection sequence (from top to bottom of the stack): Basin (40mm) connects via a P-trap (50mm water seal) through a 40mm branch to the stack using a 45° Y-junction. Bath (50mm) connects via a P-trap (50mm water seal) through a 50mm branch below the basin connection, also using a 45° Y-junction. Toilet (110mm) connects directly to the stack at the lowest point using a 110mm Y-junction (the toilet has an integral S-trap in the pan). The stack continues to the sewer below and extends upward through the roof as a vent (minimum 900mm above roof level). Why traps: each trap holds a 50mm water seal that blocks sewer gases (methane, hydrogen sulphide -- toxic and flammable) from entering the building. Why vents: the vent pipe allows air into the system to prevent siphonage (when water flowing in one pipe creates suction that pulls the water seal out of another trap) and allows sewer gases to disperse safely above roof level.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Never connect a basin or bath BELOW the toilet connection -- soil waste must enter at the lowest point.",
+          "The 50mm trap seal is a critical dimension: less than 25mm and sewer gas can escape; more than 75mm and self-siphonage can occur."
+        ],
+        "explanation": "Understanding the interaction between traps, vents, and the stack is essential for preventing sewer gas entry and ensuring all fixtures drain properly. A single missing vent can cause gurgling, slow drainage, and trap siphonage throughout the bathroom.",
+        "distractors": [
+          "Vents are optional for single-storey buildings",
+          "The toilet connection goes at the top of the stack",
+          "One trap on the main stack is sufficient for all fixtures"
+        ]
+      },
+      {
+        "question": "A rural client needs a septic tank system for a 6-person household with no municipal sewer connection. Size the septic tank and soakaway, and explain the maintenance requirements.",
+        "answer": "Septic tank sizing per SANS 10400-P: minimum capacity = 3000L for up to 6 persons (add 500L for each additional person). Recommend 4500L for a 6-person household to allow for visitors and reduce pumping frequency. The tank must be a two-chamber design: first chamber (2/3 of volume) receives raw sewage and allows solids to settle; second chamber (1/3) provides further clarification before effluent flows to the soakaway. Soakaway (french drain) sizing: depends on soil percolation rate. Conduct a percolation test: dig a hole 300mm x 300mm x 300mm, fill with water, and time how long it takes to drop 150mm. If <10 minutes: sandy soil, need ~10m² soakaway. If 10-30 minutes: loam, need ~20m². If >60 minutes: clay, a soakaway may not work -- consider a conservancy tank (sealed, pump-out only). Maintenance: pump out sludge every 2-3 years (never let sludge exceed 1/3 of tank volume). Never pour chemicals, bleach, or paint into the system (kills bacteria that break down waste). Do not plant trees within 3m of the tank or soakaway (roots infiltrate and block pipes).",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": [
+          "The percolation test is critical -- installing a soakaway in clay soil will result in surface flooding of effluent.",
+          "Septic systems rely on BACTERIA to break down waste. Antibacterial products and harsh chemicals destroy the biological process."
+        ],
+        "explanation": "Septic tank design is essential knowledge for plumbers working in rural SA. Many installations fail because the soakaway is undersized for the soil type or the tank is not maintained. The percolation test is the most important step in the design process.",
+        "distractors": [
+          "Any hole in the ground can serve as a septic system",
+          "Septic tanks never need maintenance once installed",
+          "Bleach helps keep the septic tank clean"
+        ]
+      },
+      {
+        "question": "During a drainage inspection, you notice that a 40mm basin waste pipe runs horizontally for 3m before connecting to the stack, with no gradient. The basin drains slowly and smells of sewer gas. Diagnose the problems and specify the corrections.",
+        "answer": "Problems: (1) No gradient: SANS 10252-2 requires minimum 1:40 gradient for 40mm pipe (25mm fall per metre). A horizontal pipe has zero flow velocity, causing waste water to pool and solids/soap scum to accumulate, creating blockages. (2) Sewer gas smell indicates the trap seal has been lost, likely through self-siphonage: the 3m horizontal run creates a 'plug' of water that, when it finally drains, siphons the trap dry (pulls the water seal out). (3) The long horizontal run may also exceed the maximum unvented branch length for 40mm pipe (typically 1.7m per SANS 10252-2). Corrections: (1) Re-lay the 40mm pipe with minimum 1:40 gradient (75mm fall over 3m). (2) Install an air admittance valve (AAV) or connect to a vent pipe to prevent siphonage. (3) If the run cannot be shortened, consider upsizing to 50mm pipe (which has a longer maximum unvented length). (4) Clean the existing pipe to remove accumulated buildup. (5) Verify the trap is intact and holds a 50mm water seal after corrections.",
+        "difficulty_permille": 800,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Slow drainage + sewer smell = classic signs of gradient and venting problems.",
+          "Maximum unvented branch lengths exist specifically to prevent self-siphonage."
+        ],
+        "explanation": "Diagnosing drainage problems requires understanding the interaction between gradient (flow), trap seals (gas barrier), and venting (pressure equalisation). Most drainage complaints can be traced to one or more of these three factors being incorrect.",
+        "distractors": [
+          "Just pour drain cleaner down the basin to fix the blockage",
+          "The pipe is fine -- the basin trap just needs replacing",
+          "Install a pump to force water through the horizontal pipe"
         ]
       }
     ],

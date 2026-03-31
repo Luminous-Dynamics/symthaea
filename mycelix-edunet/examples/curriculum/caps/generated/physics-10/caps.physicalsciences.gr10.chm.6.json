@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
+        "question": "List the four main steps in municipal water purification in the correct order.",
+        "answer": "1. Screening (remove large debris). 2. Flocculation and sedimentation (chemicals cause particles to clump and settle). 3. Filtration (remove remaining particles). 4. Chlorination (kill bacteria and pathogens).",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Start with removing the biggest particles and end with disinfection.",
+          "Flocculation uses chemicals like aluminium sulfate to make particles clump."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "SA water treatment follows these standard steps. Rand Water treats water from the Vaal Dam for Gauteng using this process.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Chlorination first, then screening",
+          "Only filtration is needed",
+          "Boiling replaces all these steps"
         ]
       },
       {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "A water sample has a pH of 4.5. Is this acidic, neutral, or basic? Suggest a possible source of this acidity.",
+        "answer": "pH 4.5 is acidic (pH < 7). Possible source: acid mine drainage from gold or coal mining operations (common in SA, especially in Gauteng and Mpumalanga).",
+        "difficulty_permille": 350,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "pH < 7 = acidic, pH = 7 = neutral, pH > 7 = basic.",
+          "SA has significant acid mine drainage problems from its mining history."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Acid mine drainage occurs when sulfide minerals in mine waste react with water and oxygen to produce sulfuric acid. This is a major environmental problem in SA's Witwatersrand and Mpumalanga coalfields.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "pH 4.5 is neutral",
+          "pH 4.5 is basic",
+          "Only industrial areas have acidic water"
         ]
       },
       {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
+        "question": "Explain what eutrophication is and how it affects South African rivers.",
+        "answer": "Eutrophication is the excessive enrichment of water with nutrients (especially nitrogen and phosphorus from fertiliser runoff and sewage). This causes algal blooms that deplete dissolved oxygen when they decompose, killing fish and other aquatic life. In SA, rivers like the Vaal and Hartbeespoort Dam are severely affected.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Eutrophication = too many nutrients in water.",
+          "Think about what happens when algae grow rapidly and then die."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The process: nutrients enter water -> algae bloom -> algae die -> bacteria decompose algae -> bacteria consume dissolved oxygen -> fish die (hypoxia). Hartbeespoort Dam near Pretoria is a well-known example.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Eutrophication is caused by too little nutrients",
+          "Eutrophication increases oxygen levels",
+          "Only industrial waste causes eutrophication"
         ]
       },
       {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "A household receives water with a turbidity of 25 NTU. The SA standard is <1 NTU. Suggest two causes and explain why high turbidity is a health concern.",
+        "answer": "Causes: suspended clay/silt particles, or microbial growth. Health concerns: turbid water may harbour pathogens (bacteria, viruses) that attach to particles, and particles reduce the effectiveness of chlorine disinfection. Water must be filtered to reduce turbidity before chlorination.",
+        "difficulty_permille": 550,
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Turbidity measures cloudiness/suspended particles.",
+          "Think about why particles might shield pathogens from chlorine."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "High turbidity is an indicator of poor water quality. In SA, many rural communities lack proper water treatment, receiving water with turbidity far above safe levels.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Turbidity is harmless",
+          "High turbidity means water is too clean",
+          "25 NTU is within safe limits"
         ]
       },
       {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "question": "Describe the water cycle and explain why South Africa is considered a water-scarce country.",
+        "answer": "Water cycle: evaporation (from oceans, dams, rivers) -> condensation (clouds form) -> precipitation (rain, snow) -> collection (rivers, dams, groundwater) -> repeat. SA is water-scarce because: average rainfall is 450 mm/year (global average: 860 mm), high evaporation rates (hot climate), uneven distribution (wet east, dry west), growing demand (population, industry, agriculture), and infrastructure losses (leaking pipes lose ~35% of treated water).",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Water-scarce means demand approaches or exceeds supply.",
+          "SA receives about half the world's average rainfall."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "SA has ~1,000 m^3 of water per person per year, below the 1,700 m^3 threshold for water stress. Climate change is expected to worsen this, particularly in the Western Cape and Northern Cape.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Water Chemistry",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "SA has abundant rainfall",
+          "The water cycle does not apply to SA",
+          "Only the Western Cape faces water scarcity"
         ]
       }
     ],
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.6",
         "Grade10",
-        "Chemistry — Environmental"
+        "Chemistry \u2014 Environmental"
       ],
       "difficulty_permille": 888
     }

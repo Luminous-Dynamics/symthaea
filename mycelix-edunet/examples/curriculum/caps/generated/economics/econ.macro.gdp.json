@@ -1,0 +1,218 @@
+{
+  "node_id": "ECON.MACRO.GDP",
+  "lesson": {
+    "standard_code": "ECON.MACRO.GDP",
+    "title": "GDP & Economic Growth: Measuring GDP, real vs nominal, economic indicators, SA GDP composition",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Gross Domestic Product (GDP) measures the total value of all final goods and services produced within a country's borders in a given period. SA's GDP (2024) is approximately R7 trillion (~$380 billion), making it Africa's third-largest economy. GDP can be measured three ways: expenditure (C + I + G + (X - M)), income (wages + rent + interest + profit), and production (value added across sectors). SA's GDP composition: services ~67% (finance, trade, government), industry ~26% (mining, manufacturing), agriculture ~3%. Real GDP adjusts for inflation using a base year, while nominal GDP uses current prices. SA's GDP growth has averaged about 1% per year since 2015, well below the NDP target of 5.4%.",
+    "examples": [
+      {
+        "problem": "SA's nominal GDP was R6.5 trillion in 2023 and R7.0 trillion in 2024. The GDP deflator rose from 100 to 108. Calculate real GDP growth.",
+        "steps": [
+          {
+            "instruction": "Step 1: Real GDP 2023 = R6.5T / (100/100) = R6.5 trillion",
+            "result": "base year"
+          },
+          {
+            "instruction": "Step 2: Real GDP 2024 = R7.0T / (108/100) = R7.0T / 1.08 = R6.48 trillion",
+            "result": "deflate 2024 GDP"
+          },
+          {
+            "instruction": "Step 3: Real GDP growth = (6.48 - 6.50) / 6.50 x 100 = -0.3%",
+            "result": "calculate growth rate"
+          }
+        ],
+        "answer": "Answer: Real GDP declined by 0.3%. Despite nominal GDP rising, inflation eroded the gains.",
+        "visual_description": null
+      },
+      {
+        "problem": "Using the expenditure approach, identify the largest component of SA's GDP and explain why.",
+        "steps": [
+          {
+            "instruction": "Step 1: GDP = C + I + G + (X - M)",
+            "result": "expenditure formula"
+          },
+          {
+            "instruction": "Step 2: Household consumption (C) is typically 60-65% of SA GDP",
+            "result": "largest component"
+          },
+          {
+            "instruction": "Step 3: SA is a consumer-driven economy with relatively low investment and a trade deficit",
+            "result": "explain composition"
+          }
+        ],
+        "answer": "Answer: Household consumption expenditure (C) is the largest component at ~60-65% of GDP, reflecting SA's consumer-driven economy.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define GDP and state the expenditure formula.",
+        "answer": "GDP is the total value of all final goods and services produced within a country in a year. GDP = C + I + G + (X - M).",
+        "difficulty_permille": 150,
+        "bloom_level": "Remember",
+        "hints": [
+          "C = consumption, I = investment, G = government spending, X = exports, M = imports."
+        ],
+        "explanation": "The expenditure approach sums all spending on final goods and services. It is the most commonly used method.",
+        "distractors": [
+          "GDP = C + I + G + X + M",
+          "GDP = C + I - G + (X - M)",
+          "GDP = wages + rent + profit"
+        ]
+      },
+      {
+        "question": "Nominal GDP rose from R5 trillion to R5.5 trillion, while the price level rose by 10%. Did the economy actually grow?",
+        "answer": "Nominal GDP grew by 10% (5.5/5.0 = 1.10). Since prices also rose by 10%, real GDP growth is approximately 0%. The economy did not grow in real terms.",
+        "difficulty_permille": 400,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Real growth = nominal growth - inflation (approximately).",
+          "If prices rose by exactly the same amount as nominal GDP, real output is unchanged."
+        ],
+        "explanation": "Real GDP = Nominal GDP / Price Index. If both rise by the same percentage, real GDP is unchanged.",
+        "distractors": [
+          "Yes, the economy grew by 10%",
+          "Yes, the economy grew by 5%",
+          "The economy shrank by 10%"
+        ]
+      },
+      {
+        "question": "Explain why GDP per capita is a better measure of living standards than total GDP. Compare SA and Nigeria.",
+        "answer": "GDP per capita divides total GDP by population, giving output per person. SA has lower total GDP than Nigeria but higher GDP per capita (~$6,000 vs ~$2,200), indicating higher average living standards.",
+        "difficulty_permille": 550,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "A country with a huge population may have high total GDP but low GDP per person.",
+          "Nigeria has ~220 million people vs SA's ~62 million."
+        ],
+        "explanation": "Total GDP can be misleading for comparing welfare. GDP per capita accounts for population size, though it does not capture inequality.",
+        "distractors": [
+          "Total GDP is always the better measure",
+          "GDP per capita and total GDP give the same ranking",
+          "Nigeria has higher GDP per capita than SA"
+        ]
+      },
+      {
+        "question": "SA's mining sector has declined from ~20% of GDP in the 1970s to ~8% today. What structural change does this represent, and what has replaced it?",
+        "answer": "This represents structural transformation from a primary (resource-based) economy to a services-based economy. Financial services, trade, and government services now dominate SA GDP (~67%).",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about the three economic sectors: primary, secondary, tertiary.",
+          "Most developed and middle-income countries shift toward services over time."
+        ],
+        "explanation": "SA's deindustrialisation and the rise of finance, insurance, real estate, and government services reflect a global trend toward service economies.",
+        "distractors": [
+          "Agriculture has replaced mining",
+          "Manufacturing has replaced mining",
+          "SA's economy has not changed structurally"
+        ]
+      },
+      {
+        "question": "Evaluate the limitations of GDP as a measure of wellbeing in South Africa, given that the Gini coefficient is 0.63.",
+        "answer": "GDP does not capture income distribution. SA's high Gini (0.63, one of the world's highest) means GDP growth may benefit the wealthy disproportionately. GDP also excludes unpaid work, environmental degradation, and informal economy activity (estimated at 15-20% of SA's economy).",
+        "difficulty_permille": 800,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "The Gini coefficient measures inequality (0 = perfect equality, 1 = perfect inequality).",
+          "Think about what GDP does NOT measure: inequality, environment, unpaid work."
+        ],
+        "explanation": "GDP measures production, not welfare. In highly unequal societies like SA, aggregate growth statistics can mask the reality that millions remain in poverty while a small elite benefits.",
+        "distractors": [
+          "GDP perfectly measures wellbeing",
+          "The Gini coefficient is irrelevant to GDP analysis",
+          "SA's GDP includes all informal activity"
+        ]
+      }
+    ],
+    "hints": [
+      "Real GDP removes the effect of inflation. Nominal GDP does not.",
+      "GDP per capita = GDP / Population. It is a better welfare indicator than total GDP.",
+      "SA's GDP is dominated by services (~67%), reflecting its middle-income status."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Gross Domestic Product",
+        "definition": "The total market value of all final goods and services produced within a country's borders in a given time period",
+        "example_usage": "SA's GDP was approximately R7 trillion in 2024."
+      },
+      {
+        "term": "real GDP",
+        "definition": "GDP adjusted for inflation, measured in constant (base year) prices",
+        "example_usage": "Real GDP growth of 1% means the actual volume of output increased by 1%."
+      },
+      {
+        "term": "GDP deflator",
+        "definition": "A price index that measures the average price level of all goods in GDP relative to a base year",
+        "example_usage": "Real GDP = Nominal GDP / (GDP Deflator / 100)."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think rising GDP always means the country is doing better.",
+        "correction": "GDP can rise due to inflation alone (nominal growth). Only real GDP growth indicates actual increases in output. And even real GDP growth may not benefit everyone if inequality is high.",
+        "why_students_think_this": "Headlines often report nominal GDP figures without adjusting for inflation, creating a misleading picture."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.MACRO.GDP",
+    "title": "Assessment: GDP measurement, real vs nominal, SA economic structure",
+    "items": [
+      {
+        "question": "State the expenditure formula for GDP and identify each component.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "GDP = C + I + G + (X - M). C = household consumption, I = investment, G = government spending, X = exports, M = imports.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Five components in total."
+      },
+      {
+        "question": "Calculate real GDP given: Nominal GDP = R8 trillion, GDP deflator = 125.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Real GDP = 8T / (125/100) = 8T / 1.25 = R6.4 trillion.",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Real GDP = Nominal GDP / (Deflator/100)."
+      }
+    ],
+    "total_points": 5,
+    "estimated_minutes": 10,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Apply", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the expenditure formula for GDP?",
+      "back": "GDP = C + I + G + (X - M), where C = consumption, I = investment, G = government spending, X = exports, M = imports.",
+      "tags": ["ECON.MACRO.GDP", "Economics", "Macroeconomics"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "How do you convert nominal GDP to real GDP?",
+      "back": "Real GDP = Nominal GDP / (GDP Deflator / 100). This removes the effect of inflation.",
+      "tags": ["ECON.MACRO.GDP", "Economics", "Macroeconomics"],
+      "difficulty_permille": 350
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

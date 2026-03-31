@@ -1,0 +1,357 @@
+{
+  "node_id": "CAPS.LifeOrientation.Gr12.Health",
+  "lesson": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Health",
+    "title": "CAPS.LifeOrientation.Gr12.Health: Health & Well-being",
+    "grade_level": "Grade12",
+    "bloom_level": "Evaluate",
+    "explanation": "Health is a state of complete physical, mental, and social well-being, not merely the absence of disease (WHO definition). Good nutrition means eating a balanced diet following the SA Food-Based Dietary Guidelines: eat plenty of vegetables and fruit, make starchy foods the basis of most meals, eat dry beans and lentils regularly, and drink lots of clean water. Substance abuse (alcohol, tobacco, cannabis, tik, nyaope, prescription drug misuse) is a major health challenge in SA, particularly among youth. HIV/AIDS remains a significant concern: SA has the world's largest HIV treatment programme. Prevention includes abstinence, being faithful, correct and consistent condom use (ABC strategy), and medical male circumcision. Teenage pregnancy disrupts education and has health risks. Physical fitness includes cardiovascular endurance, strength, flexibility, and body composition. Stress management techniques include exercise, deep breathing, time management, social support, and seeking professional help when needed.",
+    "examples": [
+      {
+        "problem": "Lindiwe's friend has started using alcohol heavily on weekends. Explain the short-term and long-term effects and suggest how Lindiwe can help.",
+        "steps": [
+          {
+            "instruction": "Step 1: Short-term effects: impaired judgement, risk-taking behaviour, alcohol poisoning, accidents, unprotected sex",
+            "result": "immediate risks identified"
+          },
+          {
+            "instruction": "Step 2: Long-term effects: addiction, liver damage, brain damage, depression, damaged relationships, poor academic performance",
+            "result": "chronic risks identified"
+          },
+          {
+            "instruction": "Step 3: How to help: express concern without judging, provide information, suggest speaking to a trusted adult or counsellor, contact SANCA or Lifeline",
+            "result": "support strategy"
+          }
+        ],
+        "answer": "Answer: Alcohol abuse has immediate risks (impaired judgement, accidents) and long-term consequences (addiction, organ damage). Lindiwe should express concern supportively and suggest professional help.",
+        "visual_description": null
+      },
+      {
+        "problem": "Design a one-week meal plan for a Grade 12 learner studying for exams, following SA Food-Based Dietary Guidelines.",
+        "steps": [
+          {
+            "instruction": "Step 1: Include starchy foods (bread, pap, rice) as the basis of meals for sustained energy",
+            "result": "energy foundation"
+          },
+          {
+            "instruction": "Step 2: Add vegetables and fruit at every meal for vitamins and minerals",
+            "result": "micronutrients"
+          },
+          {
+            "instruction": "Step 3: Include protein (beans, lentils, chicken, fish, eggs) for brain function",
+            "result": "protein for concentration"
+          },
+          {
+            "instruction": "Step 4: Drink 6-8 glasses of water daily; limit sugary drinks and caffeine",
+            "result": "hydration"
+          },
+          {
+            "instruction": "Step 5: Include brain-boosting snacks: nuts, fruit, yoghurt instead of chips and sweets",
+            "result": "healthy snacking"
+          }
+        ],
+        "answer": "Answer: A balanced exam diet includes starchy foods for energy, plenty of vegetables and fruit, protein for brain function, adequate water, and healthy snacks.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the ABC strategy for HIV prevention and why each element is important.",
+        "steps": [
+          {
+            "instruction": "Step 1: Abstain from sexual activity — the only 100% effective prevention method",
+            "result": "A explained"
+          },
+          {
+            "instruction": "Step 2: Be faithful to one partner — reduces risk of multiple concurrent partnerships, which drive SA's epidemic",
+            "result": "B explained"
+          },
+          {
+            "instruction": "Step 3: Condomise — correct and consistent use of condoms significantly reduces transmission",
+            "result": "C explained"
+          },
+          {
+            "instruction": "Step 4: Additional prevention: PrEP (pre-exposure prophylaxis), medical male circumcision, PMTCT (prevention of mother-to-child transmission), regular testing",
+            "result": "beyond ABC"
+          }
+        ],
+        "answer": "Answer: ABC stands for Abstain, Be faithful, Condomise. These form the foundation of HIV prevention, supplemented by PrEP, circumcision, and regular testing.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List the five main food groups in the SA Food-Based Dietary Guidelines.",
+        "answer": "Starchy foods (bread, pap, rice), vegetables and fruit, protein (meat, fish, beans, eggs), dairy (milk, cheese, yoghurt), fats and oils (use sparingly).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about what appears on the SA food guide.",
+          "Remember the guideline: 'make starchy foods the basis of most meals.'"
+        ],
+        "explanation": "The SA Dietary Guidelines emphasise local, affordable foods and stress the importance of varied nutrition for health and academic performance.",
+        "distractors": [
+          "Protein should be the largest portion of every meal",
+          "Fats and oils should be avoided completely",
+          "Starchy foods make you unhealthy and should be minimised"
+        ]
+      },
+      {
+        "question": "Explain the difference between substance use, misuse, and abuse.",
+        "answer": "Use: taking a substance as prescribed or intended (e.g., prescribed medication). Misuse: using a substance incorrectly (e.g., taking more than prescribed). Abuse: continued use despite harmful consequences, leading to physical or psychological dependence.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about the progression from acceptable to harmful use.",
+          "Consider how control over use changes at each stage."
+        ],
+        "explanation": "Understanding the spectrum from use to abuse helps identify when intervention is needed. Abuse involves loss of control and continued use despite harm.",
+        "distractors": [
+          "Use and misuse are the same thing",
+          "Abuse only applies to illegal substances",
+          "You can only become addicted if you use daily"
+        ]
+      },
+      {
+        "question": "A friend tells you she is pregnant and afraid to tell her parents. What advice would you give, and what resources are available?",
+        "answer": "Express support without judgement. Encourage her to tell a trusted adult. Provide information about antenatal care, her right to continue schooling (SA Schools Act), adoption options, and support services (Childline 116, local clinic). Discuss the importance of early prenatal care.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about both emotional support and practical information.",
+          "Remember that pregnant learners have the right to continue their education."
+        ],
+        "explanation": "Teenage pregnancy requires sensitive, non-judgemental support. Key resources include clinics for prenatal care, Childline for counselling, and schools must allow pregnant learners to continue their education.",
+        "distractors": [
+          "She should leave school immediately",
+          "It is not your place to get involved",
+          "Only her parents can decide what happens"
+        ]
+      },
+      {
+        "question": "Analyse the relationship between substance abuse and risky sexual behaviour in the South African context.",
+        "answer": "Alcohol and drugs impair judgement, leading to unprotected sex, multiple partners, and inability to negotiate condom use. This increases risk of HIV/STI transmission and unplanned pregnancy. SA's high rates of alcohol use correlate with high HIV incidence.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about how substances affect decision-making.",
+          "Consider the link between weekend binge drinking and risky behaviour."
+        ],
+        "explanation": "Research shows a strong link between substance use and risky sexual behaviour. Impaired judgement leads to unprotected sex, increasing HIV/STI risk. Addressing one helps address the other.",
+        "distractors": [
+          "There is no connection between alcohol use and HIV risk",
+          "Only illegal drugs affect sexual behaviour",
+          "Education about HIV is enough without addressing substance abuse"
+        ]
+      },
+      {
+        "question": "Evaluate the effectiveness of South Africa's HIV/AIDS response over the past decade.",
+        "answer": "Successes: world's largest ART programme (5+ million on treatment), reduced mother-to-child transmission, increased life expectancy, widespread testing. Challenges: new infections still high (especially young women), stigma, treatment adherence, prevention fatigue.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider both treatment successes and prevention challenges.",
+          "Think about who is most affected and why."
+        ],
+        "explanation": "SA's HIV response has achieved remarkable treatment rollout but still struggles with prevention, particularly among young women aged 15-24 who have the highest new infection rates.",
+        "distractors": [
+          "SA has completely solved the HIV crisis",
+          "The HIV response has been a total failure",
+          "HIV is no longer a concern in South Africa"
+        ]
+      },
+      {
+        "question": "Create a stress management plan for a Grade 12 learner during the matric exam period.",
+        "answer": "Plan should include: study timetable with breaks, physical exercise (30 min daily), relaxation techniques (breathing, mindfulness), balanced diet and adequate sleep (8 hours), social support (study groups, talking to friends/family), limiting social media, and knowing when to seek help (school counsellor, SADAG helpline).",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Address physical, mental, and social aspects of well-being.",
+          "Include specific, actionable strategies."
+        ],
+        "explanation": "Effective stress management combines physical activity, proper nutrition and sleep, time management, relaxation techniques, and social support. Professional help should be sought if stress becomes overwhelming.",
+        "distractors": [
+          "Just study harder and the stress will go away",
+          "Avoid all social contact during exams",
+          "Energy drinks and late nights are the best exam strategy"
+        ]
+      }
+    ],
+    "hints": [
+      "The WHO defines health as complete physical, mental, and social well-being, not just the absence of disease.",
+      "SA has the world's largest antiretroviral treatment (ART) programme, with over 5 million people on treatment.",
+      "Stress management should address physical, mental, and social well-being together."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "substance abuse",
+        "definition": "The harmful or hazardous use of psychoactive substances, including alcohol and illicit drugs, leading to dependence or health problems",
+        "example_usage": "Substance abuse among youth in SA often starts with alcohol and progresses to harder drugs."
+      },
+      {
+        "term": "HIV/AIDS",
+        "definition": "Human Immunodeficiency Virus destroys immune cells; Acquired Immunodeficiency Syndrome is the late stage when the immune system is severely damaged",
+        "example_usage": "South Africa has the highest number of people living with HIV in the world, but ART allows people to live long, healthy lives."
+      },
+      {
+        "term": "antiretroviral treatment (ART)",
+        "definition": "Medication that suppresses HIV, prevents AIDS, and reduces transmission. When viral load is undetectable, HIV cannot be transmitted sexually (U=U).",
+        "example_usage": "People on ART who take their medication consistently can achieve an undetectable viral load."
+      },
+      {
+        "term": "nutrition",
+        "definition": "The process of providing the body with food necessary for health and growth, following balanced dietary guidelines",
+        "example_usage": "Good nutrition during matric exams includes brain-boosting foods like fish, nuts, and vegetables."
+      },
+      {
+        "term": "stress management",
+        "definition": "Techniques and strategies for coping with stress, including exercise, time management, relaxation, social support, and professional help",
+        "example_usage": "Effective stress management during exams includes a study timetable, regular exercise, and adequate sleep."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think HIV/AIDS is a death sentence.",
+        "correction": "With ART, people living with HIV can have a normal life expectancy and quality of life. U=U (Undetectable = Untransmittable) means effective treatment prevents sexual transmission.",
+        "why_students_think_this": "Outdated information from the early epidemic era. Modern treatment has transformed HIV into a manageable chronic condition."
+      },
+      {
+        "misconception": "Students believe that cannabis (dagga) is harmless because it is a natural plant.",
+        "correction": "Cannabis affects brain development (which continues until age 25), impairs memory and concentration, can trigger mental health conditions, and affects academic performance. Being natural does not mean safe.",
+        "why_students_think_this": "Peer influence and social media normalise cannabis use. The partial decriminalisation for private adult use is misunderstood as meaning it is safe for youth."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Health",
+    "title": "Assessment: Health & Well-being",
+    "items": [
+      {
+        "question": "List four common substances of abuse among South African youth.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Alcohol, tobacco, cannabis (dagga), tik (crystal meth), nyaope, prescription drugs (codeine-based cough syrup).",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about what is commonly available and used"
+      },
+      {
+        "question": "Explain the ABC strategy for HIV prevention.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Abstain from sex, Be faithful to one partner, Condomise (use condoms correctly and consistently).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "ABC is an acronym for three prevention strategies"
+      },
+      {
+        "question": "Demonstrate how you would use a stress management technique to help a classmate who is panicking before an exam.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Guide them through deep breathing (4 counts in, hold 4, out 4), reassure them, help them focus on what they know, suggest a brief walk, remind them one exam does not define them.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Think about immediate calming techniques"
+      },
+      {
+        "question": "Analyse why teenage pregnancy rates remain high in South Africa despite widespread knowledge about contraception.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Factors: poverty, gender power imbalances (inability to negotiate condom use), alcohol/substance use, lack of access to contraception in rural areas, cultural taboos about discussing sex, peer pressure, older partners (age-disparate relationships).",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider social, economic, and cultural factors beyond just knowledge"
+      },
+      {
+        "question": "Evaluate the impact of social media on the mental health of South African teenagers.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Negative: cyberbullying, comparison/low self-esteem, FOMO, sleep disruption, exposure to harmful content. Positive: social connection, access to information, support communities. Evaluation should weigh both and note that impact depends on usage patterns.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both positive and negative impacts"
+      },
+      {
+        "question": "Design a peer education programme to address substance abuse in your school community.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Programme should include: trained peer educators, accurate information sessions, interactive activities, referral pathways (SANCA, Lifeline), parent engagement, follow-up support, and evaluation measures.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Peer education is often more effective than adult-led programmes"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the WHO definition of health?",
+      "back": "A state of complete physical, mental, and social well-being, not merely the absence of disease or infirmity.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What does ABC stand for in HIV prevention?",
+      "back": "Abstain, Be faithful, Condomise.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 125
+    },
+    {
+      "front": "What does U=U mean in HIV treatment?",
+      "back": "Undetectable = Untransmittable. A person on effective ART with an undetectable viral load cannot transmit HIV sexually.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What is nyaope?",
+      "back": "A street drug common in SA, typically containing heroin mixed with cannabis, ARVs, and other substances. Highly addictive and dangerous.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "Name four stress management techniques.",
+      "back": "Physical exercise, deep breathing/mindfulness, time management, social support from friends/family, adequate sleep, and seeking professional help.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What are the SA Food-Based Dietary Guidelines?",
+      "back": "Guidelines for healthy eating: make starchy foods the basis of meals, eat plenty of vegetables and fruit, eat dry beans regularly, drink lots of clean water, use salt and sugar sparingly.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "Why is cannabis harmful for teenagers specifically?",
+      "back": "The brain develops until age 25. Cannabis impairs memory, concentration, and motivation during this critical period, and can trigger psychosis in vulnerable individuals.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "What helplines are available for young people in SA?",
+      "back": "Childline: 116 (toll-free). Lifeline: 0861 322 322. SADAG (depression/anxiety): 0800 567 567. SANCA (substance abuse): 011 892 3829.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Health", "Grade12", "Life Orientation"],
+      "difficulty_permille": 350
+    }
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

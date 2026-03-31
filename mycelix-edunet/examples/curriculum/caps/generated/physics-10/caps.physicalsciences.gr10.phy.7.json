@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.7: EMF and internal resistance. Ohm's law (V = IR). Series a...",
     "grade_level": "Grade10",
     "bloom_level": "Remember",
-    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (ε) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = ε − Ir. For electrodynamics: Faraday's law ε = −NΔΦ/Δt (changing magnetic flux induces an EMF). AC: Vrms = Vmax/√2, Pavg = Vrms × Irms.",
+    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (\u03b5) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = \u03b5 \u2212 Ir. For electrodynamics: Faraday's law \u03b5 = \u2212N\u0394\u03a6/\u0394t (changing magnetic flux induces an EMF). AC: Vrms = Vmax/\u221a2, Pavg = Vrms \u00d7 Irms.",
     "examples": [
       {
         "problem": "Solve a Energy problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A 12 V battery is connected to a 4 ohm resistor. Calculate the current flowing through the circuit.",
+        "answer": "I = V/R = 12/4 = 3 A",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use Ohm's law: V = IR, rearranged to I = V/R.",
+          "Substitute V = 12 V and R = 4 ohm."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "I = V/R = 12/4 = 3 A. This is a direct application of Ohm's law.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "48 A",
+          "0.33 A",
+          "8 A"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "Three resistors of 2 ohm, 3 ohm, and 6 ohm are connected in parallel. Calculate the total resistance.",
+        "answer": "1/R_total = 1/2 + 1/3 + 1/6 = 3/6 + 2/6 + 1/6 = 6/6 = 1. R_total = 1 ohm.",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "For parallel: 1/R_total = 1/R1 + 1/R2 + 1/R3.",
+          "Find a common denominator."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "1/R = 1/2 + 1/3 + 1/6 = 6/6 = 1. So R_total = 1 ohm. Parallel resistance is always less than the smallest individual resistor.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "11 ohm",
+          "0.5 ohm",
+          "2 ohm"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 375,
+        "question": "A 60 W light bulb operates on 240 V mains. Calculate the current and the resistance of the filament.",
+        "answer": "I = P/V = 60/240 = 0.25 A. R = V/I = 240/0.25 = 960 ohm.",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "P = VI, so I = P/V.",
+          "Then use R = V/I."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "I = 60/240 = 0.25 A. R = 240/0.25 = 960 ohm. Alternatively, R = V^2/P = 57600/60 = 960 ohm.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "I = 4 A, R = 60 ohm",
+          "I = 0.25 A, R = 480 ohm",
+          "I = 14400 A, R = 0.017 ohm"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
+        "question": "An electric heater rated at 2000 W runs for 3 hours. Calculate the energy consumed in kWh and the cost at R2.50/kWh.",
+        "answer": "Energy = 2 kW x 3 h = 6 kWh. Cost = 6 x R2.50 = R15.00.",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Convert 2000 W to 2 kW.",
+          "Energy (kWh) = power (kW) x time (hours)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "E = Pt = 2 x 3 = 6 kWh. Cost = 6 x 2.50 = R15.00. In SA, understanding electricity costs is important given Eskom's rising tariffs.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "R150.00",
+          "R7.50",
+          "R30.00"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Energy",
-        "answer": "Answer",
+        "question": "In a circuit, a 12 V battery (internal resistance 0.5 ohm) is connected to two resistors: 3 ohm and 6 ohm in parallel, which are in series with a 2 ohm resistor. Calculate the current from the battery.",
+        "answer": "Parallel: 1/R_p = 1/3 + 1/6 = 1/2, so R_p = 2 ohm. Total external R = 2 + 2 = 4 ohm. I = EMF/(R + r) = 12/(4 + 0.5) = 12/4.5 = 2.67 A.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "First find the parallel combination, then add the series resistor.",
+          "Use EMF = I(R_ext + r) to find the current."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "R_parallel = 2 ohm. R_external = 2 + 2 = 4 ohm. I = 12/(4 + 0.5) = 2.67 A. Terminal voltage = 12 - 2.67(0.5) = 10.67 V.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "3 A",
+          "1.09 A",
+          "2 A"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.7",
-    "title": "Assessment: EMF and internal resistance. Ohm's law (V = IR). Series and parallel circuits. Power (P = VI = I²R = V²/R). Energy (E = VIt). Kirchhoff's rules (simple circuits)",
+    "title": "Assessment: EMF and internal resistance. Ohm's law (V = IR). Series and parallel circuits. Power (P = VI = I\u00b2R = V\u00b2/R). Energy (E = VIt). Kirchhoff's rules (simple circuits)",
     "items": [
       {
         "question": "Explain Energy.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.7",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 888
     }

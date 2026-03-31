@@ -1,0 +1,204 @@
+{
+  "node_id": "ECON.MACRO.UNEMP",
+  "lesson": {
+    "standard_code": "ECON.MACRO.UNEMP",
+    "title": "Unemployment & Inequality: SA unemployment ~32%, structural/cyclical/frictional, Gini coefficient, BBBEE, NDP",
+    "grade_level": "Adult",
+    "bloom_level": "Evaluate",
+    "explanation": "South Africa faces a triple challenge: unemployment (~32% official, ~42% expanded definition including discouraged workers), poverty (over 55% below the upper-bound poverty line of ~R1,335/month), and inequality (Gini coefficient ~0.63, among the highest globally). Unemployment types: structural (skills mismatch -- SA has too few engineers and too many unskilled workers), cyclical (linked to economic downturns), frictional (temporary, between jobs), and seasonal (agriculture, tourism). Youth unemployment is particularly severe (~60% for ages 15-24). Policy responses include the National Development Plan (NDP) 2030 (targeting 6% unemployment by 2030, now clearly missed), BBBEE (Broad-Based Black Economic Empowerment), social grants (18+ million recipients), EPWP (Expanded Public Works Programme), and minimum wage (R27.58/hour in 2024).",
+    "examples": [
+      {
+        "problem": "SA has a working-age population of 40 million, 16.7 million employed, and 8 million officially unemployed. Calculate the official unemployment rate and the labour force participation rate.",
+        "steps": [
+          {
+            "instruction": "Step 1: Labour force = employed + unemployed = 16.7M + 8M = 24.7 million",
+            "result": "calculate labour force"
+          },
+          {
+            "instruction": "Step 2: Unemployment rate = (8M / 24.7M) x 100 = 32.4%",
+            "result": "calculate rate"
+          },
+          {
+            "instruction": "Step 3: LFPR = (24.7M / 40M) x 100 = 61.8%",
+            "result": "participation rate"
+          },
+          {
+            "instruction": "Step 4: Not in labour force = 40M - 24.7M = 15.3M (includes students, homemakers, discouraged workers)",
+            "result": "remaining population"
+          }
+        ],
+        "answer": "Answer: Official unemployment rate = 32.4%. Labour force participation rate = 61.8%. 15.3 million working-age people are not in the labour force.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Classify each as structural, cyclical, or frictional unemployment: (a) A coal miner loses their job as SA transitions to renewable energy. (b) A teacher moves from Limpopo to Gauteng and takes a month to find a new school. (c) A factory worker is retrenched during a recession.",
+        "answer": "(a) Structural -- skills/industry mismatch due to economic transformation. (b) Frictional -- temporary, voluntary transition. (c) Cyclical -- caused by economic downturn.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": [
+          "Structural = long-term mismatch. Cyclical = linked to business cycle. Frictional = short-term transition.",
+          "Coal miners losing jobs due to the energy transition is a classic structural change."
+        ],
+        "explanation": "Understanding the type of unemployment helps identify the correct policy response. Structural unemployment requires retraining, cyclical requires stimulus, frictional requires better job-matching.",
+        "distractors": [
+          "All three are structural",
+          "All three are cyclical",
+          "(a) is frictional, (b) is structural, (c) is cyclical"
+        ]
+      },
+      {
+        "question": "South Africa's Gini coefficient is 0.63. Explain what this means and why it matters.",
+        "answer": "The Gini coefficient ranges from 0 (perfect equality) to 1 (perfect inequality). At 0.63, SA is one of the most unequal countries in the world. This means income is heavily concentrated among a small elite while the majority live in poverty. High inequality undermines social cohesion, increases crime, and constrains economic growth.",
+        "difficulty_permille": 350,
+        "bloom_level": "Understand",
+        "hints": [
+          "The Gini coefficient is measured on a 0-1 scale.",
+          "SA's inequality has roots in apartheid-era policies that concentrated wealth among the white minority."
+        ],
+        "explanation": "SA's Gini coefficient reflects both historical (apartheid dispossession) and current (skills gap, spatial inequality) factors. The top 10% of earners take ~65% of national income.",
+        "distractors": [
+          "0.63 means moderate inequality",
+          "The Gini coefficient measures unemployment",
+          "SA's inequality is average for Africa"
+        ]
+      },
+      {
+        "question": "Evaluate whether the national minimum wage (R27.58/hour in 2024) helps or hurts unemployed South Africans.",
+        "answer": "For those employed, the minimum wage raises incomes above poverty levels. However, critics argue it may increase unemployment by making it more expensive to hire low-skilled workers, particularly in sectors like agriculture and domestic work. The net effect depends on the elasticity of labour demand.",
+        "difficulty_permille": 650,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "A minimum wage is a price floor in the labour market.",
+          "If set above the market-clearing wage, it can create a surplus of labour (unemployment)."
+        ],
+        "explanation": "This is a genuine policy debate. At R27.58/hour (~R4,800/month), the minimum wage is above what some firms would voluntarily pay, potentially reducing employment. But it also reduces poverty for those who remain employed.",
+        "distractors": [
+          "Minimum wages always reduce unemployment",
+          "Minimum wages have no effect on employment",
+          "The minimum wage is too high for all sectors"
+        ]
+      },
+      {
+        "question": "Youth unemployment in SA is approximately 60% for ages 15-24. Propose two policy interventions and explain the economic logic behind each.",
+        "answer": "1) Wage subsidies for firms hiring young workers (e.g., Employment Tax Incentive) -- reduces the cost of hiring, making youth more attractive to employers. 2) Expanded technical and vocational training (TVET colleges) -- addresses structural unemployment by equipping youth with skills the economy demands (artisans, technicians). Both target the root causes: high hiring costs and skills mismatch.",
+        "difficulty_permille": 750,
+        "bloom_level": "Create",
+        "hints": [
+          "Think about why firms do not hire young people: cost, risk, skills gap.",
+          "Policy should address the specific barriers to youth employment."
+        ],
+        "explanation": "SA's Employment Tax Incentive (ETI) provides a tax break for hiring workers aged 18-29 earning below R6,500/month. Evidence suggests it has modestly increased youth employment, though the scale remains insufficient.",
+        "distractors": [
+          "Simply raising the minimum wage for youth",
+          "Banning automation to protect jobs",
+          "Reducing education spending"
+        ]
+      },
+      {
+        "question": "Over 18 million South Africans receive social grants (child support, old age pension, disability). Analyse the role of social grants in reducing poverty and their fiscal sustainability.",
+        "answer": "Social grants are SA's most effective poverty reduction tool, reaching the poorest households directly. The child support grant (R510/month per child) and old age pension (R2,180/month) prevent millions from falling into extreme poverty. However, total grant expenditure (~R250 billion/year) is a significant fiscal burden, and the number of grant recipients now exceeds the number of income taxpayers (~7 million), raising long-term sustainability concerns.",
+        "difficulty_permille": 800,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Social grants are transfer payments from taxpayers to recipients.",
+          "Consider both the poverty reduction impact and the fiscal cost."
+        ],
+        "explanation": "Research by the University of Cape Town shows social grants reduce the poverty headcount by ~6 percentage points. But the ratio of grant recipients to taxpayers (18M vs 7M) implies a heavy burden on a narrow tax base.",
+        "distractors": [
+          "Social grants have no effect on poverty",
+          "SA can afford unlimited grant expansion",
+          "Grants discourage work entirely"
+        ]
+      }
+    ],
+    "hints": [
+      "Official unemployment rate = unemployed / labour force x 100. The expanded rate includes discouraged workers.",
+      "SA's triple challenge: unemployment (~32%), poverty (>55%), inequality (Gini 0.63).",
+      "Structural unemployment requires education/training solutions, not just stimulus spending."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "structural unemployment",
+        "definition": "Unemployment caused by a mismatch between workers' skills and the skills demanded by employers",
+        "example_usage": "Coal miners facing structural unemployment as SA transitions to renewable energy."
+      },
+      {
+        "term": "Gini coefficient",
+        "definition": "A measure of income inequality ranging from 0 (perfect equality) to 1 (perfect inequality)",
+        "example_usage": "SA's Gini coefficient of 0.63 makes it one of the most unequal countries in the world."
+      },
+      {
+        "term": "NDP 2030",
+        "definition": "The National Development Plan, SA's long-term strategy to eliminate poverty and reduce inequality by 2030",
+        "example_usage": "The NDP targeted 6% unemployment by 2030, a goal that will not be met."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think the unemployment rate counts everyone without a job.",
+        "correction": "The official unemployment rate only counts people who are actively looking for work. Discouraged workers (who have given up looking) are excluded from the official rate but included in the expanded definition.",
+        "why_students_think_this": "The everyday meaning of 'unemployed' differs from the economic definition. Students may not realise that a full-time student or stay-at-home parent is not counted as unemployed."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.MACRO.UNEMP",
+    "title": "Assessment: Unemployment types, inequality, SA labour market",
+    "items": [
+      {
+        "question": "Calculate the unemployment rate given: employed = 16 million, unemployed = 8 million.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Labour force = 16 + 8 = 24 million. Unemployment rate = 8/24 x 100 = 33.3%.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Labour force = employed + unemployed."
+      },
+      {
+        "question": "Evaluate whether BBBEE has been effective in reducing inequality in SA.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "BBBEE has created a black middle class and increased black ownership in business. However, critics argue benefits have been concentrated among a small elite ('tenderpreneurs'), while the majority remain poor. The Gini coefficient has not significantly improved since 1994.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both achievements and limitations."
+      }
+    ],
+    "total_points": 6,
+    "estimated_minutes": 12,
+    "bloom_distribution": [
+      ["Apply", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the three types of unemployment?",
+      "back": "Structural (skills mismatch), Cyclical (business cycle downturns), Frictional (temporary, between jobs). SA also experiences seasonal unemployment in agriculture and tourism.",
+      "tags": ["ECON.MACRO.UNEMP", "Economics", "Labour Market"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is SA's approximate official unemployment rate?",
+      "back": "~32% (official). ~42% using the expanded definition which includes discouraged workers. Youth unemployment is ~60% for ages 15-24.",
+      "tags": ["ECON.MACRO.UNEMP", "Economics", "Labour Market"],
+      "difficulty_permille": 150
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

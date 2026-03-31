@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "question": "Explain why NaCl has a high melting point.",
+        "answer": "NaCl is an ionic compound with strong electrostatic forces between Na+ and Cl- ions in a crystal lattice. Large amounts of energy are needed to overcome these strong ionic bonds, resulting in a high melting point (801 degrees C).",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "NaCl is ionic -- Na transfers an electron to Cl.",
+          "Think about the strength of the forces holding the lattice together."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Ionic compounds form crystal lattices with strong electrostatic attractions in all directions. Breaking these requires significant energy.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "NaCl has weak bonds",
+          "NaCl is covalent",
+          "NaCl has metallic bonding"
         ]
       },
       {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "Draw the Lewis dot structure for water (H2O) and predict its molecular shape using VSEPR.",
+        "answer": "Oxygen has 2 bonding pairs (with H atoms) and 2 lone pairs. VSEPR predicts a bent/V-shape with a bond angle of approximately 104.5 degrees.",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Oxygen has 6 valence electrons. Each H shares one electron.",
+          "2 bonding pairs + 2 lone pairs = 4 electron groups around O."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "4 electron groups give tetrahedral electron geometry, but the molecular shape (considering only atoms) is bent/V-shape because of the 2 lone pairs.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Linear shape",
+          "Tetrahedral shape",
+          "Trigonal planar shape"
         ]
       },
       {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain why metals are good conductors of electricity.",
+        "answer": "In metallic bonding, positive metal ions are surrounded by a 'sea' of delocalised electrons. These free electrons can move through the metal when a potential difference is applied, carrying electric current.",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Metallic bonding involves delocalised (free) electrons.",
+          "Electrical conduction requires mobile charge carriers."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The delocalised electron model explains electrical and thermal conductivity, malleability, and ductility of metals.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Metals have ionic bonds",
+          "Protons carry the current",
+          "Metals have no bonds"
         ]
       },
       {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "question": "Classify the following as polar or non-polar molecules: (a) CO2, (b) H2O, (c) CH4.",
+        "answer": "(a) CO2: non-polar (linear, symmetrical -- bond dipoles cancel). (b) H2O: polar (bent shape -- bond dipoles do NOT cancel). (c) CH4: non-polar (tetrahedral, symmetrical -- bond dipoles cancel).",
+        "difficulty_permille": 550,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "A molecule is polar if it has polar bonds AND an asymmetric shape.",
+          "Symmetric molecules (linear, tetrahedral) can be non-polar even with polar bonds."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Molecular polarity depends on both bond polarity and molecular geometry. Symmetrical molecules have dipoles that cancel, making them non-polar overall.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "All three are polar",
+          "All three are non-polar",
+          "CO2 is polar, H2O is non-polar"
         ]
       },
       {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "Compare ionic bonding in NaCl with covalent bonding in Cl2 in terms of electron behavior, melting point, and electrical conductivity.",
+        "answer": "NaCl: electrons transferred (Na loses 1, Cl gains 1), high melting point (strong lattice), conducts when dissolved/molten (free ions). Cl2: electrons shared (single covalent bond), low melting point (weak London forces between molecules), does not conduct (no free charges).",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Ionic = transfer of electrons; covalent = sharing of electrons.",
+          "Think about the forces between particles (not within them)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The key distinction is the type of bonding and the resulting intermolecular forces. Ionic substances have strong ion-ion forces; molecular covalent substances have weak intermolecular forces.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Chemical Bonding",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Both have the same melting point",
+          "Cl2 conducts electricity",
+          "NaCl has covalent bonds"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.CHM.2",
-    "title": "Assessment: Ionic bonding (electron transfer, lattice structures). Covalent bonding (Lewis dot structures, molecular shapes — VSEPR). Metallic bonding. Bond polarity and molecular polarity",
+    "title": "Assessment: Ionic bonding (electron transfer, lattice structures). Covalent bonding (Lewis dot structures, molecular shapes \u2014 VSEPR). Metallic bonding. Bond polarity and molecular polarity",
     "items": [
       {
         "question": "Explain Chemical Bonding.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.2",
         "Grade10",
-        "Chemistry — Bonding"
+        "Chemistry \u2014 Bonding"
       ],
       "difficulty_permille": 888
     }

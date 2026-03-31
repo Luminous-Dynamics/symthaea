@@ -5,10 +5,10 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.3: Pulse, wavelength, frequency, period, amplitude. Transver...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (λ) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = fλ, period T = 1/f.",
+    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (\u03bb) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = f\u03bb, period T = 1/f.",
     "examples": [
       {
-        "problem": "Solve a Waves — Transverse and Longitudinal problem.",
+        "problem": "Solve a Waves \u2014 Transverse and Longitudinal problem.",
         "steps": [
           {
             "instruction": "Step 1: Identify the given information",
@@ -27,7 +27,7 @@
         "visual_description": null
       },
       {
-        "problem": "Solve a Waves — Transverse and Longitudinal problem.",
+        "problem": "Solve a Waves \u2014 Transverse and Longitudinal problem.",
         "steps": [
           {
             "instruction": "Step 1: Identify the given information",
@@ -46,7 +46,7 @@
         "visual_description": null
       },
       {
-        "problem": "Solve a Waves — Transverse and Longitudinal problem.",
+        "problem": "Solve a Waves \u2014 Transverse and Longitudinal problem.",
         "steps": [
           {
             "instruction": "Step 1: Identify the given information",
@@ -67,115 +67,90 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A wave has a frequency of 50 Hz and a wavelength of 0.4 m. Calculate the wave speed.",
+        "answer": "v = f x lambda = 50 x 0.4 = 20 m/s",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use the wave equation v = f x lambda.",
+          "Substitute f = 50 Hz and lambda = 0.4 m."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "v = f x lambda = (50)(0.4) = 20 m/s.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "125 m/s",
+          "10 m/s",
+          "50.4 m/s"
         ]
       },
       {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
+        "question": "A wave has a period of 0.02 s. Calculate its frequency.",
+        "answer": "f = 1/T = 1/0.02 = 50 Hz",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Frequency and period are reciprocals: f = 1/T.",
+          "Substitute T = 0.02 s."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "f = 1/T = 1/0.02 = 50 Hz. The wave completes 50 cycles every second.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "0.02 Hz",
+          "100 Hz",
+          "25 Hz"
         ]
       },
       {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Distinguish between transverse and longitudinal waves and give one example of each.",
+        "answer": "Transverse: particles vibrate perpendicular to the direction of wave propagation (e.g., light waves, water surface waves). Longitudinal: particles vibrate parallel to the direction of propagation (e.g., sound waves).",
+        "difficulty_permille": 350,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Think about the direction of particle vibration relative to wave travel.",
+          "Water waves at the surface are transverse; sound waves are longitudinal."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "In transverse waves, crests and troughs form. In longitudinal waves, compressions and rarefactions form.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Both types vibrate perpendicular to direction",
+          "Sound is a transverse wave",
+          "Light is a longitudinal wave"
         ]
       },
       {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "A sound wave travels at 340 m/s in air and has a wavelength of 1.7 m. Calculate the frequency and the period.",
+        "answer": "f = v/lambda = 340/1.7 = 200 Hz. T = 1/f = 1/200 = 0.005 s.",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Rearrange v = f x lambda to get f = v/lambda.",
+          "Then use T = 1/f."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "f = 340/1.7 = 200 Hz. T = 1/200 = 0.005 s = 5 ms.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "f = 200 Hz, T = 0.05 s",
+          "f = 578 Hz, T = 0.002 s",
+          "f = 100 Hz, T = 0.01 s"
         ]
       },
       {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "Two pulses approach each other from opposite ends of a rope. One has amplitude +3 cm and the other -2 cm. What happens when they meet, and what is the resulting amplitude?",
+        "answer": "Superposition occurs: the amplitudes add algebraically. Resultant amplitude = +3 + (-2) = +1 cm. After passing through each other, the pulses continue unchanged (destructive interference at the meeting point).",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "The principle of superposition states that displacements add.",
+          "Opposite pulses partially cancel."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "This is an example of destructive interference. The net displacement at the meeting point is the algebraic sum: 3 + (-2) = 1 cm. After passing, each pulse continues with its original shape.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Waves — Transverse and Longitudinal",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "+5 cm (constructive)",
+          "-1 cm",
+          "0 cm (complete cancellation)"
         ]
       }
     ],
     "hints": [
-      "What concept from Waves — Transverse and Longitudinal applies here?",
-      "Apply the method for Waves — Transverse and Longitudinal step by step.",
-      "Start by writing down what you know about Waves — Transverse and Longitudinal."
+      "What concept from Waves \u2014 Transverse and Longitudinal applies here?",
+      "Apply the method for Waves \u2014 Transverse and Longitudinal step by step.",
+      "Start by writing down what you know about Waves \u2014 Transverse and Longitudinal."
     ],
     "key_vocabulary": [
       {
@@ -191,7 +166,7 @@
     ],
     "misconceptions": [
       {
-        "misconception": "A common error in Waves — Transverse and Longitudinal.",
+        "misconception": "A common error in Waves \u2014 Transverse and Longitudinal.",
         "correction": "The correct understanding.",
         "why_students_think_this": "This mistake is common because students often skip a key step."
       }
@@ -206,10 +181,10 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.3",
-    "title": "Assessment: Pulse, wavelength, frequency, period, amplitude. Transverse and longitudinal waves. Wave equation v = fλ. Superposition. Standing waves (strings)",
+    "title": "Assessment: Pulse, wavelength, frequency, period, amplitude. Transverse and longitudinal waves. Wave equation v = f\u03bb. Superposition. Standing waves (strings)",
     "items": [
       {
-        "question": "Explain Waves — Transverse and Longitudinal.",
+        "question": "Explain Waves \u2014 Transverse and Longitudinal.",
         "item_type": "ShortAnswer",
         "correct_answer": "Key concept answer.",
         "points": 1,
@@ -218,7 +193,7 @@
         "hint": "3"
       },
       {
-        "question": "Explain Waves — Transverse and Longitudinal.",
+        "question": "Explain Waves \u2014 Transverse and Longitudinal.",
         "item_type": "ShortAnswer",
         "correct_answer": "Key concept answer.",
         "points": 2,
@@ -227,7 +202,7 @@
         "hint": "3"
       },
       {
-        "question": "Explain Waves — Transverse and Longitudinal.",
+        "question": "Explain Waves \u2014 Transverse and Longitudinal.",
         "item_type": "ShortAnswer",
         "correct_answer": "Key concept answer.",
         "points": 2,
@@ -236,7 +211,7 @@
         "hint": "3"
       },
       {
-        "question": "Explain Waves — Transverse and Longitudinal.",
+        "question": "Explain Waves \u2014 Transverse and Longitudinal.",
         "item_type": "ShortAnswer",
         "correct_answer": "Key concept answer.",
         "points": 3,
@@ -245,7 +220,7 @@
         "hint": "3"
       },
       {
-        "question": "Explain Waves — Transverse and Longitudinal.",
+        "question": "Explain Waves \u2014 Transverse and Longitudinal.",
         "item_type": "ShortAnswer",
         "correct_answer": "Key concept answer.",
         "points": 3,
@@ -254,7 +229,7 @@
         "hint": "3"
       },
       {
-        "question": "Explain Waves — Transverse and Longitudinal.",
+        "question": "Explain Waves \u2014 Transverse and Longitudinal.",
         "item_type": "ShortAnswer",
         "correct_answer": "Key concept answer.",
         "points": 4,
@@ -294,82 +269,82 @@
   },
   "flashcards": [
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 111
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 222
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 333
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 444
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 555
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 666
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 777
     },
     {
-      "front": "What is the key idea in Waves — Transverse and Longitudinal?",
+      "front": "What is the key idea in Waves \u2014 Transverse and Longitudinal?",
       "back": "A wave transfers energy without transferring matter",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.3",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 888
     }

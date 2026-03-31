@@ -1,0 +1,334 @@
+{
+  "node_id": "CAPS.CreativeArts.Design",
+  "lesson": {
+    "standard_code": "CAPS.CreativeArts.Design",
+    "title": "CAPS.CreativeArts.Design: Design Basics",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Design is purposeful problem-solving through visual communication. Unlike fine art, design always serves a function: informing, persuading, guiding, or enabling. Design thinking is a human-centred process with five stages: empathise (understand the user), define (frame the problem), ideate (brainstorm solutions), prototype (build rough versions), and test (get feedback and iterate). Typography is the art of arranging text: font choice (serif vs sans-serif), hierarchy (headings, subheadings, body), readability, and personality. Serif fonts (like Times New Roman) have small strokes at letter ends and feel traditional; sans-serif fonts (like Arial, Helvetica) are clean and modern. Layout follows principles like the grid system, visual hierarchy (guide the eye from most to least important), white space (breathing room), and alignment (consistent edges). Colour theory in design includes colour psychology (red = urgency, blue = trust, green = nature), colour harmony (complementary, analogous, triadic), contrast for readability, and accessibility (colour-blind-friendly palettes). Digital design tools include Canva (free, web-based), Figma (UI/UX design), Adobe Creative Suite (professional standard), and GIMP (free, open-source). Design for social impact applies these skills to community needs: health communication, educational materials, and civic awareness campaigns.",
+    "examples": [
+      {
+        "problem": "Apply the design thinking process to create a poster for a school anti-bullying campaign.",
+        "steps": [
+          {
+            "instruction": "Step 1: Empathise — talk to learners about their experiences with bullying. What forms does it take? How does it make them feel? What would help?",
+            "result": "user understanding"
+          },
+          {
+            "instruction": "Step 2: Define — frame the problem: 'Learners need a way to feel empowered to report bullying without fear of retaliation'",
+            "result": "problem statement"
+          },
+          {
+            "instruction": "Step 3: Ideate — brainstorm poster concepts: powerful imagery, statistics, helpline numbers, QR code to anonymous reporting, peer support messaging",
+            "result": "multiple solutions"
+          },
+          {
+            "instruction": "Step 4: Prototype — create rough poster drafts. Test readability from 2 metres distance. Check colour contrast. Ensure the key message is immediately clear",
+            "result": "rough versions"
+          },
+          {
+            "instruction": "Step 5: Test — show prototypes to target audience (learners). Get feedback. Iterate: is the message clear? Does it feel empowering, not preachy?",
+            "result": "user feedback and refinement"
+          }
+        ],
+        "answer": "Answer: Design thinking ensures the poster addresses real user needs. The five stages (empathise, define, ideate, prototype, test) produce a solution informed by the people it serves.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why a health pamphlet about HIV testing should use sans-serif fonts, high-contrast colours, and simple language.",
+        "steps": [
+          {
+            "instruction": "Step 1: Sans-serif fonts are more readable at small sizes and on screens. For health information, clarity is essential — decorative fonts can reduce comprehension",
+            "result": "typography choice justified"
+          },
+          {
+            "instruction": "Step 2: High contrast (dark text on light background) ensures readability in various lighting conditions and for people with visual impairments. WCAG guidelines recommend minimum 4.5:1 contrast ratio",
+            "result": "colour accessibility"
+          },
+          {
+            "instruction": "Step 3: Simple language (Grade 5-6 reading level) ensures the message reaches people with varying literacy levels. Health communication must be understood by everyone, not just the educated",
+            "result": "language accessibility"
+          }
+        ],
+        "answer": "Answer: Health communication design prioritises accessibility: readable fonts, high contrast, and simple language ensure the life-saving message reaches the widest possible audience.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the five stages of design thinking.",
+        "answer": "Empathise, Define, Ideate, Prototype, Test.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about the process from understanding the problem to testing the solution.",
+          "The first step is always about understanding the user."
+        ],
+        "explanation": "Design thinking is a non-linear, human-centred process. The five stages can be revisited and repeated as understanding deepens.",
+        "distractors": [
+          "Plan, Design, Build, Launch, Maintain",
+          "Research, Sketch, Colour, Print, Distribute",
+          "Think, Draw, Scan, Edit, Export"
+        ]
+      },
+      {
+        "question": "Explain the difference between serif and sans-serif fonts and when to use each.",
+        "answer": "Serif fonts have small decorative strokes at letter ends (Times New Roman, Georgia) — traditional, formal, good for long printed text (books, newspapers). Sans-serif fonts have no strokes (Arial, Helvetica, Roboto) — modern, clean, good for screens, headings, and signage. Use serif for formal documents and books; sans-serif for digital, modern, and accessibility-focused design.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "'Serif' means the small lines at the ends of letters. 'Sans' means 'without.'",
+          "Think about where you see each type used most often."
+        ],
+        "explanation": "Font choice communicates personality and affects readability. Serif suggests tradition and authority; sans-serif suggests modernity and clarity.",
+        "distractors": [
+          "There is no difference except appearance",
+          "Serif fonts are always better than sans-serif",
+          "Sans-serif fonts are unprofessional"
+        ]
+      },
+      {
+        "question": "Design a business card using the principles of visual hierarchy, alignment, and white space.",
+        "answer": "Name in largest, boldest font (hierarchy level 1). Job title smaller (level 2). Contact details smallest (level 3). All text left-aligned or centre-aligned consistently (alignment). Generous margins and spacing between elements (white space). Limit to 2 fonts maximum. Include only essential information.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Less is more on a business card. Only include essential information.",
+          "Use font size and weight to create a clear reading order: name first, then role, then contact."
+        ],
+        "explanation": "A business card demonstrates core design principles in a tiny space: hierarchy guides the eye, alignment creates order, and white space prevents visual clutter.",
+        "distractors": [
+          "Use as many fonts as possible to look creative",
+          "Fill every available space with information",
+          "Use a bright background with colourful text"
+        ]
+      },
+      {
+        "question": "Analyse why some public health posters are ineffective and propose design improvements.",
+        "answer": "Common problems: too much text (no one reads a wall of text), poor colour contrast (illegible), no visual hierarchy (everything looks equally important), jargon/complex language, no clear call to action, stock photos that do not reflect the target community. Improvements: one key message, strong visual, high contrast, simple language, clear call to action, culturally relevant imagery.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about health posters you have actually stopped to read versus those you walked past.",
+          "What made the difference? Usually: simplicity, relevance, and clarity."
+        ],
+        "explanation": "Effective design requires understanding the user's context. A poster competing with a busy environment needs to communicate its message in seconds, not minutes.",
+        "distractors": [
+          "More information is always better",
+          "Design does not affect whether people read health information",
+          "Only the words matter, not the visual presentation"
+        ]
+      },
+      {
+        "question": "Evaluate the importance of accessibility in design, considering colour blindness, visual impairment, and low literacy.",
+        "answer": "Accessibility is essential, not optional. 8% of men are colour-blind (do not rely on colour alone to convey meaning). Many people have visual impairments (use high contrast, large text). Literacy varies widely (use simple language, visuals). Accessible design reaches more people and is often better design for everyone (curb-cut effect). WCAG guidelines provide standards.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider who is excluded when design is not accessible.",
+          "The 'curb-cut effect': accessibility improvements benefit everyone."
+        ],
+        "explanation": "Accessible design is not a special case — it is good design. Designing for the widest range of users produces solutions that work better for everyone.",
+        "distractors": [
+          "Accessibility is only for people with disabilities",
+          "Making design accessible ruins the aesthetics",
+          "Colour-blind people are too rare to design for"
+        ]
+      },
+      {
+        "question": "Create a social media graphic campaign (3 posts) for a community clean-up event, using consistent branding, colour scheme, and typography.",
+        "answer": "Campaign should include: consistent colour palette (3-4 colours), consistent fonts (1-2 maximum), logo/brand mark, post 1 (announcement: date, time, location), post 2 (why it matters: environmental impact), post 3 (call to action: how to sign up). Each post should be visually consistent but varied in layout.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Consistency across posts creates brand recognition.",
+          "Each post needs to work independently while being part of a series."
+        ],
+        "explanation": "A social media campaign demonstrates applied design: visual consistency (branding), clear communication (hierarchy), and audience engagement (call to action).",
+        "distractors": [
+          "Each post should look completely different for variety",
+          "Use as many colours as possible to attract attention",
+          "Text is not important if the image is good"
+        ]
+      }
+    ],
+    "hints": [
+      "Design thinking always starts with the user, not with your idea of what looks good.",
+      "The grid system, visual hierarchy, and white space are three foundational layout principles that solve most design problems.",
+      "Good design is invisible — when it works, people focus on the content, not the design."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "design thinking",
+        "definition": "A human-centred problem-solving process with five stages: empathise, define, ideate, prototype, test",
+        "example_usage": "We used design thinking to redesign the school timetable notice board so students could actually read it."
+      },
+      {
+        "term": "visual hierarchy",
+        "definition": "The arrangement of design elements to guide the viewer's eye from most important to least important information, using size, colour, contrast, and placement",
+        "example_usage": "The headline is the largest element, creating a clear visual hierarchy on the poster."
+      },
+      {
+        "term": "typography",
+        "definition": "The art and technique of arranging type (text) to make written language legible, readable, and visually appealing",
+        "example_usage": "Good typography means choosing fonts that match the message and are easy to read."
+      },
+      {
+        "term": "white space",
+        "definition": "Empty space in a design that gives elements room to breathe, reduces visual clutter, and improves readability (also called negative space)",
+        "example_usage": "Adding more white space around the text made the poster much easier to read."
+      },
+      {
+        "term": "colour theory",
+        "definition": "The study of how colours interact, including colour harmony (complementary, analogous), colour psychology (emotional associations), and practical considerations (contrast, accessibility)",
+        "example_usage": "Colour theory tells us that blue conveys trust, which is why banks and healthcare companies use it."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think design is just about making things look pretty.",
+        "correction": "Design is problem-solving. Aesthetics matter, but the primary goal is communication and function. A beautiful poster that nobody reads is a failed design. A simple, clear poster that changes behaviour is a successful one.",
+        "why_students_think_this": "The visual output of design is its most visible aspect. Teaching the process (design thinking) reveals the problem-solving foundation beneath the surface."
+      },
+      {
+        "misconception": "Students believe you need expensive software to be a designer.",
+        "correction": "Many professional-quality tools are free: Canva (web-based), GIMP (image editing), Inkscape (vector graphics), Figma (free tier for individuals). Paper and pencil remain the best prototyping tools. Good design comes from principles and process, not software.",
+        "why_students_think_this": "Adobe's dominance and high costs create this perception. Highlighting free alternatives and emphasising that tools are secondary to thinking helps."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.CreativeArts.Design",
+    "title": "Assessment: Design Basics",
+    "items": [
+      {
+        "question": "Name the five stages of design thinking and list three free design tools.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Stages: Empathise, Define, Ideate, Prototype, Test. Tools: Canva, GIMP, Figma (also Inkscape, Google Slides).",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Design thinking is a 5-step process; free tools include web-based and desktop options"
+      },
+      {
+        "question": "Explain how colour psychology affects design choices for different audiences.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Colours trigger emotional associations: red (urgency, danger, passion), blue (trust, calm, professionalism), green (nature, health, growth), yellow (optimism, warning), black (sophistication, authority). Designers choose colours based on the message and audience. Note: cultural context matters (white = purity in West, mourning in some Asian cultures).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about why hospitals use blue and fast food uses red"
+      },
+      {
+        "question": "Apply the principles of visual hierarchy and contrast to critique a poorly designed flyer you have seen.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Critique should identify specific problems: competing elements at same size (no hierarchy), low contrast text (poor readability), too many fonts, no clear focal point. Suggest fixes using hierarchy (size/weight differences), contrast (dark on light), and simplification.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Look for: can you tell what is most important? Can you read everything easily?"
+      },
+      {
+        "question": "Analyse the design choices in a well-known brand's visual identity (e.g., FNB, Woolworths, MTN) and explain how they communicate the brand's values.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Analysis should cover: colour palette and what it communicates, typography style and its personality, logo design elements, consistency across touchpoints (stores, ads, app), and how these choices align with the brand's positioning.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Every design choice a brand makes is intentional — explain the intention"
+      },
+      {
+        "question": "Evaluate the statement: 'Design for social impact is less important than commercial design.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "False. Social impact design saves lives (health communication), empowers communities (civic information), and drives change. Commercial design drives profit. Both require the same skills. Social impact design may be more important because it serves those with less access to information. The best designers balance both.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider what is at stake in each type of design"
+      },
+      {
+        "question": "Design a complete visual identity for a community youth centre: name, logo, colour palette, font choices, and one sample application (poster or social media post).",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Identity should include: meaningful name, simple memorable logo, colour palette (3-4 colours with rationale), font pairing (heading + body), and a sample design showing all elements applied consistently.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Start with the values and personality of the youth centre, then express them visually"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the five stages of design thinking?",
+      "back": "Empathise (understand the user), Define (frame the problem), Ideate (brainstorm solutions), Prototype (build rough versions), Test (get feedback and iterate).",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What is visual hierarchy?",
+      "back": "Arranging elements so the viewer's eye moves from most important to least important, using differences in size, weight, colour, and placement.",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "Serif vs sans-serif fonts?",
+      "back": "Serif: small strokes at letter ends (Times New Roman) — formal, traditional. Sans-serif: no strokes (Helvetica, Arial) — clean, modern, better for screens.",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What is white space in design?",
+      "back": "Empty space between and around design elements. Reduces clutter, improves readability, and creates a professional appearance. Also called negative space.",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "Name three free design tools.",
+      "back": "Canva (web-based, general design), GIMP (image editing, like Photoshop), Figma (UI/UX design, free tier). Also: Inkscape (vector, like Illustrator).",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 125
+    },
+    {
+      "front": "What is the WCAG contrast ratio for text?",
+      "back": "Minimum 4.5:1 for normal text, 3:1 for large text. Ensures readability for people with visual impairments. Check with online contrast checkers.",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "What does colour psychology say about blue?",
+      "back": "Blue conveys trust, calm, and professionalism. Used by banks (FNB), social media (Facebook, Twitter), and healthcare. Cool colour that recedes visually.",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is a design grid system?",
+      "back": "An invisible structure of columns and rows that guides element placement, creating alignment, consistency, and visual order across a design.",
+      "tags": ["CAPS.CreativeArts.Design", "Adult", "Creative Arts"],
+      "difficulty_permille": 225
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

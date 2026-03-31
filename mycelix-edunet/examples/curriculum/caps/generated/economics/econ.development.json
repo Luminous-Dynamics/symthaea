@@ -1,0 +1,194 @@
+{
+  "node_id": "ECON.DEV.SA",
+  "lesson": {
+    "standard_code": "ECON.DEV.SA",
+    "title": "Development Economics: HDI, poverty line R624/month, social grants, land reform, infrastructure, NDP 2030",
+    "grade_level": "Adult",
+    "bloom_level": "Evaluate",
+    "explanation": "Development economics studies how countries improve living standards, reduce poverty, and build productive capacity. SA is classified as an upper-middle-income country (GNI per capita ~$6,000) but with severe inequality. The Human Development Index (HDI) combines life expectancy (64 years), education (mean schooling 10.2 years), and income into a single measure. SA's HDI is 0.713 (ranked 109th globally), dragged down by inequality and health outcomes (HIV prevalence ~13%). SA's food poverty line is R624/month (2023) -- below this, a person cannot afford adequate nutrition. The NDP 2030 envisions reducing unemployment to 6%, eliminating income poverty, and reducing the Gini coefficient to 0.60. Key development challenges include land reform (87% of agricultural land historically owned by white South Africans, post-1994 redistribution has been slow), infrastructure backlogs (housing, water, sanitation, electricity), education quality (SA consistently scores last among participating countries in international maths and science assessments like TIMSS), and health system disparities (private vs public).",
+    "examples": [
+      {
+        "problem": "Compare SA's HDI (0.713) with Norway (0.961) and Nigeria (0.535). What does the HDI reveal about development beyond income?",
+        "steps": [
+          {
+            "instruction": "Step 1: HDI combines life expectancy, education, and income on a 0-1 scale",
+            "result": "define HDI"
+          },
+          {
+            "instruction": "Step 2: Norway (0.961) = very high human development across all dimensions",
+            "result": "benchmark"
+          },
+          {
+            "instruction": "Step 3: SA (0.713) is 'high' category but inequality-adjusted HDI drops to 0.468 -- a massive loss",
+            "result": "inequality penalty"
+          },
+          {
+            "instruction": "Step 4: Nigeria (0.535) = low human development, particularly in education and health",
+            "result": "comparison"
+          }
+        ],
+        "answer": "Answer: HDI shows SA is middle-ranked globally but inequality dramatically reduces effective human development. When adjusted for inequality, SA's HDI drops by ~34%, one of the largest inequality penalties in the world.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define the food poverty line and explain why it matters for SA policy.",
+        "answer": "The food poverty line (R624/month in 2023, Stats SA) is the amount below which a person cannot afford adequate nutrition. About 25% of South Africans live below this line, meaning they face food insecurity. This measure guides social grant levels, poverty targeting, and food security programmes.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "The food poverty line is the most extreme poverty measure -- it covers food only.",
+          "There are also upper-bound (R1,335) and lower-bound (R890) poverty lines."
+        ],
+        "explanation": "Stats SA defines three poverty lines. The food poverty line is the floor: if you cannot even afford food, you are in extreme poverty. Policy responses include the Social Relief of Distress (SRD) grant of R370/month.",
+        "distractors": [
+          "The food poverty line includes housing costs",
+          "It is R624 per week",
+          "Almost no one in SA falls below this line"
+        ]
+      },
+      {
+        "question": "Explain why SA's HDI drops significantly when adjusted for inequality (from 0.713 to 0.468).",
+        "answer": "The Inequality-adjusted HDI penalises countries where health, education, and income are unequally distributed. SA has one of the world's highest inequalities in all three dimensions: life expectancy varies dramatically between rich (private healthcare) and poor (public healthcare, HIV burden), education quality differs vastly between ex-Model C schools and township schools, and income inequality is extreme (Gini 0.63).",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about how unequally health, education, and income are distributed in SA.",
+          "A 34% HDI loss means SA's average development masks huge disparities."
+        ],
+        "explanation": "The IHDI effectively shows what development 'looks like' for the average person, not just the national average. In SA, the average person experiences far lower development than the headline HDI suggests.",
+        "distractors": [
+          "The adjustment is based on population size",
+          "SA's HDI is inaccurately measured",
+          "Inequality adjustment improves the HDI"
+        ]
+      },
+      {
+        "question": "Evaluate whether land reform in SA should prioritise redistribution for equity or productivity for food security.",
+        "answer": "Both objectives matter but may conflict. Redistributing large farms to smallholders promotes equity and addresses historical injustice. However, subdividing productive commercial farms may reduce output and threaten food security. A balanced approach could include: supporting emerging black commercial farmers with finance and training, redistributing underutilised land, and maintaining productive capacity on key agricultural land.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Land reform addresses apartheid-era dispossession but must maintain agricultural output.",
+          "Consider the experience of Zimbabwe, where rapid redistribution severely reduced food production."
+        ],
+        "explanation": "SA's land reform programme has redistributed only ~10% of agricultural land since 1994, far below the 30% target. The debate between 'willing buyer, willing seller' and expropriation without compensation reflects the tension between equity and productivity.",
+        "distractors": [
+          "Land reform has no effect on food security",
+          "All large farms should be immediately subdivided",
+          "SA has no historical land dispossession to address"
+        ]
+      },
+      {
+        "question": "SA spends ~6.5% of GDP on education, higher than many middle-income countries, yet educational outcomes are poor (last in TIMSS maths assessments). Explain this paradox.",
+        "answer": "High spending does not guarantee quality outcomes. SA's education challenges include: teacher quality (many lack subject competence, especially in maths and science), teacher absenteeism (~10% of school days), poor school infrastructure (many schools lack libraries, laboratories, or reliable electricity), language barriers (instruction in English/Afrikaans from Grade 4, but most learners speak African languages at home), and weak school management.",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Spending money is necessary but not sufficient for quality education.",
+          "Think about where the money goes: teacher salaries consume ~80% of education budgets."
+        ],
+        "explanation": "About 80% of SA's education budget goes to teacher salaries, leaving little for learning materials, infrastructure, or training. The legacy of Bantu Education (deliberately inferior education for black South Africans) continues to affect teacher quality and school culture.",
+        "distractors": [
+          "SA does not spend enough on education",
+          "All SA schools are equally well-resourced",
+          "TIMSS results accurately reflect individual student ability"
+        ]
+      },
+      {
+        "question": "The NDP 2030 targeted reducing unemployment to 6% and eliminating income poverty. It is now 2026. Assess progress and explain why these targets are unlikely to be met.",
+        "answer": "Progress has been severely inadequate. Unemployment has risen from ~25% (2012) to ~32% (2024). Poverty has worsened (exacerbated by COVID-19). Contributing factors: low economic growth (~1% average since 2015), load-shedding (estimated R500 billion cost to the economy), policy uncertainty (land reform, mining regulation), state capture and corruption (Zondo Commission findings), and failure to implement structural reforms (labour market, education, SOE governance).",
+        "difficulty_permille": 850,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "The NDP was adopted in 2012. What has happened to the economy since then?",
+          "Consider both domestic factors (load-shedding, corruption) and global shocks (COVID-19)."
+        ],
+        "explanation": "The NDP remains a sound diagnostic document, but implementation has failed due to state capacity constraints, political instability, and economic headwinds. The gap between vision and execution is SA's central development challenge.",
+        "distractors": [
+          "The NDP targets have been largely achieved",
+          "The NDP was never a realistic plan",
+          "Load-shedding has had no economic impact"
+        ]
+      }
+    ],
+    "hints": [
+      "HDI = life expectancy + education + income. SA's HDI drops ~34% when adjusted for inequality.",
+      "SA's food poverty line (R624/month) is the threshold for extreme poverty -- below this, you cannot afford adequate food.",
+      "Development is multidimensional: income alone does not capture health, education, or quality of life."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "Human Development Index (HDI)",
+        "definition": "A composite index of life expectancy, education, and income per capita, used to rank countries' development levels (0-1 scale)",
+        "example_usage": "SA's HDI of 0.713 places it in the 'high human development' category, but the inequality-adjusted figure is only 0.468."
+      },
+      {
+        "term": "food poverty line",
+        "definition": "The income level below which a person cannot afford adequate nutrition (R624/month in SA, 2023)",
+        "example_usage": "About 25% of South Africans live below the food poverty line."
+      },
+      {
+        "term": "NDP 2030",
+        "definition": "South Africa's National Development Plan, a long-term strategy to reduce poverty, inequality, and unemployment by 2030",
+        "example_usage": "The NDP targeted 6% unemployment by 2030, but the actual rate remains above 30%."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think economic growth automatically reduces poverty.",
+        "correction": "Growth is necessary but not sufficient. If growth benefits only the wealthy (as in SA's case, with a Gini of 0.63), poverty can persist or even worsen. Inclusive growth -- growth that creates jobs and reaches the poor -- is what reduces poverty.",
+        "why_students_think_this": "Textbooks often present a simplified story where GDP growth trickles down to everyone, but SA's experience shows this does not happen automatically in highly unequal societies."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.DEV.SA",
+    "title": "Assessment: Development economics, HDI, poverty, land reform, NDP",
+    "items": [
+      {
+        "question": "Explain why SA's inequality-adjusted HDI (0.468) is so much lower than its headline HDI (0.713).",
+        "item_type": "ShortAnswer",
+        "correct_answer": "SA has extreme inequality in health (private vs public healthcare, HIV burden), education (ex-Model C vs township schools), and income (Gini 0.63). The IHDI penalises this unequal distribution, revealing that the average person's development experience is far below the national average.",
+        "points": 4,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Consider how unequally the three HDI dimensions are distributed."
+      }
+    ],
+    "total_points": 4,
+    "estimated_minutes": 8,
+    "bloom_distribution": [
+      ["Analyze", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the Human Development Index (HDI)?",
+      "back": "A composite index (0-1) combining life expectancy, education (mean and expected years of schooling), and GNI per capita. SA = 0.713, but drops to 0.468 when adjusted for inequality.",
+      "tags": ["ECON.DEV.SA", "Economics", "Development"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What is SA's food poverty line?",
+      "back": "R624 per person per month (2023, Stats SA). Below this, a person cannot afford adequate nutrition. About 25% of South Africans live below this line.",
+      "tags": ["ECON.DEV.SA", "Economics", "Poverty"],
+      "difficulty_permille": 200
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Plumbing Fundamentals?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
+        "question": "A house has municipal water pressure of 550 kPa at the meter. SANS 10252 limits supply pressure to 400 kPa at any fitting. What device must be installed, and where? Calculate the flow rate through a 15mm copper pipe at 400 kPa using the simplified formula Q = 0.0005 x d² x √P (Q in L/min, d in mm, P in kPa).",
+        "answer": "A pressure-reducing valve (PRV) must be installed immediately after the water meter, before the first branch. Set to 400 kPa or below. Flow rate: Q = 0.0005 x 15² x √400 = 0.0005 x 225 x 20 = 2.25 L/min per fitting. This is adequate for a single basin tap but marginal for a shower (which typically requires 8-12 L/min). For adequate shower flow, 22mm pipe should be used for the main supply line, branching to 15mm only at individual fittings.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
         "hints": [
-          "Think safety first"
+          "Pressures above 400 kPa cause water hammer, damage to fittings, and excessive noise.",
+          "The formula shows that flow rate depends on pipe diameter squared -- doubling the pipe diameter quadruples the flow."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "Pressure management is fundamental to SA plumbing. Municipal pressures vary widely (200-800 kPa) and a PRV protects the entire installation. Pipe sizing determines whether fixtures deliver adequate flow.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "High pressure is always better -- it means stronger water flow",
+          "A PRV is only needed for commercial buildings",
+          "15mm pipe is sufficient for all domestic applications"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Plumbing Fundamentals in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "You need to solder a 22mm copper elbow joint for a hot water line. Describe the complete procedure including preparation, flux selection, and testing.",
+        "answer": "Procedure: (1) Cut the pipe square using a pipe cutter (not a hacksaw, which creates burrs). (2) Ream the inside to remove the burr. (3) Clean the outside of the pipe and the inside of the fitting with emery cloth until bright copper is visible (no oxidation). (4) Apply flux to BOTH surfaces -- use lead-free flux for potable water systems (SANS 10252 requirement). (5) Assemble the joint, ensuring the pipe is fully inserted to the stop. (6) Heat the joint evenly with a propane torch, applying heat to the FITTING (not the pipe) -- the fitting transfers heat to the solder zone. (7) Touch the solder to the joint (not the flame) -- capillary action draws the solder into the gap when the correct temperature is reached (~250°C for lead-free). (8) Allow to cool naturally -- do not quench with water (thermal shock weakens the joint). (9) Clean excess flux with a damp cloth. (10) Pressure test the system at 1.5x working pressure for 15 minutes with no drop.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
+        "bloom_level": "Apply",
         "hints": [
-          "Think about SANS standards or Acts"
+          "Lead solder is BANNED for potable water systems. Use lead-free solder (tin-copper or tin-silver).",
+          "If solder doesn't flow into the joint, the fitting is not hot enough or the surfaces were not properly cleaned."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Soldering is the most fundamental copper plumbing skill. Poor preparation (dirty surfaces, wrong flux) is the number one cause of leaking joints. The pressure test confirms joint integrity before closing up walls.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "Heat the pipe directly with the flame for faster results",
+          "Quench the joint in water immediately for a stronger bond",
+          "Lead solder is acceptable for hot water lines because the lead doesn't dissolve"
+        ]
+      },
+      {
+        "question": "A client complains about water hammer (loud banging) when taps are closed quickly. Explain the cause and three solutions.",
+        "answer": "Cause: Water hammer occurs when fast-closing valves (lever taps, washing machine solenoids, dishwashers) suddenly stop water flow. The kinetic energy of the moving water converts to a pressure wave that travels back through the pipes at ~1400 m/s, causing the banging noise and potentially damaging pipes and fittings. Solutions: (1) Install water hammer arrestors (mini expansion vessels with a gas-charged diaphragm) at the point of use, typically at washing machine and dishwasher connections. (2) Reduce water pressure with a PRV -- lower pressure means less kinetic energy and smaller pressure spikes. (3) Secure loose pipes -- unsecured pipes amplify the noise by vibrating against walls and joists. Use pipe clips at maximum 1.2m intervals for copper and 0.6m for PVC. Additional: replace lever taps with quarter-turn ceramic disc taps that close more gradually, or install slow-closing solenoid valves on appliances.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Water hammer pressure spikes can exceed 10x the static pressure, potentially bursting pipes.",
+          "The problem is worse in long straight pipe runs where water has more momentum."
+        ],
+        "explanation": "Water hammer is one of the most common plumbing complaints. Understanding the physics (kinetic energy → pressure wave) helps you diagnose the cause and recommend the right combination of solutions for each installation.",
+        "distractors": [
+          "Water hammer is just noise and cannot damage pipes",
+          "The only solution is to replace all taps",
+          "Water hammer is caused by air in the pipes"
+        ]
+      },
+      {
+        "question": "You are installing a new bathroom on the second floor of a house. The geyser is in the roof space, 1.5m above the showerhead. Calculate the available pressure at the showerhead (using 10 kPa per metre of head). Is this sufficient for a standard shower? What can you do if it is not?",
+        "answer": "Available pressure: head = 1.5m, so pressure = 1.5 x 10 = 15 kPa. A standard shower mixer requires minimum 100 kPa for adequate flow (8-12 L/min). 15 kPa is far too low -- the shower will produce only a trickle. Solutions: (1) Install a shower booster pump (in-line pump that increases pressure to 150-200 kPa). The pump must be installed on both hot and cold lines to maintain balanced pressure. (2) Relocate the geyser higher (if structurally possible) -- every extra metre adds 10 kPa. (3) Install a pressurised (mains-pressure) geyser system with an expansion vessel, eliminating the gravity-feed limitation entirely. (4) Use a low-pressure shower head designed to operate at 15-50 kPa (eco option). SANS 10252 recommends minimum 50 kPa for any outlet.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Gravity-fed hot water systems depend entirely on the HEIGHT between the geyser and the outlet.",
+          "1 metre of water head = approximately 10 kPa (more precisely 9.81 kPa)."
+        ],
+        "explanation": "Understanding the relationship between head height and pressure is essential for designing hot water systems. Many SA homes have low-pressure hot water because geysers are installed in the roof with insufficient head to upper-floor bathrooms.",
+        "distractors": [
+          "15 kPa is sufficient for any shower",
+          "Opening the tap wider increases the pressure",
+          "A mixing valve can increase pressure by combining hot and cold"
+        ]
+      },
+      {
+        "question": "A client wants to replace old galvanised steel pipes with modern materials. Compare copper, PEX, and multilayer (PEX-AL-PEX) pipe for a domestic hot and cold water installation. Recommend the best option and justify your choice.",
+        "answer": "Copper (15mm, 22mm): Proven material, 50+ year lifespan, bacteriostatic (inhibits Legionella), fully recyclable, used for decades in SA. Drawbacks: expensive (copper price volatile), requires soldering skills, can develop pinhole leaks in acidic water areas, theft target. PEX (cross-linked polyethylene): Flexible, easy to install (push-fit or crimp connections), corrosion-resistant, quieter than copper, cheaper material cost. Drawbacks: cannot be used outside (UV degradation), limited to 95°C, some fittings are proprietary, not recyclable. Multilayer PEX-AL-PEX: Aluminium core makes it bendable (holds shape), oxygen barrier (prevents corrosion in heating systems), higher pressure rating than plain PEX. Drawbacks: more expensive than PEX, fewer fitting options in SA market. Recommendation: PEX-AL-PEX for the main distribution, with copper for exposed connections (aesthetics and durability). This combines the installation speed of PEX with the rigidity and oxygen barrier of multilayer, while using copper where visibility matters. All materials must be SABS approved (SANS 10252 compliance).",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider: cost, installation speed, longevity, local availability, and compliance with SANS 10252.",
+          "PEX and multilayer require different fitting systems -- check what's available from your SA suppliers."
+        ],
+        "explanation": "Material selection is a key professional skill. The 'best' material depends on the specific installation, budget, water quality, and client preferences. A good plumber can work with all three and advise appropriately.",
+        "distractors": [
+          "Galvanised steel is still the best option because it's the strongest",
+          "PVC can be used for hot water supply lines",
+          "All pipe materials have the same lifespan and performance"
         ]
       }
     ],

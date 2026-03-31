@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Crop Production Basics?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A soil test returns: pH 4.8, N low, P medium, K high. You want to plant maize in the Free State summer season. What soil amendments do you need, and how much lime is required to raise pH to 5.8 for 1 hectare (assuming 1 tonne of agricultural lime raises pH by 0.5 units in loam soil)?",
+        "answer": "pH correction: target 5.8, current 4.8, difference = 1.0 pH units. At 1 tonne per 0.5 pH units: 1.0 / 0.5 = 2 tonnes of agricultural lime per hectare. Apply lime 2-3 months before planting (lime reacts slowly). Incorporate to 200mm depth by discing. Fertiliser: N is low and maize is a heavy nitrogen feeder (120-150 kg N/ha for target yield of 6-8 t/ha). Apply 50% at planting as basal (e.g., 2:3:4 blend) and 50% as top-dressing at 6-leaf stage (LAN 28% or urea 46%). P is medium -- maintain with 30-40 kg P/ha at planting. K is high -- no additional K needed this season. Total fertiliser program: 300 kg/ha 2:3:4 at planting (provides 18 kg N, 27 kg P, 36 kg K) + 250 kg/ha LAN at 6-leaf stage (provides 70 kg N). Total N: 88 kg/ha (conservative approach given medium rainfall area).",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": ["Maize needs pH 5.5-6.5. Below 5.0, aluminium toxicity inhibits root growth.", "Never apply lime and nitrogen fertiliser at the same time -- the lime converts ammonium to ammonia gas, wasting the nitrogen."],
+        "explanation": "Soil test interpretation and amendment calculation are the foundation of profitable crop production. Applying fertiliser without a soil test wastes money and can damage the soil.",
+        "distractors": ["Just apply a general fertiliser without testing", "Lime works immediately after application", "High K means you need more K"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Crop Production Basics in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "You have 5 hectares of maize under centre-pivot irrigation. The soil water-holding capacity is 25mm per 100mm soil depth, the effective root zone is 600mm, and the crop is at tasselling stage (peak water demand: 6mm/day). Calculate the maximum irrigation interval and the application amount per cycle.",
+        "answer": "Total available water (TAW) = 25mm/100mm x 600mm = 150mm. Management allowable depletion (MAD) at tasselling = 50% (maize is sensitive to drought at tasselling). Readily available water (RAW) = TAW x MAD = 150 x 0.50 = 75mm. Maximum irrigation interval = RAW / daily demand = 75 / 6 = 12.5 days. Round down to 12 days for safety margin. Application per cycle = 12 days x 6mm/day = 72mm. However, application efficiency for a centre pivot is ~85%. Gross application = 72 / 0.85 = 84.7mm per cycle. In practice, irrigate every 7-10 days in the Free State summer to maintain a safety buffer for unexpected heat waves. Run time: if the pivot applies 8mm/hour, one full rotation takes 84.7/8 = 10.6 hours.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["MAD at tasselling is critical -- drought stress at this stage reduces yield by 50%+.", "Application efficiency accounts for evaporation and wind drift from the pivot."],
+        "explanation": "Irrigation scheduling prevents both over-watering (wasting scarce water, leaching nutrients) and under-watering (yield loss). In water-scarce SA, efficient irrigation is a competitive advantage.",
+        "distractors": ["Irrigate the same amount regardless of crop stage", "Centre pivots are 100% efficient", "Just irrigate when the crop looks wilted"]
+      },
+      {
+        "question": "Describe the Integrated Pest Management (IPM) approach for fall armyworm in a maize field. Include monitoring, threshold, and control options in order of preference.",
+        "answer": "Fall armyworm (Spodoptera frugiperda) is SA's most damaging maize pest since its arrival in 2016. IPM approach: (1) Monitoring: scout fields weekly from emergence. Check 20 plants at 5 locations per field. Look for leaf damage (window-pane feeding, ragged holes) and frass (caterpillar droppings) in the whorl. (2) Economic threshold: 25% of plants showing leaf damage with live larvae present in the whorl. Below this, natural enemies (parasitoid wasps, ladybirds, spiders) may provide sufficient control. (3) Control options (in order): (a) Cultural: early planting (Nov) to avoid peak emergence, crop rotation with non-host crops. (b) Biological: release Trichogramma parasitoid wasps (egg parasites), conserve natural predators by reducing broad-spectrum pesticide use. (c) Bt maize: genetically modified maize expressing Bacillus thuringiensis toxin provides plant-level resistance (common in SA commercial farming). Maintain 5% non-Bt refuge to delay resistance. (d) Chemical: if threshold exceeded in non-Bt maize, apply registered insecticide (e.g., chlorantraniliprole) targeting small larvae (<15mm) in the whorl. Spray in the late afternoon when larvae are actively feeding. Avoid broad-spectrum organophosphates that kill natural enemies.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": ["IPM uses the least toxic option first. Chemical control is the LAST resort, not the first.", "Scouting is the foundation of IPM -- you cannot manage what you do not measure."],
+        "explanation": "IPM is the standard approach in modern SA agriculture. It reduces chemical costs, protects the environment, and delays pest resistance. Fall armyworm is a priority pest requiring active management.",
+        "distractors": ["Spray preventatively before any damage appears", "Chemical control should always be the first response", "Bt maize makes monitoring unnecessary"]
+      },
+      {
+        "question": "Compare drip irrigation and sprinkler irrigation for a 10-hectare vegetable farm in Limpopo. Consider efficiency, cost, crop suitability, and water source requirements.",
+        "answer": "Drip irrigation: Efficiency 90-95% (water delivered directly to root zone, minimal evaporation). Cost: high initial (R15,000-25,000/ha for pipes, emitters, filters), low running (low pressure = less pumping energy). Crop suitability: excellent for row crops (tomatoes, peppers, onions), orchards. Not suitable for broadcast crops (lucerne). Advantages: reduces weed growth between rows (dry soil), enables fertigation (fertiliser through drip lines), suitable for irregular-shaped fields. Water source: needs clean water (filtered to prevent emitter clogging). Sprinkler irrigation: Efficiency 70-80% (evaporation and wind drift losses). Cost: moderate initial, higher running costs (higher pressure needed). Crop suitability: good for all crop types including broadcast. Advantage: provides foliar cooling in Limpopo heat. Disadvantage: promotes leaf diseases in humid conditions, higher water consumption. Recommendation for Limpopo vegetables: DRIP irrigation. Water is scarce (most of Limpopo is semi-arid), so the 15-25% efficiency advantage saves significant water. Fertigation reduces labour. The higher initial cost is recovered through water and fertiliser savings within 2-3 seasons.",
+        "difficulty_permille": 500,
+        "bloom_level": "Evaluate",
+        "hints": ["SA is a water-scarce country. Efficiency differences of 15-25% translate to thousands of cubic metres saved per season.", "Drip requires filtration -- river water or borehole water with sand/silt will clog emitters without proper filters."],
+        "explanation": "Irrigation system selection is one of the most important long-term farm decisions. In SA's water-scarce context, efficiency is not just an environmental consideration but an economic necessity.",
+        "distractors": ["Sprinkler is always cheaper overall", "Drip irrigation works for any crop type", "Water efficiency doesn't matter if you have a borehole"]
+      },
+      {
+        "question": "Plan a crop rotation for a 4-field system over 4 years. The farm grows maize (heavy N feeder), soybeans (legume/N-fixer), sunflower, and potatoes. Explain why each crop follows the previous one.",
+        "answer": "Year 1: Soybeans → fixes atmospheric nitrogen in root nodules (Rhizobium bacteria), adding 60-100 kg N/ha to the soil. Year 2: Maize → follows soybeans to exploit the residual nitrogen. Maize is a heavy N feeder that benefits from the N-fixing. Different root system and pest spectrum from soybeans. Year 3: Potatoes → different plant family (Solanaceae) breaks maize disease/pest cycles. Deep-rooted, benefits from the good soil structure left by maize roots. Requires different herbicides, preventing herbicide-resistant weed buildup. Year 4: Sunflower → deep tap root (2m+) breaks compaction layers, accesses deep nutrients. Oil crop diversifies income. Different pest/disease spectrum from all three previous crops. Then back to soybeans to restart the nitrogen cycle. Benefits of this rotation: (1) breaks pest and disease cycles (each crop has different enemies), (2) manages soil fertility naturally (legume N-fixation), (3) improves soil structure (different root depths), (4) reduces weed pressure (different herbicide groups), (5) spreads economic risk across multiple crop markets.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "bloom_level": "Apply",
+        "hints": ["The key principle: never follow a crop with the same crop or one with similar diseases/pests.", "Legumes (soybeans, groundnuts) are the 'free fertiliser' in the rotation -- they fix nitrogen from the air."],
+        "explanation": "Crop rotation is fundamental to sustainable farming. Monoculture (same crop every year) depletes soil, builds pest populations, and requires increasing chemical inputs.",
+        "distractors": ["Plant the most profitable crop every year", "Rotation is unnecessary with modern fertilisers", "Any sequence of crops works equally well"]
       }
     ],
     "key_vocabulary": [

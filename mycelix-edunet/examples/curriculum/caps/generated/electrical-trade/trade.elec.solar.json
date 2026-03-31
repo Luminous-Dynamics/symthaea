@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Solar PV Installation?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
+        "question": "A client in Johannesburg wants a solar system to power their home during load-shedding (8 hours/day). Daily consumption is 30kWh. Design a system: how many 400W panels are needed, what inverter size, and what battery capacity? Assume 5 peak sun hours/day and 80% system efficiency.",
+        "answer": "Step 1 -- Panel array: Energy needed from panels = 30kWh / 0.80 (efficiency) = 37.5kWh. Per panel daily output = 400W x 5 peak sun hours = 2kWh. Panels needed = 37.5 / 2 = 18.75, round up to 20 panels (8kWp array). Step 2 -- Inverter: Peak load determines inverter size. For a typical home (geyser off during load-shedding): simultaneous load ~5kW. Recommend 8kW hybrid inverter to handle surge loads and the full array. Step 3 -- Battery: Load-shedding coverage = 8 hours. Average hourly consumption = 30/24 = 1.25kWh. Battery for 8h = 1.25 x 8 = 10kWh usable. At 90% DoD (depth of discharge for lithium): 10 / 0.90 = 11.1kWh nominal. Recommend 2x 5.12kWh lithium batteries (10.24kWh usable) or 1x 10kWh unit.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
         "hints": [
-          "Think safety first"
+          "Peak sun hours in Joburg average 5-5.5 hours/day. System efficiency accounts for inverter losses, cable losses, temperature derating, and panel soiling.",
+          "Battery sizing depends on how many hours of backup are needed, not total daily consumption."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "System sizing is the most requested skill for solar installers in SA. Oversizing wastes money; undersizing disappoints the client. Always account for efficiency losses and size the inverter for peak simultaneous load, not just panel capacity.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "Just divide kWh by panel wattage without considering sun hours",
+          "The inverter only needs to match the panel wattage",
+          "One 5kWh battery is enough for any home"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Solar PV Installation in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
+        "question": "Explain the difference between grid-tied, off-grid, and hybrid solar systems. Which is most common for residential installations in SA during load-shedding, and why?",
+        "answer": "Grid-tied: Panels connect to an inverter that synchronises with Eskom. Excess power feeds into the grid (where feed-in tariffs exist). No battery. Downside: when Eskom goes off (load-shedding), the system must shut down (anti-islanding protection) -- so no power during outages. Off-grid: Completely independent of Eskom. Requires large battery bank and careful load management. Expensive due to battery requirements. Used for remote locations. Hybrid: Combines grid connection with battery storage. During normal operation, panels charge batteries and supplement grid power. During load-shedding, the inverter disconnects from the grid and powers the home from batteries/panels. Most common for SA residential because it provides load-shedding backup while still using grid power when available, reducing battery size requirements.",
+        "difficulty_permille": 300,
         "bloom_level": "Understand",
         "hints": [
-          "Think about SANS standards or Acts"
+          "Anti-islanding is a safety requirement: grid-tied inverters must shut down when the grid fails to prevent back-feeding.",
+          "Hybrid systems give the best of both worlds but require a compatible hybrid inverter."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Understanding system types is essential for advising clients correctly. In SA, hybrid systems dominate residential installations because load-shedding makes grid-tied systems unreliable, while off-grid systems are unnecessarily expensive for urban homes with grid access.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "Grid-tied systems work during load-shedding because the panels are still generating",
+          "Off-grid is the cheapest option because you don't pay Eskom",
+          "All solar systems automatically provide backup during load-shedding"
+        ]
+      },
+      {
+        "question": "You are installing 20 panels on a north-facing roof in Durban. The roof pitch is 15°. What tilt angle do you recommend, and how do you calculate the optimal string configuration for a 48V battery system if each panel has Vmp=40V and Imp=10A?",
+        "answer": "Tilt angle: For Durban (latitude ~30°S), optimal fixed tilt is approximately equal to latitude = 30°. Since the roof is only 15°, you need 15° of additional tilt from mounting frames. Alternatively, accept the 15° pitch with ~5% annual yield loss. String configuration for 48V battery system: The inverter's MPPT input typically accepts 150-500V DC. Panels in series: voltages add. 2 panels in series = 80V, 10 in series = 400V. Check inverter max MPPT voltage. Common config: 2 strings of 10 panels each (400V per string, 10A per string). Parallel strings: currents add. 2 strings x 10A = 20A total. Verify the inverter's maximum input current per MPPT. The battery voltage (48V) is the DC bus voltage -- the MPPT controller steps down the higher panel voltage to charge the batteries.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": [
+          "In the Southern Hemisphere, panels face TRUE north (not magnetic north). Tilt angle ≈ latitude for annual optimisation.",
+          "String voltage must stay within the inverter's MPPT voltage window at all temperatures. Cold mornings increase Voc."
+        ],
+        "explanation": "String configuration determines system performance and safety. Too few panels in series = voltage too low for MPPT tracking. Too many = exceeding inverter maximum voltage (especially on cold mornings when Voc increases). Always check the inverter datasheet.",
+        "distractors": [
+          "All panels should always be connected in parallel for safety",
+          "Panel voltage must exactly match battery voltage",
+          "Tilt angle doesn't matter because the sun is always overhead in Africa"
+        ]
+      },
+      {
+        "question": "During commissioning of a new solar installation, you measure the following: array Voc = 420V (expected 400V), array Isc = 9.5A (expected 10A). Ambient temperature is 10°C. Are these readings normal? Explain.",
+        "answer": "Both readings are normal and expected for 10°C ambient. Voc is HIGHER than the STC (Standard Test Conditions, 25°C) rating because solar panel voltage INCREASES as temperature DECREASES. The temperature coefficient for voltage (typically -0.3%/°C for crystalline silicon) means: temperature difference = 25°C - 10°C = 15°C below STC. Voltage increase = 400V x 0.003 x 15 = 18V. Expected Voc at 10°C ≈ 418V. Measured 420V -- consistent. Isc is slightly lower than STC because irradiance may be slightly below 1000W/m² STC standard, or there are minor cable losses. This is within normal tolerance. Key safety implication: the inverter must be rated for the MAXIMUM possible Voc at the MINIMUM expected temperature (winter morning). In Joburg, minimum can reach 0°C, so Voc could reach ~430V. Always check this against inverter maximum input voltage.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Solar panels are rated at STC: 25°C cell temperature, 1000W/m² irradiance. Real conditions are almost never STC.",
+          "Temperature coefficient for Voc is NEGATIVE (voltage drops as temperature rises, increases as it falls)."
+        ],
+        "explanation": "Understanding temperature effects on PV output is critical for safe system design. Installers who only use STC values risk exceeding inverter voltage limits on cold mornings, causing inverter damage or fire.",
+        "distractors": [
+          "The high voltage means there is a wiring fault",
+          "Solar panel voltage is constant regardless of temperature",
+          "The low current indicates panel damage"
+        ]
+      },
+      {
+        "question": "A municipality requires your client to register their solar system and comply with SSEG (Small-Scale Embedded Generation) rules. What documentation must be submitted, and what technical requirements must the system meet?",
+        "answer": "Documentation: (1) SSEG application form from the municipality. (2) Electrical COC for the solar installation (issued by registered electrician). (3) Single-line diagram showing the full installation (panels, inverter, batteries, changeover/grid-connection point, protection devices). (4) Inverter compliance certificates (IEC 62109, NRS 097-2-1 for grid-feed capability). (5) Proof of installer registration (with ECSA or relevant body). Technical requirements: (1) Anti-islanding protection -- inverter must disconnect from grid within 2 seconds of grid failure. (2) Power quality: frequency 50Hz ±0.5Hz, voltage within ±10% of nominal. (3) Maximum export limit as set by municipality (often 3.68kW single-phase or 5kW). (4) Bidirectional meter installation (municipality usually installs this). (5) Visible AC isolator switch accessible to municipality for emergency disconnect.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "SSEG rules vary by municipality -- always check the specific requirements for your area.",
+          "The anti-islanding requirement exists to protect Eskom/municipal workers from back-feed during maintenance."
+        ],
+        "explanation": "SSEG compliance is legally required for any grid-connected solar system. Operating without registration can result in disconnection, fines, and liability. As solar adoption grows in SA, installers must be fluent in municipal requirements.",
+        "distractors": [
+          "Only off-grid systems need registration",
+          "The client can register the system themselves without an electrician",
+          "Anti-islanding is optional for systems under 5kW"
         ]
       }
     ],

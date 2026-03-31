@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Solar Water Heating?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
+        "question": "A family of 5 in Pretoria uses 250L of hot water per day. Size a solar water heating system: what collector area and tank size do you recommend? Assume average solar irradiation of 5.5 kWh/m²/day and collector efficiency of 60%.",
+        "answer": "Tank sizing: 250L daily usage requires a tank of at least 250L. Recommend 300L to account for cloudy days and visitors (SANS 10106 recommends 50-75L per person). Energy required: heating 250L from 15°C (cold inlet) to 60°C (storage temperature) = 250 x 4.186 x 45 / 3600 = 13.1 kWh/day. Collector area: useful energy per m² = 5.5 kWh x 0.60 efficiency = 3.3 kWh/m²/day. Area needed = 13.1 / 3.3 = 3.97 m². Recommend 4m² of flat-plate collector (typically 2 panels of 2m² each). Solar fraction: on a good day, the solar system provides 100% of hot water needs. Annual solar fraction for Pretoria ≈ 70-80% (backup element needed for overcast winter days). Cost saving: approximately 40-60% reduction in electricity for water heating.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
         "hints": [
-          "Think safety first"
+          "The specific heat capacity of water is 4.186 kJ/kg·°C. Energy (kWh) = mass x Cp x ΔT / 3600.",
+          "Storage temperature of 60°C minimum prevents Legionella growth (SANS 10252 requirement)."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "System sizing is the foundation of a good solar water heating installation. Undersizing disappoints the client; oversizing wastes money and can cause overheating in summer (stagnation). Pretoria's high solar irradiation makes it an ideal location for solar water heating.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "A 100L tank is sufficient for any family",
+          "Collector efficiency is 100% on sunny days",
+          "Hot water only needs to be stored at 40°C"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Solar Water Heating in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
+        "question": "Explain the difference between a thermosiphon and a pumped solar water heating system. When would you recommend each?",
+        "answer": "Thermosiphon: Uses natural convection -- hot water rises, cold water sinks. The collector MUST be installed below the tank so hot water rises naturally into the tank. No pump or controller needed (passive system). Simple, reliable, low maintenance. Limitation: the tank must be on the roof above the collector, adding structural load. Pumped (forced circulation): A circulation pump moves water between the collector and a ground-level or indoor tank. A differential temperature controller activates the pump when the collector is hotter than the tank (typically ΔT > 8°C). Advantage: tank can be indoors (protected, less heat loss) and collector placement is flexible. Requires electricity for the pump and controller. Recommendations: Thermosiphon for simple domestic installations where the roof can support the tank weight (most SA installations). Pumped for multi-storey buildings, large installations, or when the roof cannot support a tank (tiled roofs, heritage buildings). Also use pumped systems when the collector must be on a different roof section from the optimal tank location.",
+        "difficulty_permille": 300,
         "bloom_level": "Understand",
         "hints": [
-          "Think about SANS standards or Acts"
+          "Hot water RISES (less dense) -- this is the principle behind thermosiphon operation.",
+          "Pumped systems need a non-return valve to prevent reverse thermosiphon at night (when the collector cools)."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Choosing between thermosiphon and pumped systems is one of the first decisions in any solar water heating project. In SA, thermosiphon is the most common domestic system due to its simplicity and low cost.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "Thermosiphon works even if the collector is above the tank",
+          "Pumped systems are always more efficient than thermosiphon",
+          "The pump runs continuously 24 hours a day"
+        ]
+      },
+      {
+        "question": "A client's existing electric geyser is in the roof space. They want to add a solar collector retrofit. The geyser is 6 years old (150L, 2kW element). Should you connect the solar collector to the existing geyser or recommend a new dedicated solar tank? Justify your answer.",
+        "answer": "Recommendation: install a NEW dedicated solar tank (200-300L) as a pre-heat tank connected IN SERIES before the existing electric geyser, rather than connecting the solar collector directly to the old geyser. Justification: (1) The existing geyser at 6 years old is past half its typical 8-10 year lifespan -- connecting expensive solar collectors to a geyser that may fail soon is poor investment. (2) A 150L tank is undersized for solar (solar works best with larger storage to capture maximum energy during peak sun). (3) The pre-heat tank arrangement means cold water enters the solar tank first, gets heated by the sun, then flows to the electric geyser which only needs to boost the temperature if the solar tank hasn't reached 60°C. On sunny days, the electric element doesn't activate at all. (4) If the old geyser fails, only the electric backup needs replacing -- the solar investment is protected. Alternative (budget option): connect the solar directly to the existing geyser, but set the electric element on a timer (4pm-6pm only) to maximise solar contribution. This is cheaper but riskier.",
+        "difficulty_permille": 600,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "The pre-heat tank arrangement is the gold standard for solar retrofits -- it separates the solar investment from the electric backup.",
+          "Consider the client's total cost of ownership: cheap now but replacing the geyser in 2 years is more expensive overall."
+        ],
+        "explanation": "Retrofit decisions require balancing cost, performance, and longevity. A plumber who recommends the cheapest option without considering the existing equipment's condition does the client a disservice.",
+        "distractors": [
+          "Always connect directly to the existing geyser to save money",
+          "Solar collectors can replace the electric geyser entirely with no backup",
+          "A 6-year-old geyser is brand new and will last another 20 years"
+        ]
+      },
+      {
+        "question": "During commissioning of a thermosiphon solar geyser, you notice the collector temperature reaches 95°C but the tank water is only 30°C after 4 hours of sunshine. Diagnose the problem.",
+        "answer": "The collector is overheating while the tank is cold -- this indicates that thermosiphon circulation is NOT occurring. Possible causes (check in order): (1) Air lock in the circulation loop: air trapped at the highest point of the connecting pipes prevents water circulation. Solution: bleed the air via a bleed valve at the highest point, or fill the system from the bottom. (2) Pipes connected incorrectly: the hot water outlet from the collector must connect to the TOP of the tank, and the cold return from the BOTTOM of the tank must connect to the inlet of the collector. If reversed, natural convection cannot establish. (3) Kinked or undersized connecting pipes: flow restriction prevents circulation. Check for kinks, crushing (from roof tile weight), or undersized connectors (minimum 22mm for domestic thermosiphon). (4) Collector installed ABOVE the tank bottom: for thermosiphon to work, the bottom of the tank must be at least 300mm above the top of the collector. If they're at the same height, there's insufficient driving force. (5) Isolation valves left closed after installation.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Hot collector + cold tank = no circulation. The water isn't moving between them.",
+          "Thermosiphon requires: correct pipe connections, no air locks, no restrictions, and the tank ABOVE the collector."
+        ],
+        "explanation": "Commissioning fault diagnosis is a critical skill. The symptom (hot collector, cold tank) immediately tells you that circulation has failed. Working through the causes systematically finds the fault quickly.",
+        "distractors": [
+          "The collector is faulty and needs replacement",
+          "The tank thermostat is set too low",
+          "The system needs a circulation pump to work"
+        ]
+      },
+      {
+        "question": "Calculate the payback period for a solar water heating system in Durban. System cost: R35,000 installed. Current electric geyser uses 350 kWh/month. Eskom tariff: R2.80/kWh. Solar fraction: 65%. Assume 5% annual electricity price increase.",
+        "answer": "Monthly electricity saving: 350 kWh x 65% solar fraction = 227.5 kWh saved. Year 1 monthly saving: 227.5 x R2.80 = R637/month = R7,644/year. With 5% annual increase: Year 1: R7,644. Year 2: R7,644 x 1.05 = R8,026. Year 3: R8,026 x 1.05 = R8,428. Year 4: R8,428 x 1.05 = R8,849. Cumulative: Year 1: R7,644. Year 2: R15,670. Year 3: R24,098. Year 4: R32,947. Year 5: R42,241. Payback period: between Year 4 and Year 5. More precisely: remaining after Year 4 = R35,000 - R32,947 = R2,053. Year 5 saving = R8,849 x 1.05 = R9,291. Months into Year 5: R2,053 / (R9,291/12) = 2.65 months. Payback: approximately 4 years and 3 months. After payback, the system saves R9,000+/year for its remaining 15+ year lifespan.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Include the annual electricity price increase -- Eskom tariffs have increased 10-15% annually in recent years.",
+          "After the payback period, every kWh saved is pure profit for the remaining system life (15-20 years)."
+        ],
+        "explanation": "ROI calculations are essential for selling solar water heating to clients. In SA, with high and rising electricity costs and excellent solar irradiation, solar geysers typically pay for themselves in 3-5 years.",
+        "distractors": [
+          "The payback period is the same regardless of electricity price increases",
+          "Solar systems stop saving money after the payback period",
+          "Maintenance costs make solar uneconomical"
         ]
       }
     ],

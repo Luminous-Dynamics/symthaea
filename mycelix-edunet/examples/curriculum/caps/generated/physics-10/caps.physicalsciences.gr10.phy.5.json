@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.5: Electromagnetic spectrum. Nature of EM waves. Properties:...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (λ) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = fλ, period T = 1/f.",
+    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (\u03bb) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = f\u03bb, period T = 1/f.",
     "examples": [
       {
         "problem": "Solve a Electromagnetic Radiation problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "question": "List the electromagnetic spectrum in order of increasing frequency.",
+        "answer": "Radio waves, microwaves, infrared, visible light, ultraviolet, X-rays, gamma rays.",
+        "difficulty_permille": 200,
+        "bloom_level": "Remember",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Start with the longest wavelength (lowest frequency).",
+          "A useful mnemonic: 'Rabbits Munch In Very Unusual X-ray Gardens'."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "All EM waves travel at c = 3 x 10^8 m/s. Higher frequency means shorter wavelength (c = f x lambda).",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Gamma, X-ray, UV, visible, IR, microwave, radio",
+          "Radio, infrared, microwave, visible, UV, X-ray, gamma",
+          "Visible, UV, IR, microwave, radio, X-ray, gamma"
         ]
       },
       {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "Calculate the frequency of red light with a wavelength of 700 nm. (c = 3 x 10^8 m/s)",
+        "answer": "f = c/lambda = 3 x 10^8 / 700 x 10^-9 = 4.29 x 10^14 Hz",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Convert nm to m: 700 nm = 700 x 10^-9 m.",
+          "Use f = c/lambda."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "f = (3 x 10^8)/(7 x 10^-7) = 4.29 x 10^14 Hz.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "4.29 x 10^11 Hz",
+          "2.1 x 10^-15 Hz",
+          "4.29 x 10^17 Hz"
         ]
       },
       {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
+        "question": "Explain why UV radiation from the sun causes sunburn but visible light does not.",
+        "answer": "UV radiation has higher frequency and energy than visible light (E = hf). UV photons carry enough energy to damage DNA in skin cells, causing sunburn and increasing cancer risk. Visible light photons have lower energy and cannot cause this damage.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Higher frequency means higher energy per photon.",
+          "Think about why sunscreen blocks UV but not visible light."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "The energy of electromagnetic radiation increases with frequency. UV lies beyond violet in the spectrum and has enough energy per photon to break chemical bonds in DNA.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "UV has lower energy than visible light",
+          "Visible light also causes sunburn",
+          "Sunburn is caused by infrared"
         ]
       },
       {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
-        "difficulty_permille": 625,
+        "question": "A radio station broadcasts at 94.5 MHz. Calculate the wavelength of its signal. (c = 3 x 10^8 m/s)",
+        "answer": "lambda = c/f = 3 x 10^8 / 94.5 x 10^6 = 3.17 m",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Convert MHz to Hz: 94.5 MHz = 94.5 x 10^6 Hz.",
+          "Use lambda = c/f."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "lambda = (3 x 10^8)/(9.45 x 10^7) = 3.17 m. Radio waves have long wavelengths compared to visible light.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "0.317 m",
+          "31.7 m",
+          "2.83 x 10^16 m"
         ]
       },
       {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "question": "Hospitals use X-rays and gamma rays in medicine. Explain one use of each and why safety precautions are necessary.",
+        "answer": "X-rays: diagnostic imaging (bones, chest). Gamma rays: cancer treatment (radiotherapy, targeting tumours). Both are ionising radiation with enough energy to damage cells and DNA, so lead shielding, minimised exposure time, and distance are essential safety measures.",
+        "difficulty_permille": 600,
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Ionising radiation has enough energy to remove electrons from atoms.",
+          "The same property that makes them useful (penetrating tissue) also makes them dangerous."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "X-rays penetrate soft tissue but are absorbed by bone (useful for imaging). Gamma rays penetrate deeply and can destroy cancer cells. Both require careful dose management to minimise harm to healthy tissue.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Electromagnetic Radiation",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "X-rays and gamma rays are completely safe in hospitals",
+          "Only gamma rays are ionising",
+          "Radio waves are used for X-ray imaging"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.5",
-    "title": "Assessment: Electromagnetic spectrum. Nature of EM waves. Properties: wavelength, frequency, speed (c = 3×10⁸ m/s). Applications of different EM bands",
+    "title": "Assessment: Electromagnetic spectrum. Nature of EM waves. Properties: wavelength, frequency, speed (c = 3\u00d710\u2078 m/s). Applications of different EM bands",
     "items": [
       {
         "question": "Explain Electromagnetic Radiation.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.5",
         "Grade10",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 888
     }

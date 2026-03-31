@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Petrol & Diesel Engines?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A compression test on a 4-cylinder petrol engine gives: Cyl 1: 165 psi, Cyl 2: 168 psi, Cyl 3: 110 psi, Cyl 4: 162 psi. What does this tell you? Describe the wet compression test to narrow down the cause.",
+        "answer": "Cylinder 3 is significantly low (110 vs 165 average). Maximum allowed variation is typically 10-15% between cylinders. 110/165 = 67%, a 33% shortfall -- this cylinder has a problem. Possible causes: worn piston rings, burnt valve, blown head gasket, or cracked head. Wet test: add 1 tablespoon of engine oil through the spark plug hole into cylinder 3 and retest. If compression rises significantly (e.g., 110→155 psi), the oil has temporarily sealed the piston rings, confirming ring wear. If compression stays low, the problem is above the piston: a burnt valve (most common) or head gasket failure. To distinguish: a leak-down test pressurises the cylinder and checks where air escapes (intake = intake valve, exhaust = exhaust valve, cooling system bubbles = head gasket, crankcase = rings).",
+        "difficulty_permille": 400,
+        "bloom_level": "Analyze",
+        "hints": ["Wet test adds oil to temporarily seal piston rings. If compression rises = ring problem. If not = valve/gasket.", "Always test with the engine warm, throttle fully open, and all spark plugs removed."],
+        "explanation": "Compression testing is the most fundamental engine health diagnostic. Combined with the wet test and leak-down test, it pinpoints the exact mechanical failure.",
+        "distractors": ["110 psi is acceptable -- all cylinders differ", "Replace the engine if one cylinder is low", "Compression testing only works on diesel engines"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Petrol & Diesel Engines in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
+        "question": "Explain the difference between common rail diesel injection and older rotary pump injection. Why has common rail become dominant in modern diesel vehicles?",
+        "answer": "Rotary pump (e.g., Bosch VE pump): a single mechanical pump generates and distributes fuel to each injector at pressures of 200-400 bar. Injection timing and quantity are controlled mechanically (with some electronic assist in later versions). Limitations: maximum pressure limits fuel atomisation, all cylinders share the same timing, and mechanical wear affects precision. Common rail: a high-pressure pump (1,600-2,500 bar) fills a common 'rail' (accumulator) that serves all injectors. Each injector is electrically controlled by the ECU, opening multiple times per combustion cycle (pilot injection, main injection, post-injection). Advantages: (1) Much higher pressure = finer fuel atomisation = better combustion. (2) Multiple injection events per cycle reduce noise (diesel 'knock') and emissions. (3) ECU precisely controls timing and quantity per cylinder individually. (4) Lower fuel consumption (5-10% improvement). (5) Meets modern emission standards (Euro 4/5/6). Common rail dominates because emission regulations require precision that mechanical systems cannot achieve.",
+        "difficulty_permille": 500,
         "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "hints": ["Common rail separates pressure generation (pump) from injection (injectors), giving independent control.", "The 'common' in common rail means all injectors share the same high-pressure fuel supply."],
+        "explanation": "Understanding injection system evolution is essential for modern diesel diagnostics. Most SA diesel vehicles from 2005 onward use common rail.",
+        "distractors": ["Rotary pumps produce higher pressure than common rail", "Common rail injectors are purely mechanical", "Common rail is only used in trucks, not passenger vehicles"]
+      },
+      {
+        "question": "A turbocharged petrol vehicle loses power above 3000 RPM, with the check engine light on. OBD2 shows P0299 (Turbo/Supercharger Underboost). List four possible causes and the diagnostic approach for each.",
+        "answer": "(1) Boost leak (split intercooler hose, loose clamp, cracked intercooler): pressurised air escapes before reaching the engine. Diagnostic: pressurize the intake system with a smoke machine or regulated air supply; listen/feel for leaks at all hose connections and the intercooler. (2) Sticking wastegate (stuck open): diverts exhaust away from the turbine even when boost is needed. Diagnostic: check wastegate actuator with a vacuum pump -- it should hold vacuum and move the wastegate arm. (3) Faulty boost pressure sensor/MAP sensor: sends incorrect readings to the ECU. Diagnostic: compare sensor reading to a known-good gauge; check wiring and connector for damage. (4) Worn turbocharger (shaft play): worn bearings allow excessive shaft movement, reducing compressor efficiency. Diagnostic: remove the intake pipe to the turbo, check for lateral and axial shaft play by hand (slight play is normal; 1mm+ is worn). Also check for oil in the intake pipe (indicating seal failure). Always check the simplest cause first (boost leak) before condemning the turbo.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["P0299 = the ECU requested boost but didn't get it. Air is either leaking out or the turbo can't make it.", "Boost leaks are the #1 cause and cheapest to fix. Always check hoses and clamps first."],
+        "explanation": "Turbo diagnosis requires understanding the boost system as a sealed path from compressor through intercooler to intake manifold. Any leak, blockage, or component failure in this path causes underboost.",
+        "distractors": ["Replace the turbo immediately", "P0299 means the turbo is over-boosting", "Boost leaks are rare on modern vehicles"]
+      },
+      {
+        "question": "A customer asks: 'Can I use 93 octane instead of 95 octane in my car to save money?' The vehicle manual specifies 95 RON minimum. Advise the customer with technical reasoning.",
+        "answer": "Advise against using 93 octane. Technical reasoning: Octane rating measures the fuel's resistance to knock (premature detonation). The engine's ECU is calibrated for 95 RON, meaning the ignition timing and compression ratio assume the fuel can resist detonation at the designed compression. With 93 octane, the fuel is more likely to detonate prematurely under load (climbing hills, overtaking, towing). Modern ECUs have knock sensors that detect detonation and retard ignition timing to protect the engine -- this prevents immediate damage but reduces power and fuel efficiency, partially or fully negating the cost saving. Prolonged knocking (if the knock sensor is slow to respond or the knock is mild) causes piston crown erosion, bearing damage, and head gasket failure. SA fuel price difference between 93 and 95 is typically R0.50-0.80/litre. On a 50L tank, the saving is R25-40. The potential engine repair cost is R5,000-R50,000. The saving is not worth the risk for any vehicle that specifies 95 RON.",
+        "difficulty_permille": 300,
+        "bloom_level": "Evaluate",
+        "hints": ["Higher octane = more resistance to detonation. It's NOT about energy content or 'performance.'", "SA inland fuel is typically 93/95 ULP; coastal is 93/95. Always match the manual's specification."],
+        "explanation": "Octane is one of the most misunderstood fuel properties. Explaining it clearly to customers builds trust and prevents engine damage.",
+        "distractors": ["93 and 95 octane are basically the same", "Higher octane always gives more power", "Modern engines automatically adjust for any fuel"]
+      },
+      {
+        "question": "Describe the diagnostic approach for a diesel vehicle producing excessive black smoke under acceleration. Include five possible causes ordered by likelihood.",
+        "answer": "Black smoke = incomplete combustion (too much fuel, not enough air, or poor fuel atomisation). Causes by likelihood: (1) Dirty/clogged air filter: restricts air supply, enriching the mixture. Test: visual inspection, measure pressure drop across filter. Cheapest fix. (2) Blocked/faulty EGR valve: stuck open, recirculating too much exhaust gas, displacing fresh air. Test: command EGR closed with scanner and observe smoke reduction. (3) Worn/clogged injectors: poor atomisation means fuel doesn't burn completely. Test: injector back-leak test (excessive return fuel = worn injector). Diesel injector cleaning or replacement. (4) Faulty turbocharger: insufficient boost pressure means less air. Test: boost pressure vs specification with a gauge. Check for shaft play. (5) Faulty MAF/MAP sensor: incorrect air measurement causes wrong fuelling. Test: compare live data readings to specifications. Additional: check for intercooler leaks, DPF back-pressure (if equipped), and fuel quality (contaminated fuel). SA diesel quality (50ppm sulphur) is generally good but storage contamination occurs.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Black smoke = too much fuel or not enough air. Start with the air side (filter, turbo) because it's cheaper.", "EGR problems are extremely common on SA diesel vehicles due to dust and poor fuel quality."],
+        "explanation": "Diesel smoke diagnosis is systematic: check air supply first (cheapest), then fuel delivery, then emission equipment. The colour of the smoke provides the first clue: black = fuel, white = coolant/unburnt fuel, blue = oil.",
+        "distractors": ["Black smoke is normal for diesel engines", "Always replace injectors first", "The DPF causes black smoke"]
       }
     ],
     "key_vocabulary": [

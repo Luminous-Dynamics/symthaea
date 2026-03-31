@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr10.CHM.5: Acid-base reactions. Redox reactions (oxidation numbers)....",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "The mole is the chemist's counting unit: 1 mol = 6.022 × 10²³ particles (Avogadro's number). Molar mass M (g/mol) is found from the periodic table. Key formulas: n = m/M (moles from mass), n = cV (moles from concentration and volume in dm³), n = N/NA (moles from number of particles). In balanced equations, coefficients give mole ratios. The limiting reagent is used up first and determines how much product forms.",
+    "explanation": "The mole is the chemist's counting unit: 1 mol = 6.022 \u00d7 10\u00b2\u00b3 particles (Avogadro's number). Molar mass M (g/mol) is found from the periodic table. Key formulas: n = m/M (moles from mass), n = cV (moles from concentration and volume in dm\u00b3), n = N/NA (moles from number of particles). In balanced equations, coefficients give mole ratios. The limiting reagent is used up first and determines how much product forms.",
     "examples": [
       {
         "problem": "Solve a Types of Reactions problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "question": "Classify the reaction: Mg + 2HCl -> MgCl2 + H2. Is this acid-base, redox, or both?",
+        "answer": "This is a redox reaction. Mg is oxidised (0 to +2, loses electrons). H is reduced (+1 to 0, gains electrons). It is also an acid-metal reaction.",
+        "difficulty_permille": 300,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Check oxidation numbers of each element before and after.",
+          "Oxidation = increase in oxidation number. Reduction = decrease."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Mg: 0 -> +2 (oxidised, loses 2e-). H: +1 -> 0 (reduced, gains e-). This is a displacement reaction where Mg displaces H from HCl.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Only acid-base",
+          "Synthesis reaction",
+          "Decomposition reaction"
         ]
       },
       {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "Write the balanced equation for the neutralisation of sulfuric acid with sodium hydroxide.",
+        "answer": "H2SO4 + 2NaOH -> Na2SO4 + 2H2O",
+        "difficulty_permille": 350,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Acid + base -> salt + water.",
+          "H2SO4 is diprotic (2 H+ ions), so you need 2 NaOH."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Neutralisation: H2SO4 + 2NaOH -> Na2SO4 + 2H2O. The salt is sodium sulfate. Balance: 2 Na, 1 S, 4+2=6 O on each side, 2+4=6 H on left, 4 H on right... checking: left has 2H(acid)+2H(NaOH)=4H? No. H2SO4 has 2H. 2NaOH has 2H. Total 4H -> 2H2O has 4H. Correct.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "H2SO4 + NaOH -> NaSO4 + H2O",
+          "H2SO4 + 2NaOH -> Na2SO4 + H2O",
+          "H2SO4 + NaOH -> NaHSO4 + H2O"
         ]
       },
       {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 375,
+        "question": "Determine the oxidation number of Mn in KMnO4.",
+        "answer": "Mn has oxidation number +7.",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "K = +1, O = -2 in compounds.",
+          "Sum of oxidation numbers = 0 for a neutral compound."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "(+1) + Mn + 4(-2) = 0. 1 + Mn - 8 = 0. Mn = +7.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "+4",
+          "+2",
+          "+5"
         ]
       },
       {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "question": "Write the net ionic equation for the reaction between HCl(aq) and NaOH(aq).",
+        "answer": "H+(aq) + OH-(aq) -> H2O(l)",
+        "difficulty_permille": 550,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Write the full ionic equation first, splitting all aqueous compounds into ions.",
+          "Cancel the spectator ions (Na+ and Cl-)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Full ionic: H+(aq) + Cl-(aq) + Na+(aq) + OH-(aq) -> Na+(aq) + Cl-(aq) + H2O(l). Cancel Na+ and Cl- (spectators). Net ionic: H+ + OH- -> H2O.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "NaCl(aq) -> Na+(aq) + Cl-(aq)",
+          "HCl + NaOH -> NaCl + H2O",
+          "H2(g) + O2(g) -> H2O(l)"
         ]
       },
       {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "Explain the difference between a synthesis (combination) reaction and a decomposition reaction, giving one example of each.",
+        "answer": "Synthesis: two or more substances combine to form one product. Example: 2Mg + O2 -> 2MgO. Decomposition: one substance breaks down into two or more products. Example: 2H2O2 -> 2H2O + O2 (hydrogen peroxide decomposes).",
+        "difficulty_permille": 350,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Synthesis = building up (A + B -> AB). Decomposition = breaking down (AB -> A + B).",
+          "Think of decomposition as the reverse of synthesis."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "These are opposite reaction types. Many compounds can be both synthesised and decomposed, depending on conditions.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Types of Reactions",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Both are the same type",
+          "Synthesis always requires a catalyst",
+          "Decomposition only occurs at high temperatures"
         ]
       }
     ],
@@ -295,81 +270,81 @@
   "flashcards": [
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "What is the key idea in Types of Reactions?",
-      "back": "Acid-base (neutralisation): acid + base → salt + water",
+      "back": "Acid-base (neutralisation): acid + base \u2192 salt + water",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.CHM.5",
         "Grade10",
-        "Chemistry — Reactions"
+        "Chemistry \u2014 Reactions"
       ],
       "difficulty_permille": 888
     }

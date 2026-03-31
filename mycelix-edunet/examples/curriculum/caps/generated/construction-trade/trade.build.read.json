@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Building Plan Reading?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A floor plan is drawn at 1:100 scale. A room measures 45mm x 35mm on the plan. What are the actual room dimensions in metres? What is the room's actual floor area?",
+        "answer": "At 1:100 scale, 1mm on plan = 100mm (0.1m) in reality. Length: 45mm x 100 = 4,500mm = 4.5m. Width: 35mm x 100 = 3,500mm = 3.5m. Floor area: 4.5 x 3.5 = 15.75 m². This is a useful skill for estimating materials: at 55 tiles/m² for 200x200mm tiles, you'd need approximately 867 tiles (15.75 x 55) plus 10% wastage = 954 tiles.",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": ["At 1:100, multiply every mm on the plan by 100 to get real mm, then convert to metres.", "1:100 is the standard scale for floor plans in SA."],
+        "explanation": "Scale reading is the most fundamental plan-reading skill. Every measurement on site starts with reading the plan correctly.",
+        "distractors": ["Divide by 100 instead of multiplying", "1:100 means the building is 100 times smaller than the plan", "Floor area is measured in linear metres"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Building Plan Reading in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
+        "question": "On a building plan, you see these symbols: a quarter-circle arc in a wall opening, two parallel lines in another opening, and a dashed line running parallel to external walls at 1.5m from the boundary. Identify each symbol.",
+        "answer": "(1) Quarter-circle arc in wall opening = DOOR. The arc shows the swing direction. The flat side of the arc is the hinge side; the arc sweeps to show where the door opens. A door marked 'SD' is a sliding door. (2) Two parallel lines in wall opening = WINDOW. The parallel lines represent the glass panes. A window marked with an 'X' pattern indicates an opening (casement) window. (3) Dashed line at 1.5m from boundary = BUILDING LINE. This shows the minimum setback required by the town planning scheme. No permanent structure may be built beyond (closer to the boundary than) this line. The 1.5m is typical for side boundaries in residential zones; front boundaries are usually 3-5m. Building line violations require municipal approval or the building must be demolished.",
+        "difficulty_permille": 350,
         "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "hints": ["Doors swing open -- the arc shows which way. Windows don't swing in plan view -- they're shown as parallel lines.", "Building lines protect your neighbour's light, air, and privacy."],
+        "explanation": "Recognising plan symbols is essential for anyone working on a building site. Misreading a door as a window or ignoring building lines causes costly errors.",
+        "distractors": ["The quarter-circle is a window bay", "Dashed lines always indicate underground pipes", "Building lines are suggestions, not legal requirements"]
+      },
+      {
+        "question": "A section drawing shows the following from bottom to top: compacted fill, concrete strip footing (600x200mm), DPC at 150mm above NGL, brick wall (cavity construction), wall tie, roof truss, and roof sheeting. Explain what information a section drawing provides that a floor plan does not.",
+        "answer": "A section drawing is a vertical 'cut' through the building, revealing: (1) Foundation depth and type (not visible on a floor plan). (2) Floor construction (slab-on-ground vs suspended). (3) Wall construction detail: cavity width, DPC position, lintels over openings. (4) Ceiling height: measured from finished floor to ceiling level. (5) Roof pitch and truss type. (6) Storey height for multi-storey buildings. (7) Ground levels: showing how the building sits on sloping sites. A floor plan shows HORIZONTAL layout (rooms, doors, windows, dimensions). A section shows VERTICAL construction (what the building looks like if you cut it in half). Both are needed: the floor plan tells the bricklayer where walls go; the section tells them how high, what construction method, and how the foundation, walls, and roof connect.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["Think of a section as slicing a cake in half -- you see all the layers.", "A floor plan is a bird's-eye view; a section is a side view through the middle."],
+        "explanation": "Understanding the relationship between floor plans, sections, and elevations is essential for reading a complete set of building plans. Each drawing type provides information the others cannot.",
+        "distractors": ["Floor plans show all the same information as sections", "Sections are only needed for multi-storey buildings", "The builder only needs the floor plan to construct the building"]
+      },
+      {
+        "question": "The site plan shows a property of 20m x 30m. Building lines are: 3m front, 1.5m sides, 1.5m rear. The client wants to maximise the footprint of a single-storey house. Calculate the maximum building footprint allowed.",
+        "answer": "Available width: 20m - 1.5m (left) - 1.5m (right) = 17m. Available depth: 30m - 3m (front) - 1.5m (rear) = 25.5m. Maximum footprint: 17 x 25.5 = 433.5 m². However, municipal coverage restrictions typically limit the total building footprint to 50-60% of the stand area (varies by zoning). Stand area = 20 x 30 = 600 m². At 50% coverage: maximum 300 m². At 60% coverage: maximum 360 m². So although building lines allow 433.5 m², the coverage restriction reduces the maximum to 300-360 m². The client should check the town planning scheme for their specific zoning (Residential 1 is typically 50-60% coverage). Coverage includes all roofed structures: house, garage, covered patio, carport.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["Building lines define WHERE you can build; coverage defines HOW MUCH you can build.", "Coverage includes ALL roofed structures, not just the house."],
+        "explanation": "Site layout requires understanding both building lines and coverage restrictions. Many clients are disappointed when they discover they can't build wall-to-wall within the building lines.",
+        "distractors": ["Building lines are the only restriction on building size", "Coverage only counts habitable rooms, not garages", "You can build right up to the boundary with neighbour's consent"]
+      },
+      {
+        "question": "You receive a set of building plans for a new house. List the FIVE essential drawings that must be included for municipal submission per SANS 10400, and describe what each shows.",
+        "answer": "(1) Site plan (1:200 or 1:500): shows the property boundaries, building position relative to boundaries and building lines, access driveway, north point, neighbouring buildings, existing trees. (2) Floor plan (1:100): shows all rooms with dimensions, wall positions, door and window positions, built-in fixtures (kitchen, bathroom). (3) Elevations (1:100): shows the external appearance from each side (north, south, east, west), including roof pitch, window sizes, floor levels, building height. (4) Sections (1:50 or 1:100): shows the vertical construction through at least two key cross-sections, including foundations, walls, floors, ceilings, roof structure. (5) Roof plan (1:100): shows the roof layout from above, including ridges, hips, valleys, gutters, downpipes, and direction of fall. Additional drawings may include: structural engineer's foundation plan, electrical layout, plumbing layout, and window/door schedule. All drawings must include the architect's stamp, owner's details, and compliance with SANS 10400.",
+        "difficulty_permille": 400,
+        "bloom_level": "Remember",
+        "hints": ["Think about what the municipality needs to verify: does it fit on the property? does it look acceptable? is it structurally sound?", "Each drawing answers different questions: site plan = WHERE, floor plan = WHAT, elevation = HOW IT LOOKS, section = HOW IT'S BUILT."],
+        "explanation": "A complete set of building plans is a legal requirement for municipal approval. Incomplete submissions are rejected, causing delays. Understanding each drawing's purpose helps builders extract the right information for their trade.",
+        "distractors": ["Only a floor plan is needed for municipal submission", "The builder draws the plans, not an architect", "Sections are optional for single-storey buildings"]
       }
     ],
     "key_vocabulary": [

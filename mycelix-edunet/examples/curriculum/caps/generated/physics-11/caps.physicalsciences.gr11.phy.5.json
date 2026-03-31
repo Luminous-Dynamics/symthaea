@@ -2,10 +2,10 @@
   "node_id": "CAPS.PhysicalSciences.Gr11.PHY.5",
   "lesson": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.PHY.5",
-    "title": "CAPS.PhysicalSciences.Gr11.PHY.5: Refraction (Snell's law: n₁sin θ₁ = n₂sin θ₂). Total inte...",
+    "title": "CAPS.PhysicalSciences.Gr11.PHY.5: Refraction (Snell's law: n\u2081sin \u03b8\u2081 = n\u2082sin \u03b8\u2082). Total inte...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (λ) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = fλ, period T = 1/f.",
+    "explanation": "A wave transfers energy without transferring matter. Transverse waves: particles vibrate perpendicular to wave direction (e.g., light, water waves). Longitudinal waves: particles vibrate parallel to wave direction (e.g., sound). Key properties: wavelength (\u03bb) is the distance between two consecutive crests, frequency (f) is the number of waves per second, wave speed v = f\u03bb, period T = 1/f.",
     "examples": [
       {
         "problem": "Solve a Geometrical Optics problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "Light passes from air (n = 1.00) into glass (n = 1.50) at an angle of incidence of 45 degrees. Calculate the angle of refraction.",
+        "answer": "n1 sin(theta1) = n2 sin(theta2). sin(theta2) = (1.00)(sin 45) / 1.50 = 0.707/1.50 = 0.471. theta2 = 28.1 degrees.",
+        "difficulty_permille": 300,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use Snell's law: n1 sin(theta1) = n2 sin(theta2).",
+          "Light bends toward the normal when entering a denser medium."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "sin(theta2) = (1.00 x 0.7071)/1.50 = 0.4714. theta2 = sin^-1(0.4714) = 28.1 degrees. The light bends toward the normal as expected.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "30 degrees",
+          "60 degrees",
+          "45 degrees"
         ]
       },
       {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "Calculate the critical angle for light passing from glass (n = 1.50) to air (n = 1.00).",
+        "answer": "sin(c) = n2/n1 = 1.00/1.50 = 0.667. c = 41.8 degrees.",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "At the critical angle, the refracted ray travels along the boundary (theta2 = 90 degrees).",
+          "sin(c) = n2/n1 (where n2 < n1)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "At critical angle: n1 sin(c) = n2 sin(90). sin(c) = 1.00/1.50 = 0.667. c = 41.8 degrees. For angles > 41.8 degrees, total internal reflection occurs.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "48.6 degrees",
+          "33.3 degrees",
+          "56.4 degrees"
         ]
       },
       {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain how total internal reflection is used in optical fibres.",
+        "answer": "Light enters the fibre at a small angle and hits the internal surface at an angle greater than the critical angle. Total internal reflection occurs repeatedly, trapping the light inside the fibre. This allows light (carrying data) to travel long distances with minimal loss. The fibre has a high-n core surrounded by a lower-n cladding.",
+        "difficulty_permille": 450,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Total internal reflection occurs when light hits a boundary at an angle greater than the critical angle.",
+          "The fibre must have a higher refractive index than its surroundings."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Optical fibres use total internal reflection to transmit light over kilometres. SA's undersea cables (e.g., SEACOM, WACS) use optical fibres for internet connectivity.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Light refracts through the fibre",
+          "Fibres use mirrors inside",
+          "Total internal reflection causes light loss"
         ]
       },
       {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "A light ray passes from water (n = 1.33) into diamond (n = 2.42) at 30 degrees. Calculate the angle of refraction.",
+        "answer": "sin(theta2) = (1.33 x sin30) / 2.42 = (1.33 x 0.5) / 2.42 = 0.665/2.42 = 0.275. theta2 = 15.9 degrees.",
+        "difficulty_permille": 400,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Snell's law works for any two media.",
+          "Diamond has a very high refractive index, so light bends significantly toward the normal."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Light bends strongly toward the normal when entering diamond because of its very high refractive index. This strong refraction contributes to diamond's brilliance.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "55 degrees",
+          "30 degrees",
+          "7.5 degrees"
         ]
       },
       {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "A student shines a laser into a semicircular glass block (n = 1.50) at the flat surface. At what angle of incidence will the light undergo total internal reflection at the curved surface?",
+        "answer": "The critical angle for glass-air is sin(c) = 1/1.5 = 0.667, so c = 41.8 degrees. Total internal reflection occurs at the curved surface when the light inside the glass hits at angles greater than 41.8 degrees. At the flat surface, light enters perpendicular to the surface (no refraction), so the student must adjust the laser so the light hits the curved surface at angles > 41.8 degrees.",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "In a semicircular block, light entering at the centre of the flat face hits the curved surface without refraction at entry.",
+          "Total internal reflection requires angle > critical angle."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "This is a classic practical experiment. The semicircular shape ensures no refraction at the curved surface (light hits perpendicular to the tangent at the centre). The student rotates the block to change the angle of incidence at the curved surface.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Geometrical Optics",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "At any angle",
+          "Only at 90 degrees",
+          "At angles less than 41.8 degrees"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.PHY.5",
-    "title": "Assessment: Refraction (Snell's law: n₁sin θ₁ = n₂sin θ₂). Total internal reflection. Critical angle. Lenses: converging and diverging. Thin lens equation (1/f = 1/do + 1/di). Magnification. Ray diagrams",
+    "title": "Assessment: Refraction (Snell's law: n\u2081sin \u03b8\u2081 = n\u2082sin \u03b8\u2082). Total internal reflection. Critical angle. Lenses: converging and diverging. Thin lens equation (1/f = 1/do + 1/di). Magnification. Ray diagrams",
     "items": [
       {
         "question": "Explain Geometrical Optics.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.5",
         "Grade11",
-        "Physics — Waves"
+        "Physics \u2014 Waves"
       ],
       "difficulty_permille": 888
     }

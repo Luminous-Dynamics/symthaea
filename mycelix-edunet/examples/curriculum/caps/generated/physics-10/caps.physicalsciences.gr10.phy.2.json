@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr10.PHY.2: Gravitational potential energy (Ep = mgh). Kinetic energy...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "Kinematics describes motion without considering forces. Key concepts: displacement (change in position, can be negative), velocity (rate of change of displacement), acceleration (rate of change of velocity). Equations of motion: v = u + at, s = ut + ½at², v² = u² + 2as. Motion graphs: x-t graphs show position over time (gradient = velocity), v-t graphs show velocity (gradient = acceleration, area = displacement).",
+    "explanation": "Kinematics describes motion without considering forces. Key concepts: displacement (change in position, can be negative), velocity (rate of change of displacement), acceleration (rate of change of velocity). Equations of motion: v = u + at, s = ut + \u00bdat\u00b2, v\u00b2 = u\u00b2 + 2as. Motion graphs: x-t graphs show position over time (gradient = velocity), v-t graphs show velocity (gradient = acceleration, area = displacement).",
     "examples": [
       {
         "problem": "Solve a Energy problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "Calculate the gravitational potential energy of a 5 kg rock at a height of 12 m above the ground. (g = 9.8 m/s^2)",
+        "answer": "Ep = mgh = 5 x 9.8 x 12 = 588 J",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use Ep = mgh.",
+          "Substitute m = 5 kg, g = 9.8 m/s^2, h = 12 m."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Ep = mgh = (5)(9.8)(12) = 588 J.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "490 J",
+          "600 J",
+          "58.8 J"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
+        "question": "A 2 kg ball is thrown upward at 10 m/s. Calculate its kinetic energy at the moment of release.",
+        "answer": "Ek = 1/2 mv^2 = 1/2(2)(10)^2 = 100 J",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use Ek = 1/2 mv^2.",
+          "Substitute m = 2 kg and v = 10 m/s."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Ek = 1/2(2)(100) = 100 J.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "200 J",
+          "50 J",
+          "20 J"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 375,
+        "question": "A 0.5 kg ball is dropped from 20 m. Using conservation of energy (no air resistance), find its speed just before hitting the ground. (g = 10 m/s^2)",
+        "answer": "v = 20 m/s",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "At the top: Ep = mgh, Ek = 0. At the bottom: Ep = 0, Ek = 1/2 mv^2.",
+          "Set mgh = 1/2 mv^2. Notice that mass cancels."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "mgh = 1/2 mv^2. gh = 1/2 v^2. (10)(20) = 1/2 v^2. v^2 = 400. v = 20 m/s.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "10 m/s",
+          "14.1 m/s",
+          "40 m/s"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "A force of 50 N pushes a box 8 m along a floor at an angle of 30 degrees to the horizontal. Calculate the work done by this force.",
+        "answer": "W = Fx cos(30) x d = 50 x cos(30) x 8 = 50 x 0.866 x 8 = 346.4 J",
+        "difficulty_permille": 550,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use W = Fd cos theta.",
+          "cos(30) = 0.866."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "W = Fd cos theta = (50)(8)(cos 30) = 400 x 0.866 = 346.4 J. Only the horizontal component of force does work along the displacement.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "400 J",
+          "200 J",
+          "250 J"
         ]
       },
       {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "A roller coaster car (mass 500 kg) is at the top of a 30 m hill moving at 5 m/s. Calculate its speed at the bottom of the hill, assuming no friction. (g = 10 m/s^2)",
+        "answer": "v = 24.7 m/s",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Total energy at top = total energy at bottom (conservation of mechanical energy).",
+          "Ep(top) + Ek(top) = Ep(bottom) + Ek(bottom), with h = 0 at the bottom."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "mgh + 1/2 mv^2(top) = 1/2 mv^2(bottom). (500)(10)(30) + 1/2(500)(25) = 1/2(500)v^2. 150000 + 6250 = 250v^2. v^2 = 625. Wait: 156250/250 = 625. v = 25 m/s. More precisely: v = sqrt(2gh + v_top^2) = sqrt(600 + 25) = sqrt(625) = 25 m/s.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Energy",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "30 m/s",
+          "20 m/s",
+          "24.5 m/s"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.2",
-    "title": "Assessment: Gravitational potential energy (Ep = mgh). Kinetic energy (Ek = ½mv²). Mechanical energy. Conservation of mechanical energy (non-conservative forces absent). Work done by a force (W = FΔx cos θ)",
+    "title": "Assessment: Gravitational potential energy (Ep = mgh). Kinetic energy (Ek = \u00bdmv\u00b2). Mechanical energy. Conservation of mechanical energy (non-conservative forces absent). Work done by a force (W = F\u0394x cos \u03b8)",
     "items": [
       {
         "question": "Explain Energy.",
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.2",
         "Grade10",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 888
     }

@@ -28,33 +28,83 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Three-Phase Power Systems?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
+        "question": "A factory has a three-phase supply (400V line-to-line). They want to install a 15kW motor. Calculate the full-load current for both star and delta connections. Which connection gives lower starting current?",
+        "answer": "Full-load current calculation (assuming power factor 0.85 and efficiency 0.90): Input power = 15kW / 0.90 = 16.67kW. For three-phase: I = P / (√3 x V x pf). Delta connection (400V across each winding): I = 16,667 / (√3 x 400 x 0.85) = 16,667 / 589.9 = 28.3A. Star connection (230V across each winding): line current is the same as phase current, but the motor develops less torque. Star-delta starting: motor starts in STAR (lower voltage per winding = 230V, starting current reduced to 1/3 of delta starting current), then switches to DELTA for full-speed operation. Star starting current ≈ 28.3 x 2 (typical starting multiplier in star) vs delta starting current ≈ 28.3 x 6. Star starting gives approximately 1/3 the starting current of direct delta starting.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
         "hints": [
-          "Think safety first"
+          "The √3 factor (1.732) is essential for all three-phase calculations.",
+          "Star-delta starting reduces starting current to 1/3 of DOL (direct-on-line) delta, but also reduces starting torque to 1/3."
         ],
-        "explanation": "Always start with safety.",
+        "explanation": "Motor current calculations are daily work for industrial electricians. Star-delta starting is the most common method for reducing starting current of large motors in SA industry, avoiding voltage dips that affect other equipment.",
         "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
+          "Star and delta give the same current",
+          "Use single-phase formula: I = P/V",
+          "Starting current is always the same as running current"
         ]
       },
       {
-        "question": "Describe the key regulation or standard that governs Three-Phase Power Systems in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "An Eskom bill shows a power factor penalty because the factory's power factor is 0.72. The total load is 200kVA. Calculate the required capacitor bank (in kVAr) to correct the power factor to 0.95.",
+        "answer": "Current reactive power: Q1 = S x sin(arccos(0.72)) = 200 x sin(43.95°) = 200 x 0.694 = 138.8 kVAr. Active power: P = S x pf = 200 x 0.72 = 144 kW. Target reactive power at pf=0.95: Q2 = P x tan(arccos(0.95)) = 144 x tan(18.19°) = 144 x 0.329 = 47.4 kVAr. Required capacitor bank: Q_cap = Q1 - Q2 = 138.8 - 47.4 = 91.4 kVAr. Recommend a 100 kVAr automatic capacitor bank (with step controllers to avoid over-correction, which can cause leading power factor and voltage rise). Cost savings: eliminates the Eskom penalty (typically 1-2% of bill per 0.01 below 0.96) and reduces line current, freeing up transformer capacity.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Power triangle: S² = P² + Q². Power factor = P/S = cos(φ).",
+          "Over-correction (leading power factor) is also penalised by Eskom -- use automatic step controllers."
+        ],
+        "explanation": "Power factor correction is a lucrative service for electricians. Eskom penalises consumers with pf below 0.96. Capacitor banks pay for themselves within 6-12 months through reduced penalties and lower maximum demand charges.",
+        "distractors": [
+          "Just install the biggest capacitor bank available",
+          "Power factor correction only benefits Eskom, not the customer",
+          "A single fixed capacitor is better than a stepped bank"
+        ]
+      },
+      {
+        "question": "You measure the following phase voltages at a three-phase DB: L1-N = 245V, L2-N = 228V, L3-N = 215V. Calculate the voltage imbalance percentage and explain the consequences.",
+        "answer": "Average voltage = (245 + 228 + 215) / 3 = 229.3V. Maximum deviation from average = 245 - 229.3 = 15.7V. Voltage imbalance = (15.7 / 229.3) x 100 = 6.85%. This is EXCESSIVE. SANS 10142 and IEC standards recommend maximum 2-3% voltage imbalance. Consequences: (1) Three-phase motors draw unequal currents, causing overheating -- a 6.85% voltage imbalance can cause motor winding temperature to increase by 40-50%, dramatically reducing motor life. (2) The overloaded phase (L3 at 215V) draws higher current (I = P/V), potentially tripping breakers. (3) The high-voltage phase (L1 at 245V) may damage sensitive electronic equipment. Cause: likely unequal single-phase loading across phases. Solution: redistribute single-phase loads more evenly across the three phases.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Voltage imbalance % = (max deviation from average / average) x 100.",
+          "Even small voltage imbalances cause disproportionate current imbalances in motors (roughly 6-10x the voltage imbalance percentage)."
+        ],
+        "explanation": "Phase balancing is a critical maintenance task in commercial and industrial installations. Unbalanced phases are one of the most common causes of premature motor failure and can also damage electronic equipment.",
+        "distractors": [
+          "6.85% imbalance is acceptable for most equipment",
+          "Voltage imbalance only matters for single-phase equipment",
+          "The solution is to install a bigger transformer"
+        ]
+      },
+      {
+        "question": "Explain the difference between a star (Y) and delta (Δ) transformer connection. A shopping centre needs 400V three-phase AND 230V single-phase from the same transformer. Which connection do they need on the secondary side?",
+        "answer": "Star (Y) connection: Each winding connects from a common neutral point to a line terminal. Provides TWO voltages: line-to-line (400V) and line-to-neutral (230V). Has a neutral point available for single-phase loads. Delta (Δ) connection: Windings connect end-to-end forming a triangle. Provides only line-to-line voltage (400V). No neutral point available (unless a zig-zag earthing transformer is added). For the shopping centre: STAR connection on the secondary side is required. This provides 400V three-phase for large equipment (HVAC, lifts, kitchens) AND 230V single-phase (via any line to neutral) for lighting, plug sockets, and individual shops. The neutral allows single-phase loads to be distributed across the three phases for balance.",
         "difficulty_permille": 400,
         "bloom_level": "Understand",
         "hints": [
-          "Think about SANS standards or Acts"
+          "The key difference is the NEUTRAL: star has one, delta does not.",
+          "In SA, 400V line-to-line and 230V line-to-neutral come from a star-connected secondary."
         ],
-        "explanation": "SA has specific standards for each trade.",
+        "explanation": "Understanding star vs delta is fundamental for specifying and connecting transformers. Most commercial buildings in SA use Dyn11 transformers (delta primary, star secondary with neutral) because they need both three-phase and single-phase supply.",
         "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
+          "Delta connection provides both 400V and 230V",
+          "Star and delta give the same voltages",
+          "You need two separate transformers for 400V and 230V"
+        ]
+      },
+      {
+        "question": "A three-phase motor suddenly starts running backwards after maintenance. What is the most likely cause, and how do you fix it? What damage could reverse rotation cause?",
+        "answer": "Most likely cause: Two of the three phase connections were swapped during maintenance (e.g., L1 and L2 were reversed at the motor terminals or at the isolator). Three-phase motor rotation direction is determined by the phase sequence (R-W-B or L1-L2-L3). Swapping any two phases reverses the rotation. Fix: (1) Isolate the motor immediately. (2) Swap ANY two of the three phase connections back (at the motor terminal box or the isolator). (3) Bump-test the motor (brief power-on) to confirm correct rotation before reconnecting the driven equipment. Damage from reverse rotation: pumps can run dry or cavitate, fans blow air the wrong way (overheating equipment), conveyor belts run backwards (crushing/jamming hazards), compressors can be destroyed, and gearboxes can be damaged by reverse loading. Some equipment has anti-reverse rotation protection, but many do not.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": [
+          "Only THREE-phase motors reverse from phase swapping. Single-phase motors do not.",
+          "Always mark the phase connections before disconnecting a motor for maintenance."
+        ],
+        "explanation": "Phase sequence errors are one of the most common three-phase maintenance mistakes. A simple check with a phase rotation meter before reconnecting prevents potentially catastrophic damage to driven equipment.",
+        "distractors": [
+          "The motor is faulty and needs rewinding",
+          "All three phases must be swapped to reverse rotation",
+          "Reverse rotation cannot damage equipment because motors have built-in protection"
         ]
       }
     ],

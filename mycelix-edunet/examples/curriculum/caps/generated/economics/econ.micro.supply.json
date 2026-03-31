@@ -1,0 +1,268 @@
+{
+  "node_id": "ECON.MICRO.SUPPLY",
+  "lesson": {
+    "standard_code": "ECON.MICRO.SUPPLY",
+    "title": "Supply & Demand: Price determination, market equilibrium, shifts, and elasticity",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "Supply and demand form the backbone of market economics. The demand curve slopes downward (as price rises, quantity demanded falls) while the supply curve slopes upward (as price rises, quantity supplied increases). Market equilibrium occurs where supply meets demand. In South Africa, understanding supply and demand helps explain phenomena like fuel price fluctuations (driven by global oil prices and the Rand/Dollar exchange rate), food prices (affected by drought and import costs), and the housing market in cities like Johannesburg and Cape Town. Price elasticity of demand measures how responsive consumers are to price changes: Ed = %ΔQd / %ΔP. Necessities (mealie meal, electricity) tend to be inelastic, while luxuries are elastic.",
+    "examples": [
+      {
+        "problem": "The price of chicken increases from R60/kg to R72/kg. Quantity demanded falls from 500 kg to 400 kg per week in a Soweto market. Calculate the price elasticity of demand and classify it.",
+        "steps": [
+          {
+            "instruction": "Step 1: %ΔP = (72 - 60)/60 x 100 = 20%",
+            "result": "percentage change in price"
+          },
+          {
+            "instruction": "Step 2: %ΔQd = (400 - 500)/500 x 100 = -20%",
+            "result": "percentage change in quantity demanded"
+          },
+          {
+            "instruction": "Step 3: Ed = %ΔQd / %ΔP = -20% / 20% = -1.0",
+            "result": "calculate elasticity"
+          },
+          {
+            "instruction": "Step 4: |Ed| = 1.0, which is unit elastic",
+            "result": "classify"
+          }
+        ],
+        "answer": "Answer: Ed = -1.0 (unit elastic). A 20% price increase leads to exactly a 20% decrease in quantity demanded.",
+        "visual_description": null
+      },
+      {
+        "problem": "Eskom announces load-shedding will increase. Explain, using supply and demand, the likely effect on the price of generators in South Africa.",
+        "steps": [
+          {
+            "instruction": "Step 1: Load-shedding increases demand for generators (demand curve shifts right)",
+            "result": "identify demand shift"
+          },
+          {
+            "instruction": "Step 2: Supply of generators is relatively fixed in the short run (supply does not shift immediately)",
+            "result": "supply analysis"
+          },
+          {
+            "instruction": "Step 3: New equilibrium is at a higher price and higher quantity",
+            "result": "find new equilibrium"
+          }
+        ],
+        "answer": "Answer: The demand curve shifts rightward while supply remains unchanged, leading to a higher equilibrium price for generators.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain why the SA government's fuel levy (tax on petrol) raises the price but does not significantly reduce the quantity of fuel consumed.",
+        "steps": [
+          {
+            "instruction": "Step 1: The fuel levy shifts the supply curve upward by the amount of the tax",
+            "result": "supply shift"
+          },
+          {
+            "instruction": "Step 2: Petrol is a necessity with few short-run substitutes, so demand is price inelastic",
+            "result": "inelastic demand"
+          },
+          {
+            "instruction": "Step 3: With inelastic demand, the price rises significantly but quantity barely decreases",
+            "result": "market outcome"
+          }
+        ],
+        "answer": "Answer: Because fuel demand is inelastic, the tax burden falls mostly on consumers as a higher price, with minimal reduction in consumption.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "The price of maize meal rises from R50 to R60 per 5 kg bag. Quantity demanded drops from 1000 bags to 950 bags per week. Calculate the price elasticity of demand.",
+        "answer": "Ed = -0.25 (inelastic)",
+        "difficulty_permille": 200,
+        "bloom_level": "Apply",
+        "hints": [
+          "Calculate the percentage change in price first: (60-50)/50 x 100.",
+          "Then calculate the percentage change in quantity demanded and divide."
+        ],
+        "explanation": "%ΔP = 20%, %ΔQd = -5%. Ed = -5/20 = -0.25. Since |Ed| < 1, demand is inelastic, which makes sense for a staple food.",
+        "distractors": [
+          "Ed = -4.0 (elastic)",
+          "Ed = -1.0 (unit elastic)",
+          "Ed = -0.50 (inelastic)"
+        ]
+      },
+      {
+        "question": "A drought in the Free State reduces maize output. Using a supply-and-demand diagram, predict the effect on maize price and quantity in SA.",
+        "answer": "Supply curve shifts left; equilibrium price rises and equilibrium quantity falls.",
+        "difficulty_permille": 350,
+        "bloom_level": "Analyze",
+        "hints": [
+          "A drought is a supply-side shock -- which curve shifts?",
+          "When supply decreases, what happens to the equilibrium?"
+        ],
+        "explanation": "The drought reduces supply (leftward shift). With demand unchanged, the new equilibrium has higher price and lower quantity. This is why droughts push up food prices in SA.",
+        "distractors": [
+          "Demand curve shifts left; price falls",
+          "Both curves shift right; quantity rises",
+          "Supply curve shifts right; price falls"
+        ]
+      },
+      {
+        "question": "If the cross elasticity of demand between Coca-Cola and Pepsi is +1.8, what does this tell us about the two goods?",
+        "answer": "They are close substitutes. A rise in the price of Coca-Cola leads to a significant increase in demand for Pepsi.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Positive cross elasticity means the goods are substitutes.",
+          "The magnitude (1.8 > 1) indicates a strong substitution effect."
+        ],
+        "explanation": "Cross elasticity > 0 means substitutes. The value of 1.8 indicates high responsiveness: a 1% rise in Coca-Cola's price leads to a 1.8% rise in Pepsi demand.",
+        "distractors": [
+          "They are complements",
+          "They are unrelated goods",
+          "Pepsi is an inferior good"
+        ]
+      },
+      {
+        "question": "The SA government imposes a price ceiling on bread at R12 per loaf (below the equilibrium price of R16). What market outcome will result?",
+        "answer": "A shortage (excess demand) will occur because quantity demanded exceeds quantity supplied at R12.",
+        "difficulty_permille": 650,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "A price ceiling below equilibrium prevents the market from clearing.",
+          "At R12, more consumers want bread than producers are willing to supply."
+        ],
+        "explanation": "At R12 (below equilibrium R16), Qd > Qs, creating a shortage. Bread queues, rationing, or black markets may emerge. Price ceilings intended to help the poor can create unintended consequences.",
+        "distractors": [
+          "A surplus of bread",
+          "No effect since it is above equilibrium",
+          "The equilibrium price will drop to R12 naturally"
+        ]
+      },
+      {
+        "question": "Explain, using the concept of income elasticity, why sales of luxury cars in SA decline sharply during a recession while sales of public transport tickets remain stable.",
+        "answer": "Luxury cars have high positive income elasticity (luxury goods), so demand falls sharply when incomes drop. Public transport is a necessity with low income elasticity, so demand remains stable.",
+        "difficulty_permille": 800,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Income elasticity measures how demand responds to income changes.",
+          "Luxuries have Ey > 1, necessities have 0 < Ey < 1."
+        ],
+        "explanation": "During a recession, consumer incomes fall. Luxury cars (Ey >> 1) see large demand drops. Public transport (0 < Ey < 1) is income-inelastic -- people still need to get to work regardless of income.",
+        "distractors": [
+          "Luxury cars are more price elastic",
+          "Public transport demand increases during recessions",
+          "There is no relationship between income and car sales"
+        ]
+      }
+    ],
+    "hints": [
+      "Remember: demand curves slope downward (inverse relationship between price and quantity demanded).",
+      "When analyzing a market change, first identify which curve shifts (supply or demand) and in which direction.",
+      "Price elasticity of demand = %ΔQd / %ΔP. If |Ed| > 1, demand is elastic; if |Ed| < 1, inelastic."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "equilibrium price",
+        "definition": "The price at which quantity demanded equals quantity supplied, clearing the market",
+        "example_usage": "The equilibrium price of maize in SA rose after the drought reduced supply."
+      },
+      {
+        "term": "price elasticity of demand",
+        "definition": "A measure of how responsive quantity demanded is to a change in price (Ed = %ΔQd / %ΔP)",
+        "example_usage": "Petrol has inelastic demand because people need it regardless of price changes."
+      },
+      {
+        "term": "market equilibrium",
+        "definition": "The state where supply equals demand and there is no tendency for price to change",
+        "example_usage": "When Eskom raises tariffs, the electricity market moves to a new equilibrium."
+      },
+      {
+        "term": "surplus",
+        "definition": "When quantity supplied exceeds quantity demanded at a given price",
+        "example_usage": "A minimum wage above equilibrium can create a surplus of labour (unemployment)."
+      },
+      {
+        "term": "shortage",
+        "definition": "When quantity demanded exceeds quantity supplied at a given price",
+        "example_usage": "Price ceilings on bread can create shortages and long queues."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think a price increase always means demand decreased.",
+        "correction": "A price increase can result from increased demand (demand shifts right) OR decreased supply (supply shifts left). Always identify which curve shifted first.",
+        "why_students_think_this": "Students confuse movement along a curve (caused by price change) with a shift of the entire curve (caused by non-price factors)."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.92,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.92,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.MICRO.SUPPLY",
+    "title": "Assessment: Supply and demand, market equilibrium, price elasticity, shifts in curves, SA fuel and food markets",
+    "items": [
+      {
+        "question": "Define price elasticity of demand and give the formula.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Price elasticity of demand measures the responsiveness of quantity demanded to a change in price. Ed = %ΔQd / %ΔP.",
+        "points": 2,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Think about what 'elasticity' means in everyday language -- something that stretches."
+      },
+      {
+        "question": "Explain why a drought in SA leads to higher maize meal prices. Use a supply-and-demand framework.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "A drought reduces maize supply (supply curve shifts left). With demand unchanged, equilibrium price rises and equilibrium quantity falls.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Identify which curve shifts and in which direction."
+      },
+      {
+        "question": "The SA government considers a price ceiling on bread. Evaluate whether this policy will achieve its goal of making bread more affordable for all South Africans.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "While the price ceiling lowers the nominal price, it creates a shortage (Qd > Qs). Many consumers may not find bread available at all, and black markets may emerge. The policy may hurt the very people it aims to help.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both the intended effect and the unintended consequences."
+      }
+    ],
+    "total_points": 9,
+    "estimated_minutes": 15,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is the law of demand?",
+      "back": "As the price of a good increases, the quantity demanded decreases (ceteris paribus), and vice versa. This creates a downward-sloping demand curve.",
+      "tags": ["ECON.MICRO.SUPPLY", "Economics", "Supply and Demand"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What causes a shift in the supply curve (as opposed to a movement along it)?",
+      "back": "Non-price factors: input costs, technology, number of suppliers, government policy (taxes/subsidies), natural events (drought). A change in the good's own price causes movement along the curve, not a shift.",
+      "tags": ["ECON.MICRO.SUPPLY", "Economics", "Supply and Demand"],
+      "difficulty_permille": 400
+    },
+    {
+      "front": "What is the formula for price elasticity of demand?",
+      "back": "Ed = %ΔQd / %ΔP. If |Ed| > 1: elastic. If |Ed| < 1: inelastic. If |Ed| = 1: unit elastic.",
+      "tags": ["ECON.MICRO.SUPPLY", "Economics", "Elasticity"],
+      "difficulty_permille": 300
+    }
+  ],
+  "quality": {
+    "coherence": 0.92,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

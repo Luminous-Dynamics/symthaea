@@ -1,0 +1,209 @@
+{
+  "node_id": "ECON.BEHAV.DECIDE",
+  "lesson": {
+    "standard_code": "ECON.BEHAV.DECIDE",
+    "title": "Behavioral Economics: Bounded rationality, loss aversion, anchoring, nudge theory, SA applications",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Evaluate",
+    "explanation": "Classical economics assumes people are rational maximisers. Behavioral economics (Kahneman, Tversky, Thaler) shows people systematically deviate from rationality due to cognitive biases. Bounded rationality (Simon): people satisfice rather than optimise due to limited information and cognitive capacity. Loss aversion (Kahneman & Tversky): losses feel roughly twice as painful as equivalent gains feel good. Anchoring: initial information disproportionately influences decisions (e.g., a listed price anchors negotiation). Nudge theory (Thaler & Sunstein): small design changes can steer people toward better choices without restricting freedom. SA applications include default enrollment in retirement funds (nudge), cell phone contract anchoring (consumers compare to the first plan shown), stokvel savings clubs (commitment devices), and the National Credit Act (protecting consumers from poor borrowing decisions).",
+    "examples": [
+      {
+        "problem": "A Johannesburg car dealer advertises a car at R350,000 but offers a 'special discount' to R310,000. Explain the behavioral economics principle at work.",
+        "steps": [
+          {
+            "instruction": "Step 1: The R350,000 listed price serves as an anchor",
+            "result": "identify anchoring"
+          },
+          {
+            "instruction": "Step 2: Buyers evaluate the R310,000 relative to the anchor, perceiving it as a good deal",
+            "result": "relative evaluation"
+          },
+          {
+            "instruction": "Step 3: The actual value of the car may be R280,000, but the anchor makes R310,000 feel like a bargain",
+            "result": "anchoring effect"
+          }
+        ],
+        "answer": "Answer: Anchoring bias. The high initial price creates a reference point that makes the 'discounted' price seem attractive, even if it is still above fair value.",
+        "visual_description": null
+      },
+      {
+        "problem": "SA changed its retirement fund policy from opt-in to opt-out (auto-enrollment with the option to withdraw). Explain using nudge theory.",
+        "steps": [
+          {
+            "instruction": "Step 1: Under opt-in, many workers did not join (status quo bias, procrastination)",
+            "result": "identify problem"
+          },
+          {
+            "instruction": "Step 2: Auto-enrollment changes the default: workers are enrolled unless they actively opt out",
+            "result": "nudge mechanism"
+          },
+          {
+            "instruction": "Step 3: Most people stick with the default (status quo bias now works in their favour)",
+            "result": "behavioral outcome"
+          }
+        ],
+        "answer": "Answer: By changing the default from opt-in to opt-out, the nudge exploits status quo bias to dramatically increase retirement savings participation without removing anyone's freedom to choose.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the concept of loss aversion and give a SA example.",
+        "answer": "Loss aversion means people feel the pain of losing R100 more strongly than the pleasure of gaining R100 (roughly 2:1 ratio). SA example: many South Africans hold onto losing investments (e.g., declining shares) too long because selling would 'realise' the loss, which feels more painful than the equivalent gain from reinvesting.",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
+        "hints": [
+          "Losses loom larger than gains (Kahneman & Tversky, 1979).",
+          "Think about why people hold onto losing investments."
+        ],
+        "explanation": "Loss aversion explains the 'disposition effect' in investing: selling winners too early and holding losers too long. It also explains why consumers resist price increases more than they appreciate equivalent discounts.",
+        "distractors": [
+          "Loss aversion means people avoid all risk",
+          "People feel gains and losses equally",
+          "Loss aversion only applies to gambling"
+        ]
+      },
+      {
+        "question": "A stokvel (informal savings club) in Soweto requires members to contribute R500/month with penalties for non-payment. Identify the behavioral economics concept that makes stokvels effective.",
+        "answer": "Commitment device. By committing to regular contributions with social pressure and penalties, stokvel members overcome present bias (the tendency to prioritise immediate consumption over future savings).",
+        "difficulty_permille": 450,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Why would someone voluntarily restrict their own freedom to spend?",
+          "Present bias makes people prefer R100 today over R120 next month."
+        ],
+        "explanation": "Stokvels are a uniquely South African commitment device. The social accountability and penalties help members save despite the temptation to spend. Estimated R50+ billion circulates through stokvels annually.",
+        "distractors": [
+          "Anchoring bias",
+          "Sunk cost fallacy",
+          "Availability heuristic"
+        ]
+      },
+      {
+        "question": "Shoprite places sweets and chips at the checkout counter. Explain using behavioral economics.",
+        "answer": "This exploits present bias and impulse purchasing. At the checkout, consumers have depleted willpower from decision-making (ego depletion) and are tempted by immediate gratification (present bias). The placement is a choice architecture that nudges people toward unplanned purchases.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about why these items are at the checkout and not in a separate aisle.",
+          "What mental state are shoppers in after a long shop?"
+        ],
+        "explanation": "Retailers use choice architecture to influence purchasing behaviour. This is a profitable application of behavioral economics insights about willpower depletion and impulse control.",
+        "distractors": [
+          "It is simply convenient for shoppers",
+          "Sweets are the most popular items",
+          "This is an example of perfect rationality"
+        ]
+      },
+      {
+        "question": "The SA National Credit Act limits how much credit providers can lend relative to a consumer's income. Evaluate this regulation using the concept of bounded rationality.",
+        "answer": "Bounded rationality means consumers cannot perfectly assess complex credit terms (interest rates, fees, compounding). They may overborrow due to optimism bias (believing they will earn more in future) and present bias (wanting goods now). The NCA acts as a paternalistic nudge that protects consumers from decisions they might rationally make with perfect information but actually make poorly due to cognitive limitations.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Would a perfectly rational consumer need borrowing limits?",
+          "Think about why people fall into debt traps despite knowing interest rates."
+        ],
+        "explanation": "The NCA responds to the reckless lending crisis that led to millions of SA consumers being over-indebted. Behavioral economics justifies such regulation because people systematically misjudge their future ability to repay.",
+        "distractors": [
+          "Consumers are perfectly rational and need no protection",
+          "The NCA eliminates all bad borrowing decisions",
+          "Bounded rationality is irrelevant to credit markets"
+        ]
+      },
+      {
+        "question": "Design a nudge to increase water conservation in Cape Town during drought conditions. Explain the behavioral principle behind your design.",
+        "answer": "Nudge: Include a neighbourhood comparison on water bills showing the household's usage vs. the neighbourhood average (social norm nudge). Behavioral principle: social proof -- people adjust their behaviour to match perceived social norms. Research (Opower) shows such comparisons reduce consumption by 2-5%.",
+        "difficulty_permille": 850,
+        "bloom_level": "Create",
+        "hints": [
+          "People are influenced by what their neighbours do (descriptive social norms).",
+          "The nudge should preserve freedom of choice while steering behaviour."
+        ],
+        "explanation": "During the 2018 Cape Town water crisis, the city used many behavioral interventions including social shaming (publishing high-use suburb data), countdown dashboards (Day Zero framing), and reduced default flow rates.",
+        "distractors": [
+          "Simply raise water prices dramatically",
+          "Ban all non-essential water use",
+          "Ignore behavioral factors and rely on rational self-interest"
+        ]
+      }
+    ],
+    "hints": [
+      "Behavioral economics shows people are predictably irrational, not randomly irrational.",
+      "A nudge changes the choice architecture without banning any options.",
+      "SA examples: stokvels (commitment devices), NCA (protecting bounded rationality), retail placement (exploiting present bias)."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "bounded rationality",
+        "definition": "Herbert Simon's concept that people make decisions with limited information, cognitive capacity, and time, leading to satisficing rather than optimising",
+        "example_usage": "Bounded rationality explains why consumers sign up for expensive cell phone contracts without fully understanding the terms."
+      },
+      {
+        "term": "loss aversion",
+        "definition": "The tendency for people to prefer avoiding losses over acquiring equivalent gains (losses feel ~2x as painful as gains feel good)",
+        "example_usage": "Loss aversion explains why SA investors hold onto declining shares rather than selling at a loss."
+      },
+      {
+        "term": "nudge",
+        "definition": "A small change in choice architecture that predictably alters people's behaviour without forbidding any options (Thaler & Sunstein)",
+        "example_usage": "Auto-enrollment in retirement funds is a nudge that dramatically increases savings rates."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think behavioral economics says people are stupid.",
+        "correction": "Behavioral economics says people are predictably influenced by cognitive biases, not that they are unintelligent. Even experts fall prey to anchoring, loss aversion, and framing effects. The goal is to design systems that account for these biases.",
+        "why_students_think_this": "Describing biases can sound like criticism of individual decision-making, but the point is that the environment (choice architecture) matters as much as individual capability."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.93,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.93,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.BEHAV.DECIDE",
+    "title": "Assessment: Behavioral economics biases and SA applications",
+    "items": [
+      {
+        "question": "Explain anchoring bias with a South African retail example.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Anchoring bias: an initial piece of information disproportionately influences subsequent judgments. Example: a clothing store shows the 'original price' of R800 crossed out with a 'sale price' of R500. The R800 anchor makes R500 feel like a bargain, even if the item was never sold at R800.",
+        "points": 3,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Think about reference prices in SA retail."
+      }
+    ],
+    "total_points": 3,
+    "estimated_minutes": 8,
+    "bloom_distribution": [
+      ["Apply", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is a nudge in behavioral economics?",
+      "back": "A small change in choice architecture that predictably alters behaviour without forbidding any options or significantly changing economic incentives. Example: auto-enrollment in retirement funds.",
+      "tags": ["ECON.BEHAV.DECIDE", "Economics", "Behavioral Economics"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "What is loss aversion?",
+      "back": "People feel the pain of losses roughly twice as strongly as the pleasure of equivalent gains. Discovered by Kahneman & Tversky (1979). Explains why people hold losing investments and fear losses more than they seek gains.",
+      "tags": ["ECON.BEHAV.DECIDE", "Economics", "Behavioral Economics"],
+      "difficulty_permille": 350
+    }
+  ],
+  "quality": {
+    "coherence": 0.93,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

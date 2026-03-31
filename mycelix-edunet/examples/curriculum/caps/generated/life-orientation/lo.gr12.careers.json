@@ -1,0 +1,353 @@
+{
+  "node_id": "CAPS.LifeOrientation.Gr12.Careers",
+  "lesson": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Careers",
+    "title": "CAPS.LifeOrientation.Gr12.Careers: Careers & Career Choices",
+    "grade_level": "Grade12",
+    "bloom_level": "Apply",
+    "explanation": "Career planning is a structured process that starts with self-knowledge: understanding your interests, abilities, values, and personality type. The Holland personality types (Realistic, Investigative, Artistic, Social, Enterprising, Conventional) help match people to careers. Study options after matric include universities, TVET colleges, learnerships, apprenticeships, and SETAs. Funding sources include NSFAS (National Student Financial Aid Scheme), bursaries from companies and government, and scholarships. A good CV (curriculum vitae) is a one- or two-page summary of your education, skills, experience, and references. Interview skills include preparation, professional appearance, body language, answering common questions using the STAR method (Situation, Task, Action, Result), and follow-up. The job market in SA requires adaptability, digital literacy, and lifelong learning.",
+    "examples": [
+      {
+        "problem": "Thabo is good at maths, enjoys solving problems, and prefers working alone. Using Holland's personality types, identify his type and suggest three suitable careers.",
+        "steps": [
+          {
+            "instruction": "Step 1: Identify traits: problem-solving, mathematical ability, preference for independent work",
+            "result": "traits identified"
+          },
+          {
+            "instruction": "Step 2: Match to Holland type: Investigative (analytical, intellectual, scientific, reserved)",
+            "result": "Holland type identified"
+          },
+          {
+            "instruction": "Step 3: Suggest careers that match: actuary, data scientist, forensic accountant",
+            "result": "career options"
+          }
+        ],
+        "answer": "Answer: Thabo's Holland type is Investigative. Suitable careers include actuary, data scientist, and forensic accountant.",
+        "visual_description": null
+      },
+      {
+        "problem": "Write a CV for a Grade 12 learner applying for a part-time retail position.",
+        "steps": [
+          {
+            "instruction": "Step 1: Personal details: full name, contact number, email, address",
+            "result": "header section"
+          },
+          {
+            "instruction": "Step 2: Education: current school, expected matric results, subjects taken",
+            "result": "education section"
+          },
+          {
+            "instruction": "Step 3: Skills: communication, teamwork, computer literacy, time management",
+            "result": "skills section"
+          },
+          {
+            "instruction": "Step 4: Experience: school projects, volunteer work, any part-time work",
+            "result": "experience section"
+          },
+          {
+            "instruction": "Step 5: References: two references (teacher, community leader) with contact details",
+            "result": "references section"
+          }
+        ],
+        "answer": "Answer: A well-structured CV includes personal details, education, skills, experience, and references. Keep it to one page, use clear headings, and proofread carefully.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain the difference between NSFAS, a bursary, and a scholarship.",
+        "steps": [
+          {
+            "instruction": "Step 1: NSFAS is a government-funded scheme providing loans and bursaries to financially needy students at public universities and TVET colleges",
+            "result": "NSFAS defined"
+          },
+          {
+            "instruction": "Step 2: A bursary is financial aid from a company or organisation, often in exchange for working for the sponsor after graduation",
+            "result": "bursary defined"
+          },
+          {
+            "instruction": "Step 3: A scholarship is merit-based financial aid awarded for academic, sporting, or other achievement, usually without a work-back obligation",
+            "result": "scholarship defined"
+          }
+        ],
+        "answer": "Answer: NSFAS is government funding for needy students, bursaries are company-sponsored (often with work-back), and scholarships are merit-based awards.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "List the six Holland personality types and give one career example for each.",
+        "answer": "Realistic (electrician), Investigative (scientist), Artistic (graphic designer), Social (teacher), Enterprising (entrepreneur), Conventional (accountant).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Use the acronym RIASEC to remember the six types.",
+          "Think about what kind of work each type enjoys."
+        ],
+        "explanation": "Holland's RIASEC model categorises personality types and matching work environments. Each type thrives in different settings.",
+        "distractors": [
+          "Holland identified only four personality types",
+          "The types are: Passive, Active, Creative, Logical, Social, Formal",
+          "Everyone fits into exactly one type with no overlap"
+        ]
+      },
+      {
+        "question": "Explain three things you should research about a career before committing to study towards it.",
+        "answer": "Job availability and demand in SA, required qualifications and study duration, salary range and working conditions, opportunities for growth.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Think about practical factors: can you get a job, how long must you study, what will you earn?",
+          "Consider the DHET list of occupations in high demand."
+        ],
+        "explanation": "Career research should be practical: check demand (DHET Occupations in High Demand list), required qualifications, typical salary, and working conditions.",
+        "distractors": [
+          "Only salary matters when choosing a career",
+          "You should only follow your passion regardless of job availability",
+          "Career research is unnecessary if your parents chose for you"
+        ]
+      },
+      {
+        "question": "You have been invited for a job interview. Describe five things you should do to prepare.",
+        "answer": "Research the company, prepare answers to common questions (STAR method), dress professionally, arrive early, prepare questions to ask the interviewer, bring copies of your CV and certificates.",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Think about what will make a good first impression.",
+          "The STAR method helps structure your answers: Situation, Task, Action, Result."
+        ],
+        "explanation": "Interview preparation includes research, practice, professional appearance, punctuality, and having thoughtful questions ready.",
+        "distractors": [
+          "Just show up and wing it",
+          "Wear casual clothes to show you are relaxed",
+          "Never ask the interviewer any questions"
+        ]
+      },
+      {
+        "question": "Compare studying at a university versus a TVET college. When might each be the better choice?",
+        "answer": "University: theoretical, research-based, leads to degrees (3-6 years), suits academic learners. TVET: practical, skills-based, leads to N-diplomas or NCV certificates (shorter), suits hands-on learners. TVET may be better for trades; university for professions requiring degrees.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about the difference between theoretical and practical learning.",
+          "Consider what employers in different fields require."
+        ],
+        "explanation": "Both pathways are valid. The choice depends on the learner's strengths, career goals, and financial situation. SA needs both graduates and skilled artisans.",
+        "distractors": [
+          "University is always better than TVET",
+          "TVET colleges are for students who failed matric",
+          "There is no difference between the two"
+        ]
+      },
+      {
+        "question": "Evaluate the claim: 'A university degree guarantees you a good job in South Africa.'",
+        "answer": "False. While a degree improves prospects, it does not guarantee employment. SA has high graduate unemployment in some fields. Success also requires relevant skills, work experience, networking, and choosing fields with demand. Soft skills and adaptability matter as much as qualifications.",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Consider graduate unemployment rates in SA.",
+          "Think about what employers actually look for besides a degree."
+        ],
+        "explanation": "SA has significant graduate unemployment, especially in oversupplied fields. Employability depends on field choice, skills, experience, and attitude.",
+        "distractors": [
+          "A degree always guarantees a job",
+          "Degrees are completely worthless in SA",
+          "Only connections matter, not qualifications"
+        ]
+      },
+      {
+        "question": "Create a personal career action plan for the next two years after Grade 12, including funding strategy.",
+        "answer": "Plan should include: self-assessment results, chosen career and required qualification, institution and programme, funding application timeline (NSFAS deadline, bursary applications), backup plan, skills to develop, and milestones.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Start with where you want to be in two years, then work backwards.",
+          "Include specific deadlines for applications and funding."
+        ],
+        "explanation": "A career action plan turns goals into concrete steps with timelines. Include self-knowledge, research, applications, funding, and contingencies.",
+        "distractors": [
+          "Just apply to one place and hope for the best",
+          "Wait until after matric to start planning",
+          "Only wealthy students need a plan"
+        ]
+      }
+    ],
+    "hints": [
+      "Use RIASEC (Holland) to match your personality type to suitable careers.",
+      "NSFAS applications usually open around August-November each year for the following year's study.",
+      "A CV should be concise, honest, and tailored to the specific job you are applying for."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "NSFAS",
+        "definition": "National Student Financial Aid Scheme: government funding for students from low-income families to study at public universities and TVET colleges",
+        "example_usage": "Sipho applied to NSFAS because his family earns less than R350 000 per year."
+      },
+      {
+        "term": "Holland personality types",
+        "definition": "Six personality types (RIASEC: Realistic, Investigative, Artistic, Social, Enterprising, Conventional) used to match people to suitable careers",
+        "example_usage": "Nomsa's Holland type is Social, which is why she enjoys teaching."
+      },
+      {
+        "term": "curriculum vitae (CV)",
+        "definition": "A document summarising your personal details, education, skills, experience, and references for job applications",
+        "example_usage": "Make sure your CV is updated before applying for the bursary."
+      },
+      {
+        "term": "STAR method",
+        "definition": "An interview technique: describe the Situation, Task, Action you took, and Result achieved",
+        "example_usage": "When asked about teamwork, use the STAR method to describe a specific group project."
+      },
+      {
+        "term": "TVET college",
+        "definition": "Technical and Vocational Education and Training college offering practical, skills-based qualifications (N-courses, NCV programmes)",
+        "example_usage": "After matric, Kagiso enrolled at a TVET college to study electrical engineering."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think university is the only option after matric.",
+        "correction": "TVET colleges, learnerships, apprenticeships, and SETAs offer excellent career paths. Many trades are in high demand and well-paid in SA.",
+        "why_students_think_this": "Social pressure and lack of information about alternatives. Schools sometimes focus only on university pathways."
+      },
+      {
+        "misconception": "Students believe they must know their exact career by Grade 12.",
+        "correction": "Career development is a lifelong process. Many successful people change careers. What matters is making an informed choice based on self-knowledge and research, while remaining open to change.",
+        "why_students_think_this": "Pressure from family and school to make a definitive choice. In reality, exploration and adaptation are normal."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.LifeOrientation.Gr12.Careers",
+    "title": "Assessment: Careers & Career Choices",
+    "items": [
+      {
+        "question": "Name the six Holland personality types using the RIASEC acronym.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Realistic, Investigative, Artistic, Social, Enterprising, Conventional",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "RIASEC"
+      },
+      {
+        "question": "Explain three differences between a bursary and NSFAS funding.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "NSFAS is government-funded (bursaries are from companies); NSFAS is means-tested (bursaries may be merit-based); bursaries often require work-back (NSFAS does not).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about who provides the money and what conditions apply"
+      },
+      {
+        "question": "Prepare a response using the STAR method for the interview question: 'Tell me about a time you worked in a team.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Situation: describe context. Task: your specific role. Action: what you did. Result: the outcome. Example: school project, group leader, organised meetings and delegated tasks, achieved distinction.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Structure your answer as Situation, Task, Action, Result"
+      },
+      {
+        "question": "Analyse the factors that influence career choices in South Africa, distinguishing between internal and external factors.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Internal: interests, abilities, personality, values. External: job market demand, family expectations, financial constraints, geographic location, socio-economic background.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Internal factors come from within you; external factors come from your environment"
+      },
+      {
+        "question": "Evaluate whether the South African education system adequately prepares learners for the world of work.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Arguments for: matric certificate, subject choice guidance, Life Orientation career module. Arguments against: theory-heavy curriculum, limited practical skills training, high youth unemployment, digital divide, mismatch between qualifications and job market needs.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider both strengths and weaknesses of the current system"
+      },
+      {
+        "question": "Create a detailed two-year career plan for yourself, including self-assessment, study/training choice, funding strategy, and contingency plan.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Must include: Holland type assessment, chosen field with rationale, specific institution, funding plan (NSFAS/bursary/savings), timeline with deadlines, backup career option, skills development plan.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Be specific with institutions, deadlines, and backup plans"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What does RIASEC stand for?",
+      "back": "Realistic, Investigative, Artistic, Social, Enterprising, Conventional — Holland's six personality types for career matching.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is NSFAS?",
+      "back": "National Student Financial Aid Scheme — government funding for students from families earning under R350 000/year to study at public universities and TVET colleges.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 150
+    },
+    {
+      "front": "What is the STAR method?",
+      "back": "Situation, Task, Action, Result — a structured way to answer behavioural interview questions with specific examples.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is the difference between a bursary and a scholarship?",
+      "back": "A bursary is usually need-based and may require work-back. A scholarship is merit-based and usually has no work-back obligation.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "What is a TVET college?",
+      "back": "Technical and Vocational Education and Training college offering practical skills-based qualifications (N-courses, NCV programmes) as an alternative to university.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What are five essential sections of a CV?",
+      "back": "Personal details, education, skills, work experience (or relevant activities), and references.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is a SETA?",
+      "back": "Sector Education and Training Authority — organisations that manage skills development and learnerships in specific economic sectors (e.g., MERSETA for manufacturing).",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 300
+    },
+    {
+      "front": "Name three factors to research before choosing a career.",
+      "back": "Job demand in SA (DHET list), required qualifications and study duration, salary range and working conditions.",
+      "tags": ["CAPS.LifeOrientation.Gr12.Careers", "Grade12", "Life Orientation"],
+      "difficulty_permille": 225
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

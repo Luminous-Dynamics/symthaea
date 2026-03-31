@@ -1,0 +1,214 @@
+{
+  "node_id": "ECON.MACRO.FISCAL",
+  "lesson": {
+    "standard_code": "ECON.MACRO.FISCAL",
+    "title": "Fiscal & Monetary Policy: SARB, repo rate, inflation targeting, government budget, national debt",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Evaluate",
+    "explanation": "Fiscal policy involves government decisions about spending and taxation, managed by National Treasury. The annual Budget Speech (February) sets spending priorities (education ~20%, social protection ~18%, health ~12% of expenditure). SA's debt-to-GDP ratio has risen from ~26% (2008) to ~74% (2024), raising sustainability concerns. Monetary policy is conducted by the South African Reserve Bank (SARB), which targets inflation at 3-6% using the repo rate (the rate at which commercial banks borrow from SARB). When inflation rises above target, SARB raises the repo rate, increasing borrowing costs, reducing spending, and cooling inflation. The prime lending rate = repo rate + 3.5%. SA has an inflation-targeting framework since 2000.",
+    "examples": [
+      {
+        "problem": "The SARB raises the repo rate from 8.25% to 8.50%. Explain the transmission mechanism to the economy.",
+        "steps": [
+          {
+            "instruction": "Step 1: Repo rate rises -> commercial banks' borrowing costs increase",
+            "result": "bank costs rise"
+          },
+          {
+            "instruction": "Step 2: Banks raise the prime rate from 11.75% to 12.00% (repo + 3.5%)",
+            "result": "lending rates rise"
+          },
+          {
+            "instruction": "Step 3: Higher interest rates -> consumers borrow less, save more -> aggregate demand falls",
+            "result": "demand contracts"
+          },
+          {
+            "instruction": "Step 4: Lower demand -> reduces upward pressure on prices -> inflation declines",
+            "result": "inflation target met"
+          }
+        ],
+        "answer": "Answer: Higher repo rate -> higher prime rate -> reduced borrowing and spending -> lower aggregate demand -> reduced inflation.",
+        "visual_description": null
+      },
+      {
+        "problem": "The SA government runs a budget deficit of R350 billion. Explain how this is financed and its long-term implications.",
+        "steps": [
+          {
+            "instruction": "Step 1: The deficit is financed by borrowing (issuing government bonds)",
+            "result": "borrowing mechanism"
+          },
+          {
+            "instruction": "Step 2: This adds to national debt (already ~R5.2 trillion, ~74% of GDP)",
+            "result": "debt accumulation"
+          },
+          {
+            "instruction": "Step 3: Debt service costs (~R390 billion/year) crowd out spending on education, health, and infrastructure",
+            "result": "crowding out"
+          }
+        ],
+        "answer": "Answer: Budget deficits are financed by borrowing, increasing national debt. As debt service costs grow, less is available for essential services, threatening long-term fiscal sustainability.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "If the repo rate is 8.25%, what is the prime lending rate?",
+        "answer": "Prime rate = 8.25% + 3.5% = 11.75%.",
+        "difficulty_permille": 150,
+        "bloom_level": "Apply",
+        "hints": [
+          "Prime rate = repo rate + 3.5% in South Africa."
+        ],
+        "explanation": "The prime rate is a benchmark for consumer loans (home loans, car finance). Banks add the 3.5% margin above the repo rate.",
+        "distractors": ["10.25%", "12.75%", "8.25%"]
+      },
+      {
+        "question": "Explain why SARB might raise interest rates even though it will slow economic growth and increase unemployment.",
+        "answer": "SARB's primary mandate is price stability (3-6% inflation target). High inflation erodes purchasing power, especially for the poor. Short-term pain (slower growth) is accepted to prevent long-term damage from uncontrolled inflation.",
+        "difficulty_permille": 450,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What is SARB's primary mandate?",
+          "Who is hurt most by high inflation?"
+        ],
+        "explanation": "SARB prioritises price stability over growth. Inflation acts as a regressive tax -- it hurts the poor most because they spend a larger share of income on necessities like food and transport.",
+        "distractors": [
+          "SARB wants to increase unemployment",
+          "SARB does not consider growth at all",
+          "Higher rates always increase inflation"
+        ]
+      },
+      {
+        "question": "SA's debt-to-GDP ratio rose from 26% (2008) to 74% (2024). Calculate the approximate total national debt if GDP is R7 trillion.",
+        "answer": "National debt = 74% x R7 trillion = R5.18 trillion.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": [
+          "Debt-to-GDP ratio = Debt / GDP. Rearrange to find Debt.",
+          "0.74 x R7 trillion = ?"
+        ],
+        "explanation": "A debt-to-GDP ratio of 74% means for every R1 of GDP, the government owes R0.74. This is approaching levels that credit rating agencies consider unsustainable.",
+        "distractors": ["R2.6 trillion", "R7.4 trillion", "R5.0 trillion"]
+      },
+      {
+        "question": "Distinguish between expansionary and contractionary fiscal policy. When would each be appropriate for SA?",
+        "answer": "Expansionary: increase spending or cut taxes to stimulate growth (appropriate during recession). Contractionary: cut spending or raise taxes to reduce demand and inflation (appropriate when economy is overheating). SA currently needs fiscal consolidation (contractionary) to stabilise debt, but also needs growth-friendly spending on infrastructure.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Expansionary = stimulate the economy. Contractionary = cool it down.",
+          "SA faces the dilemma of needing both growth and fiscal discipline."
+        ],
+        "explanation": "SA's policy dilemma: high debt requires fiscal consolidation, but low growth and high unemployment call for stimulus. The Medium Term Budget Policy Statement tries to balance these competing needs.",
+        "distractors": [
+          "SA should always use expansionary policy",
+          "Fiscal policy cannot affect the economy",
+          "Contractionary policy increases government spending"
+        ]
+      },
+      {
+        "question": "Evaluate the effectiveness of SA's inflation-targeting framework given that supply-side shocks (petrol prices, food prices, electricity tariffs) drive much of SA's inflation.",
+        "answer": "The framework is partially effective: it anchors inflation expectations and maintains credibility. However, raising interest rates is less effective against supply-side inflation (higher rates cannot reduce global oil prices or Eskom's tariff increases). The policy may cause unnecessary economic pain when inflation is supply-driven rather than demand-driven.",
+        "difficulty_permille": 850,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Interest rates work by reducing demand. But what if inflation is caused by supply problems, not excess demand?",
+          "Consider administered prices (electricity, water, fuel) that SARB cannot control."
+        ],
+        "explanation": "About 25% of SA's CPI basket consists of administered prices that SARB cannot influence. Raising rates in response to Eskom tariff hikes punishes consumers twice: higher electricity AND higher interest payments.",
+        "distractors": [
+          "Inflation targeting perfectly addresses all types of inflation",
+          "SARB should abandon inflation targeting entirely",
+          "Supply-side inflation does not exist in SA"
+        ]
+      }
+    ],
+    "hints": [
+      "SARB's inflation target is 3-6%. The repo rate is its main tool.",
+      "Prime rate = repo rate + 3.5%. This directly affects consumer borrowing costs.",
+      "Fiscal policy = government spending and taxation. Monetary policy = SARB's interest rate decisions."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "repo rate",
+        "definition": "The interest rate at which the SARB lends money to commercial banks, used as the primary monetary policy tool",
+        "example_usage": "When SARB raises the repo rate, it becomes more expensive for banks to borrow, and they pass this cost to consumers."
+      },
+      {
+        "term": "fiscal deficit",
+        "definition": "When government spending exceeds revenue (taxes) in a given period",
+        "example_usage": "SA's fiscal deficit in 2024/25 was approximately R350 billion."
+      },
+      {
+        "term": "debt-to-GDP ratio",
+        "definition": "National debt expressed as a percentage of GDP, indicating the government's ability to service its debt",
+        "example_usage": "SA's debt-to-GDP ratio of ~74% is approaching levels that concern credit rating agencies."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think the government can simply print money to pay off debt.",
+        "correction": "Printing money (monetising debt) causes hyperinflation, destroying the currency's value. Zimbabwe's experience (2008: inflation >79.6 billion %) is a stark example. SARB maintains independence from government to prevent this.",
+        "why_students_think_this": "It seems like a simple solution, but students underestimate the link between money supply and inflation."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.91,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.MACRO.FISCAL",
+    "title": "Assessment: Fiscal and monetary policy, SARB, inflation targeting, SA budget",
+    "items": [
+      {
+        "question": "Explain the monetary policy transmission mechanism from repo rate to inflation.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Repo rate up -> prime rate up -> borrowing costs rise -> spending falls -> aggregate demand falls -> inflation decreases.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Trace the chain from SARB to the consumer."
+      },
+      {
+        "question": "Evaluate whether SA should prioritise debt reduction or economic stimulus spending.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Both have merit. Debt reduction prevents a fiscal crisis and maintains credit ratings. Stimulus spending addresses unemployment and poverty. A balanced approach focusing on growth-enhancing infrastructure while containing recurrent expenditure is optimal.",
+        "points": 4,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider the trade-offs."
+      }
+    ],
+    "total_points": 7,
+    "estimated_minutes": 12,
+    "bloom_distribution": [
+      ["Understand", 1],
+      ["Evaluate", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is SARB's inflation target?",
+      "back": "3-6% (consumer price inflation). SARB uses the repo rate as its main tool to keep inflation within this band.",
+      "tags": ["ECON.MACRO.FISCAL", "Economics", "Monetary Policy"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is the relationship between the repo rate and the prime lending rate in SA?",
+      "back": "Prime rate = Repo rate + 3.5%. When SARB changes the repo rate, the prime rate moves by the same amount.",
+      "tags": ["ECON.MACRO.FISCAL", "Economics", "Monetary Policy"],
+      "difficulty_permille": 250
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in TIG Welding (GTAW)?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "Specify the complete TIG setup for welding 2mm 304 stainless steel butt joint: tungsten, filler, gas, polarity, amperage. Why is TIG preferred over MIG for thin stainless?",
+        "answer": "Tungsten: 2% lanthanated (blue), 1.6mm. Filler: ER308L, 1.6mm. Gas: 100% Ar at 8-10 L/min. Polarity: DCEN. Amperage: 40-60A with foot pedal. Back-purge inside with argon. TIG preferred because: lower minimum heat (prevents burn-through), precise foot pedal control, zero spatter (critical for food/medical), superior appearance, better gas coverage for corrosion resistance.",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["DCEN: 70% heat to workpiece, 30% to tungsten.", "Filler should match or over-alloy the base (308L for 304)."],
+        "explanation": "TIG thin stainless is a high-value skill for SA food, pharmaceutical, and architectural industries.",
+        "distractors": ["Use DCEP for stainless", "CO2 works for TIG", "Any tungsten type is fine"]
       },
       {
-        "question": "Describe the key regulation or standard that governs TIG Welding (GTAW) in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
+        "question": "Why does aluminium TIG welding require AC polarity? Explain the 'cleaning action' and why it is essential.",
+        "answer": "AC is required because each half-cycle serves a different purpose: DCEN half = penetration and heat. DCEP half = cleaning action (positive electrode attracts electrons from aluminium surface, breaking up the Al2O3 oxide layer). Cleaning is essential because aluminium oxide melts at 2072°C while aluminium melts at 660°C -- without removing oxide, filler cannot fuse to the base metal. AC balance control adjusts ratio: more EN = deeper penetration; more EP = more cleaning. Start at 70/30. Use pure argon, pure or zirconiated tungsten (forms a ball on tip, which is normal for AC).",
+        "difficulty_permille": 500,
         "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "hints": ["The oxide is invisible but reforms within seconds of removal.", "If the pool has a dull 'skin', increase EP balance."],
+        "explanation": "Understanding the oxide layer is the key to all aluminium welding. Every setup choice relates to managing this oxide.",
+        "distractors": ["Use DCEN for aluminium like steel", "Oxide protects the weld", "Thoriated tungsten is best for aluminium"]
+      },
+      {
+        "question": "TIG welding a stainless pipe, you notice dark blue/black discolouration inside the pipe at the root. Diagnose and explain the prevention method.",
+        "answer": "Diagnosis: oxidation from lack of back-purging. The heat tint colour indicates severity: straw=light, blue/black=heavy oxidation with chromium depletion (destroys corrosion resistance). Prevention: BACK-PURGE -- seal pipe ends with foam dams, fill interior with argon before welding. Maintain purge until pipe cools below 300°C. For critical work, use an oxygen analyser (target <50 ppm O2). If oxidation occurred on a critical joint, either grind out the root and re-weld with purging, or pickle the pipe interior with acid.",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
+        "hints": ["Heat tint chart: straw(300°C) → gold → brown → purple → blue → black(>700°C).", "Food-grade rejects anything beyond light straw."],
+        "explanation": "Back-purging separates qualified stainless pipe welders from general welders. Many SA food/beverage jobs require ASME-quality purged roots.",
+        "distractors": ["Blue colour indicates a strong weld", "Only large pipes need purging", "Wire brushing removes oxidation adequately"]
+      },
+      {
+        "question": "Your tungsten keeps getting contaminated (grey tip, erratic arc). List three common causes and describe the correct tungsten preparation procedure.",
+        "answer": "Three causes: (1) Dipping tungsten into weld pool (base metal deposits on tip). (2) Filler rod touching tungsten. (3) Insufficient gas coverage causing oxidation. Preparation: (1) Cut off contaminated section with diamond disc. (2) Grind on a DEDICATED tungsten wheel (never use wheels that touched steel). (3) For DCEN: sharp point with LENGTHWISE grinding marks (crosswise marks make arc wander). (4) For AC: grind to a point, then briefly arc to form a ball. (5) Taper length: 2-3x electrode diameter.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": ["Grinding marks must run lengthwise for a focused arc.", "Dedicated wheel = no cross-contamination from steel."],
+        "explanation": "Tungsten preparation directly affects arc stability. Well-prepared = focused, stable. Contaminated = erratic, wandering.",
+        "distractors": ["Run at high amperage to clean it", "Grinding direction doesn't matter", "Any bench grinder works"]
+      },
+      {
+        "question": "A job requires TIG welding 3mm 304 stainless to 3mm mild steel (dissimilar metals). What filler rod and technique do you use? Why is filler selection critical?",
+        "answer": "Filler: ER309L (over-alloyed austenitic). The higher Cr/Ni content compensates for dilution from the mild steel side. If 308L were used, dilution could produce brittle martensite. Technique: DCEN, pure argon. Direct 60-70% of heat toward the STAINLESS side (lower thermal conductivity needs more heat). If equal heat, mild steel melts excessively while stainless has lack-of-fusion. Use lower amperage to control dilution. Interpass temp <150°C. The mild steel HAZ may need stress relief for critical work.",
+        "difficulty_permille": 750,
+        "bloom_level": "Analyze",
+        "hints": ["Key challenge is DILUTION: the pool mixes both base metals.", "ER309L is the universal choice for stainless-to-carbon dissimilar joints."],
+        "explanation": "Dissimilar metal TIG welding is advanced with high SA demand in food processing, mining, and petrochemical.",
+        "distractors": ["Cannot weld stainless to mild steel", "Use mild steel filler", "Apply equal heat to both sides"]
       }
     ],
     "key_vocabulary": [

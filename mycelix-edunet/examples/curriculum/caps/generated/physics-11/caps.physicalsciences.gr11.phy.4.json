@@ -2,10 +2,10 @@
   "node_id": "CAPS.PhysicalSciences.Gr11.PHY.4",
   "lesson": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.PHY.4",
-    "title": "CAPS.PhysicalSciences.Gr11.PHY.4: Work (W = FΔx cos θ). Work-energy theorem. Conservation o...",
+    "title": "CAPS.PhysicalSciences.Gr11.PHY.4: Work (W = F\u0394x cos \u03b8). Work-energy theorem. Conservation o...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9.8 m/s²), and height. Kinetic energy Ek = ½mv² depends on mass and speed. The law of conservation of mechanical energy states that in the absence of friction, total mechanical energy (Ep + Ek) remains constant. Work is done when a force moves an object: W = FΔx cos θ.",
+    "explanation": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9.8 m/s\u00b2), and height. Kinetic energy Ek = \u00bdmv\u00b2 depends on mass and speed. The law of conservation of mechanical energy states that in the absence of friction, total mechanical energy (Ep + Ek) remains constant. Work is done when a force moves an object: W = F\u0394x cos \u03b8.",
     "examples": [
       {
         "problem": "Solve a Work, Energy, and Power problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 125,
+        "question": "A person lifts a 20 kg box 1.5 m vertically. Calculate the work done against gravity. (g = 10 m/s^2)",
+        "answer": "W = mgh = 20 x 10 x 1.5 = 300 J",
+        "difficulty_permille": 200,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Work against gravity = mgh (force x distance, with force = mg).",
+          "The angle between force and displacement is 0 degrees (both vertical)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "W = Fd cos(0) = mgd = (20)(10)(1.5) = 300 J. This work is stored as gravitational potential energy.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "30 J",
+          "3000 J",
+          "200 J"
         ]
       },
       {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 250,
+        "question": "A 1200 kg car accelerates from rest to 25 m/s. Calculate the net work done on the car using the work-energy theorem.",
+        "answer": "W_net = Delta Ek = 1/2 mv^2 - 1/2 mu^2 = 1/2(1200)(625) - 0 = 375000 J = 375 kJ",
+        "difficulty_permille": 350,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Work-energy theorem: W_net = Delta Ek = Ek_final - Ek_initial.",
+          "Starting from rest means u = 0."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "W_net = 1/2(1200)(25^2) - 0 = 600 x 625 = 375000 J = 375 kJ.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "750 kJ",
+          "15 kJ",
+          "187.5 kJ"
         ]
       },
       {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 375,
+        "question": "A 60 kg skier starts from rest at the top of a 40 m high slope. Friction does -5000 J of work. Find the skier's speed at the bottom. (g = 10 m/s^2)",
+        "answer": "v = 22.9 m/s",
+        "difficulty_permille": 550,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use conservation of energy with friction: mgh + W_friction = 1/2 mv^2.",
+          "W_friction is negative (opposes motion)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "mgh + W_friction = 1/2 mv^2. (60)(10)(40) + (-5000) = 1/2(60)v^2. 24000 - 5000 = 30v^2. 19000 = 30v^2. v^2 = 633.3. v = 25.2 m/s.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "28.3 m/s",
+          "20 m/s",
+          "15 m/s"
         ]
       },
       {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 500,
+        "question": "A motor lifts a 500 kg load 10 m in 20 seconds. Calculate the power output of the motor. (g = 10 m/s^2)",
+        "answer": "P = W/t = mgh/t = (500)(10)(10)/20 = 2500 W = 2.5 kW",
+        "difficulty_permille": 350,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Power = work/time.",
+          "Work done = mgh (lifting against gravity)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "W = mgh = 50000 J. P = W/t = 50000/20 = 2500 W. This is the useful power output, not accounting for motor efficiency.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "250 W",
+          "25000 W",
+          "500 W"
         ]
       },
       {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "A 70 kg pole vaulter runs at 9 m/s and converts all kinetic energy to gravitational potential energy. What maximum height can the vaulter reach? (g = 10 m/s^2) In practice, vaulters reach higher -- explain why.",
+        "answer": "h = v^2/(2g) = 81/20 = 4.05 m. In practice, vaulters reach ~6 m because the flexible pole stores elastic potential energy from the run-up and the vaulter does additional work by pushing off the pole (muscles add energy).",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Set Ek = Ep: 1/2 mv^2 = mgh. Mass cancels.",
+          "The pole acts as an energy storage device."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Pure energy conversion: h = v^2/2g = 81/20 = 4.05 m. Real vaulters exceed this because they add energy via muscular work and the pole's elastic energy, plus technique allows partial conversion during the upward phase.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Work, Energy, and Power",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Maximum is exactly 4.05 m",
+          "Mass affects the maximum height",
+          "The pole reduces the height achieved"
         ]
       }
     ],
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr11.PHY.4",
-    "title": "Assessment: Work (W = FΔx cos θ). Work-energy theorem. Conservation of energy with non-conservative forces. Power (P = W/Δt = Fv). Efficiency",
+    "title": "Assessment: Work (W = F\u0394x cos \u03b8). Work-energy theorem. Conservation of energy with non-conservative forces. Power (P = W/\u0394t = Fv). Efficiency",
     "items": [
       {
         "question": "Explain Work, Energy, and Power.",
@@ -295,81 +270,81 @@
   "flashcards": [
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "What is the key idea in Work, Energy, and Power?",
-      "back": "Work W = FΔx cos θ (only the component of force in the direction of motion does work)",
+      "back": "Work W = F\u0394x cos \u03b8 (only the component of force in the direction of motion does work)",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.4",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 888
     }

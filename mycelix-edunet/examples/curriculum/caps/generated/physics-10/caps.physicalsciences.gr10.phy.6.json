@@ -2,16 +2,16 @@
   "node_id": "CAPS.PhysicalSciences.Gr10.PHY.6",
   "lesson": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.6",
-    "title": "CAPS.PhysicalSciences.Gr10.PHY.6: Two kinds of charge. Coulomb's law: F = kQ₁Q₂/r². Electri...",
+    "title": "CAPS.PhysicalSciences.Gr10.PHY.6: Two kinds of charge. Coulomb's law: F = kQ\u2081Q\u2082/r\u00b2. Electri...",
     "grade_level": "Grade10",
     "bloom_level": "Understand",
-    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (ε) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = ε − Ir. For electrodynamics: Faraday's law ε = −NΔΦ/Δt (changing magnetic flux induces an EMF). AC: Vrms = Vmax/√2, Pavg = Vrms × Irms.",
+    "explanation": "Grade 12 electricity covers internal resistance and electrodynamics. EMF (\u03b5) = I(R + r), where r is internal resistance. The 'lost volts' = Ir. Terminal voltage = \u03b5 \u2212 Ir. For electrodynamics: Faraday's law \u03b5 = \u2212N\u0394\u03a6/\u0394t (changing magnetic flux induces an EMF). AC: Vrms = Vmax/\u221a2, Pavg = Vrms \u00d7 Irms.",
     "examples": [
       {
-        "problem": "A battery with ε = 12 V and r = 0.5 Ω is connected to a 5.5 Ω resistor. Find the current and terminal voltage.",
+        "problem": "A battery with \u03b5 = 12 V and r = 0.5 \u03a9 is connected to a 5.5 \u03a9 resistor. Find the current and terminal voltage.",
         "steps": [
           {
-            "instruction": "Step 1: ε = I(R + r) → 12 = I(5.5 + 0.5) = 6I",
+            "instruction": "Step 1: \u03b5 = I(R + r) \u2192 12 = I(5.5 + 0.5) = 6I",
             "result": "apply formula"
           },
           {
@@ -19,7 +19,7 @@
             "result": "solve for current"
           },
           {
-            "instruction": "Step 3: V_terminal = ε − Ir = 12 − 2(0.5) = 11 V",
+            "instruction": "Step 3: V_terminal = \u03b5 \u2212 Ir = 12 \u2212 2(0.5) = 11 V",
             "result": "or V = IR = 2(5.5) = 11 V"
           }
         ],
@@ -27,10 +27,10 @@
         "visual_description": null
       },
       {
-        "problem": "A battery with ε = 12 V and r = 0.5 Ω is connected to a 5.5 Ω resistor. Find the current and terminal voltage.",
+        "problem": "A battery with \u03b5 = 12 V and r = 0.5 \u03a9 is connected to a 5.5 \u03a9 resistor. Find the current and terminal voltage.",
         "steps": [
           {
-            "instruction": "Step 1: ε = I(R + r) → 12 = I(5.5 + 0.5) = 6I",
+            "instruction": "Step 1: \u03b5 = I(R + r) \u2192 12 = I(5.5 + 0.5) = 6I",
             "result": "apply formula"
           },
           {
@@ -38,7 +38,7 @@
             "result": "solve for current"
           },
           {
-            "instruction": "Step 3: V_terminal = ε − Ir = 12 − 2(0.5) = 11 V",
+            "instruction": "Step 3: V_terminal = \u03b5 \u2212 Ir = 12 \u2212 2(0.5) = 11 V",
             "result": "or V = IR = 2(5.5) = 11 V"
           }
         ],
@@ -46,10 +46,10 @@
         "visual_description": null
       },
       {
-        "problem": "A battery with ε = 12 V and r = 0.5 Ω is connected to a 5.5 Ω resistor. Find the current and terminal voltage.",
+        "problem": "A battery with \u03b5 = 12 V and r = 0.5 \u03a9 is connected to a 5.5 \u03a9 resistor. Find the current and terminal voltage.",
         "steps": [
           {
-            "instruction": "Step 1: ε = I(R + r) → 12 = I(5.5 + 0.5) = 6I",
+            "instruction": "Step 1: \u03b5 = I(R + r) \u2192 12 = I(5.5 + 0.5) = 6I",
             "result": "apply formula"
           },
           {
@@ -57,7 +57,7 @@
             "result": "solve for current"
           },
           {
-            "instruction": "Step 3: V_terminal = ε − Ir = 12 − 2(0.5) = 11 V",
+            "instruction": "Step 3: V_terminal = \u03b5 \u2212 Ir = 12 \u2212 2(0.5) = 11 V",
             "result": "or V = IR = 2(5.5) = 11 V"
           }
         ],
@@ -67,121 +67,96 @@
     ],
     "practice_problems": [
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 125,
+        "question": "Two charges of +3 micro-C and -5 micro-C are separated by 0.2 m. Calculate the electrostatic force between them. (k = 9 x 10^9 N.m^2/C^2)",
+        "answer": "F = kQ1Q2/r^2 = 9x10^9 x 3x10^-6 x 5x10^-6 / (0.2)^2 = 3.375 N (attractive)",
+        "difficulty_permille": 350,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Use Coulomb's law: F = kQ1Q2/r^2.",
+          "Convert micro-coulombs to coulombs: 1 micro-C = 10^-6 C."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "F = (9x10^9)(3x10^-6)(5x10^-6)/(0.04) = 0.135/0.04 = 3.375 N. The force is attractive because the charges are opposite.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "0.675 N",
+          "33.75 N",
+          "3375 N"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "question": "If the distance between two charges is doubled, what happens to the electrostatic force?",
+        "answer": "The force decreases to 1/4 of its original value (inverse square law).",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "F is proportional to 1/r^2.",
+          "If r doubles, r^2 quadruples, so F becomes F/4."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "Coulomb's law: F = kQ1Q2/r^2. If r -> 2r, then F -> kQ1Q2/(2r)^2 = kQ1Q2/4r^2 = F/4.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "Halves",
+          "Doubles",
+          "Stays the same"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
-        ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
-        "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
-        ]
-      },
-      {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "Explain why a positively charged rod attracts small pieces of paper even though paper is electrically neutral.",
+        "answer": "The positive rod induces charge separation in the paper (polarisation). The negative charges in the paper are attracted closer to the rod, while positive charges are repelled farther away. Since the attractive force on nearer negative charges is stronger than the repulsive force on farther positive charges (inverse square law), the net force is attractive.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Think about induced charges (polarisation).",
+          "The closer charges experience a stronger force (inverse square law)."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "This demonstrates electrostatic induction. The paper remains neutral overall, but the charge redistribution creates a net attractive force.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "The paper becomes positively charged",
+          "Only charged objects can be attracted",
+          "The rod gives charge to the paper"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 625,
+        "question": "Calculate the electric field strength at a point 0.3 m from a charge of +4 micro-C. (k = 9 x 10^9 N.m^2/C^2)",
+        "answer": "E = kQ/r^2 = 9x10^9 x 4x10^-6 / (0.3)^2 = 36000/0.09 = 4 x 10^5 N/C",
+        "difficulty_permille": 450,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Use E = kQ/r^2.",
+          "Convert micro-coulombs to coulombs."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "E = (9x10^9)(4x10^-6)/(0.09) = 36000/0.09 = 400000 = 4 x 10^5 N/C, directed away from the positive charge.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "1.2 x 10^5 N/C",
+          "4 x 10^3 N/C",
+          "1.33 x 10^5 N/C"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 750,
+        "question": "Two parallel plates are separated by 0.02 m with a potential difference of 200 V. Calculate the electric field between the plates and the force on an electron in this field. (e = 1.6 x 10^-19 C)",
+        "answer": "E = V/d = 200/0.02 = 10000 V/m. F = qE = 1.6x10^-19 x 10000 = 1.6 x 10^-15 N.",
+        "difficulty_permille": 650,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "For parallel plates, E = V/d (uniform field).",
+          "Force on a charge: F = qE."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "E = 200/0.02 = 10^4 V/m. F = (1.6 x 10^-19)(10^4) = 1.6 x 10^-15 N, directed from negative plate toward positive plate (opposite to electron's motion).",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
-        ]
-      },
-      {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
-        ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
-        "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "F = 3.2 x 10^-15 N",
+          "F = 1.6 x 10^-17 N",
+          "E = 4000 V/m"
         ]
       }
     ],
     "hints": [
-      "Use ε = I(R + r). With two different setups, you get two equations with two unknowns (ε and r).",
-      "Use ε = I(R + r). With two different setups, you get two equations with two unknowns (ε and r).",
-      "Use ε = I(R + r). With two different setups, you get two equations with two unknowns (ε and r)."
+      "Use \u03b5 = I(R + r). With two different setups, you get two equations with two unknowns (\u03b5 and r).",
+      "Use \u03b5 = I(R + r). With two different setups, you get two equations with two unknowns (\u03b5 and r).",
+      "Use \u03b5 = I(R + r). With two different setups, you get two equations with two unknowns (\u03b5 and r)."
     ],
     "key_vocabulary": [
       {
         "term": "EMF",
         "definition": "The maximum potential difference a battery can provide (when no current flows)",
-        "example_usage": "ε = 12 V for this battery."
+        "example_usage": "\u03b5 = 12 V for this battery."
       },
       {
         "term": "internal resistance",
@@ -192,8 +167,8 @@
     "misconceptions": [
       {
         "misconception": "Students think the terminal voltage equals the EMF.",
-        "correction": "Terminal voltage = ε − Ir. It's less than the EMF when current flows due to energy lost in the battery.",
-        "why_students_think_this": "Internal resistance causes a voltage drop inside the battery. Only when I = 0 does V_terminal = ε."
+        "correction": "Terminal voltage = \u03b5 \u2212 Ir. It's less than the EMF when current flows due to energy lost in the battery.",
+        "why_students_think_this": "Internal resistance causes a voltage drop inside the battery. Only when I = 0 does V_terminal = \u03b5."
       }
     ],
     "generation_quality": {
@@ -206,7 +181,7 @@
   },
   "assessment": {
     "standard_code": "CAPS.PhysicalSciences.Gr10.PHY.6",
-    "title": "Assessment: Two kinds of charge. Coulomb's law: F = kQ₁Q₂/r². Electric field. Electric field between parallel plates. Charge conservation and quantisation",
+    "title": "Assessment: Two kinds of charge. Coulomb's law: F = kQ\u2081Q\u2082/r\u00b2. Electric field. Electric field between parallel plates. Charge conservation and quantisation",
     "items": [
       {
         "question": "Explain why the headlights of a car dim slightly when the starter motor is engaged.",
@@ -295,81 +270,81 @@
   "flashcards": [
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "What is the relationship between EMF, terminal voltage, and internal resistance?",
-      "back": "ε = V_terminal + Ir, or equivalently ε = I(R + r)",
+      "back": "\u03b5 = V_terminal + Ir, or equivalently \u03b5 = I(R + r)",
       "tags": [
         "CAPS.PhysicalSciences.Gr10.PHY.6",
         "Grade10",
-        "Physics — Electricity"
+        "Physics \u2014 Electricity"
       ],
       "difficulty_permille": 888
     }

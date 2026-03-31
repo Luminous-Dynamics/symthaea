@@ -1,0 +1,330 @@
+{
+  "node_id": "CAPS.CreativeArts.Visual",
+  "lesson": {
+    "standard_code": "CAPS.CreativeArts.Visual",
+    "title": "CAPS.CreativeArts.Visual: Visual Arts Fundamentals",
+    "grade_level": "Adult",
+    "bloom_level": "Apply",
+    "explanation": "Visual art is the language of seeing. Every artwork, from a cave painting to a digital illustration, is built from the same foundational elements and organised by the same principles. The elements of art are the building blocks: line (marks that define edges, movement, texture), shape (2D enclosed areas: geometric or organic), colour (hue, value, saturation; primary, secondary, tertiary; warm and cool), texture (how a surface looks or feels: actual or implied), form (3D shapes with volume and depth), value (lightness or darkness of a colour), and space (positive and negative, depth through overlap, size, and perspective). The principles of design organise these elements: balance (symmetrical, asymmetrical, radial), contrast (differences that create visual interest), emphasis (focal point that draws the eye), rhythm/repetition (patterns that create movement), unity (all parts working together), proportion (size relationships), and movement (guiding the viewer's eye). South African art has a rich heritage: Esther Mahlangu's Ndebele geometric murals bridge tradition and contemporary art; William Kentridge's charcoal animations address apartheid and memory; the Mapungubwe gold rhino connects us to pre-colonial artistic mastery.",
+    "examples": [
+      {
+        "problem": "Identify the elements of art used in a traditional Ndebele house painting.",
+        "steps": [
+          {
+            "instruction": "Step 1: Line — bold black outlines define geometric shapes and create structure",
+            "result": "line identified"
+          },
+          {
+            "instruction": "Step 2: Shape — geometric shapes (rectangles, triangles, chevrons) arranged in symmetrical patterns",
+            "result": "shape identified"
+          },
+          {
+            "instruction": "Step 3: Colour — vibrant primary and secondary colours (red, blue, yellow, green) create visual impact",
+            "result": "colour identified"
+          },
+          {
+            "instruction": "Step 4: Balance and rhythm — symmetrical arrangements with repeating patterns create visual harmony",
+            "result": "principles identified"
+          }
+        ],
+        "answer": "Answer: Ndebele murals use bold lines, geometric shapes, vibrant colours, symmetrical balance, and rhythmic repetition of patterns.",
+        "visual_description": null
+      },
+      {
+        "problem": "Explain how William Kentridge uses charcoal as a medium to explore themes of memory and erasure.",
+        "steps": [
+          {
+            "instruction": "Step 1: Kentridge draws in charcoal, photographs the drawing, then partially erases and redraws, photographing each stage",
+            "result": "process described"
+          },
+          {
+            "instruction": "Step 2: The erasure marks remain visible as ghostly traces, creating a palimpsest effect",
+            "result": "visual effect explained"
+          },
+          {
+            "instruction": "Step 3: This process mirrors how memory works — partial, layered, never fully erased — and serves as a metaphor for South Africa's struggle to reckon with its apartheid past",
+            "result": "thematic connection"
+          }
+        ],
+        "answer": "Answer: Kentridge's charcoal technique — drawing, erasing, redrawing — creates visible traces that metaphorically represent memory, history, and the impossibility of fully erasing the past.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Name the seven elements of art.",
+        "answer": "Line, shape, colour, texture, form, value, and space.",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Think about the basic building blocks of any visual artwork.",
+          "Some are 2D concepts (line, shape), others involve 3D or perception (form, space)."
+        ],
+        "explanation": "The seven elements are the fundamental components from which all visual art is constructed. Every artwork uses some or all of these elements.",
+        "distractors": [
+          "Balance, contrast, emphasis, rhythm, unity",
+          "Drawing, painting, sculpture, photography",
+          "Line, circle, square, triangle, colour"
+        ]
+      },
+      {
+        "question": "Explain the difference between shape and form, with examples.",
+        "answer": "Shape is 2D (flat) — a circle, square, or triangle on paper. Form is 3D — a sphere, cube, or pyramid that has volume and depth. A drawn circle is a shape; a sculpted ball is a form. Artists create the illusion of form on a 2D surface using shading (value).",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Shape is flat; form has depth.",
+          "Think about the difference between a circle and a sphere."
+        ],
+        "explanation": "Shape exists in two dimensions (height and width). Form adds the third dimension (depth). Artists use shading, perspective, and overlap to create the illusion of form on flat surfaces.",
+        "distractors": [
+          "Shape and form are the same thing",
+          "Form only exists in sculpture, never in painting",
+          "Shape is always geometric, form is always organic"
+        ]
+      },
+      {
+        "question": "Create a simple composition using three principles of design: balance, contrast, and emphasis.",
+        "answer": "Example: arrange three shapes — one large red circle (emphasis/focal point), with smaller blue and yellow shapes on either side (asymmetrical balance). The red against blue creates contrast. The large size creates emphasis. The arrangement creates balance.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Start with a focal point (emphasis), then arrange elements around it (balance), using differences to create interest (contrast).",
+          "Contrast can be in colour, size, shape, or value."
+        ],
+        "explanation": "Applying design principles means making deliberate choices. Emphasis draws the eye to a focal point. Balance distributes visual weight. Contrast creates visual interest through differences.",
+        "distractors": [
+          "Just place shapes randomly on the page",
+          "Use only one colour to avoid contrast",
+          "Make everything the same size for balance"
+        ]
+      },
+      {
+        "question": "Analyse how Esther Mahlangu's work bridges traditional Ndebele art and contemporary global art.",
+        "answer": "Mahlangu uses traditional Ndebele geometric patterns and bold colours (rooted in women's mural-painting tradition) but applies them to contemporary contexts: BMW cars, international galleries, fashion collaborations. She preserves cultural identity while reaching global audiences, challenging the distinction between 'craft' and 'fine art.'",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Consider what is traditional and what is contemporary in her practice.",
+          "Think about how she challenges Western categories of art."
+        ],
+        "explanation": "Mahlangu's genius lies in translating a living cultural tradition into the global contemporary art world, asserting the value and relevance of indigenous African visual languages.",
+        "distractors": [
+          "She simply copies traditional patterns without innovation",
+          "Her work is only craft, not art",
+          "Contemporary art must reject traditional forms"
+        ]
+      },
+      {
+        "question": "Evaluate the role of art in social change, using one South African artwork or artist as evidence.",
+        "answer": "Art can challenge injustice, preserve memory, and inspire action. Example: Kentridge's films confronted apartheid's violence when direct political speech was dangerous. Art reaches people emotionally, bypassing censorship and creating empathy. However, art alone cannot change policy — it must work alongside activism and political action.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about protest art, resistance art, and art that documents injustice.",
+          "Consider both the power and the limitations of art as a tool for change."
+        ],
+        "explanation": "South African art has a powerful tradition of resistance and social commentary. From the Polly Street Art Centre to Kentridge, art has been a vehicle for processing trauma and imagining justice.",
+        "distractors": [
+          "Art has no real impact on society",
+          "Only political speeches can create social change",
+          "Art should never be political"
+        ]
+      },
+      {
+        "question": "Design a mural for your school that celebrates diversity and uses at least four elements of art and three principles of design.",
+        "answer": "Design should specify: theme (diversity/unity), elements used (e.g., bold lines, vibrant colours, organic and geometric shapes, varied textures), principles applied (e.g., balance through equal representation, contrast through colour/cultural symbols, emphasis on a central unifying image, rhythm through repeating patterns). Include a written description or sketch.",
+        "difficulty_permille": 875,
+        "bloom_level": "Create",
+        "hints": [
+          "Start with a central theme and focal point, then build outward.",
+          "Think about how different cultural visual traditions can be incorporated respectfully."
+        ],
+        "explanation": "Designing a mural requires applying elements and principles of art to communicate a message. A diversity mural should represent multiple cultures and create visual unity from variety.",
+        "distractors": [
+          "Just paint a South African flag",
+          "Only use one artistic style to keep it simple",
+          "Copy an existing mural from the internet"
+        ]
+      }
+    ],
+    "hints": [
+      "Elements of art are the building blocks (what you use). Principles of design are the rules for organising them (how you arrange them).",
+      "South African art is not separate from 'global art' — artists like Mahlangu and Kentridge are internationally recognised.",
+      "Every artwork communicates something. Ask: what elements did the artist choose, and why?"
+    ],
+    "key_vocabulary": [
+      {
+        "term": "elements of art",
+        "definition": "The seven basic building blocks of visual art: line, shape, colour, texture, form, value, and space",
+        "example_usage": "Ndebele murals emphasise the elements of line, shape, and colour."
+      },
+      {
+        "term": "principles of design",
+        "definition": "Rules for organising elements of art: balance, contrast, emphasis, rhythm, unity, proportion, and movement",
+        "example_usage": "The artist used asymmetrical balance and contrast to create visual interest."
+      },
+      {
+        "term": "composition",
+        "definition": "The arrangement of elements within an artwork; how the parts are organised to create a whole",
+        "example_usage": "The composition places the focal point in the upper third of the painting."
+      },
+      {
+        "term": "medium",
+        "definition": "The material or technique used to create art (e.g., charcoal, oil paint, watercolour, digital, mixed media)",
+        "example_usage": "Kentridge's preferred medium is charcoal on paper, which allows for drawing and erasure."
+      },
+      {
+        "term": "focal point",
+        "definition": "The area of an artwork that draws the viewer's eye first, created through emphasis (size, colour, contrast, placement)",
+        "example_usage": "The bright red shape creates a focal point against the neutral background."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students believe they need natural talent to create art.",
+        "correction": "Art is a skill that can be learned through practice, just like mathematics or writing. Understanding elements and principles gives everyone a foundation for visual expression. Talent helps, but practice matters more.",
+        "why_students_think_this": "The myth of the 'born artist' discourages beginners. Showing that art skills develop through deliberate practice helps overcome this barrier."
+      },
+      {
+        "misconception": "Students think traditional African art is less sophisticated than Western art.",
+        "correction": "African art traditions have their own sophisticated visual languages, techniques, and aesthetic philosophies. Ndebele murals demonstrate advanced understanding of colour theory, geometry, and symbolic communication. The Mapungubwe gold rhino (13th century) shows metallurgical and artistic mastery.",
+        "why_students_think_this": "Colonial education devalued African art as 'craft.' Studying African art on its own terms, not through Western frameworks, reveals its sophistication."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.91,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.89,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "CAPS.CreativeArts.Visual",
+    "title": "Assessment: Visual Arts Fundamentals",
+    "items": [
+      {
+        "question": "Name the seven elements of art and the five main principles of design.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Elements: line, shape, colour, texture, form, value, space. Principles: balance, contrast, emphasis, rhythm/repetition, unity.",
+        "points": 1,
+        "bloom_level": "Remember",
+        "rubric": null,
+        "hint": "Elements are building blocks; principles are organisational rules"
+      },
+      {
+        "question": "Explain how an artist creates the illusion of depth on a flat surface.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Techniques: overlapping (near objects cover far ones), size variation (far objects smaller), value/colour (far objects lighter/bluer), perspective (converging lines), placement (higher on page = farther).",
+        "points": 2,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Think about how you perceive distance in real life"
+      },
+      {
+        "question": "Identify and describe the elements of art and principles of design in a specific South African artwork of your choice.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Answer should name a specific artwork, identify at least 3 elements and 2 principles, and explain how they contribute to the artwork's meaning or impact.",
+        "points": 2,
+        "bloom_level": "Apply",
+        "rubric": null,
+        "hint": "Choose an artwork you know well and be specific"
+      },
+      {
+        "question": "Compare the visual languages of Esther Mahlangu and William Kentridge.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Mahlangu: bold geometric shapes, bright colours, symmetrical patterns, clean lines, celebratory. Kentridge: gestural charcoal marks, monochrome, erasure traces, ambiguous space, political/melancholic. Both engage with SA identity but through very different visual strategies.",
+        "points": 3,
+        "bloom_level": "Analyze",
+        "rubric": null,
+        "hint": "Compare their use of colour, line, composition, and subject matter"
+      },
+      {
+        "question": "Evaluate the statement: 'Digital art is not real art because it does not require traditional skill.'",
+        "item_type": "ShortAnswer",
+        "correct_answer": "False. Digital art requires understanding of the same elements and principles. The medium is different (screen vs canvas) but the artistic decisions are the same. Digital tools are tools, like brushes. Many digital artists also have traditional training. Art is defined by intention and communication, not medium.",
+        "points": 3,
+        "bloom_level": "Evaluate",
+        "rubric": null,
+        "hint": "Consider what defines art — is it the tool or the thinking?"
+      },
+      {
+        "question": "Design a poster for Heritage Day that incorporates visual elements from at least two South African cultural traditions.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Design should specify: cultural elements chosen (e.g., Ndebele geometry + Zulu beadwork colours + San rock art figures), composition and layout, colour palette with rationale, text placement, and how the design communicates unity in diversity.",
+        "points": 4,
+        "bloom_level": "Create",
+        "rubric": null,
+        "hint": "Research the visual traditions before combining them respectfully"
+      }
+    ],
+    "total_points": 15,
+    "estimated_minutes": 25,
+    "bloom_distribution": [
+      ["Remember", 1],
+      ["Understand", 1],
+      ["Apply", 1],
+      ["Analyze", 1],
+      ["Evaluate", 1],
+      ["Create", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What are the seven elements of art?",
+      "back": "Line, shape, colour, texture, form, value, and space.",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "What is the difference between shape and form?",
+      "back": "Shape is 2D (flat: circle, square). Form is 3D (has volume: sphere, cube). Artists create the illusion of form using shading (value).",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What are the primary colours?",
+      "back": "Red, yellow, and blue. They cannot be mixed from other colours. Mixing two primaries creates a secondary colour (orange, green, purple).",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 100
+    },
+    {
+      "front": "Who is Esther Mahlangu?",
+      "back": "A South African artist known for translating traditional Ndebele geometric mural painting into contemporary art, including a famous BMW art car. Born 1935.",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is asymmetrical balance?",
+      "back": "Visual balance achieved without symmetry — different elements on each side have equal visual weight through size, colour, or placement differences.",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 275
+    },
+    {
+      "front": "Who is William Kentridge?",
+      "back": "A South African artist known for charcoal drawings and animated films exploring memory, apartheid, and erasure. His process of drawing, erasing, and redrawing mirrors how memory works.",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 200
+    },
+    {
+      "front": "What is a focal point in composition?",
+      "back": "The area that draws the viewer's eye first, created through emphasis: larger size, brighter colour, greater contrast, or central placement.",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 175
+    },
+    {
+      "front": "What is the Mapungubwe gold rhino?",
+      "back": "A gold-foil rhinoceros figure from the Kingdom of Mapungubwe (~1200-1300 CE), demonstrating pre-colonial southern African artistic and metallurgical sophistication.",
+      "tags": ["CAPS.CreativeArts.Visual", "Adult", "Creative Arts"],
+      "difficulty_permille": 250
+    }
+  ],
+  "quality": {
+    "coherence": 0.91,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}

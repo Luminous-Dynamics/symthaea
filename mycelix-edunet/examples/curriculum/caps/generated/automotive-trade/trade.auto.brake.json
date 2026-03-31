@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Braking & Suspension Systems?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "A customer complains of a pulsating brake pedal when stopping at moderate speed. The vehicle has disc brakes front and rear, 85,000 km on the clock. What is the most likely cause, and how do you verify it?",
+        "answer": "Most likely cause: warped (heat-distorted) front brake discs. At 85,000 km, the discs may have experienced thermal distortion from hard braking or prolonged downhill braking. Verification: (1) Jack up the front end, remove wheels. (2) Measure disc thickness variation (DTV) at 8 points around the disc using a micrometer. DTV should be <0.010mm; if >0.015mm, the disc causes pedal pulsation. (3) Measure disc runout with a dial indicator: mount indicator to the caliper bracket, rotate disc. Runout should be <0.05mm. (4) Check disc thickness against minimum specification (stamped on disc or from service manual). If above minimum thickness with <0.5mm to machine, resurface (skim) on a brake lathe. If below minimum, replace both discs as a pair. Also check pad condition -- uneven pad wear confirms disc problems.",
+        "difficulty_permille": 350,
+        "bloom_level": "Analyze",
+        "hints": ["Pulsating pedal = disc thickness variation. The caliper pushes further at thin spots, less at thick spots.", "Always replace discs in pairs (both fronts or both rears) for balanced braking."],
+        "explanation": "Brake disc diagnosis requires precise measurement, not guesswork. DTV and runout measurements distinguish between a disc that can be machined and one that must be replaced.",
+        "distractors": ["Warped discs are always replaced, never machined", "Rear drums usually cause pedal pulsation", "Just replace the pads and the pulsation will stop"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Braking & Suspension Systems in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
-        "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "question": "A vehicle's ABS warning light is on. The OBD2 scanner shows code C0035 (left front wheel speed sensor circuit). Describe your diagnostic procedure.",
+        "answer": "Diagnostic procedure: (1) Read and record the DTC. Clear and road test -- if the code returns immediately, the fault is active. (2) Visual inspection: check the left front wheel speed sensor wiring for damage (chafing against suspension components, broken connector, corrosion). This is the most common cause. (3) Measure sensor resistance with a multimeter (disconnect sensor): typical 800-1400 ohms. Open circuit (OL) = broken wire or sensor. Zero = short circuit. (4) Check the air gap between the sensor and the tone ring (toothed ring on the hub). Correct gap: 0.5-1.5mm. Debris (brake dust, metal particles) in the gap causes erratic signals. (5) Inspect the tone ring for missing or damaged teeth. (6) Check the connector for corrosion, bent pins, or water ingress. (7) If sensor and wiring test OK, check for ABS module fault (rare). Most common fix: replace the sensor or repair damaged wiring. After repair, clear the DTC and road test to verify the ABS light stays off.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": ["80% of wheel speed sensor faults are wiring/connector issues, not sensor failure.", "Always check the tone ring -- missing teeth cause the same symptoms as a bad sensor."],
+        "explanation": "ABS diagnosis follows a logical path from simple (wiring) to complex (module). Replacing expensive parts without diagnosis wastes money.",
+        "distractors": ["Replace the ABS module first", "ABS light on means the whole system needs replacement", "Ignore it -- ABS is optional"]
+      },
+      {
+        "question": "During a roadworthy inspection, you measure front brake pad thickness at 1.5mm and rear drum shoe thickness at 2.5mm. The vehicle has DOT 3 brake fluid that was last replaced 4 years ago. List all failures and required actions.",
+        "answer": "Failures: (1) Front pads at 1.5mm -- FAIL. SA roadworthy requires minimum 2mm pad thickness. Action: replace front pads (both sides). Inspect discs for scoring, minimum thickness, and DTV. Machine or replace discs if scored. (2) Rear shoes at 2.5mm -- PASS (minimum 2mm for bonded shoes, 1.5mm for riveted). However, at 2.5mm they will need replacement soon -- advise customer. (3) Brake fluid 4 years old -- FAIL/advisory. DOT 3/4 fluid is hygroscopic (absorbs moisture from air). After 2 years, moisture content rises, lowering the boiling point. Wet boiling point can drop from 205°C to under 140°C, causing brake fade under hard braking. Action: flush and replace all brake fluid. (4) While inspecting, also check: no fluid leaks at calipers/wheel cylinders/hoses, handbrake operation, ABS light off, brake pedal travel and firmness.",
+        "difficulty_permille": 300,
+        "bloom_level": "Apply",
+        "hints": ["SA roadworthy minimum: 2mm for pads, 2mm for bonded shoes, 1.5mm for riveted shoes.", "Brake fluid absorbs 3-4% moisture per year -- 4-year-old fluid has significantly reduced boiling point."],
+        "explanation": "Roadworthy inspections require knowing exact pass/fail criteria. Brake fluid age is often overlooked but is a serious safety factor.",
+        "distractors": ["1.5mm pads are acceptable for roadworthy", "Brake fluid never needs changing", "Only check the front brakes"]
+      },
+      {
+        "question": "A vehicle pulls to the right during braking. List FIVE possible causes, in order of likelihood, and the test for each.",
+        "answer": "(1) Seized caliper slide pin (right side): the right caliper doesn't release fully, applying constant light braking. Test: jack up, spin wheel by hand -- resistance indicates seized caliper. (2) Contaminated pads on one side: oil or brake fluid on the left pads reduces friction. Test: remove pads, inspect for contamination (shiny, discoloured surface). (3) Unequal pad material: different pad brands or grades fitted left and right. Test: visual inspection -- pads should be identical. (4) Collapsed brake hose (left side): internal deterioration restricts fluid flow to the left caliper. Test: open the bleeder valve while braking -- if the wheel releases, the hose is collapsed internally. (5) Wheel alignment issue: incorrect camber or toe causing directional pull, exacerbated under braking. Test: measure alignment angles. Note: always check the OPPOSITE side from the direction of pull. Vehicle pulls RIGHT = the right brake is grabbing more, OR the left brake is working less.",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
+        "hints": ["Pulling right means the right brake is doing more work OR the left brake is doing less.", "Collapsed hose is an often-missed cause -- the hose looks fine externally but is deteriorated internally."],
+        "explanation": "Brake pull diagnosis requires systematic testing of both sides. Replacing parts on only one side based on assumption leads to repeat complaints.",
+        "distractors": ["Always replace both calipers", "Pulling right means the right brake is weak", "Wheel alignment cannot cause brake pull"]
+      },
+      {
+        "question": "Explain why SA's mountainous routes (e.g., Van Reenen Pass, Hex River Pass) are particularly dangerous for vehicles with poor brake maintenance. What is brake fade and how does it occur?",
+        "answer": "Mountain passes require sustained braking over long distances (Van Reenen: 5km descent at 8% grade). Brake fade occurs when brakes overheat, reducing friction coefficient. Two types: (1) Pad fade: at temperatures above 300-400°C, pad material outgasses (friction material breaks down), creating a gas layer between pad and disc that reduces friction. (2) Fluid fade: overheated brake fluid boils, creating compressible gas bubbles in the hydraulic system. The pedal goes soft/long and braking force is lost. This is why old, moisture-contaminated fluid (DOT 3 wet boiling point ~140°C) is dangerous on mountain passes. Prevention: (1) Use engine braking (lower gear) on descents. (2) Keep brake fluid fresh (replace every 2 years). (3) Don't ride the brakes continuously -- use intermittent firm braking to allow cooling between applications. (4) Vehicles towing trailers are at highest risk due to extra mass. SA has designated brake cooling areas on major passes for this reason.",
+        "difficulty_permille": 700,
+        "bloom_level": "Evaluate",
+        "hints": ["SA's major passes have warning signs and brake cooling areas because overheated brakes cause fatal accidents every year.", "Engine braking: a lower gear makes the engine resist forward motion, reducing reliance on service brakes."],
+        "explanation": "Understanding brake fade connects theoretical knowledge (heat, friction, hydraulics) to real SA driving conditions. This knowledge saves lives on passes where runaway trucks are a recurring hazard.",
+        "distractors": ["Brake fade only affects old vehicles", "Modern ABS prevents all brake fade", "Continuous light braking is safer than intermittent firm braking"]
       }
     ],
     "key_vocabulary": [

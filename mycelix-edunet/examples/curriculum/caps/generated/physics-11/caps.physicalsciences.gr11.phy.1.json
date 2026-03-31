@@ -5,7 +5,7 @@
     "title": "CAPS.PhysicalSciences.Gr11.PHY.1: Resolution of vectors into components. Addition by compon...",
     "grade_level": "Grade11",
     "bloom_level": "Apply",
-    "explanation": "Kinematics describes motion without considering forces. Key concepts: displacement (change in position, can be negative), velocity (rate of change of displacement), acceleration (rate of change of velocity). Equations of motion: v = u + at, s = ut + ½at², v² = u² + 2as. Motion graphs: x-t graphs show position over time (gradient = velocity), v-t graphs show velocity (gradient = acceleration, area = displacement).",
+    "explanation": "Kinematics describes motion without considering forces. Key concepts: displacement (change in position, can be negative), velocity (rate of change of displacement), acceleration (rate of change of velocity). Equations of motion: v = u + at, s = ut + \u00bdat\u00b2, v\u00b2 = u\u00b2 + 2as. Motion graphs: x-t graphs show position over time (gradient = velocity), v-t graphs show velocity (gradient = acceleration, area = displacement).",
     "examples": [
       {
         "problem": "Solve a Vectors in Two Dimensions problem.",
@@ -67,108 +67,83 @@
     ],
     "practice_problems": [
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
+        "question": "Resolve a 50 N force acting at 30 degrees above the horizontal into horizontal and vertical components.",
+        "answer": "Fx = 50 cos(30) = 43.3 N. Fy = 50 sin(30) = 25 N.",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Horizontal component: Fx = F cos theta.",
+          "Vertical component: Fy = F sin theta."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Fx = 50 x cos(30) = 50 x 0.866 = 43.3 N. Fy = 50 x sin(30) = 50 x 0.5 = 25 N.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "Fx = 25 N, Fy = 43.3 N",
+          "Fx = 50 N, Fy = 50 N",
+          "Fx = 43.3 N, Fy = 43.3 N"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 375,
+        "question": "Two forces act on an object: 40 N east and 30 N north. Calculate the magnitude and direction of the resultant.",
+        "answer": "R = sqrt(40^2 + 30^2) = sqrt(2500) = 50 N. Angle = tan^-1(30/40) = 36.9 degrees north of east.",
+        "difficulty_permille": 350,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Use Pythagoras for perpendicular vectors: R = sqrt(Rx^2 + Ry^2).",
+          "Direction: theta = tan^-1(Ry/Rx)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "R = sqrt(1600 + 900) = sqrt(2500) = 50 N. theta = tan^-1(30/40) = tan^-1(0.75) = 36.9 degrees north of east.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "R = 70 N at 45 degrees",
+          "R = 50 N at 53.1 degrees",
+          "R = 35 N at 36.9 degrees"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
+        "question": "A crate rests on a 25-degree inclined plane. Its weight is 200 N. Calculate the component of the weight parallel to the slope and perpendicular to the slope.",
+        "answer": "W_parallel = mg sin(25) = 200 sin(25) = 84.5 N. W_perpendicular = mg cos(25) = 200 cos(25) = 181.3 N.",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "On an incline: parallel component = mg sin theta, perpendicular = mg cos theta.",
+          "The angle of the incline equals the angle between the weight vector and the perpendicular."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "W_par = 200 x sin(25) = 200 x 0.4226 = 84.5 N (pulls crate down the slope). W_perp = 200 x cos(25) = 200 x 0.9063 = 181.3 N (pushes into the slope).",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "W_par = 181.3 N, W_perp = 84.5 N",
+          "W_par = 200 N, W_perp = 0 N",
+          "W_par = 100 N, W_perp = 100 N"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "Three forces act on an object: 60 N east, 40 N at 120 degrees from east, and 30 N south. Find the resultant using component addition.",
+        "answer": "Rx = 60 + 40cos(120) + 0 = 60 + (-20) = 40 N. Ry = 0 + 40sin(120) + (-30) = 0 + 34.6 - 30 = 4.6 N. R = sqrt(40^2 + 4.6^2) = 40.3 N at 6.6 degrees north of east.",
+        "difficulty_permille": 650,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Resolve each force into x and y components.",
+          "Sum all x-components and all y-components separately."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "F1: (60, 0). F2: (40cos120, 40sin120) = (-20, 34.64). F3: (0, -30). Sum: (40, 4.64). R = 40.3 N, theta = tan^-1(4.64/40) = 6.6 degrees.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "R = 130 N",
+          "R = 40.3 N at 45 degrees",
+          "R = 10 N west"
         ]
       },
       {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "question": "An airplane flies at 250 km/h on a bearing of 060 degrees. A crosswind blows from the west at 50 km/h. Find the resultant velocity (magnitude and direction).",
+        "answer": "Plane: Vx = 250sin(60) = 216.5, Vy = 250cos(60) = 125. Wind: Vx = 50, Vy = 0 (from west = eastward). Total: Vx = 266.5, Vy = 125. V = sqrt(266.5^2 + 125^2) = 294.4 km/h. Bearing = 90 - tan^-1(125/266.5) = 90 - 25.1 = 064.9 degrees (approximately).",
+        "difficulty_permille": 800,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
+          "Bearing 060 means 60 degrees from north (clockwise).",
+          "Resolve the plane's velocity using: east = V sin(bearing), north = V cos(bearing)."
         ],
-        "explanation": "The answer follows from applying the correct method.",
+        "explanation": "Complex vector addition with bearings. The wind pushes the plane further east, slightly changing direction and increasing ground speed.",
         "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
-        ]
-      },
-      {
-        "question": "Practice: Vectors in Two Dimensions",
-        "answer": "Answer",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about what method applies here.,Review the key formula for this topic."
-        ],
-        "explanation": "The answer follows from applying the correct method.",
-        "distractors": [
-          "Wrong answer 1",
-          "Wrong answer 2",
-          "Wrong answer 3"
+          "300 km/h at 060",
+          "200 km/h at 090",
+          "294 km/h at 045"
         ]
       }
     ],
@@ -299,7 +274,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 111
     },
@@ -309,7 +284,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 222
     },
@@ -319,7 +294,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 333
     },
@@ -329,7 +304,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 444
     },
@@ -339,7 +314,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 555
     },
@@ -349,7 +324,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 666
     },
@@ -359,7 +334,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 777
     },
@@ -369,7 +344,7 @@
       "tags": [
         "CAPS.PhysicalSciences.Gr11.PHY.1",
         "Grade11",
-        "Physics — Mechanics"
+        "Physics \u2014 Mechanics"
       ],
       "difficulty_permille": 888
     }

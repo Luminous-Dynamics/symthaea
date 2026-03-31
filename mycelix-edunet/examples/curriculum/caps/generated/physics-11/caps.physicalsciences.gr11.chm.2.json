@@ -5,64 +5,65 @@
     "title": "CAPS.PhysicalSciences.Gr11.CHM.2: Rate of reaction. Factors affecting rate: concentration, ...",
     "grade_level": "Grade11",
     "bloom_level": "Understand",
-    "explanation": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9.8 m/s²), and height. Kinetic energy Ek = ½mv² depends on mass and speed. The law of conservation of mechanical energy states that in the absence of friction, total mechanical energy (Ep + Ek) remains constant. Work is done when a force moves an object: W = FΔx cos θ.",
+    "explanation": "Gravitational potential energy Ep = mgh depends on mass, gravitational acceleration (g = 9.8 m/s\u00b2), and height. Kinetic energy Ek = \u00bdmv\u00b2 depends on mass and speed. The law of conservation of mechanical energy states that in the absence of friction, total mechanical energy (Ep + Ek) remains constant. Work is done when a force moves an object: W = F\u0394x cos \u03b8.",
     "examples": [
       {
-        "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
+        "problem": "The concentration of H\u2082O\u2082 decreases from 0.80 mol/dm\u00b3 to 0.60 mol/dm\u00b3 in 20 seconds. Calculate the average rate.",
         "steps": [
           {
-            "instruction": "Step 1: Δ[H₂O₂] = 0.60 − 0.80 = −0.20 mol/dm³",
+            "instruction": "Step 1: \u0394[H\u2082O\u2082] = 0.60 \u2212 0.80 = \u22120.20 mol/dm\u00b3",
             "result": "change in concentration"
           },
           {
-            "instruction": "Step 2: Rate = −Δ[H₂O₂]/Δt = −(−0.20)/20 = 0.01 mol/dm³/s",
+            "instruction": "Step 2: Rate = \u2212\u0394[H\u2082O\u2082]/\u0394t = \u2212(\u22120.20)/20 = 0.01 mol/dm\u00b3/s",
             "result": "apply formula"
           }
         ],
-        "answer": "Answer: Rate = 0.01 mol·dm⁻³·s⁻¹",
+        "answer": "Answer: Rate = 0.01 mol\u00b7dm\u207b\u00b3\u00b7s\u207b\u00b9",
         "visual_description": null
       },
       {
-        "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
+        "problem": "The concentration of H\u2082O\u2082 decreases from 0.80 mol/dm\u00b3 to 0.60 mol/dm\u00b3 in 20 seconds. Calculate the average rate.",
         "steps": [
           {
-            "instruction": "Step 1: Δ[H₂O₂] = 0.60 − 0.80 = −0.20 mol/dm³",
+            "instruction": "Step 1: \u0394[H\u2082O\u2082] = 0.60 \u2212 0.80 = \u22120.20 mol/dm\u00b3",
             "result": "change in concentration"
           },
           {
-            "instruction": "Step 2: Rate = −Δ[H₂O₂]/Δt = −(−0.20)/20 = 0.01 mol/dm³/s",
+            "instruction": "Step 2: Rate = \u2212\u0394[H\u2082O\u2082]/\u0394t = \u2212(\u22120.20)/20 = 0.01 mol/dm\u00b3/s",
             "result": "apply formula"
           }
         ],
-        "answer": "Answer: Rate = 0.01 mol·dm⁻³·s⁻¹",
+        "answer": "Answer: Rate = 0.01 mol\u00b7dm\u207b\u00b3\u00b7s\u207b\u00b9",
         "visual_description": null
       },
       {
-        "problem": "The concentration of H₂O₂ decreases from 0.80 mol/dm³ to 0.60 mol/dm³ in 20 seconds. Calculate the average rate.",
+        "problem": "The concentration of H\u2082O\u2082 decreases from 0.80 mol/dm\u00b3 to 0.60 mol/dm\u00b3 in 20 seconds. Calculate the average rate.",
         "steps": [
           {
-            "instruction": "Step 1: Δ[H₂O₂] = 0.60 − 0.80 = −0.20 mol/dm³",
+            "instruction": "Step 1: \u0394[H\u2082O\u2082] = 0.60 \u2212 0.80 = \u22120.20 mol/dm\u00b3",
             "result": "change in concentration"
           },
           {
-            "instruction": "Step 2: Rate = −Δ[H₂O₂]/Δt = −(−0.20)/20 = 0.01 mol/dm³/s",
+            "instruction": "Step 2: Rate = \u2212\u0394[H\u2082O\u2082]/\u0394t = \u2212(\u22120.20)/20 = 0.01 mol/dm\u00b3/s",
             "result": "apply formula"
           }
         ],
-        "answer": "Answer: Rate = 0.01 mol·dm⁻³·s⁻¹",
+        "answer": "Answer: Rate = 0.01 mol\u00b7dm\u207b\u00b3\u00b7s\u207b\u00b9",
         "visual_description": null
       }
     ],
     "practice_problems": [
       {
         "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
-        "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules, increasing the frequency of effective collisions and the reaction rate.",
+        "difficulty_permille": 200,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Think about how many particles are exposed to the acid.",
+          "Which form has a greater surface area to volume ratio?"
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Surface area affects the frequency of effective collisions. More exposed surface = more collisions per second = faster reaction.",
         "distractors": [
           "Zinc powder is less reactive",
           "The lump has more atoms",
@@ -70,93 +71,67 @@
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
-        "difficulty_permille": 250,
+        "question": "The concentration of H2O2 decreases from 0.80 to 0.40 mol/dm^3 in 40 seconds. Calculate the average rate of reaction.",
+        "answer": "Rate = Delta[H2O2]/Delta t = (0.80 - 0.40)/40 = 0.01 mol/dm^3/s",
+        "difficulty_permille": 300,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Rate = change in concentration / change in time.",
+          "Use absolute value (rate is always positive)."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Rate = |Delta c|/Delta t = 0.40/40 = 0.01 mol.dm^-3.s^-1.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "0.02 mol/dm^3/s",
+          "16 mol/dm^3/s",
+          "0.001 mol/dm^3/s"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
-        "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "question": "Explain, using collision theory, why increasing temperature increases the rate of reaction.",
+        "answer": "Higher temperature means particles have greater kinetic energy, move faster, and collide more frequently. More importantly, a greater fraction of collisions have energy >= activation energy (Ea), so more collisions are effective, increasing the rate.",
+        "difficulty_permille": 450,
+        "bloom_level": "Understand",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Collision theory: reaction occurs when particles collide with sufficient energy and correct orientation.",
+          "Temperature mainly increases the fraction of molecules with energy >= Ea."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The Maxwell-Boltzmann distribution shows that at higher temperatures, the curve shifts right, and a larger area lies beyond Ea. This is the main reason for the rate increase.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Particles collide more often only",
+          "Temperature does not affect collision energy",
+          "Higher temperature reduces activation energy"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "A catalyst is added to the decomposition of hydrogen peroxide. Explain how the catalyst increases the rate without being consumed.",
+        "answer": "The catalyst (e.g., MnO2) provides an alternative reaction pathway with a lower activation energy (Ea). More molecules have energy >= this lower Ea, so more collisions are effective and the rate increases. The catalyst is regenerated at the end of the reaction.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "A catalyst lowers the activation energy.",
+          "It participates in the mechanism but is regenerated."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Catalysts do NOT increase the energy of particles. They provide a different pathway with a lower energy barrier. The enthalpy change (Delta H) is unchanged.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "The catalyst increases particle energy",
+          "The catalyst changes Delta H",
+          "The catalyst is consumed slowly"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
-        "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "question": "In an experiment, the rate of reaction doubled when the temperature increased from 25C to 35C. Explain this observation quantitatively.",
+        "answer": "A rough rule of thumb is that reaction rates double for every 10C rise in temperature. This is because the fraction of molecules with energy >= Ea approximately doubles for every 10C increase. The precise relationship is given by the Arrhenius equation: k = Ae^(-Ea/RT).",
+        "difficulty_permille": 600,
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "The Arrhenius equation shows the exponential dependence of rate on temperature.",
+          "The '10-degree doubling rule' is an approximation."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The Arrhenius equation shows that even a small temperature increase can significantly increase the rate constant k because of the exponential dependence on T.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
-        ]
-      },
-      {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
-        "difficulty_permille": 750,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
-        ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
-        "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
-        ]
-      },
-      {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
-        "difficulty_permille": 875,
-        "bloom_level": "Apply",
-        "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
-        ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
-        "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Rate always exactly doubles per 10C",
+          "The doubling has nothing to do with Ea",
+          "Higher temperature reduces the rate"
         ]
       }
     ],
@@ -179,13 +154,13 @@
       {
         "term": "catalyst",
         "definition": "A substance that speeds up a reaction without being consumed",
-        "example_usage": "MnO₂ catalyses the decomposition of H₂O₂."
+        "example_usage": "MnO\u2082 catalyses the decomposition of H\u2082O\u2082."
       }
     ],
     "misconceptions": [
       {
         "misconception": "Students think catalysts are 'used up' in the reaction.",
-        "correction": "Catalysts provide an alternative pathway with lower activation energy but are regenerated — they are not consumed.",
+        "correction": "Catalysts provide an alternative pathway with lower activation energy but are regenerated \u2014 they are not consumed.",
         "why_students_think_this": "The catalyst participates in an intermediate step but returns to its original form by the end."
       }
     ],
@@ -288,81 +263,81 @@
   "flashcards": [
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 111
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 222
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 333
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 444
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 555
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 666
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 777
     },
     {
       "front": "How does increasing temperature affect reaction rate?",
-      "back": "Higher temperature → particles move faster → more collisions with energy ≥ Ea → faster rate.",
+      "back": "Higher temperature \u2192 particles move faster \u2192 more collisions with energy \u2265 Ea \u2192 faster rate.",
       "tags": [
         "CAPS.PhysicalSciences.Gr11.CHM.2",
         "Grade11",
-        "Chemistry — Kinetics"
+        "Chemistry \u2014 Kinetics"
       ],
       "difficulty_permille": 888
     }

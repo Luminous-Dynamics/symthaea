@@ -28,34 +28,49 @@
     ],
     "practice_problems": [
       {
-        "question": "What is the first step when beginning work in Help Desk & Customer Service?",
-        "answer": "Safety assessment and preparation",
-        "difficulty_permille": 200,
-        "bloom_level": "Remember",
-        "hints": [
-          "Think safety first"
-        ],
-        "explanation": "Always start with safety.",
-        "distractors": [
-          "Skip to the job",
-          "Ask someone else",
-          "Guess"
-        ]
+        "question": "You receive three tickets simultaneously: (P1) The CEO's laptop won't boot -- she has a board presentation in 1 hour. (P2) 5 users in accounting can't access the shared drive. (P3) A user wants their email signature updated. Prioritise these tickets and justify your ordering.",
+        "answer": "Priority order: (1) P2 -- Shared drive for 5 accounting users. This affects multiple users and a business-critical function (accounting, end of month). Could indicate a server or network issue affecting others too. SLA: P2 typically requires 2-hour response. (2) P1 -- CEO's laptop. Although the CEO is senior, this is a single-user issue. Provide an immediate workaround: loan laptop with her files accessible via cloud/network, or connect her laptop to an external monitor if the issue is display-related. Then troubleshoot while she presents. SLA: P1 would normally be highest, but the WORKAROUND makes it manageable. (3) P3 -- Email signature update. Low impact, single user, no business disruption. Schedule for later today. SLA: P3 typically allows 24-48 hours. Key principle: prioritise by BUSINESS IMPACT (number of users affected x criticality of function), not by who is asking. However, always communicate with the CEO immediately -- even if her ticket is #2, she needs to know you're on it and have a plan.",
+        "difficulty_permille": 400,
+        "bloom_level": "Evaluate",
+        "hints": ["Prioritise by impact: how many users are affected and how critical is the function?", "A workaround that gets the user working (even imperfectly) buys you time to fix the root cause."],
+        "explanation": "Ticket prioritisation is a core help desk skill. The ability to assess impact, provide workarounds, and communicate effectively under pressure distinguishes professional IT support.",
+        "distractors": ["Always help the CEO first because of seniority", "Handle tickets in the order received (FIFO)", "The email signature is quick -- do it first to close a ticket"]
       },
       {
-        "question": "Describe the key regulation or standard that governs Help Desk & Customer Service in South Africa.",
-        "answer": "See lesson content for specific SA regulations.",
+        "question": "A user calls and says: 'My computer is broken. Nothing works.' Describe how you would handle this call using the CompTIA troubleshooting methodology, including communication techniques.",
+        "answer": "CompTIA 6-step methodology: (1) Identify the problem: ask open-ended questions. 'What were you doing when the problem started? What exactly do you see on screen? Has anything changed recently (updates, new software, move)? Can you do anything at all, or is the screen completely blank?' Avoid jargon. Listen actively -- let the user describe symptoms without interrupting. Repeat back: 'So your screen is showing a blue error message when you try to open Excel -- is that correct?' (2) Establish a theory of probable cause: based on the symptoms, form a hypothesis. Blue screen when opening Excel could be: corrupt Excel file, faulty RAM, or driver issue. (3) Test the theory: guide the user through a test. 'Can you try opening Word instead? Does it also crash?' If only Excel crashes = software issue. If everything crashes = hardware/driver. (4) Establish a plan of action: 'I'm going to remote into your machine to investigate. This will take about 15 minutes. Is that OK?' (5) Implement the solution: repair/reinstall Office, test RAM, update drivers. (6) Verify and document: 'Can you try opening Excel now? Great, it's working. I've logged this as ticket #4523. If it happens again, reference this ticket number.' Communication throughout: empathise ('I understand this is frustrating'), avoid blame ('these things happen'), set expectations ('I'll have this resolved within the hour').",
+        "difficulty_permille": 350,
+        "bloom_level": "Apply",
+        "hints": ["'Nothing works' almost never means nothing works. Your job is to translate vague complaints into specific symptoms.", "The user is not the problem. They're frustrated and need help. Empathy first, troubleshooting second."],
+        "explanation": "Communication skills are as important as technical skills in IT support. A technically brilliant fix delivered with poor communication leaves the user feeling unheard.",
+        "distractors": ["Tell the user to restart and call back if it happens again", "Use technical jargon to establish credibility", "Ask the user to diagnose the problem themselves"]
+      },
+      {
+        "question": "Your company's SLA defines: P1 (critical, business down) = 30 min response, 4 hr resolve. P2 (major, degraded) = 2 hr response, 8 hr resolve. P3 (minor) = 8 hr response, 24 hr resolve. Last month, your team's metrics were: P1 response 95% met, P1 resolve 72% met. What do the metrics tell you, and what changes would you recommend?",
+        "answer": "Analysis: P1 response is good (95% met = team acknowledges critical issues quickly). P1 resolution is poor (72% met = nearly 1 in 3 critical issues takes longer than 4 hours to fix). This means the team identifies problems quickly but struggles to resolve them. Possible causes: (1) Insufficient skills: the team can triage but lacks the expertise to fix complex issues. Recommendation: identify the types of P1 that breach SLA and provide targeted training. (2) Escalation delays: issues are escalated to senior techs or vendors too slowly. Recommendation: create clear escalation paths with time triggers (e.g., if not resolved in 2 hours, auto-escalate). (3) Parts/access delays: resolution requires hardware replacement or vendor access that takes time. Recommendation: keep critical spares on-site (spare PSU, RAM, HDD, switch), ensure admin credentials are accessible. (4) Knowledge base gaps: recurring P1s that should be resolved via documented procedures. Recommendation: create runbooks for the top 10 P1 scenarios. (5) Unrealistic SLA: if the nature of P1 issues genuinely requires more than 4 hours, renegotiate the SLA to be achievable. Monthly SLA review should be standard practice.",
+        "difficulty_permille": 600,
+        "bloom_level": "Evaluate",
+        "hints": ["High response + low resolution = the team is responsive but under-skilled or under-resourced.", "SLA metrics drive behaviour: if you only measure response time, people will 'respond' (acknowledge) without actually fixing."],
+        "explanation": "SLA analysis transforms IT support from reactive firefighting to proactive service management. Understanding what metrics mean (not just what they measure) enables targeted improvement.",
+        "distractors": ["95% response is perfect -- no changes needed", "Just hire more staff", "Metrics don't matter as long as users are happy"]
+      },
+      {
+        "question": "A user reports that their password has been changed without their knowledge and they can't log in. They also notice emails in their Sent folder that they didn't write. What are the immediate steps you must take?",
+        "answer": "This is a SECURITY INCIDENT -- treat it as P1 urgency. Immediate steps: (1) Verify user identity through a secondary channel (phone call, in-person) -- do not trust the email or ticket if the account is compromised. (2) Disable/lock the compromised account IMMEDIATELY in Active Directory or the identity provider. This stops the attacker from further access. (3) Force password reset on all accounts associated with this user (email, VPN, cloud services like Office 365, any SSO applications). (4) Check login history: identify the IP addresses and times of unauthorised access. If from an unusual location (foreign country), confirm compromised. (5) Review the sent emails: determine what was sent (phishing emails to contacts? data exfiltration?). Warn recipients if phishing was sent from this account. (6) Check for forwarding rules: attackers often set auto-forwarding to an external address to maintain access even after password change. Remove any unknown forwarding rules. (7) Scan the user's PC for malware (keylogger may have captured the password). (8) Document everything: timestamp, actions taken, evidence preserved. (9) Report to management and the POPIA Information Officer if personal data was exposed. (10) Enable MFA (multi-factor authentication) on the account before re-enabling it.",
+        "difficulty_permille": 700,
+        "bloom_level": "Analyze",
+        "hints": ["This is a security incident, not just a password reset. The attacker may still have access through forwarding rules or session tokens.", "POPIA (Protection of Personal Information Act) may require notification to the Information Regulator if personal data was breached."],
+        "explanation": "Account compromise response is a critical IT support scenario. The speed of response directly limits the damage. Missing steps (like checking forwarding rules or scanning for malware) allows the attacker to maintain access.",
+        "distractors": ["Just reset the password and move on", "Wait until Monday to investigate", "The user probably forgot they sent those emails"]
+      },
+      {
+        "question": "Write a knowledge base article for a common issue: 'Outlook keeps asking for password on Windows.' Include symptoms, cause, and step-by-step resolution.",
+        "answer": "Title: Outlook Repeatedly Prompts for Password (Windows). Symptoms: Outlook displays a password dialog box every few minutes. Even after entering the correct password, the prompt returns. May show 'Need Password' in the system tray. Emails are not sending or receiving. Cause: Cached credentials in Windows Credential Manager have become corrupt or expired. This commonly occurs after a password change, Office update, or Windows update. Resolution: (1) Close Outlook completely (check Task Manager -- end 'OUTLOOK.EXE' if still running). (2) Open Control Panel → Credential Manager → Windows Credentials. (3) Look for entries containing 'Outlook', 'Office', 'Microsoft', or 'MicrosoftOffice'. (4) Click each matching entry and select 'Remove'. (5) Open Outlook. It will prompt for your password ONE time. Enter your CURRENT password and tick 'Remember my credentials.' (6) If the problem persists: open Outlook in Safe Mode (hold Ctrl while clicking Outlook icon). If it works in Safe Mode, a faulty add-in is the cause. Disable add-ins one by one to identify the culprit. (7) If still persisting: create a new Outlook profile (Control Panel → Mail → Show Profiles → Add). Set up the email account fresh. Last updated: [date]. Author: [your name]. Applies to: Outlook 2016/2019/365 on Windows 10/11.",
         "difficulty_permille": 400,
-        "bloom_level": "Understand",
-        "hints": [
-          "Think about SANS standards or Acts"
-        ],
-        "explanation": "SA has specific standards for each trade.",
-        "distractors": [
-          "No regulations exist",
-          "Use UK standards",
-          "It's unregulated"
-        ]
+        "bloom_level": "Apply",
+        "hints": ["Good KB articles are written for your future self and your colleagues. Be specific, include exact navigation paths, and date-stamp.", "This is one of the most common Outlook issues -- a well-written KB article saves hours of repeat troubleshooting."],
+        "explanation": "Knowledge base documentation is how IT teams scale. A well-written article allows any team member to resolve a known issue without escalation, improving SLA metrics.",
+        "distractors": ["Just remember the fix -- no need to document", "KB articles should use technical language that only IT understands", "Write the article after you've fixed the issue for the 10th time"]
       }
     ],
     "key_vocabulary": [

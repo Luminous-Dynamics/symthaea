@@ -7,7 +7,7 @@
     "subject_area": "Multi-Subject",
     "domain": "Multi-Subject",
     "version": "2024",
-    "total_standards": 2079,
+    "total_standards": 2087,
     "domains": [
       "Software Design and Engineering",
       "Energy & Change",
@@ -61580,6 +61580,227 @@
       "domain": "Tourism",
       "tags": [],
       "supplementary_resources": []
+    },
+    {
+      "id": "ECON.MICRO.SUPPLY",
+      "title": "Supply & Demand",
+      "description": "Price determination, market equilibrium, shifts in supply and demand curves, price elasticity of demand. SA context: fuel prices, food markets, Eskom tariffs.",
+      "node_type": "Topic",
+      "difficulty": "Intermediate",
+      "domain": "Economics",
+      "subdomain": "Microeconomics",
+      "tags": [
+        "supply",
+        "demand",
+        "equilibrium",
+        "elasticity",
+        "SA markets"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.MICRO.MARKET",
+      "title": "Market Structures",
+      "description": "Perfect competition, monopoly, oligopoly, monopolistic competition. SA context: Eskom monopoly, banking oligopoly, bread price-fixing, Competition Commission.",
+      "node_type": "Topic",
+      "difficulty": "Intermediate",
+      "domain": "Economics",
+      "subdomain": "Microeconomics",
+      "tags": [
+        "monopoly",
+        "oligopoly",
+        "competition",
+        "cartel",
+        "SA Competition Commission"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.MACRO.GDP",
+      "title": "GDP & Economic Growth",
+      "description": "Measuring GDP (expenditure, income, production approaches), real vs nominal GDP, GDP deflator, economic indicators. SA GDP composition: services 67%, industry 26%, agriculture 3%.",
+      "node_type": "Topic",
+      "difficulty": "Intermediate",
+      "domain": "Economics",
+      "subdomain": "Macroeconomics",
+      "tags": [
+        "GDP",
+        "economic growth",
+        "real vs nominal",
+        "SA economy"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.MACRO.FISCAL",
+      "title": "Fiscal & Monetary Policy",
+      "description": "SARB, repo rate, inflation targeting (3-6%), government budget, national debt (~74% of GDP). Transmission mechanism: repo rate -> prime rate -> consumer borrowing.",
+      "node_type": "Topic",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Macroeconomics",
+      "tags": [
+        "SARB",
+        "repo rate",
+        "inflation",
+        "fiscal policy",
+        "monetary policy",
+        "national debt"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.MACRO.TRADE",
+      "title": "International Trade",
+      "description": "Comparative advantage, balance of payments, exchange rates (Rand/Dollar), trade agreements (AfCFTA, BRICS, SADC). SA exports: minerals, vehicles, fruit.",
+      "node_type": "Topic",
+      "difficulty": "Intermediate",
+      "domain": "Economics",
+      "subdomain": "Macroeconomics",
+      "tags": [
+        "trade",
+        "exchange rate",
+        "comparative advantage",
+        "BOP",
+        "AfCFTA",
+        "Rand"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Analyze",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.MACRO.UNEMP",
+      "title": "Unemployment & Inequality",
+      "description": "SA unemployment ~32% (expanded ~42%), youth unemployment ~60%. Types: structural, cyclical, frictional. Gini coefficient 0.63, BBBEE, NDP 2030, social grants (18M+ recipients).",
+      "node_type": "Topic",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Macroeconomics",
+      "tags": [
+        "unemployment",
+        "inequality",
+        "Gini",
+        "BBBEE",
+        "NDP",
+        "social grants",
+        "poverty"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.BEHAV.DECIDE",
+      "title": "Behavioral Economics",
+      "description": "Bounded rationality, loss aversion, anchoring, nudge theory. SA applications: stokvels as commitment devices, National Credit Act, auto-enrollment in retirement funds.",
+      "node_type": "Topic",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Behavioral Economics",
+      "tags": [
+        "behavioral economics",
+        "nudge",
+        "loss aversion",
+        "anchoring",
+        "bounded rationality",
+        "stokvels"
+      ],
+      "estimated_hours": 8,
+      "grade_levels": [
+        "Undergraduate"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
+    },
+    {
+      "id": "ECON.DEV.SA",
+      "title": "Development Economics",
+      "description": "HDI (SA: 0.713, IHDI: 0.468), food poverty line R624/month, social grants, land reform, infrastructure backlogs, NDP 2030, education quality crisis.",
+      "node_type": "Topic",
+      "difficulty": "Advanced",
+      "domain": "Economics",
+      "subdomain": "Development Economics",
+      "tags": [
+        "HDI",
+        "poverty",
+        "land reform",
+        "NDP",
+        "development",
+        "education quality"
+      ],
+      "estimated_hours": 10,
+      "grade_levels": [
+        "Adult"
+      ],
+      "bloom_level": "Evaluate",
+      "subject_area": "Economics",
+      "academic_standards": [],
+      "credit_hours": null,
+      "course_level": null,
+      "cip_code": null,
+      "program_id": null
     }
   ],
   "edges": [
@@ -74994,6 +75215,56 @@
       "edge_type": "AppliedIn",
       "strength_permille": 750,
       "rationale": "Sustainable tourism IS sustainability in action in one of SA's biggest industries."
+    },
+    {
+      "source": "ECON.MICRO.SUPPLY",
+      "target": "ECON.MICRO.MARKET",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MICRO.SUPPLY",
+      "target": "ECON.MACRO.GDP",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MACRO.GDP",
+      "target": "ECON.MACRO.FISCAL",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MACRO.GDP",
+      "target": "ECON.MACRO.TRADE",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MACRO.GDP",
+      "target": "ECON.MACRO.UNEMP",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MICRO.SUPPLY",
+      "target": "ECON.BEHAV.DECIDE",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MACRO.UNEMP",
+      "target": "ECON.DEV.SA",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "ECON.MACRO.FISCAL",
+      "target": "ECON.DEV.SA",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "30f3ea93-882a-4525-841c-1d5b4b64076f",
+      "target": "ECON.MICRO.SUPPLY",
+      "relationship": "prerequisite"
+    },
+    {
+      "source": "c01cdf85-3ce0-4d12-ae86-e4e63493fafa",
+      "target": "ECON.MICRO.SUPPLY",
+      "relationship": "prerequisite"
     }
   ]
 }

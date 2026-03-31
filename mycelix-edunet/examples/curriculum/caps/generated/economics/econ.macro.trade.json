@@ -1,0 +1,194 @@
+{
+  "node_id": "ECON.MACRO.TRADE",
+  "lesson": {
+    "standard_code": "ECON.MACRO.TRADE",
+    "title": "International Trade: Comparative advantage, balance of payments, exchange rates, Rand/Dollar, trade agreements",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Analyze",
+    "explanation": "International trade allows countries to specialise in goods where they have a comparative advantage -- producing at a lower opportunity cost. SA exports minerals (gold, platinum, iron ore, coal ~60% of exports), vehicles, fruit, and wine. Major imports include machinery, petroleum, electronics, and chemicals. The balance of payments (BOP) records all transactions between SA and the rest of the world. The current account (trade in goods and services) has typically been in deficit. The Rand/Dollar exchange rate fluctuates based on global risk appetite, commodity prices, and domestic factors (load-shedding, political uncertainty). SA is a member of BRICS, the African Continental Free Trade Area (AfCFTA), and SADC, all of which shape trade patterns.",
+    "examples": [
+      {
+        "problem": "The Rand weakens from R15/$ to R18/$. Explain the effect on SA exporters and importers.",
+        "steps": [
+          {
+            "instruction": "Step 1: A weaker Rand means SA goods become cheaper in dollar terms for foreign buyers",
+            "result": "export advantage"
+          },
+          {
+            "instruction": "Step 2: Exporters (e.g., mining companies, fruit farmers) benefit as they receive more Rands per dollar earned",
+            "result": "exporter gain"
+          },
+          {
+            "instruction": "Step 3: Imports become more expensive (e.g., petrol, electronics, machinery)",
+            "result": "importer loss"
+          },
+          {
+            "instruction": "Step 4: The current account deficit may narrow as exports become more competitive and imports more expensive",
+            "result": "BOP effect"
+          }
+        ],
+        "answer": "Answer: A weaker Rand benefits exporters (more Rands per dollar) but hurts importers and consumers (higher import prices). It may improve the trade balance.",
+        "visual_description": null
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Define comparative advantage and explain why SA exports wine to Europe while importing machinery from Germany.",
+        "answer": "Comparative advantage means producing a good at a lower opportunity cost than another country. SA has favorable climate and land for wine production (lower opportunity cost), while Germany has advanced manufacturing capability (lower opportunity cost for machinery). Both countries benefit from specialisation and trade.",
+        "difficulty_permille": 300,
+        "bloom_level": "Understand",
+        "hints": [
+          "Comparative advantage is about opportunity cost, not absolute cost.",
+          "Think about what each country is relatively better at producing."
+        ],
+        "explanation": "David Ricardo's theory of comparative advantage shows that trade benefits both parties even if one country is more efficient at producing everything.",
+        "distractors": [
+          "SA exports wine because it is cheaper in absolute terms",
+          "Germany imports wine because it cannot produce wine at all",
+          "Comparative advantage is the same as absolute advantage"
+        ]
+      },
+      {
+        "question": "If the Rand/Dollar rate moves from R16 to R14, would this help or hurt Sasol (which exports chemicals priced in dollars)?",
+        "answer": "A stronger Rand (fewer Rands per dollar) hurts Sasol. Each dollar of export revenue now converts to fewer Rands, reducing Rand-denominated profits.",
+        "difficulty_permille": 400,
+        "bloom_level": "Apply",
+        "hints": [
+          "Sasol earns dollars from exports. How many Rands does each dollar buy?",
+          "R14/$ means fewer Rands per dollar than R16/$."
+        ],
+        "explanation": "A stronger Rand reduces the Rand value of dollar-denominated export earnings. This is why mining and export companies' share prices often fall when the Rand strengthens.",
+        "distractors": [
+          "Sasol benefits from a stronger Rand",
+          "Exchange rate changes do not affect exporters",
+          "Sasol would earn more Rands per dollar"
+        ]
+      },
+      {
+        "question": "Explain what the current account balance measures and why SA typically runs a deficit.",
+        "answer": "The current account records trade in goods and services, investment income, and transfers. SA runs a deficit because it imports more manufactured goods, oil, and machinery than it exports, and pays significant dividends/interest to foreign investors.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "The current account = trade balance + services balance + income + transfers.",
+          "SA imports oil (no domestic production sufficient for demand) and manufactured goods."
+        ],
+        "explanation": "SA's current account deficit is financed by capital inflows (foreign investment). This makes SA vulnerable to capital flight when global risk sentiment deteriorates.",
+        "distractors": [
+          "The current account only measures goods trade",
+          "SA runs a current account surplus",
+          "The current account includes government debt"
+        ]
+      },
+      {
+        "question": "Evaluate the potential benefits and risks of the African Continental Free Trade Area (AfCFTA) for South Africa.",
+        "answer": "Benefits: access to a market of 1.4 billion people, increased intra-African trade (currently only ~15% of Africa's trade), diversification away from dependence on EU/China markets. Risks: competition from lower-cost producers (e.g., textiles from Ethiopia/Kenya), potential loss of tariff revenue, infrastructure gaps (poor roads, ports, customs delays) limiting trade flows.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "AfCFTA aims to create the world's largest free trade area by population.",
+          "Consider both market access opportunities and competitive threats."
+        ],
+        "explanation": "SA is Africa's most industrialised economy, so it stands to gain from expanded markets. But implementation challenges (non-tariff barriers, infrastructure) may limit short-term benefits.",
+        "distractors": [
+          "AfCFTA will only benefit SA",
+          "Free trade always benefits all parties equally",
+          "SA should not join any trade agreements"
+        ]
+      },
+      {
+        "question": "A SA investor converts R1 million to dollars at R17/$, invests in US bonds for a year earning 5%, then converts back at R19/$. Calculate the total Rand return.",
+        "answer": "Convert: R1,000,000 / 17 = $58,824. After 5% return: $58,824 x 1.05 = $61,765. Convert back: $61,765 x 19 = R1,173,535. Rand return = R173,535 or 17.4%.",
+        "difficulty_permille": 600,
+        "bloom_level": "Apply",
+        "hints": [
+          "First convert Rands to dollars, then apply the 5% return, then convert back.",
+          "The Rand weakened from R17 to R19, which benefits the returning investment."
+        ],
+        "explanation": "The investor earned 5% in dollar terms plus a ~12% currency gain from Rand depreciation, for a combined Rand return of ~17.4%. Currency movements can dominate investment returns.",
+        "distractors": [
+          "R50,000 (5% of R1 million)",
+          "R1,050,000",
+          "R1,117,647"
+        ]
+      }
+    ],
+    "hints": [
+      "Comparative advantage is about relative (opportunity) cost, not absolute cost.",
+      "A weaker Rand helps exporters but hurts importers. A stronger Rand does the opposite.",
+      "The current account = trade in goods + services + income + transfers."
+    ],
+    "key_vocabulary": [
+      {
+        "term": "comparative advantage",
+        "definition": "The ability to produce a good at a lower opportunity cost than another country",
+        "example_usage": "SA has a comparative advantage in mining due to its mineral wealth."
+      },
+      {
+        "term": "balance of payments",
+        "definition": "A record of all economic transactions between residents of a country and the rest of the world",
+        "example_usage": "SA's balance of payments shows a current account deficit financed by capital inflows."
+      },
+      {
+        "term": "exchange rate",
+        "definition": "The price of one currency in terms of another",
+        "example_usage": "The Rand/Dollar exchange rate of R18/$ means one US dollar costs 18 Rand."
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Students think a trade deficit is always bad.",
+        "correction": "A trade deficit means a country imports more than it exports, but this can reflect strong domestic demand and investment inflows. The US has run a trade deficit for decades while remaining the world's largest economy.",
+        "why_students_think_this": "The word 'deficit' has negative connotations, but it simply means net importing."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.90,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.90,
+      "needs_human_review": false
+    }
+  },
+  "assessment": {
+    "standard_code": "ECON.MACRO.TRADE",
+    "title": "Assessment: International trade, exchange rates, balance of payments",
+    "items": [
+      {
+        "question": "Explain comparative advantage with an example involving SA and another country.",
+        "item_type": "ShortAnswer",
+        "correct_answer": "Comparative advantage means producing at lower opportunity cost. SA has comparative advantage in mining (abundant minerals, established infrastructure) while Japan has comparative advantage in electronics (technology, skilled labour). Both benefit from specialisation and trade.",
+        "points": 3,
+        "bloom_level": "Understand",
+        "rubric": null,
+        "hint": "Focus on opportunity cost, not absolute cost."
+      }
+    ],
+    "total_points": 3,
+    "estimated_minutes": 8,
+    "bloom_distribution": [
+      ["Understand", 1]
+    ]
+  },
+  "flashcards": [
+    {
+      "front": "What is comparative advantage?",
+      "back": "The ability to produce a good at a lower opportunity cost than another country. It is the basis for mutually beneficial international trade (Ricardo).",
+      "tags": ["ECON.MACRO.TRADE", "Economics", "International Trade"],
+      "difficulty_permille": 250
+    },
+    {
+      "front": "How does a weaker Rand affect SA's trade balance?",
+      "back": "Exports become cheaper (more competitive) and imports become more expensive, tending to improve the trade balance (J-curve effect in the short run).",
+      "tags": ["ECON.MACRO.TRADE", "Economics", "Exchange Rates"],
+      "difficulty_permille": 400
+    }
+  ],
+  "quality": {
+    "coherence": 0.90,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-30T18:00:00"
+}
