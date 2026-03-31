@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Distinguish between an emission spectrum and an absorption spectrum.",
+        "answer": "An emission spectrum shows bright coloured lines on a dark background (from excited atoms emitting photons). An absorption spectrum shows dark lines on a continuous coloured background (photons absorbed by cool gas).",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Think about what happens when atoms gain vs lose energy.",
+          "Which one has bright lines and which has dark lines?"
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "Emission: electrons drop to lower energy levels, emitting photons of specific frequencies. Absorption: a continuous spectrum passes through cool gas, which absorbs specific frequencies.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Both show bright lines",
+          "Absorption spectra come from hot gases",
+          "Emission spectra are continuous"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "An electron in a hydrogen atom drops from energy level E₃ = −1.51 eV to E₂ = −3.40 eV. Calculate the energy of the emitted photon in joules.",
+        "answer": "3.024 × 10⁻¹⁹ J",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Energy of photon = E_higher − E_lower.",
+          "Convert eV to joules: multiply by 1.6 × 10⁻¹⁹."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "ΔE = E₃ − E₂ = (−1.51) − (−3.40) = 1.89 eV = 1.89 × 1.6×10⁻¹⁹ = 3.024×10⁻¹⁹ J.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "4.91 × 10⁻¹⁹ J",
+          "1.51 × 10⁻¹⁹ J",
+          "7.85 × 10⁻¹⁹ J"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Calculate the wavelength of the photon emitted when a hydrogen electron transitions from n = 3 (E = −1.51 eV) to n = 2 (E = −3.40 eV). (h = 6.63 × 10⁻³⁴ J·s, c = 3 × 10⁸ m·s⁻¹)",
+        "answer": "658 nm (red light — H-alpha line)",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "First find ΔE in joules.",
+          "Then use λ = hc/ΔE."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "ΔE = 1.89 eV = 3.024×10⁻¹⁹ J. λ = hc/ΔE = (6.63×10⁻³⁴)(3×10⁸)/(3.024×10⁻¹⁹) = 6.58×10⁻⁷ m = 658 nm.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "434 nm",
+          "486 nm",
+          "122 nm"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Explain why hydrogen produces a line spectrum rather than a continuous spectrum.",
+        "answer": "Hydrogen atoms have discrete (quantised) energy levels. Electrons can only transition between these fixed levels, emitting photons of specific energies (and therefore specific frequencies/wavelengths).",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "What does 'quantised' mean for energy levels?",
+          "Can electrons exist between energy levels?"
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "Since ΔE is fixed for each transition, E = hf gives specific frequencies. This produces discrete lines, not a continuous band.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Hydrogen is a single element",
+          "The gas is too hot",
+          "Light diffracts in the prism"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "A flame test produces a yellow line at 589 nm. Calculate the energy difference between the two atomic energy levels responsible. (h = 6.63 × 10⁻³⁴ J·s, c = 3 × 10⁸ m·s⁻¹)",
+        "answer": "3.38 × 10⁻¹⁹ J (or 2.11 eV)",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Use E = hc/λ.",
+          "Convert nm to m: 1 nm = 10⁻⁹ m."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "E = hc/λ = (6.63×10⁻³⁴)(3×10⁸)/(589×10⁻⁹) = 3.38×10⁻¹⁹ J = 2.11 eV.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "5.89 × 10⁻¹⁹ J",
+          "1.13 × 10⁻¹⁹ J",
+          "3.38 × 10⁻²⁰ J"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Explain how astronomers determine the chemical composition of distant stars using absorption spectra.",
+        "answer": "Light from the star passes through its cooler outer atmosphere. Elements in the atmosphere absorb specific wavelengths. The dark absorption lines are compared to known emission spectra of elements on Earth to identify which elements are present.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "What produces the dark lines in the absorption spectrum?",
+          "Each element has a unique set of spectral lines (like a fingerprint)."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "Each element absorbs unique wavelengths corresponding to its energy level transitions. By matching dark lines to known element spectra, we identify the star's composition.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Stars emit only certain colours",
+          "Telescopes filter out specific wavelengths",
+          "Different elements glow at different temperatures"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "A hydrogen atom can undergo transitions from n = 4 to n = 1, n = 4 to n = 2, or n = 4 to n = 3. Which transition produces the photon with the (a) highest frequency and (b) longest wavelength? Given: E₁ = −13.6 eV, E₂ = −3.40 eV, E₃ = −1.51 eV, E₄ = −0.85 eV.",
+        "answer": "(a) n=4→n=1 (highest ΔE = 12.75 eV, so highest frequency). (b) n=4→n=3 (lowest ΔE = 0.66 eV, so longest wavelength).",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Larger energy difference → higher frequency (E = hf).",
+          "Longer wavelength means lower frequency, which means smaller ΔE."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "ΔE(4→1) = 12.75 eV, ΔE(4→2) = 2.55 eV, ΔE(4→3) = 0.66 eV. Since E = hf, the largest ΔE gives the highest f (shortest λ). The smallest ΔE gives the lowest f (longest λ).",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "n=4→n=3 has highest frequency",
+          "n=4→n=1 has longest wavelength",
+          "All transitions have the same frequency"
         ]
       }
     ],

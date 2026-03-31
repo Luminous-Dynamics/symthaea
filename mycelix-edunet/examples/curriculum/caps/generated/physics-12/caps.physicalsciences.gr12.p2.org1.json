@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Name the functional group in CH₃CH₂OH and give the homologous series it belongs to.",
+        "answer": "Functional group: hydroxyl (−OH). Homologous series: alcohols.",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Look for the group of atoms bonded to the carbon chain.",
+          "The suffix for this homologous series is −ol."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "The −OH (hydroxyl) group identifies the molecule as an alcohol. Ethanol is the second member of the alcohol series.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Carboxyl group, carboxylic acids",
+          "Carbonyl group, ketones",
+          "Amino group, amines"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Give the IUPAC name for CH₃CH₂CH(OH)CH₃.",
+        "answer": "Butan-2-ol",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Find the longest chain containing the −OH group.",
+          "Number from the end closest to the −OH group."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Longest chain = 4 carbons (butane). −OH on carbon 2. Suffix: −ol. Name: butan-2-ol.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Butan-3-ol",
+          "2-butanol",
+          "Propan-1-ol"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Write the structural formula for 2-methylpropan-1-ol and classify it as primary, secondary, or tertiary.",
+        "answer": "(CH₃)₂CHCH₂OH. It is a primary alcohol (the C bonded to −OH is attached to only one other C).",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "The parent chain is propan-1-ol (3 carbons, OH on C1).",
+          "A methyl branch is on C2. Check how many carbons are bonded to the carbon bearing −OH."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "2-methylpropan-1-ol: CH₃−CH(CH₃)−CH₂−OH. The C bearing OH is bonded to only one other C → primary.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Secondary alcohol",
+          "Tertiary alcohol",
+          "(CH₃)₃COH"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Propan-1-ol and propan-2-ol are isomers. State the type of isomerism and explain the difference.",
+        "answer": "Positional isomers. They have the same molecular formula (C₃H₈O) and same functional group (−OH), but the −OH is on different carbon atoms (C1 vs C2).",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "They have the same functional group but it is in a different position.",
+          "What type of isomerism involves different positions of the same functional group?"
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Positional isomers: same molecular formula, same functional group, different position on the chain.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Chain isomers",
+          "Functional group isomers",
+          "Geometric isomers"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Draw and name all structural isomers with the molecular formula C₄H₉Cl.",
+        "answer": "Four isomers: 1-chlorobutane, 2-chlorobutane, 1-chloro-2-methylpropane, 2-chloro-2-methylpropane.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Consider both straight-chain and branched-chain butyl groups.",
+          "Place the Cl on different positions of each chain."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Straight chain (butane): Cl on C1 → 1-chlorobutane, Cl on C2 → 2-chlorobutane. Branched (2-methylpropane): Cl on C1 → 1-chloro-2-methylpropane, Cl on C2 → 2-chloro-2-methylpropane.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Only two isomers exist",
+          "Three isomers",
+          "Five isomers"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Give the IUPAC name for CH₃CH(CH₃)CH₂COOH.",
+        "answer": "3-methylbutanoic acid",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "The −COOH group gets carbon number 1.",
+          "Find the longest chain that includes the −COOH carbon."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Longest chain including COOH = 4 carbons (butanoic acid). Methyl branch on C3. Name: 3-methylbutanoic acid.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "2-methylbutanoic acid",
+          "3-methylpropanoic acid",
+          "Pentanoic acid"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Ethanol (C₂H₅OH) and methoxymethane (CH₃OCH₃) have the same molecular formula C₂H₆O. State the type of isomerism and explain why their physical properties differ significantly.",
+        "answer": "Functional group isomers: ethanol is an alcohol (−OH) while methoxymethane is an ether (−O−). Ethanol can form hydrogen bonds (higher boiling point, soluble in water). Methoxymethane cannot form H-bonds with itself (lower boiling point, less soluble).",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Different functional groups with the same molecular formula.",
+          "Which intermolecular forces can each molecule form?"
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Functional group isomers have the same molecular formula but different functional groups. The −OH in ethanol allows hydrogen bonding, giving it a higher boiling point (78°C vs −24°C for methoxymethane).",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Chain isomers",
+          "Positional isomers",
+          "They have the same properties"
         ]
       }
     ],

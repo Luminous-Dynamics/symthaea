@@ -55,108 +55,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Define the rate of a chemical reaction.",
+        "answer": "The rate of reaction is the change in concentration of reactants or products per unit time: rate = −Δ[reactant]/Δt = +Δ[product]/Δt.",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Rate involves concentration and time.",
+          "The negative sign for reactants means their concentration decreases."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Rate = change in concentration per unit time. Reactant concentration decreases (negative Δ), product concentration increases.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Rate = mass lost per second",
+          "Rate = volume of gas per mole",
+          "Rate = energy released per second"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "The concentration of H₂O₂ decreases from 0.80 mol·dm⁻³ to 0.60 mol·dm⁻³ in 20 s. Calculate the average rate of reaction.",
+        "answer": "0.01 mol·dm⁻³·s⁻¹",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Rate = −Δ[H₂O₂]/Δt.",
+          "Calculate the change in concentration first."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Δ[H₂O₂] = 0.60 − 0.80 = −0.20. Rate = −(−0.20)/20 = 0.01 mol·dm⁻³·s⁻¹.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "0.1 mol·dm⁻³·s⁻¹",
+          "0.04 mol·dm⁻³·s⁻¹",
+          "0.001 mol·dm⁻³·s⁻¹"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Explain, using collision theory, why increasing the concentration of a reactant increases the rate of reaction.",
+        "answer": "Higher concentration means more reactant particles per unit volume. This increases the frequency of collisions between reactant particles, so more effective collisions occur per unit time, increasing the rate.",
         "difficulty_permille": 375,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "What does collision theory require for a reaction to occur?",
+          "How does more particles per volume affect collisions?"
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Collision theory: rate depends on frequency of effective collisions (correct orientation + energy ≥ Ea). Higher concentration → more particles → more collisions → faster rate.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Concentration increases activation energy",
+          "More particles means each particle moves faster",
+          "Concentration changes the orientation of particles"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Explain why a lump of zinc reacts more slowly with HCl than zinc powder of equal mass.",
+        "answer": "Zinc powder has a much greater surface area than a lump. More zinc atoms are exposed to HCl molecules, so there are more collisions per unit time, leading to a faster rate for the powder.",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Compare the surface area to volume ratio.",
+          "Which form exposes more particles to the acid?"
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Surface area is a factor affecting rate. Greater surface area → more contact between reactant particles → more effective collisions per second.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "The lump is less reactive",
+          "Zinc powder has a higher activation energy",
+          "The lump has more atoms"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Using a Maxwell-Boltzmann distribution curve, explain how increasing temperature increases the rate of reaction.",
+        "answer": "At higher temperature, the curve shifts right and flattens. A greater fraction of particles has kinetic energy ≥ Ea. This means more particles can undergo effective collisions, increasing the rate.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "How does the shape of the curve change?",
+          "What does the area to the right of Ea represent?"
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Higher T: average Ek increases, distribution broadens, more particles exceed Ea. The fraction with E ≥ Ea increases significantly, even with a modest temperature rise.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Ea decreases at higher temperature",
+          "All particles gain energy above Ea",
+          "The curve shifts left"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "Explain how a catalyst increases the rate of reaction without being consumed. Refer to activation energy.",
+        "answer": "A catalyst provides an alternative reaction pathway with a lower activation energy (Ea). More particles now have kinetic energy ≥ Ea, so more effective collisions occur per unit time. The catalyst participates in intermediate steps but is regenerated.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Does a catalyst change the energy of the products?",
+          "Think about the energy profile diagram with and without a catalyst."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "The catalyst lowers Ea by forming intermediates. On the Maxwell-Boltzmann curve, a lower Ea means a larger fraction of particles can react. The catalyst is not consumed overall.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "Catalysts increase the energy of particles",
+          "Catalysts are consumed in the reaction",
+          "Catalysts change the products formed"
         ]
       },
       {
-        "question": "Explain why a lump of zinc reacts slower with HCl than zinc powder.",
-        "answer": "Zinc powder has a greater surface area, exposing more zinc atoms for collision with HCl molecules.",
+        "question": "In an experiment, the reaction Mg + 2HCl → MgCl₂ + H₂ is performed at 25°C and again at 35°C, with all other conditions identical. The rate approximately doubles. A student claims this is because the particles move twice as fast. Evaluate this claim.",
+        "answer": "The claim is incorrect. The average kinetic energy increases by only about 3% (from 298 K to 308 K). The rate doubles because a 10°C increase dramatically increases the fraction of particles with E ≥ Ea (the tail of the Maxwell-Boltzmann distribution is very sensitive to temperature).",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Think about how many particles are exposed to the acid.,Which form has a greater surface area to volume ratio?"
+          "Calculate the ratio of absolute temperatures: 308/298.",
+          "The doubling of rate is due to the exponential dependence on 1/T, not linear speed increase."
         ],
-        "explanation": "Surface area affects the frequency of effective collisions.",
+        "explanation": "Average speed √(T), so speed increases by √(308/298) ≈ 1.017 (1.7%). But the fraction with E ≥ Ea depends exponentially on −1/T (Arrhenius equation), so even small T increases greatly increase this fraction.",
         "distractors": [
-          "Zinc powder is less reactive",
-          "The lump has more atoms",
-          "Temperature is different"
+          "The particles do move twice as fast",
+          "Ea decreases at higher temperature",
+          "Rate always doubles for every 10°C rise"
         ]
       }
     ],

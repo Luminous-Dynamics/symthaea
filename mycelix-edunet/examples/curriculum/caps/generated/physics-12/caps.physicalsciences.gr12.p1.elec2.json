@@ -67,48 +67,51 @@
     ],
     "practice_problems": [
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "State Faraday's law of electromagnetic induction.",
+        "answer": "The induced EMF is directly proportional to the rate of change of magnetic flux linkage: ε = −NΔΦ/Δt.",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "What quantity must change to induce an EMF?",
+          "N refers to the number of turns in the coil."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "Faraday's law: ε = −NΔΦ/Δt. The negative sign (Lenz's law) indicates the induced EMF opposes the change in flux.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "ε = NΦ/t",
+          "ε = BIl",
+          "ε = IR"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A coil of 200 turns experiences a change in magnetic flux from 0.05 Wb to 0.02 Wb in 0.1 s. Calculate the induced EMF.",
+        "answer": "60 V",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Use ε = −NΔΦ/Δt.",
+          "Calculate ΔΦ = Φ_final − Φ_initial."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "ΔΦ = 0.02 − 0.05 = −0.03 Wb. ε = −(200)(−0.03)/(0.1) = 60 V.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "6 V",
+          "600 V",
+          "30 V"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "An AC generator has peak voltage V_max = 340 V. Calculate V_rms and the average power dissipated in a 100 Ω resistor.",
+        "answer": "V_rms = 240.4 V; P_avg = 578 W",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "V_rms = V_max/√2.",
+          "P_avg = V_rms²/R."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "V_rms = 340/√2 = 240.4 V. P_avg = (240.4)²/100 = 57794/100 ≈ 578 W.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "P = 1156 W",
+          "P = 340 W",
+          "P = 289 W"
         ]
       },
       {
@@ -117,58 +120,62 @@
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "Write two equations using ε = I(R + r) for each scenario.",
+          "Set the two expressions for ε equal and solve for r."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "ε = 2(3 + r) = 6 + 2r and ε = 1(7 + r) = 7 + r. So 6 + 2r = 7 + r → r = 1 Ω. ε = 8 V.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "ε = 6 V, r = 0",
+          "ε = 10 V, r = 2 Ω",
+          "ε = 7 V, r = 0.5 Ω"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "Explain the function of slip rings in an AC generator and split-ring commutator in a DC motor.",
+        "answer": "Slip rings maintain continuous contact with the rotating coil, allowing alternating current to flow to the external circuit. A split-ring commutator reverses the current direction every half turn, ensuring the coil always rotates in the same direction.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "What would happen to the current without slip rings?",
+          "Why does a DC motor need the current to reverse every half cycle?"
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "In a generator, slip rings transfer AC to the external circuit. In a motor, the split-ring commutator switches the current direction every 180° so the force on the coil always acts the same way, maintaining rotation.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "Both serve the same function",
+          "Slip rings convert AC to DC",
+          "The commutator prevents sparking"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A transformer has 500 turns on the primary and 50 turns on the secondary. The input voltage is 230 V AC. Calculate the output voltage and state whether this is a step-up or step-down transformer.",
+        "answer": "V_s = 23 V. This is a step-down transformer (fewer secondary turns).",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "V_s/V_p = N_s/N_p.",
+          "Step-down means N_s < N_p."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "V_s/230 = 50/500 → V_s = 230 × 0.1 = 23 V. Since N_s < N_p, it is step-down.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "2300 V (step-up)",
+          "115 V",
+          "46 V"
         ]
       },
       {
-        "question": "When a 3 Ω resistor is connected to a battery, the current is 2 A. When a 7 Ω resistor is used, the current is 1 A. Find ε and r.",
-        "answer": "ε = 8 V, r = 1 Ω",
+        "question": "A battery with ε = 12 V and internal resistance r = 0.8 Ω is connected to two resistors: 4 Ω and 6 Ω in parallel. Calculate the current through the battery and the terminal voltage.",
+        "answer": "I = 4.29 A; V_terminal = 8.57 V",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write two equations using ε = I(R + r) for each scenario.,Set the two expressions for ε equal and solve for r."
+          "First find the parallel combination: 1/R_p = 1/4 + 1/6.",
+          "Then use ε = I(R_p + r)."
         ],
-        "explanation": "ε = I₁(R₁ + r) = 2(3 + r) and ε = I₂(R₂ + r) = 1(7 + r). So 6 + 2r = 7 + r → r = 1 Ω. ε = 2(4) = 8 V.",
+        "explanation": "R_parallel = (4×6)/(4+6) = 2.4 Ω. Total R = 2.4 + 0.8 = 3.2 Ω. I = 12/3.2 = 3.75 A. V_terminal = ε − Ir = 12 − 3.75(0.8) = 12 − 3 = 9 V.",
         "distractors": [
-          "ε = 6 V and r = 0",
-          "ε = 10 V and r = 2 Ω",
-          "ε = 7 V and r = 0.5 Ω"
+          "ε = 12 V (no drop)",
+          "I = 1.2 A",
+          "V = 10.8 V"
         ]
       }
     ],

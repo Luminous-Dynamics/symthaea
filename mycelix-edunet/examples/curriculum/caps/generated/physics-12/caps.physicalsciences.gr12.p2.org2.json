@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "What type of reaction occurs when ethene (C₂H₄) reacts with Br₂? Name the product.",
+        "answer": "Addition reaction. Product: 1,2-dibromoethane (CH₂BrCH₂Br).",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Ethene has a C═C double bond.",
+          "What happens when atoms add across a double bond?"
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "The C═C breaks, and Br atoms add to each carbon. This is an addition reaction — only one product is formed.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Substitution",
+          "Elimination",
+          "Esterification"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Write the balanced equation for the reaction of bromoethane (CH₃CH₂Br) with aqueous NaOH. Name the reaction type.",
+        "answer": "CH₃CH₂Br + NaOH → CH₃CH₂OH + NaBr. This is a substitution reaction (−Br replaced by −OH).",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "The OH⁻ replaces the Br.",
+          "What leaves the molecule (the leaving group)?"
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Nucleophilic substitution: OH⁻ attacks the carbon bonded to Br, replacing it. Product is ethanol.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Addition reaction",
+          "Elimination",
+          "CH₃CH₂Br + NaOH → CH₂═CH₂ + NaBr + H₂O"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Write the equation for the elimination reaction of 2-bromopropane with concentrated NaOH in ethanol. Name the organic product.",
+        "answer": "CH₃CHBrCH₃ + NaOH → CH₃CH═CH₂ + NaBr + H₂O. Product: propene.",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Elimination removes HBr from adjacent carbons, forming a C═C double bond.",
+          "Concentrated NaOH in ethanol favours elimination over substitution."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "HBr is eliminated: H from one C and Br from the adjacent C. A C═C forms. Product: propene (an alkene).",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Propan-2-ol (substitution product)",
+          "Propane",
+          "1-bromopropane"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Write the equation for the esterification of ethanol with ethanoic acid. State the catalyst and conditions.",
+        "answer": "CH₃COOH + CH₃CH₂OH ⇌ CH₃COOCH₂CH₃ + H₂O. Catalyst: concentrated H₂SO₄. Conditions: heat under reflux.",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Alcohol + carboxylic acid → ester + water.",
+          "What catalyst is used for esterification?"
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Esterification is reversible. The acid catalyst (H₂SO₄) speeds up the reaction. Reflux prevents loss of volatile reactants. Product: ethyl ethanoate.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "NaOH catalyst",
+          "The reaction is irreversible",
+          "Product is diethyl ether"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Distinguish between addition polymerisation and condensation polymerisation. Give one example of each.",
+        "answer": "Addition: monomers with C═C bonds join without losing atoms (e.g., ethene → polyethene). Condensation: monomers with two functional groups join, releasing a small molecule like H₂O (e.g., amino acids → protein + water).",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "In addition polymerisation, is anything lost?",
+          "In condensation polymerisation, what small molecule is released?"
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Addition: C═C opens, no by-product. Condensation: functional groups react, releasing H₂O (or HCl). Examples: polyethene (addition), nylon/polyester (condensation).",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Both release water",
+          "Addition polymers use two different monomers",
+          "Condensation requires a C═C bond"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "Propan-1-ol can undergo oxidation and dehydration. Write the organic product for each reaction and state the type.",
+        "answer": "Oxidation (with acidified K₂Cr₂O₇): CH₃CH₂CHO (propanal) then CH₃CH₂COOH (propanoic acid). Dehydration (with H₂SO₄, heat): CH₃CH═CH₂ (propene) — this is an elimination reaction.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Primary alcohols oxidise to aldehydes, then to carboxylic acids.",
+          "Dehydration removes H₂O to form an alkene."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "Oxidation of a primary alcohol: R-CH₂OH → R-CHO (aldehyde) → R-COOH (carboxylic acid). Dehydration: alcohol → alkene + H₂O.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "Oxidation gives a ketone",
+          "Dehydration gives an ether",
+          "Primary alcohols cannot be oxidised"
         ]
       },
       {
-        "question": "Draw the structural formula and name the organic product when ethanol reacts with ethanoic acid in the presence of H₂SO₄.",
-        "answer": "Ethyl ethanoate (CH₃COOCH₂CH₃)",
+        "question": "An unknown organic compound X (C₃H₆O) reacts with ethanoic acid in the presence of H₂SO₄ to produce a sweet-smelling compound and water. X does NOT react with Na₂CO₃. Identify X, name the product, and state the reaction type.",
+        "answer": "X is propan-1-ol (an alcohol — alcohols don't react with Na₂CO₃). Product: propyl ethanoate (ester). Reaction type: esterification.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "What type of reaction occurs between an alcohol and a carboxylic acid?,The product is an ester. Name it as: acid part (−yl) + alcohol part (−anoate)."
+          "Sweet-smelling product + water from reaction with carboxylic acid = ester.",
+          "Na₂CO₃ reacts with carboxylic acids but NOT alcohols."
         ],
-        "explanation": "Esterification: alcohol + carboxylic acid → ester + water. CH₃COOH + CH₃CH₂OH → CH₃COOCH₂CH₃ + H₂O.",
+        "explanation": "C₃H₆O could be propan-1-ol, propan-2-ol, or methoxyethane. The esterification reaction confirms X is an alcohol. No reaction with Na₂CO₃ rules out carboxylic acid (which would have formula C₂H₄O₂ anyway). Product: CH₃COOCH₂CH₂CH₃.",
         "distractors": [
-          "Ethanol",
-          "Ethanoic anhydride",
-          "Diethyl ether"
+          "X is propanoic acid",
+          "X is methoxyethane (ether)",
+          "The product is an aldehyde"
         ]
       }
     ],

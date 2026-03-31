@@ -67,29 +67,31 @@
     ],
     "practice_problems": [
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
-        "answer": "372.6 Hz",
+        "question": "State the Doppler effect in words.",
+        "answer": "The Doppler effect is the apparent change in frequency (or pitch) of a wave as perceived by an observer due to relative motion between the source and the observer.",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "Think about what happens to the pitch of a siren as an ambulance passes you.",
+          "Is it the actual frequency or the observed frequency that changes?"
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "Only the observed frequency changes. The source continues emitting at its actual frequency.",
         "distractors": [
-          "400 Hz",
-          "430.8 Hz",
-          "350 Hz"
+          "The actual frequency of the source changes",
+          "The speed of sound changes",
+          "The wavelength stays constant"
         ]
       },
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
+        "question": "A car horn emits sound at 400 Hz and moves away from you at 25 m·s⁻¹. Speed of sound = 340 m·s⁻¹. What frequency do you hear?",
         "answer": "372.6 Hz",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "Source moves away, so use + in the denominator.",
+          "f_L = f_s × v/(v + v_s)."
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "f_L = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
         "distractors": [
           "400 Hz",
           "430.8 Hz",
@@ -97,78 +99,83 @@
         ]
       },
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
-        "answer": "372.6 Hz",
+        "question": "An ambulance siren (frequency 600 Hz) approaches a stationary observer at 30 m·s⁻¹. Speed of sound = 340 m·s⁻¹. Calculate the frequency heard by the observer.",
+        "answer": "658.1 Hz",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "Source approaches → use minus in the denominator.",
+          "f_L = f_s × v/(v − v_s)."
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "f_L = 600 × 340/(340 − 30) = 600 × 340/310 ≈ 658.1 Hz.",
         "distractors": [
-          "400 Hz",
-          "430.8 Hz",
-          "350 Hz"
+          "548.4 Hz",
+          "600 Hz",
+          "720 Hz"
         ]
       },
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
-        "answer": "372.6 Hz",
+        "question": "A stationary observer hears a frequency of 440 Hz from a source moving toward her. The source frequency is 400 Hz. Speed of sound = 340 m·s⁻¹. Calculate the speed of the source.",
+        "answer": "30.9 m·s⁻¹",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "Use f_L = f_s × v/(v − v_s) and solve for v_s.",
+          "Rearrange: v − v_s = f_s × v/f_L."
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "440 = 400 × 340/(340 − v_s). 340 − v_s = 400 × 340/440 = 309.1. v_s = 340 − 309.1 = 30.9 m·s⁻¹.",
         "distractors": [
-          "400 Hz",
-          "430.8 Hz",
-          "350 Hz"
+          "40 m·s⁻¹",
+          "25 m·s⁻¹",
+          "34 m·s⁻¹"
         ]
       },
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
-        "answer": "372.6 Hz",
+        "question": "Explain why astronomers observe red shift in the light from distant galaxies and what this tells us about the universe.",
+        "answer": "Distant galaxies are moving away from us. Their light is shifted to lower frequencies (longer wavelengths → redder). This indicates the universe is expanding.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "What happens to frequency when the source moves away?",
+          "Red light has a lower frequency than blue light."
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "The Doppler effect for light: receding sources show lower observed frequency (red shift). Hubble's observation of red shift in all distant galaxies supports the expanding universe model.",
         "distractors": [
-          "400 Hz",
-          "430.8 Hz",
-          "350 Hz"
+          "Stars are cooling down",
+          "Light slows down in space",
+          "Galaxies absorb red light"
         ]
       },
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
-        "answer": "372.6 Hz",
+        "question": "A listener moves toward a stationary siren at 20 m·s⁻¹. The siren emits 500 Hz. Speed of sound = 340 m·s⁻¹. Calculate the frequency heard.",
+        "answer": "529.4 Hz",
         "difficulty_permille": 750,
         "bloom_level": "Apply",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "The listener is moving, not the source.",
+          "f_L = f_s × (v + v_L)/v when listener moves toward source."
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "f_L = 500 × (340 + 20)/340 = 500 × 360/340 ≈ 529.4 Hz.",
         "distractors": [
-          "400 Hz",
-          "430.8 Hz",
-          "350 Hz"
+          "470.6 Hz",
+          "500 Hz",
+          "560 Hz"
         ]
       },
       {
-        "question": "A car horn (frequency 400 Hz) moves away from you at 25 m/s. Speed of sound = 340 m/s. What frequency do you hear?",
-        "answer": "372.6 Hz",
+        "question": "A bat emits ultrasound at 50 kHz and flies at 10 m·s⁻¹ toward a wall. Speed of sound = 340 m·s⁻¹. Calculate the frequency of the echo heard by the bat. (Apply the Doppler effect twice.)",
+        "answer": "≈53.0 kHz",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Is the source moving toward or away from you?,When source moves away, the denominator has a + sign."
+          "Step 1: Bat is the source approaching the wall → wall receives a higher frequency.",
+          "Step 2: The reflected sound returns; now the bat is a listener approaching a stationary source (the wall)."
         ],
-        "explanation": "Source moving away: fL = 400 × 340/(340 + 25) = 400 × 340/365 ≈ 372.6 Hz.",
+        "explanation": "Step 1: f_wall = 50 × 340/(340 − 10) = 50 × 340/330 = 51.52 kHz. Step 2: f_echo = 51.52 × (340 + 10)/340 = 51.52 × 350/340 ≈ 53.03 kHz.",
         "distractors": [
-          "400 Hz",
-          "430.8 Hz",
-          "350 Hz"
+          "51.5 kHz",
+          "50 kHz",
+          "55.6 kHz"
         ]
       }
     ],

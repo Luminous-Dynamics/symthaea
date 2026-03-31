@@ -79,108 +79,115 @@
     ],
     "practice_problems": [
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "Define dynamic equilibrium.",
+        "answer": "Dynamic equilibrium occurs in a closed system when the rate of the forward reaction equals the rate of the reverse reaction, so that the concentrations of reactants and products remain constant.",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "It must be in a closed system.",
+          "What is equal at equilibrium — the concentrations or the rates?"
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "At dynamic equilibrium both reactions continue (dynamic) but at equal rates, so macroscopic properties remain constant.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "All reactions have stopped",
+          "Concentrations of reactants and products are equal",
+          "Only the forward reaction occurs"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
+        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.20 mol·dm⁻³, [O₂] = 0.10 mol·dm⁻³, [SO₃] = 0.60 mol·dm⁻³. Calculate Kc.",
         "answer": "Kc = 90",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Write Kc = [products]^coefficients / [reactants]^coefficients.",
+          "Kc = [SO₃]² / ([SO₂]²[O₂])."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "Kc = (0.60)²/((0.20)²(0.10)) = 0.36/0.004 = 90.",
         "distractors": [
           "9",
           "900",
-          "0.9"
+          "0.011"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "For N₂(g) + 3H₂(g) ⇌ 2NH₃(g) (ΔH < 0), predict the effect of increasing temperature on the equilibrium position and the value of Kc.",
+        "answer": "Equilibrium shifts to the LEFT (reverse/endothermic direction). Kc decreases.",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "The forward reaction is exothermic.",
+          "Le Chatelier: increasing temperature favours the endothermic direction."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "Increasing temperature adds heat. Le Chatelier shifts equilibrium toward the endothermic (reverse) direction to absorb excess heat. This decreases [NH₃] and increases [N₂] and [H₂], so Kc decreases.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "Shifts right, Kc increases",
+          "No change (Kc is constant)",
+          "Shifts right, Kc decreases"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "For N₂(g) + 3H₂(g) ⇌ 2NH₃(g), predict the effect of increasing pressure on the equilibrium position. Does Kc change?",
+        "answer": "Equilibrium shifts to the RIGHT (fewer gas moles: 4 mol → 2 mol). Kc does NOT change (only temperature changes Kc).",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Count moles of gas on each side.",
+          "Le Chatelier: increased pressure favours the side with fewer gas moles."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "Left: 1 + 3 = 4 mol gas. Right: 2 mol gas. Increasing pressure shifts equilibrium to the side with fewer moles (right). Kc is only affected by temperature.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "Shifts left",
+          "Kc increases",
+          "No shift (equal moles)"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "Explain why a catalyst does NOT change the equilibrium position or the value of Kc.",
+        "answer": "A catalyst lowers the activation energy equally for both the forward and reverse reactions. Both rates increase by the same factor, so the equilibrium position and Kc remain unchanged.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "A catalyst provides an alternative pathway.",
+          "Does a catalyst affect forward and reverse rates differently?"
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "Since both rates are equally accelerated, the ratio of rate constants (which determines Kc) is unchanged. The system reaches equilibrium faster, but at the same position.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "A catalyst shifts equilibrium right",
+          "A catalyst increases Kc",
+          "A catalyst only speeds up the forward reaction"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "In a 2 dm³ container at equilibrium: N₂O₄(g) ⇌ 2NO₂(g). Initially 0.40 mol N₂O₄ is placed in the container. At equilibrium, 0.10 mol N₂O₄ remains. Calculate Kc.",
+        "answer": "Kc = 1.8 mol·dm⁻³",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Use an ICE table. Change in N₂O₄ = 0.40 − 0.10 = 0.30 mol.",
+          "Change in NO₂ = 2 × 0.30 = 0.60 mol. Convert to concentrations using V = 2 dm³."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "N₂O₄ reacted = 0.30 mol, NO₂ formed = 0.60 mol. [N₂O₄] = 0.10/2 = 0.05. [NO₂] = 0.60/2 = 0.30. Kc = (0.30)²/(0.05) = 0.09/0.05 = 1.8.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "0.9",
+          "3.6",
+          "0.45"
         ]
       },
       {
-        "question": "For 2SO₂(g) + O₂(g) ⇌ 2SO₃(g), at equilibrium [SO₂] = 0.2, [O₂] = 0.1, [SO₃] = 0.6. Calculate Kc.",
-        "answer": "Kc = 90",
+        "question": "The Haber process operates at 450°C and 200 atm. Explain why a lower temperature is not used (even though it would give a higher yield) and why very high pressure is not used (even though it would shift equilibrium further right).",
+        "answer": "Lower temperature: although yield increases (Le Chatelier favours exothermic forward reaction), the rate becomes too slow — 450°C is a compromise between yield and rate. Very high pressure: the cost of equipment to withstand extreme pressures and the energy to maintain them outweigh the marginal increase in yield.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Write the Kc expression from the balanced equation.,Remember: coefficients become exponents."
+          "Consider both equilibrium (yield) and kinetics (rate).",
+          "Think about economic factors for pressure."
         ],
-        "explanation": "Kc = [SO₃]²/([SO₂]²[O₂]) = (0.6)²/((0.2)²(0.1)) = 0.36/(0.04 × 0.1) = 0.36/0.004 = 90.",
+        "explanation": "450°C: rate vs yield compromise. An iron catalyst is used to increase rate without shifting equilibrium. 200 atm: shifts right (4 mol → 2 mol gas) but higher pressures are too expensive and dangerous.",
         "distractors": [
-          "9",
-          "900",
-          "0.9"
+          "Low temperature gives no product",
+          "Pressure has no effect",
+          "The catalyst only works at high temperature"
         ]
       }
     ],

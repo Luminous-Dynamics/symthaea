@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "Define oxidation and reduction in terms of electron transfer.",
+        "answer": "Oxidation is the loss of electrons. Reduction is the gain of electrons. (Remember: OIL RIG — Oxidation Is Loss, Reduction Is Gain.)",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "Which process involves losing electrons?",
+          "Use the mnemonic OIL RIG."
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "In redox reactions, electrons transfer from the substance being oxidised to the substance being reduced.",
         "distractors": [
-          "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "Oxidation is gain of electrons",
+          "Reduction is loss of electrons",
+          "Both involve gaining electrons"
         ]
       },
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "Calculate E°cell for Zn|Zn²⁺||Cu²⁺|Cu. Given: E°(Zn²⁺/Zn) = −0.76 V, E°(Cu²⁺/Cu) = +0.34 V.",
+        "answer": "E°cell = +1.10 V",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "Zn is the anode (more reactive, lower E°). Cu is the cathode.",
+          "E°cell = E°cathode − E°anode."
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "E°cell = E°(Cu²⁺/Cu) − E°(Zn²⁺/Zn) = 0.34 − (−0.76) = 1.10 V. Positive, so spontaneous.",
         "distractors": [
-          "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "−1.10 V",
+          "0.42 V",
+          "0.34 V"
         ]
       },
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "Write the cell notation for a galvanic cell using Mg and Ag half-cells. Given: E°(Mg²⁺/Mg) = −2.37 V, E°(Ag⁺/Ag) = +0.80 V.",
+        "answer": "Mg|Mg²⁺||Ag⁺|Ag. E°cell = 0.80 − (−2.37) = +3.17 V.",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "The more reactive metal (lower E°) is the anode, written on the left.",
+          "Single line | = phase boundary. Double line || = salt bridge."
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "Mg is more reactive (lower E°), so it is oxidised at the anode. Cell notation: anode|anode ion||cathode ion|cathode.",
         "distractors": [
-          "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "Ag|Ag⁺||Mg²⁺|Mg",
+          "E°cell = −3.17 V",
+          "E°cell = 1.57 V"
         ]
       },
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "In a galvanic cell, explain the function of the salt bridge.",
+        "answer": "The salt bridge allows ions to flow between the two half-cells to maintain electrical neutrality. Without it, charge builds up (excess positive in cathode, excess negative in anode) and the cell stops working.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "What happens to the charge balance as the cell operates?",
+          "Cations move toward the cathode compartment, anions toward the anode."
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "As Cu²⁺ is reduced, the cathode solution loses positive ions. The salt bridge supplies K⁺ or Na⁺ ions. In the anode, excess Zn²⁺ is balanced by Cl⁻ or NO₃⁻ from the salt bridge.",
         "distractors": [
-          "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "It allows electron flow",
+          "It increases voltage",
+          "It contains the electrodes"
         ]
       },
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, describe what happens at each electrode and how the mass of each electrode changes.",
+        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves, mass decreases). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits, mass increases). The concentration of CuSO₄ solution remains constant.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "At which electrode does oxidation occur?",
+          "Where do the Cu²⁺ ions in solution come from?"
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "Copper transfers from anode to cathode through the solution. This is the principle behind copper refining (electroplating).",
         "distractors": [
           "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "Oxygen is produced at the cathode",
+          "The solution turns colourless"
         ]
       },
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "Using the table of standard reduction potentials, determine whether the reaction Fe(s) + Cu²⁺(aq) → Fe²⁺(aq) + Cu(s) is spontaneous. E°(Fe²⁺/Fe) = −0.44 V, E°(Cu²⁺/Cu) = +0.34 V.",
+        "answer": "E°cell = E°cathode − E°anode = 0.34 − (−0.44) = +0.78 V. Since E°cell > 0, the reaction is spontaneous.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "Identify which species is oxidised and which is reduced.",
+          "If E°cell is positive, the reaction is spontaneous."
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "Fe is oxidised (anode), Cu²⁺ is reduced (cathode). E°cell = +0.78 V > 0 → spontaneous. Fe will dissolve in CuSO₄ solution and copper will deposit.",
         "distractors": [
-          "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "E°cell = −0.78 V (not spontaneous)",
+          "E°cell = 0.10 V",
+          "Fe²⁺ is reduced"
         ]
       },
       {
-        "question": "In the electrolysis of CuSO₄ solution with copper electrodes, what happens at each electrode?",
-        "answer": "Anode: Cu → Cu²⁺ + 2e⁻ (copper dissolves). Cathode: Cu²⁺ + 2e⁻ → Cu (copper deposits).",
+        "question": "Compare a galvanic cell and an electrolytic cell in terms of: (a) energy conversion, (b) spontaneity, (c) anode sign, and (d) one industrial application of each.",
+        "answer": "(a) Galvanic: chemical → electrical. Electrolytic: electrical → chemical. (b) Galvanic: spontaneous (E°cell > 0). Electrolytic: non-spontaneous (requires external voltage). (c) Galvanic: anode is negative. Electrolytic: anode is positive. (d) Galvanic: batteries. Electrolytic: electroplating or aluminium extraction.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "What are the ions present in solution?,At which electrode does oxidation occur?"
+          "Think about which cell generates electricity and which uses it.",
+          "In both cells: oxidation occurs at the anode, but the sign of the anode differs."
         ],
-        "explanation": "Copper transfers from anode to cathode. Mass of anode decreases, mass of cathode increases.",
+        "explanation": "Both cells have oxidation at anode and reduction at cathode (AN OX, RED CAT). The key difference is energy source and spontaneity.",
         "distractors": [
-          "Both electrodes dissolve",
-          "Oxygen produced at cathode",
-          "Nothing happens"
+          "Both are spontaneous",
+          "Anode is always negative",
+          "Electrolytic cells don't need a power supply"
         ]
       }
     ],

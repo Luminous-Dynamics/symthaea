@@ -67,108 +67,115 @@
     ],
     "practice_problems": [
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Calculate the momentum of a 0.5 kg ball moving at 8 m·s⁻¹ to the right.",
+        "answer": "4 kg·m·s⁻¹ to the right",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Use p = mv.",
+          "Momentum is a vector — include the direction."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "p = mv = (0.5)(8) = 4 kg·m·s⁻¹ to the right.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "4 kg·m·s⁻¹ to the left",
+          "16 kg·m·s⁻¹",
+          "0.0625 kg·m·s⁻¹"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 3 kg trolley moving at 4 m·s⁻¹ is brought to rest by a constant force in 0.6 s. Calculate the impulse on the trolley.",
+        "answer": "−12 N·s (or 12 N·s in the direction opposing motion)",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Impulse = change in momentum.",
+          "The trolley goes from 4 m·s⁻¹ to 0 m·s⁻¹."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "Impulse = Δp = m(v_f − v_i) = 3(0 − 4) = −12 N·s. The impulse is 12 N·s opposite to the original direction.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "12 N·s in direction of motion",
+          "7.2 N·s",
+          "2 N·s"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 2 kg ball moving at 6 m·s⁻¹ collides with a stationary 4 kg ball. They stick together. Find the velocity after collision.",
+        "answer": "2 m·s⁻¹ in the original direction",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "This is a perfectly inelastic collision (they stick together).",
+          "Use conservation of momentum: m₁v₁ + m₂v₂ = (m₁ + m₂)v_f."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "p_before = 2(6) + 4(0) = 12 kg·m·s⁻¹. After: 12 = (2 + 4)v_f → v_f = 2 m·s⁻¹.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "3 m·s⁻¹",
+          "6 m·s⁻¹",
+          "1 m·s⁻¹"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 0.2 kg ball hits a wall at 10 m·s⁻¹ and bounces back at 8 m·s⁻¹. Calculate the change in momentum of the ball.",
+        "answer": "3.6 kg·m·s⁻¹ (away from wall)",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Take the initial direction as positive.",
+          "The ball reverses, so the final velocity is negative."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "Take toward wall as positive. Δp = m(v_f − v_i) = 0.2(−8 − 10) = 0.2(−18) = −3.6 kg·m·s⁻¹. The magnitude is 3.6 kg·m·s⁻¹ away from the wall.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "0.4 kg·m·s⁻¹",
+          "2.0 kg·m·s⁻¹",
+          "3.6 kg·m·s⁻¹ toward wall"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "Explain, using the impulse-momentum theorem, why airbags reduce injury in car crashes.",
+        "answer": "Airbags increase the collision time (Δt). Since FΔt = Δp and Δp is fixed, a larger Δt means a smaller force F on the passenger.",
         "difficulty_permille": 625,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "The change in momentum is the same with or without the airbag.",
+          "How does increasing time affect the force for the same impulse?"
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "From F_netΔt = Δp, the change in momentum is determined by the crash speed, which is the same regardless. The airbag extends Δt, so F = Δp/Δt is reduced.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Airbags absorb all the momentum",
+          "Airbags reduce the passenger's momentum",
+          "Airbags make the collision elastic"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 1 kg ball moving at 5 m·s⁻¹ to the right collides elastically with a 1 kg stationary ball. What are the velocities after the collision?",
+        "answer": "The first ball stops (0 m·s⁻¹) and the second moves at 5 m·s⁻¹ to the right.",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "In a head-on elastic collision between equal masses, the balls exchange velocities.",
+          "Use both conservation of momentum AND conservation of kinetic energy."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "For equal-mass elastic collision: v₁f = 0, v₂f = v₁i = 5 m·s⁻¹. Verified: momentum 1(5) = 1(0) + 1(5) = 5 ✓. Ek: ½(1)(25) = ½(1)(25) ✓.",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "Both move at 2.5 m·s⁻¹",
+          "First ball bounces at −5 m·s⁻¹, second stays",
+          "Both move at 5 m·s⁻¹"
         ]
       },
       {
-        "question": "A 1500 kg car accelerates from rest to 20 m/s in 10 s. Calculate the average power.",
-        "answer": "30 000 W (30 kW)",
+        "question": "A 1500 kg car travelling at 20 m·s⁻¹ collides with a 3000 kg truck travelling at 10 m·s⁻¹ in the opposite direction. They lock together. Find the velocity and direction after the collision. Is kinetic energy conserved?",
+        "answer": "v_f = 0 m·s⁻¹ (they come to rest). Kinetic energy is NOT conserved — all Ek is converted to deformation, heat and sound.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Find the kinetic energy gained first.,Power = work done ÷ time taken."
+          "Assign positive direction to one vehicle. The other has negative velocity.",
+          "After finding v_f, compare Ek before and after."
         ],
-        "explanation": "Ek = ½mv² = ½(1500)(400) = 300 000 J. P = W/t = 300 000/10 = 30 000 W.",
+        "explanation": "Take car direction as positive. p_i = 1500(20) + 3000(−10) = 30000 − 30000 = 0 kg·m·s⁻¹. So (4500)v_f = 0, v_f = 0 m·s⁻¹. Ek_before = ½(1500)(400) + ½(3000)(100) = 300000 + 150000 = 450 kJ. Ek_after = 0. Kinetic energy is not conserved (inelastic).",
         "distractors": [
-          "15 000 W",
-          "3000 W",
-          "300 000 W"
+          "v_f = 5 m·s⁻¹ in car direction",
+          "v_f = 3.33 m·s⁻¹ in truck direction",
+          "v_f = 10 m·s⁻¹"
         ]
       }
     ],

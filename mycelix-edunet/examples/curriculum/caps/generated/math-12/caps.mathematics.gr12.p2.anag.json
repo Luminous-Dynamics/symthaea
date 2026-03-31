@@ -79,108 +79,115 @@
     ],
     "practice_problems": [
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "Find the distance between A(1, 3) and B(4, 7).",
+        "answer": "5 units",
         "difficulty_permille": 125,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "Use the distance formula: d = \u221a[(x\u2082 \u2212 x\u2081)\u00b2 + (y\u2082 \u2212 y\u2081)\u00b2].",
+          "Substitute the coordinates carefully."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "d = \u221a[(4 \u2212 1)\u00b2 + (7 \u2212 3)\u00b2] = \u221a[9 + 16] = \u221a25 = 5 units.",
         "distractors": [
-          "Outside",
-          "On the circle",
-          "Cannot determine"
+          "7 units",
+          "\u221a7 units",
+          "25 units"
         ]
       },
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "Write down the equation of the circle with centre (0, 0) and radius 6.",
+        "answer": "x\u00b2 + y\u00b2 = 36",
         "difficulty_permille": 250,
-        "bloom_level": "Apply",
+        "bloom_level": "Remember",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "A circle centred at the origin has equation x\u00b2 + y\u00b2 = r\u00b2.",
+          "Square the radius."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "Centre (0, 0) and r = 6, so the equation is x\u00b2 + y\u00b2 = 6\u00b2 = 36.",
         "distractors": [
-          "Outside",
-          "On the circle",
-          "Cannot determine"
+          "x\u00b2 + y\u00b2 = 6",
+          "(x \u2212 6)\u00b2 + (y \u2212 6)\u00b2 = 36",
+          "x\u00b2 + y\u00b2 = 12"
         ]
       },
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x \u2212 3)\u00b2 + (y \u2212 4)\u00b2 = 16.",
+        "answer": "Inside the circle",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "Substitute the point into the left-hand side (LHS) of the circle equation.",
+          "Compare LHS with r\u00b2: if LHS < r\u00b2 then inside, = then on, > then outside."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "LHS = (1 \u2212 3)\u00b2 + (7 \u2212 4)\u00b2 = 4 + 9 = 13. Since 13 < 16, the point lies inside the circle.",
         "distractors": [
-          "Outside",
+          "Outside the circle",
           "On the circle",
-          "Cannot determine"
+          "Cannot be determined"
         ]
       },
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "Find the equation of the circle with diameter endpoints A(\u22122, 3) and B(4, \u22121).",
+        "answer": "(x \u2212 1)\u00b2 + (y \u2212 1)\u00b2 = 13",
         "difficulty_permille": 500,
         "bloom_level": "Apply",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "The centre of the circle is the midpoint of the diameter.",
+          "The radius is half the length of the diameter."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "Centre = midpoint of AB = ((\u22122+4)/2, (3+(\u22121))/2) = (1, 1). Diameter = \u221a[(4\u2212(\u22122))\u00b2 + (\u22121\u22123)\u00b2] = \u221a[36+16] = \u221a52. Radius = \u221a52/2, so r\u00b2 = 52/4 = 13. Equation: (x \u2212 1)\u00b2 + (y \u2212 1)\u00b2 = 13.",
         "distractors": [
-          "Outside",
-          "On the circle",
-          "Cannot determine"
+          "(x \u2212 1)\u00b2 + (y \u2212 1)\u00b2 = 52",
+          "(x + 1)\u00b2 + (y + 1)\u00b2 = 13",
+          "(x \u2212 1)\u00b2 + (y \u2212 1)\u00b2 = \u221a13"
         ]
       },
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "Find the equation of the tangent to the circle x\u00b2 + y\u00b2 = 25 at the point (3, 4).",
+        "answer": "3x + 4y = 25",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "Find the gradient of the radius from the centre to the point of tangency.",
+          "The tangent is perpendicular to the radius, so use m\u2081 \u00d7 m\u2082 = \u22121."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "Centre O(0, 0). Gradient of OP = (4 \u2212 0)/(3 \u2212 0) = 4/3. Tangent gradient = \u22123/4 (perpendicular). Using point-gradient form: y \u2212 4 = \u2212\u00be(x \u2212 3). Multiply by 4: 4y \u2212 16 = \u22123x + 9, so 3x + 4y = 25.",
         "distractors": [
-          "Outside",
-          "On the circle",
-          "Cannot determine"
+          "4x + 3y = 25",
+          "3x \u2212 4y = 25",
+          "3x + 4y = \u221a25"
         ]
       },
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "The line y = 2x + k is a tangent to the circle x\u00b2 + y\u00b2 = 5. Determine the value(s) of k.",
+        "answer": "k = 5 or k = \u22125",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "Substitute y = 2x + k into the circle equation and simplify to a quadratic in x.",
+          "For a tangent, the discriminant \u0394 = b\u00b2 \u2212 4ac = 0."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "Substitute: x\u00b2 + (2x + k)\u00b2 = 5 \u2192 x\u00b2 + 4x\u00b2 + 4kx + k\u00b2 = 5 \u2192 5x\u00b2 + 4kx + (k\u00b2 \u2212 5) = 0. For tangency: \u0394 = 0. \u0394 = (4k)\u00b2 \u2212 4(5)(k\u00b2 \u2212 5) = 16k\u00b2 \u2212 20k\u00b2 + 100 = \u22124k\u00b2 + 100 = 0. So k\u00b2 = 25, giving k = 5 or k = \u22125.",
         "distractors": [
-          "Outside",
-          "On the circle",
-          "Cannot determine"
+          "k = \u221a5 or k = \u2212\u221a5",
+          "k = 5 only",
+          "k = 25 or k = \u221225"
         ]
       },
       {
-        "question": "Determine whether the point (1, 7) lies inside, on, or outside the circle (x−3)² + (y−4)² = 16.",
-        "answer": "Inside",
+        "question": "A circle has centre C(2, \u22123) and passes through the point P(5, 1). A tangent is drawn to the circle at P. Determine the equation of this tangent.",
+        "answer": "3x + 4y = 19",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Evaluate",
         "hints": [
-          "Substitute the point into the LHS of the circle equation.,Compare LHS with r². If LHS < r² → inside, = r² → on, > r² → outside."
+          "First find the radius (distance CP), then the gradient of CP.",
+          "The tangent at P is perpendicular to CP. Use point-gradient form at P."
         ],
-        "explanation": "Substitute: (1−3)² + (7−4)² = 4 + 9 = 13. Since 13 < 16 (LHS < r²), the point lies inside the circle.",
+        "explanation": "Gradient of CP = (1 \u2212 (\u22123))/(5 \u2212 2) = 4/3. Tangent \u22a5 radius, so m_tangent = \u22123/4. Tangent at P(5, 1): y \u2212 1 = \u2212\u00be(x \u2212 5). Multiply by 4: 4y \u2212 4 = \u22123x + 15, so 3x + 4y = 19.",
         "distractors": [
-          "Outside",
-          "On the circle",
-          "Cannot determine"
+          "4x \u2212 3y = 19",
+          "3x + 4y = 25",
+          "3x \u2212 4y = 11"
         ]
       }
     ],

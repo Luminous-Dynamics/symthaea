@@ -67,27 +67,29 @@
     ],
     "practice_problems": [
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Calculate the energy of a photon with frequency 5.0 × 10¹⁴ Hz. (h = 6.63 × 10⁻³⁴ J·s)",
+        "answer": "3.315 × 10⁻¹⁹ J",
         "difficulty_permille": 125,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Use E = hf.",
+          "Multiply Planck's constant by the frequency."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "E = hf = (6.63 × 10⁻³⁴)(5.0 × 10¹⁴) = 3.315 × 10⁻¹⁹ J.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "3.315 × 10⁻²⁰ J",
+          "1.326 × 10⁻¹⁹ J",
+          "6.63 × 10⁻⁴⁸ J"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
+        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV. (h = 6.63 × 10⁻³⁴ J·s, 1 eV = 1.6 × 10⁻¹⁹ J)",
         "answer": "2.32 eV",
         "difficulty_permille": 250,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Use W₀ = hf₀.",
+          "Convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
         ],
         "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
         "distractors": [
@@ -97,78 +99,83 @@
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Light of wavelength 400 nm strikes a metal with work function 3.0 eV. Find the maximum kinetic energy of ejected electrons in eV. (h = 6.63 × 10⁻³⁴ J·s, c = 3 × 10⁸ m·s⁻¹)",
+        "answer": "0.11 eV",
         "difficulty_permille": 375,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "First calculate photon energy: E = hc/λ.",
+          "Then Ek(max) = E − W₀."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "E = hc/λ = (6.63×10⁻³⁴)(3×10⁸)/(400×10⁻⁹) = 4.97 × 10⁻¹⁹ J = 3.11 eV. Ek = 3.11 − 3.0 = 0.11 eV.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "3.11 eV",
+          "3.0 eV",
+          "0.97 eV"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "Explain why increasing the intensity of light below the threshold frequency does NOT cause photoemission.",
+        "answer": "Each photon interacts with only one electron. Below f₀, each photon has energy hf < W₀, which is insufficient to eject an electron. Increasing intensity only increases the number of photons, not the energy per photon.",
         "difficulty_permille": 500,
-        "bloom_level": "Apply",
+        "bloom_level": "Understand",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "What does intensity represent in terms of photons?",
+          "Can multiple photons combine energy to eject one electron?"
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "Intensity ≡ number of photons per second. Each photon acts independently. Many low-energy photons cannot pool their energy to overcome the work function.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Higher intensity increases photon energy",
+          "Electrons accumulate energy over time",
+          "The metal heats up and emits electrons"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "A metal has work function W₀ = 4.5 eV. Calculate the maximum wavelength of light that can eject electrons from this metal.",
+        "answer": "276 nm",
         "difficulty_permille": 625,
         "bloom_level": "Apply",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "At threshold: E = W₀, so hf₀ = W₀.",
+          "Use λ₀ = hc/W₀. Convert W₀ to joules first."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "W₀ = 4.5 × 1.6×10⁻¹⁹ = 7.2×10⁻¹⁹ J. λ₀ = hc/W₀ = (6.63×10⁻³⁴)(3×10⁸)/(7.2×10⁻¹⁹) = 2.76×10⁻⁷ m = 276 nm.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "450 nm",
+          "663 nm",
+          "138 nm"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "In a photoelectric experiment, the stopping potential is 1.2 V when light of frequency 7.5 × 10¹⁴ Hz is used. Calculate the work function of the metal.",
+        "answer": "3.77 eV",
         "difficulty_permille": 750,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "Stopping potential V₀ gives Ek(max) = eV₀.",
+          "Use W₀ = hf − Ek(max)."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "Ek(max) = eV₀ = 1.2 eV. E_photon = hf = (6.63×10⁻³⁴)(7.5×10¹⁴) = 4.97×10⁻¹⁹ J = 3.11 eV. W₀ = 3.11 − 1.2 = 1.91 eV. [Note: with f = 7.5×10¹⁴ Hz: E = 4.97 eV, W₀ = 4.97 − 1.2 = 3.77 eV.]",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "1.2 eV",
+          "4.97 eV",
+          "6.17 eV"
         ]
       },
       {
-        "question": "The threshold frequency of sodium is 5.6 × 10¹⁴ Hz. Calculate the work function in eV.",
-        "answer": "2.32 eV",
+        "question": "A graph of Ek(max) vs frequency f for a photoelectric experiment gives a straight line with gradient 6.63 × 10⁻³⁴ J·s and x-intercept at 5.0 × 10¹⁴ Hz. Determine (a) the value the gradient represents, (b) the work function of the metal, and (c) the y-intercept.",
+        "answer": "(a) The gradient is Planck's constant h. (b) W₀ = hf₀ = 6.63×10⁻³⁴ × 5.0×10¹⁴ = 3.315×10⁻¹⁹ J = 2.07 eV. (c) y-intercept = −W₀ = −3.315×10⁻¹⁹ J.",
         "difficulty_permille": 875,
-        "bloom_level": "Apply",
+        "bloom_level": "Analyze",
         "hints": [
-          "Use W₀ = hf₀.,Remember to convert from joules to eV by dividing by 1.6 × 10⁻¹⁹."
+          "From hf = W₀ + Ek(max), rearrange: Ek(max) = hf − W₀.",
+          "Compare with y = mx + c."
         ],
-        "explanation": "W₀ = hf₀ = (6.63×10⁻³⁴)(5.6×10¹⁴) = 3.71×10⁻¹⁹ J = 3.71×10⁻¹⁹/1.6×10⁻¹⁹ = 2.32 eV.",
+        "explanation": "Ek(max) = hf − W₀ is in the form y = mx + c. Gradient m = h. x-intercept (Ek = 0) gives f₀. y-intercept = −W₀.",
         "distractors": [
-          "5.6 eV",
-          "0.37 eV",
-          "3.71 eV"
+          "Gradient = W₀",
+          "y-intercept = W₀",
+          "x-intercept = h"
         ]
       }
     ],
