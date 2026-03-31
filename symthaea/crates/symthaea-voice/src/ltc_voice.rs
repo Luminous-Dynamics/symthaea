@@ -109,17 +109,43 @@ impl LtcVoice {
             // Encode to 16,384D HV — now different for each phoneme
             let hv = self.encoder.encode(&cognitive_state);
 
-            // Evolve LTC for each frame in this phoneme
+            // Get the CORRECT formant targets from the static lookup
+            let (target_f1, target_f2, target_f3, source_type) =
+                crate::formants::formant_target_pub(phoneme.ipa);
+
+            // Evolve LTC for each frame — blend LTC dynamics with correct targets
             for frame_idx in 0..num_frames {
-                // The magic: evolve_closed_form produces smooth transitions
-                // The τ inside the LTC adapts based on the input — stressed
-                // phonemes snap faster, relaxed ones glide
-                let mut frame = self.controller.forward(&hv, self.dt);
+                let ltc_frame = self.controller.forward(&hv, self.dt);
 
-                // Override source type from phoneme identity
-                frame.source_type = phoneme_source_type(phoneme.ipa);
+                // BLEND: 70% static target (correct formants) + 30% LTC (smooth dynamics)
+                // This gives us correct vowel shapes WITH liquid transitions
+                let blend = 0.3; // LTC influence
+                let f1 = target_f1 * (1.0 - blend) + ltc_frame.f1 * blend;
+                let f2 = target_f2 * (1.0 - blend) + ltc_frame.f2 * blend;
+                let f3 = target_f3 * (1.0 - blend) + ltc_frame.f3 * blend;
 
-                // Prosody: stress boosts energy
+                let mut frame = FormantFrame {
+                    f1: f1.clamp(200.0, 1000.0),
+                    f2: f2.clamp(600.0, 3000.0),
+                    f3: f3.clamp(1500.0, 5000.0),
+                    b1: ltc_frame.b1.clamp(60.0, 200.0),
+                    b2: ltc_frame.b2.clamp(80.0, 250.0),
+                    b3: ltc_frame.b3.clamp(100.0, 300.0),
+                    // F0 from LTC with prosody
+                    f0: ltc_frame.f0.clamp(80.0, 300.0),
+                    energy: ltc_frame.energy,
+                    voicing: if phoneme.is_vowel || "mnŋlɹwjvzð".contains(phoneme.ipa) {
+                        0.9
+                    } else {
+                        ltc_frame.voicing
+                    },
+                    time: frames.len() as f32 / 200.0,
+                    source_type,
+                    nasal_zero_freq: 0.0,
+                    nasal_zero_bw: 0.0,
+                };
+
+                // Stress boosts energy
                 if phoneme.stress > 0 {
                     frame.energy = (frame.energy * 1.3).min(1.0);
                 }

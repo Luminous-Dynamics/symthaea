@@ -117,15 +117,20 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                     }
                 }
                 SourceType::Fricative => {
+                    // Strong noise for consonants — must be clearly audible to break up vowels
                     noise_state = lcg(&mut noise_state);
-                    source = noise_f32(noise_state) * smooth_energy * 0.8;
+                    source = noise_f32(noise_state) * smooth_energy * 1.5; // boosted from 0.8
                     if frame.voicing > 0.3 {
                         glottal_phase += smooth_f0 / sr;
                         if glottal_phase >= 1.0 { glottal_phase -= 1.0; }
                         source += (glottal_phase * std::f32::consts::TAU).sin() * smooth_energy * 0.3;
                     }
                 }
-                SourceType::Stop => { source = 0.0; }
+                SourceType::Stop => {
+                    // Brief noise burst for plosives (p, t, k, b, d, g)
+                    noise_state = lcg(&mut noise_state);
+                    source = noise_f32(noise_state) * smooth_energy * 1.2;
+                }
                 SourceType::Affricate => {
                     noise_state = lcg(&mut noise_state);
                     source = noise_f32(noise_state) * smooth_energy * 0.5;
