@@ -307,10 +307,51 @@ pub fn setup_globe_view(
         marker_count += 1;
     }
 
+    // Grid stress markers (FEP allostatic load visualization)
+    let stress_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
+    let stress_data = terra_atlas_core::energy_trading::simulate_grid_stress(0);
+    for stress in &stress_data {
+        let pos = geo::lat_lon_to_xyz(stress.lat, stress.lon, 1.02);
+        let c = terra_atlas_core::energy_trading::stress_color(stress.allostatic_load);
+        let size = 0.015 + stress.allostatic_load * 0.025;
+        // Solid marker for the stress point
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(c[0], c[1], c[2]),
+            unlit: true,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(stress_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            DataMarker { layer: Layer::Energy, name: format!("{} (Φ={:.2})", stress.name, stress.phi) },
+            AtlasEntity,
+        ));
+        // Translucent stress halo — larger when under more stress
+        if stress.allostatic_load > 0.3 {
+            let halo_size = 0.03 + stress.allostatic_load * 0.06;
+            let alpha = stress.allostatic_load * 0.15;
+            let halo_mat = materials.add(StandardMaterial {
+                base_color: Color::linear_rgba(c[0], c[1] * 0.3, c[2] * 0.2, alpha),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                double_sided: true,
+                cull_mode: None,
+                ..default()
+            });
+            commands.spawn((
+                Mesh3d(stress_mesh.clone()),
+                MeshMaterial3d(halo_mat),
+                Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(halo_size)),
+                AtlasEntity,
+            ));
+        }
+    }
+
     // Store data for arc rendering (gizmos are immediate-mode)
     commands.insert_resource(AtlasData { data });
 
-    info!("[atlas] Globe view: {marker_count} markers + starfield — press Esc to return");
+    info!("[atlas] Globe view: {marker_count} markers + {} grid stress nodes — press Esc to return", stress_data.len());
 }
 
 /// Draw maglev corridor arcs using gizmos (immediate-mode, redrawn each frame).
@@ -320,7 +361,31 @@ pub fn draw_arcs_system(
     time: Res<Time>,
 ) {
     let Some(atlas_data) = atlas_data else { return };
-    let _t = time.elapsed_secs(); // reserved for animated flow effects
+    let t = time.elapsed_secs();
+
+    // P2P energy trades — green animated arcs between renewable sites
+    let trade_sites: Vec<(f64, f64, f64)> = atlas_data.data.sites.iter()
+        .take(20) // top 20 sites for trade simulation
+        .map(|s| (s.lat, s.lon, s.capacity_mw))
+        .collect();
+    let trades = terra_atlas_core::energy_trading::simulate_trades(&trade_sites, t as f64);
+    let trade_color = Color::linear_rgba(0.0, 1.0, 0.5, 0.5); // bright green
+    for trade in &trades {
+        let from = geo::lat_lon_to_xyz(trade.seller_lat, trade.seller_lon, 1.0);
+        let to = geo::lat_lon_to_xyz(trade.buyer_lat, trade.buyer_lon, 1.0);
+        let dist = terra_atlas_core::geo::haversine_km(
+            trade.seller_lat, trade.seller_lon,
+            trade.buyer_lat, trade.buyer_lon,
+        );
+        let peak = geo::arc_peak_height(dist);
+        let segments = 12u32;
+        let arc = terra_atlas_core::geometry::generate_arc(from, to, peak, segments);
+        for i in 0..segments as usize {
+            let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
+            let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
+            gizmos.line(a, b, trade_color);
+        }
+    }
 
     // Maglev corridors — amber arcs
     let maglev_color = Color::linear_rgba(0.984, 0.749, 0.141, 0.7);
