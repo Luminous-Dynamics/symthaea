@@ -4027,3 +4027,4 @@ pub mod config_loader;
 pub mod stoichiometry;
 pub mod relativistic_dht;
 pub mod epistemic_decay;
+pub mod skill_integrity;

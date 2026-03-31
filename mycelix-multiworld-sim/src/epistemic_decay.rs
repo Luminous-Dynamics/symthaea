@@ -1,15 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Cosmic epistemic decay: knowledge degrades from radiation, isolation, and
-//! population bottlenecks.
+//! Epistemic decay: SKILL INTEGRITY, not data corruption.
 //!
-//! Three decay mechanisms:
-//! 1. Radiation bit-flip: cosmic rays degrade stored knowledge
+//! Stored data on Holochain is effectively immortal (cryptographic hashing +
+//! redundancy across 667 source chains). The ship's library doesn't decay.
+//!
+//! What DOES decay is the ability to USE that data. Can someone read the
+//! reactor manual and actually fix the reactor? That depends on:
+//!
+//! 1. Skill attrition: unused skills decay (see skill_integrity.rs)
 //! 2. Henrich cultural attrition: small populations can't transmit complex skills
-//! 3. Error correction trade-off: maintaining knowledge costs energy
+//! 3. Comprehension gap: stored data requires base skills to understand
 //!
-//! The terrifying choice: when energy is scarce, the ship must decide between
-//! keeping the lights on and remembering how to fix the reactor.
+//! Data is immortal. Understanding is mortal. That's the real horror.
 //!
 //! # References
 //!
