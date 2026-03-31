@@ -103,6 +103,8 @@ pub struct CapsGraph {
     pub by_subject_grade: HashMap<(String, String), Vec<usize>>, // (subject, grade) -> indices
     pub prerequisites: HashMap<String, Vec<String>>, // node id -> prerequisite node ids
     pub dependents: HashMap<String, Vec<String>>,    // node id -> nodes that depend on it
+    /// Cross-subject edges (AppliedIn/RelatedTo) indexed by node id
+    pub cross_subject: HashMap<String, Vec<usize>>,  // node id -> edge indices
 }
 
 impl CapsGraph {
@@ -121,7 +123,9 @@ impl CapsGraph {
                 .push(i);
         }
 
-        for edge in &raw.edges {
+        let mut cross_subject: HashMap<String, Vec<usize>> = HashMap::new();
+
+        for (edge_idx, edge) in raw.edges.iter().enumerate() {
             prerequisites
                 .entry(edge.to.clone())
                 .or_default()
@@ -130,6 +134,12 @@ impl CapsGraph {
                 .entry(edge.from.clone())
                 .or_default()
                 .push(edge.to.clone());
+
+            // Index cross-subject edges (AppliedIn/RelatedTo)
+            if edge.edge_type == "AppliedIn" || edge.edge_type == "RelatedTo" {
+                cross_subject.entry(edge.from.clone()).or_default().push(edge_idx);
+                cross_subject.entry(edge.to.clone()).or_default().push(edge_idx);
+            }
         }
 
         CapsGraph {
@@ -139,6 +149,7 @@ impl CapsGraph {
             by_subject_grade,
             prerequisites,
             dependents,
+            cross_subject,
         }
     }
 
@@ -161,6 +172,22 @@ impl CapsGraph {
     /// Get a node by ID.
     pub fn node(&self, id: &str) -> Option<&CapsNode> {
         self.by_id.get(id).map(|&i| &self.nodes[i])
+    }
+
+    /// Get cross-subject connections for a node (AppliedIn/RelatedTo edges).
+    /// Returns (neighbor_node, edge, is_outgoing) tuples.
+    pub fn cross_subject_neighbors(&self, node_id: &str) -> Vec<(&CapsNode, &CapsEdge)> {
+        self.cross_subject
+            .get(node_id)
+            .map(|edge_indices| {
+                edge_indices.iter().filter_map(|&ei| {
+                    let edge = &self.edges[ei];
+                    let neighbor_id = if edge.from == node_id { &edge.to } else { &edge.from };
+                    let neighbor = self.node(neighbor_id)?;
+                    Some((neighbor, edge))
+                }).collect()
+            })
+            .unwrap_or_default()
     }
 
     /// All unique subjects.

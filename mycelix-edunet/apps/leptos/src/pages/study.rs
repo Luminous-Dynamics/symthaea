@@ -285,6 +285,10 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                     on:click=move |_| set_active_tab.set("practice")>"Practice"</button>
                 <button class=move || if active_tab.get() == "pitfalls" { "caps-tab active" } else { "caps-tab" }
                     on:click=move |_| set_active_tab.set("pitfalls")>"Pitfalls"</button>
+                <button class=move || if active_tab.get() == "connections" { "caps-tab active" } else { "caps-tab" }
+                    on:click=move |_| set_active_tab.set("connections")
+                    style="color: var(--info)"
+                >"Connections"</button>
                 <button class=move || if active_tab.get() == "notes" { "caps-tab active" } else { "caps-tab" }
                     on:click=move |_| set_active_tab.set("notes")>"Notes"</button>
                 {if games::has_game(&node_id_for_status) {
@@ -526,6 +530,51 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                     // Explore tab (game)
                                     <div style=move || if active_tab.get() == "explore" { "display: block" } else { "display: none" }>
                                         <games::GameContainer node_id=node_id.clone() />
+                                    </div>
+
+                                    // Notes tab
+                                    // Connections tab — cross-subject links
+                                    <div style=move || if active_tab.get() == "connections" { "display: block" } else { "display: none" }>
+                                        {
+                                            let graph = caps_graph();
+                                            let neighbors = graph.cross_subject_neighbors(&node_id);
+                                            if neighbors.is_empty() {
+                                                view! {
+                                                    <div class="caps-detail">
+                                                        <p style="color: var(--text-secondary); font-size: 0.9rem">
+                                                            "No cross-subject connections mapped for this topic yet. "
+                                                            "Connections show where knowledge from one subject applies in another."
+                                                        </p>
+                                                    </div>
+                                                }.into_any()
+                                            } else {
+                                                view! {
+                                                    <div class="caps-detail">
+                                                        <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-secondary)">"Connected Across Subjects"</h3>
+                                                        <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 1rem">"This topic connects to knowledge in other subjects — tap to explore."</p>
+                                                        {neighbors.iter().map(|(neighbor, edge)| {
+                                                            let href = format!("/study/{}", neighbor.id);
+                                                            let title = neighbor.title.clone();
+                                                            let subject = neighbor.subject_area.clone();
+                                                            let rationale = edge.rationale.clone();
+                                                            let edge_type = edge.edge_type.clone();
+                                                            let grade = neighbor.grade_levels.first().cloned().unwrap_or_default();
+                                                            view! {
+                                                                <a href=href class="connection-card">
+                                                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem">
+                                                                        <span class="caps-badge" style="background: var(--info); color: var(--text-on-primary); font-size: 0.65rem">{subject}</span>
+                                                                        <span style="font-size: 0.65rem; color: var(--text-tertiary)">{grade}</span>
+                                                                        <span style="font-size: 0.6rem; color: var(--text-tertiary); font-style: italic">{edge_type}</span>
+                                                                    </div>
+                                                                    <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem">{title}</div>
+                                                                    <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5">{rationale}</div>
+                                                                </a>
+                                                            }
+                                                        }).collect::<Vec<_>>()}
+                                                    </div>
+                                                }.into_any()
+                                            }
+                                        }
                                     </div>
 
                                     // Notes tab
