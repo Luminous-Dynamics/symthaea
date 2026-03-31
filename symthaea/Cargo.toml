@@ -35,6 +35,7 @@ members = [
     "crates/symthaea-physics",
     "crates/symthaea-physics-bridge",
     "crates/symthaea-vocal-tract",
+    "crates/symthaea-voice",
     "crates/symthaea-vehicle",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
@@ -666,6 +667,72 @@ proliferation-safeguards = ["nuclear-forensics"]
 # REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
 # REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
+
+# ── Tested profiles — CI-validated feature combinations ──────────
+# Each profile bundles logically related features that are tested together.
+# Run: ./scripts/test-feature-profiles.sh to validate all profiles compile.
+
+# Deep consciousness stack: IIT 4.0 + structured bottleneck + reasoning + provenance + self-schema
+profile-consciousness = [
+    "full_consciousness",
+    "provenance",
+    "self_schema",
+    "structured_bottleneck",
+    "continuous_hot",
+    "ctc_wiring",
+    "unified_precision",
+    "interoceptive_inference",
+    "england_dissipation",
+    "iit4",
+    "reasoning_engine",
+    "epistemic",
+]
+
+# Voice pipeline: vocal-tract articulatory synthesis + SSM language center (no ONNX runtime needed)
+profile-voice = [
+    "vocal-tract",
+    "ssm_language",
+    "muse",
+]
+
+# Embodiment: all robotics platforms with CPG motor control
+profile-embodiment = [
+    "cpg",
+    "humanoid",
+    "flight",
+    "helicopter",
+    "vehicle",
+    "auv",
+    "manipulator",
+]
+
+# Distributed networking: mesh radio + P2P swarm + identity + encryption
+profile-distributed = [
+    "mesh",
+    "mesh-encryption",
+    "mesh-key-exchange",
+    "swarm",
+    "identity",
+    "pqc-handshake",
+    "fhe-wisdom",
+]
+
+# Reasoning + code understanding + scientific method
+profile-reasoning = [
+    "reasoning_engine",
+    "code_generation",
+    "school_learning",
+    "scientific_method",
+    "mathematics",
+    "geodesic_synthesis",
+]
+
+# Genesis: full DNA-to-human species stewardship pipeline
+profile-genesis = [
+    "genesis",
+    "safety-agents",
+    "sentinel",
+]
 
 # ── Mind bundles (graduated consciousness stacks) ─────────────────
 default-mind = [

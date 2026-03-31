@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-voice"
+version = "0.1.0"
+edition = "2021"
+description = "Consciousness-driven voice synthesis for Symthaea"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-vocal-tract = { path = "../symthaea-vocal-tract" }
+serde = { workspace = true }
+
+[dev-dependencies]
