@@ -1,0 +1,180 @@
+{
+  "node_id": "SDF/FundProg",
+  "lesson": {
+    "standard_code": "SDF/FundProg",
+    "title": "Fundamental Programming Concepts",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Programming is about giving precise instructions to a computer. Variables store data, control flow (if/else, loops) directs execution, functions organize code into reusable pieces, and recursion lets functions call themselves to solve problems by breaking them into smaller subproblems. Mastering these fundamentals is the foundation of all software development.",
+    "examples": [
+      {
+        "problem": "Write pseudocode for a function that computes factorial(n) using recursion.",
+        "steps": [
+          {
+            "instruction": "Base case: if n \u2264 1, return 1",
+            "result": "factorial(0)=1, factorial(1)=1"
+          },
+          {
+            "instruction": "Recursive case: return n \u00d7 factorial(n-1)",
+            "result": "factorial(5) = 5 \u00d7 factorial(4)"
+          },
+          {
+            "instruction": "Trace: 5\u00d74\u00d73\u00d72\u00d71 = 120",
+            "result": "factorial(5) = 120"
+          }
+        ],
+        "answer": "function factorial(n): if n \u2264 1 return 1, else return n \u00d7 factorial(n-1)"
+      },
+      {
+        "problem": "Convert a while loop to a for loop: i=0; while i<10: print(i); i+=1",
+        "steps": [
+          {
+            "instruction": "Identify loop variable (i), start (0), end (10), step (+1)",
+            "result": "for i in range(0, 10)"
+          },
+          {
+            "instruction": "Body stays the same",
+            "result": "print(i)"
+          }
+        ],
+        "answer": "for i in range(10): print(i)"
+      },
+      {
+        "problem": "Write a function that returns True if a string is a palindrome.",
+        "steps": [
+          {
+            "instruction": "Compare string with its reverse",
+            "result": "'racecar' reversed is 'racecar'"
+          },
+          {
+            "instruction": "Return equality check",
+            "result": "s == s[::-1]"
+          }
+        ],
+        "answer": "function is_palindrome(s): return s == reverse(s)"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the output of: x = 5; x = x + 3; print(x)?",
+        "answer": "8",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Variables store values and can be updated"
+        ],
+        "explanation": "x starts at 5, then x+3=8 is assigned back to x.",
+        "distractors": [
+          "5",
+          "3",
+          "53"
+        ]
+      },
+      {
+        "question": "Write a loop that prints the numbers 1 to 100.",
+        "answer": "for i in range(1, 101): print(i)",
+        "difficulty_permille": 250,
+        "bloom_level": "Apply",
+        "hints": [
+          "Use a for loop with range"
+        ],
+        "explanation": "range(1, 101) generates 1, 2, ..., 100.",
+        "distractors": [
+          "for i in range(100)",
+          "for i in range(1, 100)",
+          "while i < 100"
+        ]
+      },
+      {
+        "question": "What is the base case for a recursive function that computes the sum of a list?",
+        "answer": "If the list is empty, return 0",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "What's the simplest list to sum?"
+        ],
+        "explanation": "An empty list has sum 0. This stops the recursion.",
+        "distractors": [
+          "If the list has one element",
+          "If the sum is 0",
+          "There is no base case"
+        ]
+      },
+      {
+        "question": "A function takes a list and returns a new list with duplicates removed. Which data structure helps?",
+        "answer": "A set \u2014 sets automatically eliminate duplicates",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Which collection doesn't allow duplicates?"
+        ],
+        "explanation": "Convert list to set, then back to list: list(set(original)).",
+        "distractors": [
+          "A stack",
+          "A queue",
+          "A linked list"
+        ]
+      },
+      {
+        "question": "Explain the difference between iteration and recursion. When would you prefer one over the other?",
+        "answer": "Iteration uses loops; recursion uses self-calling functions. Iteration is generally faster (no call stack overhead). Recursion is clearer for tree/graph problems and divide-and-conquer algorithms.",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Think about memory usage and code clarity"
+        ],
+        "explanation": "Recursion creates stack frames; deep recursion can cause stack overflow. But tree traversal is naturally recursive.",
+        "distractors": [
+          "They are identical",
+          "Recursion is always faster",
+          "Iteration can't solve recursive problems"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "variable",
+        "definition": "A named storage location in memory that holds a value",
+        "example_usage": "x = 42 assigns the integer 42 to variable x"
+      },
+      {
+        "term": "control flow",
+        "definition": "The order in which statements are executed, directed by conditionals and loops",
+        "example_usage": "if temperature > 30: print('hot') controls which code runs"
+      },
+      {
+        "term": "recursion",
+        "definition": "A technique where a function calls itself with a simpler version of the problem",
+        "example_usage": "factorial(n) calls factorial(n-1) until reaching the base case"
+      },
+      {
+        "term": "function",
+        "definition": "A reusable block of code that performs a specific task, taking inputs and returning outputs",
+        "example_usage": "def square(x): return x * x"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Recursion always leads to infinite loops",
+        "correction": "Recursion works correctly when there is a proper base case that stops the recursion. Without a base case, yes, it would run forever.",
+        "why_students_think_this": "Students see functions calling themselves and assume it never stops, forgetting about base cases."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}

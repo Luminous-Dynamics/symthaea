@@ -1,0 +1,179 @@
+{
+  "node_id": "AL/BasicAnalysis",
+  "lesson": {
+    "standard_code": "AL/BasicAnalysis",
+    "title": "Algorithm Analysis \u2014 Big-O Notation",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Algorithm analysis measures how an algorithm's resource usage (time or space) grows as input size increases. Big-O notation O(f(n)) describes the upper bound on growth rate, ignoring constants and lower-order terms. O(1) is constant, O(log n) is logarithmic (binary search), O(n) is linear, O(n log n) is linearithmic (merge sort), O(n\u00b2) is quadratic (bubble sort), and O(2\u207f) is exponential.",
+    "examples": [
+      {
+        "problem": "Determine the time complexity of: for i in range(n): for j in range(n): print(i, j)",
+        "steps": [
+          {
+            "instruction": "Outer loop runs n times",
+            "result": "n iterations"
+          },
+          {
+            "instruction": "Inner loop runs n times for each outer iteration",
+            "result": "n \u00d7 n = n\u00b2 total operations"
+          },
+          {
+            "instruction": "print is O(1), so total is O(n\u00b2)",
+            "result": "O(n\u00b2)"
+          }
+        ],
+        "answer": "O(n\u00b2) \u2014 quadratic time"
+      },
+      {
+        "problem": "What is the time complexity of binary search?",
+        "steps": [
+          {
+            "instruction": "Each step halves the search space",
+            "result": "n \u2192 n/2 \u2192 n/4 \u2192 ... \u2192 1"
+          },
+          {
+            "instruction": "Number of steps: log\u2082(n)",
+            "result": "O(log n)"
+          }
+        ],
+        "answer": "O(log n) \u2014 logarithmic time"
+      },
+      {
+        "problem": "Analyze: for i in range(n): for j in range(i): x += 1",
+        "steps": [
+          {
+            "instruction": "When i=0: 0 ops, i=1: 1 op, ..., i=n-1: n-1 ops",
+            "result": "Total: 0+1+2+...+(n-1)"
+          },
+          {
+            "instruction": "Sum = n(n-1)/2",
+            "result": "= n\u00b2/2 - n/2"
+          },
+          {
+            "instruction": "Drop constants and lower terms",
+            "result": "O(n\u00b2)"
+          }
+        ],
+        "answer": "O(n\u00b2) \u2014 the sum 1+2+...+n = n(n-1)/2 is O(n\u00b2)"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the Big-O of accessing an element in an array by index?",
+        "answer": "O(1) \u2014 constant time",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Array access is direct via memory address"
+        ],
+        "explanation": "Arrays provide direct access by computing the memory offset.",
+        "distractors": [
+          "O(n)",
+          "O(log n)",
+          "O(n\u00b2)"
+        ]
+      },
+      {
+        "question": "Rank these in order of growth: O(n\u00b2), O(1), O(n log n), O(log n), O(n)",
+        "answer": "O(1) < O(log n) < O(n) < O(n log n) < O(n\u00b2)",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Plot each function for n=10, 100, 1000"
+        ],
+        "explanation": "Each grows faster than the previous as n increases.",
+        "distractors": [
+          "O(1) < O(n) < O(log n) < O(n\u00b2) < O(n log n)",
+          "O(log n) < O(1) < O(n) < O(n log n) < O(n\u00b2)",
+          "They're all the same"
+        ]
+      },
+      {
+        "question": "What is the time complexity of: for i in range(n): if i == n//2: for j in range(n): print(j)",
+        "answer": "O(n) \u2014 the inner loop only runs once (when i equals n/2)",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "How many times does the if condition trigger?"
+        ],
+        "explanation": "The inner loop runs n times, but only once total. Combined with the outer loop's n iterations of O(1) work, total is O(n).",
+        "distractors": [
+          "O(n\u00b2)",
+          "O(n log n)",
+          "O(1)"
+        ]
+      },
+      {
+        "question": "An algorithm has time complexity T(n) = 3n\u00b2 + 7n + 15. What is its Big-O?",
+        "answer": "O(n\u00b2)",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Drop constants and lower-order terms"
+        ],
+        "explanation": "The dominant term is 3n\u00b2. Constants (3) and lower terms (7n, 15) are ignored in Big-O.",
+        "distractors": [
+          "O(3n\u00b2)",
+          "O(n\u00b2 + n)",
+          "O(n\u00b3)"
+        ]
+      },
+      {
+        "question": "Why is O(n log n) significant in sorting? Can we sort faster?",
+        "answer": "O(n log n) is the theoretical lower bound for comparison-based sorting (proven by decision tree argument). We cannot sort faster using only comparisons, but non-comparison sorts like counting sort achieve O(n) for restricted inputs.",
+        "difficulty_permille": 750,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "Think about information theory \u2014 how many comparisons are needed to distinguish n! orderings?"
+        ],
+        "explanation": "n! permutations require log\u2082(n!) \u2248 n log n comparisons to distinguish.",
+        "distractors": [
+          "O(n) is always possible",
+          "O(n\u00b2) is the best we can do",
+          "O(log n) sorting exists"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "Big-O notation",
+        "definition": "Describes the upper bound on an algorithm's growth rate as input size approaches infinity",
+        "example_usage": "Binary search is O(log n) because it halves the search space each step"
+      },
+      {
+        "term": "time complexity",
+        "definition": "How the running time of an algorithm grows with input size",
+        "example_usage": "A nested loop over n elements has O(n\u00b2) time complexity"
+      },
+      {
+        "term": "space complexity",
+        "definition": "How the memory usage of an algorithm grows with input size",
+        "example_usage": "Merge sort uses O(n) extra space for the temporary arrays"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "O(n) is always faster than O(n\u00b2)",
+        "correction": "Big-O describes asymptotic behavior. For small n, an O(n\u00b2) algorithm with small constants can be faster than an O(n) algorithm with large constants. Big-O matters for large inputs.",
+        "why_students_think_this": "Students treat Big-O as a direct speed comparison rather than a growth rate comparison."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}
