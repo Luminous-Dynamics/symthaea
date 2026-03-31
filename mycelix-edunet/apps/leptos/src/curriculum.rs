@@ -469,6 +469,7 @@ impl Subject {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Grade {
     Gr1, Gr2, Gr3, Gr4, Gr5, Gr6, Gr7, Gr8, Gr9, Gr10, Gr11, Gr12,
+    Undergraduate, Graduate, Doctoral, Adult,
 }
 
 impl Grade {
@@ -478,6 +479,8 @@ impl Grade {
             Grade::Gr4 => "Grade4", Grade::Gr5 => "Grade5", Grade::Gr6 => "Grade6",
             Grade::Gr7 => "Grade7", Grade::Gr8 => "Grade8", Grade::Gr9 => "Grade9",
             Grade::Gr10 => "Grade10", Grade::Gr11 => "Grade11", Grade::Gr12 => "Grade12",
+            Grade::Undergraduate => "Undergraduate", Grade::Graduate => "Graduate",
+            Grade::Doctoral => "Doctoral", Grade::Adult => "Adult",
         }
     }
 
@@ -487,12 +490,42 @@ impl Grade {
             Grade::Gr4 => "Grade 4", Grade::Gr5 => "Grade 5", Grade::Gr6 => "Grade 6",
             Grade::Gr7 => "Grade 7", Grade::Gr8 => "Grade 8", Grade::Gr9 => "Grade 9",
             Grade::Gr10 => "Grade 10", Grade::Gr11 => "Grade 11", Grade::Gr12 => "Grade 12",
+            Grade::Undergraduate => "University", Grade::Graduate => "Postgrad",
+            Grade::Doctoral => "Doctoral", Grade::Adult => "Life Skills",
         }
     }
 
+    /// All grades including post-secondary.
     pub fn all() -> &'static [Grade] {
         &[Grade::Gr1, Grade::Gr2, Grade::Gr3, Grade::Gr4, Grade::Gr5, Grade::Gr6,
+          Grade::Gr7, Grade::Gr8, Grade::Gr9, Grade::Gr10, Grade::Gr11, Grade::Gr12,
+          Grade::Undergraduate, Grade::Graduate, Grade::Doctoral, Grade::Adult]
+    }
+
+    /// K-12 grades only.
+    pub fn k12() -> &'static [Grade] {
+        &[Grade::Gr1, Grade::Gr2, Grade::Gr3, Grade::Gr4, Grade::Gr5, Grade::Gr6,
           Grade::Gr7, Grade::Gr8, Grade::Gr9, Grade::Gr10, Grade::Gr11, Grade::Gr12]
+    }
+
+    /// Post-secondary grades.
+    pub fn post_secondary() -> &'static [Grade] {
+        &[Grade::Undergraduate, Grade::Graduate, Grade::Doctoral, Grade::Adult]
+    }
+
+    /// Convert from profile grade number to Grade enum.
+    pub fn from_profile_grade(g: u8) -> Grade {
+        match g {
+            1 => Grade::Gr1, 2 => Grade::Gr2, 3 => Grade::Gr3, 4 => Grade::Gr4,
+            5 => Grade::Gr5, 6 => Grade::Gr6, 7 => Grade::Gr7, 8 => Grade::Gr8,
+            9 => Grade::Gr9, 10 => Grade::Gr10, 11 => Grade::Gr11, 12 => Grade::Gr12,
+            13 => Grade::Undergraduate, 14 => Grade::Graduate, 15 => Grade::Doctoral,
+            16 => Grade::Adult, _ => Grade::Gr12,
+        }
+    }
+
+    pub fn is_post_secondary(&self) -> bool {
+        matches!(self, Grade::Undergraduate | Grade::Graduate | Grade::Doctoral | Grade::Adult)
     }
 }
 

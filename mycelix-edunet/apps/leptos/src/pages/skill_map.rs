@@ -155,8 +155,23 @@ pub fn SkillMapPage() -> impl IntoView {
                         }).collect::<Vec<_>>()
                     }
                 </div>
+                // K-12 grades
                 <div class="caps-filter-group">
-                    {Grade::all().iter().map(|g| {
+                    {Grade::k12().iter().map(|g| {
+                        let g = *g;
+                        let label = g.label();
+                        view! {
+                            <button
+                                class=move || if grade.get() == g { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                on:click=move |_| set_grade.set(g)
+                            >{label}</button>
+                        }
+                    }).collect::<Vec<_>>()}
+                </div>
+                // Post-secondary
+                <div class="caps-filter-group" style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem">
+                    <span style="font-size: 0.7rem; color: var(--text-tertiary); margin-right: 0.5rem">"Beyond Matric:"</span>
+                    {Grade::post_secondary().iter().map(|g| {
                         let g = *g;
                         let label = g.label();
                         view! {

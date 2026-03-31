@@ -104,21 +104,36 @@ struct Flashcard {
 // ============================================================
 
 async fn fetch_lesson(node_id: &str) -> Result<NodeContent, String> {
-    // Convert node ID to file path: CAPS.Mathematics.Gr12.P1.CALC -> caps/generated/math-12/caps.mathematics.gr12.p1.calc.json
     let id_lower = node_id.to_lowercase();
-    let filename = format!("{}.json", id_lower);
+    // Sanitize for filename: replace / with _ for post-Gr12 IDs like "AL/BasicAnalysis"
+    let filename = format!("{}.json", id_lower.replace('/', "_"));
 
-    // Determine subject-grade dir by extracting grade number
-    let grade_num = (1..=12).rev().find(|g| id_lower.contains(&format!("gr{}", g))).unwrap_or(12);
-    let subject_dir = if id_lower.contains("naturalsciences") {
-        format!("natsci-{}", grade_num)
-    } else if id_lower.contains("physicalsciences") {
-        format!("physics-{}", grade_num)
-    } else {
-        format!("math-{}", grade_num)
+    // Determine subject-grade dir
+    let graph = caps_graph();
+    let node_meta = graph.node(node_id);
+    let grade_level = node_meta.and_then(|n| n.grade_levels.first().cloned());
+
+    let url = match grade_level.as_deref() {
+        Some("Undergraduate") | Some("Graduate") | Some("Doctoral") | Some("Adult") => {
+            // Post-Gr12: use subject-based directory
+            let subject_dir = node_meta
+                .map(|n| n.subject_area.to_lowercase().replace(' ', "-").replace('&', "and"))
+                .unwrap_or_else(|| "general".into());
+            format!("/caps/generated/{}/{}", subject_dir, filename)
+        }
+        _ => {
+            // K-12: existing logic
+            let grade_num = (1..=12).rev().find(|g| id_lower.contains(&format!("gr{}", g))).unwrap_or(12);
+            let subject_dir = if id_lower.contains("naturalsciences") {
+                format!("natsci-{}", grade_num)
+            } else if id_lower.contains("physicalsciences") {
+                format!("physics-{}", grade_num)
+            } else {
+                format!("math-{}", grade_num)
+            };
+            format!("/caps/generated/{}/{}", subject_dir, filename)
+        }
     };
-
-    let url = format!("/caps/generated/{}/{}", subject_dir, filename);
 
     let window = web_sys::window().ok_or("no window")?;
     let resp = JsFuture::from(window.fetch_with_str(&url))

@@ -543,6 +543,27 @@ fn OnboardingFlow(
                                 "No shame in going back to strengthen foundations. The strongest trees have the deepest roots."
                             </p>
                         </details>
+                        // Beyond school
+                        <details style="margin-top: 0.5rem; text-align: center">
+                            <summary style="font-size: 0.85rem; color: var(--text-tertiary); cursor: pointer; padding: 0.5rem">"Beyond school?"</summary>
+                            <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 0.75rem">
+                                <button
+                                    style="padding: 0.75rem 1.25rem; background: var(--surface); border: 1px solid var(--primary); border-radius: 12px; color: var(--primary); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit"
+                                    on:click=move |_| { set_grade.set(13); finish_onboarding(); }
+                                >"University"</button>
+                                <button
+                                    style="padding: 0.75rem 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; font-family: inherit"
+                                    on:click=move |_| { set_grade.set(16); finish_onboarding(); }
+                                >"Working adult"</button>
+                                <button
+                                    style="padding: 0.75rem 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; font-family: inherit"
+                                    on:click=move |_| { set_grade.set(16); finish_onboarding(); }
+                                >"Lifelong learner"</button>
+                            </div>
+                            <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.75rem">
+                                "Cybersecurity, Computer Science, Philosophy, Financial Literacy, and more."
+                            </p>
+                        </details>
                     </div>
                 }.into_any()
             } else {
