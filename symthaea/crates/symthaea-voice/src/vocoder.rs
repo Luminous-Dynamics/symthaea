@@ -59,10 +59,8 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
 
             match frame.source_type {
                 SourceType::Vowel | SourceType::Liquid | SourceType::Nasal => {
-                    // Jitter: ±2% random F0 variation (biological vocal fold irregularity)
-                    noise_state = noise_state.wrapping_mul(1664525).wrapping_add(1013904223);
-                    let jitter = 1.0 + ((noise_state >> 16) as f32 / 65536.0 - 0.5) * 0.04;
-                    let f0_jittered = smooth_f0 * jitter;
+                    // Jitter DISABLED for debugging — isolate click source
+                    let f0_jittered = smooth_f0;
 
                     glottal_phase += f0_jittered / sr;
                     if glottal_phase >= 1.0 { glottal_phase -= 1.0; }
@@ -80,11 +78,8 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                         0.0 // closed phase
                     };
 
-                    // Shimmer: ±5% random amplitude variation
-                    noise_state = noise_state.wrapping_mul(1664525).wrapping_add(1013904223);
-                    let shimmer = 1.0 + ((noise_state >> 20) as f32 / 4096.0 - 0.5) * 0.10;
-
-                    source = pulse * smooth_voicing * smooth_energy * shimmer;
+                    // Shimmer DISABLED for debugging
+                    source = pulse * smooth_voicing * smooth_energy;
 
                     // Aspiration: breathy noise during open phase
                     if glottal_phase < 0.35 {
@@ -141,21 +136,34 @@ pub fn synthesize(frames: &[FormantFrame], sample_rate: u32) -> Vec<f32> {
                 filtered
             };
 
-            output.push(clipped * 8.0); // master gain (reduced from 12 to avoid clipping)
+            output.push(clipped * 30.0); // master gain — target -18 to -14 dBFS
         }
     }
 
     output
 }
 
-/// Second-order resonator (digital formant filter).
+/// Second-order resonator with wider bandwidth to prevent clicking.
+///
+/// The bandwidth is clamped to minimum 100Hz to prevent high-Q ringing
+/// when formant frequencies change between frames.
 fn resonate(state: &mut [f32; 2], input: f32, freq: f32, bandwidth: f32, sr: f32) -> f32 {
+    // Minimum bandwidth prevents unstable high-Q resonance during transitions
+    let bw = bandwidth.max(100.0);
     let omega = std::f32::consts::TAU * freq / sr;
-    let r = (-std::f32::consts::PI * bandwidth / sr).exp();
+    let r = (-std::f32::consts::PI * bw / sr).exp();
+
+    // Clamp r to prevent instability
+    let r = r.clamp(0.0, 0.995);
+
     let a1 = -2.0 * r * omega.cos();
     let a2 = r * r;
 
     let output = input - a1 * state[0] - a2 * state[1];
+
+    // Clamp state to prevent runaway
+    let output = output.clamp(-10.0, 10.0);
+
     state[1] = state[0];
     state[0] = output;
 
