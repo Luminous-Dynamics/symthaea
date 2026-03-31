@@ -48,13 +48,22 @@ impl KokoroEngine {
     pub fn load(config: KokoroConfig) -> Option<Self> {
         info!("Loading Kokoro TTS from {}...", config.repo_id);
 
-        let api = hf_hub::api::sync::Api::new().ok()?;
+        let api = match hf_hub::api::sync::Api::new() {
+            Ok(a) => a,
+            Err(e) => { warn!("HF API init failed: {}", e); return None; }
+        };
         let repo = api.model(config.repo_id.clone());
 
-        let model_path = repo.get(&config.model_filename).ok()?;
-        let session = ort::session::Session::builder()
+        let model_path = match repo.get(&config.model_filename) {
+            Ok(p) => { info!("Model at: {:?}", p); p },
+            Err(e) => { warn!("Model download failed: {}", e); return None; }
+        };
+        let session = match ort::session::Session::builder()
             .and_then(|mut b| b.commit_from_file(&model_path))
-            .ok()?;
+        {
+            Ok(s) => { info!("ONNX session created"); s },
+            Err(e) => { warn!("ONNX session failed: {}", e); return None; }
+        };
 
         let voices = match repo.get(&config.voices_filename) {
             Ok(path) => {
@@ -76,9 +85,9 @@ impl KokoroEngine {
     /// Synthesize text to audio at 24kHz.
     #[cfg(feature = "kokoro")]
     pub fn synthesize(&mut self, text: &str, voice_id: Option<usize>) -> Option<Vec<f32>> {
-        // Use CMUdict G2P for phoneme IDs (Misaki format for Kokoro)
         let phoneme_ids = text_to_kokoro_ids(text);
-        if phoneme_ids.is_empty() { return None; }
+        info!("Kokoro synthesize: '{}' → {} phoneme IDs", text, phoneme_ids.len());
+        if phoneme_ids.is_empty() { warn!("No phoneme IDs!"); return None; }
 
         let voice_idx = voice_id.unwrap_or(self.config.default_voice);
         let voice_embed = self.voices.get(voice_idx).or(self.voices.first())?;
