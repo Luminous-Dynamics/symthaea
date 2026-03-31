@@ -8,7 +8,7 @@
 
 use leptos::prelude::*;
 
-use crate::holochain::use_holochain;
+use mycelix_leptos_core::use_holochain;
 
 // ---------------------------------------------------------------------------
 // Data types (mirror credential_zome integrity types for UI layer)
@@ -39,66 +39,79 @@ pub struct CredentialView {
 // Mock data (teacher/parent friendly examples)
 // ---------------------------------------------------------------------------
 
-fn mock_credentials() -> Vec<CredentialView> {
-    vec![
-        CredentialView {
-            credential_id: "vc:edunet:cred_001".into(),
-            course_name: "Multiplication Facts".into(),
-            course_id: "course_mult_301".into(),
-            issuer: "Cedar Park Elementary".into(),
-            issuance_date: "2026-03-15T10:30:00Z".into(),
+/// Generate real credentials from mastered topics
+fn real_credentials() -> Vec<CredentialView> {
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+        .unwrap_or_default();
+    let graph = crate::curriculum::caps_graph();
+
+    let mut creds = Vec::new();
+    let mut cred_num = 0u32;
+
+    for node in &graph.nodes {
+        let np = progress.get(&node.id);
+        if np.status != crate::curriculum::ProgressStatus::Mastered { continue; }
+
+        cred_num += 1;
+        let bkt = progress.bkt(&node.id);
+        let score = (bkt.p_mastery * 100.0).min(100.0);
+        let band = match score as u32 {
+            90..=100 => "A+",
+            80..=89 => "A",
+            70..=79 => "B",
+            60..=69 => "C",
+            50..=59 => "D",
+            _ => "Pass",
+        };
+
+        let now = js_sys::Date::new_0();
+        let date = format!("{:04}-{:02}-{:02}T00:00:00Z",
+            now.get_full_year(), now.get_month() + 1, now.get_date());
+
+        creds.push(CredentialView {
+            credential_id: format!("vc:edunet:local_{}", cred_num),
+            course_name: node.title.clone(),
+            course_id: node.id.clone(),
+            issuer: "EduNet (self-attested, pending Holochain verification)".into(),
+            issuance_date: date.clone(),
             expiration_date: None,
-            score: Some(92.0),
-            score_band: "A".into(),
-            proof_type: "Ed25519Signature2020".into(),
-            proof_created: "2026-03-15T10:30:00Z".into(),
-            verification_method: "did:key:z6Mkf5rGNR...#keys-1".into(),
+            score: Some(score),
+            score_band: band.into(),
+            proof_type: "LocalAttestation".into(),
+            proof_created: date,
+            verification_method: "localStorage (will upgrade to did:key when conductor connects)".into(),
             proof_purpose: "assertionMethod".into(),
-            proof_value: "z3FXs1GYtLpRduaWkRo...".into(),
-            status_purpose: None,
-            epistemic_empirical: Some(3),
-            epistemic_normative: Some(2),
+            proof_value: format!("local-bkt-mastery-{:.3}", bkt.p_mastery),
+            status_purpose: Some("Self-attested mastery — will become W3C VC when Holochain verifies".into()),
+            epistemic_empirical: Some(if bkt.attempts > 10 { 3 } else { 2 }),
+            epistemic_normative: Some(1), // Self-attested
             epistemic_materiality: Some(2),
-        },
-        CredentialView {
-            credential_id: "vc:edunet:cred_002".into(),
-            course_name: "Reading Comprehension".into(),
-            course_id: "course_read_201".into(),
-            issuer: "Cedar Park Elementary".into(),
-            issuance_date: "2026-02-28T14:00:00Z".into(),
+        });
+    }
+
+    if creds.is_empty() {
+        // Show encouragement for new users
+        creds.push(CredentialView {
+            credential_id: "vc:edunet:placeholder".into(),
+            course_name: "Your first credential awaits".into(),
+            course_id: "".into(),
+            issuer: "EduNet".into(),
+            issuance_date: "".into(),
             expiration_date: None,
-            score: Some(78.0),
-            score_band: "B".into(),
-            proof_type: "Ed25519Signature2020".into(),
-            proof_created: "2026-02-28T14:00:00Z".into(),
-            verification_method: "did:key:z6MkpT9qR...#keys-1".into(),
-            proof_purpose: "assertionMethod".into(),
-            proof_value: "z4HNmTkCnY2rzpYXBn...".into(),
-            status_purpose: None,
-            epistemic_empirical: Some(2),
-            epistemic_normative: Some(1),
-            epistemic_materiality: Some(1),
-        },
-        CredentialView {
-            credential_id: "vc:edunet:cred_003".into(),
-            course_name: "Solar System".into(),
-            course_id: "course_sci_101".into(),
-            issuer: "Cedar Park Elementary".into(),
-            issuance_date: "2026-03-22T09:15:00Z".into(),
-            expiration_date: None,
-            score: Some(95.0),
-            score_band: "A+".into(),
-            proof_type: "Ed25519Signature2020".into(),
-            proof_created: "2026-03-22T09:15:00Z".into(),
-            verification_method: "did:key:z6MkqR7wB...#keys-1".into(),
-            proof_purpose: "assertionMethod".into(),
-            proof_value: "z58DAdFfa9askDFj7a...".into(),
-            status_purpose: None,
-            epistemic_empirical: Some(3),
-            epistemic_normative: Some(2),
-            epistemic_materiality: Some(2),
-        },
-    ]
+            score: None,
+            score_band: "".into(),
+            proof_type: "".into(),
+            proof_created: "".into(),
+            verification_method: "".into(),
+            proof_purpose: "".into(),
+            proof_value: "".into(),
+            status_purpose: Some("Master a topic on the constellation to earn your first credential".into()),
+            epistemic_empirical: None,
+            epistemic_normative: None,
+            epistemic_materiality: None,
+        });
+    }
+    creds
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +174,7 @@ pub fn CredentialsPage() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome::<(), Vec<CredentialView>>(
+                .call_zome_default::<(), Vec<CredentialView>>(
                     "credential",
                     "get_my_credentials",
                     &(),
@@ -169,7 +182,7 @@ pub fn CredentialsPage() -> impl IntoView {
                 .await
             {
                 Ok(c) => c,
-                Err(_) => mock_credentials(),
+                Err(_) => real_credentials(),
             }
         }
     });

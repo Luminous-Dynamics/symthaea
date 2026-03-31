@@ -43,50 +43,97 @@ struct ClassStats {
 // Mock data
 // ---------------------------------------------------------------------------
 
-const SKILL_NAMES: [&str; 6] = [
-    "PlcVal", "Add", "Sub", "Mult", "Div", "Frac",
-];
-
-const SKILL_FULL_NAMES: [&str; 6] = [
-    "Place Value", "Addition", "Subtraction",
-    "Multiplication", "Division", "Fractions",
-];
-
-fn mock_students() -> Vec<StudentMastery> {
-    vec![
-        StudentMastery { name: "Alice",   skills: vec![950, 920, 880, 780, 420, 310] },
-        StudentMastery { name: "Bob",     skills: vec![900, 850, 280, 150,   0,   0] },
-        StudentMastery { name: "Carol",   skills: vec![980, 960, 950, 890, 820, 450] },
-        StudentMastery { name: "Dan",     skills: vec![750, 600, 350, 200,   0,   0] },
-        StudentMastery { name: "Elena",   skills: vec![920, 900, 870, 750, 580, 280] },
-        StudentMastery { name: "Frank",   skills: vec![880, 860, 810, 690, 500, 350] },
-        StudentMastery { name: "Grace",   skills: vec![960, 940, 910, 850, 700, 520] },
-        StudentMastery { name: "Henry",   skills: vec![840, 780, 720, 550, 300, 100] },
-    ]
+fn skill_names() -> Vec<String> {
+    crate::curriculum::caps_graph().subjects().iter().take(6).map(|s| {
+        if s.len() > 8 { format!("{}...", &s[..6]) } else { s.to_string() }
+    }).collect()
 }
 
-fn mock_at_risk() -> Vec<AtRiskAlert> {
-    vec![
-        AtRiskAlert {
-            student: "Bob",
-            reason: "Struggling with Subtraction (28%) — below grade-level expectations",
-            severity: AlertSeverity::Critical,
-        },
-        AtRiskAlert {
-            student: "Dan",
-            reason: "Low engagement — only 2 sessions this week, declining mastery trend",
+fn skill_full_names() -> Vec<String> {
+    crate::curriculum::caps_graph().subjects().iter().take(6).map(|s| s.to_string()).collect()
+}
+
+fn real_students() -> Vec<StudentMastery> {
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+        .unwrap_or_default();
+    let profile = crate::persistence::load::<crate::student_profile::StudentProfile>("edunet_profile");
+    let name = profile.map(|p| p.name).unwrap_or_else(|| "Student".into());
+    let name_static: &'static str = Box::leak(name.into_boxed_str());
+
+    let graph = crate::curriculum::caps_graph();
+    // Compute mastery per top subject (matching SKILL_NAMES)
+    let top_subjects: Vec<String> = graph.subjects().iter().take(6).map(|s| s.to_string()).collect();
+    let skills: Vec<u16> = top_subjects.iter().map(|subj| {
+        let nodes: Vec<_> = graph.nodes.iter().filter(|n| n.subject_area == *subj).collect();
+        if nodes.is_empty() { return 0; }
+        let total: u32 = nodes.iter().map(|n| progress.bkt(&n.id).p_mastery as u32 * 1000 / 1000).sum::<u32>();
+        let avg = total * 1000 / nodes.len() as u32;
+        avg.min(1000) as u16
+    }).collect();
+
+    vec![StudentMastery { name: name_static, skills }]
+}
+
+fn real_at_risk() -> Vec<AtRiskAlert> {
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+        .unwrap_or_default();
+    let tracker = crate::persistence::load::<crate::study_tracker::StudyTracker>("edunet_study_tracker")
+        .unwrap_or_default();
+
+    let mut alerts = Vec::new();
+    let streak = tracker.current_streak();
+    if streak == 0 && !tracker.study_days.is_empty() {
+        alerts.push(AtRiskAlert {
+            student: "Current student",
+            reason: "Study streak broken — no study activity today",
             severity: AlertSeverity::Warning,
-        },
-    ]
+        });
+    }
+
+    // Check for very low mastery topics that have been attempted
+    let weakest = progress.weakest_topics(1);
+    if let Some((id, pct)) = weakest.first() {
+        if *pct < 0.3 {
+            let title = crate::curriculum::caps_graph().node(id)
+                .map(|n| n.title.as_str()).unwrap_or("Unknown");
+            let title_static: &'static str = Box::leak(title.to_string().into_boxed_str());
+            let reason: &'static str = Box::leak(
+                format!("Struggling with {} ({:.0}% mastery) — needs focused practice", title, pct * 100.0)
+                    .into_boxed_str()
+            );
+            alerts.push(AtRiskAlert {
+                student: "Current student",
+                reason,
+                severity: AlertSeverity::Critical,
+            });
+        }
+    }
+
+    if alerts.is_empty() {
+        alerts.push(AtRiskAlert {
+            student: "No alerts",
+            reason: "All students are on track. When Holochain connects, this page will show real class data.",
+            severity: AlertSeverity::Warning,
+        });
+    }
+    alerts
 }
 
-fn mock_class_stats() -> ClassStats {
+fn real_class_stats() -> ClassStats {
+    let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("edunet_progress")
+        .unwrap_or_default();
+    let graph = crate::curriculum::caps_graph();
+    let total_nodes = graph.nodes.len();
+    let mastered = progress.mastered_count();
+    let studying = progress.studying_count();
+    let avg = if total_nodes > 0 { (mastered * 100 / total_nodes) as u16 } else { 0 };
+
     ClassStats {
-        avg_mastery_pct: 68,
-        on_track: 18,
-        ahead: 4,
-        behind: 2,
-        total: 24,
+        avg_mastery_pct: avg,
+        on_track: if studying > 0 { 1 } else { 0 },
+        ahead: if mastered > 10 { 1 } else { 0 },
+        behind: if mastered == 0 && studying == 0 { 1 } else { 0 },
+        total: 1, // Single student for now
     }
 }
 
@@ -138,8 +185,9 @@ fn MasteryHeatmap(students: Vec<StudentMastery>) -> impl IntoView {
                     <thead>
                         <tr>
                             <th class="heatmap-name-col">"Student"</th>
-                            {SKILL_NAMES.iter().map(|s| {
-                                view! { <th class="heatmap-skill-col">{*s}</th> }
+                            {skill_names().iter().map(|s| {
+                                let s = s.clone();
+                                view! { <th class="heatmap-skill-col">{s}</th> }
                             }).collect_view()}
                             <th class="heatmap-avg-col">"Avg"</th>
                         </tr>
@@ -259,12 +307,13 @@ fn SkillBreakdown(students: Vec<StudentMastery>) -> impl IntoView {
         <div class="dash-section teacher-skill-breakdown">
             <h3>"Skill Averages"</h3>
             <div class="skill-breakdown-list">
-                {SKILL_FULL_NAMES.iter().zip(skill_avgs.iter()).map(|(name, &avg)| {
+                {skill_full_names().iter().zip(skill_avgs.iter()).map(|(name, &avg)| {
                     let pct = avg / 10;
                     let cls = mastery_color(avg);
+                    let name = name.clone();
                     view! {
                         <div class="skill-breakdown-row">
-                            <span class="skill-breakdown-name">{*name}</span>
+                            <span class="skill-breakdown-name">{name}</span>
                             <div class="skill-node-bar-container">
                                 <div
                                     class=format!("skill-node-bar {}", cls)
@@ -301,9 +350,9 @@ fn TeacherActions() -> impl IntoView {
 
 #[component]
 pub fn TeacherDashboardPage() -> impl IntoView {
-    let students = mock_students();
-    let at_risk = mock_at_risk();
-    let stats = mock_class_stats();
+    let students = real_students();
+    let at_risk = real_at_risk();
+    let stats = real_class_stats();
 
     view! {
         <div class="teacher-dashboard">
