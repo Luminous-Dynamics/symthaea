@@ -1,7 +1,7 @@
 {
-  "name": "EduNet — Matric Study Companion",
+  "name": "EduNet — Learn anything, from anywhere",
   "short_name": "EduNet",
-  "description": "CAPS Mathematics and Physical Sciences — Grades 9-12",
+  "description": "Free learning: matric exam prep, trades, legal rights, cybersecurity, financial literacy. Grade 1 to PhD. Offline-first.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

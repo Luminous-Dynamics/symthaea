@@ -564,8 +564,17 @@ pub fn provide_curriculum_context() {
     let initial_progress = persistence::load::<ProgressStore>(PROGRESS_KEY)
         .unwrap_or_default();
 
-    let (subject, set_subject) = signal(Subject("Mathematics".to_string()));
-    let (grade, set_grade) = signal(Grade::Gr12);
+    // Default grade from student profile (so constellation shows relevant content)
+    let profile_grade = persistence::load::<crate::student_profile::StudentProfile>("edunet_profile")
+        .map(|p| Grade::from_profile_grade(p.grade))
+        .unwrap_or(Grade::Gr12);
+    let default_subject = match profile_grade {
+        Grade::Adult => "Financial Literacy",
+        Grade::Undergraduate => "Computer Science",
+        _ => "Mathematics",
+    };
+    let (subject, set_subject) = signal(Subject(default_subject.to_string()));
+    let (grade, set_grade) = signal(profile_grade);
     let (progress, set_progress) = signal(initial_progress);
 
     // Persist progress on change
