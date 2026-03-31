@@ -21,6 +21,8 @@ pub fn LayerPanel() -> impl IntoView {
         Layer::Emergency,
         Layer::Health,
         Layer::Robotics,
+        Layer::FossilDeposits,
+        Layer::Nuclear,
     ];
 
     view! {
@@ -39,6 +41,26 @@ pub fn LayerPanel() -> impl IntoView {
                     </div>
                 }
             }).collect::<Vec<_>>()}
+
+            <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,255,136,0.1); font-size: 11px; opacity: 0.7">
+                <div style="margin-bottom: 6px; font-weight: bold">"EROI Legend"</div>
+                <div style="display: flex; align-items: center; gap: 4px; margin: 2px 0">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: rgb(15,186,130); display: inline-block" />
+                    <span>"> 12:1 Civilization"</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; margin: 2px 0">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: rgb(250,191,36); display: inline-block" />
+                    <span>"5-12:1 Sustainable"</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; margin: 2px 0">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: rgb(240,69,69); display: inline-block" />
+                    <span>"3-5:1 Marginal"</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; margin: 2px 0">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: rgb(128,26,26); display: inline-block" />
+                    <span>"< 3:1 Unviable"</span>
+                </div>
+            </div>
 
             <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,255,136,0.1)">
                 <div class="layer-toggle" on:click=move |_| globe_state.show_core.update(|v| *v = !*v)>
