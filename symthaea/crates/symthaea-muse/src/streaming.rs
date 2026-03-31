@@ -675,16 +675,25 @@ impl StreamingSynth {
             }
         }
 
-        // ── Phase 3.8: Voice synthesis (consciousness narration over music) ──
+        // ── Phase 3.8: Voice synthesis with auto-ducking ──
         #[cfg(feature = "voice")]
         if let Some(ref mut voice) = self.voice_bridge {
             voice.maybe_generate(&self.state);
             let voice_chunk = voice.render_chunk(self.chunk_samples);
+
+            // Detect if voice is active (any non-zero samples)
+            let voice_active = voice_chunk.iter().any(|&s| s.abs() > 0.01);
+
             for (i, pair) in buffer.iter_mut().enumerate() {
                 if i < voice_chunk.len() {
-                    // Center-panned voice, slightly quieter than music
-                    pair[0] += voice_chunk[i] * 0.6;
-                    pair[1] += voice_chunk[i] * 0.6;
+                    if voice_active {
+                        // Auto-duck: reduce music by -8dB when voice is speaking
+                        pair[0] *= 0.4;
+                        pair[1] *= 0.4;
+                    }
+                    // Voice at full volume, center-panned
+                    pair[0] += voice_chunk[i] * 0.9;
+                    pair[1] += voice_chunk[i] * 0.9;
                 }
             }
         }
