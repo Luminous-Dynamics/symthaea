@@ -1,0 +1,188 @@
+{
+  "node_id": "AL/AlgorithmicStrategies",
+  "lesson": {
+    "standard_code": "AL/AlgorithmicStrategies",
+    "title": "Algorithmic Strategies",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Algorithmic strategies are general approaches to solving problems. Divide and conquer splits problems into subproblems (merge sort). Greedy algorithms make locally optimal choices (Dijkstra's shortest path). Dynamic programming solves overlapping subproblems by storing results (Fibonacci, knapsack). Backtracking explores all possibilities systematically (N-queens).",
+    "examples": [
+      {
+        "problem": "Use divide and conquer to sort [38, 27, 43, 3, 9, 82, 10].",
+        "steps": [
+          {
+            "instruction": "Split in half",
+            "result": "[38,27,43,3] and [9,82,10]"
+          },
+          {
+            "instruction": "Recursively sort each half",
+            "result": "[3,27,38,43] and [9,10,82]"
+          },
+          {
+            "instruction": "Merge sorted halves",
+            "result": "[3,9,10,27,38,43,82]"
+          }
+        ],
+        "answer": "Merge sort: O(n log n) \u2014 divide, sort recursively, merge"
+      },
+      {
+        "problem": "Use dynamic programming to compute Fibonacci(6).",
+        "steps": [
+          {
+            "instruction": "Build bottom-up: F(0)=0, F(1)=1",
+            "result": "Base cases"
+          },
+          {
+            "instruction": "F(2)=1, F(3)=2, F(4)=3, F(5)=5, F(6)=8",
+            "result": "Each uses previously computed values"
+          },
+          {
+            "instruction": "Total: O(n) time, O(1) space with two variables",
+            "result": "vs O(2\u207f) naive recursion"
+          }
+        ],
+        "answer": "F(6) = 8. DP avoids recomputing subproblems."
+      },
+      {
+        "problem": "Greedy: make change for 67 cents using [25, 10, 5, 1].",
+        "steps": [
+          {
+            "instruction": "Take largest coin \u2264 remaining: 25 (rem 42)",
+            "result": "1 quarter"
+          },
+          {
+            "instruction": "25 again (rem 17), then 10 (rem 7), 5 (rem 2), 1, 1",
+            "result": "2 quarters, 1 dime, 1 nickel, 2 pennies"
+          },
+          {
+            "instruction": "Total: 6 coins",
+            "result": "Greedy works for standard denominations"
+          }
+        ],
+        "answer": "67 = 25+25+10+5+1+1 = 6 coins. Greedy doesn't always give optimal for arbitrary denominations."
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Which strategy does merge sort use?",
+        "answer": "Divide and conquer \u2014 split array in half, sort each recursively, merge",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "Split, solve, combine"
+        ],
+        "explanation": "Merge sort divides the problem into halves at each level.",
+        "distractors": [
+          "Greedy",
+          "Dynamic programming",
+          "Brute force"
+        ]
+      },
+      {
+        "question": "Why is naive recursive Fibonacci O(2\u207f)?",
+        "answer": "Each call makes two recursive calls, creating an exponential tree of calls with massive redundancy",
+        "difficulty_permille": 375,
+        "bloom_level": "Understand",
+        "hints": [
+          "Draw the call tree for F(5)"
+        ],
+        "explanation": "F(5) computes F(3) twice, F(2) three times, etc.",
+        "distractors": [
+          "O(n)",
+          "O(n\u00b2)",
+          "O(n log n)"
+        ]
+      },
+      {
+        "question": "The greedy algorithm for coin change always gives the optimal solution. True or false?",
+        "answer": "False \u2014 greedy works for standard denominations (1,5,10,25) but fails for arbitrary ones. Example: coins [1,3,4], amount 6: greedy gives 4+1+1=3 coins, optimal is 3+3=2 coins.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Try coins {1, 3, 4} with amount 6"
+        ],
+        "explanation": "Greedy makes locally optimal choices that may not be globally optimal.",
+        "distractors": [
+          "Always true",
+          "Only false for amounts > 100",
+          "Only true for US coins"
+        ]
+      },
+      {
+        "question": "When should you use dynamic programming instead of divide and conquer?",
+        "answer": "When subproblems overlap \u2014 i.e., the same subproblems are solved repeatedly. DP stores results to avoid recomputation. D&C is for independent subproblems (like merge sort).",
+        "difficulty_permille": 625,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Do the subproblems share work?"
+        ],
+        "explanation": "Overlapping subproblems + optimal substructure = use DP.",
+        "distractors": [
+          "When the problem is small",
+          "When recursion is used",
+          "They're interchangeable"
+        ]
+      },
+      {
+        "question": "Design a DP solution for the longest common subsequence of 'ABCDE' and 'ACE'.",
+        "answer": "Build a 2D table where dp[i][j] = length of LCS of first i chars and first j chars. If chars match, dp[i][j] = dp[i-1][j-1]+1; else max(dp[i-1][j], dp[i][j-1]). Answer: 'ACE', length 3.",
+        "difficulty_permille": 750,
+        "bloom_level": "Apply",
+        "hints": [
+          "Build a 2D table, fill row by row"
+        ],
+        "explanation": "LCS is a classic DP problem with O(mn) time.",
+        "distractors": [
+          "Just compare characters left to right",
+          "Sort both strings first",
+          "Use greedy matching"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "divide and conquer",
+        "definition": "Split problem into subproblems, solve recursively, combine results",
+        "example_usage": "Merge sort splits, sorts halves, then merges"
+      },
+      {
+        "term": "dynamic programming",
+        "definition": "Solve problems by storing solutions to overlapping subproblems",
+        "example_usage": "Fibonacci DP stores each F(i) to avoid recomputation"
+      },
+      {
+        "term": "greedy algorithm",
+        "definition": "Make the locally optimal choice at each step",
+        "example_usage": "Coin change: always take the largest coin that fits"
+      },
+      {
+        "term": "backtracking",
+        "definition": "Systematically explore all possibilities, abandoning dead ends early",
+        "example_usage": "N-queens: place queen, if conflict, remove and try next position"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Greedy algorithms always give the optimal solution",
+        "correction": "Greedy works only when the problem has the greedy-choice property. Many problems (e.g., 0/1 knapsack) require DP for optimality.",
+        "why_students_think_this": "Students see greedy succeed on simple examples and assume it's universally optimal."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}

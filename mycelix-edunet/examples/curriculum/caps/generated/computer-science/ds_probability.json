@@ -1,0 +1,92 @@
+{
+  "node_id": "DS/Probability",
+  "lesson": {
+    "standard_code": "DS/Probability",
+    "title": "Discrete Probability",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Probability measures the likelihood of events. P(A) = favorable outcomes / total outcomes. For independent events: P(A\u2229B) = P(A)\u00b7P(B). Conditional probability: P(A|B) = P(A\u2229B)/P(B). Bayes' theorem reverses conditioning: P(A|B) = P(B|A)\u00b7P(A)/P(B). Expected value E[X] = \u03a3 x\u00b7P(X=x) is the 'average' outcome. Variance measures spread: Var(X) = E[X\u00b2] - (E[X])\u00b2.",
+    "examples": [
+      {
+        "problem": "Example problem for Discrete Probability",
+        "steps": [
+          {
+            "instruction": "Analyze the problem",
+            "result": "Understand the context"
+          },
+          {
+            "instruction": "Apply the concept",
+            "result": "Use the relevant technique"
+          },
+          {
+            "instruction": "Verify the result",
+            "result": "Check correctness"
+          }
+        ],
+        "answer": "Solution demonstrates discrete probability"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the key concept of discrete probability.",
+        "answer": "See lesson explanation above.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Review the main ideas"
+        ],
+        "explanation": "This tests conceptual understanding.",
+        "distractors": [
+          "Incorrect A",
+          "Incorrect B",
+          "Incorrect C"
+        ]
+      },
+      {
+        "question": "Apply discrete probability to solve a practical problem.",
+        "answer": "Apply the technique to the given scenario.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Which technique applies here?"
+        ],
+        "explanation": "This requires applying concepts to new situations.",
+        "distractors": [
+          "Wrong approach A",
+          "Wrong approach B",
+          "Wrong approach C"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "discrete",
+        "definition": "Key concept in Discrete Probability",
+        "example_usage": "Used in computer science and software engineering"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Common misunderstanding about discrete probability",
+        "correction": "The correct understanding involves nuance.",
+        "why_students_think_this": "Students oversimplify complex topics."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}

@@ -1,0 +1,188 @@
+{
+  "node_id": "DS/Logic",
+  "lesson": {
+    "standard_code": "DS/Logic",
+    "title": "Basic Logic \u2014 Propositional and Predicate Logic",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Logic is the foundation of mathematical reasoning and computer science. Propositional logic deals with statements that are true or false, connected by operators: AND (\u2227), OR (\u2228), NOT (\u00ac), IMPLIES (\u2192), IFF (\u2194). A truth table shows all possible truth values. Predicate logic extends this with quantifiers: \u2200 (for all) and \u2203 (there exists). Logical equivalences like De Morgan's laws (\u00ac(P\u2227Q) \u2261 \u00acP\u2228\u00acQ) are essential for simplification and proof.",
+    "examples": [
+      {
+        "problem": "Build a truth table for P \u2192 Q (if P then Q).",
+        "steps": [
+          {
+            "instruction": "List all combinations of P, Q",
+            "result": "TT, TF, FT, FF"
+          },
+          {
+            "instruction": "P\u2192Q is false ONLY when P is true and Q is false",
+            "result": "T\u2192T=T, T\u2192F=F, F\u2192T=T, F\u2192F=T"
+          },
+          {
+            "instruction": "Key insight: a false premise makes any implication true",
+            "result": "vacuous truth"
+          }
+        ],
+        "answer": "P\u2192Q: T,F,T,T. The implication is only false when the hypothesis is true but the conclusion is false."
+      },
+      {
+        "problem": "Prove: \u00ac(P \u2227 Q) \u2261 \u00acP \u2228 \u00acQ (De Morgan's law).",
+        "steps": [
+          {
+            "instruction": "Truth table: list all P,Q combinations",
+            "result": "4 rows"
+          },
+          {
+            "instruction": "Compute \u00ac(P\u2227Q) for each",
+            "result": "F,T,T,T"
+          },
+          {
+            "instruction": "Compute \u00acP\u2228\u00acQ for each",
+            "result": "F,T,T,T \u2014 identical!"
+          }
+        ],
+        "answer": "Both columns match for all inputs, proving logical equivalence."
+      },
+      {
+        "problem": "Translate: 'Every student who studies passes the exam' into predicate logic.",
+        "steps": [
+          {
+            "instruction": "Identify domain: students",
+            "result": "Let S(x) = x studies, P(x) = x passes"
+          },
+          {
+            "instruction": "'Every' = universal quantifier \u2200",
+            "result": "\u2200x"
+          },
+          {
+            "instruction": "'who studies passes' = implication",
+            "result": "S(x) \u2192 P(x)"
+          }
+        ],
+        "answer": "\u2200x (S(x) \u2192 P(x))"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "What is the truth value of F \u2192 T?",
+        "answer": "True. An implication with a false premise is always true (vacuous truth).",
+        "difficulty_permille": 125,
+        "bloom_level": "Remember",
+        "hints": [
+          "When is P\u2192Q false?"
+        ],
+        "explanation": "P\u2192Q is only false when P is true and Q is false.",
+        "distractors": [
+          "False",
+          "Undefined",
+          "Depends on context"
+        ]
+      },
+      {
+        "question": "Simplify \u00ac(\u00acP \u2228 Q) using De Morgan's law.",
+        "answer": "\u00ac(\u00acP \u2228 Q) \u2261 \u00ac(\u00acP) \u2227 \u00acQ \u2261 P \u2227 \u00acQ",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "Apply De Morgan: \u00ac(A\u2228B) = \u00acA\u2227\u00acB"
+        ],
+        "explanation": "First apply De Morgan, then double negation.",
+        "distractors": [
+          "\u00acP \u2227 Q",
+          "P \u2228 \u00acQ",
+          "\u00acP \u2228 \u00acQ"
+        ]
+      },
+      {
+        "question": "Translate into predicate logic: 'There exists a prime number greater than 100.'",
+        "answer": "\u2203x (Prime(x) \u2227 x > 100)",
+        "difficulty_permille": 375,
+        "bloom_level": "Apply",
+        "hints": [
+          "'There exists' = \u2203, combine conditions with \u2227"
+        ],
+        "explanation": "Use \u2203 for existence, \u2227 to combine properties.",
+        "distractors": [
+          "\u2200x (Prime(x) \u2192 x > 100)",
+          "\u2203x (Prime(x) \u2192 x > 100)",
+          "\u2200x (Prime(x) \u2227 x > 100)"
+        ]
+      },
+      {
+        "question": "Are P\u2192Q and \u00acQ\u2192\u00acP logically equivalent? Prove or disprove.",
+        "answer": "Yes \u2014 \u00acQ\u2192\u00acP is the contrapositive of P\u2192Q. They have identical truth tables. This is why proof by contrapositive works.",
+        "difficulty_permille": 500,
+        "bloom_level": "Analyze",
+        "hints": [
+          "Build truth tables for both"
+        ],
+        "explanation": "The contrapositive is always equivalent to the original implication.",
+        "distractors": [
+          "No, they're different",
+          "Only sometimes",
+          "Only for specific P and Q"
+        ]
+      },
+      {
+        "question": "Is the statement 'If it rains, the ground is wet' equivalent to 'If the ground is wet, it rained'?",
+        "answer": "No. The second is the converse (Q\u2192P), not the contrapositive. The ground could be wet from a sprinkler. The valid equivalence is the contrapositive: 'If the ground is NOT wet, it did NOT rain.'",
+        "difficulty_permille": 625,
+        "bloom_level": "Evaluate",
+        "hints": [
+          "What's the difference between converse and contrapositive?"
+        ],
+        "explanation": "Converse (Q\u2192P) is NOT equivalent to the original (P\u2192Q). Only the contrapositive (\u00acQ\u2192\u00acP) is.",
+        "distractors": [
+          "Yes, they're the same",
+          "Only in formal logic",
+          "It depends on the weather"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "proposition",
+        "definition": "A declarative statement that is either true or false",
+        "example_usage": "'2 + 2 = 4' is true; '2 + 2 = 5' is false"
+      },
+      {
+        "term": "logical connective",
+        "definition": "An operator that combines propositions: \u2227 (and), \u2228 (or), \u00ac (not), \u2192 (implies)",
+        "example_usage": "P \u2227 Q is true only when both P and Q are true"
+      },
+      {
+        "term": "predicate",
+        "definition": "A statement with variables that becomes a proposition when values are assigned",
+        "example_usage": "P(x): 'x is prime' \u2014 P(7) is true, P(4) is false"
+      },
+      {
+        "term": "quantifier",
+        "definition": "Specifies how many elements satisfy a predicate: \u2200 (for all), \u2203 (there exists)",
+        "example_usage": "\u2200x (x\u00b2 \u2265 0) means 'every real number squared is non-negative'"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "P\u2192Q means P causes Q",
+        "correction": "Implication (P\u2192Q) is a logical relationship, not a causal one. 'If 2+2=5 then pigs fly' is TRUE in logic because the premise is false.",
+        "why_students_think_this": "Students confuse logical implication with real-world causation. In logic, a false premise makes any implication vacuously true."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}

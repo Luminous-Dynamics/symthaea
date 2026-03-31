@@ -1,0 +1,92 @@
+{
+  "node_id": "AL/Automata",
+  "lesson": {
+    "standard_code": "AL/Automata",
+    "title": "Automata Theory",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Automata theory studies abstract machines and the problems they can solve. A finite automaton (DFA/NFA) processes input symbols and accepts/rejects strings \u2014 used in regular expression engines. Context-free grammars (CFGs) describe programming language syntax. The Chomsky hierarchy classifies languages by computational power: regular (regex) \u2282 context-free (parsers) \u2282 context-sensitive \u2282 recursively enumerable (Turing machines).",
+    "examples": [
+      {
+        "problem": "Example problem for Automata Theory",
+        "steps": [
+          {
+            "instruction": "Analyze the problem",
+            "result": "Understand the context"
+          },
+          {
+            "instruction": "Apply the concept",
+            "result": "Use the relevant technique"
+          },
+          {
+            "instruction": "Verify the result",
+            "result": "Check correctness"
+          }
+        ],
+        "answer": "Solution demonstrates automata theory"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the key concept of automata theory.",
+        "answer": "See lesson explanation above.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Review the main ideas"
+        ],
+        "explanation": "This tests conceptual understanding.",
+        "distractors": [
+          "Incorrect A",
+          "Incorrect B",
+          "Incorrect C"
+        ]
+      },
+      {
+        "question": "Apply automata theory to solve a practical problem.",
+        "answer": "Apply the technique to the given scenario.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Which technique applies here?"
+        ],
+        "explanation": "This requires applying concepts to new situations.",
+        "distractors": [
+          "Wrong approach A",
+          "Wrong approach B",
+          "Wrong approach C"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "automata",
+        "definition": "Key concept in Automata Theory",
+        "example_usage": "Used in computer science and software engineering"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Common misunderstanding about automata theory",
+        "correction": "The correct understanding involves nuance.",
+        "why_students_think_this": "Students oversimplify complex topics."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}

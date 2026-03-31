@@ -1,0 +1,92 @@
+{
+  "node_id": "IAS/Cryptography",
+  "lesson": {
+    "standard_code": "IAS/Cryptography",
+    "title": "Cryptography",
+    "grade_level": "Undergraduate",
+    "bloom_level": "Understand",
+    "explanation": "Cryptography protects information through mathematical transformation. Symmetric encryption (AES) uses one shared key for both encryption and decryption \u2014 fast but requires secure key exchange. Asymmetric encryption (RSA) uses public/private key pairs \u2014 anyone can encrypt with the public key, only the private key decrypts. Hash functions (SHA-256) produce fixed-size fingerprints \u2014 any change in input completely changes the output. Digital signatures combine hashing with asymmetric encryption for authentication and integrity.",
+    "examples": [
+      {
+        "problem": "Example problem for Cryptography",
+        "steps": [
+          {
+            "instruction": "Analyze the problem",
+            "result": "Understand the context"
+          },
+          {
+            "instruction": "Apply the concept",
+            "result": "Use the relevant technique"
+          },
+          {
+            "instruction": "Verify the result",
+            "result": "Check correctness"
+          }
+        ],
+        "answer": "Solution demonstrates cryptography"
+      }
+    ],
+    "practice_problems": [
+      {
+        "question": "Explain the key concept of cryptography.",
+        "answer": "See lesson explanation above.",
+        "difficulty_permille": 250,
+        "bloom_level": "Understand",
+        "hints": [
+          "Review the main ideas"
+        ],
+        "explanation": "This tests conceptual understanding.",
+        "distractors": [
+          "Incorrect A",
+          "Incorrect B",
+          "Incorrect C"
+        ]
+      },
+      {
+        "question": "Apply cryptography to solve a practical problem.",
+        "answer": "Apply the technique to the given scenario.",
+        "difficulty_permille": 500,
+        "bloom_level": "Apply",
+        "hints": [
+          "Which technique applies here?"
+        ],
+        "explanation": "This requires applying concepts to new situations.",
+        "distractors": [
+          "Wrong approach A",
+          "Wrong approach B",
+          "Wrong approach C"
+        ]
+      }
+    ],
+    "hints": [],
+    "key_vocabulary": [
+      {
+        "term": "cryptography",
+        "definition": "Key concept in Cryptography",
+        "example_usage": "Used in computer science and software engineering"
+      }
+    ],
+    "misconceptions": [
+      {
+        "misconception": "Common misunderstanding about cryptography",
+        "correction": "The correct understanding involves nuance.",
+        "why_students_think_this": "Students oversimplify complex topics."
+      }
+    ],
+    "generation_quality": {
+      "coherence": 0.9,
+      "hallucination_detected": false,
+      "veto_count": 0,
+      "epistemic_confidence": 0.9,
+      "needs_human_review": false
+    }
+  },
+  "flashcards": [],
+  "quality": {
+    "coherence": 0.9,
+    "hallucination_detected": false,
+    "needs_human_review": false,
+    "veto_count": 0
+  },
+  "generated_at": "2026-03-31T12:00:00"
+}
