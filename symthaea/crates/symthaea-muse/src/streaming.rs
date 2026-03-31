@@ -93,10 +93,22 @@ const MANIFOLD_BLEND_SCALE: f32 = 0.15;
 // ─── ADSR + clip ────────────────────────────────────────────────────────────
 
 fn envelope(atk: f32, dec: f32, sus: f32, rel: f32, t: f32, dur: f32) -> f32 {
-    if t < atk { t / atk }
-    else if t < atk + dec { 1.0 - (t - atk) / dec * (1.0 - sus) }
-    else if t < dur { sus }
-    else { sus * (1.0 - (t - dur) / rel).max(0.0) }
+    if t < atk {
+        // Attack: fast rise
+        t / atk
+    } else if t < atk + dec {
+        // Decay: exponential fall to sustain (not linear — sounds more natural)
+        let decay_progress = (t - atk) / dec;
+        1.0 - decay_progress * decay_progress * (1.0 - sus)
+    } else if t < dur {
+        // Sustain: gentle exponential decay (piano strings lose energy over time)
+        let sustain_time = t - atk - dec;
+        sus * (-sustain_time * 0.8).exp() // slow decay during sustain
+    } else {
+        // Release: fast exponential fade
+        let release_progress = (t - dur) / rel;
+        sus * (-release_progress * 3.0).exp() // fast release
+    }
 }
 
 fn soft_clip(x: f32) -> f32 {
@@ -396,10 +408,19 @@ impl StreamingSynth {
         // Max jitter: ±5ms at PE=1.0 (Vuust & Witek 2014: rhythmic surprise)
         let pe_jitter_samples = (self.state.prediction_error * 0.005 * sr) as i32;
 
-        let atk = ATTACK_BASE + (1.0 - self.state.arousal) * ATTACK_AROUSAL_SCALE;
-        let dec = 0.05 + self.state.serotonin * 0.1;
-        let sus = 0.4 + self.state.consciousness_level * 0.4;
-        let rel = 0.1 + self.state.harmony_activations[7] * 0.3;
+        // ADSR per instrument type (not just arousal)
+        // Piano: fast attack, moderate decay, low sustain (strings ring then die)
+        // Pad: slow attack, no decay, high sustain
+        // Violin: moderate attack, no decay, high sustain
+        let (atk, dec, sus, rel) = match instruments::select_instrument(&self.state) {
+            Instrument::Piano | Instrument::PianoPP => (0.005, 0.3, 0.15, 0.4),
+            Instrument::Violin | Instrument::Cello => (0.08, 0.1, 0.7, 0.3),
+            Instrument::AcousticGuitar | Instrument::Harp => (0.003, 0.2, 0.1, 0.3),
+            Instrument::Flute => (0.05, 0.1, 0.6, 0.2),
+            Instrument::Pad | Instrument::Organ => (0.2, 0.1, 0.8, 0.5),
+            Instrument::ElectricPiano => (0.01, 0.2, 0.3, 0.3),
+            Instrument::Bell => (0.001, 0.5, 0.05, 0.8),
+        };
 
         // ── Phase 1: Render per-voice mono buffers ──
         let num_voices = 4; // lead, bass, harmony, ostinato
@@ -559,19 +580,19 @@ impl StreamingSynth {
                 );
                 let sample = sample + noise + stochastic;
 
-                // Arousal-modulated gain with wide dynamic range for V-A measurability.
-                // 0.06 (calm) → 0.30 (excited). Required for Arousal↔RMS R² > 0.3.
+                // Velocity-driven gain: velocity is the PRIMARY dynamic control
+                // (not arousal — arousal sets the range, velocity fills it)
+                let vel = active.note.velocity.clamp(0.0, 1.0);
+                let vel_squared = vel * vel; // quadratic for more dramatic dynamics
+
+                // Base gain from arousal (sets the ceiling)
                 let arousal = self.state.arousal.clamp(0.0, 1.0);
-                // Wider dynamic range: 0.03 (calm) → 0.35 (excited)
-                // Arousal² for steeper response at high arousal (Weber-Fechner)
-                let base_gain = GAIN_MIN + arousal * arousal * GAIN_AROUSAL_COEFF;
-                // Valence modulates gain ±15%: positive = brighter/louder, negative = darker/softer
-                // (Huron 2006: happy music is performed louder than sad music)
-                let valence_gain = 1.0 + self.state.valence * VALENCE_GAIN_SCALE;
-                // Compensate for gesture duration changes: shorter notes → louder per-sample
-                let dur_comp = (1.0 / active.note.duration.max(0.1)).sqrt().clamp(0.7, 1.5);
-                let master_gain = base_gain * valence_gain * dur_comp;
-                voice_buffers[voice][i] += sample * active.note.velocity * active.volume * master_gain;
+                let ceiling = GAIN_MIN + arousal * GAIN_AROUSAL_COEFF;
+
+                // Velocity scales within the ceiling: pp (vel=0.1) → ff (vel=0.9)
+                let master_gain = ceiling * (0.1 + vel_squared * 0.9);
+
+                voice_buffers[voice][i] += sample * active.volume * master_gain;
                 active.sample_pos += 1;
             }
         }
