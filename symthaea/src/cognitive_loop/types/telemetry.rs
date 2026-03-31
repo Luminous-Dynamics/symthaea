@@ -1195,6 +1195,10 @@ pub struct CycleMetadata {
     /// FEP surprise → CfC tau modulation factor (0.8–1.0).
     #[serde(default = "default_one_f32")]
     pub fep_tau_factor: f32,
+    /// SpectralMIP Phi → CfC tau modulation factor [PHI_TAU_FLOOR, PHI_TAU_CEILING].
+    /// 1.0 when phi_tau_feedback is disabled or no Phi available yet.
+    #[serde(default = "default_one_f32")]
+    pub phi_tau_factor: f32,
     /// CalibrationValidator: total completed validations.
     #[serde(default)]
     pub calibration_validations_total: u32,

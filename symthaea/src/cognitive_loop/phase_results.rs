@@ -264,6 +264,7 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) epistemic_uncertainty: f32,
     pub(super) aleatoric_uncertainty: f32,
     pub(super) fep_tau_factor: f32,
+    pub(super) phi_tau_factor: f32,
     pub(super) prediction_horizon_tau: f32,
     pub(super) causal_world_model_edges: usize,
     pub(super) epistemic_budget_scale: f32,

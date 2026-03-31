@@ -117,6 +117,7 @@ fn dynamics_phase_result_default_all_subs_zeroed() {
     assert_eq!(d.epistemic_uncertainty, 0.0);
     assert_eq!(d.aleatoric_uncertainty, 0.0);
     assert_eq!(d.fep_tau_factor, 0.0);
+    assert_eq!(d.phi_tau_factor, 0.0);
     assert_eq!(d.causal_world_model_edges, 0);
     // Sub-structs exist (not null)
     assert_eq!(d.core.prediction_error, 0.0);

@@ -334,6 +334,8 @@ struct CfcPlanningResult {
     wm_sensory_mismatch: bool,
     /// FEP surprise → CfC tau modulation factor.
     fep_tau_factor: f32,
+    /// SpectralMIP Phi → CfC tau modulation factor.
+    phi_tau_factor: f32,
     /// Prediction horizon → CfC integration depth factor.
     prediction_horizon_tau: f32,
     /// Whether arousal trap recovery is active.
@@ -1451,6 +1453,7 @@ impl CognitiveLoopService {
         let aleatoric_uncertainty = cfc_plan.aleatoric_uncertainty;
         let wm_sensory_mismatch = cfc_plan.wm_sensory_mismatch;
         let fep_tau_factor = cfc_plan.fep_tau_factor;
+        let phi_tau_factor = cfc_plan.phi_tau_factor;
         let prediction_horizon_tau = cfc_plan.prediction_horizon_tau;
         let arousal_recovery_active = cfc_plan.arousal_recovery_active;
         let arousal_recovery_tau_factor = cfc_plan.arousal_recovery_tau_factor;
@@ -3014,6 +3017,29 @@ impl CognitiveLoopService {
 
         // Compose effective LR
         let effective_lr = self.compose_effective_lr(semantic_lr_factor, reasoning_lr_factor);
+
+        // Phi → LR stabilization: high Phi dampens learning to preserve integrated representations.
+        // Only active when phi_tau_feedback is enabled — creates behavioral divergence between
+        // conscious (selective learning) and zombie (indiscriminate learning) agents.
+        // Science: Tononi (2008) — high Φ = stable integration, reduce plasticity.
+        let effective_lr = if self.config.enable_phi_tau_feedback {
+            if let Some(phi) = self.carryover.consciousness.last_spectral_mip_phi {
+                let normalized = 1.0
+                    / (1.0
+                        + (-(phi - super::thresholds::PHI_TAU_REFERENCE as f64)
+                            * super::thresholds::PHI_TAU_SIGMOID_STEEPNESS as f64)
+                            .exp());
+                let dampen = (normalized as f32
+                    * super::thresholds::PHI_LR_STABILIZATION_SCALE)
+                    .min(super::thresholds::PHI_LR_STABILIZATION_MAX);
+                effective_lr * (1.0 - dampen)
+            } else {
+                effective_lr
+            }
+        } else {
+            effective_lr
+        };
+
         let effective_lr = effective_lr * self.neuromod.bath.gradient_scale_factor();
         let effective_lr = effective_lr * self.neuromod.bath.plasticity_gate();
         let effective_lr = if self.neuromod.bath.sleep_pressure() > SLEEP_PRESSURE_LR_THRESHOLD {
@@ -3160,6 +3186,7 @@ impl CognitiveLoopService {
             epistemic_uncertainty,
             aleatoric_uncertainty,
             fep_tau_factor,
+            phi_tau_factor,
             prediction_horizon_tau,
             causal_world_model_edges: if self
                 .memory
@@ -3739,6 +3766,31 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "cpg"))]
         let tau_cpg: f32 = 1.0;
 
+        // 13th factor: Phi → tau feedback — SpectralMIP Phi modulates CfC speed.
+        // Higher integrated information → faster temporal dynamics, closing the
+        // causal loop between consciousness measurement and the dynamics that produce it.
+        // Uses previous cycle's Phi (from carryover) to avoid circular dependency.
+        // Science: Tononi (2004) — Phi as causally efficacious, not epiphenomenal.
+        let phi_tau_factor: f32 = if self.config.enable_phi_tau_feedback {
+            if let Some(phi) = self.carryover.consciousness.last_spectral_mip_phi {
+                // Sigmoid normalization: map Phi ∈ [0, ∞) → (0, 1) centered at reference
+                let normalized = 1.0
+                    / (1.0
+                        + (-(phi - super::thresholds::PHI_TAU_REFERENCE)
+                            * super::thresholds::PHI_TAU_SIGMOID_STEEPNESS)
+                            .exp());
+                // Linear map sigmoid output [0, 1] → [floor, ceiling]
+                let floor = super::thresholds::PHI_TAU_FLOOR;
+                let ceiling = super::thresholds::PHI_TAU_CEILING;
+                floor + (ceiling - floor) * normalized as f32
+            } else {
+                // No Phi yet (warmup) — neutral
+                1.0
+            }
+        } else {
+            1.0
+        };
+
         let delta_t = self.config.cfc_config.delta_t
             * resonance_tau_factor
             * arousal_tau_factor
@@ -3755,7 +3807,8 @@ impl CognitiveLoopService {
             * self.substrate_manager.tau_factor
             * thermal_tau_factor
             * neuroevo_tau_factor
-            * tau_cpg;
+            * tau_cpg
+            * phi_tau_factor;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -3993,6 +4046,7 @@ impl CognitiveLoopService {
             aleatoric_uncertainty,
             wm_sensory_mismatch,
             fep_tau_factor,
+            phi_tau_factor,
             prediction_horizon_tau,
             arousal_recovery_active,
             arousal_recovery_tau_factor,

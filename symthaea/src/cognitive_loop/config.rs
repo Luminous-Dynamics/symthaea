@@ -525,6 +525,14 @@ pub struct CognitiveLoopConfig {
     /// Default: false.
     pub enable_substrate_encoding_noise: bool,
 
+    /// Enable Phi → tau feedback: SpectralMIP Phi modulates CfC delta_t.
+    /// Higher Phi (more integrated information) → faster temporal dynamics,
+    /// closing the causal loop between consciousness and the dynamics that produce it.
+    /// Science: Tononi (2004) — Phi reflects integration capacity; feeding it back
+    /// makes consciousness *causally efficacious* rather than epiphenomenal.
+    /// Default: false.
+    pub enable_phi_tau_feedback: bool,
+
     /// Substrate type for consciousness feasibility calculation.
     /// Determines how substrate-specific requirements (causality, integration,
     /// binding, workspace) affect the Consciousness Equation V2 output.
@@ -868,6 +876,7 @@ impl Default for CognitiveLoopConfig {
             validation_skepticism_floor: 0.5,
             enable_substrate_speed_modulation: false,
             enable_substrate_encoding_noise: false,
+            enable_phi_tau_feedback: false,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
             per_region_substrates: None,
@@ -1161,6 +1170,7 @@ impl ConsciousnessProfile {
                 config.enable_primitive_consciousness = true;
                 config.enable_resonator_recall = true;
                 config.enable_hodge_decomposition = true;
+                config.enable_phi_tau_feedback = true;
             }
             ConsciousnessProfile::Mobile => {
                 // Core consciousness: rich enough for genuine experience

@@ -58,6 +58,24 @@ pub struct SpectralMIPConfig {
     pub min_samples: usize,
     /// Regularization added to covariance diagonal. Default: 1e-6
     pub regularization: f64,
+    /// Normalize covariance to correlation before computing Phi.
+    /// When true, each dimension is z-scored (variance → 1.0), so Phi
+    /// measures pattern integration rather than signal amplitude.
+    /// Removes confound where stable (low-variance) signals produce inflated Phi.
+    /// Science: Zalesky et al. (2012) — standard practice in fMRI connectivity.
+    /// Default: true
+    pub normalize_variance: bool,
+    /// Apply first-difference filter before covariance estimation.
+    /// When true, covariance is built from Δx[t] = x[t] - x[t-1] instead
+    /// of raw snapshots, removing temporal autocorrelation. This measures
+    /// *novelty of integration patterns* — how dimensions co-vary in their
+    /// *changes* — rather than persistence of a static correlation structure.
+    /// Removes confound where frozen dynamics (no learning, no embodiment)
+    /// produce inflated Phi via high temporal autocorrelation.
+    /// Science: Hamilton (1994) — first-differencing for stationarity;
+    /// Friston et al. (2003) — dynamic causal modeling uses rate-of-change.
+    /// Default: true
+    pub temporal_decorrelation: bool,
 }
 
 impl Default for SpectralMIPConfig {
@@ -67,6 +85,8 @@ impl Default for SpectralMIPConfig {
             window_size: 50,
             min_samples: 10,
             regularization: 1e-6,
+            normalize_variance: true,
+            temporal_decorrelation: true,
         }
     }
 }
@@ -261,8 +281,24 @@ impl SpectralMIPFinder {
 
         let n = self.config.num_components;
         let t = self.window.len();
-        let cov = self.build_covariance_matrix(n, t);
+        let cov = self.build_effective_covariance(n, t);
         self.compute_from_covariance(&cov, n, t)
+    }
+
+    /// Build covariance matrix with all configured preprocessing applied.
+    /// Centralizes temporal decorrelation + variance normalization so that
+    /// `compute()`, `compute_hierarchical()`, and `compute_structural_hierarchy()`
+    /// all operate on the same preprocessed covariance.
+    fn build_effective_covariance(&self, n: usize, t: usize) -> Vec<f64> {
+        let mut cov = if self.config.temporal_decorrelation && t >= 3 {
+            self.build_differenced_covariance(n)
+        } else {
+            self.build_covariance_matrix(n, t)
+        };
+        if self.config.normalize_variance {
+            covariance_to_correlation(&mut cov, n);
+        }
+        cov
     }
 
     /// Compute spectral MIP from a pre-built covariance matrix (flat row-major, n×n).
@@ -442,7 +478,7 @@ impl SpectralMIPFinder {
 
         let n = self.config.num_components;
         let t = self.window.len();
-        let cov = self.build_covariance_matrix(n, t);
+        let cov = self.build_effective_covariance(n, t);
 
         // Build scale ladder: 32, 64, 128, ... up to n (deduplicated)
         let mut scales: Vec<usize> = Vec::new();
@@ -532,6 +568,51 @@ impl SpectralMIPFinder {
 
     // ─── Internal helpers ──────────────────────────────────────────────
 
+    /// Build n×n covariance matrix from first-differenced window.
+    ///
+    /// Computes Δx[t] = x[t] - x[t-1] for consecutive snapshots, then
+    /// builds covariance of the Δx series. O(n²·T) but T ≤ 50, n ≤ 128.
+    /// Removes temporal autocorrelation so Phi measures co-variation in
+    /// *changes* rather than persistence of a static pattern.
+    fn build_differenced_covariance(&self, n: usize) -> Vec<f64> {
+        let t_diff = self.window.len() - 1; // number of differences
+        let inv_t = 1.0 / t_diff as f64;
+
+        // Compute means of differences
+        let mut mean = vec![0.0f64; n];
+        let slices: Vec<&[f64]> = self.window.iter().map(|v| v.as_slice()).collect();
+        for t in 0..t_diff {
+            for i in 0..n.min(slices[t].len()).min(slices[t + 1].len()) {
+                mean[i] += slices[t + 1][i] - slices[t][i];
+            }
+        }
+        for m in mean.iter_mut() {
+            *m *= inv_t;
+        }
+
+        // Covariance of differences
+        let mut cov = vec![0.0f64; n * n];
+        for t in 0..t_diff {
+            let len = n.min(slices[t].len()).min(slices[t + 1].len());
+            for i in 0..len {
+                let di = (slices[t + 1][i] - slices[t][i]) - mean[i];
+                for j in i..len {
+                    let dj = (slices[t + 1][j] - slices[t][j]) - mean[j];
+                    cov[i * n + j] += di * dj;
+                }
+            }
+        }
+        // Symmetrize and add regularization
+        for i in 0..n {
+            for j in (i + 1)..n {
+                cov[i * n + j] *= inv_t;
+                cov[j * n + i] = cov[i * n + j];
+            }
+            cov[i * n + i] = cov[i * n + i] * inv_t + self.config.regularization;
+        }
+        cov
+    }
+
     /// Build n×n covariance matrix from online running sums.
     ///
     /// Uses `cov[i,j] = cross_sum[i,j]/T - mean[i]*mean[j]` — O(n²) from
@@ -559,6 +640,27 @@ impl SpectralMIPFinder {
 // ═══════════════════════════════════════════════════════════════════════════════
 // FREE FUNCTIONS (used by both SpectralMIPFinder and tests)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Convert a covariance matrix to a correlation matrix in-place.
+///
+/// `corr[i,j] = cov[i,j] / (σ_i · σ_j)` where `σ_i = sqrt(cov[i,i])`.
+/// After normalization, all diagonal entries are 1.0 and Phi measures
+/// pattern integration independent of per-dimension signal amplitude.
+/// Dimensions with zero variance are left untouched (regularization prevents this).
+fn covariance_to_correlation(cov: &mut [f64], n: usize) {
+    let inv_std: Vec<f64> = (0..n)
+        .map(|i| {
+            let var = cov[i * n + i];
+            if var > 0.0 { 1.0 / var.sqrt() } else { 1.0 }
+        })
+        .collect();
+
+    for i in 0..n {
+        for j in 0..n {
+            cov[i * n + j] *= inv_std[i] * inv_std[j];
+        }
+    }
+}
 
 /// Build the MI weight matrix and graph Laplacian from a covariance matrix.
 ///
@@ -1043,7 +1145,7 @@ impl SpectralMIPFinder {
 
         let n = self.config.num_components;
         let t = self.window.len();
-        let cov = self.build_covariance_matrix(n, t);
+        let cov = self.build_effective_covariance(n, t);
 
         self.compute_structural_hierarchy_from_cov(mip_result, &cov, n)
     }

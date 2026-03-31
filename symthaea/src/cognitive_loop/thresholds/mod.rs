@@ -2031,6 +2031,16 @@ mod tests {
         assert!(STRUCTURAL_BOTTLENECK_THRESHOLD > 0.0);
         assert!(STRUCTURAL_BOTTLENECK_LR_BOOST >= 1.0);
 
+        // Phi → tau + LR feedback
+        assert!(PHI_TAU_REFERENCE > 0.0);
+        assert!(PHI_TAU_SIGMOID_STEEPNESS > 0.0);
+        assert!(PHI_TAU_CEILING > PHI_TAU_FLOOR);
+        assert!(PHI_TAU_FLOOR > 0.0);
+        assert!(PHI_TAU_CEILING <= 2.0); // sanity: never more than 2× speed
+        assert!(PHI_LR_STABILIZATION_SCALE > 0.0);
+        assert!(PHI_LR_STABILIZATION_MAX > 0.0);
+        assert!(PHI_LR_STABILIZATION_MAX <= 0.2); // sanity: never kill more than 20% of LR
+
         // Consciousness engine: phi validation
         assert!(PHI_VALIDATION_HIGH_THRESHOLD > PHI_VALIDATION_LOW_THRESHOLD);
         assert!(PHI_VALIDATION_BOOST_SCALE > 0.0);

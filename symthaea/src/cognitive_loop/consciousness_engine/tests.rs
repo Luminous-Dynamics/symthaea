@@ -16,6 +16,7 @@ fn make_engine() -> ConsciousnessEngine {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     ConsciousnessEngine::new(finder, None, None, None)
@@ -117,6 +118,7 @@ fn test_equation_v2_feedback_deltas() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -194,6 +196,7 @@ fn test_low_consciousness_boosts_exploration() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -863,6 +866,7 @@ fn make_engine_with_eq_v2() -> ConsciousnessEngine {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -996,6 +1000,7 @@ fn test_substrate_feasibility_affects_consciousness() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder = SpectralMIPFinder::new(config);
     let eq = ConsciousnessEquationV2::default();
@@ -1006,6 +1011,7 @@ fn test_substrate_feasibility_affects_consciousness() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
     let finder2 = SpectralMIPFinder::new(config2);
     let eq2 = ConsciousnessEquationV2::default();
@@ -1089,6 +1095,7 @@ fn test_reduced_substrate_capabilities_lower_consciousness() {
         window_size: 20,
         min_samples: 5,
         regularization: 1e-6,
+        ..Default::default()
     };
 
     let eq_bio = ConsciousnessEquationV2::default();

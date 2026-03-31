@@ -23,6 +23,7 @@ fn conscious_config() -> CognitiveLoopConfig {
         enable_consciousness_thermodynamics: true,
         enable_phenomenal_binding: true,
         enable_primitive_consciousness: true,
+        enable_phi_tau_feedback: true,
         async_training: false,
         learning_threshold: 0.0,
         ..Default::default()
@@ -192,20 +193,21 @@ fn test_c2_temporal_structure_of_phi() {
 fn test_c3_dose_response() {
     let input_list = inputs();
 
-    // Dose 1: Full consciousness
-    let mut config_full = conscious_config();
+    // Dose 1: Full consciousness (all modules + phi feedback)
+    let config_full = conscious_config();
 
-    // Dose 2: Partial (no thermodynamics)
+    // Dose 2: Partial — consciousness modules ON but phi feedback OFF.
+    // Phi is measured but doesn't feed back into dynamics or learning.
     let mut config_partial = conscious_config();
-    config_partial.enable_consciousness_thermodynamics = false;
+    config_partial.enable_phi_tau_feedback = false;
 
-    // Dose 3: Minimal (zombie)
+    // Dose 3: Minimal (zombie) — no consciousness modules, no feedback
     let config_minimal = zombie_config();
 
     let configs = [
-        ("full", config_full),
-        ("partial", config_partial),
-        ("minimal", config_minimal),
+        ("full+fb", config_full),
+        ("no-fb", config_partial),
+        ("zombie", config_minimal),
     ];
 
     let mut dose_results = Vec::new();
@@ -216,7 +218,8 @@ fn test_c3_dose_response() {
         let mut phi_count = 0;
         let mut error_sum = 0.0f64;
         let mut proxy_sum = 0.0f64;
-        let total = 60;
+        let mut phi_tau_sum = 0.0f64;
+        let total = 500;
 
         for cycle in 0..total {
             let r = service.cycle(input_list[cycle % input_list.len()]);
@@ -226,19 +229,21 @@ fn test_c3_dose_response() {
             }
             error_sum += r.prediction_error as f64;
             proxy_sum += r.metadata.consciousness.consciousness_level;
+            phi_tau_sum += r.metadata.phi_tau_factor as f64;
         }
 
         let phi_mean = if phi_count > 0 { phi_sum / phi_count as f64 } else { 0.0 };
         let error_mean = error_sum / total as f64;
         let proxy_mean = proxy_sum / total as f64;
+        let phi_tau_mean = phi_tau_sum / total as f64;
 
-        dose_results.push((*label, phi_mean, error_mean, proxy_mean, phi_count));
+        dose_results.push((*label, phi_mean, error_mean, proxy_mean, phi_count, phi_tau_mean));
     }
 
-    eprintln!("\n═══ C3: DOSE-RESPONSE ═══");
-    eprintln!("  {:10} | {:>8} | {:>8} | {:>8} | Phi cycles", "Dose", "Phi", "Error", "Proxy");
-    for (label, phi, error, proxy, count) in &dose_results {
-        eprintln!("  {label:10} | {phi:8.3} | {error:8.4} | {proxy:8.4} | {count}/60");
+    eprintln!("\n═══ C3: DOSE-RESPONSE (500 cycles) ═══");
+    eprintln!("  {:10} | {:>8} | {:>8} | {:>8} | {:>8} | Phi cycles", "Dose", "Phi", "Error", "Proxy", "PhiTau");
+    for (label, phi, error, proxy, count, phi_tau) in &dose_results {
+        eprintln!("  {label:10} | {phi:8.3} | {error:8.4} | {proxy:8.4} | {phi_tau:8.4} | {count}/500");
     }
 
     // Check monotonicity: full > partial > minimal for Phi
@@ -248,13 +253,20 @@ fn test_c3_dose_response() {
     let error_monotonic = dose_results[0].2 <= dose_results[1].2
         && dose_results[1].2 <= dose_results[2].2;
 
+    // Check monotonicity: full > partial > minimal for phi_tau (feedback active)
+    let phi_tau_monotonic = dose_results[0].5 >= dose_results[1].5
+        && dose_results[1].5 >= dose_results[2].5;
+
     if phi_monotonic {
         eprintln!("  Phi is dose-monotonic: more consciousness → more integration.");
     }
     if error_monotonic {
         eprintln!("  Error is dose-monotonic: more consciousness → better predictions.");
     }
-    if !phi_monotonic && !error_monotonic {
+    if phi_tau_monotonic {
+        eprintln!("  PhiTau is dose-monotonic: consciousness feedback active in higher doses.");
+    }
+    if !phi_monotonic && !error_monotonic && !phi_tau_monotonic {
         eprintln!("  No dose-response detected.");
     }
     eprintln!("═════════════════════════\n");

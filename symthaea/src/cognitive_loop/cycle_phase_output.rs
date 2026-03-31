@@ -542,6 +542,7 @@ impl CognitiveLoopService {
             // Telemetry reports the same value for observability.
             prediction_horizon_scale: dynamics.prediction_horizon_tau,
             fep_tau_factor: dynamics.fep_tau_factor,
+            phi_tau_factor: dynamics.phi_tau_factor,
             causal_world_model_edges: dynamics.causal_world_model_edges,
             epistemic_budget_scale: dynamics.epistemic_budget_scale,
             feedback_signals_fired: (self.feedback_state.confidence.len()
