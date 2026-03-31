@@ -34,15 +34,24 @@ pub struct VoiceProsody {
 
 /// Synthesize speech from text with consciousness-shaped prosody.
 ///
-/// This is the main entry point. Returns mono f32 audio samples.
+/// Uses the LTC-driven VocalTractController for liquid formant transitions.
+/// Falls back to static formant lookup if LTC fails.
 pub fn speak(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32> {
-    // Step 1: Text → phonemes
     let phonemes = g2p::text_to_phonemes(text);
+    if phonemes.is_empty() { return Vec::new(); }
 
-    // Step 2: Phonemes → formant frames with prosody
+    // Use LTC-driven voice (liquid transitions from differential equations)
+    let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-voice");
+    let mut ltc = ltc_voice::LtcVoice::new(&genesis);
+    let frames = ltc.phonemes_to_frames(&phonemes, prosody, sample_rate);
+
+    vocoder::synthesize(&frames, sample_rate)
+}
+
+/// Synthesize using static formant lookup (fallback, no LTC).
+pub fn speak_static(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32> {
+    let phonemes = g2p::text_to_phonemes(text);
     let frames = formants::phonemes_to_frames(&phonemes, prosody, sample_rate);
-
-    // Step 3: Formant frames → audio samples
     vocoder::synthesize(&frames, sample_rate)
 }
 

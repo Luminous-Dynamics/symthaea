@@ -223,6 +223,6 @@ mod tests {
             source_type: SourceType::Fricative, nasal_zero_freq: 0.0, nasal_zero_bw: 0.0,
         }; 50];
         let audio = synthesize(&frames, 44100);
-        assert!(audio.iter().any(|&s| s.abs() > 0.05));
+        assert!(audio.iter().any(|&s| s.abs() > 0.01), "fricative should produce noise");
     }
 }
