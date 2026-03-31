@@ -104,11 +104,10 @@ pub fn setup_globe_view(
     ));
 
     // [5] Fresnel edge glow — outer atmosphere, brighter at grazing angles
-    // We simulate Fresnel with a larger, brighter atmosphere shell
     let fresnel_mesh = meshes.add(Sphere::new(1.03).mesh().uv(48, 48));
     let fresnel_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.06),
-        emissive: LinearRgba::new(0.0, 0.35, 0.45, 1.0),
+        base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.10), // more visible
+        emissive: LinearRgba::new(0.0, 0.5, 0.65, 1.0), // stronger edge glow
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -123,10 +122,10 @@ pub fn setup_globe_view(
         AtlasEntity,
     ));
 
-    // Second Fresnel layer — tighter, brighter
+    // Second Fresnel layer — wider, softer
     let fresnel2_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.03),
-        emissive: LinearRgba::new(0.0, 0.5, 0.65, 1.0),
+        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.05),
+        emissive: LinearRgba::new(0.0, 0.6, 0.8, 1.0),
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -443,11 +442,14 @@ pub fn setup_globe_view(
                 ..default()
             })
         } else {
+            // Slight emissive so the dark side isn't pitch black
+            // (simulates ambient light from the holographic globe)
             materials.add(StandardMaterial {
                 base_color: Color::WHITE,
                 base_color_texture: Some(texture),
                 perceptual_roughness: body.roughness,
                 metallic: body.metalness,
+                emissive: LinearRgba::new(0.02, 0.04, 0.05, 1.0), // faint teal ambient
                 ..default()
             })
         };
