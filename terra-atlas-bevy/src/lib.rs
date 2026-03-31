@@ -10,6 +10,7 @@
 pub mod camera;
 pub mod data;
 pub mod globe;
+pub mod holographic_material;
 pub mod markers;
 pub mod selection;
 pub mod timeline;
