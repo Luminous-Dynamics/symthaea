@@ -398,6 +398,9 @@ pub mod learned_moral_classifier;
 /// Consciousness-driven text encoder — CfC word-by-word temporal dynamics.
 pub mod consciousness_encoder;
 
+/// Cognitive Loop Moral Classifier — full consciousness pipeline for moral features.
+pub mod cognitive_moral_classifier;
+
 /// Persistent homology on moral scenario hypervectors.
 pub mod moral_topology;
 
