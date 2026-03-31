@@ -62,14 +62,18 @@ pub fn setup_globe_view(
         AtlasEntity,
     ));
 
-    // Earth globe with blue marble texture
+    // ═══ HOLOGRAPHIC GLOBE ═══════════════════════════════════════
+
+    // [1] Semi-transparent Earth — see the grid through the surface
     let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(128, 128));
     let earth_texture: Handle<Image> = asset_server.load(terra_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let earth_material = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
+        base_color: Color::linear_rgba(1.0, 1.0, 1.0, 0.65), // semi-transparent
         base_color_texture: Some(earth_texture),
-        perceptual_roughness: 0.85,
-        metallic: 0.0,
+        perceptual_roughness: 0.3,  // slightly glossy for holographic sheen
+        metallic: 0.1,
+        alpha_mode: AlphaMode::Blend,
+        double_sided: true,
         ..default()
     });
     commands.spawn((
@@ -80,21 +84,80 @@ pub fn setup_globe_view(
         AtlasEntity,
     ));
 
-    // Atmosphere shell
-    let atmo_mesh = meshes.add(Sphere::new(1.02).mesh().uv(64, 64));
-    let atmo_material = materials.add(StandardMaterial {
-        base_color: Color::linear_rgba(0.0, 0.261, 0.3, 0.15),
-        emissive: LinearRgba::new(0.0, 0.25, 0.30, 1.0),
+    // [2] Sacred geometry wireframe grid — the hologram's skeleton
+    // Inner sphere at 0.995 radius, visible through translucent Earth
+    let grid_mesh = meshes.add(Sphere::new(0.995).mesh().uv(24, 24)); // low-poly = visible edges
+    let grid_material = materials.add(StandardMaterial {
+        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.12), // Mycelix cyan, very faint
+        emissive: LinearRgba::new(0.0, 0.4, 0.5, 1.0),
         alpha_mode: AlphaMode::Blend,
+        unlit: true,
         double_sided: true,
         cull_mode: None,
         ..default()
     });
     commands.spawn((
-        Mesh3d(atmo_mesh),
-        MeshMaterial3d(atmo_material),
+        Mesh3d(grid_mesh),
+        MeshMaterial3d(grid_material),
+        Transform::IDENTITY,
+        AtlasEntity,
+    ));
+
+    // [5] Fresnel edge glow — outer atmosphere, brighter at grazing angles
+    // We simulate Fresnel with a larger, brighter atmosphere shell
+    let fresnel_mesh = meshes.add(Sphere::new(1.03).mesh().uv(48, 48));
+    let fresnel_material = materials.add(StandardMaterial {
+        base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.06),
+        emissive: LinearRgba::new(0.0, 0.35, 0.45, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(fresnel_mesh.clone()),
+        MeshMaterial3d(fresnel_material),
         Transform::IDENTITY,
         Atmosphere,
+        AtlasEntity,
+    ));
+
+    // Second Fresnel layer — tighter, brighter
+    let fresnel2_material = materials.add(StandardMaterial {
+        base_color: Color::linear_rgba(0.0, 0.87, 1.0, 0.03),
+        emissive: LinearRgba::new(0.0, 0.5, 0.65, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(1.05).mesh().uv(32, 32))),
+        MeshMaterial3d(fresnel2_material),
+        Transform::IDENTITY,
+        Atmosphere,
+        AtlasEntity,
+    ));
+
+    // [7] Holographic projection base — flat ring below the globe
+    // Creates the "projector" effect
+    let base_mesh = meshes.add(Sphere::new(1.5).mesh().uv(48, 4)); // very flat sphere = disc-like
+    let base_material = materials.add(StandardMaterial {
+        base_color: Color::linear_rgba(0.0, 0.5, 0.7, 0.04),
+        emissive: LinearRgba::new(0.0, 0.15, 0.2, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(base_mesh),
+        MeshMaterial3d(base_material),
+        Transform::from_scale(Vec3::new(1.0, 0.01, 1.0)) // flatten to disc
+            .with_translation(Vec3::new(0.0, -1.1, 0.0)),
         AtlasEntity,
     ));
 
@@ -110,10 +173,21 @@ pub fn setup_globe_view(
         AtlasEntity,
     ));
 
-    // 3D orbital camera with Reinhard tonemapping (avoids TonyMcMapFace LUT requirement)
+    // 3D orbital camera — holographic post-processing
     commands.spawn((
         Camera3d::default(),
         bevy::core_pipeline::tonemapping::Tonemapping::Reinhard,
+        // [6] Bloom — makes emissive markers glow through the hologram
+        bevy::post_process::bloom::Bloom {
+            intensity: 0.20,
+            ..default()
+        },
+        // [3] Chromatic aberration — holographic projection artifact
+        bevy::post_process::effect_stack::ChromaticAberration {
+            intensity: 0.008,  // subtle — just enough to read as "projected"
+            max_samples: 8,
+            ..default()
+        },
         Transform::from_xyz(0.0, 0.0, 4.2).looking_at(Vec3::ZERO, Vec3::Y),
         OrbitalCamera,
         AtlasEntity,
@@ -153,13 +227,14 @@ pub fn setup_globe_view(
     let marker_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));
     let mut marker_count = 0usize;
 
-    // Energy sites — color-coded by type, unlit for consistent visibility
+    // [6] Energy sites — holographic emissive glow
     for site in &data.sites {
         let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.008);
         let size = geo::marker_size_from_capacity(site.capacity_mw);
         let c = site.energy_type.rgb();
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(c[0], c[1], c[2]),
+            emissive: LinearRgba::new(c[0] * 0.3, c[1] * 0.3, c[2] * 0.3, 1.0),
             unlit: true,
             ..default()
         });
@@ -181,6 +256,7 @@ pub fn setup_globe_view(
         let size = geo::marker_size_from_capacity(node.capacity_mw);
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(gc[0], gc[1], gc[2]),
+            emissive: LinearRgba::new(gc[0] * 0.4, gc[1] * 0.4, gc[2] * 0.4, 1.0),
             unlit: true,
             ..default()
         });
@@ -201,6 +277,7 @@ pub fn setup_globe_view(
         let pos = geo::lat_lon_to_xyz(site.lat, site.lon, 1.015);
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(tc[0] * 1.3, tc[1] * 1.3, tc[2] * 1.3),
+            emissive: LinearRgba::new(tc[0] * 0.5, tc[1] * 0.5, tc[2] * 0.5, 1.0),
             unlit: true,
             ..default()
         });
@@ -221,6 +298,7 @@ pub fn setup_globe_view(
         let pos = geo::lat_lon_to_xyz(vault.lat, vault.lon, 1.01);
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(vc[0], vc[1], vc[2]),
+            emissive: LinearRgba::new(vc[0] * 0.3, vc[1] * 0.3, vc[2] * 0.3, 1.0),
             unlit: true,
             ..default()
         });
@@ -293,6 +371,7 @@ pub fn setup_globe_view(
         let brightness = if site.reactor_type.is_smr() { 1.4 } else { 1.0 };
         let mat = materials.add(StandardMaterial {
             base_color: Color::linear_rgb(nc[0] * brightness, nc[1] * brightness, nc[2] * brightness),
+            emissive: LinearRgba::new(nc[0] * 0.4, nc[1] * 0.4, nc[2] * 0.4, 1.0),
             unlit: true,
             ..default()
         });
@@ -526,6 +605,23 @@ pub fn timeline_visibility_system(
         } else {
             Visibility::Visible
         };
+    }
+}
+
+/// [8] Sacred Stillness breathing — atmosphere shells pulse on 8-second cycle.
+/// Only pulses the atmosphere (not markers, to avoid scale drift).
+pub fn holographic_pulse_system(
+    time: Res<Time>,
+    mut atmospheres: Query<&mut Transform, (With<Atmosphere>, With<AtlasEntity>)>,
+) {
+    let t = time.elapsed_secs();
+    // 8-second Sacred Stillness breathing cycle
+    let breath = 1.0 + 0.03 * (t * std::f32::consts::TAU / 8.0).sin();
+
+    for mut tf in atmospheres.iter_mut() {
+        let base = tf.scale.x.max(0.5); // avoid zero scale
+        // Apply breathing to atmosphere shells (they started at ~1.03-1.05 scale)
+        tf.scale = Vec3::splat(base.signum() * breath * 1.04);
     }
 }
 
