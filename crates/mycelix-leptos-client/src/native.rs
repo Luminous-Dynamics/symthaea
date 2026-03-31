@@ -140,7 +140,7 @@ impl HolochainTransport for NativeWsTransport {
             let data = rmp_serde::to_vec_named(&req)
                 .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-            this.send_request("call_zome", data).await
+            this.send_request("request", data).await
         })
     }
 
@@ -204,7 +204,7 @@ impl HolochainTransport for NativeWsTransport {
             let data = rmp_serde::to_vec_named(&info_req)
                 .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-            let info_bytes = this.send_request("app_info", data).await?;
+            let info_bytes = this.send_request("request", data).await?;
 
             let info: AppInfoResponse = rmp_serde::from_slice(&info_bytes)
                 .map_err(|e| ClientError::InvalidResponse(format!("app_info decode: {e}")))?;

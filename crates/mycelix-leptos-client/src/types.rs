@@ -82,17 +82,21 @@ pub struct ZomeCallResponse {
 
 /// Envelope for requests sent to the conductor over WebSocket.
 ///
-/// The Holochain conductor expects MessagePack-encoded requests with a
-/// numeric `id` field for correlating responses, a `type` field indicating
-/// the request kind, and `data` containing the actual payload.
+/// The Holochain conductor expects:
+/// - `type`: always `"request"` (NOT "call_zome" or "app_info")
+/// - `data`: MessagePack-encoded inner request (double-encoded)
+/// - `id`: numeric correlation ID
+///
+/// The actual request type ("app_info", "call_zome") goes INSIDE the
+/// `data` field as a tagged enum: `{type: "app_info", data: {...}}`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct WireRequest {
     /// Unique request identifier for response correlation.
     pub id: u64,
-    /// Request type discriminator (e.g. "call_zome").
+    /// Always "request" for app API, "authenticate" for auth.
     #[serde(rename = "type")]
     pub request_type: String,
-    /// The request payload, serialized as MessagePack bytes.
+    /// Double-encoded: msgpack(AppRequest) inside this bytes field.
     pub data: Vec<u8>,
 }
 

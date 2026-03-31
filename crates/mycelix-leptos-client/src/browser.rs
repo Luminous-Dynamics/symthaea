@@ -413,7 +413,7 @@ impl HolochainTransport for BrowserWsTransport {
                     .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
                 let response_bytes =
-                    Self::send_request(&inner, "app_info", app_info_bytes).await?;
+                    Self::send_request(&inner, "request", app_info_bytes).await?;
 
                 // Parse the response to build role→cell_id mapping
                 let app_info: AppResponse = rmp_serde::from_slice(&response_bytes)
@@ -520,7 +520,7 @@ impl HolochainTransport for BrowserWsTransport {
                 .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
             let response_bytes =
-                Self::send_request(&inner, "call_zome", call_bytes).await?;
+                Self::send_request(&inner, "request", call_bytes).await?;
 
             // Try to decode as AppResponse for proper error handling
             match rmp_serde::from_slice::<AppResponse>(&response_bytes) {
