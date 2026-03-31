@@ -4,14 +4,14 @@
 //! CfC-based moral classifier using HdcLtcUnifiedNetwork.
 //!
 //! Uses the unified HDC-LTC network for non-linear moral classification.
-//! Text is encoded via Spinozist affect geometry (12D NSM-grounded affects),
-//! projected to 78 features (12 linear + 66 cross-terms), evolved through
+//! Text is encoded via Spinozist affect geometry (18D NSM-grounded affects),
+//! projected to 171 features (18 linear + 153 cross-terms), evolved through
 //! a 2-layer CfC network, and classified against learned prototypes.
 //!
 //! # Architecture (Spinozist-Whiteheadian fusion)
 //!
 //! ```text
-//! Text → NsmLexicon → AffectBasis (project to 12D) → 78 features
+//! Text → NsmLexicon → AffectBasis (project to 18D) → 171 features
 //!      → random project to CFC_NEURON_DIM
 //!      → HdcLtcUnifiedNetwork (2 layers × 3 neurons) → output HV
 //!      → cosine similarity to class prototypes → verdict
@@ -69,7 +69,7 @@ impl Default for CfcMoralConfig {
     }
 }
 
-/// Number of base Spinozist cross-term features: 12 linear + C(12,2) = 78.
+/// Number of base Spinozist cross-term features: 18 linear + C(18,2) = 171.
 const NUM_BASE_SPINOZIST_FEATURES: usize = NUM_AFFECTS + (NUM_AFFECTS * (NUM_AFFECTS - 1)) / 2;
 
 /// Number of structural features from MoralParser: intent, consent, negation = 3.
@@ -81,14 +81,14 @@ const NUM_TENSION_FEATURES: usize = 2;
 /// Number of surface features from TextHdcEncoder: 3 prototype similarities.
 const NUM_SURFACE_FEATURES: usize = 3;
 
-/// Total features: 78 base + 3 structural + 2 tension + 3 surface = 86.
+/// Total features: 171 base + 3 structural + 2 tension + 3 surface = 179.
 const NUM_SPINOZIST_FEATURES: usize =
     NUM_BASE_SPINOZIST_FEATURES + NUM_STRUCTURAL_FEATURES + NUM_TENSION_FEATURES + NUM_SURFACE_FEATURES;
 
 /// Internals for Spinozist affect-space encoding.
 ///
 /// Wraps `NsmPrimeBasis`, `AffectBasis`, and `NsmLexicon` so the CfC
-/// classifier can project text into 12D affect space and encode individual
+/// classifier can project text into 18D affect space and encode individual
 /// words for Whiteheadian concrescence.
 struct SpinozistInternals {
     nsm_basis: NsmPrimeBasis,
@@ -161,7 +161,7 @@ impl SpinozistInternals {
     fn encode_word_cfc(&self, word: &str) -> ContinuousHV {
         let word_hv = self.lexicon.encode_word(word, &self.nsm_basis);
 
-        // Project onto 12 affect dimensions, then build 78 features
+        // Project onto 18 affect dimensions, then build 171 features
         let coords = self.affect_basis.project_affects(&word_hv);
 
         let mut features = Vec::with_capacity(NUM_SPINOZIST_FEATURES);
@@ -253,11 +253,11 @@ impl CfcMoralClassifier {
     /// affect geometry, structural parsing, and fluctuatio tension.
     ///
     /// 1. Encode text via NsmLexicon → weighted bundle of prime HVs
-    /// 2. Project onto 12 Spinozist affect dimensions
-    /// 3. Build 78 features: 12 linear + 66 cross-terms (i < j)
+    /// 2. Project onto 18 Spinozist affect dimensions
+    /// 3. Build 171 features: 18 linear + 153 cross-terms (i < j)
     /// 4. Add 3 structural features from MoralParser (intent, consent, negation)
     /// 5. Add 2 tension features from FluctuatioAnimi
-    /// 6. Project 83 features to CFC_NEURON_DIM via deterministic random matrix
+    /// 6. Project 176 features to CFC_NEURON_DIM via deterministic random matrix
     ///
     /// Cross-terms capture interactions like HARM×CARE (moral tension),
     /// DECEPTION×CONSENT (consent violation), JOY×SADNESS (ambivalence).
@@ -265,10 +265,10 @@ impl CfcMoralClassifier {
         // Encode text through NsmLexicon
         let text_hv = self.spinozist.encode_text(text);
 
-        // Project onto 12 affect dimensions
+        // Project onto 18 affect dimensions
         let coords = self.spinozist.affect_basis.project_affects(&text_hv);
 
-        // Build feature vector: 12 linear + 66 cross-terms (i<j) = 78 base features
+        // Build feature vector: 18 linear + 153 cross-terms (i<j) = 171 base features
         let mut features = Vec::with_capacity(NUM_SPINOZIST_FEATURES);
         for &c in &coords {
             features.push(c);

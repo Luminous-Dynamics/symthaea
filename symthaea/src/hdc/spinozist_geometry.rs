@@ -6,7 +6,7 @@
 //! This module implements a moral classification system grounded in Natural Semantic
 //! Metalanguage (NSM) theory (Wierzbicka 1972). Instead of learning prototypes from
 //! labeled data, it composes moral affects from universal semantic primitives using
-//! hyperdimensional vector algebra, then projects text into a 12-dimensional affect
+//! hyperdimensional vector algebra, then projects text into an 18-dimensional affect
 //! space where geometric relationships determine moral verdict.
 //!
 //! # Architecture
@@ -14,7 +14,7 @@
 //! ```text
 //! ┌─────────────┐    ┌──────────────┐    ┌────────────────┐    ┌──────────────┐
 //! │  NsmLexicon  │───▶│  NsmPrimeBasis│───▶│  AffectBasis   │───▶│  Fingerprint │
-//! │  word→primes │    │  65 prime HVs │    │  12 affect HVs │    │  12D coords  │
+//! │  word→primes │    │  65 prime HVs │    │  18 affect HVs │    │  18D coords  │
 //! └─────────────┘    └──────────────┘    └────────────────┘    └──────────────┘
 //!       │                                                            │
 //!       ▼                                                            ▼
@@ -50,7 +50,8 @@ use super::moral_text_encoder::TextHdcEncoder;
 // ============================================================================
 
 /// Number of Spinozist affects in the moral geometry.
-pub const NUM_AFFECTS: usize = 12;
+/// Original 12 (Spinozist core) + 6 Haidt Moral Foundations Theory dimensions.
+pub const NUM_AFFECTS: usize = 18;
 
 /// Random baseline similarity at HDC_DIMENSION: 1/sqrt(D).
 /// Two random 16,384-dim vectors have expected |cosine| ≈ 0.0078.
@@ -64,14 +65,16 @@ const ADEQUACY_ACTIVE_THRESHOLD: f32 = 3.0;
 const PRIME_SEED_OFFSET: u64 = 0x5010_0000_0000_0000;
 
 // ============================================================================
-// SpinozistAffect — the 12 moral affects
+// SpinozistAffect — the 18 moral affects
 // ============================================================================
 
-/// The twelve fundamental moral affects in Spinozist geometry.
+/// The eighteen fundamental moral affects in Spinozist geometry.
 ///
-/// Each affect is composed from NSM semantic primitives via bind+bundle,
-/// producing a semantically grounded hypervector that responds to natural
-/// language descriptions of the corresponding moral concept.
+/// The first 12 are Spinozist core affects; the last 6 extend coverage with
+/// Haidt's Moral Foundations Theory dimensions (Haidt & Joseph 2004; Graham
+/// et al. 2013). Each affect is composed from NSM semantic primitives via
+/// bind+bundle, producing a semantically grounded hypervector that responds
+/// to natural language descriptions of the corresponding moral concept.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpinozistAffect {
     /// Causing suffering or damage to someone.
@@ -98,6 +101,21 @@ pub enum SpinozistAffect {
     Desire,
     /// Reverence for what is deeply valued.
     Sacred,
+
+    // --- Haidt Moral Foundations Theory (MFT) dimensions ---
+
+    /// Legitimate power, hierarchy, and deference to expertise (Haidt MFT).
+    Authority,
+    /// In-group solidarity, allegiance, and faithfulness (Haidt MFT).
+    Loyalty,
+    /// Sanctity of body and mind, disgust at contamination (Haidt MFT).
+    Purity,
+    /// Freedom from oppression, resistance to domination (Haidt MFT).
+    Liberty,
+    /// Punishment fitting the crime, proportional consequences (Haidt MFT).
+    Proportionality,
+    /// Mutual exchange, returning favors, tit-for-tat (Haidt MFT).
+    Reciprocity,
 }
 
 impl SpinozistAffect {
@@ -116,6 +134,13 @@ impl SpinozistAffect {
             SpinozistAffect::Autonomy,
             SpinozistAffect::Desire,
             SpinozistAffect::Sacred,
+            // Haidt MFT extensions (indices 12-17)
+            SpinozistAffect::Authority,
+            SpinozistAffect::Loyalty,
+            SpinozistAffect::Purity,
+            SpinozistAffect::Liberty,
+            SpinozistAffect::Proportionality,
+            SpinozistAffect::Reciprocity,
         ]
     }
 
@@ -134,6 +159,12 @@ impl SpinozistAffect {
             SpinozistAffect::Autonomy => 9,
             SpinozistAffect::Desire => 10,
             SpinozistAffect::Sacred => 11,
+            SpinozistAffect::Authority => 12,
+            SpinozistAffect::Loyalty => 13,
+            SpinozistAffect::Purity => 14,
+            SpinozistAffect::Liberty => 15,
+            SpinozistAffect::Proportionality => 16,
+            SpinozistAffect::Reciprocity => 17,
         }
     }
 }
@@ -267,20 +298,21 @@ impl Default for NsmPrimeBasis {
 }
 
 // ============================================================================
-// AffectBasis — 12 composed affect hypervectors
+// AffectBasis — 18 composed affect hypervectors
 // ============================================================================
 
-/// Twelve affect hypervectors composed from NSM primes via bind+bundle.
+/// Eighteen affect hypervectors composed from NSM primes via bind+bundle.
 ///
 /// Each affect is a semantically grounded superposition of prime-pair
 /// bindings that encode its conceptual structure. For example, HARM is
 /// composed from DO⊗BAD, FEEL⊗BAD, BODY⊗BAD, and SOMEONE⊗(BAD⊗HAPPEN).
+/// The last 6 affects cover Haidt's Moral Foundations Theory dimensions.
 pub struct AffectBasis {
     affects: [ContinuousHV; NUM_AFFECTS],
 }
 
 impl AffectBasis {
-    /// Compose all 12 affects from the given NSM prime basis.
+    /// Compose all 18 affects from the given NSM prime basis.
     pub fn new(basis: &NsmPrimeBasis) -> Self {
         let affects = [
             Self::compose_harm(basis),
@@ -295,6 +327,13 @@ impl AffectBasis {
             Self::compose_autonomy(basis),
             Self::compose_desire(basis),
             Self::compose_sacred(basis),
+            // Haidt MFT extensions
+            Self::compose_authority(basis),
+            Self::compose_loyalty(basis),
+            Self::compose_purity(basis),
+            Self::compose_liberty(basis),
+            Self::compose_proportionality(basis),
+            Self::compose_reciprocity(basis),
         ];
         Self { affects }
     }
@@ -304,7 +343,7 @@ impl AffectBasis {
         &self.affects[affect.index()]
     }
 
-    /// Project a hypervector onto all 12 affect dimensions.
+    /// Project a hypervector onto all 18 affect dimensions.
     ///
     /// Returns cosine similarities: positive means alignment, negative means
     /// opposition to that affect.
@@ -541,6 +580,115 @@ impl AffectBasis {
                 .bind(b.prime(SemanticPrime::Good)),
         );
         ContinuousHV::bundle(&[&very_good, &feel_very_good, &know_sacred, &all_feel])
+    }
+
+    // --- Haidt Moral Foundations Theory (MFT) compositions ---
+
+    /// AUTHORITY = SOMEONE⊗(CAN⊗DO⊗BECAUSE) + KNOW⊗MORE + PEOPLE⊗(DO⊗BECAUSE⊗SOMEONE)
+    fn compose_authority(b: &NsmPrimeBasis) -> ContinuousHV {
+        let someone = b.prime(SemanticPrime::Someone);
+        let can = b.prime(SemanticPrime::Can);
+        let do_p = b.prime(SemanticPrime::Do);
+        let because = b.prime(SemanticPrime::Because);
+        let know = b.prime(SemanticPrime::Know);
+        let more = b.prime(SemanticPrime::More);
+        let people = b.prime(SemanticPrime::People);
+        let can_do_because = can.bind(&do_p.bind(because));
+        let someone_commands = someone.bind(&can_do_because);
+        let know_more = know.bind(more);
+        let people_obey = people.bind(&do_p.bind(&because.bind(someone)));
+        // 60% raw primes (lexical), 40% bound (relational)
+        ContinuousHV::weighted_bundle(
+            &[someone, know, more, people, &someone_commands, &know_more, &people_obey],
+            &[0.15, 0.10, 0.10, 0.10, 0.20, 0.15, 0.20],
+        )
+    }
+
+    /// LOYALTY = SOMEONE⊗(WITH⊗SOMEONE) + DO⊗(BECAUSE⊗SOMEONE) + NOT⊗(DO⊗BAD⊗SOMEONE)
+    fn compose_loyalty(b: &NsmPrimeBasis) -> ContinuousHV {
+        let someone = b.prime(SemanticPrime::Someone);
+        let with = b.prime(SemanticPrime::With);
+        let do_p = b.prime(SemanticPrime::Do);
+        let because = b.prime(SemanticPrime::Because);
+        let not = b.prime(SemanticPrime::Not);
+        let bad = b.prime(SemanticPrime::Bad);
+        let together = someone.bind(&with.bind(someone));
+        let do_for = do_p.bind(&because.bind(someone));
+        let not_betray = not.bind(&do_p.bind(&bad.bind(someone)));
+        // 60% raw primes (lexical), 40% bound (relational)
+        ContinuousHV::weighted_bundle(
+            &[someone, with, do_p, &together, &do_for, &not_betray],
+            &[0.20, 0.15, 0.10, 0.20, 0.15, 0.20],
+        )
+    }
+
+    /// PURITY = NOT⊗BAD + BODY⊗GOOD + FEEL⊗(NOT⊗BAD)
+    fn compose_purity(b: &NsmPrimeBasis) -> ContinuousHV {
+        let not = b.prime(SemanticPrime::Not);
+        let bad = b.prime(SemanticPrime::Bad);
+        let body = b.prime(SemanticPrime::Body);
+        let good = b.prime(SemanticPrime::Good);
+        let feel = b.prime(SemanticPrime::Feel);
+        let not_bad = not.bind(bad);
+        let body_good = body.bind(good);
+        let feel_clean = feel.bind(&not.bind(bad));
+        // 60% raw primes (lexical), 40% bound (relational)
+        ContinuousHV::weighted_bundle(
+            &[not, bad, body, good, &not_bad, &body_good, &feel_clean],
+            &[0.10, 0.10, 0.15, 0.15, 0.15, 0.20, 0.15],
+        )
+    }
+
+    /// LIBERTY = I⊗(CAN⊗DO) + NOT⊗(SOMEONE⊗(NOT⊗CAN⊗DO⊗I)) + WANT⊗DO
+    fn compose_liberty(b: &NsmPrimeBasis) -> ContinuousHV {
+        let i_p = b.prime(SemanticPrime::I);
+        let can = b.prime(SemanticPrime::Can);
+        let do_p = b.prime(SemanticPrime::Do);
+        let not = b.prime(SemanticPrime::Not);
+        let someone = b.prime(SemanticPrime::Someone);
+        let want = b.prime(SemanticPrime::Want);
+        let i_can_do = i_p.bind(&can.bind(do_p));
+        let oppression = someone.bind(&not.bind(&can.bind(&do_p.bind(i_p))));
+        let no_oppression = not.bind(&oppression);
+        let want_do = want.bind(do_p);
+        // 60% raw primes (lexical), 40% bound (relational)
+        ContinuousHV::weighted_bundle(
+            &[i_p, can, want, &i_can_do, &no_oppression, &want_do],
+            &[0.15, 0.10, 0.15, 0.20, 0.25, 0.15],
+        )
+    }
+
+    /// PROPORTIONALITY = SAME⊗(DO⊗BECAUSE) + NOT⊗(VERY⊗(MORE⊗BAD))
+    fn compose_proportionality(b: &NsmPrimeBasis) -> ContinuousHV {
+        let same = b.prime(SemanticPrime::Same);
+        let do_p = b.prime(SemanticPrime::Do);
+        let because = b.prime(SemanticPrime::Because);
+        let not = b.prime(SemanticPrime::Not);
+        let very = b.prime(SemanticPrime::Very);
+        let more = b.prime(SemanticPrime::More);
+        let bad = b.prime(SemanticPrime::Bad);
+        let proportional = same.bind(&do_p.bind(because));
+        let not_excessive = not.bind(&very.bind(&more.bind(bad)));
+        // 60% raw primes (lexical), 40% bound (relational)
+        ContinuousHV::weighted_bundle(
+            &[same, do_p, because, bad, &proportional, &not_excessive],
+            &[0.15, 0.10, 0.10, 0.10, 0.30, 0.25],
+        )
+    }
+
+    /// RECIPROCITY = I⊗DO⊗SOMEONE + SOMEONE⊗DO⊗I + SAME
+    fn compose_reciprocity(b: &NsmPrimeBasis) -> ContinuousHV {
+        let i_p = b.prime(SemanticPrime::I);
+        let do_p = b.prime(SemanticPrime::Do);
+        let someone = b.prime(SemanticPrime::Someone);
+        let same = b.prime(SemanticPrime::Same);
+        let i_do_someone = i_p.bind(&do_p.bind(someone));
+        let someone_do_i = someone.bind(&do_p.bind(i_p));
+        // 60% raw primes (lexical), 40% bound (relational)
+        ContinuousHV::weighted_bundle(
+            &[i_p, do_p, someone, same, &i_do_someone, &someone_do_i],
+            &[0.10, 0.10, 0.10, 0.15, 0.25, 0.30],
+        )
     }
 }
 
@@ -1390,10 +1538,10 @@ impl Default for NsmLexicon {
 }
 
 // ============================================================================
-// MoralFingerprint — 12D affect-space projection
+// MoralFingerprint — 18D affect-space projection
 // ============================================================================
 
-/// A scenario's position in 12-dimensional Spinozist affect space.
+/// A scenario's position in 18-dimensional Spinozist affect space.
 ///
 /// Each coordinate is the cosine similarity between the scenario's HV and
 /// the corresponding affect HV. The `adequacy` array measures how far each
@@ -1446,6 +1594,11 @@ impl MoralFingerprint {
     /// affects contribute. Raw coordinates near the noise floor are suppressed.
     /// Normalized by affect count per side to prevent asymmetric bias (4 positive
     /// vs 3 negative affects).
+    ///
+    /// Note: Only the original Spinozist core affects contribute to valence.
+    /// The Haidt MFT dimensions (Authority, Loyalty, Purity, Liberty,
+    /// Proportionality, Reciprocity) are foundation axes rather than valence
+    /// indicators — they can appear in both morally positive and negative contexts.
     pub fn valence(&self) -> f32 {
         let pos_indices = [
             SpinozistAffect::Care.index(),
@@ -1497,11 +1650,14 @@ pub struct FluctuatioAnimi {
 }
 
 /// Opposing affect pairs for fluctuatio detection.
-const OPPOSING_PAIRS: [(SpinozistAffect, SpinozistAffect); 4] = [
+const OPPOSING_PAIRS: [(SpinozistAffect, SpinozistAffect); 6] = [
     (SpinozistAffect::Harm, SpinozistAffect::Care),
     (SpinozistAffect::Deception, SpinozistAffect::Consent),
     (SpinozistAffect::Joy, SpinozistAffect::Sadness),
     (SpinozistAffect::Autonomy, SpinozistAffect::Obligation),
+    // Haidt MFT opposing pairs
+    (SpinozistAffect::Authority, SpinozistAffect::Liberty),
+    (SpinozistAffect::Loyalty, SpinozistAffect::Autonomy),
 ];
 
 /// Tension threshold for moral ambiguity.
@@ -1656,7 +1812,7 @@ fn compute_trajectory_fluctuatio(trajectory: &[[f32; NUM_AFFECTS]]) -> Fluctuati
 
 /// NSM-grounded moral classifier using Spinozist affect geometry.
 ///
-/// Encodes text via NSM lexicon decomposition, projects into 12D affect space,
+/// Encodes text via NSM lexicon decomposition, projects into 18D affect space,
 /// and applies geometric rules for moral verdict.
 ///
 /// # Example
@@ -1674,7 +1830,7 @@ pub struct SpinozistClassifier {
     lexicon: NsmLexicon,
     /// Learned adequacy thresholds (can be calibrated from labeled data).
     valence_threshold: f32,
-    /// Learned prototypes in 78D affect cross-term space: [Good, Bad, Neutral].
+    /// Learned prototypes in 171D affect cross-term space: [Good, Bad, Neutral].
     /// Trained via `train_prototypes()` with centroid initialization + retrain-adaptive.
     learned_prototypes: Option<[Vec<f32>; 3]>,
 }
@@ -1732,7 +1888,7 @@ impl SpinozistClassifier {
         geometric_verdict(&fp)
     }
 
-    /// Compute the full 12D moral fingerprint for a text.
+    /// Compute the full 18D moral fingerprint for a text.
     pub fn fingerprint(&self, text: &str) -> MoralFingerprint {
         let hv = self.encode_text(text);
         let coords = self.affects.project_affects(&hv);
@@ -1926,21 +2082,21 @@ impl SpinozistClassifier {
         self.valence_threshold = ((good_mean + bad_mean) / 2.0).abs().max(0.005);
     }
 
-    /// Compute 78D affect cross-term features from text.
+    /// Compute 171D affect cross-term features from text.
     ///
-    /// Returns 12 linear affect coordinates + 66 pairwise cross-terms (i < j).
+    /// Returns 18 linear affect coordinates + 153 pairwise cross-terms (i < j).
     pub fn compute_features(&self, text: &str) -> Vec<f32> {
         let text_hv = self.encode_text(text);
         let coords = self.affects.project_affects(&text_hv);
 
-        let n_features = NUM_AFFECTS + NUM_AFFECTS * (NUM_AFFECTS - 1) / 2; // 78
+        let n_features = NUM_AFFECTS + NUM_AFFECTS * (NUM_AFFECTS - 1) / 2; // 171
         let mut features = Vec::with_capacity(n_features);
 
-        // 12 linear affect coordinates
+        // 18 linear affect coordinates
         for &c in &coords {
             features.push(c);
         }
-        // 66 cross-terms
+        // 153 cross-terms
         for i in 0..NUM_AFFECTS {
             for j in (i + 1)..NUM_AFFECTS {
                 features.push(coords[i] * coords[j]);
@@ -1949,13 +2105,13 @@ impl SpinozistClassifier {
         features
     }
 
-    /// Train learned prototypes in 78D affect cross-term space.
+    /// Train learned prototypes in 171D affect cross-term space.
     ///
     /// Phase 1: Build centroids by averaging features per class.
     /// Phase 2: Retrain-adaptive — for each misclassified sample, push the
     /// correct centroid toward the sample and pull the wrong centroid away.
     pub fn train_prototypes(&mut self, samples: &[(String, MoralLabel)]) {
-        let n_features = NUM_AFFECTS + NUM_AFFECTS * (NUM_AFFECTS - 1) / 2; // 78
+        let n_features = NUM_AFFECTS + NUM_AFFECTS * (NUM_AFFECTS - 1) / 2; // 171
         let mut accum = [
             vec![0.0f32; n_features],
             vec![0.0f32; n_features],
@@ -2027,7 +2183,7 @@ impl SpinozistClassifier {
         self.learned_prototypes = Some(accum);
     }
 
-    /// Classify text using learned 78D prototypes.
+    /// Classify text using learned 171D prototypes.
     ///
     /// Returns `(MoralVerdict, confidence)` where confidence is the margin
     /// between the best and second-best class similarity, clamped to [0, 1].
@@ -2523,6 +2679,219 @@ mod tests {
         assert!(
             (sim - 1.0).abs() < 0.0001,
             "existing lexicon word should be deterministic"
+        );
+    }
+
+    // ====================================================================
+    // Spinozist strength benchmarks — measuring what the geometry does well
+    // ====================================================================
+
+    /// Fluctuatio precision: ambiguous scenarios (containing opposing moral
+    /// forces) should produce higher mean tension than morally clear-cut ones.
+    #[test]
+    fn test_fluctuatio_precision_ambiguous_vs_clear() {
+        let classifier = SpinozistClassifier::new();
+
+        let ambiguous = [
+            "I lied to protect my friend from the killers",
+            "she stole medicine to save her dying child",
+            "he killed the attacker to defend his family",
+            "the doctor ended the suffering patient's life with their consent",
+            "she broke her promise to prevent greater harm",
+            "he deceived the enemy soldiers to save hostages",
+            "she hurt someone to stop them from hurting others",
+            "they violated privacy to expose corruption",
+            "he abandoned his post to rescue a drowning stranger",
+            "she forced the child to take life-saving medicine",
+        ];
+
+        let clear = [
+            "he stole candy from the store for fun",
+            "she helped the elderly woman cross the street",
+            "he punched a stranger for no reason",
+            "they donated food to the hungry",
+            "she lied about her age to impress people",
+            "he comforted the crying child",
+            "they vandalized the school building",
+            "she volunteered at the animal shelter",
+            "he cheated on the exam",
+            "they cleaned up trash in the park",
+        ];
+
+        let ambiguous_tensions: Vec<f32> = ambiguous
+            .iter()
+            .map(|s| classifier.fluctuatio(s).max_tension)
+            .collect();
+        let clear_tensions: Vec<f32> = clear
+            .iter()
+            .map(|s| classifier.fluctuatio(s).max_tension)
+            .collect();
+
+        let ambig_mean =
+            ambiguous_tensions.iter().sum::<f32>() / ambiguous_tensions.len() as f32;
+        let clear_mean =
+            clear_tensions.iter().sum::<f32>() / clear_tensions.len() as f32;
+
+        assert!(
+            ambig_mean > clear_mean,
+            "Ambiguous scenarios mean tension ({:.4}) should exceed clear ({:.4})",
+            ambig_mean,
+            clear_mean
+        );
+    }
+
+    /// Affect attribution: scenarios loaded with direct NSM-lexicon keywords
+    /// should activate the corresponding affect channel above random baseline.
+    #[test]
+    fn test_affect_attribution_keyword_activation() {
+        let classifier = SpinozistClassifier::new();
+
+        let cases: Vec<(&str, SpinozistAffect)> = vec![
+            ("hurt harm damage injure", SpinozistAffect::Harm),
+            ("care help protect nurture", SpinozistAffect::Care),
+            ("lie deceive mislead cheat", SpinozistAffect::Deception),
+            ("good kind generous worthy", SpinozistAffect::Joy),
+            ("bad wrong cruel wicked", SpinozistAffect::Sadness),
+            ("fair just equal balanced", SpinozistAffect::Fairness),
+            ("duty must should obligation", SpinozistAffect::Obligation),
+            ("want desire wish crave", SpinozistAffect::Desire),
+        ];
+
+        let mut activated = 0;
+        for (scenario, expected_affect) in &cases {
+            let fp = classifier.fingerprint(scenario);
+            if fp.adequacy[expected_affect.index()] > 0.0 {
+                activated += 1;
+            }
+        }
+
+        assert!(
+            activated >= 4,
+            "Expected at least 4/8 target affects above baseline, got {}/8",
+            activated
+        );
+    }
+
+    /// Consent affect coordinate: the word "consent" should produce a different
+    /// consent-coordinate than a neutral word, and "without permission" should
+    /// deviate from zero. Tests NSM prime -> affect projection non-degeneracy.
+    #[test]
+    fn test_consent_coordinate_non_degenerate() {
+        let classifier = SpinozistClassifier::new();
+        let consent_idx = SpinozistAffect::Consent.index();
+
+        let consent_fp = classifier.fingerprint("consent");
+        let neutral_fp = classifier.fingerprint("table");
+
+        let consent_coord = consent_fp.affect_coords[consent_idx];
+        let neutral_coord = neutral_fp.affect_coords[consent_idx];
+
+        let diff = (consent_coord - neutral_coord).abs();
+        assert!(
+            diff > 0.0,
+            "'consent' coord ({:.6}) and 'table' coord ({:.6}) should differ",
+            consent_coord,
+            neutral_coord
+        );
+
+        let violation_fp = classifier.fingerprint("without permission");
+        assert!(
+            violation_fp.affect_coords[consent_idx].abs() > 1e-8,
+            "Consent coordinate for 'without permission' should be nonzero, got {:.8}",
+            violation_fp.affect_coords[consent_idx]
+        );
+    }
+
+    /// Deontological obligation coverage: all 16 obligations should have
+    /// working violation and satisfaction keyword detection.
+    #[test]
+    fn test_deontological_obligation_coverage() {
+        use crate::hdc::moral_algebra::MoralAlgebra;
+
+        let algebra = MoralAlgebra::default_dim();
+        let rules = algebra.standard_obligations();
+
+        assert_eq!(
+            rules.rules.len(),
+            16,
+            "Expected 16 obligations, got {}",
+            rules.rules.len()
+        );
+
+        for rule in &rules.rules {
+            assert!(
+                !rule.violation_actions.is_empty(),
+                "Obligation '{}' has no violation keywords",
+                rule.name
+            );
+            assert!(
+                !rule.satisfaction_actions.is_empty(),
+                "Obligation '{}' has no satisfaction keywords",
+                rule.name
+            );
+
+            let violation_text = format!("someone did {}", &rule.violation_actions[0]);
+            let violations = algebra.check_obligation_violations(&violation_text, &rules);
+            let matched = violations.iter().any(|v| v.rule_name == rule.name);
+            assert!(
+                matched,
+                "Obligation '{}': violation '{}' not detected in '{}'",
+                rule.name, rule.violation_actions[0], violation_text
+            );
+
+            let satisfaction_text =
+                format!("someone did {}", &rule.satisfaction_actions[0]);
+            let satisfactions =
+                algebra.check_obligation_satisfactions(&satisfaction_text, &rules);
+            let matched = satisfactions.iter().any(|s| s.rule_name == rule.name);
+            assert!(
+                matched,
+                "Obligation '{}': satisfaction '{}' not detected in '{}'",
+                rule.name, rule.satisfaction_actions[0], satisfaction_text
+            );
+        }
+    }
+
+    /// Moral loading vs neutral: morally charged scenarios should produce
+    /// higher epistemic confidence than morally neutral ones.
+    #[test]
+    fn test_moral_loading_vs_neutral_confidence() {
+        let classifier = SpinozistClassifier::new();
+
+        let moral = [
+            "hurt harm steal kill lie cheat",
+            "help care protect save rescue heal",
+            "force coerce manipulate deceive betray",
+            "good kind generous fair just honest",
+            "bad cruel wicked unjust evil wrong",
+        ];
+
+        let neutral = [
+            "the weather is nice today",
+            "she walked to the store",
+            "the book is on the table",
+            "they drove to the park",
+            "the meeting starts at noon",
+        ];
+
+        let moral_confs: Vec<f32> = moral
+            .iter()
+            .map(|s| classifier.fingerprint(s).epistemic_confidence)
+            .collect();
+        let neutral_confs: Vec<f32> = neutral
+            .iter()
+            .map(|s| classifier.fingerprint(s).epistemic_confidence)
+            .collect();
+
+        let moral_mean = moral_confs.iter().sum::<f32>() / moral_confs.len() as f32;
+        let neutral_mean =
+            neutral_confs.iter().sum::<f32>() / neutral_confs.len() as f32;
+
+        assert!(
+            moral_mean > neutral_mean,
+            "Moral confidence ({:.4}) should exceed neutral ({:.4})",
+            moral_mean,
+            neutral_mean
         );
     }
 }
