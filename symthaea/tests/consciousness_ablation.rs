@@ -747,3 +747,81 @@ fn test_spectral_phi_produces_real_values() {
     }
     eprintln!("═══════════════════════════════════════════════════\n");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIMENT 10: PHI-BEHAVIOR CORRELATION — THE PAPER-DEFINING EXPERIMENT
+//
+// If SpectralMIP Phi correlates with behavioral outcomes, consciousness is
+// FUNCTIONAL. If independent, consciousness is DECORATIVE.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_phi_behavior_correlation() {
+    let mut service = CognitiveLoopService::new(conscious_config()).expect("service");
+
+    let mut phi_values = Vec::new();
+    let mut proxy_values = Vec::new();
+    let mut error_values = Vec::new();
+    let mut macro_phi_values = Vec::new();
+
+    let inputs = [
+        "calm observation of a still lake",
+        "complex multi-step reasoning about ethical dilemmas in healthcare",
+        "sudden emergency requiring immediate coordinated action across teams",
+        "quiet introspective self-monitoring of cognitive processes",
+        "creative synthesis of contradictory information into novel framework",
+    ];
+
+    for cycle in 0..100 {
+        let input = inputs[cycle % inputs.len()];
+        let r = service.cycle(input);
+
+        if let Some(phi) = r.metadata.structural.spectral_mip_phi {
+            phi_values.push(phi);
+            proxy_values.push(r.metadata.consciousness.consciousness_level);
+            error_values.push(r.prediction_error as f64);
+            macro_phi_values.push(r.metadata.structural.structural_macro_phi);
+        }
+    }
+
+    let n = phi_values.len();
+    assert!(n >= 10, "Need at least 10 spectral Phi values: got {n}");
+
+    let pearson = |x: &[f64], y: &[f64]| -> f64 {
+        let len = x.len() as f64;
+        let mx = x.iter().sum::<f64>() / len;
+        let my = y.iter().sum::<f64>() / len;
+        let cov: f64 = x.iter().zip(y).map(|(a, b)| (a - mx) * (b - my)).sum::<f64>() / len;
+        let sx = (x.iter().map(|a| (a - mx).powi(2)).sum::<f64>() / len).sqrt();
+        let sy = (y.iter().map(|b| (b - my).powi(2)).sum::<f64>() / len).sqrt();
+        if sx < 1e-15 || sy < 1e-15 { return 0.0; }
+        cov / (sx * sy)
+    };
+
+    let r_phi_proxy = pearson(&phi_values, &proxy_values);
+    let r_phi_error = pearson(&phi_values, &error_values);
+    let r_phi_macro = pearson(&phi_values, &macro_phi_values);
+
+    let phi_mean = phi_values.iter().sum::<f64>() / n as f64;
+    let phi_std = (phi_values.iter().map(|p| (p - phi_mean).powi(2)).sum::<f64>() / n as f64).sqrt();
+
+    assert!(phi_std > 0.001, "PHI IS CONSTANT: std={phi_std:.6}");
+
+    let max_abs_r = r_phi_proxy.abs().max(r_phi_error.abs()).max(r_phi_macro.abs());
+
+    eprintln!("\n═══ EXPERIMENT 10: PHI-BEHAVIOR CORRELATION ═══");
+    eprintln!("  Cycles with spectral Phi: {n}/100");
+    eprintln!("  Phi: mean={phi_mean:.4}, std={phi_std:.4}");
+    eprintln!("  Pearson correlations:");
+    eprintln!("    Phi ↔ Proxy:            r = {r_phi_proxy:.4}");
+    eprintln!("    Phi ↔ Prediction Error:  r = {r_phi_error:.4}");
+    eprintln!("    Phi ↔ Macro Phi:         r = {r_phi_macro:.4}");
+    if max_abs_r > 0.3 {
+        eprintln!("  VERDICT: CONSCIOUSNESS IS STRONGLY FUNCTIONAL (|r|>{max_abs_r:.2}).");
+    } else if max_abs_r > 0.1 {
+        eprintln!("  VERDICT: CONSCIOUSNESS IS WEAKLY FUNCTIONAL (|r|={max_abs_r:.2}).");
+    } else {
+        eprintln!("  FINDING: CONSCIOUSNESS IS DECORATIVE (|r|={max_abs_r:.2}).");
+    }
+    eprintln!("═══════════════════════════════════════════════\n");
+}
