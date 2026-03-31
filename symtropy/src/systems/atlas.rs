@@ -348,10 +348,64 @@ pub fn setup_globe_view(
         }
     }
 
+    // ─── Solar System Bodies ────────────────────────────────────
+    let bodies = terra_atlas_core::solar_system::solar_system_bodies();
+    let body_mesh = meshes.add(Sphere::new(1.0).mesh().uv(32, 32));
+    for body in &bodies {
+        let pos = terra_atlas_core::solar_system::body_position(body, 0.0);
+        let texture: Handle<Image> = asset_server.load(format!("textures/{}", body.texture));
+        let mat = if body.is_sun {
+            materials.add(StandardMaterial {
+                base_color: Color::WHITE,
+                base_color_texture: Some(texture),
+                emissive: LinearRgba::new(body.emission, body.emission * 0.9, body.emission * 0.7, 1.0),
+                unlit: true,
+                ..default()
+            })
+        } else {
+            materials.add(StandardMaterial {
+                base_color: Color::WHITE,
+                base_color_texture: Some(texture),
+                perceptual_roughness: body.roughness,
+                metallic: body.metalness,
+                ..default()
+            })
+        };
+        commands.spawn((
+            Mesh3d(body_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2])
+                .with_scale(Vec3::splat(body.visual_radius)),
+            AtlasEntity,
+        ));
+    }
+
+    // ─── Governance participation markers ──────────────────────
+    let gov_pulses = terra_atlas_core::mycelix_flows::simulate_governance_pulses();
+    let gov_mesh = meshes.add(Sphere::new(1.0).mesh().uv(8, 8));
+    for pulse in &gov_pulses {
+        let pos = geo::lat_lon_to_xyz(pulse.lat, pulse.lon, 1.025);
+        let c = terra_atlas_core::mycelix_flows::governance_color(pulse.participation);
+        let size = 0.012 + pulse.participation * 0.018;
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(c[0], c[1], c[2]),
+            unlit: true,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(gov_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            DataMarker { layer: Layer::Regions, name: format!("{} ({}% participation)", pulse.name, (pulse.participation * 100.0) as u32) },
+            AtlasEntity,
+        ));
+    }
+
     // Store data for arc rendering (gizmos are immediate-mode)
     commands.insert_resource(AtlasData { data });
 
-    info!("[atlas] Globe view: {marker_count} markers + {} grid stress nodes — press Esc to return", stress_data.len());
+    info!("[atlas] Globe view: {marker_count} markers + {} stress + {} bodies + {} governance — Esc to return",
+        stress_data.len(), bodies.len(), gov_pulses.len());
 }
 
 /// Draw maglev corridor arcs using gizmos (immediate-mode, redrawn each frame).
@@ -384,6 +438,23 @@ pub fn draw_arcs_system(
             let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
             gizmos.line(a, b, trade_color);
+        }
+    }
+
+    // TEND time-banking flows — Mycelix lime arcs
+    let tend_flows = terra_atlas_core::mycelix_flows::simulate_tend_flows();
+    let tend_color = Color::linear_rgba(0.486, 0.988, 0.0, 0.7); // Mycelix lime
+    for flow in &tend_flows {
+        let from = geo::lat_lon_to_xyz(flow.from_lat, flow.from_lon, 1.0);
+        let to = geo::lat_lon_to_xyz(flow.to_lat, flow.to_lon, 1.0);
+        let dist = terra_atlas_core::geo::haversine_km(flow.from_lat, flow.from_lon, flow.to_lat, flow.to_lon);
+        let peak = geo::arc_peak_height(dist) * 1.5; // higher arcs for TEND flows
+        let segments = 16u32;
+        let arc = terra_atlas_core::geometry::generate_arc(from, to, peak, segments);
+        for i in 0..segments as usize {
+            let a = Vec3::new(arc[i * 3], arc[i * 3 + 1], arc[i * 3 + 2]);
+            let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
+            gizmos.line(a, b, tend_color);
         }
     }
 
@@ -455,6 +526,41 @@ pub fn timeline_visibility_system(
         } else {
             Visibility::Visible
         };
+    }
+}
+
+/// Animate celestial bodies along their orbits (drawn as gizmo orbit rings).
+pub fn celestial_orbit_system(
+    mut gizmos: Gizmos,
+    time: Res<Time>,
+) {
+    let t = time.elapsed_secs();
+    let bodies = terra_atlas_core::solar_system::solar_system_bodies();
+
+    for body in &bodies {
+        // Draw faint orbit ring
+        let segments = 64;
+        let orbit_color = if body.is_sun {
+            Color::linear_rgba(1.0, 0.8, 0.3, 0.08)
+        } else {
+            Color::linear_rgba(0.3, 0.4, 0.5, 0.05)
+        };
+
+        for i in 0..segments {
+            let a0 = i as f32 / segments as f32 * std::f32::consts::TAU;
+            let a1 = (i + 1) as f32 / segments as f32 * std::f32::consts::TAU;
+            let p0 = Vec3::new(
+                body.orbit_radius * a0.cos(),
+                body.y_offset,
+                body.orbit_radius * a0.sin(),
+            );
+            let p1 = Vec3::new(
+                body.orbit_radius * a1.cos(),
+                body.y_offset,
+                body.orbit_radius * a1.sin(),
+            );
+            gizmos.line(p0, p1, orbit_color);
+        }
     }
 }
 

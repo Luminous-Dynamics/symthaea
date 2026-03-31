@@ -13,6 +13,8 @@ pub mod data;
 pub mod economics;
 pub mod energy_trading;
 pub mod geo;
+pub mod mycelix_flows;
+pub mod solar_system;
 pub mod geometry;
 pub mod math;
 pub mod picking;
