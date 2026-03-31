@@ -18,26 +18,35 @@ pub fn phonemes_to_frames(
 
     // Base F0 from prosody: consciousness shapes register
     let base_f0 = 140.0 + prosody.consciousness * 60.0; // 140-200 Hz
-    // Valence shapes warmth: positive = slightly higher, warmer
     let f0_offset = prosody.valence * 20.0;
-
-    // Speaking rate from arousal: calm = slow, excited = fast
-    let rate_factor = 0.6 + prosody.arousal * 0.8; // 0.6x to 1.4x speed
+    let rate_factor = 0.6 + prosody.arousal * 0.8;
 
     for (i, phoneme) in phonemes.iter().enumerate() {
         let progress = i as f32 / total_phonemes.max(1.0);
 
-        // Duration in frames, scaled by rate
-        let duration_ms = phoneme.base_duration_ms / rate_factor;
+        // Dynamic phoneme timing: vowels sustain, consonants snap
+        let base_dur = if phoneme.is_vowel {
+            phoneme.base_duration_ms * 1.3 // vowels 30% longer (sustain)
+        } else if phoneme.ipa == " " {
+            phoneme.base_duration_ms // pauses unchanged
+        } else {
+            phoneme.base_duration_ms * 0.6 // consonants 40% shorter (snap)
+        };
+        // Stressed syllables get more time
+        let stress_stretch = 1.0 + phoneme.stress as f32 * 0.4;
+        let duration_ms = base_dur * stress_stretch / rate_factor;
         let num_frames = (duration_ms / 1000.0 * frame_rate).max(1.0) as usize;
 
-        // Get target formants for this phoneme
         let (f1, f2, f3, source) = formant_target(phoneme.ipa);
 
-        // F0 contour: declination + stress + intonation
-        let stress_boost = phoneme.stress as f32 * 15.0;
-        let declination = -progress * 20.0; // pitch drops over utterance
-        let f0 = base_f0 + f0_offset + stress_boost + declination;
+        // F0 contour: sentence-level intonation + stress peaks + phrase boundaries
+        let stress_boost = phoneme.stress as f32 * 25.0; // bigger stress peaks
+        let declination = -progress * 30.0; // steeper pitch fall
+        // Phrase-final rise for questions, fall for statements
+        let phrase_contour = if progress > 0.85 { -15.0 } else { 0.0 }; // falling end
+        // Micro-prosody: vowels slightly higher than consonants
+        let vowel_boost = if phoneme.is_vowel { 8.0 } else { -5.0 };
+        let f0 = (base_f0 + f0_offset + stress_boost + declination + phrase_contour + vowel_boost).max(60.0);
 
         // Energy from stress and prosody
         let energy = if phoneme.ipa == " " {
