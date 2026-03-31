@@ -68,30 +68,69 @@ float fbm(vec2 p, int octaves) {
 // Simulates mycelial growth — patterns branch and evolve
 // ═══════════════════════════════════════════════════
 
+// Soft organic flow — wide transitions, no sharp edges
+float organic_flow(vec2 uv, float t) {
+    float n1 = noise(uv * 4.0 + t * 0.015);
+    float n2 = noise(uv * 7.0 - t * 0.01 + 50.0);
+    float n3 = noise(uv * 2.5 + t * 0.008 + 100.0);
+
+    // Wide smoothstep transitions (0.2+ range) = soft, organic edges
+    float layer1 = smoothstep(0.3, 0.6, n1);
+    float layer2 = smoothstep(0.35, 0.65, n2) * 0.6;
+    float layer3 = smoothstep(0.4, 0.7, n3) * 0.3;
+
+    // Soft blend — no hard thresholds
+    return layer1 * 0.5 + layer2 * 0.3 + layer3 * 0.2;
+}
+
+// Deep ocean — very subtle, almost still
+float deep_ocean(vec2 uv, float t) {
+    float slow = fbm(uv * 2.0 + t * 0.005, 3);
+    float drift = noise(uv * 1.5 + t * 0.003 + 200.0);
+    return smoothstep(0.3, 0.7, slow) * 0.4 + drift * 0.15;
+}
+
+// Nebula — swirling, cosmic, high contrast but soft
+float nebula(vec2 uv, float t) {
+    vec2 warped = uv + vec2(
+        noise(uv * 3.0 + t * 0.01) * 0.15,
+        noise(uv * 3.0 + t * 0.01 + 300.0) * 0.15
+    );
+    float n = fbm(warped * 4.0 + t * 0.005, 5);
+    return smoothstep(0.25, 0.75, n);
+}
+
+// Aurora — horizontal bands with vertical shimmer
+float aurora(vec2 uv, float t) {
+    float bands = sin(uv.y * 8.0 + t * 0.2 + noise(uv * 3.0 + t * 0.05) * 2.0) * 0.5 + 0.5;
+    float shimmer = noise(vec2(uv.x * 5.0 + t * 0.1, uv.y * 2.0)) * 0.3;
+    return bands * 0.5 + shimmer;
+}
+
+// Cellular — voronoi-like soft cells
+float cellular(vec2 uv, float t) {
+    vec2 p = uv * 5.0 + t * 0.02;
+    vec2 ip = floor(p);
+    vec2 fp = fract(p);
+    float md = 1.0;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            vec2 neighbor = vec2(float(x), float(y));
+            vec2 point = hash(ip + neighbor) * vec2(0.5) + vec2(0.5);
+            point = 0.5 + 0.5 * sin(t * 0.1 + 6.2831 * point);
+            float d = length(fp - neighbor - point);
+            md = min(md, d);
+        }
+    }
+    return smoothstep(0.0, 0.8, md);
+}
+
+// Hash for cellular — needs vec2 → vec2
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(269.5, 183.3))) * 43758.5453); }
+
 float reaction_diffusion(vec2 uv, float t) {
-    // Feed and kill rates control the pattern type
-    // f=0.037, k=0.06 gives coral/mycelial branching
-    float f = 0.037 + u_alignment * 0.005; // consciousness modulates growth
-    float k = 0.06 + sin(t * 0.1) * 0.002; // slow oscillation
-
-    // Approximate reaction-diffusion with layered noise
-    // (True Gray-Scott needs ping-pong framebuffers — this is a visual approximation
-    // that captures the branching aesthetic without the computational cost)
-    float n1 = noise(uv * 8.0 + t * 0.02);
-    float n2 = noise(uv * 16.0 - t * 0.015 + 50.0);
-    float n3 = noise(uv * 32.0 + t * 0.01 + 100.0);
-
-    // Reaction: sharp thresholding creates branching edges
-    float reaction = smoothstep(0.42, 0.48, n1)
-                   * smoothstep(0.35, 0.55, n2)
-                   + smoothstep(0.55, 0.6, n3) * 0.3;
-
-    // Diffusion: blur with temporal drift simulates spreading
-    float diffused = fbm(uv * 6.0 + vec2(t * 0.008, t * 0.006), 4);
-    float spread = smoothstep(0.4, 0.6, diffused);
-
-    // Combine: reaction creates edges, diffusion fills bodies
-    return reaction * 0.7 + spread * 0.3;
+    // Default: soft organic flow (replaces sharp camo pattern)
+    return organic_flow(uv, t);
 }
 
 // ═══════════════════════════════════════════════════
@@ -124,8 +163,17 @@ void main() {
     // Sacred Stillness breathing (8-second cycle)
     float breath = sin(u_time * 0.7854) * 0.5 + 0.5;
 
-    // ── Mycelial base: reaction-diffusion growth ──
-    float mycelium = reaction_diffusion(uv, u_time);
+    // ── Background style (switchable) ──
+    // 0=organic (default), 1=deep ocean, 2=nebula, 3=aurora, 4=cellular
+    float bg_select = mod(u_flow_style * 0.0 + 0.0, 5.0); // Default organic for now
+    float mycelium;
+    if (u_domain_blend < 0.5) {
+        // Orbital/First Breath: use soft organic flow
+        mycelium = organic_flow(uv, u_time);
+    } else {
+        // Domain-specific: domain overlay takes over
+        mycelium = organic_flow(uv, u_time);
+    }
 
     // Organic flow displacement
     float flow_speed = mix(0.2, 0.05, u_alignment);
@@ -172,9 +220,9 @@ void main() {
     float center = max(0.0, 1.0 - length(uv - 0.5) * 1.4);
     color += mid * center * 0.03 * u_phi;
 
-    // Temporal shimmer — reaction-diffusion edges glow faintly
+    // Soft shimmer — gentle edge highlight, not sharp lines
     float edges = abs(dFdx(mycelium)) + abs(dFdy(mycelium));
-    color += glow * edges * 8.0 * (0.3 + breath * 0.2) * u_phi;
+    color += glow * edges * 2.0 * (0.2 + breath * 0.1) * u_phi;
 
     fragColor = vec4(color, 0.88);
 }
