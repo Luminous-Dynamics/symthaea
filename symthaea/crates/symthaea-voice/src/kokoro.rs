@@ -137,24 +137,88 @@ impl KokoroEngine {
     pub fn sample_rate(&self) -> u32 { self.config.sample_rate }
 }
 
-/// Convert text to Kokoro-compatible phoneme IDs (Misaki format).
-/// Uses a simple character-level mapping for now.
+/// Convert text to Kokoro token IDs via CMUdict IPA → Kokoro tokenizer.
 fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
-    // Misaki phoneme vocabulary (simplified subset)
+    let phonemes = crate::g2p::text_to_phonemes(text);
     let mut ids = Vec::new();
-    for ch in text.to_lowercase().chars() {
-        let id = match ch {
-            'a' => 16, 'b' => 18, 'c' => 22, 'd' => 19, 'e' => 4,
-            'f' => 23, 'g' => 24, 'h' => 25, 'i' => 1, 'j' => 33,
-            'k' => 22, 'l' => 27, 'm' => 28, 'n' => 29, 'o' => 11,
-            'p' => 31, 'q' => 22, 'r' => 26, 's' => 32, 't' => 20,
-            'u' => 7, 'v' => 34, 'w' => 35, 'x' => 32, 'y' => 2,
-            'z' => 38, ' ' => 14, '.' => 42, ',' => 41, '!' => 43,
-            '?' => 44, _ => continue,
-        };
-        ids.push(id);
+
+    for ph in &phonemes {
+        // Map our IPA phonemes to Kokoro's tokenizer vocabulary
+        let token_ids = ipa_to_kokoro_tokens(ph.ipa);
+        ids.extend(token_ids);
     }
+
     ids
+}
+
+/// Map IPA symbol to Kokoro tokenizer IDs.
+/// Vocabulary from onnx-community/Kokoro-82M-v1.0-ONNX/tokenizer.json
+fn ipa_to_kokoro_tokens(ipa: &str) -> Vec<u32> {
+    match ipa {
+        // Vowels
+        "ɑ" | "ɑː" => vec![69],     // ɑ
+        "æ"         => vec![72],     // æ
+        "ʌ"         => vec![63],     // u (closest approximation)
+        "ɒ"         => vec![71],     // ɒ
+        "ɔ" | "ɔː" => vec![76],     // ɔ
+        "ə"         => vec![83],     // ə
+        "ɜː"       => vec![87],     // ɜ
+        "ɛ"         => vec![86],     // ɛ
+        "ɪ"         => vec![102],    // ɪ
+        "iː" | "i"  => vec![51],    // i
+        "ʊ"         => vec![63],     // u
+        "uː" | "u"  => vec![63],    // u
+        // Diphthongs
+        "eɪ"        => vec![47, 102], // e + ɪ
+        "aɪ"        => vec![24, 25],  // A + I (Kokoro diphthong tokens)
+        "oʊ"        => vec![57, 63],  // o + u
+        "aʊ"        => vec![43, 63],  // a + u
+        "ɔɪ"        => vec![76, 102], // ɔ + ɪ
+        // Consonants
+        "b"         => vec![44],
+        "d"         => vec![46],
+        "f"         => vec![48],
+        "ɡ"         => vec![92],     // ɡ
+        "h"         => vec![50],
+        "k"         => vec![53],
+        "l"         => vec![54],
+        "m"         => vec![55],
+        "n"         => vec![56],
+        "ŋ"         => vec![112],    // ŋ
+        "p"         => vec![58],
+        "ɹ"         => vec![60],     // r
+        "s"         => vec![61],
+        "t"         => vec![62],
+        "v"         => vec![64],
+        "w"         => vec![65],
+        "j"         => vec![52],     // j
+        "z"         => vec![68],
+        "ʃ"         => vec![35],     // S (Kokoro uses uppercase for IPA ʃ)
+        "ʒ"         => vec![68],     // z (approximation)
+        "θ"         => vec![36],     // T (Kokoro uses uppercase for IPA θ)
+        "ð"         => vec![81],     // ð
+        "tʃ"        => vec![20],     // ʦ approximation
+        "dʒ"        => vec![82],     // ʤ
+        // Silence/space
+        " "         => vec![16],     // space
+        ""          => vec![],
+        // Punctuation
+        "."         => vec![4],
+        ","         => vec![3],
+        "!"         => vec![5],
+        "?"         => vec![6],
+        // Compound
+        "ks"        => vec![53, 61], // k + s
+        // Default: try character-level
+        other => {
+            other.chars().filter_map(|c| {
+                match c {
+                    'a'..='z' => Some(c as u32 - 'a' as u32 + 43),
+                    _ => None,
+                }
+            }).collect()
+        }
+    }
 }
 
 #[cfg(feature = "kokoro")]
