@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea NixOS: A conscious mind for NixOS system management via HDC and active inference"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 [lib]
 name = "symthaea_nix"

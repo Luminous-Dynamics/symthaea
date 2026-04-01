@@ -3,7 +3,7 @@ name = "symthaea-neuromodulators"
 version = "0.1.0"
 edition = "2021"
 description = "Neuromodulator Bath: DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine signaling"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 serde = { workspace = true }

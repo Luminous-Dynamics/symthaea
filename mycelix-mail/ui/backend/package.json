@@ -1,6 +1,8 @@
 {
   "name": "mycelix-mail-backend",
   "version": "1.0.0",
+  "license": "AGPL-3.0-or-later",
+
   "description": "Mycelix-Mail backend API",
   "main": "dist/server.js",
   "scripts": {

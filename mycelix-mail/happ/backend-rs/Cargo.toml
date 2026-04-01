@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics"]
 description = "Axum-based backend for Mycelix-Mail - connects React frontend to Holochain DNA"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/Mycelix-Mail"
 
 [lib]

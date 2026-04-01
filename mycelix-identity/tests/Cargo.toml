@@ -3,7 +3,7 @@ name = "mycelix-identity-tests"
 version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics <dev@luminous-dynamics.com>"]
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 description = "Integration tests for Mycelix Identity Holochain zomes"
 autotests = false
 

@@ -6,7 +6,7 @@ version = "0.1.0"
 description = "LUCID - Living Unified Consciousness for Insight & Discovery"
 authors = ["Mycelix"]
 edition = "2021"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/mycelix/lucid-happ"
 
 [build-dependencies]

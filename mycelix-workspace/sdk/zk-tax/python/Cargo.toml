@@ -3,7 +3,7 @@ name = "zk-tax-python"
 version = "0.1.0"
 edition = "2021"
 description = "Python bindings for ZK Tax SDK"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [lib]
 name = "zk_tax"

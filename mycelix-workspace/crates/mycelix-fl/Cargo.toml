@@ -3,7 +3,7 @@ name = "mycelix-fl"
 version = "0.1.0"
 edition = "2021"
 description = "Unified WASM-compatible federated learning computation crate for Mycelix"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 # WASM-compatible: NO ndarray, NO tokio, NO std::time
 # Only pure computation + serde serialization

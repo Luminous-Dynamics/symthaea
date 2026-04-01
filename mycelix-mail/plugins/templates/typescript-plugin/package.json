@@ -20,7 +20,7 @@
     "extension"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "peerDependencies": {
     "@mycelix/plugin-api": "^1.0.0"
   },

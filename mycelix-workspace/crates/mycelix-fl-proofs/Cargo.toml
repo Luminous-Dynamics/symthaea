@@ -3,7 +3,7 @@ name = "mycelix-fl-proofs"
 version = "0.1.0"
 edition = "2021"
 description = "zkSTARK proof scaffold for Mycelix Federated Learning"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 mycelix-fl-core = { path = "../mycelix-fl-core" }

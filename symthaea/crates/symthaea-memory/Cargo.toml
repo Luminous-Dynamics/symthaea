@@ -3,7 +3,7 @@ name = "symthaea-memory"
 version = "0.1.0"
 edition = "2021"
 description = "Memory subsystems: semantic memory, coherence tracking, hippocampus, conversation"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 anyhow = { workspace = true }

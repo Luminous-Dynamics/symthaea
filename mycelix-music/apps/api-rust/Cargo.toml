@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Tristan Stoltz <tristan.stoltz@luminousdynamics.com>"]
 description = "Rust API for Mycelix Music - Decentralized Music Platform"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/Mycelix-Music"
 
 [dependencies]
