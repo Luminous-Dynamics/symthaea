@@ -156,33 +156,28 @@ impl KokoroEngine {
 }
 
 /// Convert text to Kokoro token IDs.
-/// Builds IPA string from CMUdict, then tokenizes character-by-character
-/// using Kokoro's vocabulary (each IPA character = one token).
+/// Uses espeak-ng for G2P (what Kokoro was trained on) with CMUdict fallback.
 fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
-    // Build IPA string from text via CMUdict
-    let mut ipa_string = String::new();
-
-    for word in text.split_whitespace() {
-        let (clean, punct) = split_punctuation(word);
-
-        if !clean.is_empty() {
-            let phonemes = crate::g2p::text_to_phonemes(&clean);
-            for ph in &phonemes {
-                if ph.ipa != " " {
-                    ipa_string.push_str(ph.ipa);
+    // Try espeak-ng first (native Kokoro G2P)
+    let ipa_string = if let Some(ipa) = espeak_ipa(text) {
+        ipa
+    } else {
+        // Fallback to CMUdict if espeak-ng not available
+        warn!("espeak-ng not available, falling back to CMUdict");
+        let mut ipa = String::new();
+        for word in text.split_whitespace() {
+            let (clean, punct) = split_punctuation(word);
+            if !clean.is_empty() {
+                let phonemes = crate::g2p::text_to_phonemes(&clean);
+                for ph in &phonemes {
+                    if ph.ipa != " " { ipa.push_str(ph.ipa); }
                 }
             }
+            if let Some(p) = punct { ipa.push_str(p); }
+            ipa.push(' ');
         }
-
-        // Preserve punctuation
-        if let Some(p) = punct {
-            ipa_string.push_str(p);
-        }
-
-        ipa_string.push(' '); // space between words
-    }
-
-    let ipa_string = ipa_string.trim().to_string();
+        ipa.trim().to_string()
+    };
     info!("IPA string: '{}'", ipa_string);
 
     // Tokenize: handle diphthongs first, then character-by-character
@@ -258,11 +253,31 @@ fn char_to_kokoro_id(ch: char) -> Option<u32> {
         'ˌ' => Some(157),   // secondary stress
         'ʔ' => Some(148),   // glottal stop
         'ɾ' => Some(125),   // tap
-        'ʃ' => Some(131),   // CORRECT: ʃ=131
+        'ʃ' => Some(131),   // ʃ=131
         'ʧ' | 'ʨ' => Some(133), // affricate
         'ʤ' => Some(82),    // voiced affricate
+        'ɚ' => Some(85),    // rhotacized schwa (espeak uses this)
+        'ɐ' => Some(70),    // near-open central (espeak uses this)
+        'ʲ' => Some(164),   // palatalization (espeak adds this)
+        'ʰ' => Some(162),   // aspiration
         _ => None,
     }
+}
+
+/// Get IPA from espeak-ng (what Kokoro was trained on).
+fn espeak_ipa(text: &str) -> Option<String> {
+    let output = std::process::Command::new("espeak-ng")
+        .args(["-v", "en-us", "-q", "--ipa", text])
+        .output()
+        .ok()?;
+
+    if !output.status.success() { return None; }
+
+    let ipa = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if ipa.is_empty() { return None; }
+
+    info!("espeak IPA: '{}'", ipa);
+    Some(ipa)
 }
 
 fn split_punctuation(word: &str) -> (String, Option<&'static str>) {
