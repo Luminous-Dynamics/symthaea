@@ -15,10 +15,55 @@ const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
 
+// Security defaults: keep this service local-only unless explicitly configured.
+const HOST = process.env.GUN_HOST || '127.0.0.1';
+const PORT = process.env.GUN_PORT || 9003;
+
+// Explicit origin allowlist for browser access (comma-separated).
+// Example:
+//   GUN_ALLOWED_ORIGINS="http://localhost:7777,http://127.0.0.1:7777"
+const ALLOWED_ORIGINS = (process.env.GUN_ALLOWED_ORIGINS ||
+  `http://localhost:${PORT},http://127.0.0.1:${PORT}`
+).split(',').map(s => s.trim()).filter(Boolean);
+
+function isOriginAllowed(origin) {
+  // Non-browser clients often have no Origin header; allow them when bound to localhost.
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
 // Create Express app
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server);
+const io = socketIO(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) return callback(null, true);
+      return callback(new Error('Origin not allowed'), false);
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+  }
+});
+
+// Basic CORS gate for HTTP endpoints (no wildcard).
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  }
+
+  if (req.method === 'OPTIONS') {
+    if (origin && !isOriginAllowed(origin)) return res.status(403).end('Forbidden');
+    return res.status(204).end();
+  }
+
+  next();
+});
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -189,21 +234,25 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-const PORT = process.env.GUN_PORT || 9003;
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
     console.log(`
 ╔════════════════════════════════════════════════╗
 ║        🌐 GUN.JS P2P SERVER ACTIVE             ║
 ╠════════════════════════════════════════════════╣
 ║  Real Decentralized Database Network          ║
 ║                                                ║
-║  📡 API:       http://localhost:${PORT}        ║
-║  🔫 Gun.js:    ws://localhost:${PORT}/gun      ║
-║  📊 Health:    http://localhost:${PORT}/health ║
+║  📡 API:       http://${HOST}:${PORT}          ║
+║  🔫 Gun.js:    ws://${HOST}:${PORT}/gun        ║
+║  📊 Health:    http://${HOST}:${PORT}/health   ║
 ║                                                ║
 ║  Status: READY FOR DECENTRALIZED DATA         ║
 ╚════════════════════════════════════════════════╝
     `);
+
+    console.log('🔒 Security defaults:');
+    console.log(`  • Bound to: ${HOST} (set GUN_HOST=0.0.0.0 to expose intentionally)`);
+    console.log('  • CORS allowlist:');
+    ALLOWED_ORIGINS.forEach(o => console.log(`    - ${o}`));
     
     console.log('✨ Gun.js Features:');
     console.log('  • Real P2P data synchronization');
