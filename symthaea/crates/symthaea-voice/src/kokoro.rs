@@ -92,7 +92,7 @@ impl KokoroEngine {
     #[cfg(feature = "kokoro")]
     pub fn synthesize(&mut self, text: &str, voice_id: Option<usize>) -> Option<Vec<f32>> {
         let phoneme_ids = text_to_kokoro_ids(text);
-        info!("Kokoro synthesize: '{}' → {} phoneme IDs", text, phoneme_ids.len());
+        info!("Kokoro synthesize: '{}' → {} tokens: {:?}", text, phoneme_ids.len(), &phoneme_ids);
         if phoneme_ids.is_empty() { warn!("No phoneme IDs!"); return None; }
 
         let voice_idx = voice_id.unwrap_or(self.config.default_voice);
@@ -117,15 +117,18 @@ impl KokoroEngine {
             "speed" => speed_tensor,
         ]).ok()?;
 
-        // Try "audio" output, then first output
+        // Extract audio output with detailed logging
         if let Some(out) = outputs.get("audio") {
-            if let Ok((_shape, data)) = out.try_extract_tensor::<f32>() {
+            if let Ok((shape, data)) = out.try_extract_tensor::<f32>() {
+                info!("Kokoro output 'audio': shape={:?}, samples={}", shape, data.len());
                 if !data.is_empty() { return Some(data.to_vec()); }
             }
         }
-        if let Ok((_shape, data)) = outputs[0].try_extract_tensor::<f32>() {
+        if let Ok((shape, data)) = outputs[0].try_extract_tensor::<f32>() {
+            info!("Kokoro output[0]: shape={:?}, samples={}", shape, data.len());
             if !data.is_empty() { return Some(data.to_vec()); }
         }
+        warn!("Kokoro produced no audio");
         None
     }
 
