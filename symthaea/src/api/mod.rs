@@ -216,10 +216,13 @@ pub async fn serve_with_config(
 /// - `/v1/ws/live` — WebSocket stream of live consciousness telemetry
 /// - `/` — Static file serving from `static/` directory
 pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
+    create_demo_router_with_config(ApiConfig::default())
+}
+
+/// Create a demo router with custom security configuration.
+pub fn create_demo_router_with_config(config: ApiConfig) -> Result<Router, Box<dyn std::error::Error>> {
     let runner = demo_runner::DemoRunner::new()?;
     let runner = Arc::new(Mutex::new(runner));
-
-    let config = ApiConfig::default();
     let state = Arc::new(AppState::new_with_config(&config));
     let cors = build_cors_layer(&config);
 
@@ -274,7 +277,15 @@ pub fn create_demo_router() -> Result<Router, Box<dyn std::error::Error>> {
 
 /// Start the demo server with WebSocket and static file serving.
 pub async fn serve_demo(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let app = create_demo_router()?;
+    serve_demo_with_config(addr, ApiConfig::default()).await
+}
+
+/// Start the demo server with custom security configuration.
+pub async fn serve_demo_with_config(
+    addr: &str,
+    config: ApiConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = create_demo_router_with_config(config)?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("Symthaea Demo running at http://{}", addr);
     println!("  Live visualization: http://{}", addr);
