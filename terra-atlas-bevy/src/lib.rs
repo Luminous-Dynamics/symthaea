@@ -9,6 +9,7 @@
 
 pub mod camera;
 pub mod data;
+pub mod frame_capture;
 pub mod globe;
 pub mod holographic_material;
 pub mod markers;

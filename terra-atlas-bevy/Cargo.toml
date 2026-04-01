@@ -10,6 +10,8 @@ description = "Bevy 0.18 plugin for Terra Atlas globe rendering"
 [dependencies]
 terra-atlas-core = { path = "../terra-atlas-core" }
 
+bevy_camera = "0.18"
+
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset", "bevy_core_pipeline", "bevy_render",
     "bevy_pbr", "bevy_light", "bevy_mesh", "bevy_camera",
