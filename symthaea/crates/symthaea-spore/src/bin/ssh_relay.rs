@@ -15,6 +15,7 @@
 use async_ssh2_tokio::client::{AuthMethod, Client, ServerCheckMethod};
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
+use std::io::Read;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::net::TcpListener;
@@ -125,6 +126,9 @@ impl SessionTracker {
 #[derive(serde::Deserialize)]
 struct ClientMessage {
     action: String,
+    /// Mandatory WebSocket auth token (must be sent via the `"auth"` action before any other action).
+    #[serde(default)]
+    token: String,
     #[serde(default)]
     host: String,
     #[serde(default = "default_port")]
@@ -1149,6 +1153,19 @@ struct RelayMessage {
 }
 
 impl RelayMessage {
+    fn authed() -> Self {
+        Self {
+            msg_type: "authed".into(),
+            data: None,
+            stream: None,
+            code: None,
+            message: Some("WebSocket authenticated".into()),
+            stage: None,
+            percentage: None,
+            phase: None,
+        }
+    }
+
     fn connected() -> Self {
         Self {
             msg_type: "connected".into(),
@@ -1299,6 +1316,8 @@ async fn handle_connection(
     stream: tokio::net::TcpStream,
     peer_addr: String,
     tracker: SharedTracker,
+    auth_token: Arc<String>,
+    server_check: ServerCheckMethod,
 ) {
     // Upgrade to WebSocket
     let ws_stream = match accept_async(stream).await {
@@ -1311,6 +1330,7 @@ async fn handle_connection(
 
     let (mut ws_tx, mut ws_rx) = ws_stream.split();
     let mut ssh_client: Option<Client> = None;
+    let mut authed = false;
 
     eprintln!("[{}] WebSocket connected", peer_addr);
 
@@ -1336,6 +1356,37 @@ async fn handle_connection(
                 continue;
             }
         };
+
+        // Auth gate: require an explicit `"auth"` action with the correct token.
+        // This prevents CSWSH-style attacks against ws://127.0.0.1:* services.
+        if !authed {
+            if client_msg.action.as_str() == "auth" {
+                if !client_msg.token.is_empty() && client_msg.token == *auth_token {
+                    authed = true;
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::authed().to_json()))
+                        .await;
+                    continue;
+                }
+
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error("Unauthorized: invalid relay token").to_json(),
+                    ))
+                    .await;
+                break;
+            } else {
+                let _ = ws_tx
+                    .send(Message::Text(
+                        RelayMessage::error(
+                            "Unauthorized: send {\"action\":\"auth\",\"token\":...} first",
+                        )
+                        .to_json(),
+                    ))
+                    .await;
+                break;
+            }
+        }
 
         match client_msg.action.as_str() {
             "connect" => {
@@ -1366,7 +1417,7 @@ async fn handle_connection(
                     (client_msg.host.as_str(), client_msg.port),
                     &client_msg.username,
                     auth,
-                    ServerCheckMethod::NoCheck,
+                    server_check.clone(),
                 )
                 .await
                 {
@@ -1390,68 +1441,16 @@ async fn handle_connection(
                 }
             }
 
+            // Intentionally disabled: this relay is not a general-purpose RCE gateway.
             "exec" => {
-                let client = match ssh_client.as_ref() {
-                    Some(c) => c,
-                    None => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error("Not connected. Send 'connect' first.")
-                                    .to_json(),
-                            ))
-                            .await;
-                        continue;
-                    }
-                };
-
-                eprintln!("[{}] Executing: {}", peer_addr, &client_msg.command);
-
-                // Send initial connecting stage
                 let _ = ws_tx
                     .send(Message::Text(
-                        RelayMessage::progress(&NixosAnywhereStage::Connecting).to_json(),
+                        RelayMessage::error(
+                            "Unsupported action: 'exec' is disabled. Use typed actions like 'install', 'probe_hardware', etc.",
+                        )
+                        .to_json(),
                     ))
                     .await;
-
-                match client.execute(&client_msg.command).await {
-                    Ok(result) => {
-                        // Process stdout line by line for stage detection
-                        let combined = format!("{}{}", result.stdout, result.stderr);
-                        for line in combined.lines() {
-                            if !line.trim().is_empty() {
-                                // Send output
-                                let _ = ws_tx
-                                    .send(Message::Text(
-                                        RelayMessage::output(line, "stdout").to_json(),
-                                    ))
-                                    .await;
-
-                                // Check for stage transitions
-                                if let Some(stage) = parse_stage(line) {
-                                    let _ = ws_tx
-                                        .send(Message::Text(
-                                            RelayMessage::progress(&stage).to_json(),
-                                        ))
-                                        .await;
-                                }
-                            }
-                        }
-
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::exit(result.exit_status as i32).to_json(),
-                            ))
-                            .await;
-                    }
-                    Err(e) => {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Command execution failed: {}", e))
-                                    .to_json(),
-                            ))
-                            .await;
-                    }
-                }
             }
 
             "discover_disks" => {
@@ -2685,17 +2684,77 @@ echo '],"total_size":"'"$TOTAL_SIZE"'"}'
     eprintln!("[{}] WebSocket disconnected", peer_addr);
 }
 
+fn generate_auth_token() -> String {
+    let mut bytes = [0u8; 32];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        if f.read_exact(&mut bytes).is_ok() {
+            return bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        }
+    }
+
+    // Fallback: only used if /dev/urandom is unavailable (should not happen on Linux/NixOS).
+    let seed = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    );
+    blake3::hash(seed.as_bytes()).to_hex().to_string()
+}
+
+fn usage() {
+    eprintln!("Symthaea SSH Relay (locked down)");
+    eprintln!("Usage:");
+    eprintln!("  ssh-relay [--port <port>] [--token <token>] [--known-hosts <path>]");
+    eprintln!();
+    eprintln!("Security defaults:");
+    eprintln!("  - Binds to 127.0.0.1 only");
+    eprintln!("  - Requires an auth token over WebSocket (action: \"auth\")");
+    eprintln!("  - Enforces SSH host key verification (known_hosts)");
+    eprintln!("  - 'exec' is disabled");
+}
+
 #[tokio::main]
 async fn main() {
-    let port: u16 = std::env::args()
-        .skip_while(|a| a != "--port")
-        .nth(1)
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8091);
+    let mut port: u16 = 8091;
+    let mut token: Option<String> = None;
+    let mut known_hosts: Option<String> = None;
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--port" => {
+                if let Some(p) = args.next().and_then(|p| p.parse::<u16>().ok()) {
+                    port = p;
+                }
+            }
+            "--token" => token = args.next(),
+            "--known-hosts" => known_hosts = args.next(),
+            "--help" | "-h" => {
+                usage();
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    let token = token.unwrap_or_else(generate_auth_token);
+    if token.is_empty() {
+        eprintln!("ERROR: --token cannot be empty");
+        std::process::exit(2);
+    }
+    let auth_token = Arc::new(token);
+    let server_check = match known_hosts {
+        Some(path) => ServerCheckMethod::KnownHostsFile(path),
+        None => ServerCheckMethod::DefaultKnownHostsFile,
+    };
 
     let tracker: SharedTracker = Arc::new(Mutex::new(SessionTracker::new(1800))); // 30 min timeout
 
-    let addr = format!("0.0.0.0:{}", port);
+    // Critical security posture: this relay is localhost-only.
+    let addr = format!("127.0.0.1:{}", port);
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
@@ -2705,13 +2764,21 @@ async fn main() {
         }
     };
     eprintln!("Symthaea SSH Relay listening on ws://{}", addr);
-    eprintln!("  Protocol: connect → exec → disconnect");
+    eprintln!("  Auth token: {}", auth_token);
+    eprintln!("  Protocol: auth → connect → (discover_disks/install/...) → disconnect");
     eprintln!("  Session timeout: 30 minutes");
     eprintln!("  Rate limit: 1 active session per IP");
+    eprintln!("  SSH server check: {:?}", server_check);
 
     while let Ok((stream, addr)) = listener.accept().await {
         let peer = addr.ip().to_string();
         let tracker = tracker.clone();
-        tokio::spawn(handle_connection(stream, peer, tracker));
+        tokio::spawn(handle_connection(
+            stream,
+            peer,
+            tracker,
+            auth_token.clone(),
+            server_check.clone(),
+        ));
     }
 }
