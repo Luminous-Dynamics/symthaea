@@ -64,10 +64,12 @@ main() {
   assert_no_match "origin\\s*:\\s*['\\\"]\\*['\\\"]" "mycelix-core/gun-p2p-server.js" || failures=$((failures + 1))
 
   note "Checking installer ISO (no static root password, no Avahi broadcast, firewall enabled)..."
-  assert_no_match "initialPassword" "symthaea/nix/installer-iso.nix" || failures=$((failures + 1))
-  assert_no_match "hashedPassword" "symthaea/nix/installer-iso.nix" || failures=$((failures + 1))
-  assert_no_match "services\\.avahi\\.enable\\s*=\\s*true" "symthaea/nix/installer-iso.nix" || failures=$((failures + 1))
-  assert_match "networking\\.firewall\\.enable\\s*=\\s*true" "symthaea/nix/installer-iso.nix" || failures=$((failures + 1))
+  # The ISO builder imports the hardened module; validate both.
+  assert_match "installer-iso-module\\.nix" "symthaea/nix/installer-iso.nix" || failures=$((failures + 1))
+  assert_no_match "initialPassword" "symthaea/nix/modules/installer-iso-module.nix" || failures=$((failures + 1))
+  assert_no_match "hashedPassword" "symthaea/nix/modules/installer-iso-module.nix" || failures=$((failures + 1))
+  assert_no_match "services\\.avahi\\.enable\\s*=\\s*true" "symthaea/nix/modules/installer-iso-module.nix" || failures=$((failures + 1))
+  assert_match "networking\\.firewall\\.enable\\s*=\\s*true" "symthaea/nix/modules/installer-iso-module.nix" || failures=$((failures + 1))
 
   if [[ "${failures}" -ne 0 ]]; then
     die "${failures} regression check(s) failed"

@@ -403,6 +403,10 @@
           };
         };
 
+        checks = {
+          installer-iso-security = import ./nix/tests/installer-iso-security.nix { inherit pkgs; };
+        };
+
         formatter = pkgs.nixpkgs-fmt;
       }
     );

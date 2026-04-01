@@ -61,3 +61,10 @@ ssh -L 8091:127.0.0.1:8091 <operator_user>@<operator_ip>
 - Treat the one-time password as a secret; it regenerates on every reboot.
 - Do not bind the relay to `0.0.0.0` (it is intentionally not supported).
 
+## Security Verification (VM Test)
+
+From `symthaea/`, you can run a NixOS VM test that verifies the installer posture:
+
+```bash
+nix build .#checks.x86_64-linux.installer-iso-security
+```
