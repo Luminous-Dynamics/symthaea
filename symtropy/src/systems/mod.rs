@@ -32,6 +32,8 @@ pub mod scavenge;
 // Enabled via `cargo build --features atlas`.
 #[cfg(feature = "atlas")]
 pub mod atlas;
+#[cfg(feature = "atlas")]
+pub mod demo_director;
 
 // Mycelix integration — physicalized cryptography.
 // Enabled via `cargo build --features mycelix`.

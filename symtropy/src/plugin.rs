@@ -109,6 +109,7 @@ impl Plugin for SymtropyPlugin {
                 .init_resource::<terra_atlas_bevy::selection::SelectedMarker>()
                 .init_resource::<systems::atlas::CurrentAesthetic>()
                 .init_resource::<terra_atlas_bevy::frame_capture::FrameCaptureConfig>()
+                .init_resource::<systems::demo_director::DemoDirector>()
                 .add_systems(Update,
                     systems::atlas::atlas_toggle_system
                         .run_if(in_state(GamePhase::Playing)))
@@ -133,6 +134,7 @@ impl Plugin for SymtropyPlugin {
                     terra_atlas_bevy::selection::update_selection_text,
                     terra_atlas_bevy::holographic_material::update_holographic_time,
                     terra_atlas_bevy::frame_capture::frame_capture_system,
+                    systems::demo_director::demo_director_system,
                 ).run_if(in_state(GamePhase::GlobeView)))
                 .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view);
         }

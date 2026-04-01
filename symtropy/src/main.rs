@@ -47,6 +47,8 @@ fn main() {
     let globe_mode = std::env::args().any(|a| a == "--globe");
     #[cfg(feature = "atlas")]
     let record_mode = std::env::args().any(|a| a == "--record");
+    #[cfg(feature = "atlas")]
+    let demo_mode = std::env::args().any(|a| a == "--demo");
 
     let mut app = App::new();
     app.add_plugins(
@@ -83,6 +85,18 @@ fn main() {
         app.add_systems(Update, (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
             next.set(crate::resources::GamePhase::GlobeView);
         }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::MainMenu)));
+    }
+
+    // --demo: auto-start demo director when globe view activates
+    #[cfg(feature = "atlas")]
+    if demo_mode && globe_mode {
+        eprintln!("[symtropy] --demo: cinematic demo director enabled");
+        app.add_systems(Update, (|mut director: ResMut<crate::systems::demo_director::DemoDirector>| {
+            if !director.enabled {
+                director.enabled = true;
+                info!("[demo] Director started — 30s cinematic sequence");
+            }
+        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::GlobeView)));
     }
 
     // --record: auto-start frame capture when globe view activates
