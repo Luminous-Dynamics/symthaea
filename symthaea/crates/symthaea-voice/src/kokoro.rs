@@ -141,17 +141,54 @@ impl KokoroEngine {
 }
 
 /// Convert text to Kokoro token IDs via CMUdict IPA → Kokoro tokenizer.
+/// Preserves punctuation for natural pacing and intonation.
 fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
-    let phonemes = crate::g2p::text_to_phonemes(text);
     let mut ids = Vec::new();
 
-    for ph in &phonemes {
-        // Map our IPA phonemes to Kokoro's tokenizer vocabulary
-        let token_ids = ipa_to_kokoro_tokens(ph.ipa);
-        ids.extend(token_ids);
+    // Split text preserving punctuation
+    for word in text.split_whitespace() {
+        // Separate trailing punctuation
+        let (clean, punct) = split_punctuation(word);
+
+        if !clean.is_empty() {
+            // Look up word phonemes via CMUdict
+            let phonemes = crate::g2p::text_to_phonemes(&clean);
+            for ph in &phonemes {
+                if ph.ipa != " " { // skip inter-word spaces from G2P
+                    ids.extend(ipa_to_kokoro_tokens(ph.ipa));
+                }
+            }
+        }
+
+        // Add punctuation token (critical for Kokoro pacing!)
+        if let Some(p) = punct {
+            ids.extend(ipa_to_kokoro_tokens(p));
+        }
+
+        // Add space between words
+        ids.push(16); // space token
     }
 
+    // Remove trailing space
+    if ids.last() == Some(&16) { ids.pop(); }
+
     ids
+}
+
+fn split_punctuation(word: &str) -> (String, Option<&'static str>) {
+    let trimmed = word.trim_end_matches(|c: char| ".,!?;:".contains(c));
+    let punct = if trimmed.len() < word.len() {
+        match word.as_bytes()[word.len() - 1] {
+            b'.' => Some("."),
+            b',' => Some(","),
+            b'!' => Some("!"),
+            b'?' => Some("?"),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    (trimmed.to_string(), punct)
 }
 
 /// Map IPA symbol to Kokoro tokenizer IDs.

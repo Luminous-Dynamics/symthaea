@@ -64,23 +64,33 @@ fn speak_formant(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f3
 }
 
 /// Kokoro neural TTS (falls back to formant if unavailable).
+/// Caches the engine across calls for performance.
 fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32> {
     #[cfg(feature = "kokoro")]
     {
-        // Try Kokoro
-        let config = kokoro::KokoroConfig::default();
-        if let Some(mut engine) = kokoro::KokoroEngine::load(config) {
-            if let Some(audio) = engine.synthesize(text, None) {
-                // Kokoro outputs at 24kHz — resample if needed
-                if sample_rate != 24000 {
-                    return resample(&audio, 24000, sample_rate);
+        use std::sync::OnceLock;
+        use std::sync::Mutex;
+
+        static KOKORO: OnceLock<Mutex<Option<kokoro::KokoroEngine>>> = OnceLock::new();
+
+        let engine_lock = KOKORO.get_or_init(|| {
+            let config = kokoro::KokoroConfig::default();
+            Mutex::new(kokoro::KokoroEngine::load(config))
+        });
+
+        if let Ok(mut guard) = engine_lock.lock() {
+            if let Some(ref mut engine) = *guard {
+                // Modulate speed from arousal
+                if let Some(audio) = engine.synthesize(text, None) {
+                    if sample_rate != 24000 {
+                        return resample(&audio, 24000, sample_rate);
+                    }
+                    return audio;
                 }
-                return audio;
             }
         }
     }
 
-    // Fallback to formant
     speak_formant(text, prosody, sample_rate)
 }
 
