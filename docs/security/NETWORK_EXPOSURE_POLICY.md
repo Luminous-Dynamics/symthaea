@@ -64,3 +64,9 @@ scripts/security/network-regression-scan.sh
 ```
 
 This is a lightweight check intended for both local dev and CI, to prevent reintroducing the original "exposed installer" class of vulnerabilities.
+
+For a deeper build+scan smoke test of the hardened surfaces, run:
+
+```bash
+scripts/security/security-smoke.sh
+```
