@@ -41,6 +41,8 @@ pub struct ConsciousnessCache {
     pub(crate) last_embodied_agency: f64,
     /// Last predictive free energy (cached for surprise amplitude scaling).
     pub(crate) last_predictive_free_energy: f64,
+    /// Last FluctuatioAnimi tension (cached for FEP exploration coupling).
+    pub(crate) last_moral_fluctuatio_tension: f32,
     // ── Structural Phi persistence ──────────────────────────────────
     /// Last structural Phi result (updated every 194 cycles by consciousness engine).
     pub(crate) last_structural_phi:
@@ -75,6 +77,7 @@ impl Default for ConsciousnessCache {
             last_hierarchical_mip_phi: None,
             last_embodied_agency: 0.5,
             last_predictive_free_energy: 0.0,
+            last_moral_fluctuatio_tension: 0.0,
             last_structural_phi: None,
             mce_bottleneck_name: String::new(),
             mce_softmin: 0.0,

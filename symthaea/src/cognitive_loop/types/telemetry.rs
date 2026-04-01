@@ -2423,6 +2423,24 @@ pub struct EthicalTelemetry {
     /// Science: Friston (2010) — active inference; Cushman (2013) — dual-process moral cognition.
     #[serde(default = "default_consequence_accuracy")]
     pub ethics_consequence_accuracy: f64,
+
+    // ── Spinozist Affect Fingerprint ─────────────────────────────
+    /// 18D Spinozist affect coordinates (cosine similarity to each affect HV).
+    /// Order: Harm, Care, Consent, Deception, Joy, Sadness, Fairness, Obligation,
+    /// Vulnerability, Autonomy, Desire, Sacred, Authority, Loyalty, Purity,
+    /// Liberty, Proportionality, Reciprocity.
+    #[serde(default)]
+    pub moral_affect_coords: [f32; 18],
+    /// Maximum FluctuatioAnimi tension across opposing affect pairs.
+    /// High tension (>0.5) indicates moral ambiguity.
+    #[serde(default)]
+    pub moral_fluctuatio_tension: f32,
+    /// Whether the scenario is morally ambiguous (fluctuatio > threshold).
+    #[serde(default)]
+    pub moral_is_ambiguous: bool,
+    /// Epistemic confidence from affect adequacy scores (mean of active affects).
+    #[serde(default)]
+    pub moral_epistemic_confidence: f32,
 }
 
 fn default_consequence_accuracy() -> f64 {

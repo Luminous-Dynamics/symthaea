@@ -374,6 +374,10 @@ impl CognitiveLoopService {
                     .as_str()
                     .to_string(),
                 ethics_consequence_accuracy: self.ethics_engine.consequence_tracker_accuracy(),
+                moral_affect_coords: perception.moral.moral_affect_coords,
+                moral_fluctuatio_tension: perception.moral.moral_fluctuatio_tension,
+                moral_is_ambiguous: perception.moral.moral_is_ambiguous,
+                moral_epistemic_confidence: perception.moral.moral_epistemic_confidence,
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
             reasoning_context: mem::take(&mut feedback.reasoning.reasoning_context),

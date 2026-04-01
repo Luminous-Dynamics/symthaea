@@ -815,6 +815,8 @@ impl CognitiveLoopService {
         let narrative_self_psi = late_result.narrative_self_psi;
         let predictive_free_energy = late_result.predictive_free_energy;
         self.carryover.consciousness.last_predictive_free_energy = predictive_free_energy;
+        self.carryover.consciousness.last_moral_fluctuatio_tension =
+            perception.moral.moral_fluctuatio_tension;
         let predictive_psi_modulation = late_result.predictive_psi_modulation;
         let hierarchical_total_free_energy = late_result.hierarchical_total_free_energy;
         let predictive_self_safety = late_result.predictive_self_safety;

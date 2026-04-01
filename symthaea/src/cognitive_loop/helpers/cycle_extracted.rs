@@ -272,11 +272,13 @@ impl CognitiveLoopService {
     ///
     /// Returns `(moral_score, moral_concern_detected, moral_judgment)`.
     /// The judgment is cached in `self.ethics_values.last_moral_judgment` for throttled reuse.
+    /// Returns (moral_score, concern_detected, judgment, affect_coords, fluctuatio_tension, is_ambiguous, epistemic_confidence).
+    #[allow(clippy::type_complexity)]
     pub(in crate::cognitive_loop) fn run_moral_phase(
         &mut self,
         input: &str,
         input_negation_polarity: f32,
-    ) -> (f32, bool, MoralJudgmentSummary) {
+    ) -> (f32, bool, MoralJudgmentSummary, [f32; 18], f32, bool, f32) {
         // Throttled evaluation: re-evaluate on interval or new input
         let moral_judgment = if self.stats.total_cycles % MORAL_EVAL_INTERVAL == 1
             || self
@@ -367,7 +369,22 @@ impl CognitiveLoopService {
             self.primitive_tier.value_feedback.process_feedback(signal);
         }
 
-        (moral_score, moral_concern_detected, moral_judgment)
+        // Compute Spinozist affect fingerprint for telemetry.
+        // Uses deliberate() for trajectory-aware fingerprinting.
+        use crate::hdc::spinozist_geometry::{SpinozistClassifier, NUM_AFFECTS};
+        use std::sync::OnceLock;
+        static SPINOZIST: OnceLock<SpinozistClassifier> = OnceLock::new();
+        let classifier = SPINOZIST.get_or_init(SpinozistClassifier::new);
+        let (fingerprint, fluctuatio) = classifier.deliberate(input);
+        let mut affect_coords = [0.0f32; 18];
+        let n = fingerprint.affect_coords.len().min(18);
+        affect_coords[..n].copy_from_slice(&fingerprint.affect_coords[..n]);
+        let fluctuatio_tension = fluctuatio.max_tension;
+        let is_ambiguous = fluctuatio.is_ambiguous;
+        let epistemic_confidence = fingerprint.epistemic_confidence;
+
+        (moral_score, moral_concern_detected, moral_judgment,
+         affect_coords, fluctuatio_tension, is_ambiguous, epistemic_confidence)
     }
 
     /// Recall episodic memories and apply emotional/consciousness priming.
@@ -1021,6 +1038,23 @@ impl CognitiveLoopService {
                 Priority::Aesthetic,
                 moral_score.clamp(0.0, 1.0),
             );
+        }
+
+        // FluctuatioAnimi → FEP exploration: moral ambiguity drives information-seeking.
+        // High tension between opposing affects (e.g., Harm+Care in "mercy killing")
+        // increases epistemic uncertainty, making the system explore rather than commit.
+        // Science: Cushman (2013) — dual-process moral cognition under uncertainty.
+        {
+            let tension = self.carryover.consciousness.last_moral_fluctuatio_tension;
+            if tension > 0.5 {
+                let exploration_boost = (tension - 0.5) * 0.6; // 0.0–0.3 range
+                self.adjust_exploration("fluctuatio_animi", exploration_boost);
+                tracing::trace!(
+                    tension = tension,
+                    boost = exploration_boost,
+                    "Moral ambiguity detected — boosting FEP exploration"
+                );
+            }
         }
 
         // Surprise-gated learning rate boost
