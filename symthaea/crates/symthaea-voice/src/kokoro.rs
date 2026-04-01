@@ -108,7 +108,7 @@ impl KokoroEngine {
             (vec![1i64, voice_embed.len() as i64], voice_embed.clone())
         ).ok()?;
         let speed_tensor = ort::value::Tensor::from_array(
-            (vec![1i64], vec![1.0f32])
+            (vec![1i64], vec![0.8f32]) // 0.8x speed = 20% slower, more elongated
         ).ok()?;
 
         let outputs = self.session.run(ort::inputs![

@@ -101,6 +101,12 @@ fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32
 fn vocal_chain(audio: &mut Vec<f32>) {
     if audio.is_empty() { return; }
 
+    // 0. Fade-in first 10ms to eliminate boundary clicks
+    let fade_in_samples = (24000.0 * 0.01) as usize; // 10ms at 24kHz
+    for i in 0..fade_in_samples.min(audio.len()) {
+        audio[i] *= i as f32 / fade_in_samples as f32;
+    }
+
     // 1. Peak normalize to -1 dBFS
     let peak = audio.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     if peak > 0.001 {
