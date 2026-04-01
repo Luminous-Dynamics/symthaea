@@ -391,7 +391,7 @@
           meta = with pkgs.lib; {
             description = "Consciousness-first AI system with HDC and integrated information";
             homepage = "https://luminousdynamics.org";
-            license = licenses.mit;
+            license = licenses.agpl3Plus;
           };
         };
 
