@@ -52,14 +52,10 @@ impl MuseVoiceBridge {
         // Select phrase based on consciousness state
         let phrase = self.select_phrase(state);
 
-        // Consciousness-driven engine selection:
-        // Low Ψ = Formant (raw, digital ghost struggling to form words)
-        // High Ψ = Kokoro (clear, articulate — full consciousness)
-        let engine = if state.consciousness_level > 0.7 {
-            symthaea_voice::VoiceEngine::Kokoro
-        } else {
-            symthaea_voice::VoiceEngine::Formant
-        };
+        // Always use Kokoro when available (feature-gated).
+        // The consciousness level drives speed, not engine selection.
+        // (Dual engine crossfade is a future feature.)
+        let engine = symthaea_voice::VoiceEngine::Kokoro;
 
         // Map consciousness to prosody
         let prosody = symthaea_voice::VoiceProsody {
