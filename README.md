@@ -107,10 +107,9 @@ cargo run --features api_module --example symthaea-demo
 
 ## License
 
-This monorepo is licensed under the [Business Source License 1.1](LICENSE). Non-production use (research, evaluation, testing, development, education) is permitted. Production use requires a commercial license.
+Unless otherwise noted, this monorepo is licensed under the
+[GNU Affero General Public License v3.0 or later](LICENSE) (SPDX: AGPL-3.0-or-later).
 
-The BSL automatically converts to Apache License 2.0 on 2029-03-06.
+Commercial licensing exceptions are described in [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md).
 
-Individual projects have their own licenses:
-- **Symthaea**: [AGPL-3.0-or-later](symthaea/LICENSE) — open source with network copyleft
-- **Mycelix**: [Apache-2.0](mycelix-workspace/LICENSE) — permissive, patent-granting
+Legacy: the previous repo-root license text is archived at [LICENSE-BSL-1.1.txt](LICENSE-BSL-1.1.txt).
