@@ -234,6 +234,8 @@ export const COMMONS_CARE_ZOMES = [
   'transport_routes', 'transport_sharing', 'transport_impact',
   'support_knowledge', 'support_tickets', 'support_diagnostics',
   'space',
+  'mesh_time',
+  'resource_mesh',
 ] as const;
 
 /** All zomes across both commons DNAs (backward compatible) */

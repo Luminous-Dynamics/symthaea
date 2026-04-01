@@ -170,7 +170,7 @@ fn energy_to_supplychain_allows_bridge() {
     assert!(is_allowed(
         CrossClusterRole::Energy,
         CrossClusterRole::Supplychain,
-        "bridge"
+        "bridge_coordinator"
     ));
 }
 
@@ -179,7 +179,7 @@ fn energy_to_supplychain_allows_inventory() {
     assert!(is_allowed(
         CrossClusterRole::Energy,
         CrossClusterRole::Supplychain,
-        "inventory"
+        "inventory_coordinator"
     ));
 }
 
@@ -188,7 +188,7 @@ fn energy_to_supplychain_allows_procurement() {
     assert!(is_allowed(
         CrossClusterRole::Energy,
         CrossClusterRole::Supplychain,
-        "procurement"
+        "procurement_coordinator"
     ));
 }
 
@@ -205,7 +205,7 @@ fn climate_to_supplychain_allows_bridge() {
     assert!(is_allowed(
         CrossClusterRole::Climate,
         CrossClusterRole::Supplychain,
-        "bridge"
+        "bridge_coordinator"
     ));
 }
 
@@ -214,7 +214,7 @@ fn climate_to_supplychain_allows_claims() {
     assert!(is_allowed(
         CrossClusterRole::Climate,
         CrossClusterRole::Supplychain,
-        "claims"
+        "claims_coordinator"
     ));
 }
 
@@ -223,7 +223,7 @@ fn climate_to_supplychain_allows_verification() {
     assert!(is_allowed(
         CrossClusterRole::Climate,
         CrossClusterRole::Supplychain,
-        "verification"
+        "verification_coordinator"
     ));
 }
 
@@ -266,7 +266,7 @@ fn manufacturing_to_supplychain_allows_bridge() {
     assert!(is_allowed(
         CrossClusterRole::Manufacturing,
         CrossClusterRole::Supplychain,
-        "bridge"
+        "bridge_coordinator"
     ));
 }
 
@@ -275,7 +275,7 @@ fn manufacturing_to_supplychain_allows_procurement() {
     assert!(is_allowed(
         CrossClusterRole::Manufacturing,
         CrossClusterRole::Supplychain,
-        "procurement"
+        "procurement_coordinator"
     ));
 }
 
@@ -284,7 +284,7 @@ fn manufacturing_to_supplychain_allows_inventory() {
     assert!(is_allowed(
         CrossClusterRole::Manufacturing,
         CrossClusterRole::Supplychain,
-        "inventory"
+        "inventory_coordinator"
     ));
 }
 
@@ -954,7 +954,7 @@ fn climate_to_supplychain_blocks_logistics() {
     assert!(!is_allowed(
         CrossClusterRole::Climate,
         CrossClusterRole::Supplychain,
-        "logistics"
+        "logistics_coordinator"
     ));
 }
 
