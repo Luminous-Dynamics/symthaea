@@ -141,11 +141,37 @@ fn vocal_chain(audio: &mut Vec<f32>) {
         }
     }
 
-    // 4. Make-up gain (compression reduces overall level)
+    // 4. Make-up gain
     let post_peak = audio.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     if post_peak > 0.001 && post_peak < 0.85 {
         let makeup = 0.85 / post_peak;
         for s in audio.iter_mut() { *s *= makeup; }
+    }
+
+    // 5. Tail padding: 300ms silence so words don't clip at the end
+    let sr = 24000; // Kokoro's native rate
+    let tail_samples = (sr as f32 * 0.3) as usize; // 300ms
+    audio.extend(vec![0.0f32; tail_samples]);
+
+    // 6. Room reverb: simple comb filter (10% wet) for spatial presence
+    let delay_samples = (sr as f32 * 0.035) as usize; // 35ms early reflection
+    let mut reverb_buf = vec![0.0f32; delay_samples.max(1)];
+    let mut idx = 0usize;
+    let feedback = 0.25;
+    let wet = 0.12; // subtle room
+    for s in audio.iter_mut() {
+        let delayed = reverb_buf[idx % delay_samples];
+        reverb_buf[idx % delay_samples] = *s + delayed * feedback;
+        idx += 1;
+        *s = *s * (1.0 - wet) + delayed * wet;
+    }
+
+    // 7. Fade out last 50ms to prevent any click at very end
+    let fade_samples = (sr as f32 * 0.05) as usize;
+    let start = audio.len().saturating_sub(fade_samples);
+    for i in start..audio.len() {
+        let t = (audio.len() - i) as f32 / fade_samples as f32;
+        audio[i] *= t;
     }
 }
 
