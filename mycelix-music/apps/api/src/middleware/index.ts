@@ -70,12 +70,51 @@ export function setupMiddlewarePipeline(
   }
 
   // CORS
-  app.use(cors(options.cors || {
-    origin: process.env.CORS_ORIGIN?.split(',') || '*',
+  const defaultCorsOrigin = (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void,
+  ): void => {
+    // Non-browser clients (no Origin header) are allowed by default.
+    if (!origin) return callback(null, true);
+
+    if (
+      origin.startsWith('http://localhost') ||
+      origin.startsWith('https://localhost') ||
+      origin.startsWith('http://127.0.0.1') ||
+      origin.startsWith('https://127.0.0.1') ||
+      origin.startsWith('http://[::1]') ||
+      origin.startsWith('https://[::1]') ||
+      origin === 'null' // file:// contexts
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('CORS: Origin not allowed'));
+  };
+
+  const corsDefaults = {
+    origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()).filter(Boolean) || '',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Accept-Version'],
     exposedHeaders: ['X-Request-ID', 'X-Total-Count', 'X-API-Version'],
+  };
+
+  const corsConfig = options.cors || corsDefaults;
+  const origin = corsConfig.origin;
+  const normalizedOrigin =
+    origin === '' || (Array.isArray(origin) && origin.length === 0)
+      ? defaultCorsOrigin
+      : origin;
+
+  if (normalizedOrigin === '*') {
+    // Keep the escape hatch, but make it visible in logs.
+    console.warn('WARNING: CORS_ORIGIN="*" enables permissive cross-origin access (insecure).');
+  }
+
+  app.use(cors({
+    ...corsConfig,
+    origin: normalizedOrigin,
   }));
 
   // Compression

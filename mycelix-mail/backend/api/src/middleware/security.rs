@@ -223,7 +223,7 @@ pub async fn security_headers_middleware(request: Request<Body>, next: Next) -> 
 // CORS Configuration
 // ============================================================================
 
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 pub fn cors_layer(allowed_origins: Vec<String>) -> CorsLayer {
     let origins: Vec<HeaderValue> = allowed_origins
@@ -232,8 +232,18 @@ pub fn cors_layer(allowed_origins: Vec<String>) -> CorsLayer {
         .collect();
 
     if origins.is_empty() {
+        // Secure-by-default: restrict to localhost instead of allowing arbitrary websites.
         CorsLayer::new()
-            .allow_origin(Any)
+            .allow_origin(AllowOrigin::predicate(|origin, _| {
+                let o = origin.as_bytes();
+                o.starts_with(b"http://localhost")
+                    || o.starts_with(b"https://localhost")
+                    || o.starts_with(b"http://127.0.0.1")
+                    || o.starts_with(b"https://127.0.0.1")
+                    || o.starts_with(b"http://[::1]")
+                    || o.starts_with(b"https://[::1]")
+                    || o == b"null"
+            }))
             .allow_methods([
                 Method::GET,
                 Method::POST,

@@ -17,7 +17,8 @@ const envSchema = z.object({
   // Application
   NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('3100'),
-  HOST: z.string().default('0.0.0.0'),
+  // Secure-by-default: bind to localhost unless explicitly configured otherwise.
+  HOST: z.string().default('127.0.0.1'),
   API_VERSION: z.string().default('v2'),
 
   // Database
@@ -32,7 +33,9 @@ const envSchema = z.object({
   REDIS_KEY_PREFIX: z.string().default('mycelix:'),
 
   // Security
-  CORS_ORIGIN: z.string().default('*'),
+  // Secure-by-default: empty means "localhost only" (enforced in middleware).
+  // Set "*" explicitly if you really want permissive CORS.
+  CORS_ORIGIN: z.string().default(''),
   RATE_LIMIT_WINDOW_MS: z.string().transform(Number).pipe(z.number().min(1000)).default('60000'),
   RATE_LIMIT_MAX: z.string().transform(Number).pipe(z.number().min(1)).default('100'),
 

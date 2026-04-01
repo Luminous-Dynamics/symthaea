@@ -15,7 +15,7 @@ use axum::{
 };
 use mycelix_erp_service::AppState;
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::info;
 
 // ERP modules
@@ -112,13 +112,44 @@ async fn main() -> Result<()> {
         .filter_map(|s| s.trim().parse().ok())
         .collect();
 
+    let permissive_cors = std::env::var("PERMISSIVE_CORS")
+        .ok()
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+
     let cors = if origins.is_empty() {
-        // Fallback to permissive CORS if no valid origins configured
-        tracing::warn!("No valid CORS origins configured, using permissive CORS (not recommended for production)");
-        CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods(Any)
-            .allow_headers(Any)
+        if permissive_cors {
+            tracing::warn!(
+                "PERMISSIVE_CORS enabled and no valid CORS origins configured; allowing any origin (insecure)"
+            );
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any)
+        } else {
+            tracing::warn!(
+                "No valid CORS origins configured; defaulting to localhost-only CORS. \
+                 Set ALLOWED_ORIGINS or (insecure) PERMISSIVE_CORS=1"
+            );
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::predicate(|origin, _| {
+                    let o = origin.as_bytes();
+                    o.starts_with(b"http://localhost")
+                        || o.starts_with(b"https://localhost")
+                        || o.starts_with(b"http://127.0.0.1")
+                        || o.starts_with(b"https://127.0.0.1")
+                        || o.starts_with(b"http://[::1]")
+                        || o.starts_with(b"https://[::1]")
+                        || o == b"null"
+                }))
+                .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                .allow_headers([
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::AUTHORIZATION,
+                    axum::http::HeaderName::from_static("x-request-id"),
+                ])
+                .max_age(Duration::from_secs(3600))
+        }
     } else {
         // Strict CORS with specific origins
         CorsLayer::new()
@@ -248,11 +279,11 @@ async fn main() -> Result<()> {
             mycelix_erp_service::middleware::rate_limit_middleware
         ));
 
-    // Start server
-    let addr = "0.0.0.0:8080";
+    // Start server (secure-by-default: localhost only)
+    let addr = std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     info!("Starting server on {}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     // Enable graceful shutdown
     axum::serve(listener, app)

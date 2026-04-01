@@ -198,7 +198,7 @@ mod cors_tests {
     #[test]
     fn test_cors_layer_empty_origins() {
         let layer = cors_layer(vec![]);
-        // Should default to allowing any origin
+        // Secure-by-default: should restrict to localhost origins
         assert!(true);
     }
 
