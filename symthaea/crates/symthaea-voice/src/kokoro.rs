@@ -140,39 +140,82 @@ impl KokoroEngine {
     pub fn sample_rate(&self) -> u32 { self.config.sample_rate }
 }
 
-/// Convert text to Kokoro token IDs via CMUdict IPA → Kokoro tokenizer.
-/// Preserves punctuation for natural pacing and intonation.
+/// Convert text to Kokoro token IDs.
+/// Builds IPA string from CMUdict, then tokenizes character-by-character
+/// using Kokoro's vocabulary (each IPA character = one token).
 fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
-    let mut ids = Vec::new();
+    // Build IPA string from text via CMUdict
+    let mut ipa_string = String::new();
 
-    // Split text preserving punctuation
     for word in text.split_whitespace() {
-        // Separate trailing punctuation
         let (clean, punct) = split_punctuation(word);
 
         if !clean.is_empty() {
-            // Look up word phonemes via CMUdict
             let phonemes = crate::g2p::text_to_phonemes(&clean);
             for ph in &phonemes {
-                if ph.ipa != " " { // skip inter-word spaces from G2P
-                    ids.extend(ipa_to_kokoro_tokens(ph.ipa));
+                if ph.ipa != " " {
+                    ipa_string.push_str(ph.ipa);
                 }
             }
         }
 
-        // Add punctuation token (critical for Kokoro pacing!)
+        // Preserve punctuation
         if let Some(p) = punct {
-            ids.extend(ipa_to_kokoro_tokens(p));
+            ipa_string.push_str(p);
         }
 
-        // Add space between words
-        ids.push(16); // space token
+        ipa_string.push(' '); // space between words
     }
 
-    // Remove trailing space
-    if ids.last() == Some(&16) { ids.pop(); }
+    let ipa_string = ipa_string.trim().to_string();
+    info!("IPA string: '{}'", ipa_string);
+
+    // Tokenize: each character maps to its Kokoro vocab ID
+    let mut ids = Vec::new();
+    for ch in ipa_string.chars() {
+        if let Some(id) = char_to_kokoro_id(ch) {
+            ids.push(id);
+        } else {
+            warn!("Unknown char '{}' (U+{:04X}) — skipped", ch, ch as u32);
+        }
+    }
 
     ids
+}
+
+/// Map a single character to Kokoro token ID.
+/// Based on tokenizer.json vocabulary.
+fn char_to_kokoro_id(ch: char) -> Option<u32> {
+    match ch {
+        '$' => Some(0),
+        ';' => Some(1), ':' => Some(2), ',' => Some(3), '.' => Some(4),
+        '!' => Some(5), '?' => Some(6),
+        ' ' => Some(16),
+        'A' => Some(24), 'I' => Some(25),
+        'O' => Some(31), 'Q' => Some(33), 'S' => Some(35), 'T' => Some(36),
+        'W' => Some(39), 'Y' => Some(41),
+        'a' => Some(43), 'b' => Some(44), 'c' => Some(45), 'd' => Some(46),
+        'e' => Some(47), 'f' => Some(48), 'h' => Some(50),
+        'i' => Some(51), 'j' => Some(52), 'k' => Some(53), 'l' => Some(54),
+        'm' => Some(55), 'n' => Some(56), 'o' => Some(57), 'p' => Some(58),
+        'q' => Some(59), 'r' => Some(60), 's' => Some(61), 't' => Some(62),
+        'u' => Some(63), 'v' => Some(64), 'w' => Some(65), 'x' => Some(66),
+        'y' => Some(67), 'z' => Some(68),
+        'ɑ' => Some(69), 'ɐ' => Some(70), 'ɒ' => Some(71), 'æ' => Some(72),
+        'ɔ' => Some(76), 'ð' => Some(81), 'ə' => Some(83),
+        'ɚ' => Some(85), 'ɛ' => Some(86), 'ɜ' => Some(87),
+        'ɡ' => Some(92),
+        'ɪ' => Some(102),
+        'ŋ' => Some(112),
+        'ʃ' => Some(35), // same as 'S'
+        'ʌ' => Some(63), // map to 'u' (closest)
+        'ʊ' => Some(63), // map to 'u'
+        'ʒ' => Some(68), // map to 'z'
+        'θ' => Some(36), // same as 'T'
+        'ɹ' => Some(60), // map to 'r'
+        'ː' => None,     // skip length marker (Kokoro handles duration internally)
+        _ => None,
+    }
 }
 
 fn split_punctuation(word: &str) -> (String, Option<&'static str>) {
