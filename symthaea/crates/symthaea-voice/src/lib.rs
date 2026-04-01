@@ -80,8 +80,10 @@ fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32
 
         if let Ok(mut guard) = engine_lock.lock() {
             if let Some(ref mut engine) = *guard {
-                // Modulate speed from arousal
-                if let Some(audio) = engine.synthesize(text, None) {
+                if let Some(mut audio) = engine.synthesize(text, None) {
+                    // Vocal chain: normalize → presence EQ → compress
+                    vocal_chain(&mut audio);
+
                     if sample_rate != 24000 {
                         return resample(&audio, 24000, sample_rate);
                     }
@@ -92,6 +94,59 @@ fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32
     }
 
     speak_formant(text, prosody, sample_rate)
+}
+
+/// Vocal processing chain: normalize → presence EQ → compress.
+/// Makes the neural voice crisp, loud, and present.
+fn vocal_chain(audio: &mut Vec<f32>) {
+    if audio.is_empty() { return; }
+
+    // 1. Peak normalize to -1 dBFS
+    let peak = audio.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+    if peak > 0.001 {
+        let target = 0.89; // -1 dBFS
+        let gain = target / peak;
+        for s in audio.iter_mut() { *s *= gain; }
+    }
+
+    // 2. Presence EQ: high-shelf boost above 4kHz (+4dB)
+    // Simple one-pole high-shelf at 24kHz sample rate
+    let mut hp_state = 0.0f32;
+    let shelf_coeff = 0.7; // cutoff ~4kHz at 24kHz SR
+    let shelf_gain = 1.6; // +4dB
+    for s in audio.iter_mut() {
+        hp_state += shelf_coeff * (*s - hp_state);
+        let high = *s - hp_state; // high-frequency component
+        *s += high * (shelf_gain - 1.0); // boost highs
+    }
+
+    // 3. Soft-knee compressor: 4:1 ratio above -12dBFS
+    let threshold = 0.25; // -12 dBFS
+    let ratio = 4.0;
+    let mut env = 0.0f32;
+    let attack = 0.001; // fast attack
+    let release = 0.02; // moderate release
+    for s in audio.iter_mut() {
+        let level = s.abs();
+        // Envelope follower
+        if level > env { env += attack * (level - env); }
+        else { env += release * (level - env); }
+
+        // Gain reduction
+        if env > threshold {
+            let over = env - threshold;
+            let compressed = threshold + over / ratio;
+            let gain = compressed / env.max(0.0001);
+            *s *= gain;
+        }
+    }
+
+    // 4. Make-up gain (compression reduces overall level)
+    let post_peak = audio.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+    if post_peak > 0.001 && post_peak < 0.85 {
+        let makeup = 0.85 / post_peak;
+        for s in audio.iter_mut() { *s *= makeup; }
+    }
 }
 
 /// Simple linear resampling.
