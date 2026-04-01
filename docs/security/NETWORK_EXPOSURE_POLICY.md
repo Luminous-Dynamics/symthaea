@@ -20,6 +20,13 @@ The default posture is:
   - Bind: `127.0.0.1` by default (`--bind`)
   - CORS: explicit allowlist (`--allow-origin`); no wildcard fallbacks
 
+- `symthaea-holon` Soma bridge (`symthaea/src/bin/symthaea-holon.rs`, `symthaea/src/api/holon.rs`)
+  - Bind: `HOLON_LISTEN` (default `127.0.0.1`)
+  - Auth:
+    - If bound to a non-loopback interface, a token is required (set `HOLON_TOKEN` or it is generated on startup).
+    - Token is accepted via `Authorization: Bearer ...`, `X-Holon-Token`, or `?token=...`.
+    - `HOLON_INSECURE_ALLOW_UNAUTH=1` is an explicit insecure escape hatch.
+
 - Installer ISO (`symthaea/nix/installer-iso.nix`)
   - Firewall: enabled (SSH only)
   - Root access: one-time password generated on boot and displayed locally
@@ -57,4 +64,3 @@ scripts/security/network-regression-scan.sh
 ```
 
 This is a lightweight check intended for both local dev and CI, to prevent reintroducing the original "exposed installer" class of vulnerabilities.
-

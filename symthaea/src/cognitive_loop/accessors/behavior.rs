@@ -1040,6 +1040,20 @@ impl CognitiveLoopService {
         self.holon_receiver.total_processed()
     }
 
+    /// Collective QOL summary across all connected Soma devices as JSON.
+    ///
+    /// Used by the Holon dashboard for quick polling without locking/serializing in the HTTP layer.
+    pub fn holon_collective_qol_json(&self) -> String {
+        self.holon_receiver.collective_qol_json()
+    }
+
+    /// Drain all pending Holon task requests across peers.
+    ///
+    /// Returns (device_id, task_type, payload) tuples.
+    pub fn holon_drain_task_requests(&mut self) -> Vec<(String, String, String)> {
+        self.holon_receiver.drain_task_requests()
+    }
+
     /// Clone the Holon inbound sender for use by HTTP handlers.
     ///
     /// The channel is created eagerly at CLS construction. Clone the returned

@@ -54,6 +54,11 @@ main() {
   assert_no_match "CorsLayer::permissive\\(" "symthaea/crates/symthaea-spore/src/bin/eval_api.rs" || failures=$((failures + 1))
   assert_no_match "0\\.0\\.0\\.0" "symthaea/crates/symthaea-spore/src/bin/eval_api.rs" || failures=$((failures + 1))
 
+  note "Checking Symthaea Holon daemon (localhost default + token on LAN bind)..."
+  assert_no_match "0\\.0\\.0\\.0" "symthaea/src/bin/symthaea-holon.rs" || failures=$((failures + 1))
+  assert_match "HOLON_TOKEN" "symthaea/src/bin/symthaea-holon.rs" || failures=$((failures + 1))
+  assert_match "holon_auth_middleware" "symthaea/src/api/holon.rs" || failures=$((failures + 1))
+
   note "Checking Mycelix gun server (localhost default + explicit CORS allowlist)..."
   assert_match "127\\.0\\.0\\.1" "mycelix-core/gun-p2p-server.js" || failures=$((failures + 1))
   assert_no_match "origin\\s*:\\s*['\\\"]\\*['\\\"]" "mycelix-core/gun-p2p-server.js" || failures=$((failures + 1))
@@ -72,4 +77,3 @@ main() {
 }
 
 main "$@"
-
