@@ -1,0 +1,59 @@
+name: Security Smoke
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/security-smoke.yml"
+      - "docs/security/**"
+      - "scripts/security/**"
+      - "symthaea/**"
+      - "mycelix-core/gun-p2p-server.js"
+      - "mycelix-finance/sidecar/**"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/security-smoke.yml"
+      - "docs/security/**"
+      - "scripts/security/**"
+      - "symthaea/**"
+      - "mycelix-core/gun-p2p-server.js"
+      - "mycelix-finance/sidecar/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ripgrep \
+            pkg-config \
+            libssl-dev \
+            cmake
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Security smoke
+        env:
+          RUSTC_WRAPPER: ""
+        run: |
+          scripts/security/security-smoke.sh
+
