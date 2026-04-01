@@ -11,6 +11,8 @@
 use bevy::prelude::*;
 use terra_atlas_bevy::camera::OrbitalCameraConfig;
 use terra_atlas_bevy::timeline::TimelineState;
+use symthaea_fep::EnhancedFEPBridge;
+use symthaea_fep::MotorCommandType;
 
 use crate::systems::atlas::CurrentAesthetic;
 
@@ -66,6 +68,14 @@ pub struct DemoDirector {
     pub phase: DemoPhase,
     pub phase_timer: f32,
     pub total_time: f32,
+    /// FEP agent for consciousness-driven modulation (None = fully deterministic).
+    pub fep_bridge: Option<EnhancedFEPBridge>,
+    /// How much the FEP agent modulates the deterministic path (0.0 = none, 1.0 = full).
+    pub modulation_strength: f32,
+    /// Last prediction error from the FEP agent.
+    pub last_prediction_error: f64,
+    /// Phi (consciousness integration) of the demo.
+    pub phi: f64,
 }
 
 impl Default for DemoDirector {
@@ -75,6 +85,10 @@ impl Default for DemoDirector {
             phase: DemoPhase::Opening,
             phase_timer: 0.0,
             total_time: 0.0,
+            fep_bridge: None, // deterministic by default
+            modulation_strength: 0.0,
+            last_prediction_error: 0.0,
+            phi: 0.0,
         }
     }
 }
@@ -165,6 +179,42 @@ pub fn demo_director_system(
         }
 
         DemoPhase::Done => {}
+    }
+
+    // FEP modulation — consciousness-driven adjustments to the deterministic path
+    let mod_strength = director.modulation_strength;
+    let last_pe = director.last_prediction_error;
+    let phi = director.phi;
+    if mod_strength > 0.0 {
+        if let Some(ref mut bridge) = director.fep_bridge {
+            let phase_progress = t as f64;
+            let cam_dist_normalized = (camera.distance as f64 - 1.8) / (8.0 - 1.8);
+            let coherence = 1.0 - last_pe;
+
+            let result = bridge.cycle(phi, phase_progress, coherence, cam_dist_normalized);
+
+            let new_pe = result.fep_result.free_energy.abs().min(1.0);
+            let new_phi = coherence * 0.7 + phase_progress * 0.3;
+            let intensity = result.motor_command.intensity as f32;
+
+            match result.motor_command.command_type {
+                MotorCommandType::AttentionShift => {
+                    camera.theta += intensity * 0.01 * mod_strength;
+                }
+                MotorCommandType::ExplorationTrigger => {
+                    camera.distance -= intensity * 0.02 * mod_strength;
+                }
+                MotorCommandType::ReflectionInitiate => {
+                    timeline.speed = 10.0 * (1.0 - intensity * 0.5 * mod_strength);
+                }
+                _ => {}
+            }
+
+            // Update director state after borrow is released
+            drop(bridge);
+            director.last_prediction_error = new_pe;
+            director.phi = new_phi;
+        }
     }
 
     // Phase transition
