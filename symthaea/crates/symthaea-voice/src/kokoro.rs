@@ -40,6 +40,8 @@ pub struct KokoroEngine {
     #[cfg(feature = "kokoro")]
     voices: Vec<Vec<f32>>,
     config: KokoroConfig,
+    /// Consciousness-driven speed (set before each synthesize call).
+    pub speed: Option<f32>,
 }
 
 impl KokoroEngine {
@@ -80,7 +82,7 @@ impl KokoroEngine {
         };
 
         info!("Kokoro loaded: {} voices", voices.len());
-        Some(Self { session, voices, config })
+        Some(Self { session, voices, config, speed: None })
     }
 
     #[cfg(not(feature = "kokoro"))]
@@ -117,8 +119,11 @@ impl KokoroEngine {
         let style_tensor = ort::value::Tensor::from_array(
             (vec![1i64, voice_embed.len() as i64], voice_embed.clone())
         ).ok()?;
+        // LIQUID KOKORO: consciousness drives speech rate
+        // High arousal/confidence = faster (1.1x), low/confused = slower (0.75x)
+        let speed = self.speed.unwrap_or(0.9);
         let speed_tensor = ort::value::Tensor::from_array(
-            (vec![1i64], vec![0.8f32]) // 0.8x speed = 20% slower, more elongated
+            (vec![1i64], vec![speed])
         ).ok()?;
 
         let outputs = self.session.run(ort::inputs![
