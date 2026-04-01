@@ -91,12 +91,22 @@ impl KokoroEngine {
     /// Synthesize text to audio at 24kHz.
     #[cfg(feature = "kokoro")]
     pub fn synthesize(&mut self, text: &str, voice_id: Option<usize>) -> Option<Vec<f32>> {
-        let phoneme_ids = text_to_kokoro_ids(text);
-        info!("Kokoro synthesize: '{}' → {} tokens: {:?}", text, phoneme_ids.len(), &phoneme_ids);
-        if phoneme_ids.is_empty() { warn!("No phoneme IDs!"); return None; }
+        let raw_ids = text_to_kokoro_ids(text);
+        info!("Kokoro synthesize: '{}' → {} tokens: {:?}", text, raw_ids.len(), &raw_ids);
+        if raw_ids.is_empty() { warn!("No phoneme IDs!"); return None; }
 
-        let voice_idx = voice_id.unwrap_or(self.config.default_voice);
-        let voice_embed = self.voices.get(voice_idx).or(self.voices.first())?;
+        // Pad with 0 at start and end (model expects this)
+        let mut phoneme_ids = Vec::with_capacity(raw_ids.len() + 2);
+        phoneme_ids.push(0); // start pad
+        phoneme_ids.extend(&raw_ids);
+        phoneme_ids.push(0); // end pad
+
+        // Voice indexing: voices[token_count] not voices[voice_id]
+        let token_count = phoneme_ids.len().min(self.voices.len().saturating_sub(1));
+        let voice_embed = self.voices.get(token_count)
+            .or_else(|| self.voices.last())
+            .or_else(|| self.voices.first())?;
+        info!("Voice index: {} (token count), embed dim: {}", token_count, voice_embed.len());
 
         let seq_len = phoneme_ids.len();
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
@@ -187,7 +197,7 @@ fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
         // Single character
         if let Some(id) = char_to_kokoro_id(chars[i]) {
             ids.push(id);
-        } else if chars[i] != 'ː' { // silently skip length marks
+        } else {
             warn!("Unknown char '{}' (U+{:04X}) — skipped", chars[i], chars[i] as u32);
         }
         i += 1;
@@ -233,12 +243,19 @@ fn char_to_kokoro_id(ch: char) -> Option<u32> {
         'ɪ' => Some(102),
         'ŋ' => Some(112),
         'ʃ' => Some(35), // same as 'S'
-        'ʌ' => Some(63), // map to 'u' (closest)
-        'ʊ' => Some(63), // map to 'u'
-        'ʒ' => Some(68), // map to 'z'
-        'θ' => Some(36), // same as 'T'
-        'ɹ' => Some(60), // map to 'r'
-        'ː' => None,     // skip length marker (Kokoro handles duration internally)
+        'ʌ' => Some(138),   // CORRECT: ʌ=138, NOT 63 (u)
+        'ʊ' => Some(135),   // CORRECT: ʊ=135
+        'ʒ' => Some(147),   // CORRECT: ʒ=147
+        'θ' => Some(119),   // CORRECT: θ=119
+        'ɹ' => Some(123),   // CORRECT: ɹ=123
+        'ː' => Some(158),   // CORRECT: ː=158 — DO NOT SKIP (controls vowel length!)
+        'ˈ' => Some(156),   // primary stress
+        'ˌ' => Some(157),   // secondary stress
+        'ʔ' => Some(148),   // glottal stop
+        'ɾ' => Some(125),   // tap
+        'ʃ' => Some(131),   // CORRECT: ʃ=131
+        'ʧ' | 'ʨ' => Some(133), // affricate
+        'ʤ' => Some(82),    // voiced affricate
         _ => None,
     }
 }
