@@ -170,17 +170,42 @@ fn text_to_kokoro_ids(text: &str) -> Vec<u32> {
     let ipa_string = ipa_string.trim().to_string();
     info!("IPA string: '{}'", ipa_string);
 
-    // Tokenize: each character maps to its Kokoro vocab ID
+    // Tokenize: handle diphthongs first, then character-by-character
     let mut ids = Vec::new();
-    for ch in ipa_string.chars() {
-        if let Some(id) = char_to_kokoro_id(ch) {
-            ids.push(id);
-        } else {
-            warn!("Unknown char '{}' (U+{:04X}) — skipped", ch, ch as u32);
+    let chars: Vec<char> = ipa_string.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        // Check for diphthongs (2-char sequences → Kokoro uppercase tokens)
+        if i + 1 < chars.len() {
+            let pair = format!("{}{}", chars[i], chars[i+1]);
+            if let Some(token) = diphthong_to_kokoro(&pair) {
+                ids.extend(token);
+                i += 2;
+                continue;
+            }
         }
+        // Single character
+        if let Some(id) = char_to_kokoro_id(chars[i]) {
+            ids.push(id);
+        } else if chars[i] != 'ː' { // silently skip length marks
+            warn!("Unknown char '{}' (U+{:04X}) — skipped", chars[i], chars[i] as u32);
+        }
+        i += 1;
     }
 
     ids
+}
+
+/// Map diphthongs to Kokoro's uppercase token pairs.
+fn diphthong_to_kokoro(pair: &str) -> Option<Vec<u32>> {
+    match pair {
+        "aɪ" => Some(vec![24, 25]),   // A + I (as in "I", "my", "light")
+        "eɪ" => Some(vec![47, 25]),   // e + I (as in "say", "day")
+        "oʊ" => Some(vec![57, 39]),   // o + W (as in "go", "slow")
+        "aʊ" => Some(vec![43, 39]),   // a + W (as in "how", "now")
+        "ɔɪ" => Some(vec![76, 25]),   // ɔ + I (as in "boy", "joy")
+        _ => None,
+    }
 }
 
 /// Map a single character to Kokoro token ID.
