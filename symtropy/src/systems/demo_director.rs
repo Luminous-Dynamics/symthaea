@@ -127,9 +127,9 @@ pub fn demo_director_system(
         DemoPhase::ZoomIn => {
             // Zoom toward Europe/Middle East (theta ≈ 0.5, phi ≈ 0.3)
             camera.auto_rotate = false;
-            camera.distance = 4.5 - ease * 2.0; // 4.5 → 2.5
-            camera.theta += (0.5 - camera.theta) * 0.03;
-            camera.phi += (0.3 - camera.phi) * 0.03;
+            camera.distance = 4.5 - ease * 1.0; // 4.5 → 3.5 (stays in Atmosphere — clean, no markers)
+            camera.theta += (0.8 - camera.theta) * 0.04; // more rotation to show coverage
+            camera.phi += (0.2 - camera.phi) * 0.03;
             // Start timeline at year 50
             timeline.year = (ease * 50.0) as u32;
         }

@@ -20,12 +20,12 @@ pub enum LodLevel {
 
 impl LodLevel {
     pub fn from_camera_distance(distance: f32) -> Self {
-        if distance > 3.5 {
-            Self::Orbit      // default zoom (4.2) shows heat blobs
-        } else if distance > 2.2 {
-            Self::Atmosphere  // mid-zoom shows top markers
+        if distance > 3.8 {
+            Self::Orbit      // far zoom — heat blobs only
+        } else if distance > 2.8 {
+            Self::Atmosphere  // mid — nothing (clean transition gap)
         } else {
-            Self::Surface     // close-up shows everything
+            Self::Surface     // close — individual markers only
         }
     }
 }
@@ -107,8 +107,8 @@ mod tests {
     #[test]
     fn test_lod_levels() {
         assert_eq!(LodLevel::from_camera_distance(4.2), LodLevel::Orbit); // default zoom
-        assert_eq!(LodLevel::from_camera_distance(3.0), LodLevel::Atmosphere);
-        assert_eq!(LodLevel::from_camera_distance(2.0), LodLevel::Surface);
+        assert_eq!(LodLevel::from_camera_distance(3.5), LodLevel::Atmosphere); // transition gap
+        assert_eq!(LodLevel::from_camera_distance(2.5), LodLevel::Surface);
     }
 
     #[test]

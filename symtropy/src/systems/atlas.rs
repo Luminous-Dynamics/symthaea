@@ -378,7 +378,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.022)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.014)),
             DataMarker { layer: Layer::TerraLumina, name: site.name.clone() },
             SurfaceLod,
             TimelineLayer::Renewable,
@@ -400,7 +400,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.016)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.010)),
             DataMarker { layer: Layer::ResontiaVaults, name: vault.name.clone() },
             SurfaceLod,
             TimelineLayer::Vault(i),
@@ -824,6 +824,7 @@ pub fn aesthetic_apply_system(
 }
 
 /// LOD visibility — toggle markers based on camera zoom distance.
+/// Mutually exclusive: Orbit = heat blobs, Surface = markers, Atmosphere = neither.
 pub fn lod_visibility_system(
     camera: Query<&Transform, With<OrbitalCamera>>,
     mut surface_markers: Query<&mut Visibility, (With<SurfaceLod>, Without<OrbitLod>)>,
@@ -833,8 +834,9 @@ pub fn lod_visibility_system(
     let distance = cam_tf.translation.length();
     let lod = LodLevel::from_camera_distance(distance);
 
-    let show_surface = matches!(lod, LodLevel::Surface);  // only at closest zoom
-    let show_orbit = matches!(lod, LodLevel::Orbit | LodLevel::Atmosphere); // blobs at mid AND far
+    let show_surface = matches!(lod, LodLevel::Surface);
+    let show_orbit = matches!(lod, LodLevel::Orbit);
+    // Atmosphere = clean gap — only arcs + globe visible
 
     for mut vis in surface_markers.iter_mut() {
         *vis = if show_surface { Visibility::Visible } else { Visibility::Hidden };
