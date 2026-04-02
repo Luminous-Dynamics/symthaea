@@ -39,15 +39,17 @@
     description = "Generate one-time root password for SSH (Sovereign Inoculation)";
     wantedBy = [ "multi-user.target" ];
     before = [ "sshd.service" ];
+    requiredBy = [ "sshd.service" ];
     serviceConfig = {
       Type = "oneshot";
+      RemainAfterExit = true;
       ExecStart = pkgs.writeShellScript "sovereign-one-time-root-password" ''
         set -euo pipefail
         DIR="/run/sovereign-inoculation"
         install -d -m 0700 "$DIR"
 
         # 20 chars from a friendly alphabet (no ambiguous 0/O/1/l).
-        PASS="$(${pkgs.coreutils}/bin/tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | ${pkgs.coreutils}/bin/head -c 20)"
+        PASS="$(${pkgs.coreutils}/bin/tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | ${pkgs.coreutils}/bin/head -c 20 || true)"
         ${pkgs.coreutils}/bin/echo -n "$PASS" > "$DIR/root-password"
         ${pkgs.coreutils}/bin/chmod 0600 "$DIR/root-password"
 
@@ -156,4 +158,3 @@
 
   system.stateVersion = "25.05";
 }
-

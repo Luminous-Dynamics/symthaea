@@ -12,35 +12,50 @@
 let
   modulesPath = "${pkgs.path}/nixos/modules";
   installerIsoModule = import ../modules/installer-iso-module.nix { inherit modulesPath; };
+  nixosTest =
+    # nixpkgs 2025-10+ renamed pkgs.nixosTest -> pkgs.testers.nixosTest
+    if pkgs ? testers && pkgs.testers ? nixosTest
+    then pkgs.testers.nixosTest
+    else throw "pkgs.testers.nixosTest is missing (nixpkgs too old?)";
 in
-pkgs.nixosTest {
+nixosTest {
   name = "installer-iso-security";
 
   nodes = {
-    installer = { ... }: {
+    installer = { lib, ... }: {
       imports = [ installerIsoModule ];
+      # Ensure the test driver injects `installer` (by system.name/hostname), not
+      # the ISO default `sovereign-inoculation`.
+      networking.hostName = lib.mkForce "installer";
     };
 
     attacker = { pkgs, ... }: {
+      # Ensure the test driver injects `attacker`.
+      networking.hostName = "attacker";
       environment.systemPackages = [ pkgs.netcat-openbsd pkgs.iproute2 pkgs.ripgrep ];
     };
   };
 
   testScript = ''
+    # Start the installer VM with QEMU reboot enabled; this test asserts that the
+    # one-time SSH password changes across reboot.
+    installer.start(allow_reboot=True)
+    attacker.start()
+
     installer.wait_for_unit("network-online.target")
     installer.wait_for_unit("sshd.service")
     installer.wait_for_unit("sovereign-one-time-root-password.service")
 
     # One-time password material exists and is not world-readable.
     installer.succeed("test -f /run/sovereign-inoculation/root-password")
-    installer.succeed("stat -c '%a %U %G' /run/sovereign-inoculation/root-password | rg -q '^600 root root$'")
+    installer.succeed("[ \"$(stat -c '%a %U %G' /run/sovereign-inoculation/root-password)\" = \"600 root root\" ]")
 
     # Avahi should not be active (no mDNS broadcast).
     installer.fail("systemctl is-active --quiet avahi-daemon.service")
 
     # Firewall should only allow SSH from the network.
     installer_ip = installer.succeed("ip -4 -o addr show dev eth1 | awk '{print $4}' | cut -d/ -f1").strip()
-    attacker.wait_for_unit("network-online.target")
+    attacker.wait_for_unit("multi-user.target")
     attacker.wait_until_succeeds(f"nc -zvw2 {installer_ip} 22")
 
     for port in [8091, 8090, 8094, 8080, 3000]:
@@ -55,4 +70,3 @@ pkgs.nixosTest {
     assert pw1 != pw2, "expected one-time root password to change across reboot"
   '';
 }
-
