@@ -63,6 +63,20 @@ main() {
   assert_match "127\\.0\\.0\\.1" "mycelix-core/gun-p2p-server.js" || failures=$((failures + 1))
   assert_no_match "origin\\s*:\\s*['\\\"]\\*['\\\"]" "mycelix-core/gun-p2p-server.js" || failures=$((failures + 1))
 
+  note "Checking Mycelix signaling server (localhost default + Origin gate + token-on-LAN)..."
+  assert_match "SIGNAL_HOST" "mycelix-core/signaling-server.js" || failures=$((failures + 1))
+  assert_match "127\\.0\\.0\\.1" "mycelix-core/signaling-server.js" || failures=$((failures + 1))
+  assert_no_match "server\\.listen\\(PORT\\)" "mycelix-core/signaling-server.js" || failures=$((failures + 1))
+  assert_match "Origin not allowed" "mycelix-core/signaling-server.js" || failures=$((failures + 1))
+  assert_match "token" "mycelix-core/signaling-server.js" || failures=$((failures + 1))
+
+  note "Checking Mycelix WebSocket bridge (localhost default + Origin gate + token-on-LAN)..."
+  assert_match "BRIDGE_HOST" "mycelix-core/websocket-bridge.js" || failures=$((failures + 1))
+  assert_match "127\\.0\\.0\\.1" "mycelix-core/websocket-bridge.js" || failures=$((failures + 1))
+  assert_no_match "server\\.listen\\(BRIDGE_PORT\\)" "mycelix-core/websocket-bridge.js" || failures=$((failures + 1))
+  assert_match "Origin not allowed" "mycelix-core/websocket-bridge.js" || failures=$((failures + 1))
+  assert_match "token" "mycelix-core/websocket-bridge.js" || failures=$((failures + 1))
+
   note "Checking installer ISO (no static root password, no Avahi broadcast, firewall enabled)..."
   # The ISO builder imports the hardened module; validate both.
   assert_match "installer-iso-module\\.nix" "symthaea/nix/installer-iso.nix" || failures=$((failures + 1))

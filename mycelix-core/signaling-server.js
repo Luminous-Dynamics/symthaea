@@ -10,8 +10,47 @@
 
 const WebSocket = require('ws');
 const http = require('http');
+const crypto = require('crypto');
 
-const PORT = process.env.SIGNAL_PORT || 9002;
+const DEFAULT_ALLOWED_ORIGIN_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+function isLoopbackHost(host) {
+    return host === '127.0.0.1' || host === '::1' || host === 'localhost';
+}
+
+function isOriginAllowed(origin, allowedOrigins) {
+    if (!origin) return true; // Non-browser clients
+    if (origin === 'null') return false; // Avoid file:// or sandbox bypass origins by default
+
+    if (allowedOrigins.length > 0) {
+        return allowedOrigins.includes(origin);
+    }
+
+    try {
+        const url = new URL(origin);
+        return DEFAULT_ALLOWED_ORIGIN_HOSTS.has(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
+function getTokenFromReq(req) {
+    try {
+        const url = new URL(req.url, 'http://localhost');
+        return url.searchParams.get('token') || '';
+    } catch {
+        return '';
+    }
+}
+
+const HOST = process.env.SIGNAL_HOST || '127.0.0.1';
+const PORT = Number(process.env.SIGNAL_PORT) || 9002;
+const REQUIRE_TOKEN = process.env.SIGNAL_REQUIRE_TOKEN === '1' || !isLoopbackHost(HOST);
+const AUTH_TOKEN = process.env.SIGNAL_AUTH_TOKEN || crypto.randomBytes(32).toString('hex');
+const ALLOWED_ORIGINS = (process.env.SIGNAL_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
 // Create HTTP server for health checks
 const server = http.createServer((req, res) => {
@@ -35,10 +74,28 @@ const wss = new WebSocket.Server({ server });
 const peers = new Map();
 
 wss.on('connection', (ws, req) => {
+    const origin = req.headers.origin;
+    const remoteAddress = req.socket.remoteAddress;
+
+    if (!isOriginAllowed(origin, ALLOWED_ORIGINS)) {
+        console.warn(`🛑 Rejected peer (disallowed Origin) from ${remoteAddress}: ${origin}`);
+        ws.close(1008, 'Origin not allowed');
+        return;
+    }
+
+    if (REQUIRE_TOKEN) {
+        const token = getTokenFromReq(req);
+        if (token !== AUTH_TOKEN) {
+            console.warn(`🛑 Rejected peer (invalid token) from ${remoteAddress}`);
+            ws.close(1008, 'Unauthorized');
+            return;
+        }
+    }
+
     const peerId = generatePeerId();
     
     console.log(`🟢 New peer connected: ${peerId}`);
-    console.log(`   From: ${req.connection.remoteAddress}`);
+    console.log(`   From: ${remoteAddress}`);
     
     // Store peer
     peers.set(peerId, {
@@ -178,19 +235,25 @@ function generatePeerId() {
 }
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
     console.log(`
 ╔════════════════════════════════════════════════╗
 ║       🧬 MYCELIX SIGNALING SERVER              ║
 ╠════════════════════════════════════════════════╣
 ║  WebRTC Signaling for Holochain P2P Network   ║
 ║                                                ║
-║  🌐 WebSocket: ws://localhost:${PORT}           ║
-║  📊 Health:    http://localhost:${PORT}/health  ║
+║  🌐 WebSocket: ws://${HOST}:${PORT}             ║
+║  📊 Health:    http://${HOST}:${PORT}/health    ║
 ║                                                ║
 ║  Status: READY FOR P2P CONNECTIONS            ║
 ╚════════════════════════════════════════════════╝
     `);
+
+    if (REQUIRE_TOKEN) {
+        console.log(`🔐 Auth required: ws://${HOST}:${PORT}?token=${AUTH_TOKEN}`);
+    } else {
+        console.log('🔐 Loopback bind: Origin checks enabled; token not required.');
+    }
     
     // Log stats every 30 seconds
     setInterval(() => {

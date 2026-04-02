@@ -8,6 +8,8 @@ on:
       - "scripts/security/**"
       - "symthaea/**"
       - "mycelix-core/gun-p2p-server.js"
+      - "mycelix-core/signaling-server.js"
+      - "mycelix-core/websocket-bridge.js"
       - "mycelix-finance/sidecar/**"
   push:
     branches: ["main"]
@@ -17,6 +19,8 @@ on:
       - "scripts/security/**"
       - "symthaea/**"
       - "mycelix-core/gun-p2p-server.js"
+      - "mycelix-core/signaling-server.js"
+      - "mycelix-core/websocket-bridge.js"
       - "mycelix-finance/sidecar/**"
   workflow_dispatch: {}
 
@@ -56,4 +60,3 @@ jobs:
           RUSTC_WRAPPER: ""
         run: |
           scripts/security/security-smoke.sh
-

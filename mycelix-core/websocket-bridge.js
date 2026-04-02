@@ -12,14 +12,52 @@ const WebSocket = require('ws');
 const http = require('http');
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
 
 // Configuration
-const HOLOCHAIN_WS_URL = 'ws://localhost:8888'; // Holochain app interface
-const BRIDGE_PORT = 8889;
-const UI_PORT = 8890;
+const DEFAULT_ALLOWED_ORIGIN_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+function isLoopbackHost(host) {
+    return host === '127.0.0.1' || host === '::1' || host === 'localhost';
+}
+
+function isOriginAllowed(origin, allowedOrigins) {
+    if (!origin) return true; // Non-browser clients
+    if (origin === 'null') return false;
+
+    if (allowedOrigins.length > 0) {
+        return allowedOrigins.includes(origin);
+    }
+
+    try {
+        const url = new URL(origin);
+        return DEFAULT_ALLOWED_ORIGIN_HOSTS.has(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
+function getTokenFromReq(req) {
+    try {
+        const url = new URL(req.url, 'http://localhost');
+        return url.searchParams.get('token') || '';
+    } catch {
+        return '';
+    }
+}
+
+const HOLOCHAIN_WS_URL = process.env.HOLOCHAIN_WS_URL || 'ws://127.0.0.1:8888'; // Holochain app interface
+const BRIDGE_HOST = process.env.BRIDGE_HOST || '127.0.0.1';
+const BRIDGE_PORT = Number(process.env.BRIDGE_PORT) || 8889;
+const REQUIRE_TOKEN = process.env.BRIDGE_REQUIRE_TOKEN === '1' || !isLoopbackHost(BRIDGE_HOST);
+const AUTH_TOKEN = process.env.BRIDGE_AUTH_TOKEN || crypto.randomBytes(32).toString('hex');
+const ALLOWED_ORIGINS = (process.env.BRIDGE_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
 // Serve static files from UI directory
 app.use(express.static(path.join(__dirname, 'ui')));
@@ -111,7 +149,25 @@ function broadcastToClients(message) {
 
 // Handle UI client connections
 wss.on('connection', (ws, req) => {
-    console.log('📱 New UI client connected from', req.socket.remoteAddress);
+    const origin = req.headers.origin;
+    const remoteAddress = req.socket.remoteAddress;
+
+    if (!isOriginAllowed(origin, ALLOWED_ORIGINS)) {
+        console.warn(`🛑 Rejected UI client (disallowed Origin) from ${remoteAddress}: ${origin}`);
+        ws.close(1008, 'Origin not allowed');
+        return;
+    }
+
+    if (REQUIRE_TOKEN) {
+        const token = getTokenFromReq(req);
+        if (token !== AUTH_TOKEN) {
+            console.warn(`🛑 Rejected UI client (invalid token) from ${remoteAddress}`);
+            ws.close(1008, 'Unauthorized');
+            return;
+        }
+    }
+
+    console.log('📱 New UI client connected from', remoteAddress);
     clients.add(ws);
     
     // Send initial state
@@ -255,11 +311,11 @@ setInterval(() => {
 }, 5000);
 
 // Start the server
-server.listen(BRIDGE_PORT, () => {
+server.listen(BRIDGE_PORT, BRIDGE_HOST, () => {
     console.log('🌊 Mycelix WebSocket Bridge');
     console.log('================================');
-    console.log(`📡 Bridge running on port ${BRIDGE_PORT}`);
-    console.log(`🌐 Web UI available at http://localhost:${BRIDGE_PORT}`);
+    console.log(`📡 Bridge bind: ${BRIDGE_HOST}:${BRIDGE_PORT}`);
+    console.log(`🌐 Web UI: http://${BRIDGE_HOST}:${BRIDGE_PORT}`);
     console.log('');
     console.log('Features:');
     console.log('• Real-time P2P messaging');
@@ -268,6 +324,12 @@ server.listen(BRIDGE_PORT, () => {
     console.log('• Automatic Holochain connection (when available)');
     console.log('• Simulation mode fallback');
     console.log('');
+
+    if (REQUIRE_TOKEN) {
+        console.log(`🔐 Auth required: ws://${BRIDGE_HOST}:${BRIDGE_PORT}?token=${AUTH_TOKEN}`);
+    } else {
+        console.log('🔐 Loopback bind: Origin checks enabled; token not required.');
+    }
     
     // Try to connect to Holochain
     connectToHolochain();

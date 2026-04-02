@@ -29,6 +29,8 @@ main() {
 
   note "Syntax-check JS gun server..."
   node --check mycelix-core/gun-p2p-server.js >/dev/null
+  node --check mycelix-core/signaling-server.js >/dev/null
+  node --check mycelix-core/websocket-bridge.js >/dev/null
 
   note "Cargo check: symthaea-spore ssh-relay + eval-api..."
   (cd symthaea && RUSTC_WRAPPER= cargo check "${cargo_args[@]}" -p symthaea-spore --features server --bin ssh-relay)
@@ -46,4 +48,3 @@ main() {
 }
 
 main "$@"
-
