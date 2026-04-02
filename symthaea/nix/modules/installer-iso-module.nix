@@ -8,13 +8,17 @@
 
 { modulesPath }:
 { config, lib, pkgs, ... }:
+let
+  isoFileName = "sovereign-inoculation-${config.system.nixos.label}-x86_64.iso";
+in
 {
   imports = [
     (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix")
   ];
 
   # ISO metadata
-  isoImage.isoName = "sovereign-inoculation-${config.system.nixos.label}-x86_64.iso";
+  # nixpkgs 25.05+ renamed `isoImage.isoName` -> `image.fileName`.
+  image.fileName = isoFileName;
   isoImage.volumeID = "SOVEREIGN";
   isoImage.squashfsCompression = "zstd -Xcompression-level 15";
 
@@ -50,6 +54,10 @@
 
         # 20 chars from a friendly alphabet (no ambiguous 0/O/1/l).
         PASS="$(${pkgs.coreutils}/bin/tr -dc 'A-HJ-NP-Za-km-z2-9' </dev/urandom | ${pkgs.coreutils}/bin/head -c 20 || true)"
+        if [ "''${#PASS}" -ne 20 ]; then
+          echo "failed to generate one-time root password" >&2
+          exit 1
+        fi
         ${pkgs.coreutils}/bin/echo -n "$PASS" > "$DIR/root-password"
         ${pkgs.coreutils}/bin/chmod 0600 "$DIR/root-password"
 
@@ -59,7 +67,7 @@
   };
 
   # Set hostname (no mDNS broadcast by default).
-  networking.hostName = "sovereign-inoculation";
+  networking.hostName = lib.mkDefault "sovereign-inoculation";
 
   # ── Installation tools ──
   environment.systemPackages = with pkgs; [
