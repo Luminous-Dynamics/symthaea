@@ -18,10 +18,15 @@
 //!
 //! ## Output
 //!
-//! `CivicCrisisEvent` maps to Mycelix `emergency-incidents` zome entries:
+//! `CivicCrisisEvent` is forwarded to Mycelix `emergency-incidents` via the
+//! Symthaea conductor adapter (`symthaea-mycelix-conductor`):
 //! - `severity` → `SeverityLevel` (Level1-Level5, FEMA-aligned)
 //! - `crisis_type` → `DisasterType` (Infrastructure, CyberAttack, etc.)
 //! - `description` → human-readable narrative from Broca
+//!
+//! Note: the Mycelix `declare_disaster` schema includes geospatial fields.
+//! Until Symthaea emits reliable geo coordinates, the conductor adapter
+//! publishes a transparent placeholder affected_area ("global/unknown").
 //!
 //! ## Design
 //!
@@ -43,8 +48,8 @@ use serde::{Deserialize, Serialize};
 
 /// A civic crisis event produced when sustained anomalies are detected.
 ///
-/// This struct maps directly to the Mycelix `emergency-incidents` zome
-/// `DeclareDisasterInput` schema.
+/// This event is expanded by the conductor adapter into Mycelix
+/// `DeclareDisasterInput` for `emergency_incidents::declare_disaster`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CivicCrisisEvent {
     /// Crisis severity (FEMA-aligned, 1 = lowest, 5 = highest).

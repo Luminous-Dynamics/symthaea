@@ -37,6 +37,46 @@ fn now_micros_i64() -> i64 {
     }
 }
 
+fn truncate_utf8(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s[..end].to_string()
+}
+
+fn severity_level_str(severity: u8) -> &'static str {
+    match severity.clamp(1, 5) {
+        1 => "Level1",
+        2 => "Level2",
+        3 => "Level3",
+        4 => "Level4",
+        5 => "Level5",
+        _ => "Level3",
+    }
+}
+
+fn disaster_type_value(crisis_type: &str) -> serde_json::Value {
+    // Mycelix civic emergency-incidents `DisasterType` uses Rust enum variant names
+    // (e.g., "Infrastructure", "CyberAttack"). Unknown values map to `Other(String)`.
+    match crisis_type {
+        "Hurricane"
+        | "Earthquake"
+        | "Wildfire"
+        | "Flood"
+        | "Tornado"
+        | "Pandemic"
+        | "Industrial"
+        | "MassCasualty"
+        | "CyberAttack"
+        | "Infrastructure" => serde_json::Value::String(crisis_type.to_string()),
+        other => serde_json::json!({ "Other": other }),
+    }
+}
+
 // ============================================================================
 // Types mirrored from mycelix_bridge.rs (avoid circular dependency)
 // ============================================================================
@@ -437,21 +477,44 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                 confidence,
                 detected_at_cycle,
             } => {
+                // Mycelix civic emergency-incidents currently expects `DeclareDisasterInput`,
+                // which includes geospatial fields. Symthaea's crisis detector doesn't yet
+                // produce reliable geo coordinates, so we publish a transparent placeholder
+                // "global/unknown" affected area (0,0 + large radius).
+                let id = format!("symthaea-crisis-{}", correlation_id);
+                let title = truncate_utf8(&format!("Symthaea Crisis: {}", crisis_type), 256);
+                let desc = format!(
+                    "{}\n\n[symthaea]\nconfidence={:.3}\ndetected_at_cycle={}\nNOTE: affected_area is a placeholder (global/unknown).",
+                    description.trim(),
+                    confidence,
+                    detected_at_cycle
+                );
+
                 let payload = serde_json::json!({
-                    "severity": severity,
-                    "crisis_type": crisis_type,
-                    "description": description,
-                    "confidence": confidence,
-                    "detected_at_cycle": detected_at_cycle,
+                    "id": id,
+                    "disaster_type": disaster_type_value(&crisis_type),
+                    "title": title,
+                    // Integrity validation caps description at 4096 bytes.
+                    "description": truncate_utf8(&desc, 4096),
+                    "severity": severity_level_str(severity),
+                    "affected_area": {
+                        "center_lat": 0.0,
+                        "center_lon": 0.0,
+                        "radius_km": 20000.0,
+                        "boundary": null,
+                        "zones": [],
+                    },
+                    "estimated_affected": 0,
+                    "coordination_lead": null,
                 });
                 let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
 
                 match self
                     .transport
                     .call_zome(
-                        "mycelix-civic",
-                        "emergency",
-                        "create_incident",
+                        "civic",
+                        "emergency_incidents",
+                        "declare_disaster",
                         payload_bytes,
                     )
                     .await
@@ -604,7 +667,7 @@ mod tests {
         let mut transport = MockTransport;
         assert!(transport.is_connected());
         let result = transport
-            .call_zome("governance", "agora", "create_proposal", vec![])
+            .call_zome("governance", "proposals", "create_proposal", vec![])
             .await;
         assert!(result.is_ok());
     }
