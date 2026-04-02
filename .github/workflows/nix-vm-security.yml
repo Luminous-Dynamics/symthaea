@@ -1,0 +1,45 @@
+name: Nix VM Security
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/nix-vm-security.yml"
+      - "symthaea/flake.nix"
+      - "symthaea/flake.lock"
+      - "symthaea/nix/**"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/nix-vm-security.yml"
+      - "symthaea/flake.nix"
+      - "symthaea/flake.lock"
+      - "symthaea/nix/**"
+  schedule:
+    # Daily run to catch drift in nixpkgs / QEMU behavior.
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  installer-iso-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Run installer ISO security VM test
+        run: |
+          mkdir -p /tmp/nix-cache
+          cd symthaea
+          XDG_CACHE_HOME=/tmp/nix-cache nix build .#checks.x86_64-linux.installer-iso-security
+
