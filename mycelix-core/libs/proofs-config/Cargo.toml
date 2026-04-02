@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Mycelix Network"]
 description = "Centralized configuration for Mycelix ZK proof systems"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/luminous-dynamics/Mycelix-Core"
 
 [features]
