@@ -1,0 +1,44 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "EduNet",
+  "version": "0.1.0",
+  "identifier": "net.mycelix.edunet",
+  "build": {
+    "frontendDist": "../../leptos/dist",
+    "devUrl": "http://localhost:3001",
+    "beforeBuildCommand": "cd ../../leptos && trunk build --release",
+    "beforeDevCommand": "cd ../../leptos && trunk serve --port 3001"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "EduNet — Sovereign Learning",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 360,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: wss: ws://localhost:*; font-src 'self' https: data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "targets": "all",
+    "category": "Education",
+    "shortDescription": "Decentralized education with Proof of Learning",
+    "longDescription": "EduNet is a sovereign learning platform where studying generates economic value through TEND mutual credit. Built on Holochain for data ownership and privacy."
+  }
+}
