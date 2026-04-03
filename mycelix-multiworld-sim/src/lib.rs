@@ -759,6 +759,23 @@ impl MultiWorldSimulator {
             world.economy.infrastructure_capital =
                 (world.infrastructure_level * 50.0).max(1.0); // map 0-1 to 0-50
 
+            // Phase 1b: resource_priority biases sector productivity
+            match self.config.policy.resource_priority {
+                config::ResourcePriority::Industrial => {
+                    world.economy.technology_multiplier[0] *= 1.5; // engineering
+                    world.economy.technology_multiplier[7] *= 1.3; // logistics
+                }
+                config::ResourcePriority::Biological => {
+                    world.economy.technology_multiplier[1] *= 1.5; // agriculture
+                    world.economy.technology_multiplier[2] *= 1.3; // medicine
+                }
+                config::ResourcePriority::Knowledge => {
+                    world.economy.technology_multiplier[4] *= 1.5; // science
+                    world.economy.technology_multiplier[5] *= 1.3; // education
+                }
+                config::ResourcePriority::Balanced => {} // no bias
+            }
+
             world.economy.tick_production();
             world.economy.tick_demurrage();
             world.economy.compute_gini(&world.agents);
@@ -919,7 +936,9 @@ impl MultiWorldSimulator {
                                     (0.1 + 0.9 * (1.0 + phase.cos()) / 2.0).clamp(0.1, 1.0)
                                 };
 
-                                let mut amount = (ss_i - ss_j) * 10.0 * window_efficiency;
+                                // Phase 1c: trade_openness scales all trade
+                                let mut amount = (ss_i - ss_j) * 10.0 * window_efficiency
+                                    * self.config.policy.trade_openness;
 
                                 // Kessler degradation: reduce trade volume for Earth routes
                                 if leo_access < 1.0 {
@@ -1738,7 +1757,9 @@ impl MultiWorldSimulator {
                 && tick % 120 == 0 // Check every 10 years
             {
                 // Base 3% + science bonus. Fires even at starting science level.
-                let exploration_prob = 0.03 + (world.knowledge.technology_levels[4] - 1.0).max(0.0) * 0.05;
+                // Phase 1e: exploration_investment multiplies probability
+                let explore_mult = 1.0 + self.config.policy.exploration_investment * 5.0;
+                let exploration_prob = (0.03 + (world.knowledge.technology_levels[4] - 1.0).max(0.0) * 0.05) * explore_mult;
                 if self.rng.bernoulli(exploration_prob.min(0.25)) {
                     world.explorations_completed += 1;
                     // Discovery boosts knowledge and resources
@@ -2379,7 +2400,17 @@ impl MultiWorldSimulator {
             self.disaster_engine
                 .tick(&self.worlds, self.current_tick, &mut self.rng, &policy);
 
+        // Phase 1d: defense_spending reduces disaster severity
+        let defense_mult = 1.0 - (self.config.policy.defense_spending * 2.0).min(0.5);
+
         for (effects, world_id, event) in disaster_results {
+            let effects = disasters::DisasterEffects {
+                consciousness_shock: effects.consciousness_shock * defense_mult,
+                allostatic_load_increase: effects.allostatic_load_increase * defense_mult,
+                infrastructure_damage: effects.infrastructure_damage * defense_mult,
+                resource_production_penalty: effects.resource_production_penalty * defense_mult,
+                ..effects
+            };
             // Apply effects to targeted world(s)
             let target_ids: Vec<u32> = match world_id {
                 Some(id) => vec![id],
@@ -3023,7 +3054,7 @@ impl MultiWorldSimulator {
                     && world.project_manager.queue.is_empty()
                     && self.current_tick % 12 == 0
                 {
-                    let priorities = projects::prioritize_projects(
+                    let mut priorities = projects::prioritize_projects(
                         world.population(),
                         world.power_demand_kw - world.power_generation_kw,
                         world.resources.fraction_of_capacity("food"),
@@ -3034,6 +3065,35 @@ impl MultiWorldSimulator {
                         &world.location,
                         &world.project_manager.completed,
                     );
+                    // Phase 1a: project_strategy inserts strategy-specific priorities first
+                    let completed = &world.project_manager.completed;
+                    let mut strategy_priorities = Vec::new();
+                    match self.config.policy.project_strategy {
+                        config::ProjectStrategy::SurvivalFirst => {
+                            if !completed.contains(&projects::ProjectBlueprint::RadiationShelter) {
+                                strategy_priorities.push(projects::ProjectBlueprint::RadiationShelter);
+                            }
+                        }
+                        config::ProjectStrategy::GrowthFirst => {
+                            strategy_priorities.push(projects::ProjectBlueprint::HabitatExpansion);
+                            strategy_priorities.push(projects::ProjectBlueprint::GreenhouseModule);
+                        }
+                        config::ProjectStrategy::ScienceFirst => {
+                            if !completed.contains(&projects::ProjectBlueprint::ExplorationVehicle) {
+                                strategy_priorities.push(projects::ProjectBlueprint::ExplorationVehicle);
+                            }
+                        }
+                        config::ProjectStrategy::IndependenceFirst => {
+                            if !completed.contains(&projects::ProjectBlueprint::FissionReactor) {
+                                strategy_priorities.push(projects::ProjectBlueprint::FissionReactor);
+                            }
+                        }
+                        config::ProjectStrategy::Balanced => {}
+                    }
+                    // Strategy priorities go first, then default priorities
+                    strategy_priorities.append(&mut priorities);
+                    let priorities = strategy_priorities;
+
                     for bp in priorities.into_iter().take(2) {
                         world.project_manager.queue.push(bp);
                     }
