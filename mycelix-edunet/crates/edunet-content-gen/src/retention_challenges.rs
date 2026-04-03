@@ -40,6 +40,10 @@ pub fn built_in_banks() -> Vec<RetentionBank> {
         caps_math_gr12_bank(),
         caps_physics_gr12_bank(),
         caps_chemistry_gr12_bank(),
+        caps_life_sciences_bank(),
+        caps_history_bank(),
+        caps_geography_bank(),
+        ib_biology_bank(),
         rust_programming_bank(),
         holochain_development_bank(),
     ]
@@ -270,6 +274,51 @@ fn holochain_development_bank() -> RetentionBank {
                 skill_tag: "holochain-guardrails".to_string(),
                 bloom_level: "Analyze".to_string(),
             },
+        ],
+    }
+}
+
+fn caps_life_sciences_bank() -> RetentionBank {
+    RetentionBank {
+        domain: "CAPS Life Sciences".to_string(),
+        questions: vec![
+            RetentionQuestion { question: "What is the function of mitochondria?".to_string(), correct_answer: "Produce ATP (energy) through cellular respiration.".to_string(), distractors: vec!["Store DNA".to_string(), "Photosynthesis".to_string(), "Protein synthesis".to_string()], skill_tag: "cell-biology".to_string(), bloom_level: "Remember".to_string() },
+            RetentionQuestion { question: "What is osmosis?".to_string(), correct_answer: "Movement of water across a semi-permeable membrane from high to low water concentration.".to_string(), distractors: vec!["Movement of any substance".to_string(), "Active transport of water".to_string(), "Diffusion of gases".to_string()], skill_tag: "transport".to_string(), bloom_level: "Understand".to_string() },
+            RetentionQuestion { question: "What are the base pairing rules in DNA?".to_string(), correct_answer: "Adenine pairs with Thymine (A-T), Guanine pairs with Cytosine (G-C).".to_string(), distractors: vec!["A-G and T-C".to_string(), "A-C and T-G".to_string(), "A-U and T-C".to_string()], skill_tag: "genetics".to_string(), bloom_level: "Remember".to_string() },
+            RetentionQuestion { question: "Why is the Cape Floral Kingdom globally significant?".to_string(), correct_answer: "Smallest of 6 floral kingdoms but most diverse per area. ~9000 species, 70% endemic (fynbos).".to_string(), distractors: vec!["Largest kingdom".to_string(), "Most trees".to_string(), "Oldest plants".to_string()], skill_tag: "biodiversity".to_string(), bloom_level: "Understand".to_string() },
+        ],
+    }
+}
+
+fn caps_history_bank() -> RetentionBank {
+    RetentionBank {
+        domain: "CAPS History".to_string(),
+        questions: vec![
+            RetentionQuestion { question: "When did the Dutch arrive at the Cape?".to_string(), correct_answer: "1652 — Jan van Riebeeck established a refreshment station for the VOC.".to_string(), distractors: vec!["1806".to_string(), "1488".to_string(), "1994".to_string()], skill_tag: "colonialism".to_string(), bloom_level: "Remember".to_string() },
+            RetentionQuestion { question: "What was the 'Scramble for Africa'?".to_string(), correct_answer: "European nations dividing and colonising Africa (1881-1914), formalised at the Berlin Conference (1884).".to_string(), distractors: vec!["African independence movements".to_string(), "A gold rush".to_string(), "A trade route".to_string()], skill_tag: "imperialism".to_string(), bloom_level: "Understand".to_string() },
+            RetentionQuestion { question: "What is the difference between a primary and secondary source?".to_string(), correct_answer: "Primary: from the time period (diary, photo). Secondary: written later analysing primary sources (textbook, documentary).".to_string(), distractors: vec!["Same thing".to_string(), "Primary=important, secondary=not".to_string(), "Primary=government, secondary=private".to_string()], skill_tag: "source-analysis".to_string(), bloom_level: "Understand".to_string() },
+        ],
+    }
+}
+
+fn caps_geography_bank() -> RetentionBank {
+    RetentionBank {
+        domain: "CAPS Geography".to_string(),
+        questions: vec![
+            RetentionQuestion { question: "Name South Africa's two main ocean currents.".to_string(), correct_answer: "Benguela (cold, west coast) and Agulhas (warm, east coast).".to_string(), distractors: vec!["Gulf Stream and Kuroshio".to_string(), "Only one current".to_string(), "Benguela and Atlantic".to_string()], skill_tag: "climate".to_string(), bloom_level: "Remember".to_string() },
+            RetentionQuestion { question: "What is the lapse rate?".to_string(), correct_answer: "Temperature drops ~6.5°C per 1000m altitude increase.".to_string(), distractors: vec!["Speed of wind".to_string(), "Rate of rainfall".to_string(), "Temperature increase per km".to_string()], skill_tag: "atmosphere".to_string(), bloom_level: "Remember".to_string() },
+            RetentionQuestion { question: "Explain the rain shadow effect.".to_string(), correct_answer: "Mountains force air up (rain on windward side). Air descends on the other side, warms, and creates dry conditions (leeward/rain shadow).".to_string(), distractors: vec!["Mountains block all rain".to_string(), "Shadow of clouds".to_string(), "Only happens at night".to_string()], skill_tag: "geomorphology".to_string(), bloom_level: "Understand".to_string() },
+        ],
+    }
+}
+
+fn ib_biology_bank() -> RetentionBank {
+    RetentionBank {
+        domain: "IB Biology".to_string(),
+        questions: vec![
+            RetentionQuestion { question: "What happens to enzymes above 40°C?".to_string(), correct_answer: "Denaturation: heat breaks hydrogen bonds, destroying the active site shape. Substrate can no longer fit.".to_string(), distractors: vec!["They work faster".to_string(), "They dissolve".to_string(), "Nothing changes".to_string()], skill_tag: "enzymes".to_string(), bloom_level: "Understand".to_string() },
+            RetentionQuestion { question: "What is the difference between condensation and hydrolysis?".to_string(), correct_answer: "Condensation: monomers join, releasing H₂O (builds polymers). Hydrolysis: water breaks a bond (breaks polymers).".to_string(), distractors: vec!["Same reaction".to_string(), "Condensation uses water".to_string(), "Hydrolysis builds polymers".to_string()], skill_tag: "molecular-biology".to_string(), bloom_level: "Understand".to_string() },
+            RetentionQuestion { question: "Why is water called the 'universal solvent'?".to_string(), correct_answer: "Water's polarity allows it to dissolve many ionic and polar substances. Most biochemical reactions occur in aqueous solution.".to_string(), distractors: vec!["It dissolves everything".to_string(), "It's the most common liquid".to_string(), "It has no charge".to_string()], skill_tag: "water-properties".to_string(), bloom_level: "Understand".to_string() },
         ],
     }
 }
