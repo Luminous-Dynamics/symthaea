@@ -16,6 +16,8 @@ pub enum MaterialCategory {
     Polymer,
     /// Fiber-reinforced composite materials (carbon fiber).
     Composite,
+    /// Engineered metamaterial (layered structures with emergent EM properties).
+    Metamaterial,
 }
 
 /// A material's key engineering properties (8 numeric dimensions).
@@ -128,7 +130,43 @@ impl MaterialProperty {
         }
     }
 
-    /// All 5 preset reference materials.
+    /// Bismuth-Magnesium(Zinc) layered metamaterial — "Art's Parts" (Roswell debris claim).
+    ///
+    /// Alternating layers of Bi (9,780 kg/m³) and Mg-Zn alloy (1,830 kg/m³).
+    /// Properties are bulk averages for a ~50/50 layered structure.
+    ///
+    /// Claimed to be a "terahertz waveguide" for anti-gravity propulsion.
+    /// ORNL analysis (2022): terrestrial isotopic signatures, impure Bi layers
+    /// with multiple Bi layers (disrupts waveguide function).
+    ///
+    /// References:
+    /// - AARO/ORNL analysis (2022): terrestrial manufacturing byproduct
+    /// - Bismuth properties: CRC Handbook of Chemistry and Physics
+    /// - Mg-3Zn alloy properties: ASM International
+    pub fn bismuth_magnesium_metamaterial() -> Self {
+        Self {
+            name: "Bi-Mg(Zn) Metamaterial (Art's Parts)".into(),
+            category: MaterialCategory::Metamaterial,
+            // Bulk average: ~50% Bi (9780) + 50% Mg-Zn (1830)
+            density_kg_m3: 5805.0,
+            // Bi: 32 GPa, Mg: 45 GPa → layered composite ~35 GPa
+            youngs_modulus_gpa: 35.0,
+            // Bi is brittle (~4 MPa), Mg-Zn ~130 MPa → limited by weakest layer
+            yield_strength_mpa: 20.0,
+            // Bi: 7.97 W/(m·K), Mg: 156 W/(m·K) → cross-layer avg ~15
+            thermal_conductivity_w_mk: 15.0,
+            // Bi: 122, Mg: 1020 → weighted average
+            specific_heat_j_kgk: 400.0,
+            // Bi melts at 271°C (very low) — limiting factor
+            melting_point_c: 271.0,
+            // Bi oxidizes slowly; Mg corrodes readily
+            corrosion_resistance: 0.3,
+            // Bi is extremely brittle → near-zero fatigue life
+            fatigue_limit_mpa: 5.0,
+        }
+    }
+
+    /// All preset reference materials (6 including metamaterial).
     pub fn presets() -> Vec<Self> {
         vec![
             Self::steel_a36(),
@@ -136,6 +174,7 @@ impl MaterialProperty {
             Self::titanium_ti6al4v(),
             Self::concrete_c30(),
             Self::carbon_fiber_t300(),
+            Self::bismuth_magnesium_metamaterial(),
         ]
     }
 
@@ -160,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_presets_count() {
-        assert_eq!(MaterialProperty::presets().len(), 5);
+        assert_eq!(MaterialProperty::presets().len(), 6);
     }
     #[test]
     fn test_steel_category() {
@@ -210,6 +249,7 @@ mod tests {
             ("Titanium Ti6Al4V", MaterialCategory::Metal),
             ("Concrete C30", MaterialCategory::Ceramic),
             ("Carbon Fiber T300", MaterialCategory::Composite),
+            ("Bi-Mg(Zn) Metamaterial (Art's Parts)", MaterialCategory::Metamaterial),
         ];
         let presets = MaterialProperty::presets();
         assert_eq!(presets.len(), expected.len());

@@ -182,6 +182,15 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     // Condensed Matter
     eqs.push(bcs_gap_equation());
 
+    // Additional Physics (filling gaps)
+    eqs.push(waveguide_dispersion());
+    eqs.push(drude_model());
+    eqs.push(schwarzschild_radius());
+    eqs.push(hawking_temperature());
+    eqs.push(landauer_principle());
+    eqs.push(ideal_gas_law());
+    eqs.push(stefan_boltzmann_law());
+
     eqs
 }
 
@@ -1720,6 +1729,259 @@ pub fn lazar_gravity_a_query() -> PhysicsEquation {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ADDITIONAL PHYSICS (FILLING GAPS)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// ω² = (c/n)²k² + ω_c² — Waveguide dispersion relation
+///
+/// The cutoff frequency ω_c depends on waveguide geometry and mode number.
+/// Below cutoff, waves are evanescent (exponentially decaying).
+fn waveguide_dispersion() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Waveguide Dispersion Relation".to_string(),
+        domain: PhysicsDomain::Optics,
+        ast: make_equals(
+            EquationNode::Power {
+                base: Box::new(make_const("ω")),
+                exponent: Box::new(EquationNode::Scalar(2.0)),
+            },
+            make_sum(vec![
+                make_product(vec![
+                    EquationNode::Power {
+                        base: Box::new(make_const("c/n")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                    EquationNode::Power {
+                        base: Box::new(make_field("k", TensorDescriptor::scalar(euc3))),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                EquationNode::Power {
+                    base: Box::new(make_const("ω_cutoff")),
+                    exponent: Box::new(EquationNode::Scalar(2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![],
+            vec![DiscreteSymmetry::T],
+            false,
+        ),
+        dimensions: DimensionalSignature {
+            mass: 0, length: 0, time: -2,
+            current: 0, temperature: 0, amount: 0, luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
+/// σ(ω) = ne²/(m(γ - iω)) — Drude model for metallic conductivity
+///
+/// Describes free electron response to EM fields. Foundation of metamaterial
+/// design — negative permittivity below plasma frequency enables waveguiding.
+fn drude_model() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Drude Conductivity Model".to_string(),
+        domain: PhysicsDomain::CondensedMatter,
+        ast: make_equals(
+            make_const("σ(ω)"),
+            make_product(vec![
+                make_const("ne²/m"),
+                EquationNode::Power {
+                    base: Box::new(make_sum(vec![
+                        make_const("γ"),
+                        EquationNode::Negate(Box::new(make_product(vec![
+                            make_const("i"),
+                            make_const("ω"),
+                        ]))),
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::U(1)],
+            vec![DiscreteSymmetry::T],
+            false,
+        ),
+        dimensions: DimensionalSignature {
+            mass: -1, length: -3, time: 3,
+            current: 2, temperature: 0, amount: 0, luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
+/// r_s = 2GM/c² — Schwarzschild radius
+fn schwarzschild_radius() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Schwarzschild Radius".to_string(),
+        domain: PhysicsDomain::GeneralRelativity,
+        ast: make_equals(
+            make_const("r_s"),
+            make_product(vec![
+                EquationNode::Scalar(2.0),
+                make_const("G"),
+                make_const("M"),
+                EquationNode::Power {
+                    base: Box::new(make_const("c")),
+                    exponent: Box::new(EquationNode::Scalar(-2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    }
+}
+
+/// T_H = ℏc³/(8πGMk_B) — Hawking temperature
+fn hawking_temperature() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Hawking Temperature".to_string(),
+        domain: PhysicsDomain::GeneralRelativity,
+        ast: make_equals(
+            make_const("T_H"),
+            make_product(vec![
+                make_const("ℏc³"),
+                EquationNode::Power {
+                    base: Box::new(make_product(vec![
+                        make_const("8πG"),
+                        make_const("M"),
+                        make_const("k_B"),
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature {
+            mass: 0, length: 0, time: 0,
+            current: 0, temperature: 1, amount: 0, luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
+/// E_min = k_B T ln(2) — Landauer's principle (minimum energy to erase one bit)
+///
+/// Already used in Symthaea's thermodynamic physics bridge for memory cost accounting.
+fn landauer_principle() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Landauer Principle".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_const("E_min"),
+            make_product(vec![
+                make_const("k_B"),
+                make_const("T"),
+                make_const("ln(2)"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// PV = nRT — Ideal gas law
+fn ideal_gas_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Ideal Gas Law".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_product(vec![make_const("P"), make_const("V")]),
+            make_product(vec![make_const("n"), make_const("R"), make_const("T")]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// P = σ T⁴ — Stefan-Boltzmann law (blackbody radiation power per unit area)
+fn stefan_boltzmann_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Stefan-Boltzmann Law".to_string(),
+        domain: PhysicsDomain::Thermodynamics,
+        ast: make_equals(
+            make_const("P/A"),
+            make_product(vec![
+                make_const("σ_SB"),
+                EquationNode::Power {
+                    base: Box::new(make_const("T")),
+                    exponent: Box::new(EquationNode::Scalar(4.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature {
+            mass: 1, length: 0, time: -3,
+            current: 0, temperature: 0, amount: 0, luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
+/// "Art's Parts" terahertz waveguide claim: alternating Bi/Mg layers
+/// act as a metamaterial waveguide at THz frequencies, enabling
+/// anti-gravity propulsion.
+///
+/// Structurally, this is a guided wave dispersion relation in a
+/// layered dielectric medium: ω² = c²k² + ω_cutoff², where the
+/// cutoff frequency depends on layer thickness and refractive indices.
+///
+/// ORNL (2022) found: impure Bi, multiple Bi layers, terrestrial isotopes.
+pub fn arts_parts_waveguide_query() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Art's Parts THz Waveguide (Query)".to_string(),
+        domain: PhysicsDomain::Optics,
+        ast: make_equals(
+            // ω² dispersion relation
+            EquationNode::Power {
+                base: Box::new(make_const("ω")),
+                exponent: Box::new(EquationNode::Scalar(2.0)),
+            },
+            make_sum(vec![
+                // c²k² (free-space dispersion)
+                make_product(vec![
+                    EquationNode::Power {
+                        base: Box::new(make_const("c/n_eff")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                    EquationNode::Power {
+                        base: Box::new(make_field("k", TensorDescriptor::scalar(euc3))),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                // ω_cutoff² (from layer structure)
+                EquationNode::Power {
+                    base: Box::new(make_const("ω_cutoff")),
+                    exponent: Box::new(EquationNode::Scalar(2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![],
+            vec![DiscreteSymmetry::T, DiscreteSymmetry::P],
+            false,
+        ),
+        dimensions: DimensionalSignature {
+            mass: 0,
+            length: 0,
+            time: -2,
+            current: 0,
+            temperature: 0,
+            amount: 0,
+            luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1729,8 +1991,8 @@ mod tests {
     fn catalog_builds_successfully() {
         let catalog = PhysicsCatalog::new();
         assert!(
-            catalog.len() >= 45,
-            "Expected >= 45 entries, got {}",
+            catalog.len() >= 52,
+            "Expected >= 52 entries, got {}",
             catalog.len()
         );
     }
@@ -1951,6 +2213,13 @@ mod tests {
             "Snell Law",
             "Fresnel Equations",
             "BCS Gap Equation",
+            "Waveguide Dispersion Relation",
+            "Drude Conductivity Model",
+            "Schwarzschild Radius",
+            "Hawking Temperature",
+            "Landauer Principle",
+            "Ideal Gas Law",
+            "Stefan-Boltzmann Law",
         ];
 
         for name in &new_names {
@@ -1961,6 +2230,25 @@ mod tests {
                 e.full_hv.values.iter().all(|v| v.is_finite()),
                 "Non-finite HV for {}",
                 name
+            );
+        }
+    }
+
+    #[test]
+    fn arts_parts_waveguide_search() {
+        use crate::query::PhysicsSearchEngine;
+
+        let engine = PhysicsSearchEngine::new();
+        let query = arts_parts_waveguide_query();
+        let results = engine.search_equation(&query, 5);
+
+        assert!(!results.is_empty(), "Art's Parts query should return results");
+
+        // Report neighbors (informational)
+        for r in &results {
+            eprintln!(
+                "  Art's Parts neighbor: {} (score={:.3}, domain={:?})",
+                r.name, r.score, r.domain
             );
         }
     }
