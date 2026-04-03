@@ -78,6 +78,63 @@ impl ConvergenceDetector {
     }
 }
 
+/// Mann-Whitney U test (nonparametric, no normality assumption).
+/// Returns (U statistic, z-score, p-value approximation).
+/// Two-tailed: tests whether samples come from different distributions.
+pub fn mann_whitney_u(a: &[f64], b: &[f64]) -> (f64, f64, f64) {
+    let na = a.len() as f64;
+    let nb = b.len() as f64;
+    if na < 1.0 || nb < 1.0 {
+        return (0.0, 0.0, 1.0);
+    }
+
+    // Count how many times a[i] > b[j] for all pairs
+    let mut u_a = 0.0;
+    for &ai in a {
+        for &bj in b {
+            if ai > bj { u_a += 1.0; }
+            else if (ai - bj).abs() < 1e-15 { u_a += 0.5; }
+        }
+    }
+    let u_b = na * nb - u_a;
+    let u = u_a.min(u_b);
+
+    // Normal approximation for z-score (valid for n > 20)
+    let mean_u = na * nb / 2.0;
+    let std_u = (na * nb * (na + nb + 1.0) / 12.0).sqrt();
+    let z = if std_u > 1e-15 { (u - mean_u) / std_u } else { 0.0 };
+
+    // Two-tailed p-value from z-score (normal CDF approximation)
+    let p = 2.0 * normal_cdf(-z.abs());
+    (u, z, p)
+}
+
+/// Cohen's d effect size: (mean_a - mean_b) / pooled_std_dev.
+/// |d| < 0.2 = negligible, 0.2-0.5 = small, 0.5-0.8 = medium, > 0.8 = large.
+pub fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
+    let na = a.len() as f64;
+    let nb = b.len() as f64;
+    if na < 2.0 || nb < 2.0 { return 0.0; }
+
+    let mean_a = a.iter().sum::<f64>() / na;
+    let mean_b = b.iter().sum::<f64>() / nb;
+    let var_a = a.iter().map(|x| (x - mean_a).powi(2)).sum::<f64>() / (na - 1.0);
+    let var_b = b.iter().map(|x| (x - mean_b).powi(2)).sum::<f64>() / (nb - 1.0);
+
+    let pooled_std = (((na - 1.0) * var_a + (nb - 1.0) * var_b) / (na + nb - 2.0)).sqrt();
+    if pooled_std < 1e-15 { return 0.0; }
+    (mean_a - mean_b) / pooled_std
+}
+
+/// Standard normal CDF approximation (Abramowitz & Stegun 26.2.17).
+fn normal_cdf(x: f64) -> f64 {
+    let t = 1.0 / (1.0 + 0.2316419 * x.abs());
+    let d = 0.3989422804014327; // 1/sqrt(2*pi)
+    let p = d * (-x * x / 2.0).exp()
+        * (t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429)))));
+    if x >= 0.0 { 1.0 - p } else { p }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,5 +191,45 @@ mod tests {
         // NaN push should not change convergence state (rejected).
         det.push(f64::NAN);
         assert!(det.is_converged());
+    }
+
+    #[test]
+    fn mann_whitney_identical_samples() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let b = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let (_, _, p) = mann_whitney_u(&a, &b);
+        assert!(p > 0.5, "Identical samples should have high p-value: {p}");
+    }
+
+    #[test]
+    fn mann_whitney_different_samples() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let b = vec![10.0, 11.0, 12.0, 13.0, 14.0];
+        let (_, _, p) = mann_whitney_u(&a, &b);
+        assert!(p < 0.05, "Very different samples should have low p-value: {p}");
+    }
+
+    #[test]
+    fn cohens_d_large_effect() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let b = vec![10.0, 11.0, 12.0, 13.0, 14.0];
+        let d = cohens_d(&a, &b);
+        assert!(d.abs() > 0.8, "Large separation should give |d| > 0.8: {d}");
+    }
+
+    #[test]
+    fn cohens_d_no_effect() {
+        let a = vec![5.0, 5.0, 5.0, 5.0];
+        let b = vec![5.0, 5.0, 5.0, 5.0];
+        let d = cohens_d(&a, &b);
+        assert!((d - 0.0).abs() < 1e-10, "Identical means should give d=0: {d}");
+    }
+
+    #[test]
+    fn normal_cdf_symmetry() {
+        let p_pos = normal_cdf(1.96);
+        let p_neg = normal_cdf(-1.96);
+        assert!((p_pos - 0.975).abs() < 0.01, "CDF(1.96) ≈ 0.975: {p_pos}");
+        assert!((p_neg - 0.025).abs() < 0.01, "CDF(-1.96) ≈ 0.025: {p_neg}");
     }
 }

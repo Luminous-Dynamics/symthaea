@@ -231,9 +231,13 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         world.step_with_callback(DT, &mut consciousness);
         let balance = consciousness.tick_thermodynamics();
 
-        // 6. Track convergence
+        // 6. Track convergence (normalized J/Phi per agent per second)
         if let Some(jphi) = balance.joules_per_phi {
-            if jphi_detector.push(jphi) && !converged {
+            let alive_count = handles.iter()
+                .filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false))
+                .count().max(1) as f64;
+            let jphi_normalized = jphi / alive_count / (1.0 / DT); // per agent per second
+            if jphi_normalized.is_finite() && jphi_detector.push(jphi_normalized) && !converged {
                 converged = true;
                 convergence_tick = tick;
             }
@@ -311,7 +315,49 @@ fn main() {
         eprintln!("  Clustering:       {:.2}", mean_cluster);
     }
 
+    // Statistical comparison: FULL vs FREE clustering
+    eprintln!("\n── Statistical Tests ──");
+
+    // Re-run to collect per-condition data for comparison
+    let mut full_cluster = Vec::new();
+    let mut free_cluster = Vec::new();
+    let mut energy_cluster = Vec::new();
+
+    for s in 0..NUM_SEEDS {
+        let seed = 42 + s as u64 * 997;
+        let r_full = run_experiment(Condition::Full, seed);
+        let r_free = run_experiment(Condition::Free, seed);
+        let r_energy = run_experiment(Condition::EnergyOnly, seed);
+        full_cluster.push(r_full.final_clustering);
+        free_cluster.push(r_free.final_clustering);
+        energy_cluster.push(r_energy.final_clustering);
+    }
+
+    use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d};
+
+    let (u, z, p) = mann_whitney_u(&full_cluster, &free_cluster);
+    let d = cohens_d(&full_cluster, &free_cluster);
+    eprintln!("  FULL vs FREE clustering:");
+    eprintln!("    Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u, z, p);
+    eprintln!("    Cohen's d={:.3} ({})", d, effect_label(d));
+    eprintln!("    {} at α=0.05", if p < 0.05 { "SIGNIFICANT" } else { "not significant" });
+
+    let (u2, z2, p2) = mann_whitney_u(&full_cluster, &energy_cluster);
+    let d2 = cohens_d(&full_cluster, &energy_cluster);
+    eprintln!("  FULL vs ENERGY_ONLY clustering:");
+    eprintln!("    Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u2, z2, p2);
+    eprintln!("    Cohen's d={:.3} ({})", d2, effect_label(d2));
+    eprintln!("    {} at α=0.05", if p2 < 0.05 { "SIGNIFICANT" } else { "not significant" });
+
     eprintln!("\n=== Experiment Complete ===");
+}
+
+fn effect_label(d: f64) -> &'static str {
+    let d = d.abs();
+    if d < 0.2 { "negligible" }
+    else if d < 0.5 { "small" }
+    else if d < 0.8 { "medium" }
+    else { "large" }
 }
 
 fn avg_nearest_neighbor(world: &PhysicsWorld<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {

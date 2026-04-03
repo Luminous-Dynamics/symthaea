@@ -67,9 +67,20 @@ impl HdcConsciousnessContext {
             .map(|i| ContinuousHV::random(HDC_DIM, seed.wrapping_add(i as u64 * 7919)))
             .collect();
 
-        // Generate basis HVs for harmonies.
+        // Generate harmony basis as CORRELATED perturbations of consciousness basis.
+        // This ensures thought vectors (in consciousness_basis span) have nonzero
+        // projection onto harmony space — fixing the Phi=0 readout problem.
+        //
+        // Each harmony basis[i] = blend(consciousness_basis[i % 7], noise, 0.7/0.3).
+        // The 70% correlation means Phi readout is meaningful; 30% noise gives
+        // each harmony a unique identity.
         let harmony_basis: Vec<ContinuousHV> = (0..NUM_HARMONIES)
-            .map(|i| ContinuousHV::random(HDC_DIM, seed.wrapping_add(1000 + i as u64 * 6271)))
+            .map(|i| {
+                let base = &consciousness_basis[i % NUM_COMPONENTS];
+                let noise = ContinuousHV::random(HDC_DIM, seed.wrapping_add(1000 + i as u64 * 6271));
+                // 70% correlated with consciousness basis, 30% unique noise
+                base.scale(0.7).add(&noise.scale(0.3)).normalize()
+            })
             .collect();
 
         // Create encoder network: 7 input neurons → 8 hidden → 4 output.
