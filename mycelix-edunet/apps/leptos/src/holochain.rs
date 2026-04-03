@@ -111,7 +111,9 @@ impl HolochainCtx {
 // Provider component
 // ---------------------------------------------------------------------------
 
-const CONDUCTOR_URL: &str = "ws://localhost:8888";
+// Production conductor port (per PORTS.md: 8307 = EduNet app interface)
+// Override at runtime via window.__HC_CONDUCTOR_URL in index.html
+const CONDUCTOR_URL: &str = "ws://localhost:8307";
 
 fn conductor_url() -> String {
     web_sys::window()
