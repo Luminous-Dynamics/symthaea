@@ -270,6 +270,7 @@ fn feedback_phase_result_default_all_subs() {
 /// Count fields via std::mem::size_of ratio is unreliable due to padding.
 /// Instead we use a simpler approach: verify total field count by exhaustive match.
 /// If a field is added/removed, this test won't compile.
+/// Compile-time verification: exhaustive destructure ensures field count is correct.
 #[test]
 fn dyn_core_field_count_11() {
     let d = DynCore::default();
@@ -287,8 +288,10 @@ fn dyn_core_field_count_11() {
         prediction_coherence: _,
         self_model_accuracy: _,
     } = d;
+    // Compile-time assertion: if fields change, destructure above won't compile
 }
 
+/// Compile-time verification: exhaustive destructure ensures field count is correct.
 #[test]
 fn dyn_fep_field_count_10() {
     let d = DynFep::default();
@@ -304,8 +307,10 @@ fn dyn_fep_field_count_10() {
         trajectory_surprise: _,
         trajectory_ode_steps: _,
     } = d;
+    // Compile-time assertion: if fields change, destructure above won't compile
 }
 
+/// Compile-time verification: exhaustive destructure ensures field count is correct.
 #[test]
 fn dyn_reasoning_field_count_10() {
     let d = DynReasoning::default();
@@ -322,8 +327,10 @@ fn dyn_reasoning_field_count_10() {
         school_predicted_phi_gain: _,
         ..
     } = d;
+    // Compile-time assertion: if fields change, destructure above won't compile
 }
 
+/// Compile-time verification: exhaustive destructure ensures field count is correct.
 #[test]
 fn dynamics_phase_result_field_count() {
     let d = DynamicsPhaseResult::default();
@@ -347,8 +354,10 @@ fn dynamics_phase_result_field_count() {
         epistemic_budget_scale: _,
         ..
     } = d;
+    // Compile-time assertion: if fields change, destructure above won't compile
 }
 
+/// Compile-time verification: exhaustive destructure ensures field count is correct.
 #[test]
 fn feedback_phase_result_field_count() {
     let f = FeedbackPhaseResult::default();
@@ -367,6 +376,7 @@ fn feedback_phase_result_field_count() {
         grid_spatial_complexity: _,
         social_learning_rate_factor: _,
     } = f;
+    // Compile-time assertion: if fields change, destructure above won't compile
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -554,8 +554,10 @@ mod tests {
                 _ => {} // Ask, Simulate, Defer, Summarize don't need anchors
             }
         }
-        // All conflict kinds should produce a valid recommended action
-        // (if we reached here without panic, all variants are valid)
+        // All conflict kinds produce a valid recommended action (is_external or is_internal)
+        let action = ConflictKind::IntegrationCollapse.recommended_action();
+        assert!(action.is_external() || action.is_internal(),
+            "recommended_action should be either external or internal");
     }
 
     #[test]

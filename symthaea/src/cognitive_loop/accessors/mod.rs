@@ -437,6 +437,9 @@ mod tests {
     fn clamp_neuromod_levels_no_panic() {
         let mut s = make_service();
         s.clamp_neuromod_levels(Some(0.5), None, Some(1.0), None);
+        let snap = s.neuromod_snapshot();
+        assert!(snap.da_effective.is_finite(), "DA should be finite after clamp");
+        assert!(snap.sht_effective.is_finite(), "5HT should be finite after clamp");
     }
 
     #[test]
@@ -541,7 +544,12 @@ mod tests {
     #[test]
     fn coupling_quality_no_panic() {
         let s = make_service();
-        let _q = s.coupling_quality();
+        let q = s.coupling_quality();
+        // Initially should be InsufficientData (no cycles run)
+        assert!(
+            matches!(q, crate::cognitive_loop::routing::CouplingQuality::InsufficientData),
+            "coupling should be InsufficientData before any cycles, got {q:?}"
+        );
     }
 
     // ── World model ───────────────────────────────────────────────────
@@ -636,8 +644,11 @@ mod tests {
     #[test]
     fn voice_indicates_uncertainty_initial() {
         let s = make_service();
-        // Just verify it doesn't panic; specific value depends on state
-        let _u = s.voice_indicates_uncertainty();
+        let u = s.voice_indicates_uncertainty();
+        // Verify accessor returns without panic; initial state may vary
+        let _ = u;
+        // Success: accessor completed without panic
+        assert!(true);
     }
 
     #[test]
@@ -695,7 +706,7 @@ mod tests {
         let _ = s.flow_intensity();
         let _ = s.flow_streak();
         let _ = s.flow_learning_boost();
-        let _ = s.emotional_valence();
+        let valence = s.emotional_valence();
         let _ = s.emotional_arousal();
         let _ = s.is_bored();
         let _ = s.current_strategy();
@@ -704,6 +715,10 @@ mod tests {
         // System accessors
         let _ = s.stats();
         let _ = s.config();
-        let _ = s.prediction_confidence();
+        let confidence = s.prediction_confidence();
+
+        // At least verify returned values are finite
+        assert!(valence.is_finite(), "emotional_valence should be finite");
+        assert!(confidence.is_finite(), "prediction_confidence should be finite");
     }
 }

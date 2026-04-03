@@ -3202,9 +3202,13 @@ mod tests {
         let pair_a = RotatingKeyPair::new(key);
         let pair_b = RotatingKeyPair::new(key);
         // With 256 possible epochs, collision probability is 1/256.
-        // We don't assert inequality (could collide), but verify epoch is accessible.
-        let _ = pair_a.epoch();
-        let _ = pair_b.epoch();
+        // We don't assert inequality (could collide ~1/256), but verify epoch is accessible
+        // and both pairs are independently initialized.
+        let _epoch_a = pair_a.epoch();
+        let _epoch_b = pair_b.epoch();
+        // Both key pairs should report the same current key
+        assert_eq!(pair_a.current_key(), &key, "pair_a should hold the provided key");
+        assert_eq!(pair_b.current_key(), &key, "pair_b should hold the provided key");
     }
 
     #[cfg(feature = "mesh-encryption")]

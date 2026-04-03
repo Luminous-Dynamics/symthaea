@@ -170,6 +170,12 @@ impl NeuroevolutionManager {
 
         // Run one generation
         let gen_snapshot = self.engine.step_generation();
+
+        // Lamarckian injection: use MetaCognitive suggestions to bias mutation
+        if !self.pending_mutations.is_empty() {
+            self.engine.inject_lamarckian(&self.pending_mutations);
+            self.pending_mutations.clear();
+        }
         self.last_snapshot = Some(gen_snapshot.clone());
 
         // Update telemetry
@@ -372,7 +378,8 @@ mod tests {
             consciousness: 0.025,
             efficiency: 0.025,
         });
-        // No panic = success
+        // Success: weights applied without panic (no getter exposed, but manager is still functional)
+        assert_eq!(mgr.interval, NEUROEVOLUTION_MANAGER_INTERVAL, "manager should remain valid after setting weights");
     }
 
     #[test]

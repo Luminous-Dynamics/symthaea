@@ -154,7 +154,8 @@ mod tests {
         let config = CognitiveLoopConfig::default();
         let tier = SelfModelTierManager::new(&config);
         // self_reflection is not Option — always constructed
-        let _ = &tier.self_reflection;
+        // Verify learning_effectiveness is finite at initialization
+        assert!(tier.self_reflection.learning_effectiveness().is_finite(), "self_reflection learning_effectiveness should be finite");
     }
 
     #[test]
