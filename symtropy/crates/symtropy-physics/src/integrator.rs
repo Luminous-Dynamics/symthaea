@@ -49,7 +49,11 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
     // --- Angular dynamics ---
 
     // Angular acceleration = torque / inertia (scalar approximation)
-    let ang_accel = body.torque_accumulator.scale(body.inv_inertia);
+    // Per-axis inertia: use mean of principal moments for each bivector plane.
+    // For spheres (isotropic), this is exact. For asymmetric bodies, it's the
+    // average inertia of the two axes spanning each rotation plane.
+    let inv_i_avg = body.inv_inertia.sum() / D as f64;
+    let ang_accel = body.torque_accumulator.scale(inv_i_avg);
 
     // Update angular velocity
     body.angular_velocity = body.angular_velocity.add(&ang_accel.scale(dt));
@@ -103,7 +107,8 @@ pub fn apply_angular_impulse<const D: usize>(
     impulse: &Bivector<D>,
 ) {
     if body.is_dynamic() {
-        body.angular_velocity = body.angular_velocity.add(&impulse.scale(body.inv_inertia));
+        let inv_i_avg = body.inv_inertia.sum() / D as f64;
+        body.angular_velocity = body.angular_velocity.add(&impulse.scale(inv_i_avg));
     }
 }
 

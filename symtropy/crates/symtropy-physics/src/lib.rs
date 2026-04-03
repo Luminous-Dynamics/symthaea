@@ -27,4 +27,5 @@ pub use body::{BodyHandle, BodyType, RigidBody};
 pub use contact::{CollisionEvent, ContactManifold};
 pub use constraint::Constraint;
 pub use epa::EpaResult;
+pub use broadphase::{Aabb, Lbvh, morton_encode, morton_prefix};
 pub use world::{NoOpCallback, PhysicsCallback, PhysicsWorld};
