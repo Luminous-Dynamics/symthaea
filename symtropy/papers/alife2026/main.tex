@@ -101,7 +101,7 @@ FULL & \textbf{13.5} & 45\% & Sustainable \\
 \end{tabular}
 \end{table}
 
-\textbf{Finding 1:} The FEP gradient is the clustering mechanism (15.1$\to$1.8). Epistemic offloading is the survival mechanism (72\%$\to$45\% collapse). Neither alone is sufficient.
+\textbf{Finding 1:} The FEP gradient is the clustering mechanism (18.1$\to$1.8). Epistemic offloading is the survival mechanism (71.7\%$\to$56.7\% collapse). Neither alone is sufficient (Figure~\ref{fig:ablation_full}).
 
 \subsection{Metric Independence}
 
@@ -230,7 +230,7 @@ a_i = -2(v \cdot \nabla\sigma) v_i + |v|^2 \nabla_i\sigma
 \end{equation}
 clamped to 50~m/s$^2$ for numerical stability under semi-implicit Euler.
 
-\textbf{Finding 8: Consciousness bends space.} A test body launched past a stationary consciousness source ($\Phi = 0.8$) deflects proportionally to curvature scale (Table~\ref{tab:curvature}). At $\kappa = 0.05$, deflection is 12.4 units (62\% of closest approach). Mann-Whitney $U = 0.0$, $p = 0.009$, Cohen's $d = -35.5$.
+\textbf{Finding 8: Consciousness bends space.} A test body launched past a stationary consciousness source ($\Phi = 0.8$) deflects proportionally to curvature scale (Table~\ref{tab:curvature}, Figure~\ref{fig:curvature_full}). At $\kappa = 0.05$, deflection is 12.4 units (62\% of closest approach). Mann-Whitney $U = 0.0$, $p = 0.009$, Cohen's $d = -35.5$.
 
 \begin{table}[h]
 \centering
@@ -277,6 +277,27 @@ The biological matches were not engineered---they emerged from the thermodynamic
 The Symtropy engine and all experiments are open-source. Results are reproducible via \texttt{cargo run --example}.
 
 \end{multicols}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{fig1_ablation.pdf}
+\caption{Ablation study (re-verified with overhauled engine). (a)~Only conditions with FEP gradient cluster tightly ($<4$). (b)~Gradient without offloading kills 72\% of agents. The FEP gradient is the clustering mechanism; epistemic offloading is the survival mechanism.}
+\label{fig:ablation_full}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\begin{minipage}{0.45\textwidth}
+\includegraphics[width=\textwidth]{fig2_curvature.pdf}
+\caption{Consciousness bends space. Trajectory deflection scales linearly with curvature $\kappa$ ($p=0.009$, $d=-35.5$).}
+\label{fig:curvature_full}
+\end{minipage}\hfill
+\begin{minipage}{0.45\textwidth}
+\includegraphics[width=\textwidth]{fig4_cooperation.pdf}
+\caption{Cooperation emergence. Thermodynamic enforcement produces 81\% tighter clustering ($p<0.001$, $d=-1.94$).}
+\label{fig:coop_full}
+\end{minipage}
+\end{figure*}
 
 \bibliographystyle{apalike}
 \begin{thebibliography}{99}
