@@ -1605,7 +1605,7 @@ h2, h3 { letter-spacing: 0.02em; }
           <li>A machine to install NixOS on (target)</li>
           <li>A NixOS minimal ISO on USB (or PXE boot)</li>
           <li>Network connectivity between this browser and the target</li>
-          <li>The SSH relay running: <code>ssh-relay --port 8094</code></li>
+          <li>The SSH relay running: <code>ssh-relay --port 8091</code></li>
         </ul>
       </details>
     </div>
@@ -3655,10 +3655,10 @@ window.drawLineChart = drawLineChart;
       evalStatus.textContent = 'Connecting to eval service...';
 
       var customEval = localStorage.getItem('symthaea-eval-url');
+      // Security: default to localhost-only eval API (no remote fallback).
       var evalUrls = customEval ? [customEval] : [
-        'http://localhost:8090/api/v1/eval',
-        'http://' + window.location.hostname + ':8090/api/v1/eval',
-        'https://eval.luminousdynamics.io/api/v1/eval'
+        'http://127.0.0.1:8090/api/v1/eval',
+        'http://localhost:8090/api/v1/eval'
       ];
       var hwContent = '';
       try {
@@ -3789,11 +3789,20 @@ window.drawLineChart = drawLineChart;
       '  </label>',
       '  <label style="font-size:0.82rem; color:var(--fg-dim);">Password',
       '    <input id="ssh-pass" type="password" placeholder="(from NixOS ISO)" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
-      '  </label>',
-      '</div>',
-      '<div style="text-align:center; margin-bottom:1rem;">',
-      '  <button id="btn-ssh-connect" class="btn-glow" style="padding:0.6rem 2rem; cursor:pointer;">Connect &amp; Deploy</button>',
-      '</div>',
+	      '  </label>',
+	      '</div>',
+	      '<div style="max-width:500px; margin:0 auto 1rem;">',
+	      '  <label style="font-size:0.82rem; color:var(--fg-dim);">SSH Relay URL <span style="color:var(--fg-muted);">(optional)</span>',
+	      '    <input id="ssh-relay-url" type="text" placeholder="ws://127.0.0.1:8091" value="' + (localStorage.getItem('symthaea-relay-url') || '') + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+	      '  </label>',
+	      '  <label style="font-size:0.82rem; color:var(--fg-dim); margin-top:0.8rem; display:block;">SSH Relay Token <span style="color:var(--fg-muted);">(required)</span>',
+	      '    <input id="ssh-relay-token" type="password" placeholder="(from ssh-relay startup)" value="' + (localStorage.getItem('symthaea-relay-token') || '') + '" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">',
+	      '  </label>',
+	      '  <p style="font-size:0.72rem; color:var(--fg-muted); margin-top:0.3rem;">Start <code>ssh-relay</code> locally; copy the token it prints at startup.</p>',
+	      '</div>',
+	      '<div style="text-align:center; margin-bottom:1rem;">',
+	      '  <button id="btn-ssh-connect" class="btn-glow" style="padding:0.6rem 2rem; cursor:pointer;">Connect &amp; Deploy</button>',
+	      '</div>',
       // ── Ceremony Stage (default view during install) ──
       '<div id="ceremony-stage" style="display:none; text-align:center; padding:2rem 0; max-width:600px; margin:0 auto;">',
       '  <div id="ceremony-phi" style="font-size:2.5rem; font-weight:200; color:var(--fg-dim); margin-bottom:1rem; transition:color 2s, font-size 1s;">&Phi; 0.000</div>',
@@ -3865,15 +3874,38 @@ window.drawLineChart = drawLineChart;
 
       window.addNarration('Initiating Sovereign Birth ceremony for ' + host + '...');
 
-      // Connect to SSH relay via WebSocket
-      // Relay URLs: check localStorage override, then try common ports, then remote
-      var customRelay = localStorage.getItem('symthaea-relay-url');
-      var relayUrls = customRelay ? [customRelay] : [
-        'ws://localhost:8091', 'ws://localhost:8093',
-        'ws://' + window.location.hostname + ':8091',
-        'wss://relay.luminousdynamics.io'
-      ];
-      var ws = null;
+	      // Connect to SSH relay via WebSocket
+	      // Relay URL + token: check UI inputs, then localStorage, then auto-detect localhost ports.
+	      var relayInput = document.getElementById('ssh-relay-url');
+	      var tokenInput = document.getElementById('ssh-relay-token');
+
+	      var customRelay = (relayInput && relayInput.value.trim()) ||
+	                        localStorage.getItem('symthaea-relay-url');
+	      if (customRelay && relayInput) {
+	        localStorage.setItem('symthaea-relay-url', customRelay);
+	      }
+
+	      var relayToken = (tokenInput && tokenInput.value.trim()) ||
+	                       localStorage.getItem('symthaea-relay-token');
+	      if (relayToken && tokenInput) {
+	        localStorage.setItem('symthaea-relay-token', relayToken);
+	      }
+	      if (!relayToken) {
+	        sshStatus.textContent = 'Missing SSH relay token. Start ssh-relay locally and paste the token it prints at startup.';
+	        sshStatus.style.color = 'var(--clay)';
+	        btn.disabled = false;
+	        btn.textContent = 'Connect & Deploy';
+	        return;
+	      }
+
+	      // Security: never auto-probe non-localhost relay URLs (prevents token leakage).
+	      var relayUrls = customRelay ? [customRelay] : [
+	        'ws://127.0.0.1:8091',
+	        'ws://localhost:8091',
+	        'ws://127.0.0.1:8093',
+	        'ws://localhost:8093'
+	      ];
+	      var ws = null;
 
       for (var i = 0; i < relayUrls.length; i++) {
         try {
@@ -3886,13 +3918,13 @@ window.drawLineChart = drawLineChart;
           });
           break;
         } catch(e) {
-          if (i === relayUrls.length - 1) {
-            sshStatus.textContent = 'SSH relay not available. Start with: ssh-relay --port 8091';
-            sshStatus.style.color = 'var(--clay)';
-            btn.disabled = false;
-            btn.textContent = 'Connect & Deploy';
-            return;
-          }
+	          if (i === relayUrls.length - 1) {
+	            sshStatus.textContent = 'SSH relay not available. Start with: ssh-relay --port 8091 (then paste the token it prints)';
+	            sshStatus.style.color = 'var(--clay)';
+	            btn.disabled = false;
+	            btn.textContent = 'Connect & Deploy';
+	            return;
+	          }
         }
       }
 
@@ -4275,18 +4307,19 @@ window.drawLineChart = drawLineChart;
         btn.textContent = 'Connect & Deploy';
       };
 
-      wsRef.current = ws;
+	      wsRef.current = ws;
 
-      // Send connect command
-      ws.send(JSON.stringify({
-        action: 'connect',
-        host: host,
-        port: port,
-        username: user,
-        password: pass
-      }));
-    });
-  }
+	      // Authenticate to relay (required), then connect to target via SSH
+	      ws.send(JSON.stringify({ action: 'auth', token: relayToken }));
+	      ws.send(JSON.stringify({
+	        action: 'connect',
+	        host: host,
+	        port: port,
+	        username: user,
+	        password: pass
+	      }));
+	    });
+	  }
 
   // ── Glassmorphic Disk Selector ──
   // ── App Compatibility Report ──

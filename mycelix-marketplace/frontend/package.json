@@ -1,6 +1,8 @@
 {
   "name": "mycelix-marketplace-frontend",
   "version": "1.0.0",
+  "license": "AGPL-3.0-or-later",
+
   "description": "Mycelix Decentralized Marketplace - SvelteKit Frontend",
   "private": true,
   "type": "module",

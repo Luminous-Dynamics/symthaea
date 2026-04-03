@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_validate_passes() {
-        validate(); // Should not panic
+        validate(); // Panics on any threshold ordering violation — success means all thresholds are consistent
     }
 
     #[test]

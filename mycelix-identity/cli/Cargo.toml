@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Legacy Bridge CLI for importing institutional academic credentials"
 authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [workspace]
 # This crate is not part of the Holochain WASM workspace

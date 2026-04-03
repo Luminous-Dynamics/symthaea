@@ -710,6 +710,8 @@ impl CognitiveLoopService {
             )
         };
 
+        #[cfg(feature = "jepa")]
+        let jepa_input_dim = config.cfc_config.input_dim;
         let mut service = Self {
             config,
             encoder,
@@ -789,6 +791,7 @@ impl CognitiveLoopService {
                     4,
                 ),
                 learning_signal: 0.0,
+                last_action_idx: 0,
                 lr_boost: 1.0,
                 surprise_bridge,
                 trajectory_config: super::fep_module::TrajectoryPlanningConfig {
@@ -1100,6 +1103,18 @@ impl CognitiveLoopService {
                 MasterConsciousnessEquation::default(),
             ),
             substrate_manager,
+            threshold_overrides: super::threshold_overrides::ThresholdOverrides::default(),
+            #[cfg(feature = "jepa")]
+            jepa_engine: {
+                let seed: u64 = 42;
+                Some(symthaea_jepa::JepaEngine::new(
+                    symthaea_jepa::JepaConfig {
+                        input_dim: jepa_input_dim,
+                        ..Default::default()
+                    },
+                    seed,
+                ))
+            },
             #[cfg(feature = "neural_validation")]
             cortical_history: std::collections::VecDeque::with_capacity(1000),
             // physics_integration moved to feature_integ manager
@@ -1336,6 +1351,8 @@ impl CognitiveLoopService {
             pending_crisis_events: Vec::new(),
             #[cfg(feature = "neuroevolution")]
             neuroevolution_manager: super::managers::NeuroevolutionManager::default(),
+            #[cfg(feature = "hypervisor")]
+            hypervisor_manager: super::managers::HypervisorManager::new("agent".to_string()),
             #[cfg(feature = "reasoning_engine")]
             reasoning_manager: super::managers::ReasoningManager::default(),
             #[cfg(feature = "ssm_language")]

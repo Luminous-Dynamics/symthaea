@@ -2,7 +2,7 @@
 name = "serde_core"
 version = "1.0.228"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 description = "Local shim — re-exports serde to bridge the serde_core split"
 
 [dependencies]

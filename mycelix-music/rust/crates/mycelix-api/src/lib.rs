@@ -21,7 +21,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
@@ -83,16 +83,21 @@ pub struct ApiConfig {
     pub max_upload_size: usize,
     pub enable_graphql: bool,
     pub enable_websocket: bool,
+    /// Allowed CORS origins. Empty = localhost only (secure-by-default).
+    #[serde(default)]
+    pub allowed_origins: Vec<String>,
 }
 
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
-            host: "0.0.0.0".to_string(),
+            // Secure-by-default: bind to localhost unless explicitly configured otherwise.
+            host: "127.0.0.1".to_string(),
             port: 3000,
             max_upload_size: 100 * 1024 * 1024, // 100MB
             enable_graphql: true,
             enable_websocket: true,
+            allowed_origins: Vec::new(),
         }
     }
 }
@@ -138,9 +143,35 @@ pub fn create_router(state: AppState, config: &ApiConfig) -> Router {
         router = router.route("/ws", get(websocket::ws_handler));
     }
 
+    let cors = if config.allowed_origins.is_empty() {
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::predicate(|origin, _| {
+                let o = origin.as_bytes();
+                o.starts_with(b"http://localhost")
+                    || o.starts_with(b"https://localhost")
+                    || o.starts_with(b"http://127.0.0.1")
+                    || o.starts_with(b"https://127.0.0.1")
+                    || o.starts_with(b"http://[::1]")
+                    || o.starts_with(b"https://[::1]")
+                    || o == b"null"
+            }))
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        let origins: Vec<_> = config
+            .allowed_origins
+            .iter()
+            .filter_map(|o| o.parse().ok())
+            .collect();
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
+
     router
         .layer(DefaultBodyLimit::max(config.max_upload_size))
-        .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
+        .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

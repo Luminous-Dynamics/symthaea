@@ -17,7 +17,10 @@ use axum::{
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    cors::{AllowOrigin, Any, CorsLayer},
+    trace::TraceLayer,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod routes;
@@ -156,6 +159,41 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Build router
+    let permissive_cors = std::env::var("PERMISSIVE_CORS")
+        .ok()
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+
+    let allowed_origins = std::env::var("ALLOWED_ORIGINS").unwrap_or_default();
+    let origins: Vec<_> = allowed_origins
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
+
+    let cors = if permissive_cors {
+        tracing::warn!("PERMISSIVE_CORS enabled: allowing any origin (insecure)");
+        CorsLayer::permissive()
+    } else if origins.is_empty() {
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::predicate(|origin, _| {
+                let o = origin.as_bytes();
+                o.starts_with(b"http://localhost")
+                    || o.starts_with(b"https://localhost")
+                    || o.starts_with(b"http://127.0.0.1")
+                    || o.starts_with(b"https://127.0.0.1")
+                    || o.starts_with(b"http://[::1]")
+                    || o.starts_with(b"https://[::1]")
+                    || o == b"null"
+            }))
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
+
     let app = Router::new()
         // Health & Status
         .route("/health", get(health_check))
@@ -185,12 +223,13 @@ async fn main() -> anyhow::Result<()> {
 
         // Middleware
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(cors)
         .with_state(state);
 
     // Start server
+    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let port = std::env::var("PORT").unwrap_or_else(|_| "3100".into());
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("{}:{}", host, port);
 
     tracing::info!("🎵 Mycelix Music API starting on {}", addr);
     tracing::info!("   Vision: Default choice for the entire music industry");

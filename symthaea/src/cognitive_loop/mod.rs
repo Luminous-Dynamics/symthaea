@@ -180,6 +180,7 @@ pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
 pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
+pub(crate) mod threshold_overrides;
 
 #[cfg(feature = "epistemic_auditor")]
 pub(crate) mod epistemic_auditor;
@@ -629,6 +630,9 @@ pub struct CognitiveLoopService {
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
+    pub(crate) threshold_overrides: threshold_overrides::ThresholdOverrides,
+    #[cfg(feature = "jepa")]
+    pub(super) jepa_engine: Option<symthaea_jepa::JepaEngine>,
 
     /// Rolling window of per-cycle cortical activation maps for temporal analysis.
     /// Capacity: ~1000 cycles (~32s at 31Hz). Used for HRF convolution and EEG comparison.
@@ -828,6 +832,8 @@ pub struct CognitiveLoopService {
     /// Interval 71 (co-prime). Feature-gated behind `neuroevolution`.
     #[cfg(feature = "neuroevolution")]
     pub(crate) neuroevolution_manager: managers::NeuroevolutionManager,
+    #[cfg(feature = "hypervisor")]
+    pub(crate) hypervisor_manager: managers::HypervisorManager,
 
     /// Reasoning Manager: reasoning reliability → LR modulation, confidence, trend affect.
     /// Implements CognitiveSubsystem at interval 73. Feature-gated behind `reasoning_engine`.

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Terra Atlas Operator Console — decentralized energy project management via Holochain"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "devtools"] }

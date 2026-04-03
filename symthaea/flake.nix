@@ -391,7 +391,7 @@
           meta = with pkgs.lib; {
             description = "Consciousness-first AI system with HDC and integrated information";
             homepage = "https://luminousdynamics.org";
-            license = licenses.mit;
+            license = licenses.agpl3Plus;
           };
         };
 
@@ -401,6 +401,11 @@
             drv = self.packages.${system}.default;
             name = "symthaea";
           };
+        };
+
+        checks = {
+          installer-iso-security = import ./nix/tests/installer-iso-security.nix { inherit pkgs; };
+          eval-api-security = import ./nix/tests/eval-api-security.nix { inherit pkgs; };
         };
 
         formatter = pkgs.nixpkgs-fmt;

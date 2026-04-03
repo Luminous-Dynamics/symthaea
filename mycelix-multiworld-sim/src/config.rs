@@ -49,11 +49,12 @@ pub struct PolicyConfig {
     /// Enable the education guild tick (peer teaching, epistemic foraging).
     /// Default true. Set false for A/B comparison.
     pub education_enabled: bool,
-    /// Enable consciousness-gated governance (tier-based decision authority).
-    /// Default true. When false, all agents are treated as Observer tier —
-    /// no consciousness-based filtering of decisions. This is the control
-    /// condition for proving that consciousness gating improves outcomes.
-    pub consciousness_gating_enabled: bool,
+    /// Enable trust-weighted governance (tier-based decision authority).
+    /// Trust-weighted governance: voting power and authority scale with
+    /// trust depth (4D profile: identity, reputation, community, engagement).
+    /// When false, all agents vote equally regardless of trust — the control
+    /// condition. A/B test showed +6.9% CVS improvement with trust weighting.
+    pub trust_weighted_governance: bool,
     pub faction_enabled: bool,
     pub amendment_enabled: bool,
     pub outer_system_fission_enabled: bool,
@@ -183,7 +184,7 @@ impl Default for PolicyConfig {
             migration_enabled: true,
             migration_max_per_cycle: 3,
             education_enabled: true,
-            consciousness_gating_enabled: true,
+            trust_weighted_governance: true,
             faction_enabled: true,
             amendment_enabled: true,
             outer_system_fission_enabled: true,
@@ -215,11 +216,11 @@ impl Default for PolicyConfig {
 }
 
 impl PolicyConfig {
-    /// Legacy mode: standard human governance WITHOUT consciousness gating or FEP.
+    /// Legacy mode: standard human governance WITHOUT trust weighting or FEP.
     /// This is the control group for proving Symthaea/Mycelix are necessary.
     pub fn legacy_mode() -> Self {
         Self {
-            consciousness_gating_enabled: false,
+            trust_weighted_governance: false,
             fep_immiseration_enabled: false,
             sacred_stillness_enabled: false,
             turchin_cycles_enabled: true, // Keep conflict — it's what breaks legacy

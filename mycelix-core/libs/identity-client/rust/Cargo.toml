@@ -3,7 +3,7 @@ name = "mycelix-identity-client"
 version = "1.0.0"
 edition = "2021"
 description = "Shared identity client for Mycelix applications - DID resolution, credential verification, and assurance levels"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
 keywords = ["mycelix", "identity", "did", "holochain", "verifiable-credentials"]
 

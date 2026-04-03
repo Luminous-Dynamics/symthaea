@@ -310,7 +310,9 @@ pub fn query_commons_inventory(
     .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
 
     match call(
-        CallTargetCell::OtherRole("commons".into()),
+        // Commons is split into two roles in the unified hApp: commons_land + commons_care.
+        // `resource_mesh` lives in the commons_care DNA.
+        CallTargetCell::OtherRole("commons_care".into()),
         ZomeName::from("resource_mesh"),
         FunctionName::from("get_resource_status"),
         None,

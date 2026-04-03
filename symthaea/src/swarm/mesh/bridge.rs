@@ -449,8 +449,10 @@ mod tests {
             })
             .collect();
 
-        // Should not panic even though channel capacity is 4
+        // Should not panic even though channel capacity is 4 (excess packets are dropped)
         handle.flush_outbox(packets);
+        // Success: no panic on overflow — handle remains alive
+        assert!(handle.is_alive(), "handle should remain alive after overflow flush");
     }
 
     #[test]

@@ -3,7 +3,7 @@ name = "mycelix-fl-core"
 version = "0.1.0"
 edition = "2021"
 description = "Core federated learning types, aggregation algorithms, Byzantine detection, and unified pipeline"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 
 # Minimal dependencies — no holochain, no burn, no conflicts
 [dependencies]

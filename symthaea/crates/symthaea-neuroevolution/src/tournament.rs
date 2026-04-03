@@ -543,6 +543,36 @@ impl NeuroevolutionEngine {
     }
 
     /// Get best-ever genome and fitness.
+
+    /// Inject a Lamarckian offspring: create biased mutant from best genome,
+    /// replace the worst organism in the population.
+    /// `targets`: slice of (start_bit, num_bits, confidence) tuples for biased mutation.
+    pub fn inject_lamarckian(
+        &mut self,
+        targets: &[(usize, usize, f32)],
+    ) {
+        if targets.is_empty() { return; }
+        let best_genome = match &self.best_ever {
+            Some((g, _)) => g.clone(),
+            None => return,
+        };
+        let biased = best_genome.mutate_biased(
+            self.config.mutation_rate,
+            self.generation as u64 * 0x517CC1B727220A95,
+            targets,
+        );
+        // Replace worst organism
+        if let Some(worst) = self.population.iter_mut().min_by(|a, b| {
+            a.fitness.composite.partial_cmp(&b.fitness.composite).unwrap_or(std::cmp::Ordering::Equal)
+        }) {
+            *worst = crate::organism::NeuralOrganism::spawn(
+                worst.id,
+                biased,
+                &self.genesis,
+                self.generation as u32,
+            );
+        }
+    }
     pub fn best_ever(&self) -> Option<(&NeuralGenome, f64)> {
         self.best_ever.as_ref().map(|(g, f)| (g, *f))
     }

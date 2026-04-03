@@ -5,7 +5,7 @@
 //!
 //! The Symtropy game is set in "Algorithmic Collapse" — centralized AIs
 //! consumed Earth's thermodynamic budget. Players rebuild civilization
-//! using TEND economics, consciousness-gated governance, and the Mycelix
+//! using TEND economics, trust-weighted governance, and the Mycelix
 //! fractal architecture.
 //!
 //! This bridge converts simulation state into game state and player

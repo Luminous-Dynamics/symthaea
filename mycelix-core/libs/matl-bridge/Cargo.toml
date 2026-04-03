@@ -3,7 +3,7 @@ name = "matl-bridge"
 version = "0.1.0"
 edition = "2021"
 description = "Multi-Agent Trust Layer bridge for Mycelix - connects Holochain DHT with external trust systems"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/luminous-dynamics/mycelix"
 
 [features]

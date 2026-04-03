@@ -62,7 +62,7 @@ The exploration check uses a fixed base probability (3%). Wire
 - 0.10: base 10% (5x more exploration)
 - 0.20: base 20% (aggressive exploration program)
 
-## Phase 2: Make Consciousness Gating Bite (4 hours)
+## Phase 2: Make Trust Weighting Bite (4 hours)
 
 The ConsciousnessProfile is imported from bridge-common but not used
 for governance decisions. The AI governor makes optimal choices regardless
@@ -90,7 +90,7 @@ This creates the fundamental trade-off: invest in consciousness
 (long-term governance quality) or production (short-term survival).
 
 ### 2c. The A/B test
-Run: consciousness_gating_enabled=true vs false.
+Run: trust_weighted_governance_enabled=true vs false.
 If true produces higher Phi at Year 500 than false, consciousness
 gating is empirically validated as a governance mechanism.
 
@@ -130,7 +130,7 @@ After Phases 1-3, rerun the policy comparison:
 - 5 presets × 5 seeds × 1000 years
 - Compare CVS, Phi, population, milestones
 - If spread > 5%, governance strategy matters
-- If spread > 10%, consciousness gating is transformative
+- If spread > 10%, trust weighting is transformative
 - If spread < 2%, the Tainter decline is structural
 
 ## Phase 5: Connect to Production (4 hours)
@@ -158,7 +158,7 @@ Map simulation output to portal domains:
 | Phase | Effort | Impact | What It Proves |
 |-------|--------|--------|---------------|
 | **1** | 4 hr | **CRITICAL** | Whether governance CAN matter |
-| **2** | 4 hr | **HIGH** | Whether consciousness gating specifically matters |
+| **2** | 4 hr | **HIGH** | Whether trust weighting specifically matters |
 | **3** | 8 hr | MEDIUM | What sustains flourishing |
 | 4 | 2 hr | HIGH | Definitive test |
 | 5 | 4 hr | MEDIUM | Production integration |

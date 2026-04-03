@@ -34,7 +34,7 @@
     "decentralized"
   ],
   "author": "Luminous Dynamics",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "peerDependencies": {
     "@holochain/client": ">=0.17.0"
   },

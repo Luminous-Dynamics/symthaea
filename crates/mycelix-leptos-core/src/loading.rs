@@ -35,16 +35,22 @@ pub fn LoadingSkeleton(
 ) -> impl IntoView {
     view! {
         <div
+            class="mycelix-skeleton"
             style=format!(
-                "width: {width}; height: {height}; border-radius: {border_radius}; \
-                 background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%); \
-                 background-size: 200% 100%; \
-                 animation: mycelix-skeleton-pulse 1.5s ease-in-out infinite;",
+                "width: {width}; height: {height}; border-radius: {border_radius};",
             )
             aria-hidden="true"
         >
             <style>
-                "@keyframes mycelix-skeleton-pulse { \
+                ".mycelix-skeleton { \
+                    background: linear-gradient(90deg, \
+                        var(--bg-raised, var(--bg-surface, #1a1a2e)) 25%, \
+                        var(--surface, var(--border, rgba(148, 163, 184, 0.12))) 50%, \
+                        var(--bg-raised, var(--bg-surface, #1a1a2e)) 75%); \
+                    background-size: 200% 100%; \
+                    animation: mycelix-skeleton-pulse 1.5s ease-in-out infinite; \
+                } \
+                @keyframes mycelix-skeleton-pulse { \
                     0% { background-position: 200% 0; } \
                     100% { background-position: -200% 0; } \
                 }"

@@ -1,6 +1,8 @@
 {
   "name": "@mycelix/supplychain-examples",
   "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+
   "description": "Comprehensive examples for the Mycelix Supply Chain SDK",
   "private": true,
   "scripts": {

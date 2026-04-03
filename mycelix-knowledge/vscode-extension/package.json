@@ -4,7 +4,7 @@
   "description": "Fact-check text, explore claims, and contribute to the decentralized knowledge graph",
   "version": "0.1.0",
   "publisher": "luminous-dynamics",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "icon": "media/icon.png",
   "galleryBanner": {
     "color": "#8b5cf6",

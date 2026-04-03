@@ -6,7 +6,7 @@
 //! Governance evolves through four authority levels as the colony matures:
 //! MissionControl -> LocalWithEarthVeto -> LocalSovereign -> Federation.
 //!
-//! Voting is consciousness-gated: only agents whose Phi exceeds the threshold
+//! Voting is trust-weighted: only agents whose Phi exceeds the threshold
 //! for their tier may participate. This prevents premature democratic collapse
 //! while the oppression detector watches for exclusionary dynamics.
 
@@ -93,7 +93,7 @@ pub struct WorldGovernance {
     /// Remaining ticks of emergency powers (0 = inactive).
     pub emergency_ticks_remaining: u32,
     /// Minimum phi threshold for each consciousness tier (0-4) to vote.
-    pub consciousness_gating_threshold: [f64; 5],
+    pub trust_depth_threshold: [f64; 5],
     /// Oppression index: 0.0 = fair, 1.0 = oppressive.
     pub oppression_index: f64,
     /// Consecutive ticks where oppression_index > 0.5.
@@ -139,7 +139,7 @@ impl WorldGovernance {
             amendment_count: 0,
             emergency_powers_active: false,
             emergency_ticks_remaining: 0,
-            consciousness_gating_threshold: [0.0, 0.2, 0.4, 0.6, 0.8],
+            trust_depth_threshold: [0.0, 0.2, 0.4, 0.6, 0.8],
             oppression_index: 0.0,
             oppression_streak: 0,
             constitutional_crisis: false,
@@ -161,7 +161,7 @@ impl WorldGovernance {
 
     /// Run one tick of governance simulation.
     ///
-    /// Generates proposals, processes consciousness-gated votes, evaluates
+    /// Generates proposals, processes trust-weighted votes, evaluates
     /// oppression, manages emergency powers, and checks for constitutional
     /// amendments. Returns events generated this tick.
     pub fn tick_governance(
@@ -243,7 +243,7 @@ impl WorldGovernance {
                     .push((current_tick, self.constitution_version));
 
                 // Adjust gating thresholds: slight relaxation over time
-                for threshold in &mut self.consciousness_gating_threshold {
+                for threshold in &mut self.trust_depth_threshold {
                     *threshold = (*threshold - 0.01).max(0.0);
                 }
 
@@ -286,7 +286,7 @@ impl WorldGovernance {
         if self.oppression_streak >= CRISIS_STREAK_THRESHOLD && !self.constitutional_crisis {
             self.constitutional_crisis = true;
             // Force reform: lower all thresholds
-            for threshold in &mut self.consciousness_gating_threshold {
+            for threshold in &mut self.trust_depth_threshold {
                 *threshold = (*threshold * 0.5).max(0.0);
             }
             self.constitution_version += 1;
@@ -434,7 +434,7 @@ impl WorldGovernance {
     ///
     /// Oppression occurs when many agents are at the lowest tier (Observer)
     /// while very few are at the highest tier (Guardian), indicating that
-    /// consciousness gating is excluding the majority from participation.
+    /// trust-weighted governance is excluding the majority from participation.
     ///
     /// Returns 0.0 if guardians >= 5%, otherwise
     /// `observer_fraction * (1.0 - guardian_fraction)`.
@@ -532,7 +532,7 @@ impl WorldGovernance {
         (base * stability_factor).min(1.0)
     }
 
-    /// Fraction of population eligible to vote based on consciousness gating.
+    /// Fraction of population eligible to vote based on trust-weighted governance.
     fn eligible_voter_fraction(&self, tier_dist: &[f64; 5]) -> f64 {
         // Sum fractions at each tier (tier 0 threshold is 0.0, so everyone passes)
         tier_dist.iter().sum::<f64>()

@@ -44,7 +44,7 @@
     "self-sovereign-identity"
   ],
   "author": "Luminous Dynamics",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
     "url": "https://github.com/Luminous-Dynamics/Mycelix-Core"

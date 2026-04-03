@@ -3,7 +3,7 @@ name = "mycelix-mail-desktop"
 version = "0.1.0"
 description = "Mycelix Mail Desktop Application"
 authors = ["Mycelix Team"]
-license = "MIT"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/mycelix/mycelix-mail"
 edition = "2021"
 

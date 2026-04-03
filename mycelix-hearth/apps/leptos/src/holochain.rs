@@ -148,7 +148,7 @@ pub fn HolochainProvider(children: Children) -> impl IntoView {
         let ws_transport = BrowserWsTransport::new();
         let config = ConnectConfig {
             url,
-            app_id: "hearth".to_string(),
+            app_id: "mycelix-unified".to_string(),
             auth_token: token.map(|s| s.into_bytes()),
         };
 

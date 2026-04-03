@@ -96,13 +96,18 @@ impl PortalIdentity {
                         .ok()
                         .and_then(|v| v.as_string())
                 })
-                // Sandbox assigns numeric app IDs (e.g., "9999")
-                .unwrap_or_else(|| "9999".to_string());
+                .unwrap_or_else(|| "mycelix-unified".to_string());
+
+            let auth_token = web_sys::window().and_then(|w| {
+                js_sys::Reflect::get(&w, &wasm_bindgen::JsValue::from_str("__HC_AUTH_TOKEN"))
+                    .ok()
+                    .and_then(|v| v.as_string())
+            });
 
             let config = ConnectConfig {
                 url,
                 app_id,
-                auth_token: None,
+                auth_token: auth_token.map(|s| s.into_bytes()),
             };
 
             match ws_transport.connect(config).await {

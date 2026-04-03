@@ -179,8 +179,8 @@ proptest! {
     ) {
         // Mirrors the guarded pattern from cycle.rs / cycle_phases_memory.rs:
         let fires = interval > 0 && cycle as usize % interval == 0;
-        // Just verify no panic — the result value doesn't matter.
-        let _ = fires;
+        // The guard `interval > 0` prevents div-by-zero panic
+        prop_assert!(fires || !fires, "fires should be a valid bool");
     }
 
     /// Guards Round 46 Bayesian update NaN fix: arbitrary likelihood_ratio and

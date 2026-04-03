@@ -1,0 +1,14 @@
+# Mars Independence: what happens when Mars prioritizes self-sufficiency?
+
+[simulation]
+years = 1000
+seed = 42
+
+[policy]
+birth_policy = "ProNatal"
+project_strategy = "IndependenceFirst"
+resource_priority = "Industrial"
+trade_openness = 0.3               # Minimal trade — build it yourself
+defense_spending = 0.10
+exploration_investment = 0.10
+trust_weighted_governance = true

@@ -1,7 +1,4 @@
 [workspace]
-
-[workspace.package]
-license = "AGPL-3.0-or-later"
 resolver = "2"
 members = [
     "zomes/registry/integrity",
@@ -12,6 +9,9 @@ members = [
     "zomes/reciprocity/coordinator",
 ]
 exclude = ["tests", "cli", "verifier", "prover", "stark-common"]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 hdk = "0.6.0"

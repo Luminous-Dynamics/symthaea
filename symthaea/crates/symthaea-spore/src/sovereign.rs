@@ -538,8 +538,10 @@ impl Default for InoculationOrchestrator {
             attestation: None,
             hardware_profile: None,
             eval_result: None,
+            // Security default: local-only eval API (no hosted fallback).
+            // The portal should be served locally when using this pathway.
             eval_backend: NixEvalBackend::ServerSide {
-                endpoint: "https://eval.luminousdynamics.io/api/v1/eval".to_string(),
+                endpoint: "http://127.0.0.1:8090/api/v1/eval".to_string(),
             },
             ssh_target: None,
             ssh_transport: None,

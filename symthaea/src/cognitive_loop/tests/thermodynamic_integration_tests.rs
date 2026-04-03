@@ -504,8 +504,9 @@ fn bench_feedback_activation_rates() {
     // At least some feedback should be active (not all loops dead)
     let total_active = insights + prigogine + memory_sup;
     // With sinusoidal variation, we expect at least a few activations
-    // Don't assert hard numbers — just verify the loops fire at all
+    // With sinusoidal variation over 500 cycles, some feedback loops should fire
     eprintln!("    Total activations: {total_active}");
+    assert!(total_active > 0, "at least some feedback loops should activate over {n} cycles");
 }
 
 #[test]

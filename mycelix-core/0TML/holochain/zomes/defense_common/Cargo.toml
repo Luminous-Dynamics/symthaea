@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Common utilities for Byzantine defense zomes: error handling, logging, metrics"
 authors = ["Luminous Dynamics Research Team"]
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [workspace]
 

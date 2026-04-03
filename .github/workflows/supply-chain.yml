@@ -1,0 +1,55 @@
+name: Supply Chain (cargo-deny)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/supply-chain.yml"
+      - "symthaea/**/Cargo.toml"
+      - "symthaea/Cargo.lock"
+      - "symthaea/deny.toml"
+      - "mycelix-core/**/Cargo.toml"
+      - "mycelix-core/Cargo.lock"
+      - "mycelix-core/deny.toml"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/supply-chain.yml"
+      - "symthaea/**/Cargo.toml"
+      - "symthaea/Cargo.lock"
+      - "symthaea/deny.toml"
+      - "mycelix-core/**/Cargo.toml"
+      - "mycelix-core/Cargo.lock"
+      - "mycelix-core/deny.toml"
+  schedule:
+    - cron: "0 9 * * 1" # weekly (Mondays 09:00 UTC)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ["symthaea", "mycelix-core"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: cargo deny check
+        run: |
+          cd "${{ matrix.workspace }}"
+          cargo deny check
+

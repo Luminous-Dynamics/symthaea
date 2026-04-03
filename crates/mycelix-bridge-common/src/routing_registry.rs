@@ -87,10 +87,10 @@ pub const COMMONS_LOCAL_ZOMES: &[&str] = &[
     "support_diagnostics",
     // Space (1)
     "space",
-    // Community Calendar (1)
-    "community_calendar",
-    // Tool Library (1)
-    "tool_library",
+    // Mesh-Time (1)
+    "mesh_time",
+    // Resource-Mesh (1)
+    "resource_mesh",
 ];
 
 /// Zomes allowed for local dispatch within the Civic cluster.
@@ -205,10 +205,10 @@ pub const COMMONS_CARE_ZOMES: &[&str] = &[
     "support_diagnostics",
     // Space
     "space",
-    // Community Calendar
-    "community_calendar",
-    // Tool Library
-    "tool_library",
+    // Mesh-Time
+    "mesh_time",
+    // Resource-Mesh
+    "resource_mesh",
 ];
 
 /// Zomes allowed for local dispatch within the Health cluster.
@@ -239,8 +239,7 @@ pub const ENERGY_LOCAL_ZOMES: &[&str] = &[
     "investments",
     "regenerative",
     "grid",
-    "bridge",
-    "shared",
+    "energy_bridge",
 ];
 
 /// Zomes allowed for local dispatch within the Knowledge cluster.
@@ -252,7 +251,7 @@ pub const KNOWLEDGE_LOCAL_ZOMES: &[&str] = &[
     "factcheck",
     "markets_integration",
     "dkg",
-    "bridge",
+    "knowledge_bridge",
 ];
 
 /// Zomes allowed for local dispatch within the Climate cluster.
@@ -269,19 +268,19 @@ pub const MANUFACTURING_LOCAL_ZOMES: &[&str] = &[
     "operations",
     "planning",
     "workorders",
-    "bridge",
+    "manufacturing_bridge",
 ];
 
 /// Zomes allowed for local dispatch within the Supplychain cluster.
 pub const SUPPLYCHAIN_LOCAL_ZOMES: &[&str] = &[
-    "bridge",
-    "claims",
-    "inventory",
-    "logistics",
-    "payments",
-    "procurement",
-    "trust",
-    "verification",
+    "bridge_coordinator",
+    "claims_coordinator",
+    "inventory_coordinator",
+    "logistics_coordinator",
+    "payments_coordinator",
+    "procurement_coordinator",
+    "trust_coordinator",
+    "verification_coordinator",
 ];
 
 /// Zomes allowed for local dispatch within the Edunet cluster.
@@ -327,7 +326,7 @@ pub const IDENTITY_LOCAL_ZOMES: &[&str] = &[
 
 /// Zomes allowed for local dispatch within the Finance cluster.
 pub const FINANCE_LOCAL_ZOMES: &[&str] = &[
-    "bridge",
+    "finance_bridge",
     "currency_mint",
     "payments",
     "price_oracle",
@@ -339,7 +338,7 @@ pub const FINANCE_LOCAL_ZOMES: &[&str] = &[
 
 /// Zomes allowed for local dispatch within the Governance cluster.
 pub const GOVERNANCE_LOCAL_ZOMES: &[&str] = &[
-    "bridge",
+    "governance_bridge",
     "budgeting",
     "constitution",
     "councils",
@@ -600,16 +599,16 @@ const ENERGY_TO_FINANCE: &[&str] = &[
 
 /// Supplychain-side zomes that energy-bridge is allowed to call cross-cluster.
 const ENERGY_TO_SUPPLYCHAIN: &[&str] = &[
-    "bridge",
-    "inventory",
-    "procurement",
+    "bridge_coordinator",
+    "inventory_coordinator",
+    "procurement_coordinator",
 ];
 
 /// Supplychain-side zomes that climate-bridge is allowed to call cross-cluster.
 const CLIMATE_TO_SUPPLYCHAIN: &[&str] = &[
-    "bridge",
-    "claims",
-    "verification",
+    "bridge_coordinator",
+    "claims_coordinator",
+    "verification_coordinator",
 ];
 
 /// Commons-side zomes that manufacturing-bridge is allowed to call cross-cluster.
@@ -620,9 +619,9 @@ const MANUFACTURING_TO_COMMONS: &[&str] = &[
 
 /// Supplychain-side zomes that manufacturing-bridge is allowed to call cross-cluster.
 const MANUFACTURING_TO_SUPPLYCHAIN: &[&str] = &[
-    "bridge",
-    "procurement",
-    "inventory",
+    "bridge_coordinator",
+    "procurement_coordinator",
+    "inventory_coordinator",
 ];
 
 // --- Group B: Routes needed for governance execution loop ---
@@ -1321,7 +1320,7 @@ mod tests {
         assert_eq!(get_local_zomes(CrossClusterRole::Personal).unwrap().len(), 3);
         assert_eq!(get_local_zomes(CrossClusterRole::Music).unwrap().len(), 4);
         assert_eq!(get_local_zomes(CrossClusterRole::Health).unwrap().len(), 16);
-        assert_eq!(get_local_zomes(CrossClusterRole::Energy).unwrap().len(), 6);
+        assert_eq!(get_local_zomes(CrossClusterRole::Energy).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Knowledge).unwrap().len(), 8);
         assert_eq!(get_local_zomes(CrossClusterRole::Climate).unwrap().len(), 3);
         assert_eq!(get_local_zomes(CrossClusterRole::Manufacturing).unwrap().len(), 6);

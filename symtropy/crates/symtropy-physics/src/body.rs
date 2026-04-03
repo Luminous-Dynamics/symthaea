@@ -5,7 +5,7 @@ use nalgebra::SVector;
 use symtropy_math::{Bivector, Point, Shape, Sphere, Transform};
 
 /// Opaque handle to a rigid body in the physics world.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BodyHandle(pub usize);
 
 /// Whether a body is affected by forces and collisions.
@@ -28,11 +28,12 @@ pub struct RigidBody<const D: usize> {
     pub angular_velocity: Bivector<D>,
     pub mass: f64,
     pub inv_mass: f64,
-    /// Inertia for angular dynamics. For simplicity, stored as a scalar
-    /// (uniform sphere-equivalent inertia). Full tensor is D*(D-1)/2 × D*(D-1)/2
-    /// but that's overkill for game physics.
-    pub inertia: f64,
-    pub inv_inertia: f64,
+    /// Principal moments of inertia along each axis [I_x, I_y, ...].
+    /// For spheres: all equal (isotropic). For asymmetric bodies: different per axis.
+    /// Angular acceleration in bivector plane (i,j) uses avg(I_i, I_j).
+    pub inertia: SVector<f64, D>,
+    /// Inverse principal moments (1/I per axis). Zero for static bodies.
+    pub inv_inertia: SVector<f64, D>,
     pub restitution: f64,
     pub friction: f64,
     /// Collider shape. Boxed because Shape<D> is a trait object.
@@ -62,8 +63,8 @@ impl<const D: usize> RigidBody<D> {
             angular_velocity: Bivector::zero(),
             mass,
             inv_mass: 1.0 / mass,
-            inertia: 0.4 * mass * radius * radius, // 2/5 * m * r² (sphere)
-            inv_inertia: 1.0 / (0.4 * mass * radius * radius),
+            inertia: SVector::from_element(0.4 * mass * radius * radius), // 2/5 * m * r² (sphere, isotropic)
+            inv_inertia: SVector::from_element(1.0 / (0.4 * mass * radius * radius)),
             restitution: 0.5,
             friction: 0.3,
             collider: Box::new(Sphere::new(Point::origin(), radius)),
@@ -86,8 +87,8 @@ impl<const D: usize> RigidBody<D> {
             angular_velocity: Bivector::zero(),
             mass: f64::INFINITY,
             inv_mass: 0.0,
-            inertia: f64::INFINITY,
-            inv_inertia: 0.0,
+            inertia: SVector::from_element(f64::INFINITY),
+            inv_inertia: SVector::zeros(),
             restitution: 0.5,
             friction: 0.5,
             collider,
@@ -100,7 +101,7 @@ impl<const D: usize> RigidBody<D> {
         }
     }
 
-    /// Create a dynamic body with a custom collider.
+    /// Create a dynamic body with a custom collider (isotropic inertia).
     pub fn dynamic(
         handle: BodyHandle,
         position: Point<D>,
@@ -116,8 +117,8 @@ impl<const D: usize> RigidBody<D> {
             angular_velocity: Bivector::zero(),
             mass,
             inv_mass: 1.0 / mass,
-            inertia,
-            inv_inertia: 1.0 / inertia,
+            inertia: SVector::from_element(inertia),
+            inv_inertia: SVector::from_element(1.0 / inertia),
             restitution: 0.5,
             friction: 0.3,
             collider,
@@ -189,10 +190,12 @@ impl<const D: usize> RigidBody<D> {
         false
     }
 
-    /// Kinetic energy: 0.5 * m * v² + 0.5 * I * ω²
+    /// Kinetic energy: 0.5 * m * v² + 0.5 * I_avg * ω²
+    /// Uses mean principal moment for angular KE (exact for isotropic bodies).
     pub fn kinetic_energy(&self) -> f64 {
         let linear = 0.5 * self.mass * self.linear_velocity.norm_squared();
-        let angular = 0.5 * self.inertia * self.angular_velocity.norm_squared();
+        let i_avg = self.inertia.sum() / D as f64;
+        let angular = 0.5 * i_avg * self.angular_velocity.norm_squared();
         linear + angular
     }
 

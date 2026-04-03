@@ -206,10 +206,9 @@ The monorepo is PUBLIC. This means:
 
 ### Step 1: License (TODAY)
 
-Add BSL-1.1 (Business Source License) to repo root:
-- Non-production use allowed (portfolio, research, evaluation)
-- Converts to Apache-2.0 after 3 years
-- Protects HDC+LTC, Broca SSM, consciousness equation IP
+Adopt AGPL-3.0-or-later at the repo root (with documented commercial licensing exceptions):
+- `LICENSE` (AGPL-3.0-or-later)
+- `COMMERCIAL_LICENSE.md` (commercial exception policy / dual-licensing posture)
 
 ### Step 2: Make monorepo private (TODAY)
 

@@ -61,6 +61,16 @@ impl Default for Flashlight {
     }
 }
 
+/// Marker for the flashlight cone visual (translucent radial glow).
+#[derive(Component)]
+pub struct FlashlightCone;
+
+/// Marker for a collapsed NPC (T4).
+#[derive(Component)]
+pub struct NpcCollapsed {
+    pub recovery_tend_spent: u32,
+}
+
 /// Noise source component — anything that makes sound alerts the Leviathan.
 #[derive(Component, Default)]
 pub struct NoiseEmitter {

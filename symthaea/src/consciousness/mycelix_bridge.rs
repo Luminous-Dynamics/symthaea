@@ -19,7 +19,7 @@
 //! │  ┌────────────────────┐                ┌────────────────────┐        │
 //! │  │    Symthaea        │                │      Mycelix       │        │
 //! │  │                    │                │                    │        │
-//! │  │ • Consciousness Φ  │◄──────────────►│ • Agora (Proposals)│        │
+//! │  │ • Consciousness Φ  │◄──────────────►│ • Proposals (Gov)  │        │
 //! │  │ • Eight Harmonies  │   Bridge       │ • MATL (Trust)     │        │
 //! │  │ • Affective State  │   Protocol     │ • HyperFeel (FL)   │        │
 //! │  │ • Unified Evaluator│                │ • Epistemic Charter│        │
@@ -1229,8 +1229,10 @@ impl MycelixBridge {
     /// Forward a civic crisis event to the Mycelix emergency-incidents zome.
     ///
     /// Uses the same `governance_dispatch_tx` channel as proposals and votes.
-    /// The conductor bridge maps `DeclareCrisis` to a `civic::create_incident`
-    /// zome call on the civic cluster role.
+    /// The conductor bridge maps `DeclareCrisis` to an
+    /// `emergency_incidents::declare_disaster` zome call on the civic role.
+    /// Note: until Symthaea produces geospatial fields, the conductor adapter
+    /// publishes a transparent placeholder affected_area ("global/unknown").
     #[cfg(feature = "mycelix")]
     pub fn dispatch_crisis(
         &mut self,

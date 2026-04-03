@@ -64,7 +64,7 @@
     "epistemic",
     "fact-checking"
   ],
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "bugs": {
     "url": "https://github.com/Luminous-Dynamics/mycelix-knowledge/issues"
   },

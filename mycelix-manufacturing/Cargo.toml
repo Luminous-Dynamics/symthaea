@@ -16,6 +16,10 @@ members = [
     "zomes/bridge/integrity",
 ]
 
+[workspace.package]
+license = "AGPL-3.0-or-later"
+edition = "2021"
+
 [workspace.dependencies]
 hdi = "0.5"
 hdk = "0.4"

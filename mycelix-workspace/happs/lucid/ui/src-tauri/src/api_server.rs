@@ -202,9 +202,20 @@ async fn clear_pending_handler(
 // ============================================================================
 
 pub fn create_api_router(state: Arc<ApiState>) -> Router {
-    // Configure CORS for browser extension
+    // Configure CORS for the local app + browser extension.
+    // DO NOT use allow_origin(Any): it allows arbitrary websites to read/drive localhost APIs.
+    use tower_http::cors::AllowOrigin;
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(AllowOrigin::predicate(|origin, _| {
+            let o = origin.as_bytes();
+            o.starts_with(b"http://localhost")
+                || o.starts_with(b"http://127.0.0.1")
+                || o.starts_with(b"http://[::1]")
+                || o.starts_with(b"chrome-extension://")
+                || o.starts_with(b"moz-extension://")
+                || o.starts_with(b"safari-extension://")
+                || o == b"null" // file:// pages and some extension contexts
+        }))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 

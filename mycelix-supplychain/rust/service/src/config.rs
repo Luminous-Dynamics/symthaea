@@ -32,7 +32,7 @@ pub struct Config {
 /// Server configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
-    /// Address to bind to (default: 0.0.0.0:8080)
+    /// Address to bind to (default: 127.0.0.1:8080)
     pub bind_address: SocketAddr,
 
     /// Maximum request body size in bytes (default: 2MB)
@@ -137,7 +137,7 @@ impl Config {
 impl ServerConfig {
     fn from_env() -> Result<Self> {
         let bind_address = std::env::var("BIND_ADDRESS")
-            .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
+            .unwrap_or_else(|_| "127.0.0.1:8080".to_string())
             .parse()
             .context("Invalid BIND_ADDRESS format")?;
 
@@ -254,7 +254,7 @@ mod tests {
         std::env::remove_var("MAX_BODY_SIZE");
 
         let config = ServerConfig::from_env().unwrap();
-        assert_eq!(config.bind_address.to_string(), "0.0.0.0:8080");
+        assert_eq!(config.bind_address.to_string(), "127.0.0.1:8080");
         assert_eq!(config.max_body_size, 2 * 1024 * 1024);
     }
 

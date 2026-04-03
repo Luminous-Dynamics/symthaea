@@ -153,6 +153,9 @@ pub struct ConsciousnessField<const D: usize> {
     pub ledger: ThermodynamicLedger,
     /// Tunable thermodynamic constants.
     pub constants: ThermodynamicConstants,
+    /// Accumulated sanctuary absorption (deferred from &self → &mut self).
+    /// Uses AtomicU64 storing f64 bits for thread safety (Bevy requires Sync).
+    sanctuary_absorbed: std::sync::atomic::AtomicU64,
 }
 
 impl<const D: usize> ConsciousnessField<D> {
@@ -164,6 +167,16 @@ impl<const D: usize> ConsciousnessField<D> {
             collective_phi: 0.0,
             ledger: ThermodynamicLedger::new(),
             constants: ThermodynamicConstants::default(),
+            sanctuary_absorbed: std::sync::atomic::AtomicU64::new(0u64.to_le()),
+        }
+    }
+
+    /// Drain accumulated sanctuary absorption into ledger.
+    fn drain_sanctuary_absorption(&mut self) {
+        let bits = self.sanctuary_absorbed.swap(0, std::sync::atomic::Ordering::Relaxed);
+        let absorbed = f64::from_bits(bits);
+        if absorbed > 1e-15 {
+            self.ledger.record_dissipation(absorbed);
         }
     }
 
@@ -249,9 +262,20 @@ impl<const D: usize> ConsciousnessField<D> {
         let mut multiplier: f64 = 1.0;
         for sanctuary in self.sanctuaries.values() {
             let m = sanctuary.impulse_multiplier(contact_point);
-            multiplier = multiplier.min(m); // Most dampening wins
+            multiplier = multiplier.min(m);
         }
-        impulse * multiplier
+        let dampened = impulse * multiplier;
+        let absorbed = impulse - dampened;
+        // Track absorbed impulse energy for deferred ledger recording (Fix 2).
+        // KE equivalent ≈ absorbed * 0.5 (simplified impulse-to-energy conversion).
+        if absorbed > 1e-10 {
+            use std::sync::atomic::Ordering;
+            let prev_bits = self.sanctuary_absorbed.load(Ordering::Relaxed);
+            let prev = f64::from_bits(prev_bits);
+            let new = prev + absorbed * 0.5;
+            self.sanctuary_absorbed.store(new.to_bits(), Ordering::Relaxed);
+        }
+        dampened
     }
 
     /// Try to consume energy for an entity. Returns actual energy consumed.
@@ -366,8 +390,10 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     }
 
     fn on_collision(&mut self, event: &symtropy_physics::CollisionEvent<D>) {
+        // Drain deferred sanctuary absorption into ledger (Fix 2).
+        self.drain_sanctuary_absorption();
+
         let drain_rate = self.constants.collision_energy_drain;
-        // Rule 3+6: collision spikes prediction error AND drains energy
         if let Some(entity) = self.entities.get_mut(&event.body_a) {
             entity.on_collision(event.impulse);
             let drain = event.impulse * drain_rate;
@@ -383,6 +409,7 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     }
 
     fn record_dissipation(&mut self, energy: f64) {
+        self.drain_sanctuary_absorption();
         self.ledger.record_dissipation(energy);
     }
 }

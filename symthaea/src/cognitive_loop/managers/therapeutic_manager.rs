@@ -900,9 +900,9 @@ mod tests {
         let mut manager = TherapeuticManager::new();
         let snapshot = make_snapshot(-0.5, 0.8, 1);
         let output = manager.process(&snapshot);
-        // Should produce some valence/arousal change from regulation
-        // (validation strategy should boost serotonin/oxytocin → positive valence_delta)
-        let _ = output; // non-neutral output is strategy-dependent
+        // Output deltas should be finite (strategy-dependent magnitude)
+        assert!(output.valence_delta.is_finite(), "valence_delta should be finite");
+        assert!(output.confidence_delta.is_finite(), "confidence_delta should be finite");
     }
 
     #[test]

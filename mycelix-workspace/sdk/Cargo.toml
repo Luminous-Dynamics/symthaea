@@ -3,7 +3,7 @@ name = "mycelix-sdk"
 version = "0.1.0"
 edition = "2021"
 description = "Mycelix SDK - Trust infrastructure for the Mycelix Conscious Ecosystem"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/luminous-dynamics/mycelix"
 
 [features]

@@ -29,8 +29,12 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
     // Semi-implicit: velocity first
     body.linear_velocity += accel * dt;
 
-    // Apply linear damping
-    body.linear_velocity *= 1.0 - body.linear_damping;
+    // LTC-based damping: v(t+dt) = v(t) × exp(-dt/τ) where τ = 1/damping.
+    // Frame-rate independent, never reverses velocity (exp > 0), exact for any dt.
+    if body.linear_damping > 1e-15 {
+        let tau = 1.0 / body.linear_damping;
+        body.linear_velocity *= (-dt / tau).exp();
+    }
 
     // Clamp velocity to prevent explosion
     let speed = body.linear_velocity.norm();
@@ -45,13 +49,20 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
     // --- Angular dynamics ---
 
     // Angular acceleration = torque / inertia (scalar approximation)
-    let ang_accel = body.torque_accumulator.scale(body.inv_inertia);
+    // Per-axis inertia: use mean of principal moments for each bivector plane.
+    // For spheres (isotropic), this is exact. For asymmetric bodies, it's the
+    // average inertia of the two axes spanning each rotation plane.
+    let inv_i_avg = body.inv_inertia.sum() / D as f64;
+    let ang_accel = body.torque_accumulator.scale(inv_i_avg);
 
     // Update angular velocity
     body.angular_velocity = body.angular_velocity.add(&ang_accel.scale(dt));
 
-    // Apply angular damping
-    body.angular_velocity = body.angular_velocity.scale(1.0 - body.angular_damping);
+    // LTC angular damping (same closed-form)
+    if body.angular_damping > 1e-15 {
+        let ang_tau = 1.0 / body.angular_damping;
+        body.angular_velocity = body.angular_velocity.scale((-dt / ang_tau).exp());
+    }
 
     // Clamp angular velocity
     let ang_speed = body.angular_velocity.norm();
@@ -96,7 +107,8 @@ pub fn apply_angular_impulse<const D: usize>(
     impulse: &Bivector<D>,
 ) {
     if body.is_dynamic() {
-        body.angular_velocity = body.angular_velocity.add(&impulse.scale(body.inv_inertia));
+        let inv_i_avg = body.inv_inertia.sum() / D as f64;
+        body.angular_velocity = body.angular_velocity.add(&impulse.scale(inv_i_avg));
     }
 }
 

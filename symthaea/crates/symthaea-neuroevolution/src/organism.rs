@@ -51,6 +51,7 @@ pub struct OrganismFitness {
     pub prediction_accuracy: f64,
     /// Energy efficiency (lower energy per useful computation).
     pub energy_efficiency: f64,
+    pub threshold_fitness: f64,
 }
 
 /// Result of a single evaluation step.
@@ -75,6 +76,8 @@ pub struct NeuralOrganism {
     pub total_free_energy: f64,
     pub total_cycles: u64,
     pub peak_phi: f32,
+    /// Accumulated Phi across evaluation steps (for mean Phi computation).
+    pub total_phi: f64,
     /// HDC dimension used for this organism's network.
     pub eval_dim: usize,
 }
@@ -125,6 +128,7 @@ impl NeuralOrganism {
             total_free_energy: 0.0,
             total_cycles: 0,
             peak_phi: 0.0,
+            total_phi: 0.0,
             eval_dim: dim,
         }
     }
@@ -158,6 +162,7 @@ impl NeuralOrganism {
         let phi_proxy = compute_phi_proxy(&output);
         if phi_proxy > self.peak_phi {
             self.peak_phi = phi_proxy;
+        self.total_phi += phi_proxy as f64;
         }
 
         self.total_free_energy += fe.total;
@@ -178,7 +183,8 @@ impl NeuralOrganism {
         }
 
         let mean_fe = self.total_free_energy / self.total_cycles as f64;
-        let mean_phi = self.peak_phi as f64; // Best observed Phi
+        // Mean Phi across all eval steps (sustained consciousness, not lucky spikes)
+        let mean_phi = self.total_phi / self.total_cycles.max(1) as f64;
 
         // Prediction accuracy from FEP agent stats
         let pred_acc = if self.fep_agent.stats.perception_cycles > 0 {
@@ -190,11 +196,17 @@ impl NeuralOrganism {
         // Energy efficiency: lower mean FE per cycle = better
         let efficiency = 1.0 / (1.0 + mean_fe.abs());
 
-        // Composite: negate FE (lower is better), add Phi and others
+        // Threshold consistency from genome's cognitive parameters
+        let threshold_fit = crate::threshold_genome::evaluate_threshold_fitness(
+            &self.genome.decode_thresholds(),
+        );
+
+        // 5-objective weighted composite
         let composite = -mean_fe * weights.free_energy
             + mean_phi * weights.phi
-            + mean_phi * weights.consciousness // Use phi as consciousness proxy
-            + efficiency * weights.efficiency;
+            + mean_phi * weights.consciousness
+            + efficiency * weights.efficiency
+            + threshold_fit * 0.1;
 
         self.fitness = OrganismFitness {
             composite: composite.max(FITNESS_FLOOR),
@@ -203,6 +215,7 @@ impl NeuralOrganism {
             consciousness: mean_phi,
             prediction_accuracy: pred_acc,
             energy_efficiency: efficiency,
+            threshold_fitness: threshold_fit,
         };
     }
 
@@ -246,6 +259,7 @@ impl NeuralOrganism {
         self.total_free_energy = 0.0;
         self.total_cycles = 0;
         self.peak_phi = 0.0;
+        self.total_phi = 0.0;
         self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
         // Re-instantiate network from genome with same dimension
         let phenotype = self.genome.decode();

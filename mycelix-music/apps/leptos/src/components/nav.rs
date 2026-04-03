@@ -8,14 +8,15 @@ use leptos_router::components::A;
 #[component]
 pub fn Nav() -> impl IntoView {
     view! {
-        <nav class="navbar">
+        <nav class="navbar" aria-label="Primary navigation">
             <a href="/" class="logo">"Mycelix Music"</a>
             <div class="nav-links">
+                <A href="/">"Synthesize"</A>
                 <A href="/discover">"Discover"</A>
-                <A href="/upload">"Upload"</A>
-                <A href="/dashboard">"Dashboard"</A>
                 <A href="/gallery">"Gallery"</A>
-                <A href="/artist">"Artist"</A>
+                <A href="/dashboard">"Dashboard"</A>
+                <A href="/upload">"Contribute"</A>
+                <A href="/artist">"For Artists"</A>
             </div>
         </nav>
     }

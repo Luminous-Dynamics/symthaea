@@ -11,12 +11,21 @@
 //! motor output halts, and recovery requires another agent's help.
 
 /// Persistent energy reservoir for a consciousness-coupled entity.
+///
+/// Tracks internal energy (U), temperature (T), and entropy (S)
+/// for 2nd Law compliance. Available work = Helmholtz free energy F = U - TS.
 #[derive(Debug, Clone)]
 pub struct EnergyBudget {
     /// Maximum energy capacity.
     pub max_energy: f64,
-    /// Current available energy (persistent — does NOT reset each tick).
+    /// Current internal energy U (persistent — does NOT reset each tick).
     pub available: f64,
+    /// Entity temperature in Kelvin (rises with dissipated heat).
+    pub temperature: f64,
+    /// Cumulative entropy in J/K (monotonically increases per 2nd Law).
+    pub entropy: f64,
+    /// Heat capacity in J/K.
+    pub heat_capacity: f64,
     /// Total energy consumed this tick (reset each tick for telemetry).
     pub consumed_this_tick: f64,
     /// Total energy regenerated this tick (reset each tick for telemetry).
@@ -33,6 +42,9 @@ impl EnergyBudget {
         Self {
             max_energy,
             available: max_energy,
+            temperature: 310.0,
+            entropy: 0.0,
+            heat_capacity: 100.0,
             consumed_this_tick: 0.0,
             regenerated_this_tick: 0.0,
             lifetime_consumed: 0.0,
@@ -58,12 +70,33 @@ impl EnergyBudget {
         self.consumed_this_tick += actual;
         self.lifetime_consumed += actual;
 
+        // 2nd Law: irreversible consumption increases entropy
+        if self.temperature > 0.0 && actual > 0.0 {
+            self.entropy += actual / self.temperature;
+        }
+
         // Check for collapse
         if self.available <= 0.0 {
             self.available = 0.0;
             self.collapsed = true;
         }
         actual
+    }
+
+    /// Absorb heat from dissipation (damping, friction, collision).
+    /// Increases temperature and entropy per 2nd Law.
+    pub fn dissipate_heat(&mut self, energy: f64) {
+        if energy <= 0.0 || self.heat_capacity <= 0.0 {
+            return;
+        }
+        self.temperature += energy / self.heat_capacity;
+        self.entropy += energy / self.temperature;
+    }
+
+    /// Helmholtz free energy: maximum extractable work at constant T.
+    /// F = U - TS. Always ≥ 0.
+    pub fn available_work(&self) -> f64 {
+        (self.available - self.temperature * self.entropy).max(0.0)
     }
 
     /// Add energy (from regeneration sources). Capped at max_energy.

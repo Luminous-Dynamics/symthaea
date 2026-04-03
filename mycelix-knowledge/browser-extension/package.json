@@ -26,5 +26,5 @@
     "directory": "browser-extension"
   },
   "author": "Luminous Dynamics <dev@luminousdynamics.org>",
-  "license": "MIT"
+  "license": "AGPL-3.0-or-later"
 }

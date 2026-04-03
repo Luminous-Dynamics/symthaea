@@ -15,18 +15,18 @@
 //! - GET /api/v1/health — Health check
 
 use axum::{
-    extract::State,
-    http::{HeaderMap, Method, StatusCode},
+    extract::{ConnectInfo, State},
+    http::{header, HeaderValue, Method, StatusCode},
     response::Json,
     routing::{get, post},
     Router,
 };
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 /// Nix evaluation request from the browser portal.
 #[derive(serde::Deserialize)]
@@ -249,15 +249,11 @@ fn error_response(msg: &str, start: &Instant) -> NixEvalResponse {
 
 async fn eval_handler(
     State(state): State<SharedState>,
-    headers: HeaderMap,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<NixEvalRequest>,
 ) -> Result<Json<NixEvalResponse>, StatusCode> {
-    // Rate limit by IP
-    let ip = headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown")
-        .to_string();
+    // Rate limit by the actual socket peer address (do not trust X-Forwarded-For by default).
+    let ip = addr.ip().to_string();
 
     {
         let mut limiter = state.lock().unwrap();
@@ -290,16 +286,66 @@ async fn health_handler() -> Json<HealthResponse> {
 
 #[tokio::main]
 async fn main() {
-    let port: u16 = std::env::args()
-        .skip_while(|a| a != "--port")
-        .nth(1)
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8090);
+    let mut port: u16 = 8090;
+    let mut bind: String = "127.0.0.1".into();
+    let mut allowed_origins: Vec<String> = Vec::new();
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--port" => {
+                if let Some(p) = args.next().and_then(|p| p.parse::<u16>().ok()) {
+                    port = p;
+                }
+            }
+            "--bind" => {
+                if let Some(b) = args.next() {
+                    bind = b;
+                }
+            }
+            "--allow-origin" => {
+                if let Some(o) = args.next() {
+                    allowed_origins.push(o);
+                }
+            }
+            "--help" | "-h" => {
+                eprintln!("Symthaea Eval API (locked down)");
+                eprintln!("Usage:");
+                eprintln!("  eval-api [--bind <ip|localhost>] [--port <port>] [--allow-origin <origin> ...]");
+                eprintln!();
+                eprintln!("Security defaults:");
+                eprintln!("  - Binds to 127.0.0.1 only");
+                eprintln!("  - CORS restricted to explicit localhost origins");
+                eprintln!();
+                eprintln!("Examples:");
+                eprintln!("  eval-api --port 8090 --allow-origin http://localhost:7777 --allow-origin http://127.0.0.1:7777");
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    // Default allowlist: local Symthaea dashboard + common local test servers.
+    if allowed_origins.is_empty() {
+        allowed_origins = vec![
+            "http://localhost:7777".into(),
+            "http://127.0.0.1:7777".into(),
+            "http://localhost:8093".into(),
+            "http://127.0.0.1:8093".into(),
+            "http://localhost:8094".into(),
+            "http://127.0.0.1:8094".into(),
+        ];
+    }
+
+    let origin_values: Vec<HeaderValue> = allowed_origins
+        .iter()
+        .filter_map(|o| o.parse::<HeaderValue>().ok())
+        .collect();
 
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(AllowOrigin::list(origin_values))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers(Any);
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 
     let state: SharedState = Arc::new(Mutex::new(RateLimiter::new(10)));
 
@@ -309,11 +355,23 @@ async fn main() {
         .layer(cors)
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let ip: IpAddr = match bind.as_str() {
+        "localhost" => IpAddr::V4(Ipv4Addr::LOCALHOST),
+        other => other
+            .parse()
+            .unwrap_or_else(|_| IpAddr::V4(Ipv4Addr::LOCALHOST)),
+    };
+    let addr = SocketAddr::new(ip, port);
     eprintln!("Symthaea Eval API listening on http://{}", addr);
     eprintln!("  POST /api/v1/eval  — Evaluate NixOS flake");
     eprintln!("  GET  /api/v1/health — Health check");
+    eprintln!("  CORS allowlist:");
+    for o in &allowed_origins {
+        eprintln!("    - {}", o);
+    }
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .await
+        .unwrap();
 }

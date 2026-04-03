@@ -3,7 +3,7 @@ name = "bridge_integrity"
 version = "0.1.0"
 edition = "2021"
 description = "Bridge integrity zome - inter-hApp communication and reputation aggregation"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

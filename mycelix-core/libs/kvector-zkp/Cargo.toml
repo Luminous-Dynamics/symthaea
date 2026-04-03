@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Luminous Dynamics <contact@luminous-dynamics.org>"]
 description = "Zero-knowledge STARK proofs for K-Vector validation in Mycelix"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/luminous-dynamics/mycelix"
 readme = "README.md"
 

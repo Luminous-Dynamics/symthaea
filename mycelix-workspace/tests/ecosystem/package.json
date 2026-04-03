@@ -1,6 +1,8 @@
 {
   "name": "@mycelix/ecosystem-tests",
   "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+
   "description": "Mycelix Ecosystem E2E Tests with Tryorama",
   "private": true,
   "type": "module",

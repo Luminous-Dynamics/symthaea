@@ -1,0 +1,20 @@
+# Harsh Reality: everything is harder than the optimistic defaults.
+# Tests whether civilization survives under pessimistic assumptions.
+
+[simulation]
+years = 1000
+seed = 42
+
+[policy]
+birth_policy = "Natural"
+project_strategy = "SurvivalFirst"
+defense_spending = 0.15
+trust_weighted_governance = true
+
+[params]
+spoilage_food = 0.05               # 5% — poor storage conditions
+spoilage_energy = 0.20             # 20% — inefficient grid
+stress_baseline = 0.006            # Higher baseline stress
+project_setback_probability = 0.05 # More construction delays
+project_failure_probability = 0.01 # 1% critical failure per month
+solar_dust_mars = 0.08             # Aggressive dust accumulation
