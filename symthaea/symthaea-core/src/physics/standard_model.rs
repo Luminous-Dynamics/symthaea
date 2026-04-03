@@ -40,6 +40,7 @@
 
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
+use crate::physics::constants;
 use serde::{Deserialize, Serialize};
 
 /// Dimension for physics vectors (matches HDC standard)
@@ -538,6 +539,133 @@ impl StandardModel {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// RUNNING COUPLING CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// 1-loop QCD running coupling constant α_s(Q²).
+///
+/// Uses the 1-loop beta function:
+///   α_s(Q²) = α_s(M_Z²) / (1 + b₀·α_s(M_Z²)·ln(Q²/M_Z²)/(2π))
+///
+/// where b₀ = (11·N_c - 2·n_f)/3 with N_c=3 colors and n_f active flavors.
+///
+/// # Arguments
+/// * `q2_gev2` — momentum transfer squared in GeV² (must be > 0)
+///
+/// # Returns
+/// α_s at the given scale. Returns `None` if Q² is at or below the Landau pole.
+pub fn alpha_s_running(q2_gev2: f64) -> Option<f64> {
+    if q2_gev2 <= 0.0 {
+        return None;
+    }
+    let m_z_gev = constants::M_Z_BOSON / 1000.0; // Convert MeV to GeV
+    let m_z2 = m_z_gev * m_z_gev;
+    let alpha_s_mz = constants::ALPHA_S_MZ;
+
+    // Determine active flavors at this scale (threshold crossings)
+    let n_f = if q2_gev2 < 1.3_f64.powi(2) {
+        3.0 // u, d, s
+    } else if q2_gev2 < 4.18_f64.powi(2) {
+        4.0 // + c
+    } else if q2_gev2 < 173.1_f64.powi(2) {
+        5.0 // + b
+    } else {
+        6.0 // + t
+    };
+
+    let b0 = (11.0 * 3.0 - 2.0 * n_f) / 3.0;
+    let log_ratio = (q2_gev2 / m_z2).ln();
+    let denominator = 1.0 + b0 * alpha_s_mz * log_ratio / (2.0 * std::f64::consts::PI);
+
+    if denominator <= 0.0 {
+        return None; // Landau pole
+    }
+
+    Some(alpha_s_mz / denominator)
+}
+
+/// 1-loop QED running coupling constant α_em(Q²).
+///
+/// Uses the 1-loop running:
+///   α(Q²) = α(0) / (1 - Δα(Q²))
+///
+/// Simplified: only lepton contributions at low scale, hadronic at higher scale.
+///
+/// # Arguments
+/// * `q2_gev2` — momentum transfer squared in GeV²
+pub fn alpha_em_running(q2_gev2: f64) -> f64 {
+    let alpha_0 = constants::ALPHA;
+    if q2_gev2 <= 0.0 {
+        return alpha_0;
+    }
+
+    // Lepton loop contribution: Δα_lep ≈ (α/3π)·Σ ln(Q²/m_l²) for m_l² < Q²
+    let m_e2 = (constants::M_ELECTRON_MEV / 1000.0).powi(2); // GeV²
+    let m_mu2 = (105.66 / 1000.0_f64).powi(2);
+    let m_tau2 = (1776.86 / 1000.0_f64).powi(2);
+
+    let prefactor = alpha_0 / (3.0 * std::f64::consts::PI);
+    let mut delta_alpha = 0.0;
+
+    if q2_gev2 > m_e2 {
+        delta_alpha += prefactor * (q2_gev2 / m_e2).ln();
+    }
+    if q2_gev2 > m_mu2 {
+        delta_alpha += prefactor * (q2_gev2 / m_mu2).ln();
+    }
+    if q2_gev2 > m_tau2 {
+        delta_alpha += prefactor * (q2_gev2 / m_tau2).ln();
+    }
+
+    // Hadronic contribution (~0.02762 at M_Z, interpolated)
+    let m_z_gev2 = (constants::M_Z_BOSON / 1000.0).powi(2);
+    let hadronic = 0.02762 * (q2_gev2 / m_z_gev2).min(1.0);
+    delta_alpha += hadronic;
+
+    alpha_0 / (1.0 - delta_alpha)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CKM & PMNS MIXING MATRICES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// CKM quark mixing matrix magnitudes |V_ij|.
+///
+/// Rows: (u, c, t), Columns: (d, s, b). PDG 2024 global fit.
+pub const CKM: [[f64; 3]; 3] = [
+    [0.97435, 0.22500, 0.00369], // u → d, s, b
+    [0.22486, 0.97349, 0.04182], // c → d, s, b
+    [0.00857, 0.04110, 0.99912], // t → d, s, b
+];
+
+/// PMNS neutrino mixing matrix magnitudes |U_αi|.
+///
+/// Rows: (e, μ, τ), Columns: (ν₁, ν₂, ν₃). NuFIT 5.2 (2023).
+pub const PMNS: [[f64; 3]; 3] = [
+    [0.821, 0.550, 0.149], // e  → ν₁, ν₂, ν₃
+    [0.352, 0.579, 0.737], // μ  → ν₁, ν₂, ν₃
+    [0.449, 0.602, 0.660], // τ  → ν₁, ν₂, ν₃
+];
+
+/// Check approximate unitarity of a 3×3 mixing matrix.
+/// Returns the maximum deviation of any row or column norm from 1.0.
+pub fn mixing_matrix_unitarity_deviation(matrix: &[[f64; 3]; 3]) -> f64 {
+    let mut max_dev = 0.0_f64;
+
+    for row in matrix.iter() {
+        let norm_sq: f64 = row.iter().map(|x| x * x).sum();
+        max_dev = max_dev.max((norm_sq - 1.0).abs());
+    }
+
+    for col in 0..3 {
+        let norm_sq: f64 = matrix.iter().map(|row| row[col] * row[col]).sum();
+        max_dev = max_dev.max((norm_sq - 1.0).abs());
+    }
+
+    max_dev
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -623,6 +751,52 @@ mod tests {
             recovery_sim > 0.9,
             "Double antimatter transform should recover original: {}",
             recovery_sim
+        );
+    }
+
+    #[test]
+    fn test_alpha_s_at_m_z() {
+        // At Q² = M_Z², α_s should recover the input value
+        let m_z_gev = constants::M_Z_BOSON / 1000.0;
+        let alpha = alpha_s_running(m_z_gev * m_z_gev).unwrap();
+        assert!(
+            (alpha - constants::ALPHA_S_MZ).abs() < 1e-6,
+            "α_s(M_Z) = {}, expected {}",
+            alpha,
+            constants::ALPHA_S_MZ
+        );
+    }
+
+    #[test]
+    fn test_asymptotic_freedom() {
+        // α_s should decrease with increasing Q² (asymptotic freedom)
+        let alpha_low = alpha_s_running(100.0).unwrap(); // Q = 10 GeV
+        let alpha_high = alpha_s_running(10000.0).unwrap(); // Q = 100 GeV
+        assert!(
+            alpha_low > alpha_high,
+            "Asymptotic freedom violated: α_s(100)={} should be > α_s(10000)={}",
+            alpha_low,
+            alpha_high
+        );
+    }
+
+    #[test]
+    fn test_ckm_unitarity() {
+        let dev = mixing_matrix_unitarity_deviation(&CKM);
+        assert!(
+            dev < 0.01,
+            "CKM unitarity deviation too large: {}",
+            dev
+        );
+    }
+
+    #[test]
+    fn test_pmns_unitarity() {
+        let dev = mixing_matrix_unitarity_deviation(&PMNS);
+        assert!(
+            dev < 0.05,
+            "PMNS unitarity deviation too large: {}",
+            dev
         );
     }
 }

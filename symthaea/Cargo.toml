@@ -53,6 +53,8 @@ members = [
     "crates/symthaea-neuroevolution",
     "crates/symthaea-jepa",
     "crates/symthaea-materials",
+    "crates/symthaea-gravcraft",
+    "crates/symthaea-nuclear",
     "crates/symthaea-nuclear-forensics",
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",

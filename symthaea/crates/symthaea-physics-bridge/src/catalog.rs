@@ -109,7 +109,7 @@ impl Default for PhysicsCatalog {
 
 /// Build all landmark equations for the catalog.
 fn build_all_equations() -> Vec<PhysicsEquation> {
-    let mut eqs = Vec::with_capacity(32);
+    let mut eqs = Vec::with_capacity(48);
 
     // Electromagnetism
     eqs.push(maxwell_gauss_law());
@@ -151,6 +151,36 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(coulomb_screening());
     eqs.push(dd_branching_ratio());
     eqs.push(thermal_gamow_coupling());
+
+    // Nuclear Forces
+    eqs.push(yukawa_potential());
+    eqs.push(one_pion_exchange());
+    eqs.push(nuclear_radius_formula());
+    eqs.push(geiger_nuttall_law());
+    eqs.push(bateman_equations());
+
+    // Modified Gravity
+    eqs.push(f_r_gravity());
+    eqs.push(mond_milgrom());
+    eqs.push(brans_dicke());
+    eqs.push(proca_equation());
+
+    // Statistical Mechanics
+    eqs.push(boltzmann_distribution());
+    eqs.push(ising_hamiltonian());
+    eqs.push(partition_function());
+
+    // Particle Physics
+    eqs.push(running_coupling_alpha_s());
+    eqs.push(casimir_force());
+    eqs.push(higgs_potential());
+
+    // Optics
+    eqs.push(snell_law());
+    eqs.push(fresnel_equations());
+
+    // Condensed Matter
+    eqs.push(bcs_gap_equation());
 
     eqs
 }
@@ -1150,6 +1180,546 @@ fn thermal_gamow_coupling() -> PhysicsEquation {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// NUCLEAR FORCES
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// V(r) = -g²·exp(-μr)/(4πr) — Yukawa meson-exchange potential
+fn yukawa_potential() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Yukawa Potential".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(
+            make_field("V", TensorDescriptor::scalar(euc3)),
+            EquationNode::Negate(Box::new(make_product(vec![
+                make_const("g²/4π"),
+                EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(
+                    make_product(vec![make_const("μ"), make_field("r", TensorDescriptor::scalar(euc3))]),
+                )))),
+                EquationNode::Power {
+                    base: Box::new(make_field("r", TensorDescriptor::scalar(euc3))),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]))),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::SO(3)],
+            vec![DiscreteSymmetry::P, DiscreteSymmetry::T],
+            false,
+        ),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// V_OPEP(r) ∝ (σ₁·σ₂)(τ₁·τ₂) exp(-m_π r)/(m_π r) — One-Pion Exchange
+fn one_pion_exchange() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "One-Pion Exchange Potential".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(
+            make_field("V_OPEP", TensorDescriptor::scalar(euc3)),
+            make_product(vec![
+                make_const("f²_πNN/4π"),
+                make_const("m_π/3"),
+                make_const("σ₁·σ₂"),
+                make_const("τ₁·τ₂"),
+                EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(
+                    make_product(vec![make_const("m_π"), make_field("r", TensorDescriptor::scalar(euc3))]),
+                )))),
+                EquationNode::Power {
+                    base: Box::new(make_product(vec![
+                        make_const("m_π"),
+                        make_field("r", TensorDescriptor::scalar(euc3)),
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::SU(2), LieGroup::SU(2)], // Spin × Isospin
+            vec![DiscreteSymmetry::P, DiscreteSymmetry::T],
+            false,
+        ),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// R = r₀·A^(1/3) — Nuclear radius formula
+fn nuclear_radius_formula() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Nuclear Radius Formula".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(
+            make_const("R"),
+            make_product(vec![
+                make_const("r₀"),
+                EquationNode::Power {
+                    base: Box::new(make_const("A")),
+                    exponent: Box::new(make_product(vec![
+                        EquationNode::Scalar(1.0),
+                        EquationNode::Power {
+                            base: Box::new(EquationNode::Scalar(3.0)),
+                            exponent: Box::new(EquationNode::Scalar(-1.0)),
+                        },
+                    ])),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::LENGTH,
+        tensor: None,
+    }
+}
+
+/// log₁₀(t½) = aZ/√Q + b — Geiger-Nuttall law for alpha decay
+fn geiger_nuttall_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Geiger-Nuttall Law".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(
+            make_const("log₁₀(t½)"),
+            make_sum(vec![
+                make_product(vec![
+                    make_const("a"),
+                    make_const("Z"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("Q_α")),
+                        exponent: Box::new(EquationNode::Scalar(-0.5)),
+                    },
+                ]),
+                make_const("b"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// dN_i/dt = Σ λ_j·N_j - λ_i·N_i — Bateman radioactive decay chain
+fn bateman_equations() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Bateman Decay Equations".to_string(),
+        domain: PhysicsDomain::NuclearPhysics,
+        ast: make_equals(
+            make_diffop(
+                DiffOperator::TimeDerivative,
+                make_const("N_i"),
+            ),
+            make_sum(vec![
+                make_product(vec![make_const("λ_parent"), make_const("N_parent")]),
+                EquationNode::Negate(Box::new(make_product(vec![
+                    make_const("λ_i"),
+                    make_const("N_i"),
+                ]))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature {
+            mass: 0,
+            length: 0,
+            time: -1,
+            current: 0,
+            temperature: 0,
+            amount: 0,
+            luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODIFIED GRAVITY
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// f(R) gravity: f'(R)R_μν - f(R)g_μν/2 + g_μν□f'(R) - ∇_μ∇_νf'(R) = κT_μν
+fn f_r_gravity() -> PhysicsEquation {
+    let lor4 = MetricSignature::Lorentzian(4);
+    PhysicsEquation {
+        name: "f(R) Modified Gravity".to_string(),
+        domain: PhysicsDomain::ModifiedGravity,
+        ast: make_equals(
+            make_sum(vec![
+                make_product(vec![
+                    make_const("f'(R)"),
+                    make_field("R_μν", TensorDescriptor::symmetric_2(lor4)),
+                ]),
+                EquationNode::Negate(Box::new(make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("f(R)"),
+                    make_field("g_μν", TensorDescriptor::symmetric_2(lor4)),
+                ]))),
+            ]),
+            make_product(vec![
+                make_const("κ"),
+                make_field("T_μν", TensorDescriptor::symmetric_2(lor4)),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::GL(4)], false),
+        dimensions: DimensionalSignature::INVERSE_LENGTH,
+        tensor: Some(TensorDescriptor::symmetric_2(lor4)),
+    }
+}
+
+/// μ(|a|/a₀)·a = a_N — MOND (Modified Newtonian Dynamics)
+fn mond_milgrom() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "MOND Milgrom Law".to_string(),
+        domain: PhysicsDomain::ModifiedGravity,
+        ast: make_equals(
+            make_product(vec![
+                make_const("μ(|a|/a₀)"),
+                make_field("a", TensorDescriptor::vector(euc3)),
+            ]),
+            make_field("a_N", TensorDescriptor::vector(euc3)),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ACCELERATION,
+        tensor: Some(TensorDescriptor::vector(euc3)),
+    }
+}
+
+/// □φ = 8πT/(3+2ω) — Brans-Dicke scalar-tensor gravity
+fn brans_dicke() -> PhysicsEquation {
+    let lor4 = MetricSignature::Lorentzian(4);
+    PhysicsEquation {
+        name: "Brans-Dicke Equation".to_string(),
+        domain: PhysicsDomain::ModifiedGravity,
+        ast: make_equals(
+            make_diffop(
+                DiffOperator::DAlembertian,
+                make_field("φ", TensorDescriptor::scalar(lor4)),
+            ),
+            make_product(vec![
+                make_const("8πT/(3+2ω)"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::GL(4)], false),
+        dimensions: DimensionalSignature::INVERSE_LENGTH,
+        tensor: Some(TensorDescriptor::scalar(lor4)),
+    }
+}
+
+/// ∂_μF^μν + m²A^ν = J^ν — Proca equation (massive vector boson → finite-range force)
+fn proca_equation() -> PhysicsEquation {
+    let lor4 = MetricSignature::Lorentzian(4);
+    PhysicsEquation {
+        name: "Proca Equation".to_string(),
+        domain: PhysicsDomain::ParticlePhysics,
+        ast: make_equals(
+            make_sum(vec![
+                make_diffop(
+                    DiffOperator::Partial,
+                    make_field("F^μν", TensorDescriptor::antisymmetric_2(lor4)),
+                ),
+                make_product(vec![
+                    EquationNode::Power {
+                        base: Box::new(make_const("m")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                    make_field("A^ν", TensorDescriptor::vector(lor4)),
+                ]),
+            ]),
+            make_field("J^ν", TensorDescriptor::vector(lor4)),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::Lorentz],
+            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            false, // NOT gauge invariant (mass breaks gauge symmetry)
+        ),
+        dimensions: DimensionalSignature::INVERSE_LENGTH,
+        tensor: Some(TensorDescriptor::vector(lor4)),
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATISTICAL MECHANICS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// P(E) ∝ exp(-E/kT) — Boltzmann distribution
+fn boltzmann_distribution() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Boltzmann Distribution".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(
+            make_const("P(E)"),
+            EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(
+                make_product(vec![
+                    make_const("E"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("kT")),
+                        exponent: Box::new(EquationNode::Scalar(-1.0)),
+                    },
+                ]),
+            )))),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// H = -J·Σ s_i·s_j - h·Σ s_i — Ising model Hamiltonian
+fn ising_hamiltonian() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Ising Hamiltonian".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(
+            make_const("H"),
+            EquationNode::Negate(Box::new(make_sum(vec![
+                make_product(vec![make_const("J"), make_const("Σ_⟨ij⟩ s_i·s_j")]),
+                make_product(vec![make_const("h"), make_const("Σ_i s_i")]),
+            ]))),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![],
+            vec![DiscreteSymmetry::Z2], // Z₂ spin-flip symmetry (when h=0)
+            false,
+        ),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Z = Σ_n exp(-βE_n) — Canonical partition function
+fn partition_function() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Canonical Partition Function".to_string(),
+        domain: PhysicsDomain::StatisticalMechanics,
+        ast: make_equals(
+            make_const("Z"),
+            make_const("Σ_n exp(-βE_n)"),
+        ),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PARTICLE PHYSICS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// α_s(Q²) = α_s(M_Z²) / (1 + b₀·α_s·ln(Q²/M_Z²)/(2π)) — QCD running coupling
+fn running_coupling_alpha_s() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "QCD Running Coupling".to_string(),
+        domain: PhysicsDomain::ParticlePhysics,
+        ast: make_equals(
+            make_const("α_s(Q²)"),
+            make_product(vec![
+                make_const("α_s(M_Z²)"),
+                EquationNode::Power {
+                    base: Box::new(make_sum(vec![
+                        EquationNode::Scalar(1.0),
+                        make_product(vec![
+                            make_const("b₀·α_s/(2π)"),
+                            make_const("ln(Q²/M_Z²)"),
+                        ]),
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SU(3)], true),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// F/A = -π²ℏc/(240d⁴) — Casimir force between parallel plates
+fn casimir_force() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Casimir Force".to_string(),
+        domain: PhysicsDomain::ParticlePhysics,
+        ast: make_equals(
+            make_const("F/A"),
+            EquationNode::Negate(Box::new(make_product(vec![
+                make_const("π²ℏc/240"),
+                EquationNode::Power {
+                    base: Box::new(make_const("d")),
+                    exponent: Box::new(EquationNode::Scalar(-4.0)),
+                },
+            ]))),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::U(1)],
+            vec![DiscreteSymmetry::P, DiscreteSymmetry::T],
+            true,
+        ),
+        dimensions: DimensionalSignature::PRESSURE,
+        tensor: None,
+    }
+}
+
+/// V(φ) = μ²|φ|² + λ|φ|⁴ — Higgs potential (Mexican hat)
+fn higgs_potential() -> PhysicsEquation {
+    let lor4 = MetricSignature::Lorentzian(4);
+    PhysicsEquation {
+        name: "Higgs Potential".to_string(),
+        domain: PhysicsDomain::ParticlePhysics,
+        ast: make_equals(
+            make_const("V(φ)"),
+            make_sum(vec![
+                make_product(vec![
+                    make_const("μ²"),
+                    EquationNode::Power {
+                        base: Box::new(make_field("φ", TensorDescriptor::scalar(lor4))),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                make_product(vec![
+                    make_const("λ"),
+                    EquationNode::Power {
+                        base: Box::new(make_field("φ", TensorDescriptor::scalar(lor4))),
+                        exponent: Box::new(EquationNode::Scalar(4.0)),
+                    },
+                ]),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::SU(2), LieGroup::U(1)],
+            vec![],
+            true, // Gauge symmetry (spontaneously broken)
+        ),
+        dimensions: DimensionalSignature::ENERGY_DENSITY,
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OPTICS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// n₁sin(θ₁) = n₂sin(θ₂) — Snell's law of refraction
+fn snell_law() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Snell Law".to_string(),
+        domain: PhysicsDomain::Optics,
+        ast: make_equals(
+            make_product(vec![make_const("n₁"), make_const("sin(θ₁)")]),
+            make_product(vec![make_const("n₂"), make_const("sin(θ₂)")]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![],
+            vec![DiscreteSymmetry::T], // Time-reversible
+            false,
+        ),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// r_s = (n₁cos(θ₁) - n₂cos(θ₂))/(n₁cos(θ₁) + n₂cos(θ₂)) — Fresnel s-polarization
+fn fresnel_equations() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Fresnel Equations".to_string(),
+        domain: PhysicsDomain::Optics,
+        ast: make_equals(
+            make_const("r_s"),
+            make_product(vec![
+                make_sum(vec![
+                    make_product(vec![make_const("n₁"), make_const("cos(θ₁)")]),
+                    EquationNode::Negate(Box::new(make_product(vec![
+                        make_const("n₂"),
+                        make_const("cos(θ₂)"),
+                    ]))),
+                ]),
+                EquationNode::Power {
+                    base: Box::new(make_sum(vec![
+                        make_product(vec![make_const("n₁"), make_const("cos(θ₁)")]),
+                        make_product(vec![make_const("n₂"), make_const("cos(θ₂)")]),
+                    ])),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::U(1)],
+            vec![DiscreteSymmetry::T],
+            false,
+        ),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONDENSED MATTER
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Δ = 2ℏω_D·exp(-1/(N(0)V)) — BCS superconducting gap equation
+fn bcs_gap_equation() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "BCS Gap Equation".to_string(),
+        domain: PhysicsDomain::CondensedMatter,
+        ast: make_equals(
+            make_const("Δ"),
+            make_product(vec![
+                EquationNode::Scalar(2.0),
+                make_const("ℏω_D"),
+                EquationNode::Exponential(Box::new(EquationNode::Negate(Box::new(
+                    EquationNode::Power {
+                        base: Box::new(make_product(vec![
+                            make_const("N(0)"),
+                            make_const("V"),
+                        ])),
+                        exponent: Box::new(EquationNode::Scalar(-1.0)),
+                    },
+                )))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::new(
+            vec![LieGroup::U(1)],
+            vec![],
+            true, // U(1) gauge symmetry broken by Cooper pairs
+        ),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LAZAR STRUCTURAL QUERY
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Lazar "Gravity-A" wave: claimed extension of strong nuclear force beyond
+/// the nucleus via Element 115. Structurally, this is a Yukawa potential with
+/// the range parameter μ→0 (infinite range), making it a 1/r potential
+/// coupled to a massive vector field.
+///
+/// This is NOT a real physics equation — it's a query designed to find
+/// structural analogs in the catalog via HDC skeleton similarity.
+pub fn lazar_gravity_a_query() -> PhysicsEquation {
+    let euc3 = MetricSignature::Euclidean(3);
+    PhysicsEquation {
+        name: "Lazar Gravity-A Wave (Query)".to_string(),
+        domain: PhysicsDomain::ModifiedGravity,
+        ast: make_equals(
+            make_field("F_gravity_A", TensorDescriptor::vector(euc3)),
+            make_product(vec![
+                make_const("coupling_115"),
+                // Key structural claim: 1/r potential (Yukawa with μ→0)
+                // exp(-μr) → exp(0) = 1 when μ=0, leaving pure 1/r
+                EquationNode::Power {
+                    base: Box::new(make_field("r", TensorDescriptor::scalar(euc3))),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+                // Directional amplitude from 3-amplifier focusing
+                make_const("amplitude(θ,φ)"),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::FORCE,
+        tensor: Some(TensorDescriptor::vector(euc3)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1159,8 +1729,8 @@ mod tests {
     fn catalog_builds_successfully() {
         let catalog = PhysicsCatalog::new();
         assert!(
-            catalog.len() >= 27,
-            "Expected >= 27 entries, got {}",
+            catalog.len() >= 45,
+            "Expected >= 45 entries, got {}",
             catalog.len()
         );
     }
@@ -1272,6 +1842,126 @@ mod tests {
         for (e1, e2) in c1.entries().iter().zip(c2.entries().iter()) {
             assert_eq!(e1.full_hv.values, e2.full_hv.values);
             assert_eq!(e1.equation.name, e2.equation.name);
+        }
+    }
+
+    // ── Phase 2a expansion tests ──
+
+    #[test]
+    fn new_domains_present() {
+        let catalog = PhysicsCatalog::new();
+        assert!(
+            !catalog
+                .entries_in_domain(PhysicsDomain::ModifiedGravity)
+                .is_empty(),
+            "Modified gravity equations should exist"
+        );
+        assert!(
+            !catalog
+                .entries_in_domain(PhysicsDomain::ParticlePhysics)
+                .is_empty(),
+            "Particle physics equations should exist"
+        );
+        assert!(
+            !catalog
+                .entries_in_domain(PhysicsDomain::CondensedMatter)
+                .is_empty(),
+            "Condensed matter equations should exist"
+        );
+        assert!(
+            !catalog
+                .entries_in_domain(PhysicsDomain::Optics)
+                .is_empty(),
+            "Optics equations should exist"
+        );
+    }
+
+    #[test]
+    fn yukawa_present_and_valid() {
+        let catalog = PhysicsCatalog::new();
+        let yukawa = catalog.find_by_name("Yukawa Potential");
+        assert!(yukawa.is_some(), "Yukawa potential should be in catalog");
+        let y = yukawa.unwrap();
+        assert_eq!(y.equation.domain, PhysicsDomain::NuclearPhysics);
+        assert!(y.full_hv.values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn yukawa_clusters_with_opep() {
+        let catalog = PhysicsCatalog::new();
+        let yukawa = catalog.find_by_name("Yukawa Potential").unwrap();
+        let opep = catalog.find_by_name("One-Pion Exchange Potential").unwrap();
+        let snell = catalog.find_by_name("Snell Law").unwrap();
+
+        // Yukawa and OPEP share the same exp(-μr)/r skeleton
+        let nuclear_sim = yukawa.skeleton_hv.similarity(&opep.skeleton_hv);
+        let cross_sim = yukawa.skeleton_hv.similarity(&snell.skeleton_hv);
+
+        assert!(
+            nuclear_sim > cross_sim,
+            "Yukawa-OPEP skeleton similarity ({}) should exceed Yukawa-Snell ({})",
+            nuclear_sim,
+            cross_sim
+        );
+    }
+
+    #[test]
+    fn lazar_query_structural_search() {
+        use crate::query::PhysicsSearchEngine;
+
+        let engine = PhysicsSearchEngine::new();
+        let query = lazar_gravity_a_query();
+
+        let results = engine.search_equation(&query, 5);
+
+        // The Lazar query should find SOME structural analogs
+        assert!(
+            !results.is_empty(),
+            "Lazar query should return at least one result"
+        );
+
+        // Report what the nearest neighbors are (informational)
+        for r in &results {
+            eprintln!(
+                "  Lazar neighbor: {} (score={:.3}, domain={:?})",
+                r.name, r.score, r.domain
+            );
+        }
+    }
+
+    #[test]
+    fn all_new_entries_have_finite_hvs() {
+        let catalog = PhysicsCatalog::new();
+        let new_names = [
+            "Yukawa Potential",
+            "One-Pion Exchange Potential",
+            "Nuclear Radius Formula",
+            "Geiger-Nuttall Law",
+            "Bateman Decay Equations",
+            "f(R) Modified Gravity",
+            "MOND Milgrom Law",
+            "Brans-Dicke Equation",
+            "Proca Equation",
+            "Boltzmann Distribution",
+            "Ising Hamiltonian",
+            "Canonical Partition Function",
+            "QCD Running Coupling",
+            "Casimir Force",
+            "Higgs Potential",
+            "Snell Law",
+            "Fresnel Equations",
+            "BCS Gap Equation",
+        ];
+
+        for name in &new_names {
+            let entry = catalog.find_by_name(name);
+            assert!(entry.is_some(), "Missing equation: {}", name);
+            let e = entry.unwrap();
+            assert!(
+                e.full_hv.values.iter().all(|v| v.is_finite()),
+                "Non-finite HV for {}",
+                name
+            );
         }
     }
 }

@@ -16193,6 +16193,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-gravcraft"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "symthaea-core",
+]
+
+[[package]]
 name = "symthaea-hal"
 version = "0.1.0"
 dependencies = [
@@ -16407,6 +16416,15 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-nix",
  "zbus 4.4.0",
+]
+
+[[package]]
+name = "symthaea-nuclear"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "symthaea-core",
 ]
 
 [[package]]
