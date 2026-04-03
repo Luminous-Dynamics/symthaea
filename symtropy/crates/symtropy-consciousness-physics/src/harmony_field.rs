@@ -31,6 +31,13 @@ pub struct HarmonySource<const D: usize> {
     pub strength: f64,
     /// Field radius (beyond this, field is negligible).
     pub radius: f64,
+    /// Simulation time when this source was created/activated (Fix 6).
+    /// Used for finite propagation delay. Default 0.0 (instant).
+    pub created_at: f64,
+    /// Field propagation speed in units/sec (Fix 6).
+    /// Default f64::MAX (instant propagation for moving agents).
+    /// Use finite values only for stationary sources (wells, sanctuaries).
+    pub propagation_speed: f64,
 }
 
 /// The harmony field: aggregates all sources and computes field effects.
@@ -129,6 +136,37 @@ impl<const D: usize> HarmonyField<D> {
         1.0 - res * 0.5
     }
 
+    /// Sample the field at a point with finite propagation delay (Fix 6).
+    ///
+    /// Sources whose field hasn't reached the point yet (based on distance /
+    /// propagation_speed since created_at) contribute zero.
+    /// For stationary sources only — moving agents should use default
+    /// propagation_speed = f64::MAX (instant).
+    pub fn sample_at_time(&self, point: &Point<D>, current_time: f64) -> [f64; NUM_HARMONIES] {
+        let mut total = [0.0f64; NUM_HARMONIES];
+        let exponent = (D as f64 - 1.0).max(1.0);
+        for source in &self.sources {
+            let dist = source.position.distance(point);
+            if dist >= source.radius {
+                continue;
+            }
+            // Finite propagation delay check
+            if source.propagation_speed < f64::MAX {
+                let travel_time = dist / source.propagation_speed;
+                if current_time < source.created_at + travel_time {
+                    continue; // Field hasn't reached here yet
+                }
+            }
+            let r_soft = (dist * dist + Self::SOFTENING_EPSILON * Self::SOFTENING_EPSILON)
+                .powf(exponent / 2.0);
+            let falloff = source.strength / r_soft;
+            for i in 0..NUM_HARMONIES {
+                total[i] += source.activations[i] * falloff;
+            }
+        }
+        total
+    }
+
     /// Total field energy at a point (sum of all harmony strengths).
     pub fn field_energy(&self, point: &Point<D>) -> f64 {
         let field = self.sample(point);
@@ -198,6 +236,8 @@ mod tests {
             activations,
             strength: 10.0,
             radius: 100.0,
+            created_at: 0.0,
+            propagation_speed: f64::MAX,
         }
     }
 
@@ -304,11 +344,13 @@ mod tests {
     #[test]
     fn harmony_field_4d() {
         let mut field = HarmonyField::<4>::new();
-        let mut source = HarmonySource {
+        let source = HarmonySource {
             position: Point::origin(),
             activations: [0.5; 8],
             strength: 5.0,
             radius: 50.0,
+            created_at: 0.0,
+            propagation_speed: f64::MAX,
         };
         field.sources.push(source);
         let sample = field.sample(&Point::new([3.0, 0.0, 0.0, 0.0]));
