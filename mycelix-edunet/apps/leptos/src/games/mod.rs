@@ -3,6 +3,7 @@
 //! Educational games — interactive STEM simulations embedded in study pages.
 
 pub mod shared;
+pub mod foundation;
 pub mod math;
 pub mod physics;
 pub mod chemistry;
@@ -48,6 +49,10 @@ fn game_type(node_id: &str) -> Option<&'static str> {
         id if id.contains("Cybersecurity") || id.contains("CYBER") || id.contains("InfoSec") => Some("password"),
         // Philosophy / Critical Thinking (Fallacy Detector)
         id if id.contains("Philosophy") || id.contains("PHIL") || id.contains("CriticalThinking") || id.contains("CRITTHINK") => Some("fallacy"),
+        // Foundation Phase (Gr1-6)
+        id if id.contains("Gr1") || id.contains("Gr2") || id.contains("Grade1") || id.contains("Grade2") => Some("number_bonds"),
+        id if (id.contains("Gr3") || id.contains("Gr4") || id.contains("Gr5") || id.contains("Grade3") || id.contains("Grade4") || id.contains("Grade5")) && (id.contains("NF") || id.contains("fraction") || id.contains("Fraction")) => Some("fraction_pizza"),
+        id if (id.contains("Gr3") || id.contains("Gr4") || id.contains("Gr5") || id.contains("Grade3") || id.contains("Grade4") || id.contains("Grade5")) && (id.contains("OA") || id.contains("multiply") || id.contains("Multiply") || id.contains("times")) => Some("times_tables"),
         _ => None,
     }
 }
@@ -70,6 +75,9 @@ pub fn GameContainer(node_id: String) -> impl IntoView {
         Some("budget") => view! { <universal::budget_sim::BudgetSimulator node_id=id /> }.into_any(),
         Some("password") => view! { <universal::password_strength::PasswordStrengthGame node_id=id /> }.into_any(),
         Some("fallacy") => view! { <universal::fallacy_detector::FallacyDetector node_id=id /> }.into_any(),
+        Some("number_bonds") => view! { <foundation::number_bonds::NumberBondsGame node_id=id /> }.into_any(),
+        Some("fraction_pizza") => view! { <foundation::fraction_pizza::FractionPizzaGame node_id=id /> }.into_any(),
+        Some("times_tables") => view! { <foundation::times_tables::TimesTablesGame node_id=id /> }.into_any(),
         _ => view! { <p style="color: var(--text-secondary)">"No interactive game available yet."</p> }.into_any(),
     }
 }
