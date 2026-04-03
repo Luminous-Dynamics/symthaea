@@ -41,10 +41,13 @@ pub mod batch;
 pub mod broca_adapter;
 pub mod caps_content;
 pub mod channels;
+pub mod dedup;
 pub mod ingest;
 pub mod mock;
 pub mod pipeline;
+pub mod retention_challenges;
 pub mod templates;
+pub mod translation_seeds;
 pub mod types;
 
 /// Convenience re-exports for common usage.
