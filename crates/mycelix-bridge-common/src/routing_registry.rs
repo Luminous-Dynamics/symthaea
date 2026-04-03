@@ -705,6 +705,12 @@ const HEALTH_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry"];
 /// Identity-side zomes that edunet-bridge is allowed to call cross-cluster.
 const EDUNET_TO_IDENTITY: &[&str] = &["identity_bridge", "verifiable_credential"];
 
+/// Finance-side zomes that edunet-bridge is allowed to call cross-cluster (TEND learning credits).
+const EDUNET_TO_FINANCE: &[&str] = &["finance_bridge", "tend"];
+
+/// Edunet-side zomes that finance-bridge is allowed to call cross-cluster (payment confirmations).
+const FINANCE_TO_EDUNET: &[&str] = &["edunet_bridge"];
+
 /// Finance-side zomes that cafe-bridge is allowed to call cross-cluster.
 const CAFE_TO_FINANCE: &[&str] = &["finance_bridge", "payments", "tend", "price_oracle"];
 
@@ -810,6 +816,10 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
 
         // Edunet outbound
         (CrossClusterRole::Edunet, CrossClusterRole::Identity) => EDUNET_TO_IDENTITY,
+        (CrossClusterRole::Edunet, CrossClusterRole::Finance) => EDUNET_TO_FINANCE,
+
+        // Inbound to Edunet
+        (CrossClusterRole::Finance, CrossClusterRole::Edunet) => FINANCE_TO_EDUNET,
 
         // Cafe outbound
         (CrossClusterRole::Cafe, CrossClusterRole::Finance) => CAFE_TO_FINANCE,

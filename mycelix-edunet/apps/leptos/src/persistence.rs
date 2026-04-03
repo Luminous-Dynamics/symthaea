@@ -119,6 +119,114 @@ impl GovernanceStore {
     }
 }
 
+// ============================================================
+// Pending TEND Ledger — Trial Mode Economic Activity
+// ============================================================
+//
+// Tracks TEND credits earned locally before conductor connection.
+// When the learner connects to the network, Pending TEND can be
+// replayed as real TEND exchanges.
+//
+// DESIGN PRINCIPLE: Learning is NEVER blocked behind a conductor.
+// Pending TEND accumulates freely. Connection unlocks real value.
+
+const TEND_KEY: &str = "edunet_pending_tend";
+
+/// A record of a TEND-earning learning event (pre-conductor).
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PendingTendEvent {
+    /// TEND credits earned for this event
+    pub tend_credits: f32,
+    /// Learning event type that triggered it
+    pub event_type: String,
+    /// Quality of the learning session (0-1000 permille)
+    pub quality_permille: u16,
+    /// Duration in seconds
+    pub duration_seconds: u32,
+    /// When the event occurred (JS timestamp ms)
+    pub timestamp_ms: f64,
+    /// Whether this has been synced to the network
+    pub synced: bool,
+}
+
+/// The Pending TEND ledger — accumulates locally until conductor connects.
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct PendingTendLedger {
+    /// Total pending TEND (not yet synced to network)
+    pub total_pending: f32,
+    /// Total TEND ever earned (including synced)
+    pub total_earned: f32,
+    /// Individual events
+    pub events: Vec<PendingTendEvent>,
+    /// Whether the learner has been prompted to connect
+    pub connection_prompted: bool,
+}
+
+/// Connection readiness threshold: prompt at this many pending TEND
+pub const TEND_CONNECTION_THRESHOLD: f32 = 10.0;
+
+impl PendingTendLedger {
+    pub fn load() -> Self {
+        load::<PendingTendLedger>(TEND_KEY).unwrap_or_default()
+    }
+
+    pub fn save_ledger(&self) {
+        save(TEND_KEY, self);
+    }
+
+    /// Record a learning event that earned TEND credits.
+    pub fn record_event(
+        &mut self,
+        tend_credits: f32,
+        event_type: &str,
+        quality_permille: u16,
+        duration_seconds: u32,
+    ) {
+        let now = js_sys::Date::now();
+        self.events.push(PendingTendEvent {
+            tend_credits,
+            event_type: event_type.to_string(),
+            quality_permille,
+            duration_seconds,
+            timestamp_ms: now,
+            synced: false,
+        });
+        self.total_pending += tend_credits;
+        self.total_earned += tend_credits;
+        self.save_ledger();
+    }
+
+    /// Check if the learner has earned enough to prompt for connection.
+    pub fn should_prompt_connection(&self) -> bool {
+        self.total_pending >= TEND_CONNECTION_THRESHOLD && !self.connection_prompted
+    }
+
+    /// Mark that the connection prompt has been shown.
+    pub fn mark_prompted(&mut self) {
+        self.connection_prompted = true;
+        self.save_ledger();
+    }
+
+    /// Count of unsynced events (for replay on connection).
+    pub fn unsynced_count(&self) -> usize {
+        self.events.iter().filter(|e| !e.synced).count()
+    }
+
+    /// Mark events as synced (after successful conductor replay).
+    pub fn mark_synced(&mut self, count: usize) {
+        let mut remaining = count;
+        for event in &mut self.events {
+            if !event.synced && remaining > 0 {
+                event.synced = true;
+                self.total_pending -= event.tend_credits;
+                remaining -= 1;
+            }
+        }
+        self.total_pending = self.total_pending.max(0.0); // Safety clamp
+        self.save_ledger();
+    }
+}
+
 /// Bundled export of all student data.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ExportBundle {

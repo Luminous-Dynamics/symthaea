@@ -258,6 +258,51 @@ pub enum ChallengeType {
     Custom,
 }
 
+// ============== Peer Tutoring ==============
+
+/// A 1:1 peer tutoring session between a tutor and tutee.
+///
+/// Linked via topic-sharded, time-boxed anchors to prevent DHT hotspots:
+/// `Path::from("tutoring.{topic}.week_{week_number}")`
+/// This distributes load naturally and lets clients fetch localized subsets.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq, Eq)]
+pub struct PeerTutoringSession {
+    /// Agent who is tutoring (has mastered the topic)
+    pub tutor: AgentPubKey,
+    /// Agent being tutored (struggling with the topic)
+    pub tutee: AgentPubKey,
+    /// Topic being tutored (e.g., "CAPS.Mathematics.Gr12.P1.CALC")
+    pub topic_id: String,
+    /// Human-readable topic name
+    pub topic_name: String,
+    /// Session status
+    pub status: TutoringSessionStatus,
+    /// When the session was created/requested
+    pub created_at: i64,
+    /// When the session was completed (if finished)
+    pub completed_at: Option<i64>,
+    /// Tutor's rating of the session (0-1000 permille)
+    pub tutor_rating_permille: Option<u16>,
+    /// Tutee's rating of the session (0-1000 permille)
+    pub tutee_rating_permille: Option<u16>,
+    /// Optional notes about the session
+    pub notes: Option<String>,
+}
+
+/// Status of a peer tutoring session
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TutoringSessionStatus {
+    /// Tutor has been matched/requested
+    Requested,
+    /// Both parties have confirmed
+    Active,
+    /// Session completed successfully
+    Completed,
+    /// Session was cancelled
+    Cancelled,
+}
+
 // ============== Entry and Link Type Definitions ==============
 
 #[hdk_entry_types]
@@ -277,6 +322,8 @@ pub enum EntryTypes {
     PodAchievement(PodAchievement),
     #[entry_type(required_validations = 3, visibility = "public")]
     PodChallenge(PodChallenge),
+    #[entry_type(required_validations = 1, visibility = "public")]
+    PeerTutoringSession(PeerTutoringSession),
 }
 
 #[hdk_link_types]
@@ -299,6 +346,12 @@ pub enum LinkTypes {
     PodToCourses,
     /// Course -> Pods studying it
     CourseToPods,
+    /// Agent -> tutoring sessions as tutor
+    AgentToTutorSessions,
+    /// Agent -> tutoring sessions as tutee
+    AgentToTuteeSessions,
+    /// Topic-sharded anchor -> tutoring sessions (e.g., "tutoring.calculus.week_14")
+    TopicToTutoringSessions,
 }
 
 // ============== Validation Functions ==============
@@ -354,6 +407,35 @@ pub fn validate_create_membership(membership: &PodMembership) -> ExternResult<Va
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Validate peer tutoring session
+pub fn validate_tutoring_session(session: &PeerTutoringSession) -> ExternResult<ValidateCallbackResult> {
+    if session.tutor == session.tutee {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot tutor yourself".to_string(),
+        ));
+    }
+    if session.topic_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Topic ID cannot be empty".to_string(),
+        ));
+    }
+    if let Some(rating) = session.tutor_rating_permille {
+        if rating > 1000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Rating must be 0-1000 permille".to_string(),
+            ));
+        }
+    }
+    if let Some(rating) = session.tutee_rating_permille {
+        if rating > 1000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Rating must be 0-1000 permille".to_string(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 /// Genesis self-check
 #[hdk_extern]
 pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
@@ -368,6 +450,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::LearningPod(pod) => validate_create_pod(&pod),
                 EntryTypes::PodMembership(membership) => validate_create_membership(&membership),
+                EntryTypes::PeerTutoringSession(session) => validate_tutoring_session(&session),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {

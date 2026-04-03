@@ -18,6 +18,12 @@ pub enum PledgeType {
     DeveloperTime,
     QA,
     Documentation,
+    /// Pledge tutoring hours to help future learners
+    TutoringTime,
+    /// Pledge translation time for curriculum localization
+    ContentTranslation,
+    /// Pledge to review/improve curriculum content
+    CurriculumReview,
     Other,
 }
 

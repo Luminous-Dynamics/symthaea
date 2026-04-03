@@ -1,0 +1,18 @@
+[package]
+name = "translation_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Translation coordinator zome — proposal, verification, and credential issuance"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "translation_coordinator"
+
+[dependencies]
+hdk.workspace = true
+holochain_serialized_bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+translation_integrity = { path = "../integrity" }

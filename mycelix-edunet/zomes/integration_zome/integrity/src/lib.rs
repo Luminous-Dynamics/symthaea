@@ -491,6 +491,22 @@ pub struct DailyLearningReport {
     pub generated_at: i64,
 }
 
+// ============== Graduation ==============
+
+/// A graduation record — proof that a learner completed a pathway
+/// with mastery, sovereignty, and verified credentials.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct GraduationRecord {
+    pub agent: AgentPubKey,
+    pub domain: String,
+    pub pol_score_permille: u16,
+    pub sovereignty_permille: u16,
+    pub active_credentials: u32,
+    pub pathway_completion_permille: u16,
+    pub graduated_at: i64,
+}
+
 // ============== Entry and Link Type Definitions ==============
 
 #[hdk_entry_types]
@@ -506,6 +522,8 @@ pub enum EntryTypes {
     OrchestratedSession(OrchestratedSession),
     #[entry_type(required_validations = 1, visibility = "private")]
     DailyLearningReport(DailyLearningReport),
+    #[entry_type(required_validations = 1, visibility = "public")]
+    GraduationRecord(GraduationRecord),
 }
 
 #[hdk_link_types]
@@ -522,6 +540,8 @@ pub enum LinkTypes {
     GlobalTriggers,
     /// Trigger -> Earners
     TriggerToEarners,
+    /// Learner -> Graduation records
+    LearnerToGraduation,
 }
 
 // ============== Helper Functions ==============
@@ -802,6 +822,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::AchievementTrigger(trigger) => validate_achievement_trigger(&trigger),
                     EntryTypes::OrchestratedSession(session) => validate_orchestrated_session(&session),
                     EntryTypes::DailyLearningReport(report) => validate_daily_report(&report),
+                    EntryTypes::GraduationRecord(_) => Ok(ValidateCallbackResult::Valid),
                 }
             }
             // Other entry types (agents, capabilities) are always valid

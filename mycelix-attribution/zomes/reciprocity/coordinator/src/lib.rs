@@ -560,6 +560,9 @@ fn compute_type_weight(pledge_type: &PledgeType) -> f64 {
         PledgeType::Bandwidth => 1.1,
         PledgeType::QA => 1.1,
         PledgeType::Documentation => 1.0,
+        PledgeType::TutoringTime => 1.4,       // High value: direct human impact
+        PledgeType::ContentTranslation => 1.3,  // High value: expands access
+        PledgeType::CurriculumReview => 1.2,    // Moderate: quality improvement
         PledgeType::Other => 0.8,
     }
 }

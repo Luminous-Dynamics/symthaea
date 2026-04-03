@@ -571,3 +571,163 @@ pub fn get_bridge_health(_: ()) -> ExternResult<bridge::BridgeHealth> {
         ],
     })
 }
+
+// ============================================================================
+// TEND Payout Bridge — Learning Becomes Economic Activity
+// ============================================================================
+//
+// Converts high-quality learning events into TEND mutual credit.
+//
+// Formula: P_tend = T_hours × (B_rate + ΔPoL × reputation_factor)
+// - B_rate = 0.25 TEND/hr base
+// - Quality bonus scaled by quality_permille
+// - Reputation factor from consciousness profile (Reputational Burn guardrail)
+//
+// GUARDRAILS:
+// - TEND formula in coordinator only (NOT integrity — clock determinism)
+// - Rate limited: max 4 TEND events per day per agent
+// - Non-blocking: learning event succeeds even if TEND dispatch fails
+// - Cap: max 2.0 TEND per event
+
+/// Maximum TEND credits per single learning event
+const MAX_TEND_PER_EVENT: f32 = 2.0;
+
+/// Base rate: TEND per hour of study
+const BASE_TEND_RATE: f32 = 0.25;
+
+/// Maximum TEND-generating events per day per agent
+const MAX_TEND_EVENTS_PER_DAY: u32 = 4;
+
+/// Minimum quality permille for TEND eligibility
+const MIN_QUALITY_FOR_TEND: u16 = 600;
+
+/// Minimum duration in seconds (15 minutes)
+const MIN_DURATION_FOR_TEND: u32 = 900;
+
+/// Input for triggering a learning TEND credit.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LearningTendInput {
+    /// Quality of the learning session (0-1000 permille)
+    pub quality_permille: u16,
+    /// Duration in seconds
+    pub duration_seconds: u32,
+    /// Consciousness phi level (0-1000 permille, optional — from frontend)
+    pub phi_permille: Option<u16>,
+    /// Agent's reputation permille (0-1000, from consciousness profile)
+    pub reputation_permille: Option<u16>,
+}
+
+/// Result of TEND credit computation.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LearningTendResult {
+    /// TEND credits earned (0.0 if not eligible)
+    pub tend_credits: f32,
+    /// Whether the agent hit the daily rate limit
+    pub rate_limited: bool,
+    /// Breakdown of the computation
+    pub breakdown: String,
+}
+
+/// Compute TEND credits for a learning event.
+///
+/// Does NOT create the actual TEND exchange (that requires cross-hApp call
+/// to the Finance cluster). Returns the computed amount for the frontend
+/// to display and/or dispatch.
+#[hdk_extern]
+pub fn compute_learning_tend(input: LearningTendInput) -> ExternResult<LearningTendResult> {
+    // Check minimums
+    if input.quality_permille < MIN_QUALITY_FOR_TEND {
+        return Ok(LearningTendResult {
+            tend_credits: 0.0,
+            rate_limited: false,
+            breakdown: format!(
+                "Quality {} < minimum {} permille",
+                input.quality_permille, MIN_QUALITY_FOR_TEND
+            ),
+        });
+    }
+
+    if input.duration_seconds < MIN_DURATION_FOR_TEND {
+        return Ok(LearningTendResult {
+            tend_credits: 0.0,
+            rate_limited: false,
+            breakdown: format!(
+                "Duration {}s < minimum {}s",
+                input.duration_seconds, MIN_DURATION_FOR_TEND
+            ),
+        });
+    }
+
+    // Rate limit check: count today's TEND events via links
+    let agent = agent_info()?.agent_initial_pubkey;
+    let today_anchor = {
+        let now = sys_time()?;
+        let day = now.as_micros() / (86_400 * 1_000_000); // Day number
+        format!("tend_daily.{}.{}", agent, day)
+    };
+
+    // Check existing daily count via simple link counting
+    let tend_path = Path::from(today_anchor.clone());
+    let typed = tend_path.typed(LinkTypes::DispatchRateLimit)?;
+    typed.ensure()?;
+    let daily_anchor = typed.path.path_entry_hash()?;
+
+    let daily_links = get_links(
+        LinkQuery::try_new(daily_anchor.clone(), LinkTypes::DispatchRateLimit)?,
+        GetStrategy::Local,
+    )?;
+
+    if daily_links.len() as u32 >= MAX_TEND_EVENTS_PER_DAY {
+        return Ok(LearningTendResult {
+            tend_credits: 0.0,
+            rate_limited: true,
+            breakdown: format!(
+                "Daily limit reached ({}/{})",
+                daily_links.len(),
+                MAX_TEND_EVENTS_PER_DAY
+            ),
+        });
+    }
+
+    // Compute TEND credits
+    let hours = input.duration_seconds as f32 / 3600.0;
+    let quality_factor = input.quality_permille as f32 / 1000.0;
+
+    // Base credit: hours × base rate
+    let base_credit = hours * BASE_TEND_RATE;
+
+    // Quality bonus: hours × quality × 0.5
+    let quality_bonus = hours * quality_factor * 0.5;
+
+    // Reputation factor (Reputational Burn guardrail):
+    // High reputation = more economic breath. Low/new = reduced rate.
+    let reputation = input.reputation_permille.unwrap_or(500) as f32 / 1000.0;
+    let reputation_multiplier = 0.5 + reputation * 0.5; // Range: 0.5x to 1.0x
+
+    // Phi bonus (optional): focused consciousness adds small bonus
+    let phi_bonus = input
+        .phi_permille
+        .map(|p| (p as f32 / 1000.0) * 0.1 * hours)
+        .unwrap_or(0.0);
+
+    let total = ((base_credit + quality_bonus + phi_bonus) * reputation_multiplier)
+        .min(MAX_TEND_PER_EVENT);
+
+    // Record the daily count (link to anchor for rate limiting)
+    let agent_hash: AnyDhtHash = agent.into();
+    create_link(
+        daily_anchor,
+        agent_hash,
+        LinkTypes::DispatchRateLimit,
+        vec![],
+    )?;
+
+    Ok(LearningTendResult {
+        tend_credits: total,
+        rate_limited: false,
+        breakdown: format!(
+            "hours={:.2} base={:.3} quality_bonus={:.3} phi={:.3} rep_mult={:.2} total={:.3}",
+            hours, base_credit, quality_bonus, phi_bonus, reputation_multiplier, total
+        ),
+    })
+}

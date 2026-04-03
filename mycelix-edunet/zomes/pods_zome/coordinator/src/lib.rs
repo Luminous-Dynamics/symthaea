@@ -20,6 +20,7 @@ use pods_integrity::{
     EntryTypes, LinkTypes, LearningPod, PodMembership, PodProgress,
     PodDiscussion, DiscussionReply, PodAchievement, PodChallenge,
     PodStatus, MembershipStatus, MemberRole,
+    PeerTutoringSession, TutoringSessionStatus,
 };
 
 // Helper function to ensure a path exists and return its entry hash
@@ -595,4 +596,244 @@ pub struct PodProgressStats {
     pub avg_streak: u32,
     pub total_courses_completed: u32,
     pub last_updated: i64,
+}
+
+// ============== Peer Tutoring ==============
+//
+// Topic-sharded, time-boxed anchors prevent DHT hotspots:
+// Path::from("tutoring.{topic_id}.week_{week}") distributes load naturally.
+// Matching runs CLIENT-SIDE in Leptos (per guardrail: no global aggregation in WASM).
+
+/// Compute the week number for time-boxed anchor sharding.
+fn current_week_number(timestamp: i64) -> u32 {
+    // Unix epoch was a Thursday. Week 0 = 1970-01-01.
+    // Approximate: timestamp / (7 * 24 * 3600)
+    (timestamp / (7 * 24 * 3600)).max(0) as u32
+}
+
+/// Get the topic-sharded, time-boxed anchor for a tutoring topic.
+fn tutoring_anchor(topic_id: &str, week: u32) -> ExternResult<EntryHash> {
+    // Sharding: "tutoring.{topic_id}.week_{week}" — distributes across DHT neighborhoods
+    let path = Path::from(format!("tutoring.{}.week_{}", topic_id, week));
+    let typed_path = path.typed(LinkTypes::TopicToTutoringSessions)?;
+    typed_path.ensure()?;
+    typed_path.path.path_entry_hash()
+}
+
+/// Input for creating a tutoring session request.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateTutoringSessionInput {
+    pub tutor: AgentPubKey,
+    pub topic_id: String,
+    pub topic_name: String,
+}
+
+/// Create a peer tutoring session request.
+///
+/// Links to topic-sharded anchor (prevents DHT hotspots) and both agents.
+#[hdk_extern]
+pub fn create_tutoring_session(input: CreateTutoringSessionInput) -> ExternResult<ActionHash> {
+    let tutee = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?.as_micros() / 1_000_000;
+    let week = current_week_number(now);
+
+    let session = PeerTutoringSession {
+        tutor: input.tutor.clone(),
+        tutee: tutee.clone(),
+        topic_id: input.topic_id.clone(),
+        topic_name: input.topic_name,
+        status: TutoringSessionStatus::Requested,
+        created_at: now,
+        completed_at: None,
+        tutor_rating_permille: None,
+        tutee_rating_permille: None,
+        notes: None,
+    };
+
+    let action_hash = create_entry(EntryTypes::PeerTutoringSession(session))?;
+
+    // Link: tutee -> session
+    let tutee_hash: AnyDhtHash = tutee.into();
+    create_link(tutee_hash, action_hash.clone(), LinkTypes::AgentToTuteeSessions, vec![])?;
+
+    // Link: tutor -> session
+    let tutor_hash: AnyDhtHash = input.tutor.into();
+    create_link(tutor_hash, action_hash.clone(), LinkTypes::AgentToTutorSessions, vec![])?;
+
+    // Link: topic-sharded anchor -> session (prevents hotspot)
+    let anchor = tutoring_anchor(&input.topic_id, week)?;
+    create_link(anchor, action_hash.clone(), LinkTypes::TopicToTutoringSessions, vec![])?;
+
+    Ok(action_hash)
+}
+
+/// Input for completing a tutoring session.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CompleteTutoringSessionInput {
+    pub session_hash: ActionHash,
+    pub rating_permille: u16,
+    pub notes: Option<String>,
+}
+
+/// Complete a peer tutoring session. Both tutor and tutee can call this
+/// to provide their rating. Sovereignty growth is recorded on both sides.
+#[hdk_extern]
+pub fn complete_tutoring_session(input: CompleteTutoringSessionInput) -> ExternResult<ActionHash> {
+    let agent = agent_info()?.agent_initial_pubkey;
+
+    let record = get(input.session_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Session not found".into())))?;
+
+    let mut session: PeerTutoringSession = match record.entry().as_option() {
+        Some(Entry::App(bytes)) => PeerTutoringSession::try_from(
+            SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
+        ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?,
+        _ => return Err(wasm_error!(WasmErrorInner::Guest("Not an entry".into()))),
+    };
+
+    // Set rating based on who's calling
+    if agent == session.tutor {
+        session.tutor_rating_permille = Some(input.rating_permille);
+    } else if agent == session.tutee {
+        session.tutee_rating_permille = Some(input.rating_permille);
+    } else {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only tutor or tutee can complete the session".into()
+        )));
+    }
+
+    session.notes = input.notes.or(session.notes);
+
+    // Mark completed if both have rated
+    if session.tutor_rating_permille.is_some() && session.tutee_rating_permille.is_some() {
+        session.status = TutoringSessionStatus::Completed;
+        session.completed_at = Some(sys_time()?.as_micros() / 1_000_000);
+    }
+
+    update_entry(input.session_hash, &session)
+}
+
+/// List tutoring sessions where the caller is the tutor.
+#[hdk_extern]
+pub fn list_my_tutor_sessions(_: ()) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let agent_hash: AnyDhtHash = agent.into();
+
+    let links = get_links(
+        LinkQuery::try_new(agent_hash, LinkTypes::AgentToTutorSessions)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        if let Some(hash) = link.target.into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
+}
+
+/// List tutoring sessions where the caller is the tutee.
+#[hdk_extern]
+pub fn list_my_tutee_sessions(_: ()) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let agent_hash: AnyDhtHash = agent.into();
+
+    let links = get_links(
+        LinkQuery::try_new(agent_hash, LinkTypes::AgentToTuteeSessions)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        if let Some(hash) = link.target.into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
+}
+
+/// Find available tutors for a topic in the current time window.
+/// Returns session records linked to the topic-sharded anchor.
+///
+/// NOTE: The actual scoring/matching runs CLIENT-SIDE in Leptos.
+/// This zome only provides the raw data via anchor queries.
+#[hdk_extern]
+pub fn find_topic_tutors(topic_id: String) -> ExternResult<Vec<Record>> {
+    let now = sys_time()?.as_micros() / 1_000_000;
+    let week = current_week_number(now);
+
+    // Query current week and previous week (covers edge cases near week boundary)
+    let mut records = Vec::new();
+    for w in [week.saturating_sub(1), week] {
+        let anchor = tutoring_anchor(&topic_id, w)?;
+        let links = get_links(
+            LinkQuery::try_new(anchor, LinkTypes::TopicToTutoringSessions)?,
+            GetStrategy::Local,
+        )?;
+
+        for link in links {
+            if let Some(hash) = link.target.into_action_hash() {
+                if let Some(record) = get(hash, GetOptions::default())? {
+                    records.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(records)
+}
+
+// ============== Collective Competence Proofs ==============
+
+/// Collective competence profile for a Learning Pod.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PodCompetenceProfile {
+    pub pod_hash: String,
+    pub collective_skills: Vec<String>,
+    pub member_count: u32,
+}
+
+/// Aggregate collective competence for a Pod.
+///
+/// Collects all member skills from personal goals and produces a union.
+/// Client-side matching compares this against career archetypes.
+#[hdk_extern]
+pub fn aggregate_pod_competence(pod_hash: ActionHash) -> ExternResult<PodCompetenceProfile> {
+    let member_links = get_links(
+        LinkQuery::try_new(pod_hash.clone(), LinkTypes::PodToMembers)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut all_skills = std::collections::HashSet::new();
+    let mut member_count = 0u32;
+
+    for link in member_links {
+        if let Some(hash) = link.target.into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                if let Some(Entry::App(bytes)) = record.entry().as_option() {
+                    if let Ok(membership) = PodMembership::try_from(
+                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
+                    ) {
+                        if membership.status == MembershipStatus::Active {
+                            member_count += 1;
+                            for goal in &membership.personal_goals {
+                                all_skills.insert(goal.to_lowercase());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(PodCompetenceProfile {
+        pod_hash: pod_hash.to_string(),
+        collective_skills: all_skills.into_iter().collect(),
+        member_count,
+    })
 }

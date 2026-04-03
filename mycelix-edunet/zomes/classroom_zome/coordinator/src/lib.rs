@@ -160,12 +160,14 @@ pub fn get_my_classrooms(_: ()) -> ExternResult<Vec<Record>> {
 
     // Check teacher links
     let teacher_links = get_links(
-        GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::TeacherToClassrooms)?.build(),
+        LinkQuery::try_new(agent.clone(), LinkTypes::TeacherToClassrooms)?,
+        GetStrategy::Local,
     )?;
 
     // Check student links
     let student_links = get_links(
-        GetLinksInputBuilder::try_new(agent.clone(), LinkTypes::StudentToClassrooms)?.build(),
+        LinkQuery::try_new(agent.clone(), LinkTypes::StudentToClassrooms)?,
+        GetStrategy::Local,
     )?;
 
     let mut records = Vec::new();
@@ -251,7 +253,8 @@ pub fn join_classroom(input: JoinClassroomInput) -> ExternResult<Record> {
     let path = Path::from("all_classrooms");
     let path_hash = ensure_path(path, LinkTypes::AllClassrooms)?;
     let classroom_links = get_links(
-        GetLinksInputBuilder::try_new(path_hash, LinkTypes::AllClassrooms)?.build(),
+        LinkQuery::try_new(path_hash, LinkTypes::AllClassrooms)?,
+        GetStrategy::Local,
     )?;
 
     let mut found_code: Option<(JoinCode, ActionHash)> = None;
@@ -259,7 +262,8 @@ pub fn join_classroom(input: JoinClassroomInput) -> ExternResult<Record> {
     'outer: for cl_link in &classroom_links {
         if let Some(classroom_hash) = cl_link.target.clone().into_action_hash() {
             let code_links = get_links(
-                GetLinksInputBuilder::try_new(classroom_hash, LinkTypes::ClassroomToJoinCodes)?.build(),
+                LinkQuery::try_new(classroom_hash, LinkTypes::ClassroomToJoinCodes)?,
+                GetStrategy::Local,
             )?;
             for code_link in &code_links {
                 if let Some(code_hash) = code_link.target.clone().into_action_hash() {
@@ -338,7 +342,8 @@ pub fn join_classroom(input: JoinClassroomInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn get_class_roster(classroom_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(classroom_hash, LinkTypes::ClassroomToMembers)?.build(),
+        LinkQuery::try_new(classroom_hash, LinkTypes::ClassroomToMembers)?,
+        GetStrategy::Local,
     )?;
 
     let mut records = Vec::new();
@@ -399,7 +404,8 @@ pub fn link_guardian(input: LinkGuardianInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn get_student_guardians(student: AgentPubKey) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(student, LinkTypes::AgentToGuardianLinks)?.build(),
+        LinkQuery::try_new(student, LinkTypes::AgentToGuardianLinks)?,
+        GetStrategy::Local,
     )?;
 
     let mut records = Vec::new();

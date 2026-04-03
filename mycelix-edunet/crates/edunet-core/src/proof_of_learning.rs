@@ -29,7 +29,6 @@
 //! - Build reputation across the ecosystem
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Proof of Learning score for a learner
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -197,9 +196,9 @@ pub struct PoLAnalyzer {
     /// Minimum activities required for analysis
     min_activities: usize,
     /// Time window for analysis (days)
-    analysis_window_days: u32,
+    _analysis_window_days: u32,
     /// Weights for component scoring
-    weights: PoLWeights,
+    _weights: PoLWeights,
 }
 
 /// Configurable weights for PoL calculation
@@ -231,8 +230,8 @@ impl PoLAnalyzer {
     pub fn new() -> Self {
         Self {
             min_activities: 10,
-            analysis_window_days: 90,
-            weights: PoLWeights::default(),
+            _analysis_window_days: 90,
+            _weights: PoLWeights::default(),
         }
     }
 
@@ -240,8 +239,8 @@ impl PoLAnalyzer {
     pub fn with_settings(min_activities: usize, window_days: u32, weights: PoLWeights) -> Self {
         Self {
             min_activities,
-            analysis_window_days: window_days,
-            weights,
+            _analysis_window_days: window_days,
+            _weights: weights,
         }
     }
 

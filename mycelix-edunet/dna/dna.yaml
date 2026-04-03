@@ -28,6 +28,10 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/knowledge_integrity.wasm
     - name: classroom_integrity
       path: ../target/wasm32-unknown-unknown/release/classroom_integrity.wasm
+    - name: mentorship_integrity
+      path: ../target/wasm32-unknown-unknown/release/mentorship_integrity.wasm
+    - name: translation_integrity
+      path: ../target/wasm32-unknown-unknown/release/translation_integrity.wasm
 
 coordinator:
   zomes:
@@ -81,3 +85,11 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/classroom_coordinator.wasm
       dependencies:
         - name: classroom_integrity
+    - name: mentorship_coordinator
+      path: ../target/wasm32-unknown-unknown/release/mentorship_coordinator.wasm
+      dependencies:
+        - name: mentorship_integrity
+    - name: translation_coordinator
+      path: ../target/wasm32-unknown-unknown/release/translation_coordinator.wasm
+      dependencies:
+        - name: translation_integrity

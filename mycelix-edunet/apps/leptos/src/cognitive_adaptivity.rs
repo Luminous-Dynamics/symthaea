@@ -109,6 +109,10 @@ pub enum SovereigntyGrowthType {
     PeerTeaching,
     /// Overrode a system suggestion and it worked out.
     IndependentSuccess,
+    /// Fulfilled a reciprocity pledge (tutoring, translation, curriculum review).
+    FulfilledPledge,
+    /// Made a community contribution (non-teaching: funding, content, review).
+    CommunityContribution,
 }
 
 impl SovereigntyLevel {
@@ -188,6 +192,8 @@ impl SovereigntyLevel {
             SovereigntyGrowthType::DifficultyCalibration => 10,
             SovereigntyGrowthType::PeerTeaching => 25,
             SovereigntyGrowthType::IndependentSuccess => 20,
+            SovereigntyGrowthType::FulfilledPledge => 20,
+            SovereigntyGrowthType::CommunityContribution => 15,
         };
 
         self.level = (self.level + delta as u16).min(1000);

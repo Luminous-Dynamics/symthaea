@@ -246,6 +246,9 @@ pub fn DashboardPage() -> impl IntoView {
             // CAPS Progress Overview
             <CapsProgressCard />
 
+            // Pending TEND — economic value from learning
+            <PendingTendCard />
+
             // Suggestion overlay
             <SuggestionOverlay />
 
@@ -423,6 +426,8 @@ fn SovereigntyCard() -> impl IntoView {
                                             SovereigntyGrowthType::DifficultyCalibration => "\u{1f3af}",
                                             SovereigntyGrowthType::PeerTeaching => "\u{1f9d1}\u{200d}\u{1f3eb}",
                                             SovereigntyGrowthType::IndependentSuccess => "\u{1f680}",
+                                            SovereigntyGrowthType::FulfilledPledge => "\u{1f91d}",
+                                            SovereigntyGrowthType::CommunityContribution => "\u{1f331}",
                                         };
                                         view! {
                                             <li class="sovereignty-event">
@@ -1366,6 +1371,50 @@ fn SubjectMasteryBreakdown() -> impl IntoView {
                         }).collect::<Vec<_>>()}
                     </div>
                 }
+            }}
+        </div>
+    }
+}
+
+/// Pending TEND card — shows economic value earned from learning.
+#[component]
+fn PendingTendCard() -> impl IntoView {
+    let ledger = crate::persistence::PendingTendLedger::load();
+    let total = ledger.total_earned;
+    let pending = ledger.total_pending;
+    let event_count = ledger.events.len();
+    let should_prompt = ledger.should_prompt_connection();
+
+    view! {
+        <div class="dash-card tend-card">
+            <h3>"Learning Economy"</h3>
+            <div style="display: flex; align-items: baseline; gap: 0.5rem">
+                <span style="font-size: 2rem; font-weight: 700; color: var(--primary)">{format!("{:.1}", total)}</span>
+                <span style="font-size: 0.9rem; color: var(--text-secondary)">"TEND earned"</span>
+            </div>
+            {if pending > 0.0 {
+                view! {
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">
+                        {format!("{:.1} pending", pending)}" \u{2014} connect to claim"
+                    </div>
+                }.into_any()
+            } else {
+                view! { <span></span> }.into_any()
+            }}
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem">
+                {event_count}" sessions \u{2014} 1 TEND = 1 hour community service"
+            </div>
+            {if should_prompt {
+                view! {
+                    <div role="status" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--primary, #7c3aed); color: #fff; border-radius: 0.5rem; text-align: center">
+                        <strong>"Your knowledge has value."</strong>
+                        <div style="font-size: 0.85rem; margin-top: 0.25rem">
+                            "Connect to the network to secure "{format!("{:.1}", pending)}" TEND and join the mesh."
+                        </div>
+                    </div>
+                }.into_any()
+            } else {
+                view! { <span></span> }.into_any()
             }}
         </div>
     }

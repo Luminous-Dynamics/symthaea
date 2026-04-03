@@ -318,11 +318,23 @@ pub fn record_learning_event(input: RecordEventInput) -> ExternResult<LearningEv
     // Check for triggered achievements
     let triggered = check_achievement_triggers(&agent, &input.event_type, xp)?;
 
+    // Check for reciprocity opportunity: high quality achievement events
+    // suggest the learner is ready to give back to the community
+    let reciprocity_opportunity = match &input.event_type {
+        LearningEventType::SkillMastered | LearningEventType::GoalAchieved
+            if input.quality_permille >= 800 =>
+        {
+            Some("mastery_achieved".to_string())
+        }
+        _ => None,
+    };
+
     Ok(LearningEventResult {
         event_hash: action_hash,
         xp_gained: xp,
         mastery_change,
         achievements_triggered: triggered,
+        reciprocity_opportunity,
     })
 }
 
@@ -332,6 +344,9 @@ pub struct LearningEventResult {
     pub event_hash: ActionHash,
     pub xp_gained: u32,
     pub mastery_change: i16,
+    /// If set, the learner has achieved something significant and may want to
+    /// pledge back to the community (tutoring, translation, curriculum review).
+    pub reciprocity_opportunity: Option<String>,
     pub achievements_triggered: Vec<String>,
 }
 
@@ -2315,6 +2330,127 @@ pub fn calculate_learning_velocity(input: VelocityInput) -> ExternResult<Learnin
         cohort_comparison_permille,
         days_to_next_level,
     })
+}
+
+// ============== Graduation Ceremony ==============
+//
+// Detection: all conditions must align simultaneously:
+// - PoL > 0.85 for the domain
+// - Sovereignty >= 801 (Autonomous mode)
+// - At least 1 credential with vitality > 800
+// - Career pathway > 80% complete
+//
+// The platform's primary success metric should be "time from enrollment
+// to graduation," NOT daily active users.
+
+/// Input for checking graduation eligibility.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GraduationCheckInput {
+    /// Domain to check (e.g., "Mathematics", "Rust Development")
+    pub domain: String,
+    /// PoL composite score (0-1000 permille) — from frontend PoL computation
+    pub pol_score_permille: u16,
+    /// Sovereignty level (0-1000 permille) — from frontend sovereignty state
+    pub sovereignty_permille: u16,
+    /// Number of published credentials with vitality > 800
+    pub active_credential_count: u32,
+    /// Pathway completion (0-1000 permille) — from frontend progress tracking
+    pub pathway_completion_permille: u16,
+}
+
+/// Result of graduation eligibility check.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GraduationResult {
+    pub eligible: bool,
+    pub graduation_hash: Option<ActionHash>,
+    pub missing: Vec<String>,
+}
+
+/// Check graduation eligibility and record if all conditions met.
+///
+/// Graduation is the moment the platform says: "You are no longer a consumer
+/// of this knowledge; you are a peer-contributor to the mesh."
+#[hdk_extern]
+pub fn check_graduation(input: GraduationCheckInput) -> ExternResult<GraduationResult> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = current_time()?;
+
+    let mut missing = Vec::new();
+
+    if input.pol_score_permille < 850 {
+        missing.push(format!(
+            "PoL score {}/1000 (need 850+)",
+            input.pol_score_permille
+        ));
+    }
+    if input.sovereignty_permille < 801 {
+        missing.push(format!(
+            "Sovereignty {}/1000 (need 801+ Autonomous)",
+            input.sovereignty_permille
+        ));
+    }
+    if input.active_credential_count == 0 {
+        missing.push("No active credentials with vitality > 800".to_string());
+    }
+    if input.pathway_completion_permille < 800 {
+        missing.push(format!(
+            "Pathway {}% complete (need 80%+)",
+            input.pathway_completion_permille / 10
+        ));
+    }
+
+    if !missing.is_empty() {
+        return Ok(GraduationResult {
+            eligible: false,
+            graduation_hash: None,
+            missing,
+        });
+    }
+
+    // All conditions met — record graduation
+    let record = GraduationRecord {
+        agent: agent.clone(),
+        domain: input.domain,
+        pol_score_permille: input.pol_score_permille,
+        sovereignty_permille: input.sovereignty_permille,
+        active_credentials: input.active_credential_count,
+        pathway_completion_permille: input.pathway_completion_permille,
+        graduated_at: now,
+    };
+
+    let hash = create_entry(EntryTypes::GraduationRecord(record))?;
+
+    // Link: agent -> graduation
+    let agent_hash: AnyDhtHash = agent.into();
+    create_link(agent_hash, hash.clone(), LinkTypes::LearnerToGraduation, vec![])?;
+
+    Ok(GraduationResult {
+        eligible: true,
+        graduation_hash: Some(hash),
+        missing: vec![],
+    })
+}
+
+/// List all graduation records for the calling agent.
+#[hdk_extern]
+pub fn list_my_graduations(_: ()) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let agent_hash: AnyDhtHash = agent.into();
+
+    let links = get_links(
+        LinkQuery::try_new(agent_hash, LinkTypes::LearnerToGraduation)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        if let Some(hash) = link.target.into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
 }
 
 #[cfg(test)]

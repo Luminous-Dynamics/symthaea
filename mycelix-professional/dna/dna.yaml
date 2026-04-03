@@ -1,0 +1,39 @@
+manifest_version: "1"
+name: mycelix_professional
+integrity:
+  origin_time: "2026-03-29T00:00:00.000000Z"
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: professional_graph_integrity
+      bundled: ../target/wasm32-unknown-unknown/release/professional_graph_integrity.wasm
+    - name: job_postings_integrity
+      bundled: ../target/wasm32-unknown-unknown/release/job_postings_integrity.wasm
+    - name: work_history_integrity
+      bundled: ../target/wasm32-unknown-unknown/release/work_history_integrity.wasm
+    - name: connection_graph_integrity
+      bundled: ../target/wasm32-unknown-unknown/release/connection_graph_integrity.wasm
+    - name: applications_integrity
+      bundled: ../target/wasm32-unknown-unknown/release/applications_integrity.wasm
+coordinator:
+  zomes:
+    - name: professional_graph
+      bundled: ../target/wasm32-unknown-unknown/release/professional_graph.wasm
+      dependencies:
+        - name: professional_graph_integrity
+    - name: job_postings_coordinator
+      bundled: ../target/wasm32-unknown-unknown/release/job_postings_coordinator.wasm
+      dependencies:
+        - name: job_postings_integrity
+    - name: work_history_coordinator
+      bundled: ../target/wasm32-unknown-unknown/release/work_history_coordinator.wasm
+      dependencies:
+        - name: work_history_integrity
+    - name: connection_graph_coordinator
+      bundled: ../target/wasm32-unknown-unknown/release/connection_graph_coordinator.wasm
+      dependencies:
+        - name: connection_graph_integrity
+    - name: applications_coordinator
+      bundled: ../target/wasm32-unknown-unknown/release/applications_coordinator.wasm
+      dependencies:
+        - name: applications_integrity

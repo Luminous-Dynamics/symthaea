@@ -36,6 +36,9 @@ members = [
   # Trust Tier Bridge (cross-domain dispatch + consciousness gating)
   "zomes/edunet-bridge/integrity",
   "zomes/edunet-bridge/coordinator",
+  # Community Translation (multilingual content with trust-weighted verification)
+  "zomes/translation_zome/integrity",
+  "zomes/translation_zome/coordinator",
 ]
 # Excluded from workspace: these pull in non-WASM-compatible deps.
 # - tests: full holochain conductor (tokio/mio)
