@@ -58,6 +58,22 @@ pub struct ThermodynamicConstants {
     pub harmony_range: f64,
 }
 
+impl ThermodynamicConstants {
+    /// Research-grade constants tuned for scarcity-driven dynamics.
+    /// Solo agent ~1000 ticks. Cooperation extends to 5000+. Wells sustain but don't trivialize.
+    pub fn research() -> Self {
+        Self {
+            initial_energy: 200.0, max_energy: 200.0,
+            movement_cost_per_unit: 0.008, sprint_cost_multiplier: 2.5,
+            consciousness_maintenance_per_tick: 0.20, collision_energy_drain: 0.05,
+            harmony_resonance_regen_rate: 0.06, energy_well_regen_rate: 0.12,
+            ambient_regen_rate: 0.005,
+            collapse_recovery_harmony_threshold: 0.5,
+            harmony_range: 40.0,
+        }
+    }
+}
+
 impl Default for ThermodynamicConstants {
     fn default() -> Self {
         Self {
