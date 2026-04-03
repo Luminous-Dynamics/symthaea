@@ -1,13 +1,13 @@
 [package]
 name = "edunet-tests"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <info@mycelix.org>"]
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 edunet-core = { path = "../crates/edunet-core" }
-edunet-agg = { path = "../crates/edunet-agg" }
+# edunet-agg excluded — has workspace inheritance issues when outside workspace
 
 # Learning zome dependencies (for integration tests)
 learning_integrity = { path = "../zomes/learning_zome/integrity" }
@@ -50,8 +50,8 @@ integration_integrity = { path = "../zomes/integration_zome/integrity" }
 integration_coordinator = { path = "../zomes/integration_zome/coordinator" }
 
 # Holochain dependencies (for integration testing)
-hdk.workspace = true
-hdi.workspace = true
+hdk = "0.6.0"
+hdi = "0.7.0"
 
 # Holochain testing dependencies
 holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
@@ -61,17 +61,17 @@ holochain_types = "0.6"
 tokio = { version = "1.35", features = ["full", "test-util"] }
 
 # Serialization
-serde.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Utilities
-chrono.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1.6", features = ["v4"] }
 
 # Random generation
-rand.workspace = true
-rand_chacha.workspace = true
-rand_distr.workspace = true
+rand = "0.8"
+rand_chacha = "0.3"
+rand_distr = "0.4"
 
 # WASM compatibility: Force getrandom 0.2.x to enable "js" feature
 # This ensures that the transitive dependency (via rand_core) has WASM support
