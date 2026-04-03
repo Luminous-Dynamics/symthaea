@@ -82,13 +82,6 @@ fn run_cognitive_loop(cycles: usize, thresholds: Option<&symthaea_neuroevolution
 
     let mut config = CognitiveLoopConfig::default();
 
-    // Apply evolved thresholds by modifying config values that map to them.
-    // Note: CognitiveLoopConfig doesn't directly expose threshold overrides,
-    // so we modify the CfC config parameters that are closest analogs.
-    if let Some(t) = thresholds {
-        config.cfc_config.learning_rate = t.fep_lr_decay * 0.001; // Scale LR by evolved decay
-    }
-
     let mut service = match CognitiveLoopService::new(config) {
         Ok(s) => s,
         Err(e) => {
@@ -99,6 +92,15 @@ fn run_cognitive_loop(cycles: usize, thresholds: Option<&symthaea_neuroevolution
             };
         }
     };
+
+    // Apply evolved thresholds via the real ThresholdOverrides system.
+    // All 18 evolvable parameters are injected at runtime and take
+    // precedence over compile-time defaults at every usage site.
+    if let Some(t) = thresholds {
+        service.threshold_overrides_mut().apply_from_phenotype(t);
+        println!("    Applied {} threshold overrides",
+            service.threshold_overrides().active_count());
+    }
 
     // Diverse input corpus to drive state changes
     let inputs = [

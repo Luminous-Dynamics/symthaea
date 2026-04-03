@@ -444,6 +444,14 @@ impl NeuralGenome {
     pub fn distance(&self, other: &Self) -> f32 {
         self.hv.hamming_distance(&other.hv) as f32 / BinaryHV::DIM as f32
     }
+
+    pub fn decode_thresholds(&self) -> crate::threshold_genome::ThresholdPhenotype {
+        crate::threshold_genome::decode_thresholds(&self.hv)
+    }
+
+    pub fn encode_thresholds(&mut self, pheno: &crate::threshold_genome::ThresholdPhenotype) {
+        crate::threshold_genome::encode_thresholds(&mut self.hv, pheno);
+    }
 }
 
 /// Simple deterministic bit generator using BLAKE3.
