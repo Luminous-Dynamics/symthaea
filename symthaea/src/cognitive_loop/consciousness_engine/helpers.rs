@@ -164,6 +164,7 @@ impl ConsciousnessEngine {
     ) -> f64 {
         // Normalize spectral phi from [0, ∞) to [0, 1] via shifted sigmoid
         let spectral_norm = spectral_mip_phi
+            .filter(|phi| phi.is_finite())
             .map(|phi| 2.0 / (1.0 + (-phi).exp()) - 1.0)
             .unwrap_or(0.0);
 
