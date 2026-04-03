@@ -43,6 +43,7 @@ pub mod caps_content;
 pub mod channels;
 pub mod dedup;
 pub mod ingest;
+pub mod international_content;
 pub mod mock;
 pub mod pipeline;
 pub mod retention_challenges;
