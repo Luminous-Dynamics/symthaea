@@ -403,7 +403,6 @@ dashmap = { workspace = true }
 lru = { workspace = true }
 rand = { workspace = true }
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
-turbo-quant = { version = "0.1", optional = true }  # PolarQuant HDC vector compression (ICLR 2026)
 blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
 ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"], optional = true }  # MFDI identity signatures
@@ -593,7 +592,6 @@ humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid wi
 
 # ── Storage ────────────────────────────────────────────────────────
 hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with persistent LSH
-turbo-quant = ["dep:turbo-quant"]      # PolarQuant HDC vector compression (64KB → ~10KB per ContinuousHV)
 fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
 space-alerts = []                      # Space situational awareness alerts from mycelix-space
 circular = []                          # Waste/circular economy tracking (SwarmEvent + telemetry)

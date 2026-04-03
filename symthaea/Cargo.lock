@@ -10610,23 +10610,6 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.33.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d43ddcacf343185dfd6de2ee786d9e8b1c2301622afab66b6c73baf9882abfd"
-dependencies = [
- "approx",
- "matrixmultiply",
- "nalgebra-macros 0.2.2",
- "num-complex",
- "num-rational",
- "num-traits",
- "serde",
- "simba",
- "typenum",
-]
-
-[[package]]
-name = "nalgebra"
 version = "0.34.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4d5b3eff5cd580f93da45e64715e8c20a3996342f1e466599cf7a267a0c2f5f"
@@ -10649,23 +10632,12 @@ dependencies = [
  "glam 0.29.3",
  "glam 0.30.10",
  "matrixmultiply",
- "nalgebra-macros 0.3.0",
+ "nalgebra-macros",
  "num-complex",
  "num-rational",
  "num-traits",
  "simba",
  "typenum",
-]
-
-[[package]]
-name = "nalgebra-macros"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "254a5372af8fc138e36684761d3c0cdb758a4410e938babcff1c860ce14ddbfc"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
 ]
 
 [[package]]
@@ -11084,7 +11056,6 @@ checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
 dependencies = [
  "bytemuck",
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -14485,18 +14456,6 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
-dependencies = [
- "dyn-clone",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd191f9397d57d581cddd31014772520aa448f65ef991055d7f61582c65165f"
@@ -14517,18 +14476,6 @@ dependencies = [
  "ref-cast",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn 2.0.117",
 ]
 
 [[package]]
@@ -14756,17 +14703,6 @@ name = "serde_derive"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "serde_derive_internals"
-version = "0.29.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -15797,7 +15733,7 @@ dependencies = [
  "mycelix-crypto",
  "mycelix-fl-core",
  "mycelix-sdk",
- "nalgebra 0.34.1",
+ "nalgebra",
  "ndarray 0.16.1",
  "once_cell",
  "ort",
@@ -15854,6 +15790,7 @@ dependencies = [
  "symthaea-helicopter",
  "symthaea-hodge",
  "symthaea-humanoid",
+ "symthaea-jepa",
  "symthaea-manipulator",
  "symthaea-materials",
  "symthaea-memory",
@@ -15894,7 +15831,6 @@ dependencies = [
  "tree-sitter-nix",
  "tree-sitter-python",
  "tree-sitter-rust",
- "turbo-quant",
  "urlencoding",
  "uuid",
  "wait-timeout",
@@ -16056,7 +15992,7 @@ dependencies = [
  "criterion",
  "duckdb",
  "hf-hub",
- "nalgebra 0.34.1",
+ "nalgebra",
  "ndarray 0.16.1",
  "once_cell",
  "ordered-float 4.6.0",
@@ -16323,6 +16259,16 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+]
+
+[[package]]
+name = "symthaea-jepa"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -16631,7 +16577,7 @@ dependencies = [
  "cpal 0.17.1",
  "ctrlc",
  "hound",
- "nalgebra 0.34.1",
+ "nalgebra",
  "ndarray 0.16.1",
  "rand 0.8.5",
  "ringbuf",
@@ -17997,21 +17943,6 @@ dependencies = [
  "sha1",
  "thiserror 1.0.69",
  "utf-8",
-]
-
-[[package]]
-name = "turbo-quant"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ad22d1738e4ad55b9f6d301b3e2bc320117990718d8bfa20ae034a98f6fed22"
-dependencies = [
- "nalgebra 0.33.3",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rand_distr 0.4.3",
- "schemars 0.8.22",
- "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]
