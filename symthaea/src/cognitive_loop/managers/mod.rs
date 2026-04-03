@@ -166,3 +166,8 @@ pub use vision_manager::VisionManager;
 pub mod muse_manager;
 #[cfg(feature = "muse")]
 pub use muse_manager::{MuseManager, MuseTelemetry};
+
+#[cfg(feature = "hypervisor")]
+pub mod hypervisor_manager;
+#[cfg(feature = "hypervisor")]
+pub use hypervisor_manager::{HypervisorManager, HypervisorTelemetry, SupervisoryEvent};

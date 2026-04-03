@@ -207,6 +207,7 @@ pub struct FepModule {
 
     /// Current learning signal from FEP (for downstream systems).
     pub learning_signal: f32,
+    pub last_action_idx: u8,
 
     /// FEP-driven learning rate boost (applied during CfC training step).
     /// Range: [1.0, 3.0].

@@ -82,7 +82,7 @@ pub struct NeuralPhenotype {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Extract `num_bits` starting at `start_bit` from a BinaryHV, returned as u64.
-fn extract_bits(hv: &BinaryHV, start_bit: usize, num_bits: usize) -> u64 {
+pub(crate) fn extract_bits(hv: &BinaryHV, start_bit: usize, num_bits: usize) -> u64 {
     let mut value: u64 = 0;
     for i in 0..num_bits {
         let bit_index = start_bit + i;
@@ -96,7 +96,7 @@ fn extract_bits(hv: &BinaryHV, start_bit: usize, num_bits: usize) -> u64 {
 }
 
 /// Set `num_bits` starting at `start_bit` in a BinaryHV from a u64 value.
-fn set_bits(hv: &mut BinaryHV, start_bit: usize, num_bits: usize, value: u64) {
+pub(crate) fn set_bits(hv: &mut BinaryHV, start_bit: usize, num_bits: usize, value: u64) {
     for i in 0..num_bits {
         let bit_index = start_bit + i;
         let byte_index = bit_index / 8;
@@ -110,7 +110,7 @@ fn set_bits(hv: &mut BinaryHV, start_bit: usize, num_bits: usize, value: u64) {
 }
 
 /// Map a u64 (from `num_bits` bits) to a f32 in [lo, hi] linearly.
-fn bits_to_linear(raw: u64, num_bits: usize, lo: f32, hi: f32) -> f32 {
+pub(crate) fn bits_to_linear(raw: u64, num_bits: usize, lo: f32, hi: f32) -> f32 {
     let max_val = ((1u64 << num_bits) - 1) as f32;
     if max_val == 0.0 {
         return lo;
@@ -127,7 +127,7 @@ fn bits_to_log(raw: u64, num_bits: usize, lo: f32, hi: f32) -> f32 {
 }
 
 /// Inverse of bits_to_linear: f32 in [lo, hi] → u64 for `num_bits`.
-fn linear_to_bits(val: f32, num_bits: usize, lo: f32, hi: f32) -> u64 {
+pub(crate) fn linear_to_bits(val: f32, num_bits: usize, lo: f32, hi: f32) -> u64 {
     let max_val = ((1u64 << num_bits) - 1) as f32;
     let t = ((val - lo) / (hi - lo)).clamp(0.0, 1.0);
     (t * max_val).round() as u64

@@ -51,6 +51,7 @@ members = [
     "crates/symthaea-nurture",
     "crates/symthaea-population",
     "crates/symthaea-neuroevolution",
+    "crates/symthaea-jepa",
     "crates/symthaea-materials",
     "crates/symthaea-nuclear-forensics",
     "crates/symthaea-memory",
@@ -293,6 +294,7 @@ symthaea-ectogenesis = { path = "crates/symthaea-ectogenesis", optional = true }
 symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
 symthaea-population = { path = "crates/symthaea-population", optional = true }
 symthaea-neuroevolution = { path = "crates/symthaea-neuroevolution", optional = true }
+symthaea-jepa = { path = "crates/symthaea-jepa", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
 symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
@@ -537,6 +539,7 @@ spectral_state = []                         # Spectral twin: frequency-domain Cf
 
 # ── Defense / Immune System ────────────────────────────────────────
 sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
+hypervisor = []                              # Hierarchical consciousness supervision
 
 # ── Consciousness Deepening ───────────────────────────────────────
 provenance = []                              # Source tracking on StructuredThought (Goldman 1986: reliabilism)
@@ -582,6 +585,7 @@ ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-h
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
 neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
+jepa = ["dep:symthaea-jepa"]                         # JEPA: latent-space prediction for thermodynamically efficient FEP
 therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba-cpu"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating (CPU; use symthaea-broca/mamba for GPU)
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
