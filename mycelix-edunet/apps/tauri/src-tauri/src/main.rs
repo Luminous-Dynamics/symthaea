@@ -58,9 +58,29 @@ pub enum ConductorState {
     Error(String),
 }
 
+/// Consciousness state from Soma sensors (or simulation).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConsciousnessState {
+    /// Integrated Information (Phi proxy, 0.0-1.0)
+    pub phi: f32,
+    /// Neuromodulator levels (0.0-1.0 each)
+    pub dopamine: f32,
+    pub serotonin: f32,
+    pub norepinephrine: f32,
+    /// Derived signals
+    pub valence: f32,   // DA - cortisol (-1 to 1)
+    pub arousal: f32,   // NE + DA*0.5 (0 to 1.5)
+    /// Metabolic state
+    pub wake_state: String, // "Alert", "Focused", "Drowsy", "Sleeping"
+    /// Timestamp
+    pub tick: u64,
+}
+
 /// Application state managed by Tauri.
 struct AppState {
     conductor_state: std::sync::Mutex<ConductorState>,
+    consciousness: std::sync::Mutex<ConsciousnessState>,
+    consciousness_tick: std::sync::atomic::AtomicU64,
 }
 
 // ============== IPC Commands ==============
@@ -219,6 +239,63 @@ fn validate_bkt_state(claimed: f32, attempts: u32, correct: u32, tolerance: f32)
     claimed >= (min_case - tolerance) && claimed <= (max_case + tolerance)
 }
 
+// ============== Consciousness Commands ==============
+
+/// Get current consciousness state (from Soma or simulation).
+#[tauri::command]
+fn get_consciousness(state: tauri::State<AppState>) -> ConsciousnessState {
+    state.consciousness.lock().unwrap().clone()
+}
+
+/// Update consciousness from sensor data (called by frontend at 4Hz).
+/// In simulation mode, this auto-updates. With Soma, real sensor data feeds in.
+#[tauri::command]
+fn tick_consciousness(
+    state: tauri::State<AppState>,
+    keyboard_active: bool,
+    mouse_moving: bool,
+) -> ConsciousnessState {
+    let tick = state.consciousness_tick.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+    let mut cs = state.consciousness.lock().unwrap();
+
+    // Desktop sensor simulation (replaced by real Soma when consciousness feature enabled)
+    // Keyboard activity → attention proxy → dopamine + norepinephrine
+    let activity = if keyboard_active { 0.7 } else if mouse_moving { 0.4 } else { 0.1 };
+
+    // Simple coupled-oscillator simulation (matches Leptos consciousness.rs)
+    let t = tick as f64 * 0.25; // 4Hz tick rate
+    let theta = (t * 0.4).sin() as f32 * 0.3 + 0.5;  // ~4Hz theta
+    let gamma = (t * 4.0).sin() as f32 * 0.2 + 0.5;   // ~40Hz gamma
+
+    // Phi proxy: phase-amplitude coupling modulated by activity
+    cs.phi = (theta * gamma * activity).clamp(0.0, 1.0);
+
+    // Neuromodulators from activity
+    cs.dopamine = (activity * 0.8 + (t * 0.1).sin() as f32 * 0.2).clamp(0.0, 1.0);
+    cs.serotonin = (0.5 + (t * 0.05).cos() as f32 * 0.2).clamp(0.0, 1.0);
+    cs.norepinephrine = (activity * 0.6 + (t * 0.15).sin() as f32 * 0.15).clamp(0.0, 1.0);
+
+    // Derived
+    let cortisol = cs.norepinephrine * (1.0 - cs.serotonin);
+    cs.valence = cs.dopamine - cortisol;
+    cs.arousal = cs.norepinephrine + cs.dopamine * 0.5;
+
+    // Wake state from activity patterns
+    cs.wake_state = if cs.phi > 0.55 && cs.dopamine > 0.4 {
+        "Focused".to_string()
+    } else if cs.phi > 0.35 {
+        "Alert".to_string()
+    } else if activity > 0.2 {
+        "Drowsy".to_string()
+    } else {
+        "Sleeping".to_string()
+    };
+
+    cs.tick = tick;
+    cs.clone()
+}
+
 // ============== Entry Point ==============
 
 fn main() {
@@ -226,11 +303,24 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             conductor_state: std::sync::Mutex::new(ConductorState::Stopped),
+            consciousness: std::sync::Mutex::new(ConsciousnessState {
+                phi: 0.0,
+                dopamine: 0.5,
+                serotonin: 0.5,
+                norepinephrine: 0.3,
+                valence: 0.0,
+                arousal: 0.3,
+                wake_state: "Alert".to_string(),
+                tick: 0,
+            }),
+            consciousness_tick: std::sync::atomic::AtomicU64::new(0),
         })
         .invoke_handler(tauri::generate_handler![
             get_conductor_state,
             validate_pwa_import,
             get_platform_info,
+            get_consciousness,
+            tick_consciousness,
         ])
         .run(tauri::generate_context!())
         .expect("error while running EduNet");
