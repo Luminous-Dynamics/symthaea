@@ -19,6 +19,7 @@ pub mod provenance;
 pub mod proof_of_learning;
 pub mod types;
 pub mod validation;
+mod benchmarks;
 
 pub use crypto::*;
 pub use errors::*;
