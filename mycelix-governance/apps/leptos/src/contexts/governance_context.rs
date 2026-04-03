@@ -73,11 +73,20 @@ async fn try_load_real_data(ctx: GovernanceCtx) {
 
     web_sys::console::log_1(&"[Civic] Loading real governance data from conductor…".into());
 
-    // Load proposals
+    // Load proposals — conductor returns Vec<Record> decoded to JSON values.
     match hc.call_zome::<(), Vec<serde_json::Value>>("governance", "proposals", "get_active_proposals", &()).await {
         Ok(records) => {
-            web_sys::console::log_1(&format!("[Civic] Loaded {} proposals", records.len()).into());
-            // TODO: parse records into ProposalView via record_bridge
+            let proposals: Vec<ProposalView> = records
+                .iter()
+                .filter_map(|record| {
+                    let entry = record.get("entry")?.get("Present")?;
+                    serde_json::from_value::<ProposalView>(entry.clone()).ok()
+                })
+                .collect();
+            web_sys::console::log_1(&format!("[Civic] Loaded {} proposals from conductor", proposals.len()).into());
+            if !proposals.is_empty() {
+                ctx.proposals.set(proposals);
+            }
         }
         Err(e) => {
             web_sys::console::log_1(&format!("[Civic] Could not load proposals: {e}").into());

@@ -447,6 +447,11 @@ pub fn App() -> impl IntoView {
                                     <h1 class="domain-title">{domain_data.as_ref().map(|d| d.bio_name).unwrap_or("Unknown")}</h1>
                                     <p class="domain-subtitle">{domain_data.as_ref().map(|d| d.name).unwrap_or("")}</p>
                                 </div>
+                                {domain_app_url(&domain_id).map(|url| view! {
+                                    <a class="domain-launch-btn" href=url target="_blank" rel="noopener">
+                                        "Open Full App →"
+                                    </a>
+                                })}
                             </div>
                             <div class="domain-stats">
                                 <div class="domain-stat">
@@ -468,6 +473,18 @@ pub fn App() -> impl IntoView {
                 }
             }}
         </div>
+    }
+}
+
+/// Map domain IDs to standalone app URLs.
+fn domain_app_url(domain_id: &str) -> Option<&'static str> {
+    match domain_id {
+        "governance" => Some("http://localhost:8110"),
+        "hearth" => Some("http://localhost:8096"),
+        "edunet" => Some("http://localhost:8107"),
+        "health" => Some("http://localhost:8111"),
+        "music" => Some("http://localhost:8121"),
+        _ => None,
     }
 }
 

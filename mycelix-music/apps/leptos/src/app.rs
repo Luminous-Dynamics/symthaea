@@ -44,19 +44,19 @@ pub fn App() -> impl IntoView {
                 <Nav />
                 <main class="main-content">
                     <Routes fallback=|| view! { <div class="page"><h1>"404 — Page not found"</h1></div> }>
-                        <Route path=path!("/") view=HomePage />
+                        <Route path=path!("/") view=ConsciousnessPage />
                         <Route path=path!("/discover") view=DiscoverPage />
                         <Route path=path!("/artist") view=ArtistPage />
                         <Route path=path!("/dashboard") view=DashboardPage />
                         <Route path=path!("/upload") view=UploadPage />
                         <Route path=path!("/gallery") view=GalleryPage />
-                        <Route path=path!("/consciousness") view=ConsciousnessPage />
+                        <Route path=path!("/about") view=HomePage />
                     </Routes>
                 </main>
                 <Player />
                 <footer class="footer">
                     <ConnectionStatusIndicator />
-                    <span class="footer-text">"Mycelix Music — Zero-cost streaming on Holochain"</span>
+                    <span class="footer-text">"Mycelix Music — What does your consciousness sound like?"</span>
                 </footer>
             </Router>
         </HolochainProvider>

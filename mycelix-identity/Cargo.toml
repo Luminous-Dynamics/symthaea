@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 # Tests excluded from WASM workspace (use different deps)
-exclude = ["tests", "cli"]
+exclude = ["tests", "cli", "crates/identity-leptos-types", "apps"]
 members = [
     # Shared crypto-agile types (PQE abstraction layer)
     "crates/mycelix-crypto",

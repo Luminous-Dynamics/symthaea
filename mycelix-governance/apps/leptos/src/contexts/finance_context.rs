@@ -71,9 +71,11 @@ async fn try_load_real_data(ctx: FinanceCtx) {
             dao_did: "default".into(),
         },
     ).await {
-        Ok(_record) => {
-            web_sys::console::log_1(&"[Civic] Loaded TEND balance".into());
-            // TODO: parse record into TendBalanceView
+        Ok(record) => {
+            if let Ok(balance) = serde_json::from_value::<TendBalanceView>(record) {
+                ctx.tend_balance.set(balance);
+                web_sys::console::log_1(&"[Civic] Loaded TEND balance from conductor".into());
+            }
         }
         Err(e) => {
             web_sys::console::log_1(&format!("[Civic] Could not load TEND balance: {e}").into());
@@ -82,15 +84,16 @@ async fn try_load_real_data(ctx: FinanceCtx) {
 
     // Load oracle state
     match hc.call_zome::<(), serde_json::Value>("finance", "tend", "get_oracle_state", &()).await {
-        Ok(_record) => {
-            web_sys::console::log_1(&"[Civic] Loaded oracle state".into());
+        Ok(record) => {
+            if let Ok(oracle) = serde_json::from_value::<OracleStateView>(record) {
+                ctx.oracle_state.set(oracle);
+                web_sys::console::log_1(&"[Civic] Loaded oracle state from conductor".into());
+            }
         }
         Err(e) => {
             web_sys::console::log_1(&format!("[Civic] Could not load oracle: {e}").into());
         }
     }
-
-    let _ = ctx;
 }
 
 pub fn use_finance() -> FinanceCtx {
