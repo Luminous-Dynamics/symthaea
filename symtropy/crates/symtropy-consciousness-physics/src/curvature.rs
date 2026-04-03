@@ -115,8 +115,6 @@ impl<const D: usize> ConformalMetric<D> {
             raw
         }
     }
-}
-
     /// Ricci scalar curvature for validation (Fix 8).
     ///
     /// For conformal metric g = e^{2σ}δ in D dimensions:
