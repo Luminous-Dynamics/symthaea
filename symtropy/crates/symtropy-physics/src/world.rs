@@ -217,6 +217,23 @@ impl<const D: usize> PhysicsWorld<D> {
             }
         }
 
+        // 5b. Velocity-level constraint solve (impulse-based, Fix 7)
+        for _ in 0..self.solver_iterations {
+            for ci in 0..self.constraints.len() {
+                let (ha, hb) = self.constraints[ci].bodies();
+                let (idx_a, idx_b) = self.find_body_indices(ha, hb);
+                if let (Some(a), Some(b)) = (idx_a, idx_b) {
+                    if a < b {
+                        let (left, right) = self.bodies.split_at_mut(b);
+                        self.constraints[ci].solve_velocity(&mut left[a], &mut right[0], dt);
+                    } else {
+                        let (left, right) = self.bodies.split_at_mut(a);
+                        self.constraints[ci].solve_velocity(&mut right[0], &mut left[b], dt);
+                    }
+                }
+            }
+        }
+
         // 6. Body sleeping: deactivate near-stationary bodies
         let threshold = self.sleep_threshold;
         let ticks = self.sleep_ticks;

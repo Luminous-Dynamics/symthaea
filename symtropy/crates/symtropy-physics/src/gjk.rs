@@ -363,16 +363,21 @@ fn do_simplex_general<const D: usize>(
             }
         }
 
-        // Approximate normal: use triple cross product of first two face vectors
-        if face_vecs.len() >= 2 {
-            let normal = triple_cross_product(&face_vecs[0], &face_vecs[1], &face_vecs[0]);
-            // Ensure normal points away from removed vertex
+        // Gram-Schmidt normal: project toward-removed onto face span, take perpendicular.
+        // Exact for any D (Fix 9: replaces approximate triple cross product).
+        if face_vecs.len() >= 1 {
             let to_removed = simplex[i] - a;
-            let outward = if normal.dot(&to_removed) < 0.0 {
-                normal
-            } else {
-                -normal
-            };
+            let mut normal = to_removed;
+            for edge in &face_vecs {
+                let edge_nsq = edge.norm_squared();
+                if edge_nsq > 1e-20 {
+                    let proj = edge * (normal.dot(edge) / edge_nsq);
+                    normal -= proj;
+                }
+            }
+            // Normal now perpendicular to face, pointing toward removed vertex.
+            // Negate to point OUTWARD (away from removed).
+            let outward = -normal;
 
             if outward.dot(&ao) > 0.0 {
                 // Origin is outside this face — remove vertex i and continue

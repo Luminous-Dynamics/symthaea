@@ -10,9 +10,14 @@ pub trait Constraint<const D: usize>: Send + Sync {
     /// The two bodies this constraint connects.
     fn bodies(&self) -> (BodyHandle, BodyHandle);
 
-    /// Solve the constraint by applying positional corrections and velocity changes.
+    /// Solve the constraint by applying positional corrections.
     /// Called multiple times per frame for iterative convergence.
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, dt: f64);
+
+    /// Optional velocity-level correction (impulse-based, Fix 7).
+    /// Called after position solve for hybrid PBD+impulse dynamics.
+    /// Default: no-op (pure PBD).
+    fn solve_velocity(&self, _body_a: &mut RigidBody<D>, _body_b: &mut RigidBody<D>, _dt: f64) {}
 }
 
 /// Distance constraint: keeps two bodies at a fixed distance.
@@ -51,6 +56,28 @@ impl<const D: usize> Constraint<D> for DistanceConstraint<D> {
         }
         if body_b.is_dynamic() {
             body_b.transform.translation.0 -= correction * ratio_b;
+        }
+    }
+
+    fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
+        let delta = body_b.transform.translation.0 - body_a.transform.translation.0;
+        let dist = delta.norm();
+        if dist < 1e-15 { return; }
+        let normal = delta / dist;
+
+        let rel_vel = body_b.linear_velocity - body_a.linear_velocity;
+        let vel_along = rel_vel.dot(&normal);
+
+        let total_inv = body_a.inv_mass + body_b.inv_mass;
+        if total_inv < 1e-15 { return; }
+        let impulse = -vel_along / total_inv * self.stiffness;
+
+        let impulse_vec = normal * impulse;
+        if body_a.is_dynamic() {
+            body_a.linear_velocity -= impulse_vec * body_a.inv_mass;
+        }
+        if body_b.is_dynamic() {
+            body_b.linear_velocity += impulse_vec * body_b.inv_mass;
         }
     }
 }

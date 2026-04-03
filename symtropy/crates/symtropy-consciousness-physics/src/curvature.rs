@@ -117,6 +117,23 @@ impl<const D: usize> ConformalMetric<D> {
     }
 }
 
+    /// Ricci scalar curvature for validation (Fix 8).
+    ///
+    /// For conformal metric g = e^{2σ}δ in D dimensions:
+    /// R = -2(D-1)(∇²σ + (D-1)|∇σ|²)   (small σ approximation)
+    ///
+    /// Negative R = positive curvature (space bends toward source).
+    /// Zero R = flat space. Used for experiment validation, not dynamics.
+    pub fn ricci_scalar(
+        &self,
+        sigma_gradient: &SVector<f64, D>,
+        sigma_laplacian: f64,
+    ) -> f64 {
+        let d = D as f64;
+        -2.0 * (d - 1.0) * (sigma_laplacian + (d - 1.0) * sigma_gradient.norm_squared())
+    }
+}
+
 impl<const D: usize> Default for ConformalMetric<D> {
     fn default() -> Self {
         Self::new()

@@ -134,6 +134,50 @@ impl<const D: usize> HarmonyField<D> {
         let field = self.sample(point);
         field.iter().sum()
     }
+
+    /// Gradient of conformal parameter σ = scale × field_energy (for curvature).
+    /// Computed via central finite differences.
+    #[cfg(feature = "consciousness-curvature")]
+    pub fn sigma_gradient(
+        &self,
+        point: &Point<D>,
+        curvature_scale: f64,
+        epsilon: f64,
+    ) -> nalgebra::SVector<f64, D> {
+        let mut grad = nalgebra::SVector::<f64, D>::zeros();
+        for i in 0..D {
+            let mut p_plus = *point;
+            let mut p_minus = *point;
+            *p_plus.coord_mut(i) += epsilon;
+            *p_minus.coord_mut(i) -= epsilon;
+            let e_plus = self.field_energy(&p_plus) * curvature_scale;
+            let e_minus = self.field_energy(&p_minus) * curvature_scale;
+            grad[i] = (e_plus - e_minus) / (2.0 * epsilon);
+        }
+        grad
+    }
+
+    /// Laplacian of conformal parameter σ (for Ricci scalar, Fix 8).
+    #[cfg(feature = "consciousness-curvature")]
+    pub fn sigma_laplacian(
+        &self,
+        point: &Point<D>,
+        curvature_scale: f64,
+        epsilon: f64,
+    ) -> f64 {
+        let center = self.field_energy(point) * curvature_scale;
+        let mut sum = 0.0;
+        for i in 0..D {
+            let mut p_plus = *point;
+            let mut p_minus = *point;
+            *p_plus.coord_mut(i) += epsilon;
+            *p_minus.coord_mut(i) -= epsilon;
+            let e_plus = self.field_energy(&p_plus) * curvature_scale;
+            let e_minus = self.field_energy(&p_minus) * curvature_scale;
+            sum += (e_plus - 2.0 * center + e_minus) / (epsilon * epsilon);
+        }
+        sum
+    }
 }
 
 impl<const D: usize> Default for HarmonyField<D> {
