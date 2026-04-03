@@ -68,6 +68,9 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         SVector::from([25.0, 25.0]),
         SVector::from([-25.0, -25.0]),
     ];
+    // Well depletion: each well has finite capacity (Joules).
+    // Forces migration when wells run dry, breaking equilibrium flatline.
+    let mut well_remaining = vec![3000.0f64; well_positions.len()];
 
     let mut rng = seed;
     let mut handles = Vec::new();
@@ -146,7 +149,11 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                     Some((body.position().0, entity.harmony_activations))
                 }).collect();
 
-            let well_data: Vec<(SVector<f64, 2>, f64)> = well_positions.iter().map(|&p| (p, 1.0)).collect();
+            // Well data includes remaining fraction (depleted wells are less attractive)
+            let well_data: Vec<(SVector<f64, 2>, f64)> = well_positions.iter().zip(well_remaining.iter())
+                .filter(|(_, &rem)| rem > 0.0)
+                .map(|(&p, &rem)| (p, (rem / 3000.0).min(1.0)))
+                .collect();
 
             for &h in &handles {
                 let Some(body) = world.body(h) else { continue };
@@ -172,12 +179,14 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         let ambient_rate = consciousness.constants.ambient_regen_rate;
         let well_rate = consciousness.constants.energy_well_regen_rate;
 
-        // Collect well proximity before mutable borrow
-        let near_wells: Vec<bool> = handles.iter().map(|&h| {
-            world.body(h).map(|body| {
+        // Collect which well (if any) each agent is near, with depletion check
+        let agent_well_idx: Vec<Option<usize>> = handles.iter().map(|&h| {
+            world.body(h).and_then(|body| {
                 let pos = body.position().0;
-                well_positions.iter().any(|&wp| (pos - wp).norm() < 35.0)
-            }).unwrap_or(false)
+                well_positions.iter().enumerate()
+                    .find(|(i, &wp)| (pos - wp).norm() < 35.0 && well_remaining[*i] > 0.0)
+                    .map(|(i, _)| i)
+            })
         }).collect();
 
         for (idx, &h) in handles.iter().enumerate() {
@@ -193,11 +202,13 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                 consciousness.consume_energy(h, maintenance);
             }
 
-            // Regeneration
+            // Regeneration (with well depletion)
             if let Some(entity) = consciousness.entities.get_mut(&h) {
                 entity.energy.regenerate(ambient_rate * regen_mult);
-                if near_wells[idx] {
-                    entity.energy.regenerate(well_rate);
+                if let Some(wi) = agent_well_idx[idx] {
+                    let draw = well_rate.min(well_remaining[wi]);
+                    entity.energy.regenerate(draw);
+                    well_remaining[wi] -= draw;
                 }
             }
         }
