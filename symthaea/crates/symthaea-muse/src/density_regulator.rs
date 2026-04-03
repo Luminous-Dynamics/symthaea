@@ -99,10 +99,12 @@ impl DensityRegulator {
 
     /// Adjust note_gen_cadence based on current density.
     pub fn adjust_cadence(&self, current: u32) -> u32 {
+        // Respect the caller's cadence range — don't cap to 16.
+        // Low-arousal states legitimately need cadences of 100+ chunks.
         match self.recommend() {
-            DensityAction::IncreaseCadence(n) => (current + n).min(16),
+            DensityAction::IncreaseCadence(n) => current + n,
             DensityAction::ReduceCadence(n) => current.saturating_sub(n).max(1),
-            DensityAction::InsertRest => (current + 3).min(16),
+            DensityAction::InsertRest => current + 5,
             DensityAction::NoAction => current,
         }
     }

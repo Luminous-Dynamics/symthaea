@@ -4,10 +4,16 @@
 
 mod nav;
 mod player;
+mod queue;
 mod song_card;
 mod earnings;
+mod metrics_panel;
+mod mini_viz;
 
 pub use nav::Nav;
 pub use player::Player;
+pub use queue::QueuePanel;
 pub use song_card::SongCard;
 pub use earnings::EarningsCalculator;
+pub use metrics_panel::MetricsPanel;
+pub use mini_viz::MiniViz;

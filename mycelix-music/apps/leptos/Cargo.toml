@@ -22,10 +22,27 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = [
     "console", "HtmlAudioElement", "HtmlInputElement",
     "HtmlCanvasElement", "CanvasRenderingContext2d",
+    "HtmlMediaElement", "HtmlElement", "MediaError",
+    "Event", "EventTarget", "CssStyleDeclaration",
     "Window", "Storage", "Document", "Performance",
+    # WebGL2 consciousness visualization
+    "WebGl2RenderingContext", "WebGlProgram", "WebGlShader",
+    "WebGlBuffer", "WebGlUniformLocation", "WebGlVertexArrayObject",
+    # Web Audio API for synthesis + spectral analysis
+    "AudioContext", "AnalyserNode", "GainNode",
+    "MediaElementAudioSourceNode", "AudioNode", "AudioDestinationNode",
+    "BaseAudioContext", "AudioBuffer", "AudioBufferSourceNode",
+    "AudioScheduledSourceNode",
+    # Blob/URL for WAV export download
+    "Blob", "BlobPropertyBag", "Url",
 ] }
 console_error_panic_hook = "0.1"
 gloo-timers = { version = "0.3", features = ["futures"] }
+
+# Real consciousness-driven synthesis engine
+symthaea-muse = { path = "../../../symthaea/crates/symthaea-muse", default-features = false }
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { version = "1", features = ["js"] }
 
 # Shared Mycelix Leptos infrastructure
 mycelix-leptos-core = { path = "../../../crates/mycelix-leptos-core" }

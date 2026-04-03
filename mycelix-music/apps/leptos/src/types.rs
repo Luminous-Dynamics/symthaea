@@ -157,6 +157,17 @@ impl VerificationTier {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum RepeatMode { None, One, All }
+impl RepeatMode {
+    pub fn icon(&self) -> &'static str { match self { Self::None => "\u{1f501}", Self::One => "\u{1f502}", Self::All => "\u{1f501}" } }
+    pub fn next(&self) -> Self { match self { Self::None => Self::All, Self::All => Self::One, Self::One => Self::None } }
+}
+
+pub fn mock_verification(artist: &str) -> VerificationTier {
+    match artist { "mock-artist-1" => VerificationTier::CommunityVerified, "mock-artist-2" => VerificationTier::Trusted, _ => VerificationTier::Unverified }
+}
+
 // --- Mock data for when conductor is unavailable ---
 
 pub fn mock_songs() -> Vec<Song> {

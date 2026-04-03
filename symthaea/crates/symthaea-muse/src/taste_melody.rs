@@ -212,15 +212,28 @@ impl TasteMelody {
     /// Should this be a rest instead of a note?
     /// Must advance seed to avoid repeating the same decision.
     pub fn should_rest(&mut self) -> bool {
+        self.should_rest_with_arousal(0.5)
+    }
+
+    /// Consciousness-aware rest probability.
+    /// Low arousal = more silence (Eno: "silence at least twice as long as sound").
+    /// High arousal = fewer rests (energetic states fill space).
+    pub fn should_rest_with_arousal(&mut self, arousal: f32) -> bool {
         self.seed = self.seed.wrapping_mul(1664525).wrapping_add(1013904223);
         let r = (self.seed >> 16) % 100;
-        // Rests at phrase boundaries for breathing
+
+        // Base rest probability scales inversely with arousal:
+        // arousal=0.1 → 40% base rest (peaceful, breathing)
+        // arousal=0.5 → 15% base rest
+        // arousal=0.9 → 3% base rest (energetic, filling)
+        let base_rest = ((1.0 - arousal) * 45.0) as u32;
+
         if self.phrase_notes >= self.phrase_length.saturating_sub(1) {
-            r < 25 // 25% chance at phrase end
+            r < base_rest + 20 // phrase end: more likely to breathe
         } else if self.phrase_notes == 0 {
-            r < 15 // 15% chance at phrase start
+            r < base_rest + 10 // phrase start: slight pause before beginning
         } else {
-            r < 5  // 5% chance mid-phrase (sparse rests)
+            r < base_rest
         }
     }
 

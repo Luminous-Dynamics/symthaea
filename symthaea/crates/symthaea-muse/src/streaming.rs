@@ -50,11 +50,11 @@ const MIN_CHUNK_SAMPLES: usize = 64;
 // ── Synthesis Parameter Constants ────────────────────────────────────────
 // Each constant documents its acoustic/psychoacoustic rationale.
 
-/// Minimum gain at zero arousal. Prevents complete silence.
-const GAIN_MIN: f32 = 0.03;
-/// Arousal² gain coefficient. Weber-Fechner: perceived loudness ~ log(intensity).
-/// 0.03 + 1.0² × 0.32 = 0.35 at max arousal → ~21dB dynamic range.
-const GAIN_AROUSAL_COEFF: f32 = 0.32;
+/// Minimum gain at zero arousal.
+const GAIN_MIN: f32 = 0.22;
+/// Arousal gain coefficient. Total: 0.22 (calm) to 0.42 (excited).
+/// Reduced from 0.30 to prevent clipping when drums + notes overlap at high arousal.
+const GAIN_AROUSAL_COEFF: f32 = 0.20;
 /// Valence gain modulation ±15%. Huron (2006): happy music performed louder.
 const VALENCE_GAIN_SCALE: f32 = 0.15;
 
@@ -211,6 +211,11 @@ pub struct StreamingSynth {
     fe_history: Vec<f64>,
     /// Dither PRNG state.
     dither_state: u32,
+    /// Brightness evolution: smoothed RMS for timbral arc.
+    brightness_rms: f32,
+    /// Brightness LP filter state (L/R).
+    brightness_lp_l: f32,
+    brightness_lp_r: f32,
     /// Mixing chain: EQ → compressor → limiter.
     mixing: MixingChain,
     /// Pending drum hits for the current bar.
@@ -288,6 +293,9 @@ impl StreamingSynth {
             fep_engine: MusicalInferenceEngine::new(),
             fe_history: Vec::with_capacity(1024),
             dither_state: 42,
+            brightness_rms: 0.0,
+            brightness_lp_l: 0.0,
+            brightness_lp_r: 0.0,
             mixing: MixingChain::new(sample_rate),
             drum_hits: Vec::new(),
             bar_sample_pos: 0,
@@ -345,15 +353,24 @@ impl StreamingSynth {
         );
 
         // Arousal-driven note generation cadence:
-        // High arousal (0.9) → generate every 1 chunk (dense onsets)
-        // Low arousal (0.1) → generate every 8 chunks (sparse, calm)
-        // Formula: cadence = 8 - 7 * arousal, clamped to [1, 8]
-        let base_cadence = 8.0 - 7.0 * state.arousal.clamp(0.0, 1.0);
-        // Apply tempo rubato from dramatic state
+        // Each chunk is ~32ms. At 44.1kHz with 1411 samples/chunk:
+        //   1 chunk  = 32ms  (frantic)
+        //   30 chunks = ~1s  (moderate)
+        //   90 chunks = ~3s  (calm)
+        //   150 chunks = ~5s (very peaceful)
+        //
+        // High arousal (0.9) → every 2 chunks (~64ms, very dense)
+        // Mid arousal (0.5) → every 20 chunks (~640ms)
+        // Low arousal (0.1) → every 100 chunks (~3.2s, very sparse)
+        let arousal = state.arousal.clamp(0.05, 0.95);
+        // Exponential curve: sparse at low arousal, dense at high
+        let base_cadence = 2.0 + 148.0 * (1.0 - arousal).powf(2.5);
         let rubato_cadence = base_cadence / self.dramatic.tempo_factor.max(0.5);
-        self.note_gen_cadence = rubato_cadence.round().clamp(1.0, 12.0) as u32;
-        // Density regulator adjusts cadence to match section targets
-        self.note_gen_cadence = self.density.adjust_cadence(self.note_gen_cadence);
+        self.note_gen_cadence = rubato_cadence.round().clamp(2.0, 200.0) as u32;
+        // Only let density regulator adjust if arousal is moderate+.
+        if state.arousal > 0.3 {
+            self.note_gen_cadence = self.density.adjust_cadence(self.note_gen_cadence);
+        }
 
         // Dynamic time signature and groove (consciousness-driven)
         self.time_sig = rhythm_engine::select_time_signature(&self.state);
@@ -540,7 +557,33 @@ impl StreamingSynth {
                     }
                     s * norm * env
                     };
-                    sc * 0.6 + additive * 0.4
+                    // Dynamic blend with LP-filtered additive layer.
+                    // The additive synth only contributes sub-bass warmth,
+                    // not competing mid/high frequencies.
+                    let phi = self.state.consciousness_level;
+                    let pe = self.state.prediction_error;
+                    let ne = self.state.noradrenaline;
+                    let serotonin = self.state.serotonin;
+
+                    // LP filter the additive output (1-pole, ~200-400Hz cutoff)
+                    // Higher serotonin → higher cutoff (warmer, richer sub-contribution)
+                    let lp_cutoff = 200.0 + serotonin * 200.0; // 200-400 Hz
+                    let lp_alpha = (lp_cutoff / (lp_cutoff + sr / std::f32::consts::TAU)).min(0.99);
+                    // Simple 1-pole: out = alpha * in + (1-alpha) * prev
+                    // Use the note's fm_phase as scratch for LP state (it's unused in sample mode)
+                    let lp_prev = active.fm_phase; // reuse as LP filter state
+                    let lp_out = lp_alpha * additive + (1.0 - lp_alpha) * lp_prev;
+                    active.fm_phase = lp_out; // store state for next sample
+
+                    // Dynamic blend ratio
+                    let additive_blend = (0.05
+                        + phi * 0.15
+                        + pe * 0.10
+                        + ne * 0.05
+                        - serotonin * 0.08
+                    ).clamp(0.02, 0.35);
+                    let sample_blend = 1.0 - additive_blend;
+                    sc * sample_blend + lp_out * additive_blend
                 } else {
                     // No sample: pure additive synthesis
                     let inst_partials = active.instrument.partials();
@@ -562,8 +605,10 @@ impl StreamingSynth {
                     s * (if psum > 0.01 { 1.0 / psum } else { 1.0 }) * env
                 };
 
-                // Stochastic residual: filtered noise that gives instruments body
-                // (IRCAM SMS framework — the #1 fix for thin additive sound)
+                // Stochastic residual: filtered noise that gives instruments body.
+                // Reduced at low arousal to prevent "ticking" — peaceful states
+                // should have smooth, clean attacks without noise artifacts.
+                let noise_scale = if self.state.arousal < 0.3 { 0.1 } else { 1.0 };
                 let inst_name = match active.instrument {
                     Instrument::Piano | Instrument::PianoPP => "piano",
                     Instrument::Violin => "violin",
@@ -584,24 +629,26 @@ impl StreamingSynth {
                     raw_noise * noise_amt * env
                 };
 
-                // Attack noise transient: adds realism to note onsets
-                let attack_samples = (0.015 * sr) as usize; // 15ms attack
+                // Attack noise transient: adds realism to note onsets.
+                // Reduced at low arousal — peaceful notes should be soft and clean.
+                let attack_samples = (0.015 * sr) as usize;
                 let noise = crate::dramatic::attack_noise(
                     active.sample_pos, attack_samples, brightness,
-                );
-                let sample = sample + noise + stochastic;
+                ) * noise_scale;
+                let sample = sample + noise + stochastic * noise_scale;
 
-                // Velocity-driven gain: velocity is the PRIMARY dynamic control
-                // (not arousal — arousal sets the range, velocity fills it)
+                // Gain staging: ensure all consciousness states are audible.
+                // Professional solo piano: -20 to -14 dBFS RMS.
                 let vel = active.note.velocity.clamp(0.0, 1.0);
-                let vel_squared = vel * vel; // quadratic for more dramatic dynamics
-
-                // Base gain from arousal (sets the ceiling)
                 let arousal = self.state.arousal.clamp(0.0, 1.0);
+
+                // Arousal sets the ceiling (calm=0.15, excited=0.45)
                 let ceiling = GAIN_MIN + arousal * GAIN_AROUSAL_COEFF;
 
-                // Velocity scales within the ceiling: pp (vel=0.1) → ff (vel=0.9)
-                let master_gain = ceiling * (0.1 + vel_squared * 0.9);
+                // Velocity scales linearly within the ceiling.
+                // Floor at 0.3 (even pp notes are audible), full at vel=1.0.
+                let vel_scale = 0.3 + vel * 0.7;
+                let master_gain = ceiling * vel_scale;
 
                 voice_buffers[voice][i] += sample * active.volume * master_gain;
                 active.sample_pos += 1;
@@ -613,19 +660,27 @@ impl StreamingSynth {
             self.sidechain.apply(&mut voice_buffers, &voice_roles, self.chunk_samples);
         }
 
-        // ── Phase 3: Binaural rendering OR simple panning ──
+        // ── Phase 3: Stereo imaging ──
+        // Wide panning + Haas effect (1-3ms L/R delay per voice for spatial depth)
         let mut buffer = if self.enable_binaural {
             self.binaural.render(&voice_buffers)
         } else {
-            // Simple panning fallback
-            let pans = [0.0f32, -0.2, 0.4, -0.3];
+            // Wide pan positions — lead slightly off-center for stereo interest
+            let pans = [0.15f32, -0.5, 0.6, -0.4]; // lead slightly right, bass left, harmony right, ostinato left
+            // Haas delay in samples: 3-8ms per voice for wide spatial image
+            let haas_delays = [44usize, 265, 132, 353]; // 1ms, 6ms, 3ms, 8ms at 44.1kHz
             let mut buf = vec![[0.0f32; 2]; self.chunk_samples];
             for (v, voice_buf) in voice_buffers.iter().enumerate() {
                 let theta = (pans[v.min(3)] + 1.0) * std::f32::consts::FRAC_PI_4;
                 let (gl, gr) = (theta.cos(), theta.sin());
+                let delay = haas_delays[v.min(3)];
                 for (i, &s) in voice_buf.iter().enumerate() {
                     buf[i][0] += s * gl;
-                    buf[i][1] += s * gr;
+                    // Delay the right channel by Haas amount for spatial width
+                    let delayed_i = if i >= delay { i - delay } else { 0 };
+                    if delayed_i < voice_buf.len() {
+                        buf[i][1] += voice_buf[delayed_i] * gr;
+                    }
                 }
             }
             buf
@@ -655,8 +710,8 @@ impl StreamingSynth {
                 for (j, &s) in drum_buf.iter().enumerate() {
                     let idx = local_offset + j;
                     if idx < buffer.len() {
-                        // Consciousness-scaled drums: barely present at high Psi
-                        let drum_gain = 0.06 * (1.0 - self.state.consciousness_level * 0.7);
+                        // Drums: arousal drives volume. Soft-clipped to prevent crackling.
+                        let drum_gain = 0.12 + self.state.arousal * 0.18;
                         buffer[idx][0] += s * drum_gain;
                         buffer[idx][1] += s * drum_gain;
                     }
@@ -721,6 +776,35 @@ impl StreamingSynth {
             pair[1] = r;
         }
 
+        // ── Phase 4.5: Brightness evolution ──
+        // Darker in quiet moments, brighter in loud moments.
+        // A gentle 1-pole LP filter whose cutoff tracks recent RMS energy.
+        {
+            let chunk_rms = buffer.iter()
+                .map(|p| p[0] * p[0] + p[1] * p[1])
+                .sum::<f32>() / (buffer.len() as f32 * 2.0);
+            let chunk_rms = chunk_rms.sqrt();
+
+            // Smooth the RMS with EMA (slow, ~2 second time constant)
+            self.brightness_rms = self.brightness_rms * 0.97 + chunk_rms * 0.03;
+
+            // Map RMS to LP filter cutoff: quiet=2kHz (dark), loud=18kHz (bright)
+            let brightness = self.brightness_rms.clamp(0.0, 0.3) / 0.3;
+            let cutoff = 2000.0 + brightness * 16000.0;
+            let rc = 1.0 / (cutoff * std::f32::consts::TAU);
+            let dt = 1.0 / self.sample_rate as f32;
+            let alpha = dt / (rc + dt);
+
+            for pair in &mut buffer {
+                self.brightness_lp_l = self.brightness_lp_l + alpha * (pair[0] - self.brightness_lp_l);
+                self.brightness_lp_r = self.brightness_lp_r + alpha * (pair[1] - self.brightness_lp_r);
+                // Blend: significant LP darkening in quiet passages
+                let blend = 0.35; // 35% LP filtering in quiet passages → noticeably darker
+                pair[0] = pair[0] * (1.0 - blend * (1.0 - brightness)) + self.brightness_lp_l * blend * (1.0 - brightness);
+                pair[1] = pair[1] * (1.0 - blend * (1.0 - brightness)) + self.brightness_lp_r * blend * (1.0 - brightness);
+            }
+        }
+
         // ── Phase 4.6: TPDF dithering (triangular probability density function) ──
         // Eliminates quantization artifacts in quiet passages for 16-bit output.
         {
@@ -761,6 +845,12 @@ impl StreamingSynth {
             }
 
             features.modulate_state(&mut self.state, self.feedback_strength);
+        }
+
+        // Final soft clip: prevent any sample from exceeding ±1.0
+        for pair in &mut buffer {
+            pair[0] = pair[0].tanh();
+            pair[1] = pair[1].tanh();
         }
 
         self.total_samples_rendered += self.chunk_samples as u64;
@@ -852,9 +942,17 @@ impl StreamingSynth {
             }
         }
 
-        // Texture density limits polyphony
+        // Texture density limits polyphony.
+        // At low arousal, spawn only 1 note at a time (sparse, contemplative).
         let texture_voices = self.dramatic.max_voices();
-        let max_new = if psi > 0.7 { 4 } else if psi > 0.5 { 3 } else if psi > 0.3 { 2 } else { 1 };
+        let arousal_voices = if self.state.arousal > 0.7 { 4 }
+            else if self.state.arousal > 0.4 { 3 }
+            else if self.state.arousal > 0.2 { 2 }
+            else { 1 }; // very low arousal: single notes only
+        let max_new = if psi > 0.7 { arousal_voices }
+            else if psi > 0.5 { arousal_voices.min(3) }
+            else if psi > 0.3 { arousal_voices.min(2) }
+            else { 1 };
         let max_new = max_new.min(texture_voices);
 
         for _ in 0..max_new {
@@ -928,7 +1026,7 @@ impl StreamingSynth {
 
                 // Phrasing: rests are handled via duration (longer notes = space)
                 // NOT via skipping — skipping breaks the melody state machine
-                let is_rest = self.taste_melody.should_rest();
+                let is_rest = self.taste_melody.should_rest_with_arousal(self.state.arousal);
 
                 // Taste-optimized melody with phrasing and dynamics
                 let taste_scale = crate::taste_melody::build_scale_with(
@@ -943,11 +1041,12 @@ impl StreamingSynth {
                 note.duration = self.taste_melody.suggest_duration(
                     self.state.arousal, self.muse_stream.tempo(),
                 );
-                note.velocity = if is_rest {
-                    0.0 // rest: silent note (still advances melody state)
-                } else {
-                    self.taste_melody.suggest_velocity(self.state.arousal)
-                };
+                if is_rest {
+                    // True rest: skip this note entirely. Silence is music.
+                    self.prev_note_freq = Some(note.frequency); // track for voice leading
+                    continue;
+                }
+                note.velocity = self.taste_melody.suggest_velocity(self.state.arousal);
 
                 // Apply key modulation from dramatic state
                 note.frequency = self.dramatic.apply_key_shift(note.frequency);
@@ -976,7 +1075,12 @@ impl StreamingSynth {
                 if gesture.staccato > 0.1 {
                     note.duration *= 1.0 - gesture.staccato * 0.6;
                 }
-                note.velocity = (note.velocity * gesture.velocity_scale).clamp(0.05, 1.0);
+                // Preserve true rests (vel=0.0) through gesture scaling
+                note.velocity = if note.velocity < 0.01 {
+                    0.0 // keep rest silent
+                } else {
+                    (note.velocity * gesture.velocity_scale).clamp(0.05, 1.0)
+                };
                 // High harmonic tension → inject passing tones for dissonance
                 if gesture.harmonic_tension > 0.5 && scale.len() > 2 && self.note_counter % 3 == 0 {
                     let shift = if gesture.direction_bias > 0.0 { 1i32 } else { -1 };
@@ -990,10 +1094,19 @@ impl StreamingSynth {
                 }
             }
 
-            // Apply humanization
+            // Apply Phi-dependent humanization (Gaussian timing, FEP velocity curves)
             let beat_pos = self.chord_beat_counter;
             let phrase_pos = self.motif.replay_queue_len() as f32 / 8.0;
-            performance::humanize(&mut note, beat_pos, phrase_pos, self.note_counter);
+            performance::humanize_with_consciousness(
+                &mut note, beat_pos, phrase_pos, self.note_counter,
+                self.state.consciousness_level, self.state.arousal,
+            );
+
+            // Sustain pedal simulation: high Phi = sustain engaged (notes ring longer)
+            if self.state.consciousness_level > 0.5 {
+                let sustain_mult = 1.0 + self.state.consciousness_level; // 1.5x at Phi=0.5, 2x at Phi=1.0
+                note.duration *= sustain_mult;
+            }
 
             // Record note for motif memory + creative journal + density regulator + MIDI export
             self.motif.record_note(note);
@@ -1037,8 +1150,49 @@ impl StreamingSynth {
                     2 => if psi > 0.6 { 2 } else { 0 }, // harmony or lead
                     _ => if psi > 0.7 { 3 } else { 0 }, // ostinato or lead
                 };
-                // Select instrument based on consciousness state
-                let instrument = instruments::select_instrument(&self.state);
+
+                // Clear old notes in this voice to prevent mud
+                // Allow more overlap when sustain pedal is engaged (high Phi)
+                let max_per_voice = if self.state.consciousness_level > 0.5 { 4 } else { 2 };
+                let voice_count = self.active_notes.iter()
+                    .filter(|n| n.voice_idx == voice_idx)
+                    .count();
+                if voice_count >= max_per_voice {
+                    // Force-expire the oldest note in this voice
+                    if let Some(oldest) = self.active_notes.iter_mut()
+                        .filter(|n| n.voice_idx == voice_idx)
+                        .min_by_key(|n| n.sample_pos)
+                    {
+                        oldest.total_samples = oldest.sample_pos; // expire it
+                    }
+                }
+
+                // Select instrument per voice role for variety
+                // Lead follows consciousness, others get complementary instruments
+                let instrument = match voice_idx {
+                    0 => instruments::select_instrument(&self.state), // lead: consciousness-driven
+                    1 => { // bass: organ or pad (sustained low register)
+                        if self.state.harmony_activations[7] > 0.4 {
+                            Instrument::Organ
+                        } else {
+                            Instrument::Pad
+                        }
+                    }
+                    2 => { // harmony: harp or electric piano
+                        if self.state.dopamine > 0.5 {
+                            Instrument::ElectricPiano
+                        } else {
+                            Instrument::Harp
+                        }
+                    }
+                    _ => { // ostinato: vibraphone or bell (rhythmic shimmer)
+                        if self.state.arousal > 0.5 {
+                            Instrument::Bell
+                        } else {
+                            Instrument::AcousticGuitar
+                        }
+                    }
+                };
 
                 // Initialize instrument-specific synthesis state
                 let ks = if instrument.uses_karplus_strong() {

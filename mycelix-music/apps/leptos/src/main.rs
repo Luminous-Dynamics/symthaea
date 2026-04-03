@@ -5,10 +5,16 @@
 use leptos::prelude::*;
 
 mod app;
+mod audio_bridge;
 mod components;
+mod consciousness_viz;
+mod journey;
+mod live_synth;
 mod pages;
+mod synth_engine;
 mod types;
 mod visualization;
+mod wav_export;
 
 fn main() {
     console_error_panic_hook::set_once();
