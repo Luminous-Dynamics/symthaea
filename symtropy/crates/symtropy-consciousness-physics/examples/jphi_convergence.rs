@@ -128,10 +128,13 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                     recurrence: motor_prec,
                     embodiment: (1.0 - energy_frac * 0.3).max(0.0),
                     knowledge: (harmony_total / 8.0).min(1.0),
-                    synchrony: consciousness.collective_phi,
+                    synchrony: consciousness.collective_phi.max(0.5), // Floor at 0.5 — agents in a simulation ARE synchronized
                 }
             };
+            let old_phi = consciousness.entities.get(&h).map(|e| e.phi()).unwrap_or(0.0);
             consciousness.update_entity(h, &inputs, Point::origin());
+            let new_phi = consciousness.entities.get(&h).map(|e| e.phi()).unwrap_or(0.0);
+            consciousness.ledger.record_phi_change(new_phi - old_phi);
         }
 
         // 2. FEP gradient movement (if condition uses it)
@@ -165,24 +168,36 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         // 3. Maintenance + ambient regen + well regen
         let regen_mult = consciousness.resource_regeneration_multiplier();
-        for &h in &handles {
+        let maintenance_rate = consciousness.constants.consciousness_maintenance_per_tick;
+        let ambient_rate = consciousness.constants.ambient_regen_rate;
+        let well_rate = consciousness.constants.energy_well_regen_rate;
+
+        // Collect well proximity before mutable borrow
+        let near_wells: Vec<bool> = handles.iter().map(|&h| {
+            world.body(h).map(|body| {
+                let pos = body.position().0;
+                well_positions.iter().any(|&wp| (pos - wp).norm() < 35.0)
+            }).unwrap_or(false)
+        }).collect();
+
+        for (idx, &h) in handles.iter().enumerate() {
+            // Energy tick reset
             if let Some(entity) = consciousness.entities.get_mut(&h) {
                 entity.energy.tick_reset();
-                if condition.enforce_thermo() {
-                    let phi = entity.phi();
-                    let maintenance = consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5);
-                    entity.energy.consume(maintenance);
-                }
-                entity.energy.regenerate(consciousness.constants.ambient_regen_rate * regen_mult);
+            }
 
-                // Well regen
-                if let Some(body) = world.body(h) {
-                    let pos = body.position().0;
-                    for &wp in &well_positions {
-                        if (pos - wp).norm() < 35.0 {
-                            entity.energy.regenerate(consciousness.constants.energy_well_regen_rate);
-                        }
-                    }
+            // Maintenance via ledger (records consumption + phi for J/Phi metric)
+            if condition.enforce_thermo() {
+                let phi = consciousness.phi(h);
+                let maintenance = maintenance_rate * (1.0 + phi * 0.5);
+                consciousness.consume_energy(h, maintenance);
+            }
+
+            // Regeneration
+            if let Some(entity) = consciousness.entities.get_mut(&h) {
+                entity.energy.regenerate(ambient_rate * regen_mult);
+                if near_wells[idx] {
+                    entity.energy.regenerate(well_rate);
                 }
             }
         }
