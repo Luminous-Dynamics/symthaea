@@ -390,20 +390,42 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     }
 
     fn on_collision(&mut self, event: &symtropy_physics::CollisionEvent<D>) {
-        // Drain deferred sanctuary absorption into ledger (Fix 2).
         self.drain_sanctuary_absorption();
 
         let drain_rate = self.constants.collision_energy_drain;
+
+        // Compute resonance between colliding bodies for prediction error scaling
+        let resonance = {
+            let harm_a = self.entities.get(&event.body_a).map(|e| e.harmony_activations);
+            let harm_b = self.entities.get(&event.body_b).map(|e| e.harmony_activations);
+            match (harm_a, harm_b) {
+                (Some(a), Some(b)) => crate::harmony_field::HarmonyField::<D>::resonance(&a, &b),
+                _ => 0.0,
+            }
+        };
+
         if let Some(entity) = self.entities.get_mut(&event.body_a) {
-            entity.on_collision(event.impulse);
+            // Resonance-aware prediction error: unexpected collisions (low resonance)
+            // cause more surprise than expected ones (high resonance).
+            let surprise_factor = (1.0 - resonance).max(0.1); // never fully predicted
+            entity.on_collision(event.impulse * surprise_factor);
+
             let drain = event.impulse * drain_rate;
-            entity.energy.consume(drain);
+            let consumed = entity.energy.consume(drain);
+
+            // Wire dissipate_heat: collision energy becomes heat (raises temperature + entropy)
+            entity.energy.dissipate_heat(consumed * 0.5);
+
             self.ledger.record_phi_change(event.impulse * 0.001);
         }
         if let Some(entity) = self.entities.get_mut(&event.body_b) {
-            entity.on_collision(event.impulse);
+            let surprise_factor = (1.0 - resonance).max(0.1);
+            entity.on_collision(event.impulse * surprise_factor);
+
             let drain = event.impulse * drain_rate;
-            entity.energy.consume(drain);
+            let consumed = entity.energy.consume(drain);
+            entity.energy.dissipate_heat(consumed * 0.5);
+
             self.ledger.record_phi_change(event.impulse * 0.001);
         }
     }
@@ -411,6 +433,15 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     fn record_dissipation(&mut self, energy: f64) {
         self.drain_sanctuary_absorption();
         self.ledger.record_dissipation(energy);
+
+        // Distribute damping heat across all entities (simplified: equal share)
+        let n = self.entities.len();
+        if n > 0 && energy > 1e-15 {
+            let per_entity = energy / n as f64;
+            for entity in self.entities.values_mut() {
+                entity.energy.dissipate_heat(per_entity);
+            }
+        }
     }
 }
 
