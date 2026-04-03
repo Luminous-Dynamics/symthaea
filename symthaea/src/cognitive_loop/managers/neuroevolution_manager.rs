@@ -171,9 +171,22 @@ impl NeuroevolutionManager {
         // Run one generation
         let gen_snapshot = self.engine.step_generation();
 
-        // Lamarckian injection: use MetaCognitive suggestions to bias mutation
+        // Lamarckian injection: convert MetaCognitive suggestions to bit-range targets
         if !self.pending_mutations.is_empty() {
-            self.engine.inject_lamarckian(&self.pending_mutations);
+            use symthaea_wisdom::meta_cognition::MutationTarget;
+            let targets: Vec<(usize, usize, f32)> = self.pending_mutations.iter().map(|s| {
+                let (start, bits) = match s.target {
+                    MutationTarget::FepSurpriseScale => (400, 12),
+                    MutationTarget::FepLrDecay => (412, 12),
+                    MutationTarget::DreamBaseInterval => (436, 10),
+                    MutationTarget::NeuromodArousalDecay => (490, 12),
+                    MutationTarget::HomeostasisPullCruise => (610, 12),
+                    MutationTarget::FlowExplorationIncrement => (562, 12),
+                    MutationTarget::SelfModelWeightHigh => (598, 12),
+                };
+                (start, bits, s.confidence)
+            }).collect();
+            self.engine.inject_lamarckian(&targets);
             self.pending_mutations.clear();
         }
         self.last_snapshot = Some(gen_snapshot.clone());

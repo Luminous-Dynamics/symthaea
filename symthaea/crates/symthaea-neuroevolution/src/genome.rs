@@ -452,6 +452,29 @@ impl NeuralGenome {
     pub fn encode_thresholds(&mut self, pheno: &crate::threshold_genome::ThresholdPhenotype) {
         crate::threshold_genome::encode_thresholds(&mut self.hv, pheno);
     }
+
+    /// Biased mutation for Lamarckian evolution.
+    /// `targets`: slice of (start_bit, num_bits, confidence) tuples identifying
+    /// threshold loci to mutate with boosted rate (3× base_rate × confidence).
+    pub fn mutate_biased(&self, base_rate: f32, seed: u64, targets: &[(usize, usize, f32)]) -> Self {
+        let mut child = self.hv.add_noise(base_rate, seed);
+        let boost_rate = (base_rate * 3.0).min(0.5);
+        for &(start, bits, confidence) in targets {
+            let mut rng_state = seed ^ (start as u64 * 0x517CC1B727220A95);
+            for bit_idx in start..start + bits {
+                rng_state ^= rng_state << 13;
+                rng_state ^= rng_state >> 7;
+                rng_state ^= rng_state << 17;
+                let r = (rng_state >> 40) as f32 / (1u64 << 24) as f32;
+                if r < boost_rate * confidence {
+                    let byte_idx = bit_idx / 8;
+                    let bit_offset = bit_idx % 8;
+                    child.0[byte_idx] ^= 1 << bit_offset;
+                }
+            }
+        }
+        Self { hv: child }
+    }
 }
 
 /// Simple deterministic bit generator using BLAKE3.
@@ -661,3 +684,4 @@ mod tests {
         assert_ne!(g1, g3);
     }
 }
+

@@ -341,8 +341,8 @@ impl FepFitnessBridge {
 /// Returns 1 if a dominates b, -1 if b dominates a, 0 if neither.
 fn dominates(a: &OrganismFitness, b: &OrganismFitness) -> i8 {
     // Objectives: minimize FE, maximize Phi, consciousness, efficiency
-    let a_vals = [-a.free_energy, a.phi, a.consciousness, a.energy_efficiency];
-    let b_vals = [-b.free_energy, b.phi, b.consciousness, b.energy_efficiency];
+    let a_vals = [-a.free_energy, a.phi, a.consciousness, a.energy_efficiency, a.threshold_fitness];
+    let b_vals = [-b.free_energy, b.phi, b.consciousness, b.energy_efficiency, b.threshold_fitness];
 
     let mut a_better = false;
     let mut b_better = false;
@@ -437,6 +437,7 @@ mod tests {
                     consciousness: i as f64 * 0.3,
                     prediction_accuracy: 0.5,
                     energy_efficiency: 0.5,
+                threshold_fitness: 0.5,
                 };
                 org
             })
@@ -468,6 +469,7 @@ mod tests {
                     consciousness: i as f64 * 0.3,
                     prediction_accuracy: 0.5,
                     energy_efficiency: i as f64 * 0.2,
+                threshold_fitness: 0.5,
                 };
                 org
             })

@@ -852,6 +852,14 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub substrate: super::SubstrateTelemetry,
 
+    // ── JEPA telemetry ──────────────────────────────────────────────────
+    /// JEPA latent prediction error (cosine loss, 0.0 = perfect). Feature: `jepa`.
+    pub jepa_latent_pe: f32,
+    /// Total energy spent by JEPA engine (joules). Feature: `jepa`.
+    pub jepa_total_energy: f64,
+    /// Whether JEPA representation collapse has been detected. Feature: `jepa`.
+    pub jepa_collapse_detected: bool,
+
     /// Muse telemetry: streaming consciousness-driven music synthesis.
     #[cfg(feature = "muse")]
     #[serde(default)]
