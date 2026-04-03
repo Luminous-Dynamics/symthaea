@@ -44,6 +44,7 @@
 pub mod bridge;
 pub mod catalog;
 pub mod dimensional;
+pub mod discovery;
 pub mod equation_ast;
 pub mod query;
 pub mod symmetry;
