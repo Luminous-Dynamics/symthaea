@@ -1,0 +1,32 @@
+# Default scenario: 1000 years, balanced governance, cited defaults.
+# Every parameter has a published source — see constants.rs.
+
+[simulation]
+years = 1000
+seed = 42
+
+[policy]
+# Governance strategy
+birth_policy = "Natural"           # Natural | ProNatal | PopulationControl | ReplacementOnly
+project_strategy = "Balanced"      # Balanced | SurvivalFirst | GrowthFirst | ScienceFirst | IndependenceFirst
+resource_priority = "Balanced"     # Balanced | Industrial | Biological | Knowledge
+trade_openness = 0.8               # 0.0 = autarky, 1.0 = free trade
+defense_spending = 0.05            # 0.0 = no defense, 0.3 = maximum
+exploration_investment = 0.05      # 0.0 = no exploration, 0.2 = aggressive
+consciousness_gating_enabled = true
+disasters_enabled = true
+
+[params]
+# Radiation (Hassler 2014, Cucinotta 2014)
+radiation_mars_sv_month = 0.020    # MSL/RAD measured: 0.67 mSv/day
+
+# Spoilage (NASA ISS data)
+spoilage_food = 0.03               # 3% per month
+spoilage_energy = 0.15             # 15% storage/transmission loss
+
+# Psychology (McEwen 1998, Palinkas 2008)
+stress_baseline = 0.004            # Inherent habitat stress
+
+# Projects (Flyvbjerg 2002)
+project_setback_probability = 0.03 # 3% per month
+project_failure_probability = 0.005 # 0.5% per month

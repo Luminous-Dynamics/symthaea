@@ -52,6 +52,7 @@ pub mod cohort;
 pub mod constants;
 pub mod engine_v2;
 pub mod habitat;
+pub mod io;
 pub mod projects;
 pub mod robotics;
 pub mod supply_chain;
