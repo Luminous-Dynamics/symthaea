@@ -340,9 +340,15 @@ impl FepFitnessBridge {
 
 /// Returns 1 if a dominates b, -1 if b dominates a, 0 if neither.
 fn dominates(a: &OrganismFitness, b: &OrganismFitness) -> i8 {
-    // Objectives: minimize FE, maximize Phi, consciousness, efficiency
-    let a_vals = [-a.free_energy, a.phi, a.consciousness, a.energy_efficiency, a.threshold_fitness];
-    let b_vals = [-b.free_energy, b.phi, b.consciousness, b.energy_efficiency, b.threshold_fitness];
+    // 5 Pareto objectives (all maximize):
+    // 1. Phi (consciousness integration)
+    // 2. FE reduction (learning capability — Goodhart defense)
+    // 3. Prediction accuracy (cognitive utility — Goodhart defense)
+    // 4. Phi stability (sustained, not oscillating — consciousness = phi_stability)
+    // 5. Threshold consistency
+    // Note: -free_energy approximates FE reduction when initial FE varies
+    let a_vals = [a.phi, -a.free_energy, a.prediction_accuracy, a.consciousness, a.threshold_fitness];
+    let b_vals = [b.phi, -b.free_energy, b.prediction_accuracy, b.consciousness, b.threshold_fitness];
 
     let mut a_better = false;
     let mut b_better = false;
