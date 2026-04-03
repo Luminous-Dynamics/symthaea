@@ -853,6 +853,8 @@ impl CognitiveLoopService {
         self.behavior.flow_state.reset();
         self.behavior.emotion_contagion.reset();
         self.behavior.curiosity_drive.reset();
+        // Reset unified emotional state so emotional_valence() returns 0.0
+        self.unification_engine.emotional = crate::consciousness::dynamics::consciousness_unification::EmotionalBridge::new();
         self.consciousness.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();

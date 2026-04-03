@@ -815,13 +815,21 @@ mod tests {
 
     #[test]
     fn test_workspace_processing() {
-        let mut ws = UnifiedGlobalWorkspace::new(UnifiedGWTConfig::default());
+        let mut ws = UnifiedGlobalWorkspace::new(UnifiedGWTConfig {
+            workspace_config: WorkspaceConfig {
+                winner_takes_all: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
 
-        // Submit high-activation strategy
+        // Submit high-activation strategy with random HV (~50% balance → max
+        // info_phi) and "Ensemble" name (high strategy_phi) so that Φ-weighted
+        // activation exceeds the entry threshold and triggers ignition.
         ws.submit_strategy(
-            "FastPatterns",
-            0.95,
-            vec![BinaryHV::ones()],
+            "EnsemblePatterns",
+            0.99,
+            vec![BinaryHV::random(42)],
             vec!["Motor".to_string(), "Perception".to_string()],
         );
 
@@ -852,32 +860,46 @@ mod tests {
 
     #[test]
     fn test_consciousness_check() {
-        let mut ws = UnifiedGlobalWorkspace::new(UnifiedGWTConfig::default());
+        let mut ws = UnifiedGlobalWorkspace::new(UnifiedGWTConfig {
+            workspace_config: WorkspaceConfig {
+                winner_takes_all: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
 
+        // Use "Ensemble" name and random HV for high Φ so that the Φ-weighted
+        // activation exceeds the entry threshold and triggers ignition.
         ws.submit_strategy(
-            "HeuristicGuided",
-            0.9,
-            vec![BinaryHV::ones()],
+            "EnsembleGuided",
+            0.99,
+            vec![BinaryHV::random(42)],
             vec!["Evaluation".to_string(), "Memory".to_string()],
         );
         ws.process();
 
         // After processing, strategy should be in workspace
-        assert!(ws.is_conscious("HeuristicGuided"));
+        assert!(ws.is_conscious("EnsembleGuided"));
         assert!(!ws.is_conscious("NonExistent"));
     }
 
     #[test]
     fn test_cross_broadcast() {
         let mut ws = UnifiedGlobalWorkspace::new(UnifiedGWTConfig {
+            workspace_config: WorkspaceConfig {
+                winner_takes_all: true,
+                ..Default::default()
+            },
             enable_cross_broadcast: true,
             ..Default::default()
         });
 
+        // Use "Ensemble" name and random HV for high Φ so activation exceeds
+        // the entry threshold and triggers ignition + broadcasting.
         ws.submit_strategy(
-            "StandardProcessing",
-            0.85,
-            vec![BinaryHV::ones()],
+            "EnsembleProcessing",
+            0.99,
+            vec![BinaryHV::random(42)],
             vec!["Symbolic".to_string(), "MetaCognition".to_string()],
         );
 

@@ -38,8 +38,8 @@ use super::moral_prototypes::MoralLabel;
 use super::moral_text_encoder::TextHdcEncoder;
 use super::spinozist_geometry::SpinozistClassifier;
 
-/// Number of features: 171 Spinozist + 3 surface prototype similarities = 174.
-const N_FEATURES: usize = 81;
+/// Number of features: 171 Spinozist (18 linear + 153 cross-terms) + 3 surface prototype similarities = 174.
+const N_FEATURES: usize = 174;
 
 /// Number of moral classes: Good(0), Bad(1), Neutral(2).
 const N_CLASSES: usize = 3;

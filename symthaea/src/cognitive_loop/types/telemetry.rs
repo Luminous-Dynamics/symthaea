@@ -92,7 +92,7 @@ pub struct NeuromodTelemetry {
     /// D2-mediated behavioral flexibility factor (0.7–1.5).
     pub neuromod_behavioral_flexibility: f32,
     /// Full neurochemical state snapshot (sampled every 10 cycles, None otherwise).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub neuromod_snapshot: Option<crate::cognitive_loop::neuromodulators::NeuromodSnapshot>,
 
     // ── Phase 4: Neuroendocrine control telemetry ──────────────────────────
@@ -303,13 +303,16 @@ pub struct StructuralPhiMetrics {
     pub structural_num_clusters: usize,
     /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
     /// `None` when not computed this cycle (only computed every N cycles).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sigma: Option<f64>,
     /// Spectral MIP Phi — O(n³) Fiedler-ordered MIP approximation (Layer 2+).
     /// `None` when not computed this cycle (only computed every 50 cycles).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spectral_mip_phi: Option<f64>,
     /// Hierarchical spectral MIP Phi (multi-scale: 32→64→128 components).
     /// Uses coarser scales to focus finer scales on the MIP boundary region.
     /// `None` when not computed this cycle (only computed every 100 cycles).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hierarchical_mip_phi: Option<f64>,
     /// Number of scales used in hierarchical MIP (0 when not computed).
     pub hierarchical_mip_scales: usize,
@@ -599,6 +602,7 @@ pub struct CycleMetadata {
     pub reasoning_confidence: f32,
 
     /// Description of the exploration action taken (if any)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exploration_action: Option<String>,
 
     /// Whether the reasoning engine's tool gate blocked an action this cycle.
@@ -606,15 +610,18 @@ pub struct CycleMetadata {
     pub reasoning_gate_blocked: bool,
 
     /// Fallback strategy selected when gating blocked an action (if any)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning_fallback: Option<String>,
 
     /// Best action from MCTS planning (Tier 1+), if planning ran
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning_plan_action: Option<usize>,
 
     /// MCTS plan confidence (0.0 = no plan, >0 = plan confidence)
     pub reasoning_plan_confidence: f32,
 
     /// Human-readable reasoning narrative (Tier 2, best-effort)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning_narrative: Option<String>,
 
     /// Quality diagnostics telemetry (meta-cognitive, dissipative, coherence, anomaly).
@@ -801,6 +808,7 @@ pub struct CycleMetadata {
     pub safety_blocked: bool,
 
     /// Which forbidden category the safety gateway detected (if any).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub safety_category: Option<String>,
 
     /// Negation polarity detected in input text (0.0 = no negation, >0.5 = negated).
@@ -1052,8 +1060,10 @@ pub struct CycleMetadata {
 
     // ── Nurture Attachment Telemetry ─────────────────────────────────────
     /// Current attachment style (e.g., "Forming", "Secure"). Empty when nurture disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachment_style: Option<String>,
     /// Current attachment security score (0.0–1.0). None when nurture disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachment_security: Option<f64>,
 
     // ── Partnership / Phi-Dyad Telemetry ──────────────────────────────
@@ -1070,7 +1080,7 @@ pub struct CycleMetadata {
 
     /// Describes a substrate transition that occurred during this cycle (if any).
     /// Format: "SiliconDigital -> BiologicalNeurons (0.710 -> 0.920)"
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub substrate_transition: Option<String>,
 
     /// Raw substrate feasibility before validation overlay (0.0–1.0).
@@ -2386,7 +2396,7 @@ pub struct EthicalTelemetry {
     #[serde(default)]
     pub moral_convergence_severity: f64,
     /// Name of matched hazard signature template (e.g. "weaponization"), if any.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub moral_matched_hazard: Option<String>,
     /// Harmony entropy (moral breadth): Shannon entropy of harmony variance distribution.
     /// Range: [0, ln(8)] ≈ [0, 2.08]. Higher = broader moral engagement.
@@ -2408,8 +2418,10 @@ pub struct EthicalTelemetry {
     #[serde(default)]
     pub hodge_curl_fraction: f64,
     /// Critical Rips scale where harmonic fraction exceeds 0.5 (moral coherence
-    /// phase transition). NaN if no transition detected. Lower = more fragile.
-    #[serde(default)]
+    /// phase transition). -1.0 if no transition detected. Lower = more fragile.
+    /// Note: must not be NaN — NaN serializes as null through flatten → Value
+    /// intermediary, breaking serde roundtrip.
+    #[serde(default = "default_no_transition")]
     pub hodge_critical_scale: f64,
     /// Whether the system is at criticality (harmonic ∈ [0.2, 0.8]).
     /// The "Goldilocks zone" between echo chamber and isolation.
@@ -2453,6 +2465,10 @@ pub struct EthicalTelemetry {
 
 fn default_consequence_accuracy() -> f64 {
     0.5
+}
+
+fn default_no_transition() -> f64 {
+    -1.0
 }
 
 /// Free energy principle (FEP) and predictive processing telemetry.

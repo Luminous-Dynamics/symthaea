@@ -196,29 +196,29 @@ impl ThreatMemory {
         // One-hot threat kind (dims 0-9)
         features[kind.one_hot_index()] = 1.0;
 
-        // Severity and confidence (dims 7-8)
-        features[7] = severity.clamp(0.0, 1.0);
-        features[8] = confidence.clamp(0.0, 1.0);
+        // Severity and confidence (dims 10-11, after one-hot block)
+        features[10] = severity.clamp(0.0, 1.0);
+        features[11] = confidence.clamp(0.0, 1.0);
 
-        // Temporal encoding (dims 9-16): sin/cos at 4 frequencies
+        // Temporal encoding (dims 12-19): sin/cos at 4 frequencies
         let t = cycle as f32;
         for i in 0..4 {
             let freq = (i + 1) as f32 * 0.01;
-            features[9 + i * 2] = (t * freq).sin();
-            features[10 + i * 2] = (t * freq).cos();
+            features[12 + i * 2] = (t * freq).sin();
+            features[13 + i * 2] = (t * freq).cos();
         }
 
-        // Description hash features (dims 17-31)
+        // Description hash features (dims 20-31)
         let mut hash: u64 = 0xcbf29ce484222325; // FNV-1a offset basis
         for byte in description.bytes() {
             hash ^= byte as u64;
             hash = hash.wrapping_mul(0x100000001b3); // FNV prime
         }
-        for i in 0..15 {
+        for i in 0..12 {
             // Extract pseudo-random features from hash
             let shift = (i * 4) % 60;
             let nibble = ((hash >> shift) & 0xF) as f32 / 15.0;
-            features[17 + i] = nibble * 2.0 - 1.0; // map to [-1, 1]
+            features[20 + i] = nibble * 2.0 - 1.0; // map to [-1, 1]
         }
 
         features
