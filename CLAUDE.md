@@ -35,6 +35,33 @@ Full details: @.claude/rules/CREDENTIALS.md
 
 Full allocation: @.claude/rules/PORTS.md
 
+### Holochain Ecosystem Conductor
+A single shared conductor runs ALL Mycelix hApps (EduNet, Portal, Health, etc.):
+- **Data**: `/tmp/C0qrby_9EFM6egCrrUWTo/` (dev sandbox)
+- **Admin WebSocket**: `ws://localhost:33743` (auto-assigned)
+- **App WebSocket**: `ws://localhost:8888`
+- **Bootstrap**: `https://dev-test-bootstrap2.holochain.org/`
+- **Keystore**: lair_server in-proc
+
+**Installing a new hApp onto the shared conductor:**
+```bash
+cd mycelix-edunet  # or any cluster
+nix develop
+# 1. Build WASM zomes
+cargo build --workspace --target wasm32-unknown-unknown --release
+# 2. Pack DNA + hApp
+hc dna pack dna/ -o dna/edunet.dna
+cp dna/edunet.dna happ/edunet.dna
+hc app pack happ/ -o happ/mycelix-edunet.happ
+# 3. Install onto shared conductor via admin WebSocket (port 33743)
+# Use hc sandbox or admin API to install the hApp
+```
+
+**PWA connection**: Each Leptos frontend connects via `ws://localhost:8888` (app interface).
+Override per-app via `window.__HC_CONDUCTOR_URL` in index.html.
+
+**Do NOT start a separate conductor** — all hApps share one conductor for cross-cluster `CallTargetCell::OtherRole()` dispatch.
+
 ### Development
 1. **Direct cargo first** - `mold` and `sccache` are system-wide (NixOS). Run `cargo build`/`cargo test` directly — no `nix develop` needed for Rust builds. Use `nix develop` ONLY when you need CUDA, Python/PyPhi, or ONNX Runtime. Direct cargo preserves `CARGO_TARGET_DIR` from the session hook (Rule 5); `nix develop` does not.
 2. **No workarounds** - Fix the flake, don't hack
