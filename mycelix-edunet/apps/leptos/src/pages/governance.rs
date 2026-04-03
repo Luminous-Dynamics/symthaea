@@ -8,7 +8,7 @@
 
 use leptos::prelude::*;
 
-use mycelix_leptos_core::use_holochain;
+use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
 // Data types (mirror dao_zome integrity types for the UI layer)
@@ -140,7 +140,7 @@ pub fn GovernancePage() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome_default::<(), Vec<ProposalView>>("dao", "list_active_proposals", &())
+                .call_zome::<(), Vec<ProposalView>>("dao", "list_active_proposals", &())
                 .await
             {
                 Ok(p) => p,

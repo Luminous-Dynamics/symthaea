@@ -12,9 +12,7 @@ use leptos_router::{
 use crate::adaptivity_provider::AdaptivityProvider;
 use crate::consciousness::ConsciousnessProvider;
 use crate::curriculum::provide_curriculum_context;
-use mycelix_leptos_core::{
-    ConnectionBadge, HolochainProviderAuto, HolochainProviderConfig, ConnectStrategy,
-};
+use crate::holochain::{HolochainProvider, ConnectionBadge};
 use crate::learning_engine::LearningEngineProvider;
 use crate::pages::*;
 use crate::role::{provide_role_context, UserRole};
@@ -23,24 +21,16 @@ use crate::theme::{provide_theme_context, use_theme, use_set_theme};
 
 #[component]
 pub fn App() -> impl IntoView {
-    let config = HolochainProviderConfig {
-        app_id: "edunet".to_string(),
-        default_role: Some("edunet".to_string()),
-        log_prefix: "[EduNet]",
-        connect_strategy: ConnectStrategy::WebSocket,
-        status_labels: None,
-    };
-
     view! {
-        <HolochainProviderAuto config=config>
-        <ConsciousnessProvider>
-        <LearningEngineProvider>
-        <AdaptivityProvider>
-            <AppInner />
-        </AdaptivityProvider>
-        </LearningEngineProvider>
-        </ConsciousnessProvider>
-        </HolochainProviderAuto>
+        <HolochainProvider>
+            <ConsciousnessProvider>
+            <LearningEngineProvider>
+            <AdaptivityProvider>
+                <AppInner />
+            </AdaptivityProvider>
+            </LearningEngineProvider>
+            </ConsciousnessProvider>
+        </HolochainProvider>
     }
 }
 

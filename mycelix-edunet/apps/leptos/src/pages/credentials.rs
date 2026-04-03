@@ -8,7 +8,7 @@
 
 use leptos::prelude::*;
 
-use mycelix_leptos_core::use_holochain;
+use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
 // Data types (mirror credential_zome integrity types for UI layer)
@@ -174,7 +174,7 @@ pub fn CredentialsPage() -> impl IntoView {
         let hc = hc.clone();
         async move {
             match hc
-                .call_zome_default::<(), Vec<CredentialView>>(
+                .call_zome::<(), Vec<CredentialView>>(
                     "credential",
                     "get_my_credentials",
                     &(),
