@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 mod dashboard;
+mod employer;
 mod jobs;
 mod network;
 mod applications;
 mod profile;
 
 pub use dashboard::DashboardPage;
+pub use employer::EmployerDashboard;
 pub use jobs::JobsPage;
 pub use network::NetworkPage;
 pub use applications::ApplicationsPage;

@@ -17,6 +17,7 @@ pub fn App() -> impl IntoView {
             <nav class="navbar" aria-label="Primary navigation">
                 <a href="/" class="logo">"Mycelix Professional"</a>
                 <div class="nav-links">
+                    <A href="/employer">"Employer"</A>
                     <A href="/jobs">"Jobs"</A>
                     <A href="/network">"Network"</A>
                     <A href="/applications">"Applications"</A>
@@ -27,6 +28,7 @@ pub fn App() -> impl IntoView {
             <main id="main-content">
                 <Routes fallback=|| view! { <p>"Page not found"</p> }>
                     <Route path=path!("/") view=DashboardPage />
+                    <Route path=path!("/employer") view=EmployerDashboard />
                     <Route path=path!("/jobs") view=JobsPage />
                     <Route path=path!("/network") view=NetworkPage />
                     <Route path=path!("/applications") view=ApplicationsPage />
