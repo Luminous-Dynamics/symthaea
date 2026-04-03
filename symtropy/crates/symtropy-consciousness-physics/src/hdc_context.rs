@@ -151,6 +151,45 @@ impl HdcConsciousnessContext {
     }
 }
 
+/// Derive consciousness inputs dynamically from physics/game state (HDC-D).
+///
+/// Closes the consciousness-physics loop: physics state drives consciousness
+/// inputs, consciousness (via HDC thought vectors) drives motor authority,
+/// motor authority drives physics state.
+///
+/// Replaces the hardcoded `ConsciousnessInputs { phi: 0.5, ... }` with
+/// state-responsive values.
+pub fn inputs_from_state(
+    energy_frac: f64,
+    nearby_count: usize,
+    prediction_error: f64,
+    danger: f64,
+    motor_precision: f64,
+    harmony_total: f64,
+    collective_phi: f64,
+) -> [f64; NUM_COMPONENTS] {
+    [
+        energy_frac.clamp(0.0, 1.0),                          // phi ← energy = integration capacity
+        (nearby_count as f64 / 5.0).min(1.0),                 // broadcast ← social = workspace
+        (1.0 - prediction_error).clamp(0.0, 1.0),             // working_memory ← surprise load
+        if danger > 0.3 { 0.8 } else { 0.5 },                 // attention ← threat presence
+        motor_precision.clamp(0.0, 1.0),                       // recurrence ← action feedback
+        (1.0 - energy_frac * 0.3).clamp(0.0, 1.0),            // embodiment ← physical cost
+        (harmony_total / 8.0).clamp(0.0, 1.0),                // knowledge ← harmony integration
+    ]
+}
+
+/// Compute inter-agent thought-space resonance (HDC-B).
+///
+/// Returns cosine similarity between two thought vectors.
+/// Replaces scalar harmony resonance with semantic thought alignment.
+pub fn thought_resonance(
+    thought_a: &ContinuousHV,
+    thought_b: &ContinuousHV,
+) -> f64 {
+    thought_a.similarity(thought_b) as f64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,5 +274,44 @@ mod tests {
             sim > 0.3,
             "Thought should retain temporal memory: similarity={sim}"
         );
+    }
+
+    #[test]
+    fn inputs_from_state_clamped() {
+        let inputs = inputs_from_state(0.5, 3, 0.2, 0.0, 0.8, 4.0, 0.5);
+        for &v in &inputs {
+            assert!(v >= 0.0 && v <= 1.0, "Input {v} out of [0,1]");
+        }
+    }
+
+    #[test]
+    fn inputs_respond_to_energy_depletion() {
+        let high_energy = inputs_from_state(0.9, 3, 0.1, 0.0, 0.9, 4.0, 0.5);
+        let low_energy = inputs_from_state(0.1, 3, 0.1, 0.0, 0.9, 4.0, 0.5);
+        // Low energy → lower phi input (integration capacity drops)
+        assert!(low_energy[0] < high_energy[0]);
+    }
+
+    #[test]
+    fn inputs_respond_to_danger() {
+        let safe = inputs_from_state(0.5, 3, 0.1, 0.0, 0.8, 4.0, 0.5);
+        let danger = inputs_from_state(0.5, 3, 0.1, 0.8, 0.8, 4.0, 0.5);
+        // Danger → higher attention input
+        assert!(danger[3] > safe[3]);
+    }
+
+    #[test]
+    fn thought_resonance_self_is_one() {
+        let ctx = HdcConsciousnessContext::new(42);
+        // Before stepping, thought_hv is zero → similarity undefined
+        // After stepping, should be self-similar
+        let mut ctx2 = HdcConsciousnessContext::new(42);
+        let inputs = [0.5; 7];
+        let harmony = [0.5; 8];
+        for _ in 0..5 {
+            ctx2.step(&inputs, &harmony, 0.016);
+        }
+        let res = thought_resonance(ctx2.thought_hv(), ctx2.thought_hv());
+        assert!((res - 1.0).abs() < 0.01, "Self-resonance should be ~1.0: {res}");
     }
 }
