@@ -1,0 +1,39 @@
+[package]
+name = "symtropy-manipulator-demo"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Split-screen demo: Φ-gated continuous safety gradient vs ISO/TS 15066 binary SSM"
+
+[[bin]]
+name = "manipulator-demo"
+path = "src/main.rs"
+
+[dependencies]
+# Symthaea robotics
+symthaea-manipulator = { path = "../../../symthaea/crates/symthaea-manipulator" }
+symthaea-core = { path = "../../../symthaea/symthaea-core" }
+symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
+symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+
+# Symtropy engine
+symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
+symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
+symtropy-physics = { path = "../symtropy-physics" }
+symtropy-math = { path = "../symtropy-math" }
+
+# Bevy — 3D PBR + UI + windowing (x11 for NixOS)
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_asset", "bevy_core_pipeline", "bevy_render",
+    "bevy_pbr",
+    "bevy_text", "bevy_ui", "bevy_ui_render",
+    "bevy_winit", "bevy_color", "bevy_state",
+    "bevy_log", "bevy_mesh",
+    "multi_threaded", "x11",
+    "default_font",
+] }
+
+rand = "0.8"
+
+[lints.clippy]
+all = "warn"

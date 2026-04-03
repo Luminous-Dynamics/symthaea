@@ -1,0 +1,26 @@
+[package]
+name = "symtropy-lightyear"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Lightyear integration for Symtropy — prediction, rollback, interpolation over Iroh QUIC"
+
+[dependencies]
+# Lightyear netcode
+lightyear = "0.26"
+
+# Bevy sub-crates (match Symtropy's Bevy 0.18)
+bevy_app = "0.18"
+bevy_ecs = "0.18"
+bevy_log = "0.18"
+
+# Symtropy crates
+symtropy-net = { path = "../symtropy-net" }
+symtropy-physics = { path = "../symtropy-physics" }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+
+# Bytes for Link buffers
+bytes = "1"
+bevy_reflect = "0.18"
