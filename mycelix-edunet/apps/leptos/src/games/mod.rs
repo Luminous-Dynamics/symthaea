@@ -4,6 +4,7 @@
 
 pub mod shared;
 pub mod foundation;
+pub mod intermediate;
 pub mod math;
 pub mod physics;
 pub mod chemistry;
@@ -53,6 +54,9 @@ fn game_type(node_id: &str) -> Option<&'static str> {
         id if id.contains("Gr1") || id.contains("Gr2") || id.contains("Grade1") || id.contains("Grade2") => Some("number_bonds"),
         id if (id.contains("Gr3") || id.contains("Gr4") || id.contains("Gr5") || id.contains("Grade3") || id.contains("Grade4") || id.contains("Grade5")) && (id.contains("NF") || id.contains("fraction") || id.contains("Fraction")) => Some("fraction_pizza"),
         id if (id.contains("Gr3") || id.contains("Gr4") || id.contains("Gr5") || id.contains("Grade3") || id.contains("Grade4") || id.contains("Grade5")) && (id.contains("OA") || id.contains("multiply") || id.contains("Multiply") || id.contains("times")) => Some("times_tables"),
+        // Intermediate Phase (Gr6-9)
+        id if (id.contains("Gr6") || id.contains("Grade6")) && (id.contains("integer") || id.contains("Integer") || id.contains("negative") || id.contains("NS")) => Some("integer_line"),
+        id if (id.contains("Gr7") || id.contains("Gr8") || id.contains("Grade7") || id.contains("Grade8")) && (id.contains("ALG") || id.contains("algebra") || id.contains("equation") || id.contains("EE")) => Some("equation_balance"),
         _ => None,
     }
 }
@@ -78,6 +82,8 @@ pub fn GameContainer(node_id: String) -> impl IntoView {
         Some("number_bonds") => view! { <foundation::number_bonds::NumberBondsGame node_id=id /> }.into_any(),
         Some("fraction_pizza") => view! { <foundation::fraction_pizza::FractionPizzaGame node_id=id /> }.into_any(),
         Some("times_tables") => view! { <foundation::times_tables::TimesTablesGame node_id=id /> }.into_any(),
+        Some("integer_line") => view! { <intermediate::integer_number_line::IntegerNumberLine node_id=id /> }.into_any(),
+        Some("equation_balance") => view! { <intermediate::equation_balance::EquationBalance node_id=id /> }.into_any(),
         _ => view! { <p style="color: var(--text-secondary)">"No interactive game available yet."</p> }.into_any(),
     }
 }
