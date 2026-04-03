@@ -88,6 +88,7 @@ pub struct NeuroevolutionManager {
     accumulated_confidence: Vec<f64>,
     /// Latest champion topology suggestion.
     champion: ChampionSuggestion,
+    pub pending_mutations: Vec<symthaea_wisdom::meta_cognition::MutationSuggestion>,
 }
 
 impl NeuroevolutionManager {
@@ -121,6 +122,7 @@ impl NeuroevolutionManager {
             accumulated_prediction_error: Vec::new(),
             accumulated_confidence: Vec::new(),
             champion: ChampionSuggestion::default(),
+            pending_mutations: Vec::new(),
         }
     }
 
@@ -136,10 +138,14 @@ impl NeuroevolutionManager {
             accumulated_psi: Vec::new(),
             accumulated_prediction_error: Vec::new(),
             accumulated_confidence: Vec::new(),
+            pending_mutations: Vec::new(),
             champion: ChampionSuggestion::default(),
         }
     }
 
+    pub fn inject_mutations(&mut self, mutations: Vec<symthaea_wisdom::meta_cognition::MutationSuggestion>) {
+        self.pending_mutations = mutations;
+    }
     /// Process a cognitive cycle: accumulate observations, run evolution on interval.
     pub fn process(&mut self, snapshot: &CycleSnapshot) -> SubsystemOutput {
         self.cycle_count += 1;

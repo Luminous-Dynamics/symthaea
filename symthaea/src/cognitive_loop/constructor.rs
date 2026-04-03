@@ -710,6 +710,8 @@ impl CognitiveLoopService {
             )
         };
 
+        #[cfg(feature = "jepa")]
+        let jepa_input_dim = config.cfc_config.input_dim;
         let mut service = Self {
             config,
             encoder,

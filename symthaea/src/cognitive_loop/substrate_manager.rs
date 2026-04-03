@@ -102,6 +102,8 @@ pub(crate) struct SubstrateManager {
     current_substrate: SubstrateType,
 
     /// Energy spent in the most recent tick (for telemetry).
+    #[cfg(feature = "jepa")]
+    pub(crate) jepa_energy: f64,
     last_energy_spent: f64,
 }
 
