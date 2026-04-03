@@ -45,20 +45,26 @@ impl<const D: usize> HarmonyField<D> {
         }
     }
 
+    /// Softening parameter ε for Plummer softening: (r² + ε²)^(n/2).
+    /// Prevents singularity at r→0. Standard N-body astrophysics technique.
+    const SOFTENING_EPSILON: f64 = 1.0;
+
     /// Sample the total harmony field at a point.
     ///
     /// Returns the summed harmony activations at that location,
-    /// with each source's contribution falling off as 1/r².
+    /// with dimension-correct 1/r^(D-1) falloff and Plummer softening.
     pub fn sample(&self, point: &Point<D>) -> [f64; NUM_HARMONIES] {
         let mut total = [0.0f64; NUM_HARMONIES];
+        let exponent = (D as f64 - 1.0).max(1.0); // 2D→1/r, 3D→1/r², 4D→1/r³
         for source in &self.sources {
             let dist = source.position.distance(point);
             if dist >= source.radius {
                 continue;
             }
-            // 1/r² falloff (clamped at r=1 to avoid singularity)
-            let r = dist.max(1.0);
-            let falloff = source.strength / (r * r);
+            // Plummer-softened 1/r^(D-1) falloff (dimension-correct field theory)
+            let r_soft = (dist * dist + Self::SOFTENING_EPSILON * Self::SOFTENING_EPSILON)
+                .powf(exponent / 2.0);
+            let falloff = source.strength / r_soft;
 
             for i in 0..NUM_HARMONIES {
                 total[i] += source.activations[i] * falloff;
