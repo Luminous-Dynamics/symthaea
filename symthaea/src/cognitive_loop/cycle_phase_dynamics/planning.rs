@@ -375,11 +375,16 @@ impl CognitiveLoopService {
         // full observation-space prediction (128D latent vs full CfC dimension).
         #[cfg(feature = "jepa")]
         if let Some(ref mut jepa) = self.jepa_engine {
-            // Convert Array1<f32> to ContinuousHV for JEPA encoder
+            let jepa_dim = jepa.config().input_dim;
+            // Normalize both vectors to JEPA's input_dim (pad with zeros or truncate)
+            let mut current_vec = input_array.to_vec();
+            current_vec.resize(jepa_dim, 0.0);
             let current_hv =
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(input_array.to_vec());
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(current_vec);
+            let mut next_vec = prediction.clone();
+            next_vec.resize(jepa_dim, 0.0);
             let next_hv =
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(prediction.clone());
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(next_vec);
 
             // Use last cycle's FEP action (stored on fep module after each FEP step).
             // CfC planning runs before this cycle's FEP, so we use the previous action.
