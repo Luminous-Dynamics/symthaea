@@ -5156,3 +5156,47 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     .caps-badge { font-size: 0.65rem; padding: 2px 6px; }
     .caps-filter-btn { padding: 4px 8px; font-size: 0.7rem; }
 }
+
+/* ===========================================================================
+   RTL (Right-to-Left) Support — Arabic, Hebrew, Farsi, Urdu
+   ===========================================================================
+   Activated when html[dir="rtl"] is set by the i18n module.
+   Uses CSS logical properties where possible for automatic flipping.
+   =========================================================================== */
+
+html[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Flip horizontal layouts */
+html[dir="rtl"] .navbar { flex-direction: row-reverse; }
+html[dir="rtl"] .nav-links { flex-direction: row-reverse; }
+html[dir="rtl"] .nav-actions { flex-direction: row-reverse; }
+html[dir="rtl"] .mobile-bottom-nav { flex-direction: row-reverse; }
+
+/* Flip margins/paddings using logical properties */
+html[dir="rtl"] .logo { margin-inline-start: 0; margin-inline-end: 1rem; }
+html[dir="rtl"] .search-input { text-align: right; }
+
+/* Card layouts stay grid (auto-flip) */
+html[dir="rtl"] .dashboard-grid,
+html[dir="rtl"] .feature-grid,
+html[dir="rtl"] .jobs-grid { direction: rtl; }
+
+/* Progress bars flip direction */
+html[dir="rtl"] .progress-bar,
+html[dir="rtl"] .skill-bar { transform-origin: right; }
+
+/* Icons before text → icons after text */
+html[dir="rtl"] .bottom-tab { flex-direction: column; } /* keep vertical */
+html[dir="rtl"] .kid-rate-btn { flex-direction: column; } /* keep vertical */
+
+/* Exam timer stays LTR (numbers are universal) */
+html[dir="rtl"] .exam-timer-bar { direction: ltr; }
+
+/* Code blocks stay LTR */
+html[dir="rtl"] pre, html[dir="rtl"] code { direction: ltr; text-align: left; }
+
+/* Heatmap table stays LTR (data grid) */
+html[dir="rtl"] .heatmap-table { direction: ltr; }
