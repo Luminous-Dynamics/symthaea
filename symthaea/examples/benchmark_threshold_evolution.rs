@@ -3,8 +3,8 @@
 //! Benchmark: Live Cognitive Loop with Evolved Thresholds
 //!
 //! Runs the full CognitiveLoopService twice:
-//! 1. Baseline: default thresholds (100 cycles)
-//! 2. Evolved: best thresholds from threshold evolution (100 cycles)
+//! 1. Baseline: default thresholds (1000 cycles)
+//! 2. Evolved: best thresholds from threshold evolution (1000 cycles)
 //!
 //! Compares: Phi, prediction error, consciousness level, coherence.
 //! This proves the evolution pipeline affects real cognitive behavior,
@@ -41,13 +41,13 @@ fn main() {
     println!();
 
     // ── Phase 2: Run baseline cognitive loop ────────────────────────────
-    println!("  Phase 2: Running baseline (default thresholds, 100 cycles)...");
-    let baseline = run_cognitive_loop(100, None);
+    println!("  Phase 2: Running baseline (default thresholds, 1000 cycles)...");
+    let baseline = run_cognitive_loop(1000, None);
     print_stats("    Baseline", &baseline);
 
     // ── Phase 3: Run evolved cognitive loop ─────────────────────────────
-    println!("  Phase 3: Running evolved (100 cycles)...");
-    let evolved_stats = run_cognitive_loop(100, Some(&evolved));
+    println!("  Phase 3: Running evolved (1000 cycles)...");
+    let evolved_stats = run_cognitive_loop(1000, Some(&evolved));
     print_stats("    Evolved ", &evolved_stats);
 
     // ── Phase 4: Compare ────────────────────────────────────────────────

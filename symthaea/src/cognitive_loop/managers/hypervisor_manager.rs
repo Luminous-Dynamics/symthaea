@@ -580,3 +580,7 @@ mod tests {
         assert!(mgr.aggregated_phi < 0.8, "but not exactly B's phi");
     }
 }
+
+#[path = "hypervisor_manager_integration_test.rs"]
+#[cfg(test)]
+mod integration_tests;
