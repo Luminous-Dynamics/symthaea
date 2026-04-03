@@ -9,7 +9,7 @@ seed = 42
 birth_policy = "Natural"
 project_strategy = "SurvivalFirst"
 defense_spending = 0.15
-consciousness_gating_enabled = true
+trust_weighted_governance = true
 
 [params]
 spoilage_food = 0.05               # 5% — poor storage conditions

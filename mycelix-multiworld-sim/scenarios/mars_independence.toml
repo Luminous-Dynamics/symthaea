@@ -11,4 +11,4 @@ resource_priority = "Industrial"
 trade_openness = 0.3               # Minimal trade — build it yourself
 defense_spending = 0.10
 exploration_investment = 0.10
-consciousness_gating_enabled = true
+trust_weighted_governance = true

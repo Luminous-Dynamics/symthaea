@@ -110,7 +110,7 @@ impl LiveMetrics {
 
         // Collect active toggles
         let mut active = Vec::new();
-        if policy.consciousness_gating_enabled { active.push("consciousness_gating".to_string()); }
+        if policy.trust_weighted_governance { active.push("trust_weighting".to_string()); }
         if policy.turchin_cycles_enabled { active.push("turchin_cycles".to_string()); }
         if policy.fep_immiseration_enabled { active.push("fep_immiseration".to_string()); }
         if policy.sacred_stillness_enabled { active.push("sacred_stillness".to_string()); }

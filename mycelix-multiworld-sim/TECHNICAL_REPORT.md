@@ -13,7 +13,7 @@ Key innovations:
 1. **Spinozist affect dynamics** with emotional momentum (EMA α=0.3),
    producing emergent grief, resentment, and collective joy
 2. **Supply chain DAG** (petgraph) enabling topology-aware cascade failures
-3. **Consciousness-gated governance** with anti-tyranny invariants
+3. **Trust-weighted governance** with anti-tyranny invariants
 4. **Colony project system** (11 blueprints) where governance is decisions
 5. **Gillespie event queue** (V2 engine) proven statistically equivalent
    to per-tick Bernoulli rolls (within 5% for all major event types)
@@ -31,7 +31,7 @@ Statistical validation across 5 seeds × 1000 years shows:
 The question "can human civilization survive on multiple worlds?" is not
 answerable by physics alone. It requires integrating orbital mechanics with
 Gompertz mortality, Cobb-Douglas economics with Spinozist psychology,
-disaster probability with consciousness gating.
+disaster probability with trust weighting.
 
 This simulation represents the most comprehensive open-system approach to
 this question, modeling individual agents with health, skills, affects,
@@ -66,7 +66,7 @@ pipeline:
 | 4 | Economy | Cobb-Douglas production, trade |
 | 5 | Inter-world | Migration, supply chain, projects |
 | 6 | Knowledge | Tech milestones, critical systems |
-| 7 | Governance | Consciousness gating, anti-tyranny |
+| 7 | Governance | Trust weighting, anti-tyranny |
 | 8 | Consciousness | Phi growth, faction dynamics |
 | 9 | Disasters | 40 event types, 7 categories |
 | 10 | Narrative | Chronicle generation |

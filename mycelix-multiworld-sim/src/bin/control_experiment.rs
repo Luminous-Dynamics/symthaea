@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Control experiment: consciousness gating enabled vs disabled.
+//! Control experiment: trust-weighted governance enabled vs disabled.
 //!
-//! Proves that consciousness-gated governance improves civilization outcomes
+//! Proves that trust-weighted governance improves civilization outcomes
 //! by comparing the full system against a control where gating is disabled.
 
 use mycelix_multiworld_sim::{config::SimulationConfig, MultiWorldSimulator};
@@ -22,17 +22,17 @@ fn main() {
     let mut phi_off_sum = 0.0f64;
 
     for &seed in &SEEDS {
-        // --- WITH consciousness gating (treatment) ---
+        // --- WITH trust-weighted governance (treatment) ---
         let mut config_on = SimulationConfig::default_150_year();
         config_on.seed = seed;
-        config_on.policy.consciousness_gating_enabled = true;
+        config_on.policy.trust_weighted_governance = true;
         let mut sim_on = MultiWorldSimulator::new(config_on);
         let report_on = sim_on.run();
 
-        // --- WITHOUT consciousness gating (control) ---
+        // --- WITHOUT trust-weighted governance (control) ---
         let mut config_off = SimulationConfig::default_150_year();
         config_off.seed = seed;
-        config_off.policy.consciousness_gating_enabled = false;
+        config_off.policy.trust_weighted_governance = false;
         let mut sim_off = MultiWorldSimulator::new(config_off);
         let report_off = sim_off.run();
 

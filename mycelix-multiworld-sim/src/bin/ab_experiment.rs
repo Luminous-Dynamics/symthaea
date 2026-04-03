@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! A/B Experiment: Default (Symthaea) vs Legacy (standard governance)
 //!
-//! Proves that consciousness-gated governance prevents Turchin crises
+//! Proves that trust-weighted governance prevents Turchin crises
 //! from becoming extinction events.
 //!
 //! Run: cargo run --release --bin ab_experiment
@@ -58,7 +58,7 @@ fn main() {
     // Condition A: Full Symthaea (default)
     run_experiment("Symthaea (default)", PolicyConfig::default(), seed, years);
 
-    // Condition B: Legacy mode (no consciousness gating, no FEP, no Sacred Stillness)
+    // Condition B: Legacy mode (no trust-weighted governance, no FEP, no Sacred Stillness)
     run_experiment("Legacy (no gating)", PolicyConfig::legacy_mode(), seed, years);
 
     // Condition C: Utopia (no disasters, no conflict) — the ceiling
@@ -66,7 +66,7 @@ fn main() {
 
     println!("\n=== INTERPRETATION ===");
     println!("If Legacy collapses or has more wars than Symthaea,");
-    println!("consciousness-gated governance is provably necessary.");
+    println!("trust-weighted governance is provably necessary.");
     println!("The delta between Legacy CVS and Symthaea CVS is the");
     println!("thermodynamic value of consciousness integration.");
 }

@@ -48,7 +48,7 @@ following Phua 2025).
 - Robot Phi measures computational coherence, not robot feelings
 
 **Next**: Update TECHNICAL_REPORT.md with honest framing. Replace claims
-like "consciousness-gated governance" with "consciousness-metric-gated
+like "trust-weighted governance" with "consciousness-metric-gated
 governance" in documentation.
 
 ### 4. Portal Domain Structure

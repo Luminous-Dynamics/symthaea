@@ -41,7 +41,7 @@ pub struct PolicyToml {
     pub trade_openness: Option<f64>,
     pub defense_spending: Option<f64>,
     pub exploration_investment: Option<f64>,
-    pub consciousness_gating_enabled: Option<bool>,
+    pub trust_weighted_governance: Option<bool>,
     pub disasters_enabled: Option<bool>,
 }
 
@@ -112,7 +112,7 @@ impl ScenarioToml {
             if let Some(v) = pol.trade_openness { config.policy.trade_openness = v; }
             if let Some(v) = pol.defense_spending { config.policy.defense_spending = v; }
             if let Some(v) = pol.exploration_investment { config.policy.exploration_investment = v; }
-            if let Some(v) = pol.consciousness_gating_enabled { config.policy.consciousness_gating_enabled = v; }
+            if let Some(v) = pol.trust_weighted_governance { config.policy.trust_weighted_governance = v; }
             if let Some(v) = pol.disasters_enabled { config.policy.disasters_enabled = v; }
         }
 

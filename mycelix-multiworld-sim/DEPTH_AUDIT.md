@@ -89,7 +89,7 @@ amplification.
   to fund infrastructure investment. Default risk based on trust level.
 
 ### 5. GOVERNANCE: Grade C
-**What works**: Consciousness gating, anti-tyranny invariants, Dunbar transitions.
+**What works**: Trust weighting, anti-tyranny invariants, Dunbar transitions.
 **What's shallow**:
 - No LEADERS. Governance is a statistical process, not a human one. Real
   colonies are shaped by specific individuals — a visionary founder, a

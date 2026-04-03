@@ -13,7 +13,7 @@ resource_priority = "Balanced"     # Balanced | Industrial | Biological | Knowle
 trade_openness = 0.8               # 0.0 = autarky, 1.0 = free trade
 defense_spending = 0.05            # 0.0 = no defense, 0.3 = maximum
 exploration_investment = 0.05      # 0.0 = no exploration, 0.2 = aggressive
-consciousness_gating_enabled = true
+trust_weighted_governance = true    # Voting power scales with trust depth (4D profile)
 disasters_enabled = true
 
 [params]

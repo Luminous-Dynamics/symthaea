@@ -860,9 +860,9 @@ impl MultiWorldSimulator {
             // (The disaster engine naturally accounts for this via infra_factor.)
 
             // Slowly improve infrastructure (capped at 1.0).
-            // Without consciousness gating, poor governance decisions cause
+            // Without trust-weighted governance, poor governance decisions cause
             // ~20% resource waste (wrong priorities, unchecked extractive behavior).
-            if !self.config.policy.consciousness_gating_enabled {
+            if !self.config.policy.trust_weighted_governance {
                 for name in &["food", "water", "energy"] {
                     if let Some(stock) = world.resources.get_mut(name) {
                         stock.current *= 0.998; // 0.2% waste per tick = ~2.4% annual
@@ -2016,7 +2016,7 @@ impl MultiWorldSimulator {
             }
         }
 
-        // Phase 6b: Per-world consciousness-gated governance with anti-tyranny invariants
+        // Phase 6b: Per-world trust-weighted governance with anti-tyranny invariants
         {
             let tick = self.current_tick;
             let amendment_enabled = self.config.policy.amendment_enabled;
@@ -2095,9 +2095,9 @@ impl MultiWorldSimulator {
                 } else {
                     0.0
                 };
-                // Without consciousness gating, there's no institutional incentive
+                // Without trust-weighted governance, there's no institutional incentive
                 // for consciousness development — growth rate drops by 50%.
-                let gating_factor = if self.config.policy.consciousness_gating_enabled {
+                let gating_factor = if self.config.policy.trust_weighted_governance {
                     1.0
                 } else {
                     0.5
