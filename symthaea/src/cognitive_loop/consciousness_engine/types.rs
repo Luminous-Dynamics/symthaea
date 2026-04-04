@@ -179,6 +179,24 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     ///          Woolley et al. (2010) — collective intelligence emerges from social sensitivity.
     pub governance_collective_phi: f64,
 
+    // ── GWT broadcast state → Workspace component ───────────────────
+    /// Whether a GWT broadcast (workspace ignition) occurred this cycle.
+    /// Replaces coherence-proxy for Workspace component in EquationV2.
+    /// Science: Dehaene & Changeux (2011) — workspace ignition is the signature
+    /// of conscious access; mere coherence without ignition is subliminal.
+    pub gwt_broadcast_occurred: bool,
+    /// Size of the winning GWT coalition (number of participating modules).
+    /// Larger coalitions indicate broader workspace access.
+    pub gwt_coalition_size: u32,
+
+    // ── Prediction precision → Efficacy component ─────────────────────
+    /// Precision (inverse variance) of recent prediction errors [0.1, 10.0].
+    /// Distinguishes genuine predictive success from inactivity: high precision
+    /// + low PE = real efficacy; low precision + low PE = uncertain/sleeping.
+    /// Science: Feldman & Friston (2010) — precision weighting is the core
+    /// mechanism of predictive processing.
+    pub prediction_precision: f32,
+
     // ── Knowledge grounding → epistemic quality coupling ─────────────
     /// Knowledge grounding score [0.0, 1.0] from the knowledge engine.
     /// Combines fact relevance and certainty: high grounding → more confident reasoning.

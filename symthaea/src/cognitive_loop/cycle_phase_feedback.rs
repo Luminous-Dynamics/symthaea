@@ -895,6 +895,21 @@ impl CognitiveLoopService {
                 binding_capability: self.substrate_manager.binding_capability(&self.config),
                 workspace_capability: self.substrate_manager.workspace_capability(&self.config),
                 attention_capability: self.substrate_manager.attention_capability(&self.config),
+                // GWT broadcast state → Workspace component
+                gwt_broadcast_occurred: self.carryover.gwt_broadcast_occurred,
+                gwt_coalition_size: self.carryover.gwt_coalition_size,
+                // Prediction precision (inverse variance of recent PE)
+                prediction_precision: {
+                    let pe_history = &self.carryover.history.error_history;
+                    if pe_history.len() >= 4 {
+                        let mean: f32 = pe_history.iter().sum::<f32>() / pe_history.len() as f32;
+                        let variance: f32 = pe_history.iter().map(|e| (e - mean).powi(2)).sum::<f32>()
+                            / pe_history.len() as f32;
+                        (1.0 / (variance + 1e-6)).clamp(0.1, 10.0)
+                    } else {
+                        1.0 // neutral precision when insufficient history
+                    }
+                },
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,

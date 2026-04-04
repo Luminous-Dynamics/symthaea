@@ -47,12 +47,30 @@ impl CognitiveLoopService {
                         .max(novelty_salience)
                         .max(confidence_salience)
                         .clamp(0.0, 1.0);
-                    // Submit current encoding with activation-weighted salience
+                    // Submit current encoding with activation-weighted salience.
+                    // List all active contributing modules as supporters — larger
+                    // coalitions get synergy boost and higher Phi estimate, which is
+                    // critical for crossing the workspace entry threshold.
+                    // Science: Dehaene (2011) — ignition requires convergent evidence
+                    // from multiple specialized processors.
+                    let mut supporters = vec!["encoder".to_string()];
+                    if self.consciousness.self_model_tier.narrative_self.is_some() {
+                        supporters.push("narrative_self".to_string());
+                    }
+                    if self.consciousness.self_model_tier.meta_cognition.is_some() {
+                        supporters.push("meta_cognition".to_string());
+                    }
+                    if self.consciousness.consciousness_monitors.phenomenal_binding.is_some() {
+                        supporters.push("phenomenal_binding".to_string());
+                    }
+                    if self.config.enable_knowledge_engine {
+                        supporters.push("knowledge".to_string());
+                    }
                     gwt.submit_strategy(
                         "cognitive_loop",
                         activation,
                         vec![ctx.hv16_cached],
-                        vec!["encoder".to_string()],
+                        supporters,
                     );
                     // If previous cycle's subsystems requested broadcast, boost salience
                     if self.carryover.gwt_broadcast_occurred {
