@@ -1,0 +1,899 @@
+% What's Real and What Isn't: A Transparent Assessment of
+% Consciousness-Physics Coupling in Agent Simulation
+%
+% Copyright (c) 2026 Tristan Stoltz / Luminous Dynamics
+% SPDX-License-Identifier: AGPL-3.0-or-later
+%
+% Target: Minds and Machines
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{xcolor}
+% \usepackage{enumitem} % not available on this system
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{What's Real and What Isn't:\\
+A Transparent Assessment of Consciousness-Physics Coupling\\
+in Agent Simulation}
+
+\author{Tristan Stoltz\\
+  Luminous Dynamics\\
+  \texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
+
+\date{April 2026}
+
+\begin{document}
+
+\maketitle
+
+% ============================================================
+\begin{abstract}
+A growing number of agent simulation engines couple internal
+integration metrics---often labeled ``consciousness''---to
+physical dynamics, claiming that an agent's integration state
+influences its motor behavior, sensory processing, or even the
+geometry of its simulated environment.  Most such systems do not
+disclose which of their mechanics rest on established physics,
+which draw loose inspiration from neuroscience, and which are
+pure invention.  We propose a three-tier classification
+framework---\textsc{Grounded}, \textsc{Inspired}, and
+\textsc{Speculative}---and apply it, with full candor, to our
+own engine (Symtropy).  Of nine distinct mechanics, we classify
+two as \textsc{Grounded}, three as \textsc{Inspired}, and four
+as \textsc{Speculative}.  We report what changed in our design
+process once we performed this audit: speculative mechanics were
+not removed but were relabeled, reframed, and documented as
+computational metaphors rather than physical claims.  We argue
+that this kind of transparency should be standard practice in
+any system that couples integration metrics to simulated physics,
+and we propose concrete reporting standards for the field.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+The last decade has seen a proliferation of systems that attempt
+to simulate, measure, or operationalize aspects of integrated
+information processing in artificial agents.  Implementations of
+Integrated Information Theory
+\citep{tononi2004,oizumi2014} now appear in game AI, digital
+twins, and safety-testing frameworks for autonomous systems.
+Free Energy Principle (FEP) formulations
+\citep{friston2010} are used to drive robot behavior.
+Claims of ``conscious AI'' appear in both academic preprints and
+press releases with increasing frequency.
+
+Many of these systems couple an internal integration metric---a
+scalar or vector quantity that summarizes how tightly an agent's
+information processing is integrated---to the agent's physical
+dynamics.  The coupling takes various forms: the metric may gate
+motor output, modulate sensory gain, influence decision
+thresholds, or, in more adventurous designs, bend the geometry
+of the simulated environment itself.
+
+The problem is not that these couplings exist.  Simulation
+engines are free to define whatever mechanics serve their design
+goals.  The problem is that most systems do not clearly
+distinguish between three very different kinds of mechanics:
+
+\begin{enumerate}[label=(\roman*)]
+  \item Mechanics that implement well-established physical or
+    mathematical laws and can be validated against nature;
+  \item Mechanics that draw loose analogy from real systems but
+    do not faithfully implement their equations; and
+  \item Mechanics that have no published precedent and are
+    entirely invented for the simulation.
+\end{enumerate}
+
+When these categories are conflated, the result is what we call
+\emph{integration washing}: the presentation of speculative
+computational metaphors as though they were grounded in
+established science.  This is not always intentional.
+Developers who build engines iteratively may lose track of which
+coupling channels rest on real physics and which rest on
+aesthetic intuition.  But the downstream consequences are
+serious.
+
+For \textbf{AI safety}, reviewers evaluating an agent system
+that claims ``integration-coupled physics'' need to know whether
+the coupling is a validated thermodynamic constraint or an
+invented force field.  The safety implications differ
+categorically.
+
+For \textbf{reproducibility}, speculative mechanics cannot be
+validated against nature because there is no natural system they
+model.  They can only be validated against their own
+specification---a tautology that should be disclosed.
+
+For \textbf{philosophy of mind}, conflating grounded and
+speculative mechanics muddles the already difficult question of
+whether any computational system implements genuine integration
+\citep{chalmers1995}.  If a system claims to couple
+``information integration to spacetime curvature'' but the
+coupling is an invented scalar multiplier, the philosophical
+import is very different from what the language implies.
+
+For \textbf{education}, students encountering these systems
+deserve to know which parts teach real physics and which parts
+teach game design.
+
+In this paper, we propose a classification framework, apply it
+with full honesty to our own engine, report what the audit
+changed, and argue that this transparency should be standard.
+
+
+% ============================================================
+\section{The Classification Framework}
+\label{sec:framework}
+
+We propose that every mechanic in an integration-coupled
+simulation engine be classified into exactly one of three tiers.
+The tiers are distinguished by the strength of the connection
+between the mechanic and published, empirically validated
+science.
+
+\subsection{\textsc{Grounded}}
+
+A mechanic is \textsc{Grounded} if it satisfies all of the
+following:
+
+\begin{enumerate}
+  \item It implements equations drawn from a published physical
+    or mathematical theory (with citation).
+  \item The constants used are drawn from the literature, not
+    invented.
+  \item The mechanic's predictions, within its domain of
+    application, can in principle be validated against physical
+    measurement.
+\end{enumerate}
+
+Example: a thermodynamic subsystem that computes internal energy
+$U$, temperature $T$, entropy $S$, and Helmholtz free energy
+$F = U - TS$ using Landauer's principle \citep{landauer1961} for
+the energy cost of bit erasure.  The equations are textbook
+thermodynamics.  The constants ($k_B T \ln 2$ per erased bit)
+are empirically established.  The predictions (minimum energy
+dissipation per computation) are experimentally verified
+\citep{berut2012}.
+
+A \textsc{Grounded} classification does not mean the mechanic
+is correctly applied to the simulation domain---only that the
+underlying physics is real.  Whether thermodynamic constraints
+meaningfully apply to an abstract agent's ``cognitive''
+processes is a separate question.
+
+\subsection{\textsc{Inspired}}
+
+A mechanic is \textsc{Inspired} if:
+
+\begin{enumerate}
+  \item It draws on a real scientific theory or empirical
+    finding, and the connection is stated explicitly.
+  \item It captures the \emph{qualitative spirit} of the source
+    theory but does not faithfully implement its equations,
+    constants, or boundary conditions.
+  \item The developer acknowledges the gap between the source
+    theory and the implementation.
+\end{enumerate}
+
+Example: a free-energy gradient that drives agent behavior ``in
+the spirit of'' the Free Energy Principle \citep{friston2010}
+but uses a simplified scalar proxy rather than the full
+variational inference framework.  The inspiration is legitimate;
+the implementation is a loose analogy.
+
+The key disclosure for an \textsc{Inspired} mechanic is:
+\emph{what, specifically, was simplified, omitted, or
+reinterpreted?}  Without this, the reader cannot assess how far
+the implementation has drifted from its source.
+
+\subsection{\textsc{Speculative}}
+
+A mechanic is \textsc{Speculative} if:
+
+\begin{enumerate}
+  \item No published theory or empirical finding supports the
+    specific coupling it implements.
+  \item The mechanic is the developer's invention, even if it
+    uses vocabulary borrowed from real physics.
+  \item There is no known natural system in which this coupling
+    has been observed.
+\end{enumerate}
+
+Example: a mechanic that couples an agent's integration metric
+$\Phi$ to the curvature of its simulated spacetime, producing a
+``$\Phi$-gravity'' effect.  Tononi's IIT
+\citep{tononi2004} never proposed gravitational effects of
+integrated information.  General relativity \citep{carroll2004}
+couples the stress-energy tensor to curvature, not information
+integration.  The mechanic borrows vocabulary from both theories
+but implements a coupling that neither theory contains.
+
+A \textsc{Speculative} classification is not a condemnation.
+Speculative mechanics can produce interesting emergent behavior,
+can serve as generative hypotheses, and can be valuable game
+design tools.  The classification simply requires that they be
+presented honestly: as inventions, not as implementations of
+established science.
+
+
+% ============================================================
+\section{The Engine Under Audit}
+\label{sec:engine}
+
+Symtropy is an agent simulation engine with five coupling
+channels between an internal integration metric and simulated
+physics.  The engine implements nine distinct mechanics across
+these channels.  It has been exercised across more than 3,000
+simulation runs during development and testing.
+
+The coupling channels are:
+
+\begin{enumerate}
+  \item \textbf{Thermodynamic}: The agent maintains an internal
+    thermodynamic state ($U$, $T$, $S$, $F$) that constrains
+    its computational budget.
+  \item \textbf{Geometric}: The simulated environment uses
+    conformal geometry, and certain mechanics modulate curvature
+    or metric properties.
+  \item \textbf{Free-energy}: A scalar gradient drives the agent
+    toward states that minimize a prediction-error proxy.
+  \item \textbf{Field}: Scalar fields in the environment are
+    influenced by agent state or by spatial configuration.
+  \item \textbf{Motor}: The agent's motor output is gated by
+    its integration state.
+\end{enumerate}
+
+The engine was built iteratively over approximately eighteen
+months.  During that period, mechanics were added based on a
+mixture of scientific reading, design intuition, and aesthetic
+preference.  The audit described in this paper was conducted
+after the engine was functionally complete, precisely because the
+developers (the present author included) realized they could no
+longer clearly articulate which mechanics rested on real physics
+and which did not.
+
+This is, we suspect, a common situation.  It is also the
+situation that our proposed framework is designed to address.
+
+
+% ============================================================
+\section{Application: The Realism Audit}
+\label{sec:audit}
+
+We applied the three-tier framework to each of Symtropy's nine
+mechanics.  The results are summarized in
+Table~\ref{tab:audit} and discussed individually below.
+
+\begin{table}[htbp]
+\centering
+\caption{Realism audit of Symtropy's integration-physics
+  coupling mechanics.  Each mechanic is classified as
+  \textsc{Grounded} (G), \textsc{Inspired} (I), or
+  \textsc{Speculative} (S).}
+\label{tab:audit}
+\smallskip
+\begin{tabularx}{\textwidth}{L{3.2cm} c L{8.5cm}}
+\toprule
+\textbf{Mechanic} & \textbf{Tier} & \textbf{Justification} \\
+\midrule
+Thermodynamics ($U$, $T$, $S$, $F$)
+  & G
+  & Implements Landauer's principle \citep{landauer1961} and
+    the second law.  Constants from literature.  Experimentally
+    validated \citep{berut2012}. \\[6pt]
+Conformal geometry (math)
+  & G
+  & Uses standard differential geometry
+    \citep{carroll2004,wald1984}.  Equations are textbook.
+    No novel physical claims. \\[6pt]
+FEP gradient
+  & I
+  & Captures the qualitative drive toward prediction-error
+    minimization \citep{friston2010} but uses a simplified
+    scalar proxy, not the full variational framework.
+    Omits generative model, recognition density, and
+    Markov blanket formalism. \\[6pt]
+Harmony fields
+  & I
+  & Loosely inspired by McFadden's CEMI field theory
+    \citep{mcfadden2020}, which proposes that
+    electromagnetic fields in the brain contribute to
+    integration.  Our fields are scalar, not
+    electromagnetic, and lack Maxwell's equations.  The
+    qualitative idea (fields as integration medium) is
+    preserved; the physics is not. \\[6pt]
+Motor gain tiers
+  & I
+  & Inspired by motor cortex gating, where preparatory
+    activity modulates the gain of motor output
+    \citep{kaufman2014}.  Our implementation uses discrete
+    tiers rather than continuous population dynamics.
+    The qualitative structure (integration state gates
+    motor authority) has biological precedent; the
+    specific tier boundaries do not. \\[6pt]
+Conformal curvature as physics
+  & S
+  & No published physical law couples an information
+    integration metric to spacetime curvature.  The
+    mathematics is valid (conformal rescaling of a
+    metric), but the \emph{physical claim} that
+    integration produces curvature is our invention.
+    General relativity couples the stress-energy tensor
+    to curvature \citep{carroll2004}, not information
+    integration. \\[6pt]
+Sanctuary zones
+  & S
+  & No precedent for spatial regions where a ``harmony
+    field'' suppresses entropy or confers protective
+    effects.  The mechanic is a game-design construct
+    presented in physics vocabulary. \\[6pt]
+$\Phi$-gravity
+  & S
+  & Tononi's IIT \citep{tononi2004} defines $\Phi$ as
+    a measure of integrated information.  It does not
+    propose gravitational effects.  Our coupling of
+    $\Phi$ to a gravitational potential is pure
+    invention. \\[6pt]
+Dimensional leakage
+  & S
+  & Borrows the language of Randall-Sundrum brane
+    scenarios \citep{randall1999}, but the actual
+    mechanic (integration metric modulating
+    cross-dimensional information flow) has no
+    precedent in braneworld physics or any other
+    published theory. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Grounded Mechanics}
+
+\paragraph{Thermodynamics.}
+The engine's thermodynamic subsystem computes internal energy,
+temperature, entropy, and Helmholtz free energy using standard
+equations.  The minimum energy cost of computation is set by
+Landauer's bound: $E_{\min} = k_B T \ln 2$ per bit erased
+\citep{landauer1961}.  This has been experimentally verified to
+within a factor of order unity \citep{berut2012}.
+
+We note, however, that applying Landauer's bound to an abstract
+agent's ``cognitive'' operations is itself a modeling choice.
+The bound applies to physical bit erasure in thermodynamic
+systems.  Whether it constrains computation in an abstract
+simulation is a question about the simulation's semantics, not
+about thermodynamics.  We classify the mechanic as
+\textsc{Grounded} because the equations and constants are real,
+while acknowledging that the \emph{domain of application} is
+a design decision.
+
+\paragraph{Conformal geometry.}
+The engine uses conformal transformations---rescalings of a
+metric tensor by a smooth positive function---as a mathematical
+framework for environment geometry.  The mathematics is standard
+\citep{carroll2004,wald1984}.  No novel physical claims are
+made by the mathematical framework itself.  The \emph{use} of
+this framework (what drives the conformal factor) is where
+classifications diverge, as discussed under ``Conformal
+curvature as physics'' below.
+
+\subsection{Inspired Mechanics}
+
+\paragraph{FEP gradient.}
+The Free Energy Principle \citep{friston2010} proposes that
+biological agents minimize variational free energy, which
+requires a generative model, a recognition density, and a
+Markov blanket.  Our implementation preserves the qualitative
+idea---agents are driven toward states that reduce prediction
+error---but replaces the full variational apparatus with a
+scalar gradient computed from a simplified surprise signal.
+
+What is lost: the rich structure of approximate Bayesian
+inference, the distinction between perceptual and active
+inference, and the information-geometric properties of the
+variational bound.  What is preserved: the directional pressure
+toward prediction-error reduction as a behavioral driver.
+
+We classify this as \textsc{Inspired} because the simplification
+is severe enough that the mechanic cannot be called an
+implementation of the FEP.  It is a scalar proxy that shares the
+FEP's motivating intuition.
+
+\paragraph{Harmony fields.}
+McFadden's Conscious Electromagnetic Information (CEMI) theory
+\citep{mcfadden2020} proposes that the brain's endogenous
+electromagnetic field is not an epiphenomenon but a functional
+medium for information integration.  This is a minority position
+in neuroscience, though it has generated testable predictions
+\citep{mcfadden2020}.
+
+Our ``harmony fields'' borrow the qualitative idea that a field
+can serve as an integration medium.  However, our fields are
+scalar (not electromagnetic), do not obey Maxwell's equations,
+and are not coupled to any physical field dynamics.  The
+name ``harmony field'' itself signals that we have moved from
+physics to metaphor.
+
+We considered classifying this as \textsc{Speculative}, since
+the connection to CEMI is so loose.  We settled on
+\textsc{Inspired} because the core idea (fields as integration
+substrates) does have a published scientific advocate, even if
+our implementation shares almost none of the theory's formal
+content.
+
+\paragraph{Motor gain tiers.}
+Neurophysiology has established that motor cortex activity
+undergoes preparatory modulation before movement execution:
+population-level dynamics in premotor and primary motor cortex
+gate the gain of downstream motor commands
+\citep{kaufman2014}.  Our implementation captures this
+qualitative structure---the agent's integration state determines
+how much motor authority it has---but uses discrete tiers
+(four levels) rather than continuous population dynamics.
+
+The tier boundaries are not derived from neurophysiology.  They
+are design parameters tuned for gameplay.  The classification is
+\textsc{Inspired}: the structure has biological precedent, but
+the parameterization does not.
+
+\subsection{Speculative Mechanics}
+
+\paragraph{Conformal curvature as physics.}
+The engine allows the agent's integration metric to drive the
+conformal factor of the environment's geometry.  This means that
+an agent's integration state literally bends the simulated
+space around it.
+
+This is our most problematic mechanic from a transparency
+standpoint.  The mathematical framework (conformal geometry) is
+\textsc{Grounded}.  The \emph{physical claim} that integration
+produces curvature is \textsc{Speculative}.  There is no
+published physical law that couples any information-theoretic
+quantity to spacetime curvature.  General relativity couples the
+stress-energy tensor to the Einstein tensor
+\citep{carroll2004}.  IIT defines $\Phi$ as a property of
+causal structures \citep{tononi2004}.  No bridge between these
+two theories has been established.
+
+The mechanic produces visually compelling emergent behavior:
+high-integration agents warp the local geometry, creating
+navigational consequences for nearby agents.  This is
+interesting \emph{as game design}.  It is not physics.
+
+\paragraph{Sanctuary zones.}
+The engine designates certain spatial regions as ``sanctuaries''
+where harmony field values are elevated and entropy production
+is suppressed.  There is no physical or biological precedent for
+spatial regions that confer integrative protection by virtue of
+their location.
+
+The mechanic serves a game-design function: it creates
+strategically important locations that reward integration-aware
+play.  We classify it as \textsc{Speculative} because it is
+presented using physics vocabulary (entropy suppression, field
+elevation) without any physical basis.
+
+\paragraph{$\Phi$-gravity.}
+The engine implements a gravitational-like attraction between
+agents that is proportional to their integration metrics.  This
+directly borrows the language and mathematical form of
+Newtonian gravitation but replaces mass with $\Phi$.
+
+Tononi's IIT \citep{tononi2004,tononi2016} defines $\Phi$ as
+the irreducible integrated information of a system.  The theory
+makes no claims about gravitational effects.  Our coupling is
+pure invention.  It produces interesting flocking and clustering
+behavior, but it is not a physical prediction of IIT or any
+other published theory.
+
+\paragraph{Dimensional leakage.}
+The engine includes a mechanic where high integration values
+allow information to ``leak'' between simulated dimensions,
+borrowing the language of Randall-Sundrum braneworld scenarios
+\citep{randall1999}.  In the original Randall-Sundrum models,
+gravitational fields propagate in a five-dimensional bulk while
+Standard Model fields are confined to a four-dimensional brane.
+The mechanism for confinement involves exponential warp factors
+in the bulk metric.
+
+Our mechanic preserves none of this structure.  The
+``dimensions'' in our engine are abstract game-state dimensions,
+not spatial dimensions.  The ``leakage'' is controlled by the
+integration metric, not by bulk geometry.  The Randall-Sundrum
+vocabulary is borrowed for evocative effect, not for physical
+content.
+
+We flag this as the clearest case of vocabulary borrowing that
+could mislead: a reader encountering ``dimensional leakage
+inspired by Randall-Sundrum'' might reasonably assume a
+connection to extra-dimensional physics that does not exist.
+
+
+% ============================================================
+\section{What the Audit Changed}
+\label{sec:lessons}
+
+Performing this audit produced five concrete changes in our
+development practice.
+
+\paragraph{1. Terminology.}
+Before the audit, internal documentation referred to ``consciousness
+bends space'' as a description of the conformal curvature
+mechanic.  After the audit, we reframed this as
+``integration-parameterized curvature.''  The mechanic is
+identical; the description is honest.  We found that the revised
+language also improved technical communication: ``integration
+metric'' has a clear referent (a scalar computed from agent
+state), while ``consciousness'' imports philosophical baggage
+that obscures the engineering.
+
+\paragraph{2. Documentation.}
+Each mechanic now carries a classification tag in its source
+code documentation.  Developers encountering a mechanic for
+the first time can immediately see whether it rests on real
+physics, loose analogy, or invention.
+
+\paragraph{3. Interpretation of results.}
+Emergent behaviors arising from \textsc{Speculative} mechanics
+are now reported differently.  Before the audit, we might have
+written: ``the engine demonstrates that integration produces
+gravitational effects.''  After the audit, we write: ``the
+engine's invented $\Phi$-gravity mechanic produces clustering
+behavior that is interesting as a simulation artifact.''  The
+second formulation is less exciting but more honest.
+
+\paragraph{4. No mechanics were removed.}
+This is important.  The audit did not lead us to strip out
+speculative mechanics.  They serve design goals, produce
+interesting behavior, and may even generate testable hypotheses.
+What changed is how they are \emph{presented}.  A
+\textsc{Speculative} mechanic clearly labeled as such is a tool.
+A \textsc{Speculative} mechanic presented as \textsc{Grounded}
+is a misrepresentation.
+
+\paragraph{5. Humility about ``Inspired'' mechanics.}
+The audit revealed that our \textsc{Inspired} mechanics were
+the hardest to classify.  The FEP gradient ``captures the
+spirit'' of the Free Energy Principle---but how much spirit is
+enough to justify the label?  We adopted a conservative rule:
+if the implementation omits the core mathematical structure of
+the source theory (not just incidental details), the mechanic
+should be classified as \textsc{Inspired} at best, regardless
+of how faithfully it captures the qualitative intuition.
+
+
+% ============================================================
+\section{Proposed Standards}
+\label{sec:standards}
+
+Based on our experience, we propose that the following
+disclosures become standard practice for any system that couples
+an integration metric (or any quantity labeled ``consciousness,''
+``awareness,'' ``sentience,'' etc.) to simulated physics.
+
+\subsection{The Realism Table}
+
+Every paper describing such a system should include a table,
+analogous to Table~\ref{tab:audit}, that classifies each
+coupling mechanic as \textsc{Grounded}, \textsc{Inspired}, or
+\textsc{Speculative}.  The table should include:
+
+\begin{itemize}
+  \item The name of the mechanic.
+  \item The classification tier.
+  \item A brief justification citing the relevant published
+    science (for \textsc{Grounded} and \textsc{Inspired}) or
+    explicitly stating the absence of precedent (for
+    \textsc{Speculative}).
+\end{itemize}
+
+\subsection{Mathematical vs.\ Physical Grounding}
+
+A crucial distinction that our audit surfaced: using real
+mathematical equations does not make a mechanic physically
+grounded.  Conformal geometry is real mathematics.  Applying a
+conformal factor driven by an integration metric is not real
+physics.  The realism table should distinguish:
+
+\begin{itemize}
+  \item \textbf{Mathematically grounded}: the equations are
+    valid mathematics (correctly implemented).
+  \item \textbf{Physically grounded}: the equations describe
+    a relationship that holds in nature.
+\end{itemize}
+
+Our conformal curvature mechanic is mathematically grounded
+but not physically grounded.  Failing to make this distinction
+is, in our experience, the most common source of accidental
+misrepresentation.
+
+\subsection{Terminology Discipline}
+
+We advocate for the following terminological practices:
+
+\begin{itemize}
+  \item Use ``integration metric'' or ``integration measure''
+    rather than ``consciousness'' when describing the scalar
+    quantity that drives coupling, unless the system explicitly
+    claims to implement a specific theory of consciousness
+    (e.g., IIT's $\Phi$) and the implementation can be validated
+    against that theory's formal definitions.
+  \item Avoid borrowing vocabulary from fundamental physics
+    (``gravity,'' ``dimensions,'' ``curvature'') unless the
+    mechanic faithfully implements the relevant physics.
+    Metaphorical use of physics vocabulary should be flagged
+    explicitly: ``we use the term `gravity' metaphorically
+    to describe\ldots''
+  \item When citing a theory as inspiration, specify what was
+    omitted.  ``Inspired by the Free Energy Principle
+    \citep{friston2010}, simplified to a scalar gradient
+    (omitting the variational framework, generative model,
+    and Markov blanket formalism)'' is more useful than
+    ``based on the Free Energy Principle.''
+\end{itemize}
+
+\subsection{Emergent Behavior Disclaimers}
+
+When reporting emergent behavior from \textsc{Speculative}
+mechanics, papers should note that the behavior is an artifact
+of the invented mechanic, not a prediction of any physical
+theory.  This does not diminish the behavior's interest as a
+simulation result.  It prevents the behavior from being
+misinterpreted as evidence for a physical claim that was never
+established.
+
+\subsection{Versioned Realism Audits}
+
+We recommend that realism audits be versioned and updated as
+the system evolves.  Mechanics may move between tiers as new
+science is published (a \textsc{Speculative} mechanic could
+become \textsc{Inspired} if a relevant theory emerges) or as
+implementations are revised (an \textsc{Inspired} mechanic
+could become \textsc{Grounded} if the full source theory's
+equations are implemented).
+
+
+% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+The need for transparency in consciousness-related AI claims
+has been raised from several directions.  \citet{chalmers1995}
+established the conceptual distinction between ``easy'' and
+``hard'' problems that makes integration-metric claims
+philosophically fraught.  \citet{koch2019} has argued for
+rigorous empirical criteria before attributing consciousness
+to any system, biological or artificial.  \citet{bostrom2003}
+raised the question of substrate-independence of consciousness
+in simulation, but did not address the transparency of the
+simulation's mechanics.
+
+In the philosophy of simulation, \citet{winsberg2010} has
+argued that models should be transparent about their
+idealizations and approximations.  Our framework operationalizes
+this principle for the specific case of integration-coupled
+systems.
+
+The IIT community has developed formal tools for computing
+$\Phi$ \citep{tononi2004,oizumi2014,tononi2016}, and these
+provide an example of \textsc{Grounded} practice: the theory
+specifies its mathematics precisely enough that implementations
+can be validated.  Our concern is with the many systems that
+borrow IIT's vocabulary without implementing its formalism.
+
+The FEP community has similarly developed formal tools
+\citep{friston2010,parr2022}, but the gap between the full
+FEP formalism and typical ``FEP-inspired'' implementations
+in robotics and AI is substantial and often undisclosed.
+
+To our knowledge, no prior work has proposed a systematic
+classification framework for the realism of integration-physics
+couplings, nor has any system published a full self-audit of
+the kind we present here.
+
+
+% ============================================================
+\section{Limitations}
+\label{sec:limitations}
+
+Our framework has several limitations that should be
+acknowledged.
+
+First, the boundaries between tiers are judgment calls.  We
+classified harmony fields as \textsc{Inspired} rather than
+\textsc{Speculative} because the qualitative idea of fields
+as integration substrates has a published advocate.  Others
+might reasonably disagree.  The framework's value lies not in
+producing unique classifications but in forcing the
+classification conversation to happen.
+
+Second, we have applied the framework only to our own engine.
+We have not audited other systems, both because we lack access
+to their internals and because the audit is most valuable as a
+self-assessment tool.  We encourage other developers to
+perform their own audits rather than relying on external
+classification.
+
+Third, the framework addresses only the \emph{physics} side of
+integration-coupled systems.  It does not address whether the
+integration metric itself is a valid measure of anything
+philosophically interesting.  Whether $\Phi$ or any other
+metric captures genuine consciousness is orthogonal to whether
+the metric's coupling to physics is grounded, inspired, or
+speculative.
+
+Fourth, our audit was performed by the engine's developers.
+Self-audits are subject to motivated reasoning.  We have tried
+to err on the side of classifying mechanics as
+\textsc{Speculative} when in doubt, but external audits would
+be more rigorous.
+
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We built an agent simulation engine that couples an integration
+metric to physical dynamics through nine distinct mechanics.
+When we audited those mechanics for scientific grounding, we
+found that only two rest on established physics, three draw
+loose inspiration from real science, and four are our own
+inventions dressed in physics vocabulary.
+
+This finding did not diminish the engine.  The speculative
+mechanics produce interesting emergent behavior.  But the audit
+changed how we describe that behavior, how we document the
+engine, and how we think about the relationship between
+simulation and science.
+
+The core lesson is simple: \textbf{transparency is a feature,
+not a weakness}.  An engine that clearly labels its speculative
+mechanics is more useful to researchers, safer for deployment,
+and more honest to its users than one that presents invention
+as established science.
+
+We propose the \textsc{Grounded}/\textsc{Inspired}/\textsc{%
+Speculative} framework as a minimal standard for any system
+that couples integration metrics to simulated physics.  The
+framework is deliberately simple---three tiers, clear criteria,
+a single table.  Complexity is not the barrier to adoption;
+cultural norms are.  If the field adopts a norm of disclosing
+what is real and what is not, the quality of the science, the
+safety of the systems, and the integrity of the philosophical
+discourse will all benefit.
+
+We have shown that performing this audit is tractable, that it
+does not require removing speculative mechanics, and that it
+improves both the engine's documentation and its developers'
+understanding.  We encourage others to do the same.
+
+
+% ============================================================
+\section*{Acknowledgments}
+
+The author thanks the open-source communities around IIT, the
+Free Energy Principle, and Holochain for making the foundational
+work accessible.  The Symtropy engine is released under the
+AGPL-3.0-or-later license.
+
+
+% ============================================================
+\begin{thebibliography}{99}
+
+\bibitem[B\'{e}rut et~al.(2012)]{berut2012}
+B\'{e}rut, A., Arakelyan, A., Petrosyan, A., Ciliberto, S.,
+  Dillenschneider, R., \& Lutz, E. (2012).
+\newblock Experimental verification of {L}andauer's principle
+  linking information and thermodynamics.
+\newblock \emph{Nature}, 483(7388), 187--189.
+
+\bibitem[Bostrom(2003)]{bostrom2003}
+Bostrom, N. (2003).
+\newblock Are we living in a computer simulation?
+\newblock \emph{The Philosophical Quarterly}, 53(211), 243--255.
+
+\bibitem[Carroll(2004)]{carroll2004}
+Carroll, S.~M. (2004).
+\newblock \emph{Spacetime and Geometry: An Introduction to
+  General Relativity}.
+\newblock Addison-Wesley.
+
+\bibitem[Chalmers(1995)]{chalmers1995}
+Chalmers, D.~J. (1995).
+\newblock Facing up to the problem of consciousness.
+\newblock \emph{Journal of Consciousness Studies}, 2(3),
+  200--219.
+
+\bibitem[Friston(2010)]{friston2010}
+Friston, K. (2010).
+\newblock The free-energy principle: A unified brain theory?
+\newblock \emph{Nature Reviews Neuroscience}, 11(2), 127--138.
+
+\bibitem[Kaufman et~al.(2014)]{kaufman2014}
+Kaufman, M.~T., Churchland, M.~M., Ryu, S.~I., \&
+  Shenoy, K.~V. (2014).
+\newblock Cortical activity in the null space: Permitting
+  preparation without movement.
+\newblock \emph{Nature Neuroscience}, 17(3), 440--448.
+
+\bibitem[Koch(2019)]{koch2019}
+Koch, C. (2019).
+\newblock \emph{The Feeling of Life Itself: Why Consciousness
+  Is Widespread but Can't Be Computed}.
+\newblock MIT Press.
+
+\bibitem[Landauer(1961)]{landauer1961}
+Landauer, R. (1961).
+\newblock Irreversibility and heat generation in the computing
+  process.
+\newblock \emph{IBM Journal of Research and Development}, 5(3),
+  183--191.
+
+\bibitem[McFadden(2020)]{mcfadden2020}
+McFadden, J. (2020).
+\newblock Integrating information in the brain's {EM} field:
+  The {CEMI} field theory of consciousness.
+\newblock \emph{Neuroscience of Consciousness}, 2020(1),
+  niaa016.
+
+\bibitem[Oizumi et~al.(2014)]{oizumi2014}
+Oizumi, M., Albantakis, L., \& Tononi, G. (2014).
+\newblock From the phenomenology to the mechanisms of
+  consciousness: {I}ntegrated {I}nformation {T}heory 3.0.
+\newblock \emph{PLoS Computational Biology}, 10(5), e1003588.
+
+\bibitem[Parr et~al.(2022)]{parr2022}
+Parr, T., Pezzulo, G., \& Friston, K.~J. (2022).
+\newblock \emph{Active Inference: The Free Energy Principle in
+  Mind, Brain, and Behavior}.
+\newblock MIT Press.
+
+\bibitem[Randall \& Sundrum(1999)]{randall1999}
+Randall, L. \& Sundrum, R. (1999).
+\newblock Large mass hierarchy from a small extra dimension.
+\newblock \emph{Physical Review Letters}, 83(17), 3370--3373.
+
+\bibitem[Tononi(2004)]{tononi2004}
+Tononi, G. (2004).
+\newblock An information integration theory of consciousness.
+\newblock \emph{BMC Neuroscience}, 5, 42.
+
+\bibitem[Tononi et~al.(2016)]{tononi2016}
+Tononi, G., Boly, M., Massimini, M., \& Koch, C. (2016).
+\newblock Integrated information theory: From consciousness to
+  its physical substrate.
+\newblock \emph{Nature Reviews Neuroscience}, 17(7), 450--461.
+
+\bibitem[Wald(1984)]{wald1984}
+Wald, R.~M. (1984).
+\newblock \emph{General Relativity}.
+\newblock University of Chicago Press.
+
+\bibitem[Winsberg(2010)]{winsberg2010}
+Winsberg, E. (2010).
+\newblock \emph{Science in the Age of Computer Simulation}.
+\newblock University of Chicago Press.
+
+\end{thebibliography}
+
+\end{document}

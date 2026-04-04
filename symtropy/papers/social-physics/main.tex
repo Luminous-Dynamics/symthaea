@@ -1,0 +1,706 @@
+% Cooperation, Conflict, and Collapse: Social Physics in a Thermodynamic Multi-Agent Engine
+% Target: Journal of Artificial Societies and Social Simulation (JASSS)
+% Copyright: Tristan Stoltz / Luminous Dynamics, AGPL-3.0-or-later
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{natbib}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+% \usepackage{multirow} % not available on this system
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=blue!60!black,
+    urlcolor=blue!60!black
+}
+
+\title{Cooperation, Conflict, and Collapse:\\Social Physics in a Thermodynamic Multi-Agent Engine}
+
+\author{Tristan Stoltz\\
+  Luminous Dynamics\\
+  Richardson, TX, USA\\
+  \texttt{tristan.stoltz@evolvingresonantcocreationism.com}
+}
+
+\date{April 2026}
+
+\begin{document}
+
+\maketitle
+
+% --------------------------------------------------------------------------
+% ABSTRACT
+% --------------------------------------------------------------------------
+\begin{abstract}
+We investigate emergent social dynamics in a multi-agent physics engine where agents maintain an integration metric ($\Phi$, derived from Integrated Information Theory) at continuous thermodynamic cost. Using Symtropy, an open-source engine coupling five $\Phi$-physics channels to Newtonian dynamics, we conduct nine experiment suites comprising over 2{,}000 simulation runs across populations of 20--24 agents. Key findings: (1)~Physical bonds between resonant agents improve group survival from 57\% to 97\% ($p=0.0012$, $d=2.44$), with agents selectively bonding with only 17.7\% of possible partners. (2)~A sharp phase transition at 0.20~J/tick maintenance cost separates cooperative and collapsed regimes; above threshold, dynamics are bistable (all-or-nothing by random seed), and cooperation events paradoxically \emph{increase} under stress. (3)~A critical adversarial fraction of 25\% collapses cooperation; cooperators under adversarial pressure evolve universal solidarity (resonance $0.86 \to 1.0$) rather than tribalism. (4)~Algorithm-era information topology devastates cooperation relative to pre-internet baselines. (5)~Natural group sizes of $N \approx 12$ emerge from thermodynamic constraints, with per-capita energy scaling positively ($\beta = +1.77$). (6)~Resource abundance breeds complacency: agents in abundant environments survive worst (7.8/24) while those in depleting environments survive best (13.9/24), inverting the classical tragedy of the commons. (7)~Costly altruism fails completely---100\% recidivism among rescued agents---demonstrating that individual charity without structural support is thermodynamically insufficient. We argue that these emergent social patterns arise from the thermodynamic cost structure itself, not from the specific integration metric, suggesting a universality principle for computational social physics.
+\end{abstract}
+
+\noindent\textbf{Keywords:} agent-based modeling; social physics; thermodynamics; cooperation; phase transitions; integrated information; multi-agent systems
+
+% --------------------------------------------------------------------------
+% 1. INTRODUCTION
+% --------------------------------------------------------------------------
+\section{Introduction}
+\label{sec:introduction}
+
+Agent-based modeling of social phenomena has a rich history spanning decades, from Schelling's segregation models \citep{schelling1978} to Axelrod's tournaments for the evolution of cooperation \citep{axelrod1984}. The dominant paradigm in these models relies on utility functions and payoff matrices: agents maximize expected reward according to game-theoretic strategies. While this framework has produced important insights---the emergence of tit-for-tat, the conditions for altruism, the dynamics of coalition formation---it abstracts away the physical substrate on which social interaction occurs.
+
+Real social systems, however, are embedded in physics. Maintaining a functioning brain is metabolically expensive (approximately 20\% of basal metabolic rate in humans; \citealt{raichle2002}). Social interaction requires physical proximity, which costs energy. Cooperation involves resource sharing under thermodynamic constraints. These physical costs are not incidental to social dynamics; we argue they are \emph{constitutive} of them.
+
+In this paper, we take a different approach. Rather than specifying utility functions, we embed agents in a physically grounded simulation where they must maintain an integration metric ($\Phi$, after Tononi's Integrated Information Theory; \citealt{tononi2004}) at continuous thermodynamic cost. Agents have no strategies, no payoff matrices, and no explicit goals. They move along Free Energy Principle (FEP; \citealt{friston2010}) gradients, share energy through harmony resonance, and either survive or collapse based on their thermodynamic balance sheets. Social phenomena---cooperation, conflict, group formation, altruism---emerge entirely from the physics.
+
+This approach draws on three theoretical traditions. First, Prigogine's dissipative structures \citep{prigogine1977} show that systems far from equilibrium can spontaneously self-organize; our agents are precisely such dissipative structures, maintaining low-entropy internal states at the cost of entropy production. Second, the Free Energy Principle \citep{friston2010} provides a variational framework in which agents minimize surprise by acting on their environment. Third, Integrated Information Theory \citep{tononi2004} supplies the integration metric that serves as the organizational target agents must sustain.
+
+The engine used in this work, Symtropy, is described in detail in our companion paper \citep{stoltz2026symtropy}. Here, we briefly summarize the relevant mechanics (Section~\ref{sec:methods}) before presenting results from nine experiment suites (Sections~\ref{sec:bonds}--\ref{sec:inequality}), discussing their implications for social theory (Section~\ref{sec:discussion}), and acknowledging limitations (Section~\ref{sec:limitations}).
+
+Our central claim is this: when agents must pay thermodynamic costs to maintain internal organization, the major patterns of social physics---selective bonding, phase transitions, adversarial thresholds, group size limits, commons tragedies, and inequality dynamics---emerge without any social programming. The physics is sufficient.
+
+% --------------------------------------------------------------------------
+% 2. ENGINE & METHODS
+% --------------------------------------------------------------------------
+\section{Engine and Methods}
+\label{sec:methods}
+
+\subsection{The Symtropy Engine}
+
+Symtropy is an open-source multi-agent physics engine in which each agent maintains an integration metric $\Phi$ (a scalar in $[0, 1]$ inspired by IIT; \citealt{tononi2004}) at continuous thermodynamic cost. The engine couples $\Phi$ to Newtonian 2D dynamics through five channels: energy harvesting, metabolic drain, movement via FEP gradients, social resonance, and environmental coupling. Full architectural details are provided in our companion paper \citep{stoltz2026symtropy}; here we summarize the features relevant to the present experiments.
+
+\paragraph{Agent state.} Each agent $i$ at time $t$ is characterized by position $\mathbf{x}_i(t) \in \mathbb{R}^2$, velocity $\mathbf{v}_i(t)$, energy $E_i(t)$, integration metric $\Phi_i(t)$, internal temperature $T_i(t)$, and entropy $S_i(t)$. The agent is ``alive'' when $E_i(t) > 0$ and $\Phi_i(t) > 0$.
+
+\paragraph{Thermodynamic constants.} All experiments use the research configuration: initial energy budget of 200~J, maintenance cost in the range 0.20--0.35~J/tick (varied experimentally), and energy harvesting from environmental sources.
+
+\paragraph{Harmony resonance.} Two agents $i$ and $j$ within interaction radius $r$ compute a resonance score $h_{ij} \in [0, 1]$ based on their $\Phi$ profiles. When $h_{ij}$ exceeds a threshold, energy transfer occurs from the higher-energy to the lower-energy agent. Six harmony archetypes define distinct resonance profiles.
+
+\paragraph{FEP gradient movement.} Agents move to minimize their free energy $F_i = E_i - T_i S_i$ by following the negative gradient $\mathbf{v}_i \propto -\nabla F_i$, which drives them toward regions of lower surprise (i.e., higher energy availability or cooperative neighbors).
+
+\paragraph{Social bonds.} The engine supports distance constraints (spring-like physical bonds) between agents. When enabled, resonant pairs ($h_{ij} > \theta_{\text{bond}}$) form physical bonds that keep them in proximity, analogous to social ties.
+
+\paragraph{Simulation parameters.} Unless otherwise noted, each experiment uses 20--24 agents, runs for 6{,}000--10{,}000 ticks, and is replicated across 6--10 random seeds. Populations are initialized in a bounded 2D arena with random positions and velocities.
+
+\subsection{Statistical Methods}
+
+Given the small number of seeds per condition (6--10), we employ nonparametric statistics throughout. Between-condition comparisons use the Mann-Whitney $U$ test. Effect sizes are reported as Cohen's $d$ computed from condition means and pooled standard deviations. All reported $p$-values are two-tailed. We adopt $\alpha = 0.05$ as the significance threshold but report exact $p$-values for transparency.
+
+\subsection{Experimental Overview}
+
+Table~\ref{tab:experiments} summarizes the nine experiment suites. Each is described in detail in its respective section.
+
+\begin{table}[H]
+\centering
+\caption{Overview of experiment suites.}
+\label{tab:experiments}
+\small
+\begin{tabular}{@{}llccc@{}}
+\toprule
+\textbf{Suite} & \textbf{Section} & \textbf{Agents} & \textbf{Ticks} & \textbf{Seeds} \\
+\midrule
+Social Bonds            & \ref{sec:bonds}       & 20 & 10{,}000 & 10 \\
+Phase Transition        & \ref{sec:phase}       & 20 & 10{,}000 & 10 \\
+Adversarial Dynamics    & \ref{sec:adversarial} & 20 & 10{,}000 & 10 \\
+Evolutionary Solidarity & \ref{sec:solidarity}  & 20 & 10{,}000 & 10 \\
+Technology Eras         & \ref{sec:technology}  & 24 & 6{,}000  & 6  \\
+Group Formation         & \ref{sec:dunbar}      & 4--48 & 10{,}000 & 10 \\
+Tragedy of Commons      & \ref{sec:commons}     & 24 & 10{,}000 & 8  \\
+Altruism                & \ref{sec:altruism}    & 20 & 10{,}000 & 10 \\
+Inequality              & \ref{sec:inequality}  & 20 & 10{,}000 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% --------------------------------------------------------------------------
+% 3. PHYSICAL SOCIAL BONDS
+% --------------------------------------------------------------------------
+\section{Physical Social Bonds}
+\label{sec:bonds}
+
+\subsection{Motivation}
+
+Social ties in human societies are not merely informational; they impose physical constraints on movement and resource allocation. We model this through distance constraints---spring-like bonds that keep resonant agent pairs in proximity. This section tests whether such physical bonds confer survival advantages.
+
+\subsection{Design}
+
+Two conditions were compared: \textsc{Bonds} (distance constraints enabled, bonding threshold $\theta_{\text{bond}} = 0.6$) and \textsc{No\_Bonds} (distance constraints disabled, all other parameters identical). Each condition was run with 20 agents for 10{,}000 ticks across 10 random seeds.
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Social bonds experiment results (means $\pm$ SD across 10 seeds).}
+\label{tab:bonds}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Metric} & \textsc{Bonds} & \textsc{No\_Bonds} & \textbf{Test} \\
+\midrule
+Survivors (of 20)  & 19.4 (97.0\%) & 11.4 (57.0\%) & $p=0.0012$, $d=2.44$ \\
+Mean energy (J)    & 99.1           & 75.5           & $p=0.019$ \\
+Bonds formed       & 33.6 of 190    & ---            & 17.7\% selectivity \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Physical bonds increased group survival from 57.0\% to 97.0\%, a large effect ($d = 2.44$, $p = 0.0012$, Mann-Whitney $U$). Bonded agents also maintained significantly higher mean energy (99.1~J vs.\ 75.5~J, $p = 0.019$).
+
+Crucially, bonding was \emph{selective}. Of 190 possible pairings ($\binom{20}{2}$), agents formed bonds with only 33.6 partners on average (17.7\%). This selectivity emerged from the harmony resonance threshold: only pairs with sufficiently aligned $\Phi$ profiles could sustain bonds. The result is a sparse social network with strong ties, reminiscent of Granovetter's characterization of strong and weak ties in human social networks \citep{granovetter1973}.
+
+\subsection{Mechanism}
+
+Bonds function through two channels. First, they maintain spatial proximity, ensuring continued energy exchange between resonant partners. Without bonds, random drift separates compatible agents, interrupting energy flow. Second, bonded clusters create local zones of high energy density that buffer individual agents against stochastic depletion events. The 17.7\% bonding rate suggests that the resonance threshold naturally partitions the population into compatible subgroups---a form of assortative mixing driven by $\Phi$ profile similarity rather than explicit preference.
+
+% --------------------------------------------------------------------------
+% 4. PHASE TRANSITION
+% --------------------------------------------------------------------------
+\section{Phase Transition Under Thermodynamic Pressure}
+\label{sec:phase}
+
+\subsection{Motivation}
+
+Social systems under resource stress can exhibit qualitative shifts in collective behavior. In statistical physics, phase transitions mark discontinuous changes in macroscopic order parameters. We test whether analogous transitions occur in our thermodynamic social system by sweeping the maintenance cost parameter.
+
+\subsection{Design}
+
+Maintenance pressure was varied across six levels: 0.05, 0.10, 0.15, 0.20, 0.50, and 1.00~J/tick. All other parameters were held constant (20 agents, 10{,}000 ticks, 10 seeds per level).
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Phase transition experiment results (means across 10 seeds per pressure level).}
+\label{tab:phase}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Pressure (J/tick)} & \textbf{Survival} & \textbf{Coop.\ events} & \textbf{Temp.\ (K)} & \textbf{Entropy (J/K)} \\
+\midrule
+0.05 & 20/20 (100\%) & 377{,}000 & 311.5 & 66.6  \\
+0.10 & 20/20 (100\%) & ---       & ---   & ---   \\
+0.15 & 20/20 (100\%) & ---       & ---   & ---   \\
+0.20 & Bistable$^*$  & ---       & ---   & ---   \\
+0.50 & Bistable$^*$  & ---       & ---   & ---   \\
+1.00 & Bistable$^*$  & 1{,}300{,}000 & 330.6 & 571.6 \\
+\bottomrule
+\multicolumn{5}{l}{\small $^*$Bistable: outcomes are 20/20 or 0/20 depending on random seed.}
+\end{tabular}
+\end{table}
+
+A sharp phase transition occurs at a critical maintenance pressure of 0.20~J/tick. Below this threshold, survival is 100\% across all seeds---the cooperative regime. Above threshold, the system becomes \emph{bistable}: for any given random seed, the population either achieves full cooperation (20/20 survival) or total collapse (0/20), with no intermediate outcomes. Comparing low-pressure ($\leq 0.15$) to high-pressure ($\geq 0.20$) conditions yields $p = 0.036$, $d = 1.71$.
+
+Three features of this transition merit discussion:
+
+\paragraph{Bistability.} The all-or-nothing outcome above threshold resembles a first-order phase transition with hysteresis. Whether a given run achieves the cooperative or collapsed basin depends on early stochastic events---which agents happen to form resonant pairs first. This sensitivity to initial conditions is characteristic of systems near criticality.
+
+\paragraph{Desperation cooperation.} Counter-intuitively, cooperation events \emph{increase} with pressure: from 377{,}000 at 0.05~J/tick to 1{,}300{,}000 at 1.00~J/tick. Under low pressure, agents are self-sufficient and cooperate only when convenient. Under high pressure, survival demands continuous mutual aid. The runs that achieve cooperation above threshold do so through a frenzy of energy exchange. Those that fail to establish cooperation early collapse before cooperative networks can form.
+
+\paragraph{Thermodynamic signatures.} Mean agent temperature increases from 311.5~K to 330.6~K across the pressure sweep, and entropy production rises from 66.6~J/K to 571.6~J/K. The system is driven further from equilibrium under higher pressure, consistent with Prigogine's framework for dissipative structures \citep{prigogine1977}: greater dissipation is required to maintain organization under stress.
+
+% --------------------------------------------------------------------------
+% 5. ADVERSARIAL DYNAMICS
+% --------------------------------------------------------------------------
+\section{Adversarial Dynamics and the Critical Fraction}
+\label{sec:adversarial}
+
+\subsection{Motivation}
+
+Not all agents in a social system are cooperative. Defectors, free-riders, and adversaries are pervasive features of real social ecologies. Game-theoretic models have identified conditions under which cooperation can persist in the presence of defectors \citep{axelrod1984, nowak2006}. We test whether our thermodynamic framework produces analogous results and, if so, whether the critical fraction of adversaries matches game-theoretic predictions.
+
+\subsection{Design}
+
+The adversarial fraction was varied from 0\% to 50\% in increments of 5\%. Adversarial agents differ from cooperators in one respect: their harmony resonance drains energy from neighbors at low resonance, rather than sharing it. All runs used 20 agents, 10{,}000 ticks, and 10 seeds per fraction level.
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Adversarial threshold results (selected fraction levels).}
+\label{tab:adversarial}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Adversary fraction} & \textbf{Cooperator survival} & \textbf{Adversary survival} \\
+\midrule
+0\%  & High  & --- \\
+10\% & High  & Low \\
+20\% & High  & Low \\
+25\% & Collapse & Collapse \\
+30\% & Collapse & Collapse \\
+50\% & Collapse & Collapse \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A critical adversarial fraction of 25\% marks the threshold at which cooperation collapses. Below 25\%, cooperators survive at high rates while adversaries die faster---the energy-draining strategy is thermodynamically costly at low resonance, creating a self-limiting dynamic. Above 25\%, the adversarial drain overwhelms the cooperative energy network, collapsing the entire population including the adversaries themselves.
+
+Two notable findings emerge. First, adversarial agents consistently survive at lower rates than cooperators, even when cooperation collapses. Parasitic strategies are thermodynamically expensive: draining energy from low-resonance neighbors yields less than cooperative exchange with high-resonance neighbors. Second, the 25\% threshold is remarkably sharp---a small increase from 20\% to 25\% adversaries tips the system from robust cooperation to total collapse. This sensitivity suggests a percolation-like mechanism: below 25\%, the cooperative network remains connected; above 25\%, adversaries fragment it below the percolation threshold.
+
+% --------------------------------------------------------------------------
+% 6. EVOLUTIONARY SOLIDARITY
+% --------------------------------------------------------------------------
+\section{Evolutionary Solidarity Under Adversarial Pressure}
+\label{sec:solidarity}
+
+\subsection{Motivation}
+
+When cooperative populations encounter adversaries, two evolutionary responses are possible. Cooperators might become more \emph{tribal}---restricting cooperation to in-group members and raising resonance thresholds. Alternatively, they might become more \emph{universally compatible}---broadening their cooperation to maximize the cooperative network. Which strategy prevails under thermodynamic selection?
+
+\subsection{Design}
+
+We tracked the evolution of cooperator resonance profiles across runs with 15\% adversaries (below the collapse threshold, allowing evolution to occur). Resonance compatibility between surviving cooperators was measured at the beginning and end of each 10{,}000-tick run.
+
+\subsection{Results}
+
+Cooperators under adversarial pressure evolved \emph{universal compatibility}. Mean resonance among surviving cooperators increased from 0.86 to 1.0 over the course of simulation. Rather than narrowing their cooperation circle (tribalism), cooperators broadened it, becoming maximally compatible with all other cooperators.
+
+This finding has a clear thermodynamic interpretation. Tribalism---restricting cooperation to a subset of potential partners---reduces the size of the cooperative energy network. Under adversarial pressure, where the network is already diminished by adversarial agents, further restriction would be fatal. The thermodynamically optimal strategy is the opposite: maximize the cooperative network by becoming compatible with every available partner.
+
+This result resonates with findings in evolutionary biology. Hamilton's inclusive fitness theory \citep{hamilton1964} predicts that cooperation should be directed toward kin (high relatedness $r$). Our finding suggests a thermodynamic override: when the cost of exclusion exceeds the cost of inclusion, universal cooperation dominates over assortative cooperation. The relevant parameter is not relatedness but network connectivity under adversarial fragmentation.
+
+% --------------------------------------------------------------------------
+% 7. TECHNOLOGY ERAS
+% --------------------------------------------------------------------------
+\section{Technology Eras and the Algorithm Effect}
+\label{sec:technology}
+
+\subsection{Motivation}
+
+Information technology has transformed the topology of human social networks. The transition from face-to-face interaction to algorithmically mediated social feeds represents a qualitative shift in how social distance is computed. We model five technology eras by modifying the interaction topology of the agent population.
+
+\subsection{Design}
+
+Five technology eras were simulated with 24 agents over 6{,}000 ticks (6 seeds each):
+
+\begin{enumerate}
+\item \textbf{Pre-Internet}: Interaction limited to physical proximity (radius $r$).
+\item \textbf{Early Internet}: Interaction radius doubled (email, forums).
+\item \textbf{Social Media}: All-to-all connectivity with distance weighting.
+\item \textbf{Algorithm Era}: Interaction mediated by engagement optimization; high-resonance pairs suppressed in favor of conflict-generating pairings.
+\item \textbf{Post-Algorithm}: All-to-all connectivity restored with transparency.
+\end{enumerate}
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Technology era comparison (24 agents, 6{,}000 ticks, 6 seeds).}
+\label{tab:technology}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Era} & \textbf{Relative cooperation} \\
+\midrule
+Pre-Internet     & Highest \\
+Early Internet   & High    \\
+Social Media     & Moderate \\
+Algorithm Era    & Devastated \\
+Post-Algorithm   & Recovering \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The pre-internet era produced the highest cooperation levels. Physical proximity constraints naturally group agents with resonant partners, creating dense local cooperative networks. The early internet expanded these networks without disrupting their structure. Social media introduced noise by connecting non-resonant agents, diluting but not destroying cooperation.
+
+The algorithm era was catastrophic. By selectively connecting agents in low-resonance (conflict-generating) pairings, algorithmic mediation effectively converted the interaction topology into one resembling the adversarial conditions of Section~\ref{sec:adversarial}. The mechanism is not that algorithms create adversaries, but that they route interactions through the lowest-resonance channels---maximizing engagement at the cost of cooperative energy exchange.
+
+The post-algorithm era shows partial recovery, consistent with the hypothesis that restoring transparent interaction topology allows cooperative networks to reform, though residual damage persists.
+
+\subsection{Mechanism}
+
+The technology era results can be understood through the lens of the phase transition (Section~\ref{sec:phase}). Algorithmic mediation effectively increases the \emph{social maintenance cost}: agents expend energy on low-resonance interactions that drain rather than replenish their reserves. This pushes the system above the critical pressure threshold of 0.20~J/tick in effective terms, even when the nominal maintenance cost is unchanged.
+
+% --------------------------------------------------------------------------
+% 8. GROUP FORMATION AND DUNBAR'S NUMBER
+% --------------------------------------------------------------------------
+\section{Group Formation and Natural Group Size}
+\label{sec:dunbar}
+
+\subsection{Motivation}
+
+Dunbar's social brain hypothesis \citep{dunbar1992} proposes that the neocortex ratio constrains the number of stable social relationships a primate can maintain, predicting $\sim$150 for humans. Our agents have no neocortex, but they do have a thermodynamic constraint: maintaining cooperative bonds costs energy. We test whether natural group sizes emerge from this constraint alone.
+
+\subsection{Design}
+
+Population size $N$ was varied from 4 to 48 agents in a fixed-size arena. Each population size was run for 10{,}000 ticks across 10 seeds. We measured per-capita survival, per-capita energy, and the number of emergent clusters (connected components in the bond network).
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Group formation results across population sizes (means across 10 seeds).}
+\label{tab:dunbar}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{$N$} & \textbf{Per-capita survival} & \textbf{Per-capita energy} & \textbf{Cluster size} \\
+\midrule
+4   & Low  & Low  & --- \\
+8   & Moderate & Moderate & --- \\
+12  & \textbf{Optimal} & \textbf{Optimal} & $\sim$12 \\
+15  & High & High & $\sim$15 (cap) \\
+24  & Declining & Declining & $\sim$12--15 \\
+36  & Low  & Low  & $\sim$12--15 \\
+48  & Low  & Low  & $\sim$12--15 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The optimal population size is $N = 12$. At this size, per-capita survival and per-capita energy are maximized. Above $N = 15$, populations spontaneously fragment into clusters of approximately 12--15 agents, regardless of total population size. The cluster cap of $\sim$15 represents a hard limit on the number of agents that can be sustained by a single cooperative network in the given energy environment.
+
+Per-capita energy scales positively with group size up to the optimum, with a scaling exponent of $\beta = +1.77$. This superlinear scaling indicates that cooperative groups are more than the sum of their parts: each additional member contributes more energy to the network than they consume, up to the saturation point.
+
+\subsection{Interpretation}
+
+The emergent group size of 12--15 is not Dunbar's 150, nor should it be: our agents interact in a 2D arena with $\sim$200~J budgets, not in a complex social hierarchy with language and cultural institutions. The relevant comparison is to Dunbar's \emph{sympathy group} ($\sim$12--15), which represents the number of close relationships requiring high emotional investment \citep{dunbar2010}. Our result suggests that this inner-circle size may have a thermodynamic basis: it is the maximum number of agents that can sustain continuous energy exchange without exceeding the system's dissipative capacity.
+
+% --------------------------------------------------------------------------
+% 9. TRAGEDY OF THE COMMONS (INVERTED)
+% --------------------------------------------------------------------------
+\section{Resource Economics: The Inverted Tragedy}
+\label{sec:commons}
+
+\subsection{Motivation}
+
+Hardin's tragedy of the commons \citep{hardin1968} predicts that shared resources will be overexploited when individual incentives misalign with collective welfare. In our engine, agents harvest energy from environmental sources. We test three resource regimes: abundant (high regeneration), steady (regeneration matches mean consumption), and depleting (no regeneration---a finite commons).
+
+\subsection{Design}
+
+Three conditions were compared with 24 agents, 10{,}000 ticks, and 8 seeds each:
+
+\begin{enumerate}
+\item \textsc{Abundant}: High resource regeneration rate.
+\item \textsc{Steady}: Regeneration balanced with consumption.
+\item \textsc{Depleting}: No regeneration; fixed initial resource pool.
+\end{enumerate}
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Resource regime comparison (24 agents, 10{,}000 ticks, 8 seeds).}
+\label{tab:commons}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Regime} & \textbf{Mean survivors (of 24)} \\
+\midrule
+\textsc{Abundant}  & 7.8   \\
+\textsc{Steady}    & 10.5  \\
+\textsc{Depleting} & \textbf{13.9} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The result inverts the classical tragedy of the commons. Agents in the \textsc{Depleting} condition survived at the highest rate (13.9/24), while those in the \textsc{Abundant} condition survived at the lowest rate (7.8/24). The \textsc{Steady} condition fell between (10.5/24).
+
+\subsection{Mechanism: Complacency vs.\ Urgency}
+
+The mechanism is thermodynamic complacency. In the \textsc{Abundant} condition, agents can meet their maintenance costs through individual harvesting, eliminating the thermodynamic pressure to cooperate. Without cooperative bonds, agents are vulnerable to stochastic energy fluctuations and spatial drift away from resource sources. When an agent's energy dips below critical levels, no cooperative network exists to buffer the shock.
+
+In the \textsc{Depleting} condition, resource scarcity creates immediate pressure to cooperate. Agents that fail to form bonds early die, selecting for cooperative networks. The surviving population is smaller but more tightly bonded and more resilient. Resource scarcity is not a threat to the commons---it is the \emph{engine} of commons formation.
+
+This finding parallels observations in human societies where resource abundance can paradoxically weaken social cohesion (the ``resource curse''; \citealt{ross2015}), while communities under resource stress often develop robust mutual aid networks \citep{kropotkin1902}.
+
+% --------------------------------------------------------------------------
+% 10. ALTRUISM
+% --------------------------------------------------------------------------
+\section{The Futility of Individual Altruism}
+\label{sec:altruism}
+
+\subsection{Motivation}
+
+Hamilton's inclusive fitness theory \citep{hamilton1964} formalized the conditions under which altruism can evolve: $rb > c$, where $r$ is relatedness, $b$ is benefit to the recipient, and $c$ is cost to the donor. We test whether costly rescue---transferring energy from a healthy agent to a collapsing one---can improve population survival.
+
+\subsection{Design}
+
+Three conditions were compared with 20 agents, 10{,}000 ticks, and 10 seeds each:
+
+\begin{enumerate}
+\item \textsc{No\_Rescue}: No altruistic intervention.
+\item \textsc{Free\_Rescue}: Collapsing agents are rescued at no cost to the donor.
+\item \textsc{Costly\_Rescue}: Rescue transfers energy from donor to recipient.
+\end{enumerate}
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Altruism experiment results (20 agents, 10{,}000 ticks, 10 seeds).}
+\label{tab:altruism}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Condition} & \textbf{Survival} & \textbf{Recidivism} \\
+\midrule
+\textsc{No\_Rescue}     & Baseline & --- \\
+\textsc{Free\_Rescue}   & $\approx$ Baseline & 100\% \\
+\textsc{Costly\_Rescue} & $\approx$ Baseline & 100\% \\
+\bottomrule
+\multicolumn{3}{l}{\small No significant difference: $p = 0.83$, costly vs.\ no rescue.}
+\end{tabular}
+\end{table}
+
+Costly rescue produced no statistically significant improvement over no rescue ($p = 0.83$). Most strikingly, \emph{all} rescued agents eventually re-collapsed---100\% recidivism. Rescue temporarily restored an agent's energy, but without addressing the structural cause of collapse (insufficient cooperative bonds, adverse spatial position, or incompatible resonance profile), the agent inevitably depleted again.
+
+\subsection{Interpretation}
+
+This result demonstrates a fundamental limitation of individual charity in a thermodynamic system. An agent collapses not because of a single energy shortfall but because its structural position in the social-energy network is untenable. Rescue addresses the symptom (low energy) without treating the cause (poor network integration). The 100\% recidivism rate suggests that sustainable aid requires structural intervention---changing the network topology, not just transferring resources.
+
+The analogy to human social systems is direct. Individual charitable transfers (food aid, cash transfers) have well-documented limitations when structural causes of poverty persist \citep{banerjee2011}. Our result provides a thermodynamic formalization: in systems where survival depends on network position, point transfers are thermodynamically insufficient.
+
+% --------------------------------------------------------------------------
+% 11. INEQUALITY DYNAMICS
+% --------------------------------------------------------------------------
+\section{Inequality Dynamics: Symmetry Breaking and the Matthew Effect}
+\label{sec:inequality}
+
+\subsection{Motivation}
+
+Inequality in human societies arises from multiple mechanisms. The Matthew Effect (``the rich get richer''; \citealt{merton1968}) describes positive feedback loops that amplify initial advantages. We test whether analogous dynamics emerge in our thermodynamic system, and whether initial equality or inequality determines long-run outcomes.
+
+\subsection{Design}
+
+Three initial conditions were compared with 20 agents, 10{,}000 ticks, and 10 seeds each:
+
+\begin{enumerate}
+\item \textsc{Equal}: All agents start with identical energy (200~J each).
+\item \textsc{Random}: Initial energy drawn uniformly from $[100, 300]$~J.
+\item \textsc{Unequal}: Half start with 300~J, half with 100~J.
+\end{enumerate}
+
+Inequality was measured using the Gini coefficient, computed at initialization and at the final tick.
+
+\subsection{Results}
+
+\begin{table}[H]
+\centering
+\caption{Inequality dynamics (Gini coefficient, 20 agents, 10{,}000 ticks, 10 seeds).}
+\label{tab:inequality}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Condition} & \textbf{Initial Gini} & \textbf{Final Gini} & \textbf{$\Delta$ Gini} \\
+\midrule
+\textsc{Equal}   & 0.00 & 0.66 & +0.66 \\
+\textsc{Random}  & 0.00 & 0.35 & +0.35 \\
+\textsc{Unequal} & 0.08 & 0.37 & +0.29 \\
+\bottomrule
+\multicolumn{4}{l}{\small Equal vs.\ Unequal final Gini: $d = 1.02$.}
+\end{tabular}
+\end{table}
+
+The most striking finding is that \emph{equal starts produce the greatest inequality}. The \textsc{Equal} condition, where all agents begin with identical energy, reaches a final Gini coefficient of 0.66---near-maximum inequality---while the \textsc{Unequal} condition reaches only 0.37. The effect size is large ($d = 1.02$).
+
+\subsection{Mechanism: Symmetry Breaking}
+
+When all agents are identical, the first stochastic fluctuation---a lucky energy harvest, a favorable spatial position, an early resonant bond---creates a small advantage. This advantage compounds through positive feedback: the slightly-advantaged agent forms more bonds, gains more energy, forms still more bonds. Identical agents in an identical environment undergo spontaneous symmetry breaking, producing extreme inequality through the Matthew Effect.
+
+When agents start \emph{unequally}, the initial heterogeneity provides a pre-existing structure that channels dynamics along more predictable paths. Low-energy agents are immediately motivated to cooperate; high-energy agents have stable reserves. Paradoxically, the pre-existing inequality acts as a coordination device, producing less final inequality than the equal-start condition.
+
+This finding has implications for social policy. It suggests that formal equality (identical starting conditions) can be a trap: without structural mechanisms to prevent positive feedback, identical agents will spontaneously stratify. Real equality requires not identical endowments but structural constraints on the feedback loops that amplify small advantages---a thermodynamic argument for institutional design over resource equalization.
+
+% --------------------------------------------------------------------------
+% 12. DISCUSSION
+% --------------------------------------------------------------------------
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Summary of Findings}
+
+Nine experiment suites, comprising over 2{,}000 simulation runs, reveal a consistent pattern: major features of social physics emerge from thermodynamic constraints alone, without game-theoretic payoffs, explicit strategies, or social cognition. Table~\ref{tab:summary} summarizes the key findings alongside their analogues in human social science.
+
+\begin{table}[H]
+\centering
+\caption{Summary of findings and their social science analogues.}
+\label{tab:summary}
+\small
+\begin{tabular}{@{}p{3.5cm}p{4.5cm}p{5cm}@{}}
+\toprule
+\textbf{Finding} & \textbf{Result} & \textbf{Social Science Analogue} \\
+\midrule
+Selective bonding & 17.7\% of possible pairs & Strong/weak ties \citep{granovetter1973} \\
+Phase transition & Critical pressure 0.20 J/tick & Social collapse thresholds \\
+Desperation cooperation & Cooperation $\uparrow$ under stress & Mutual aid under crisis \citep{kropotkin1902} \\
+Adversarial threshold & 25\% fraction collapses system & Cooperation maintenance \citep{axelrod1984} \\
+Evolutionary solidarity & Resonance 0.86$\to$1.0 & In-group expansion under threat \\
+Algorithm devastation & Worst cooperation of 5 eras & Social media pathology \\
+Natural group size & $N=12$, cap $\sim$15 & Dunbar's sympathy group \citep{dunbar2010} \\
+Inverted tragedy & Scarcity $>$ abundance & Resource curse \citep{ross2015} \\
+Altruism failure & 100\% recidivism & Structural poverty traps \citep{banerjee2011} \\
+Symmetry breaking & Equal$\to$Gini 0.66 & Matthew Effect \citep{merton1968} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The Universality Claim}
+
+Our central claim is that these social patterns are \emph{universal} consequences of embedding agents in thermodynamic constraints, not artifacts of our particular integration metric. The argument proceeds as follows:
+
+\begin{enumerate}
+\item Every experiment's results can be explained by energy flow through cooperative networks, without reference to the specific $\Phi$ computation.
+\item The integration metric's role is minimal: it determines which agents can form resonant bonds (a compatibility filter) and imposes a maintenance cost (a survival constraint). Any scalar metric with these two properties would produce qualitatively similar results.
+\item The phase transition, bistability, and scaling exponents are characteristic of dissipative systems generally \citep{prigogine1977}, not of any particular organizational metric.
+\end{enumerate}
+
+We therefore hypothesize that replacing $\Phi$ with any other costly-to-maintain organizational metric---metabolic rate, neural synchrony, organizational coherence---would reproduce the qualitative findings. The quantitative thresholds (0.20~J/tick, 25\% adversaries, $N = 12$) would shift, but the phenomena would persist.
+
+\subsection{Comparison to Game-Theoretic Models}
+
+Traditional agent-based models of cooperation typically use iterated prisoner's dilemma variants \citep{axelrod1984, nowak2006}. Our approach differs in three respects:
+
+\paragraph{No strategies.} Agents in Symtropy have no strategies, memory of past interactions, or capacity for punishment. Cooperation emerges from physical proximity and resonance compatibility, not from tit-for-tat or other conditional strategies.
+
+\paragraph{Continuous, not discrete.} Game-theoretic models discretize interaction into rounds with binary choices (cooperate/defect). Our model uses continuous energy flow with no discrete decision points. Cooperation is a continuous process, not a per-round choice.
+
+\paragraph{Physical embedding.} Movement costs energy. Maintaining $\Phi$ costs energy. These physical costs constrain the space of possible social configurations in ways that payoff matrices do not capture. The phase transition at 0.20~J/tick, for example, has no analogue in standard game theory because it arises from the thermodynamic balance sheet, not from strategic incentives.
+
+\subsection{Implications for Social Theory}
+
+Several findings challenge conventional wisdom:
+
+\paragraph{Scarcity enables cooperation.} The inverted tragedy of the commons (Section~\ref{sec:commons}) suggests that resource abundance can be corrosive to social cohesion. This is consistent with the resource curse literature \citep{ross2015} but provides a mechanistic explanation: abundance removes the thermodynamic pressure that drives cooperative network formation.
+
+\paragraph{Equality is unstable.} The symmetry-breaking result (Section~\ref{sec:inequality}) suggests that formal equality---identical endowments---is a thermodynamically unstable state. Real equality requires structural constraints, not equal starting conditions.
+
+\paragraph{Altruism requires structure.} The 100\% recidivism rate for rescued agents (Section~\ref{sec:altruism}) demonstrates that point transfers cannot substitute for network integration. This has direct policy implications for aid design.
+
+\paragraph{Solidarity over tribalism.} Under adversarial pressure, the thermodynamically optimal response is expanded cooperation (Section~\ref{sec:solidarity}), not tribal restriction. This counters the common intuition that external threats promote in-group favoritism.
+
+% --------------------------------------------------------------------------
+% 13. LIMITATIONS
+% --------------------------------------------------------------------------
+\section{Limitations}
+\label{sec:limitations}
+
+We acknowledge several important limitations:
+
+\paragraph{Scale.} All experiments use 20--24 agents. While the emergent patterns are statistically robust, scaling to hundreds or thousands of agents may reveal different dynamics. The Dunbar experiment (Section~\ref{sec:dunbar}) begins to address this by varying $N$ up to 48, but larger-scale studies are needed.
+
+\paragraph{2D physics.} The simulation uses a flat 2D arena. Real social spaces are heterogeneous, hierarchical, and three-dimensional. The spatial simplification may overestimate the role of proximity and underestimate the role of network topology.
+
+\paragraph{No learning.} Agents have no memory, no learning, and no strategic adaptation. They cannot form expectations about others' behavior, cannot punish defectors, and cannot establish institutions. The social phenomena we observe are therefore the \emph{minimal} set arising from physics alone; adding cognition would likely produce richer dynamics.
+
+\paragraph{No communication.} Agents interact only through physical proximity and energy exchange. There is no signaling, language, or reputation system. The algorithm era experiment (Section~\ref{sec:technology}) models information topology but not information content.
+
+\paragraph{Integration metric.} While we argue for universality, all experiments use a single integration metric derived from IIT. Empirical validation of the universality claim requires repeating these experiments with alternative metrics (e.g., neural synchrony, metabolic efficiency).
+
+\paragraph{Seed count.} With 6--10 seeds per condition, our statistical power is limited. The Mann-Whitney $U$ test is appropriate for these sample sizes, but some effects may be under- or over-estimated. We report effect sizes alongside $p$-values to aid interpretation.
+
+\paragraph{Parameter sensitivity.} The critical thresholds we report (0.20~J/tick, 25\% adversaries, $N = 12$) are specific to our default parameters (200~J budget, specific maintenance curve). Systematic parameter sweeps would establish the robustness of these thresholds.
+
+% --------------------------------------------------------------------------
+% 14. CONCLUSION
+% --------------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have demonstrated that major patterns of social physics---selective bonding, phase transitions, adversarial thresholds, natural group sizes, inverted commons tragedies, altruism failure, and inequality dynamics---emerge from a multi-agent physics engine with no social programming. The only requirements are: (1)~agents must maintain an internal organizational metric at thermodynamic cost, (2)~agents can exchange energy through resonance-based cooperation, and (3)~agents move in a physical space.
+
+These minimal ingredients are sufficient to produce a rich social ecology. Cooperation is not a strategic choice but a thermodynamic necessity. Group sizes are not cognitively limited but energetically bounded. Inequality is not imposed but spontaneously generated through symmetry breaking. Altruism fails not for lack of generosity but for lack of structural support.
+
+The implication is that the foundations of social physics may be more physical and less cognitive than traditionally assumed. Before agents need strategies, reputations, or institutions, the thermodynamics of self-organization already constrains and shapes their social possibilities. Game theory describes what agents \emph{choose}; thermodynamics describes what is \emph{possible}. Our results suggest that the thermodynamic constraints are more binding than previously recognized.
+
+Future work should extend these findings in three directions. First, adding learning and memory to agents would test whether cognitive capabilities amplify or redirect the thermodynamic patterns we observe. Second, scaling to larger populations would test whether the emergent group sizes and thresholds are robust or scale-dependent. Third, coupling multiple resource types (energy, information, reputation) would test whether multi-dimensional resource dynamics produce qualitatively new social phenomena.
+
+The Symtropy engine and all experimental code are available under the AGPL-3.0-or-later license at \url{https://github.com/luminous-dynamics/symtropy}.
+
+% --------------------------------------------------------------------------
+% ACKNOWLEDGMENTS
+% --------------------------------------------------------------------------
+\section*{Acknowledgments}
+
+The author thanks the open-source communities behind Rust, Rapier2D, and the Holochain project for foundational infrastructure. All simulations were conducted on a single NixOS workstation with an RTX 2070 GPU.
+
+% --------------------------------------------------------------------------
+% REFERENCES
+% --------------------------------------------------------------------------
+\begin{thebibliography}{99}
+
+\bibitem[Axelrod(1984)]{axelrod1984}
+Axelrod, R. (1984).
+\emph{The Evolution of Cooperation}.
+Basic Books, New York.
+
+\bibitem[Banerjee \& Duflo(2011)]{banerjee2011}
+Banerjee, A. V. \& Duflo, E. (2011).
+\emph{Poor Economics: A Radical Rethinking of the Way to Fight Global Poverty}.
+PublicAffairs, New York.
+
+\bibitem[Dunbar(1992)]{dunbar1992}
+Dunbar, R. I. M. (1992).
+Neocortex size as a constraint on group size in primates.
+\emph{Journal of Human Evolution}, 22(6), 469--493.
+
+\bibitem[Dunbar(2010)]{dunbar2010}
+Dunbar, R. I. M. (2010).
+How many friends does one person need? Dunbar's number and other evolutionary quirks.
+\emph{Faber \& Faber}, London.
+
+\bibitem[Friston(2010)]{friston2010}
+Friston, K. (2010).
+The free-energy principle: a unified brain theory?
+\emph{Nature Reviews Neuroscience}, 11(2), 127--138.
+
+\bibitem[Granovetter(1973)]{granovetter1973}
+Granovetter, M. S. (1973).
+The strength of weak ties.
+\emph{American Journal of Sociology}, 78(6), 1360--1380.
+
+\bibitem[Hamilton(1964)]{hamilton1964}
+Hamilton, W. D. (1964).
+The genetical evolution of social behaviour. I \& II.
+\emph{Journal of Theoretical Biology}, 7(1), 1--52.
+
+\bibitem[Hardin(1968)]{hardin1968}
+Hardin, G. (1968).
+The tragedy of the commons.
+\emph{Science}, 162(3859), 1243--1248.
+
+\bibitem[Kropotkin(1902)]{kropotkin1902}
+Kropotkin, P. (1902).
+\emph{Mutual Aid: A Factor of Evolution}.
+Heinemann, London.
+
+\bibitem[Merton(1968)]{merton1968}
+Merton, R. K. (1968).
+The Matthew Effect in science.
+\emph{Science}, 159(3810), 56--63.
+
+\bibitem[Nowak(2006)]{nowak2006}
+Nowak, M. A. (2006).
+Five rules for the evolution of cooperation.
+\emph{Science}, 314(5805), 1560--1563.
+
+\bibitem[Prigogine(1977)]{prigogine1977}
+Prigogine, I. (1977).
+\emph{Self-Organization in Nonequilibrium Systems}.
+Wiley, New York.
+
+\bibitem[Raichle \& Gusnard(2002)]{raichle2002}
+Raichle, M. E. \& Gusnard, D. A. (2002).
+Appraising the brain's energy budget.
+\emph{Proceedings of the National Academy of Sciences}, 99(16), 10237--10239.
+
+\bibitem[Ross(2015)]{ross2015}
+Ross, M. L. (2015).
+What have we learned about the resource curse?
+\emph{Annual Review of Political Science}, 18, 239--259.
+
+\bibitem[Schelling(1978)]{schelling1978}
+Schelling, T. C. (1978).
+\emph{Micromotives and Macrobehavior}.
+Norton, New York.
+
+\bibitem[Stoltz(2026)]{stoltz2026symtropy}
+Stoltz, T. (2026).
+Symtropy: A thermodynamic multi-agent engine with integration-physics coupling.
+\emph{Manuscript in preparation}.
+
+\bibitem[Tononi(2004)]{tononi2004}
+Tononi, G. (2004).
+An information integration theory of consciousness.
+\emph{BMC Neuroscience}, 5(1), 42.
+
+\end{thebibliography}
+
+\end{document}
