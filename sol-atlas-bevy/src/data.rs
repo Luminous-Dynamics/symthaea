@@ -30,6 +30,8 @@ const STORMS_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/nasa-eonet.json");
 const VOLCANOES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/volcanoes.json");
+const MAJOR_CITIES_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/major-cities-1m.json");
 const SHIPPING_LANES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/shipping-lanes-simplified.json");
 
@@ -55,5 +57,6 @@ pub fn load_all() -> LoadedData {
         FIRES_JSON,
         STORMS_JSON,
         VOLCANOES_JSON,
+        MAJOR_CITIES_JSON,
     )
 }

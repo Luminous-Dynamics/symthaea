@@ -132,6 +132,7 @@ pub fn load_all(
     fires_json: &str,
     storms_json: &str,
     volcanoes_json: &str,
+    cities_json: &str,
 ) -> LoadedData {
     let sites = parse_sites(sites_json).unwrap_or_default();
     let (geothermal_nodes, maglev_corridors) =
@@ -161,6 +162,7 @@ pub fn load_all(
         fossil_deposits,
         nuclear_sites,
         natural_events: parse_natural_events(earthquakes_json, fires_json, storms_json, volcanoes_json),
+        major_cities: serde_json::from_str(cities_json).unwrap_or_default(),
     }
 }
 

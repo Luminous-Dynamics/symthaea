@@ -722,6 +722,31 @@ pub fn setup_globe_view(
         ));
     }
 
+    // ─── Major World Cities (232 cities, pop >= 1M) ──────────────
+    // Tiny dots showing global population distribution at orbit zoom.
+    let city_dot_mesh = meshes.add(Sphere::new(1.0).mesh().uv(4, 4));
+    for city in &data.major_cities {
+        let pos = geo::lat_lon_to_xyz(city.lat, city.lon, 1.008);
+        let pop_scale = (city.population as f32 / 20_000_000.0).clamp(0.0, 1.0);
+        let size = 0.003 + pop_scale * 0.005; // tiny dots, larger for megacities
+        let alpha = 0.3 + pop_scale * 0.4;
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgba(0.9, 0.8, 0.5, alpha), // warm amber
+            emissive: LinearRgba::new(0.3, 0.25, 0.1, 1.0),
+            unlit: true,
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        });
+        commands.spawn((
+            Mesh3d(city_dot_mesh.clone()),
+            MeshMaterial3d(mat),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
+            DataMarker { layer: Layer::Regions, name: format!("{} ({}M)", city.name, city.population / 1_000_000) },
+            AtlasEntity,
+        ));
+    }
+    info!("[atlas] {} major cities loaded (pop >= 1M)", data.major_cities.len());
+
     // ─── Natural Events (ALWAYS VISIBLE) ──────────────────────────
     // Earthquakes, fires, storms, volcanoes from USGS/NASA/NOAA.
     let event_mesh = meshes.add(Sphere::new(1.0).mesh().uv(6, 6));

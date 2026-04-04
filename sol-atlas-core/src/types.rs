@@ -468,6 +468,17 @@ pub struct LoadedData {
     pub fossil_deposits: Vec<FossilDeposit>,
     pub nuclear_sites: Vec<NuclearSite>,
     pub natural_events: Vec<NaturalEvent>,
+    pub major_cities: Vec<MajorCity>,
+}
+
+/// Major world city (population >= 1M).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MajorCity {
+    pub name: String,
+    pub country: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub population: u64,
 }
 
 /// Natural event from USGS, NASA EONET, FIRMS, or volcanoes.
