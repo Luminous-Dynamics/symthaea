@@ -1,0 +1,30 @@
+[
+    {
+        "id": "community-garden-tracker",
+        "name": "Garden Tracker",
+        "version": "1.0.0",
+        "author": "community-member",
+        "bio_name": "Cultivation",
+        "color_primary": "#22C55E",
+        "color_glow": "#86EFAC",
+        "min_tier": "Participant",
+        "frontend_url": "https://garden.mycelix.community",
+        "required_clusters": ["commons", "identity"],
+        "optional_clusters": ["finance"],
+        "description": "Track community garden plots, harvests, and seed swaps"
+    },
+    {
+        "id": "local-energy-coop",
+        "name": "Energy Co-op",
+        "version": "0.5.0",
+        "author": "energy-collective",
+        "bio_name": "Photosynthesis",
+        "color_primary": "#EAB308",
+        "color_glow": "#FDE047",
+        "min_tier": "Citizen",
+        "frontend_url": "https://energy-coop.example.org",
+        "required_clusters": ["energy", "finance", "identity"],
+        "optional_clusters": ["governance"],
+        "description": "Manage local solar microgrids, energy trading, and cooperative ownership"
+    }
+]

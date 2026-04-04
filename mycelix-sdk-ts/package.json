@@ -1,0 +1,26 @@
+{
+  "name": "@mycelix/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for building Mycelix extensions and frontends",
+  "license": "AGPL-3.0-or-later",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "peerDependencies": {
+    "@holochain/client": ">=0.18.0"
+  },
+  "peerDependenciesMeta": {
+    "@holochain/client": {
+      "optional": true
+    }
+  }
+}
