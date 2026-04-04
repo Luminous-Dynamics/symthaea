@@ -6,6 +6,7 @@
 \usepackage{multicol}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{caption}
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{natbib}
@@ -84,10 +85,10 @@ Cooperation does NOT generate energy. It reduces expenditure. Solo survival: $\s
 
 Six conditions, 12 agents, 5000 ticks, 5 seeds, 2 energy wells (Table~\ref{tab:ablation}).
 
-\begin{table}[h]
+\begingroup
 \centering
 \small
-\caption{Ablation: Which mechanisms produce clustering?}
+\captionof{table}{Ablation: Which mechanisms produce clustering?}
 \label{tab:ablation}
 \begin{tabular}{lrrl}
 \toprule
@@ -101,7 +102,7 @@ E+OFF+RAND & 15.1 & 0\% & Random $\neq$ clustering \\
 FULL & \textbf{13.5} & 45\% & Sustainable \\
 \bottomrule
 \end{tabular}
-\end{table}
+\endgroup
 
 \textbf{Finding 1:} The FEP gradient is the clustering mechanism (18.1$\to$1.8). Epistemic offloading is the survival mechanism (71.7\%$\to$56.7\% collapse). Neither alone is sufficient (Figure~\ref{fig:ablation_full}).
 
@@ -109,10 +110,10 @@ FULL & \textbf{13.5} & 45\% & Sustainable \\
 
 Five consciousness metrics, 30 seeds each, $\Phi$ not coupled into the gradient (Table~\ref{tab:metric}).
 
-\begin{table}[h]
+\begingroup
 \centering
 \small
-\caption{Metric independence: all produce identical clustering.}
+\captionof{table}{Metric independence: all produce identical clustering.}
 \label{tab:metric}
 \begin{tabular}{lrl}
 \toprule
@@ -125,7 +126,7 @@ Constant 0.5 & 4.57 & $\pm$0.97 \\
 Zero & 4.38 & $\pm$0.94 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\endgroup
 
 \textbf{Finding 2:} All five metrics produce statistically identical clustering. The specific consciousness metric is interchangeable.
 
@@ -133,10 +134,10 @@ Zero & 4.38 & $\pm$0.94 \\
 
 We coupled $\Phi$ into three behavioral pathways: cooperation urgency ($0.5+\Phi$), resonance gating ($0.3+\Phi \times 0.7$), and danger sensitivity ($0.5-\Phi \times 0.4$). Six conditions, 24 agents, 20 seeds (Table~\ref{tab:causal}).
 
-\begin{table}[h]
+\begingroup
 \centering
 \small
-\caption{Causal test: $\Phi$=0 clusters 35\% less tightly.}
+\captionof{table}{Causal test: $\Phi$=0 clusters 35\% less tightly.}
 \label{tab:causal}
 \begin{tabular}{lrrl}
 \toprule
@@ -150,7 +151,7 @@ ZERO-COUPLED & \textbf{7.50} & $\pm$3.41 & 2993 \\
 DECOUPLED & 5.57 & $\pm$0.48 & 2859 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\endgroup
 
 \textbf{Finding 3 (central result):} When wired into the gradient, $\Phi > 0$ produces 35\% tighter clustering than $\Phi = 0$ (5.57 vs 7.50). But $\Phi$, entropy, and constant 0.5 are interchangeable ($\sim$5.6). The conscious/unconscious distinction matters; the choice between theories does not.
 
@@ -168,10 +169,10 @@ We compared two emergent properties of our simulation against published clinical
 
 \textbf{Finding 6: Cooperative metabolic scaling.} Per-capita energy consumption across 10 population sizes ($N$=4--128, 20 seeds each, Table~\ref{tab:scaling}) follows a power law $E_{pc} \propto N^{\beta}$ with $\beta = -0.178$ ($R^2 = 0.60$).
 
-\begin{table}[h]
+\begingroup
 \centering
 \small
-\caption{Per-capita energy vs.\ population size (20 seeds each).}
+\captionof{table}{Per-capita energy vs.\ population size (20 seeds each).}
 \label{tab:scaling}
 \begin{tabular}{rrrr}
 \toprule
@@ -185,16 +186,16 @@ $N$ & Social (J) & Isolated (J) & Ratio \\
 128 & 348 & 208 & 1.67 \\
 \bottomrule
 \end{tabular}
-\end{table} This matches the $\beta = -0.19$ measured across 168 eusocial insect species \citep{hou2010} (whole-colony exponent 0.81, 95\% CI: 0.55--1.08). The isolated control (no social interaction) gives $\beta = 0.000$ exactly, matching \citet{waters2010}: isolated ant workers show isometric scaling. The cooperative scaling only emerges in the social context --- the same pattern as biology.
+\endgroup This matches the $\beta = -0.19$ measured across 168 eusocial insect species \citep{hou2010} (whole-colony exponent 0.81, 95\% CI: 0.55--1.08). The isolated control (no social interaction) gives $\beta = 0.000$ exactly, matching \citet{waters2010}: isolated ant workers show isometric scaling. The cooperative scaling only emerges in the social context --- the same pattern as biology.
 
 \textbf{Finding 7: Consciousness energy threshold.} Gradually depleting agent energy while measuring $\Phi$ reveals a functional consciousness threshold at 45\% of maximum energy capacity. Below this fraction, $\Phi$ drops below the functional minimum (Red safety tier). This matches the 42\% of normal cortical metabolism identified by \citet{stender2015} as the boundary between vegetative and minimally conscious states (131 patients, 18F-FDG PET, 88\% classification accuracy). No hysteresis was observed in either our model or the clinical data \citep{stender2016}.
 
 Table~\ref{tab:bio} summarizes both comparisons.
 
-\begin{table}[h]
+\begingroup
 \centering
 \small
-\caption{Biological validation: emergent matches (not fitted).}
+\captionof{table}{Biological validation: emergent matches (not fitted).}
 \label{tab:bio}
 \begin{tabular}{lrrl}
 \toprule
@@ -206,7 +207,7 @@ Consciousness floor & 45\% & 42\% & Stender 2015 \\
 Hysteresis & 0\% & $\sim$0\% & Stender 2016 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\endgroup
 
 Neither parameter was calibrated to match biological data. The metabolic scaling emerges from the cost structure of epistemic offloading; the consciousness threshold emerges from the relationship between maintenance cost and safety tier boundaries.
 
@@ -234,10 +235,10 @@ clamped to 50~m/s$^2$ for numerical stability under semi-implicit Euler.
 
 \textbf{Finding 8: Integration-parameterized curvature deflects trajectories.} A test body launched past a stationary high-$\Phi$ source deflects proportionally to curvature scale (Table~\ref{tab:curvature}, Figure~\ref{fig:curvature_full}). At $\kappa = 0.05$, deflection is 12.4 units (62\% of closest approach). Mann-Whitney $U = 0.0$, $p = 0.009$, Cohen's $d = -35.5$.
 
-\begin{table}[h]
+\begingroup
 \centering
 \small
-\caption{Curvature lensing: trajectory deflection.}
+\captionof{table}{Curvature lensing: trajectory deflection.}
 \label{tab:curvature}
 \begin{tabular}{rrr}
 \toprule
@@ -250,7 +251,7 @@ Scale $\kappa$ & Deflection & Speed Change \\
 0.050 & 12.40 & $-25.4$\% \\
 \bottomrule
 \end{tabular}
-\end{table}
+\endgroup
 
 \subsection{J/$\Phi$ Convergence with Well Depletion}
 
@@ -266,24 +267,13 @@ We swept maintenance pressure from 0.05 to 1.00~J/tick (12 levels, 8 seeds each)
 
 Counterintuitively, cooperation events \emph{increase} under stress: 378K events at 0.05~J/tick vs 1.31M at 1.00~J/tick---a 3.5$\times$ increase. Agents cooperate more frantically as survival becomes precarious. System temperature rises monotonically (311.5K to 330.6K), entropy production increases 8.6$\times$ (66.6 to 571.6~J/K), and Helmholtz free energy drops to zero above the critical pressure.
 
-The bistability above threshold---seeds either fully survive or fully collapse---is characteristic of first-order phase transitions in statistical mechanics. The spatial lottery (proximity to wells at time of pressure onset) determines the outcome (Figure~\ref{fig:phase}).
-
-\end{multicols}
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.85\textwidth]{fig5_phase_transition.pdf}
-\caption{Phase transition in cooperation. (a) Survival drops sharply at 0.20~J/tick while cooperation events increase 3.5$\times$ under stress. (b) Temperature saturates at $\sim$331K as entropy production maximizes.}
-\label{fig:phase}
-\end{figure*}
-\begin{multicols}{2}
+The bistability above threshold---seeds either fully survive or fully collapse---is characteristic of first-order phase transitions in statistical mechanics. The spatial lottery (proximity to wells at time of pressure onset) determines the outcome.
 
 \subsection{HDC vs Scalar Integration Substrate}
 
 We compared two consciousness substrates: the scalar MasterConsciousnessEquation ($\Phi \approx 0.09$, near-static) and 16,384-dimensional Holographic Distributed Computing (HDC) thought vectors evolved by Liquid Time-Constant (LTC) neural networks ($\Phi \approx 0.37$, dynamic). Both conditions use identical thermodynamic enforcement.
 
-\textbf{Finding 10: Higher-dimensional integration is more expensive.} HDC produces 4$\times$ higher $\Phi$ ($0.374 \pm 0.094$ vs $0.090 \pm 0.013$) but at a survival cost: $9.0/12$ alive vs $11.1/12$. HDC agents cluster less tightly ($17.18$ vs $8.15$), with higher per-agent behavioral divergence. Mean pairwise HDC vector similarity is $0.043$---agents produce diverse state representations from identical inputs.
-
-The LTC network's $\Phi$ output crosses an activation threshold around tick 1000: $\Phi$ increases from $\sim 0$ to $\sim 0.56$ as network dynamics reach equilibrium. This threshold-crossing behavior arises from the closed-form LTC dynamics $x(t+\Delta t) = x_\infty + (x(t) - x_\infty) e^{-\Delta t/\tau}$, not from any consciousness-like mechanism.
+\textbf{Finding 11: Higher-dimensional integration is more expensive.} HDC produces 4$\times$ higher $\Phi$ ($0.374 \pm 0.094$ vs $0.090 \pm 0.013$) but at a survival cost: $9.0/12$ alive vs $11.1/12$. HDC agents cluster less tightly ($17.18$ vs $8.15$), with mean pairwise vector similarity of $0.043$---agents produce diverse state representations from identical inputs. The LTC threshold-crossing ($\Phi$: $0 \to 0.56$ at tick $\sim$1000) arises from closed-form dynamics, not consciousness-like mechanisms.
 
 \section{Discussion}
 
@@ -312,7 +302,7 @@ The Symtropy engine and all experiments are open-source. Results are reproducibl
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.9\textwidth]{fig1_ablation.pdf}
-\caption{Ablation study (re-verified with overhauled engine). (a)~Only conditions with FEP gradient cluster tightly ($<4$). (b)~Gradient without offloading kills 72\% of agents. The FEP gradient is the clustering mechanism; epistemic offloading is the survival mechanism.}
+\caption{Ablation study (re-verified with overhauled engine). (a)~Only conditions with FEP gradient cluster tightly ($<4$). (b)~Gradient without offloading kills 72\% of agents.}
 \label{fig:ablation_full}
 \end{figure*}
 
@@ -320,12 +310,12 @@ The Symtropy engine and all experiments are open-source. Results are reproducibl
 \centering
 \begin{minipage}{0.45\textwidth}
 \includegraphics[width=\textwidth]{fig2_curvature.pdf}
-\caption{Integration-parameterized curvature deflects trajectories. Trajectory deflection scales linearly with curvature $\kappa$ ($p=0.009$, $d=-35.5$).}
+\caption{Integration-parameterized curvature deflects trajectories ($p=0.009$, $d=-35.5$).}
 \label{fig:curvature_full}
 \end{minipage}\hfill
 \begin{minipage}{0.45\textwidth}
 \includegraphics[width=\textwidth]{fig4_cooperation.pdf}
-\caption{Cooperation emergence. Thermodynamic enforcement produces 81\% tighter clustering ($p<0.001$, $d=-1.94$).}
+\caption{Cooperation emergence: 81\% tighter clustering ($p<0.001$, $d=-1.94$).}
 \label{fig:coop_full}
 \end{minipage}
 \end{figure*}
