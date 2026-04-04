@@ -1,0 +1,11 @@
+# Build all crates
+build:
+    cargo build --workspace
+
+# Run tests
+test:
+    cargo test --workspace
+
+# Check (fast)
+check:
+    cargo check --workspace
