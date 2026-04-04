@@ -20,7 +20,7 @@ Full details: @.claude/rules/CREDENTIALS.md
 | 7777 | Sacred Bridge | — |
 | 7778 | Holon (Soma mobile bridge) | — |
 | 8090 | Symthaea Web (eval-api) | symthaea.luminousdynamics.io |
-| 8091 | Terra Atlas (Leptos) | atlas.luminousdynamics.io |
+| 8091 | Sol Atlas (Leptos) | atlas.luminousdynamics.io |
 | 8094 | SSH Relay | — |
 | **81XX** | **Mycelix Frontends** (alphabetical) | |
 | 8104 | Commons UI | commons.luminousdynamics.io |
@@ -77,7 +77,7 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 
 ## Active Projects
 
-### Terra Atlas (Priority)
+### Sol Atlas (Priority)
 - **Live**: https://atlas.luminousdynamics.io
 - **DB**: `bws get supabase-prod-url`
 - **Focus**: USACE data, SMR pipeline, investments
@@ -221,7 +221,7 @@ Excluding `target/`, `node_modules/`, `venv/`, build artifacts:
 | Domain | Purpose |
 |--------|---------|
 | luminousdynamics.org | Main org |
-| atlas.luminousdynamics.io | Terra Atlas |
+| atlas.luminousdynamics.io | Sol Atlas |
 | edunet.mycelix.net | EduNet (Cloudflare Tunnel → :8092) |
 | nixforhumanity.org | Luminous Nix |
 | mycelix.net | Mycelix |

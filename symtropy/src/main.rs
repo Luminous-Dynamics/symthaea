@@ -83,7 +83,7 @@ fn main() {
     // --globe: enter globe view from main menu (requires --features atlas)
     #[cfg(feature = "atlas")]
     if globe_mode {
-        eprintln!("[symtropy] --globe: entering Terra Atlas globe view from MainMenu");
+        eprintln!("[symtropy] --globe: entering Sol Atlas globe view from MainMenu");
         app.add_systems(Update, (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
             next.set(crate::resources::GamePhase::GlobeView);
         }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::MainMenu)));
@@ -105,7 +105,7 @@ fn main() {
     #[cfg(feature = "atlas")]
     if record_mode && globe_mode {
         eprintln!("[symtropy] --record: auto-capturing frames to /tmp/terra-atlas-frames/");
-        app.add_systems(Update, (|mut config: ResMut<terra_atlas_bevy::frame_capture::FrameCaptureConfig>| {
+        app.add_systems(Update, (|mut config: ResMut<sol_atlas_bevy::frame_capture::FrameCaptureConfig>| {
             if !config.active && config.frame_count == 0 {
                 config.active = true;
                 let _ = std::fs::create_dir_all(&config.output_dir);
@@ -126,7 +126,7 @@ fn main() {
         app.insert_resource(crate::systems::cinematic_director::NarrationState::default());
         app.insert_resource(crate::systems::cinematic_director::VoiceNarration::default());
         // Frame capture with cinematic output dir
-        app.insert_resource(terra_atlas_bevy::frame_capture::FrameCaptureConfig {
+        app.insert_resource(sol_atlas_bevy::frame_capture::FrameCaptureConfig {
             output_dir: "/tmp/symtropy-cinematic-frames".into(),
             max_frames: 720,
             active: true,

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Deterministic demo director for Terra Atlas.
+//! Deterministic demo director for Sol Atlas.
 //!
 //! Drives camera, timeline, and aesthetics through a scripted cinematic
 //! narrative. Combined with frame_capture (--record), produces a demo video.
@@ -9,8 +9,8 @@
 //! Future: wire Symthaea FEP agent to modulate within each phase.
 
 use bevy::prelude::*;
-use terra_atlas_bevy::camera::OrbitalCameraConfig;
-use terra_atlas_bevy::timeline::TimelineState;
+use sol_atlas_bevy::camera::OrbitalCameraConfig;
+use sol_atlas_bevy::timeline::TimelineState;
 use symthaea_fep::EnhancedFEPBridge;
 use symthaea_fep::MotorCommandType;
 
@@ -146,11 +146,11 @@ pub fn demo_director_system(
             // Cycle through aesthetics
             let phase_third = t * 3.0;
             let new_aesthetic = if phase_third < 1.0 {
-                terra_atlas_core::aesthetics::Aesthetic::Satellite
+                sol_atlas_core::aesthetics::Aesthetic::Satellite
             } else if phase_third < 2.0 {
-                terra_atlas_core::aesthetics::Aesthetic::Night
+                sol_atlas_core::aesthetics::Aesthetic::Night
             } else {
-                terra_atlas_core::aesthetics::Aesthetic::Holographic
+                sol_atlas_core::aesthetics::Aesthetic::Holographic
             };
             if new_aesthetic != aesthetic.aesthetic {
                 aesthetic.aesthetic = new_aesthetic;
@@ -166,8 +166,8 @@ pub fn demo_director_system(
             camera.distance += (5.0 - camera.distance) * 0.04;
             camera.auto_rotate = true;
             // Ensure holographic
-            if aesthetic.aesthetic != terra_atlas_core::aesthetics::Aesthetic::Holographic {
-                aesthetic.aesthetic = terra_atlas_core::aesthetics::Aesthetic::Holographic;
+            if aesthetic.aesthetic != sol_atlas_core::aesthetics::Aesthetic::Holographic {
+                aesthetic.aesthetic = sol_atlas_core::aesthetics::Aesthetic::Holographic;
                 aesthetic.changed = true;
             }
         }

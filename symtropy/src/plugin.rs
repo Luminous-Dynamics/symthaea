@@ -99,23 +99,23 @@ impl Plugin for SymtropyPlugin {
             ).chain().run_if(in_state(GamePhase::Playing)))
             // Mycelix physicalized cryptography (only when --features mycelix)
             ;
-        // Terra Atlas globe view (only when --features atlas)
+        // Sol Atlas globe view (only when --features atlas)
         #[cfg(feature = "atlas")]
         {
             app
-                .add_plugins(bevy::pbr::MaterialPlugin::<terra_atlas_bevy::holographic_material::HolographicMaterial>::default())
-                .init_resource::<terra_atlas_bevy::camera::OrbitalCameraConfig>()
-                .init_resource::<terra_atlas_bevy::timeline::TimelineState>()
-                .init_resource::<terra_atlas_bevy::selection::SelectedMarker>()
+                .add_plugins(bevy::pbr::MaterialPlugin::<sol_atlas_bevy::holographic_material::HolographicMaterial>::default())
+                .init_resource::<sol_atlas_bevy::camera::OrbitalCameraConfig>()
+                .init_resource::<sol_atlas_bevy::timeline::TimelineState>()
+                .init_resource::<sol_atlas_bevy::selection::SelectedMarker>()
                 .init_resource::<systems::atlas::CurrentAesthetic>()
-                .init_resource::<terra_atlas_bevy::frame_capture::FrameCaptureConfig>()
+                .init_resource::<sol_atlas_bevy::frame_capture::FrameCaptureConfig>()
                 .init_resource::<systems::demo_director::DemoDirector>()
                 .add_systems(Update,
                     systems::atlas::atlas_toggle_system
                         .run_if(in_state(GamePhase::Playing)))
                 .add_systems(OnEnter(GamePhase::GlobeView), (
                     systems::atlas::setup_globe_view,
-                    terra_atlas_bevy::selection::setup_selection_ui,
+                    sol_atlas_bevy::selection::setup_selection_ui,
                 ))
                 // Visibility pipeline: timeline → temporal → LOD (chained so LOD wins)
                 .add_systems(Update, (
@@ -127,9 +127,9 @@ impl Plugin for SymtropyPlugin {
                 .add_systems(Update, (
                     systems::atlas::globe_input_system,
                     systems::atlas::draw_arcs_system,
-                    terra_atlas_bevy::camera::orbital_camera_system,
-                    terra_atlas_bevy::timeline::timeline_input_system,
-                    terra_atlas_bevy::timeline::timeline_autoplay_system,
+                    sol_atlas_bevy::camera::orbital_camera_system,
+                    sol_atlas_bevy::timeline::timeline_input_system,
+                    sol_atlas_bevy::timeline::timeline_autoplay_system,
                     systems::atlas::celestial_orbit_system,
                     systems::atlas::holographic_pulse_system,
                     systems::audio::globe_audio_system,
@@ -138,10 +138,10 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::consciousness_shader_system,
                     systems::atlas::aesthetic_switch_system,
                     systems::atlas::aesthetic_apply_system,
-                    terra_atlas_bevy::selection::click_select_system,
-                    terra_atlas_bevy::selection::update_selection_text,
-                    terra_atlas_bevy::holographic_material::update_holographic_time,
-                    terra_atlas_bevy::frame_capture::frame_capture_system,
+                    sol_atlas_bevy::selection::click_select_system,
+                    sol_atlas_bevy::selection::update_selection_text,
+                    sol_atlas_bevy::holographic_material::update_holographic_time,
+                    sol_atlas_bevy::frame_capture::frame_capture_system,
                     systems::demo_director::demo_director_system,
                 ).run_if(in_state(GamePhase::GlobeView)))
                 .add_systems(OnExit(GamePhase::GlobeView), systems::atlas::cleanup_globe_view)

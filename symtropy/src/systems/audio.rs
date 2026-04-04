@@ -127,7 +127,7 @@ pub fn audio_system(
     audio.current = Some(state);
 }
 
-/// Planetary ambient audio for Terra Atlas globe view.
+/// Planetary ambient audio for Sol Atlas globe view.
 /// Uses DeepSpace biome preset — sparse, reverberant, Sacred Stillness.
 /// Does not depend on BiometricsCtx or LeviathanState.
 pub fn globe_audio_system(

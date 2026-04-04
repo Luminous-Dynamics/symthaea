@@ -39,8 +39,8 @@ symtropy-render-bridge = { path = "crates/symtropy-render-bridge" }
 symtropy-robotics-bridge = { path = "crates/symtropy-robotics-bridge" }
 
 # Terra Atlas globe view — enable with: cargo run --features atlas
-terra-atlas-bevy = { path = "../terra-atlas-bevy", optional = true }
-terra-atlas-core = { path = "../terra-atlas-core", optional = true }
+sol-atlas-bevy = { path = "../sol-atlas-bevy", optional = true }
+sol-atlas-core = { path = "../sol-atlas-core", optional = true }
 
 # Optional advanced features
 symtropy-world = { path = "crates/symtropy-world", optional = true }
@@ -60,7 +60,7 @@ default = []
 # Enable with: cargo build --features live-audio
 live-audio = ["symthaea-muse/muse-live"]
 mycelix = ["dep:symtropy-sim-bridge", "dep:mycelix-bridge-common", "dep:mycelix-core-types"]
-atlas = ["dep:terra-atlas-bevy", "dep:terra-atlas-core"]
+atlas = ["dep:sol-atlas-bevy", "dep:sol-atlas-core"]
 world = ["dep:symtropy-world"]
 net = ["world", "dep:symtropy-net"]
 

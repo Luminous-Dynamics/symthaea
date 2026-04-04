@@ -28,10 +28,12 @@ pub mod psychology;
 pub mod rendering;
 pub mod scavenge;
 
-// Terra Atlas globe view — planetary coordination layer.
+// Sol Atlas globe view — planetary coordination layer.
 // Enabled via `cargo build --features atlas`.
 #[cfg(feature = "atlas")]
 pub mod atlas;
+#[cfg(feature = "atlas")]
+pub mod cinematic_director;
 #[cfg(feature = "atlas")]
 pub mod demo_director;
 

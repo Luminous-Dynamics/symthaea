@@ -102,7 +102,7 @@ pub enum GamePhase {
     GameOver,
     /// Player escaped with the core.
     Victory,
-    /// Terra Atlas globe view — planetary coordination layer.
+    /// Sol Atlas globe view — planetary coordination layer.
     #[cfg(feature = "atlas")]
     GlobeView,
 }

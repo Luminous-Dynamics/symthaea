@@ -346,8 +346,8 @@ pub fn cinematic_director_system(
     leviathan: Option<ResMut<crate::resources::LeviathanState>>,
     dim_transition: Option<ResMut<crate::systems::dimension_transition::DimensionTransition>>,
     // Globe resources (optional — not present during dungeon)
-    camera_config: Option<ResMut<terra_atlas_bevy::camera::OrbitalCameraConfig>>,
-    timeline: Option<ResMut<terra_atlas_bevy::timeline::TimelineState>>,
+    camera_config: Option<ResMut<sol_atlas_bevy::camera::OrbitalCameraConfig>>,
+    timeline: Option<ResMut<sol_atlas_bevy::timeline::TimelineState>>,
     aesthetic: Option<ResMut<crate::systems::atlas::CurrentAesthetic>>,
     // AI player
     ai_player: Option<ResMut<crate::systems::ai_player::AiPlayer>>,
@@ -474,8 +474,8 @@ pub fn cinematic_director_system(
 
         CinematicPhase::Night => {
             if let Some(mut aes) = aesthetic {
-                if aes.aesthetic != terra_atlas_core::aesthetics::Aesthetic::Night {
-                    aes.aesthetic = terra_atlas_core::aesthetics::Aesthetic::Night;
+                if aes.aesthetic != sol_atlas_core::aesthetics::Aesthetic::Night {
+                    aes.aesthetic = sol_atlas_core::aesthetics::Aesthetic::Night;
                     aes.changed = true;
                 }
             }
@@ -494,8 +494,8 @@ pub fn cinematic_director_system(
             }
             // Return to holographic
             if let Some(mut aes) = aesthetic {
-                if aes.aesthetic != terra_atlas_core::aesthetics::Aesthetic::Holographic {
-                    aes.aesthetic = terra_atlas_core::aesthetics::Aesthetic::Holographic;
+                if aes.aesthetic != sol_atlas_core::aesthetics::Aesthetic::Holographic {
+                    aes.aesthetic = sol_atlas_core::aesthetics::Aesthetic::Holographic;
                     aes.changed = true;
                 }
             }
@@ -504,9 +504,9 @@ pub fn cinematic_director_system(
         CinematicPhase::FlyToMars => {
             // Fly toward Mars position
             if let Some(mut cam) = camera_config {
-                let mars = terra_atlas_core::solar_system::solar_system_bodies()
+                let mars = sol_atlas_core::solar_system::solar_system_bodies()
                     .into_iter().find(|b| b.name == "Mars").unwrap();
-                let pos = terra_atlas_core::solar_system::body_position(&mars, director.total_time);
+                let pos = sol_atlas_core::solar_system::body_position(&mars, director.total_time);
                 // Interpolate camera toward Mars
                 let target_theta = pos[2].atan2(pos[0]);
                 let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 0.5;
@@ -518,9 +518,9 @@ pub fn cinematic_director_system(
 
         CinematicPhase::FlyToJupiter => {
             if let Some(mut cam) = camera_config {
-                let jupiter = terra_atlas_core::solar_system::solar_system_bodies()
+                let jupiter = sol_atlas_core::solar_system::solar_system_bodies()
                     .into_iter().find(|b| b.name == "Jupiter").unwrap();
-                let pos = terra_atlas_core::solar_system::body_position(&jupiter, director.total_time);
+                let pos = sol_atlas_core::solar_system::body_position(&jupiter, director.total_time);
                 let target_theta = pos[2].atan2(pos[0]);
                 let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 1.0;
                 cam.theta += (target_theta - cam.theta) * 0.03;
@@ -531,9 +531,9 @@ pub fn cinematic_director_system(
 
         CinematicPhase::SaturnRings => {
             if let Some(mut cam) = camera_config {
-                let saturn = terra_atlas_core::solar_system::solar_system_bodies()
+                let saturn = sol_atlas_core::solar_system::solar_system_bodies()
                     .into_iter().find(|b| b.name == "Saturn").unwrap();
-                let pos = terra_atlas_core::solar_system::body_position(&saturn, director.total_time);
+                let pos = sol_atlas_core::solar_system::body_position(&saturn, director.total_time);
                 let target_theta = pos[2].atan2(pos[0]);
                 let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 1.0;
                 cam.theta += (target_theta - cam.theta) * 0.03;
