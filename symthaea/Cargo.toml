@@ -55,6 +55,7 @@ members = [
     "crates/symthaea-materials",
     "crates/symthaea-gravcraft",
     "crates/symthaea-nuclear",
+    "crates/symthaea-physics-catalog",
     "crates/symthaea-nuclear-forensics",
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",
@@ -272,6 +273,9 @@ symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = 
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
+
+# Symthaea Spore - WASM consciousness kernel (BrocaLite fallback for always-on language)
+symthaea-spore = { path = "crates/symthaea-spore", optional = true, default-features = false }
 
 # Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
 symthaea-muse = { path = "crates/symthaea-muse", optional = true }
@@ -591,6 +595,7 @@ manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled indus
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
+broca_lite = ["dep:symthaea-spore"]             # Lightweight always-on language generation (512 tokens, 1024D, ~2MB)
 ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
 canvas = ["dep:symthaea-canvas"]               # Living topology UI: cognitive geometry → animated SVG
 neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
