@@ -1810,6 +1810,10 @@ fn compute_trajectory_fluctuatio(trajectory: &[[f32; NUM_AFFECTS]]) -> Fluctuati
 // SpinozistClassifier — the main public interface
 // ============================================================================
 
+const NUM_ANCHORS: usize = 48;
+const NUM_HYBRID_FEATURES: usize = NUM_AFFECTS + NUM_ANCHORS + 3;
+const MULTI_PROTO_K: usize = 5;
+
 /// NSM-grounded moral classifier using Spinozist affect geometry.
 ///
 /// Encodes text via NSM lexicon decomposition, projects into 18D affect space,
@@ -1828,11 +1832,16 @@ pub struct SpinozistClassifier {
     basis: NsmPrimeBasis,
     affects: AffectBasis,
     lexicon: NsmLexicon,
-    /// Learned adequacy thresholds (can be calibrated from labeled data).
     valence_threshold: f32,
-    /// Learned prototypes in 171D affect cross-term space: [Good, Bad, Neutral].
-    /// Trained via `train_prototypes()` with centroid initialization + retrain-adaptive.
     learned_prototypes: Option<[Vec<f32>; 3]>,
+    // Hybrid architecture: 69D data-driven classification
+    surface_encoder: TextHdcEncoder,
+    anchor_hvs: Vec<ContinuousHV>,
+    surface_protos: Option<[ContinuousHV; 3]>,
+    multi_prototypes: Option<Vec<(Vec<f32>, usize)>>,
+    feature_normalizer: Option<(Vec<f32>, Vec<f32>)>,
+    hybrid_ensemble_weights: [f32; 2],
+    hybrid_trained: bool,
 }
 
 impl SpinozistClassifier {
@@ -1873,17 +1882,28 @@ impl SpinozistClassifier {
             }
         }
 
+        let surface_encoder = TextHdcEncoder::with_framing(HDC_DIMENSION, 3, 0.5, 0.15, 0.1);
         Self {
             basis,
             affects,
             lexicon,
             valence_threshold: 0.02,
             learned_prototypes: None,
+            surface_encoder,
+            anchor_hvs: Vec::new(),
+            surface_protos: None,
+            multi_prototypes: None,
+            feature_normalizer: None,
+            hybrid_ensemble_weights: [0.5, 0.5],
+            hybrid_trained: false,
         }
     }
 
     /// Classify a text string into a moral verdict with confidence.
     pub fn classify(&self, text: &str) -> (MoralVerdict, f32) {
+        if self.learned_prototypes.is_some() {
+            return self.classify_learned(text);
+        }
         let fp = self.fingerprint(text);
         geometric_verdict(&fp)
     }
@@ -2215,6 +2235,132 @@ impl SpinozistClassifier {
             1 => MoralVerdict::Bad,
             _ => MoralVerdict::Neutral,
         };
+        (verdict, margin.min(1.0))
+    }
+
+    pub fn train_hybrid(&mut self, samples: &[(String, MoralLabel)]) {
+        if samples.len() < 10 { return; }
+        let mut good_acc = vec![0.0f32; HDC_DIMENSION];
+        let mut bad_acc = vec![0.0f32; HDC_DIMENSION];
+        let mut neu_acc = vec![0.0f32; HDC_DIMENSION];
+        let (mut gn, mut bn, mut nn) = (0usize, 0usize, 0usize);
+        let surface_hvs: Vec<(ContinuousHV, usize)> = samples.iter().map(|(text, label)| {
+            let hv = self.surface_encoder.encode(text);
+            let cls = match label { MoralLabel::Good => 0, MoralLabel::Bad => 1, MoralLabel::Neutral => 2 };
+            let (acc, n) = match cls { 0 => (&mut good_acc, &mut gn), 1 => (&mut bad_acc, &mut bn), _ => (&mut neu_acc, &mut nn) };
+            for (a, v) in acc.iter_mut().zip(hv.values.iter()) { *a += v; }
+            *n += 1;
+            (hv, cls)
+        }).collect();
+        let norm_acc = |acc: &mut [f32], n: usize| {
+            if n > 0 { let nf = n as f32; for v in acc.iter_mut() { *v /= nf; } }
+            let norm: f32 = acc.iter().map(|v| v * v).sum::<f32>().sqrt();
+            if norm > 1e-10 { for v in acc.iter_mut() { *v /= norm; } }
+        };
+        norm_acc(&mut good_acc, gn); norm_acc(&mut bad_acc, bn); norm_acc(&mut neu_acc, nn);
+        self.surface_protos = Some([ContinuousHV::from_vec(good_acc.clone()), ContinuousHV::from_vec(bad_acc.clone()), ContinuousHV::from_vec(neu_acc.clone())]);
+        let mut anchors = Vec::with_capacity(NUM_ANCHORS);
+        for affect in &SpinozistAffect::all() { anchors.push(self.affects.affect_hv(*affect).clone()); }
+        anchors.push(ContinuousHV::from_vec(good_acc)); anchors.push(ContinuousHV::from_vec(bad_acc)); anchors.push(ContinuousHV::from_vec(neu_acc));
+        let nk = NUM_ANCHORS - NUM_AFFECTS - 3;
+        let n = surface_hvs.len();
+        let dim = HDC_DIMENSION;
+        let mut centroids: Vec<Vec<f32>> = (0..nk).map(|i| surface_hvs[(i * n) / nk].0.values.clone()).collect();
+        for _ in 0..15 {
+            let mut cacc = vec![vec![0.0f32; dim]; nk];
+            let mut ccnt = vec![0usize; nk];
+            for (hv, _) in &surface_hvs {
+                let mut best = 0; let mut bsim = f32::NEG_INFINITY;
+                for (c, cen) in centroids.iter().enumerate() {
+                    let s: f32 = hv.values.iter().zip(cen.iter()).map(|(a, b)| a * b).sum();
+                    if s > bsim { bsim = s; best = c; }
+                }
+                for (a, v) in cacc[best].iter_mut().zip(hv.values.iter()) { *a += v; }
+                ccnt[best] += 1;
+            }
+            for c in 0..nk {
+                if ccnt[c] > 0 {
+                    let nf = ccnt[c] as f32; for v in &mut cacc[c] { *v /= nf; }
+                    let norm: f32 = cacc[c].iter().map(|v| v * v).sum::<f32>().sqrt();
+                    if norm > 1e-10 { for v in &mut cacc[c] { *v /= norm; } }
+                    centroids[c] = cacc[c].clone();
+                }
+            }
+        }
+        for cen in centroids { anchors.push(ContinuousHV::from_vec(cen)); }
+        self.anchor_hvs = anchors;
+        let labeled: Vec<(Vec<f32>, usize)> = samples.iter().zip(surface_hvs.iter()).map(|((text, label), (shv, _))| {
+            let f = self.extract_hybrid_features_inner(text, shv);
+            let c = match label { MoralLabel::Good => 0, MoralLabel::Bad => 1, MoralLabel::Neutral => 2 };
+            (f, c)
+        }).collect();
+        self.fit_normalizer(&labeled);
+        let normed: Vec<(Vec<f32>, usize)> = labeled.iter().map(|(f, c)| (self.norm_features(f), *c)).collect();
+        self.train_multi_proto(&normed);
+        self.hybrid_trained = true;
+    }
+
+    fn extract_hybrid_features_inner(&self, text: &str, surface_hv: &ContinuousHV) -> Vec<f32> {
+        let mut f = Vec::with_capacity(NUM_HYBRID_FEATURES);
+        let shv = self.encode_text(text);
+        let aff = self.affects.project_affects(&shv);
+        f.extend_from_slice(&aff);
+        for a in &self.anchor_hvs { f.push(surface_hv.similarity(a)); }
+        if let Some(p) = &self.surface_protos { for proto in p { f.push(surface_hv.similarity(proto)); } } else { f.extend_from_slice(&[0.0, 0.0, 0.0]); }
+        f
+    }
+
+    pub fn extract_hybrid_features(&self, text: &str) -> Vec<f32> {
+        let shv = self.surface_encoder.encode(text);
+        self.extract_hybrid_features_inner(text, &shv)
+    }
+
+    fn fit_normalizer(&mut self, samples: &[(Vec<f32>, usize)]) {
+        let d = NUM_HYBRID_FEATURES;
+        let mut mins = vec![f32::INFINITY; d]; let mut maxs = vec![f32::NEG_INFINITY; d];
+        for (f, _) in samples { for (i, &v) in f.iter().enumerate().take(d) { if v < mins[i] { mins[i] = v; } if v > maxs[i] { maxs[i] = v; } } }
+        let ranges: Vec<f32> = mins.iter().zip(maxs.iter()).map(|(&mn, &mx)| { let r = mx - mn; if r > 1e-10 { r } else { 1.0 } }).collect();
+        self.feature_normalizer = Some((mins, ranges));
+    }
+
+    fn norm_features(&self, f: &[f32]) -> Vec<f32> {
+        match &self.feature_normalizer { Some((mins, ranges)) => f.iter().enumerate().map(|(i, &v)| ((v - mins[i]) / ranges[i]).clamp(0.0, 1.0)).collect(), None => f.to_vec() }
+    }
+
+    fn train_multi_proto(&mut self, samples: &[(Vec<f32>, usize)]) {
+        let d = NUM_HYBRID_FEATURES;
+        let mut protos: Vec<(Vec<f32>, usize)> = Vec::new();
+        for cls in 0..3 {
+            let cs: Vec<&Vec<f32>> = samples.iter().filter(|(_, c)| *c == cls).map(|(f, _)| f).collect();
+            let n = cs.len();
+            if n == 0 { for _ in 0..MULTI_PROTO_K { protos.push((vec![0.0; d], cls)); } continue; }
+            for k in 0..MULTI_PROTO_K { protos.push((cs[(k * n) / MULTI_PROTO_K].clone(), cls)); }
+        }
+        let lr = 0.02f32;
+        for _ in 0..10 {
+            for (feat, correct) in samples {
+                let mut bi = 0; let mut bs = f32::NEG_INFINITY;
+                for (i, (p, _)) in protos.iter().enumerate() { let s: f32 = feat.iter().zip(p.iter()).map(|(a, b)| a * b).sum(); if s > bs { bs = s; bi = i; } }
+                if protos[bi].1 != *correct {
+                    let ci = protos.iter().enumerate().filter(|(_, (_, c))| *c == *correct)
+                        .max_by(|(_, (a, _)), (_, (b, _))| { let sa: f32 = feat.iter().zip(a.iter()).map(|(x, y)| x * y).sum(); let sb: f32 = feat.iter().zip(b.iter()).map(|(x, y)| x * y).sum(); sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal) })
+                        .map(|(i, _)| i).unwrap_or(0);
+                    for (i, &fv) in feat.iter().enumerate() { protos[ci].0[i] += lr * (fv - protos[ci].0[i]); protos[bi].0[i] -= lr * (fv - protos[bi].0[i]); }
+                }
+            }
+        }
+        self.multi_prototypes = Some(protos);
+    }
+
+    pub fn classify_hybrid(&self, text: &str) -> (MoralVerdict, f32) {
+        if !self.hybrid_trained { return (MoralVerdict::Neutral, 0.0); }
+        let f = self.extract_hybrid_features(text);
+        let nf = self.norm_features(&f);
+        let protos = match &self.multi_prototypes { Some(p) => p, None => return (MoralVerdict::Neutral, 0.0) };
+        let mut bi = 0; let mut bs = f32::NEG_INFINITY; let mut ss = f32::NEG_INFINITY;
+        for (i, (p, _)) in protos.iter().enumerate() { let s: f32 = nf.iter().zip(p.iter()).map(|(a, b)| a * b).sum(); if s > bs { ss = bs; bs = s; bi = i; } else if s > ss { ss = s; } }
+        let margin = (bs - ss).max(0.0);
+        let verdict = match protos[bi].1 { 0 => MoralVerdict::Good, 1 => MoralVerdict::Bad, _ => MoralVerdict::Neutral };
         (verdict, margin.min(1.0))
     }
 }
