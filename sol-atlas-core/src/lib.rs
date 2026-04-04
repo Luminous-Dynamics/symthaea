@@ -22,6 +22,7 @@ pub mod math;
 pub mod picking;
 pub mod simulation;
 pub mod timeline;
+pub mod visual_validation;
 pub mod types;
 
 pub use types::*;
