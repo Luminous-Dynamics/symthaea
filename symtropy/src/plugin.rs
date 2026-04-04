@@ -117,17 +117,21 @@ impl Plugin for SymtropyPlugin {
                     systems::atlas::setup_globe_view,
                     terra_atlas_bevy::selection::setup_selection_ui,
                 ))
+                // Visibility pipeline: timeline → temporal → LOD (chained so LOD wins)
+                .add_systems(Update, (
+                    systems::atlas::timeline_visibility_system,
+                    systems::atlas::temporal_4d_system,
+                    systems::atlas::lod_visibility_system,
+                ).chain().run_if(in_state(GamePhase::GlobeView)))
+                // Everything else runs in parallel
                 .add_systems(Update, (
                     systems::atlas::globe_input_system,
                     systems::atlas::draw_arcs_system,
                     terra_atlas_bevy::camera::orbital_camera_system,
                     terra_atlas_bevy::timeline::timeline_input_system,
                     terra_atlas_bevy::timeline::timeline_autoplay_system,
-                    systems::atlas::timeline_visibility_system,
                     systems::atlas::celestial_orbit_system,
                     systems::atlas::holographic_pulse_system,
-                    systems::atlas::lod_visibility_system,
-                    systems::atlas::temporal_4d_system,
                     systems::atlas::aesthetic_switch_system,
                     systems::atlas::aesthetic_apply_system,
                     terra_atlas_bevy::selection::click_select_system,
