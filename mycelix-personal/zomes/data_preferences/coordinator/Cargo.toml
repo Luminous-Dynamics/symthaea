@@ -1,0 +1,14 @@
+[package]
+name = "data-preferences-coordinator"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Coordinator zome for per-user data sharing preferences"
+
+[dependencies]
+hdk = "=0.6.0"
+serde = { version = "1", features = ["derive"] }
+data-preferences-integrity = { path = "../integrity" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

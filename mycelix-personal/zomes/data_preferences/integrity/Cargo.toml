@@ -1,0 +1,13 @@
+[package]
+name = "data-preferences-integrity"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Integrity zome for per-user data sharing preferences"
+
+[dependencies]
+hdi = "=0.7.0"
+serde = { version = "1", features = ["derive"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
