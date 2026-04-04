@@ -266,7 +266,16 @@ We swept maintenance pressure from 0.05 to 1.00~J/tick (12 levels, 8 seeds each)
 
 Counterintuitively, cooperation events \emph{increase} under stress: 378K events at 0.05~J/tick vs 1.31M at 1.00~J/tick---a 3.5$\times$ increase. Agents cooperate more frantically as survival becomes precarious. System temperature rises monotonically (311.5K to 330.6K), entropy production increases 8.6$\times$ (66.6 to 571.6~J/K), and Helmholtz free energy drops to zero above the critical pressure.
 
-The bistability above threshold---seeds either fully survive or fully collapse---is characteristic of first-order phase transitions in statistical mechanics. The spatial lottery (proximity to wells at time of pressure onset) determines the outcome.
+The bistability above threshold---seeds either fully survive or fully collapse---is characteristic of first-order phase transitions in statistical mechanics. The spatial lottery (proximity to wells at time of pressure onset) determines the outcome (Figure~\ref{fig:phase}).
+
+\end{multicols}
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{fig5_phase_transition.pdf}
+\caption{Phase transition in cooperation. (a) Survival drops sharply at 0.20~J/tick while cooperation events increase 3.5$\times$ under stress. (b) Temperature saturates at $\sim$331K as entropy production maximizes.}
+\label{fig:phase}
+\end{figure*}
+\begin{multicols}{2}
 
 \subsection{HDC vs Scalar Integration Substrate}
 
