@@ -26,8 +26,8 @@ impl Default for FrameCaptureConfig {
     fn default() -> Self {
         Self {
             output_dir: "/tmp/terra-atlas-frames".into(),
-            interval_secs: 1.0 / 8.0,  // 8fps — fast enough for smooth video, low overhead
-            max_frames: 240,           // 30 seconds at 8fps
+            interval_secs: 1.0 / 4.0,  // 4fps — gives async screenshots time to resolve
+            max_frames: 720,           // 90 seconds at 8fps
             frame_count: 0,
             accumulator: 0.0,
             active: false,

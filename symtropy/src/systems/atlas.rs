@@ -76,9 +76,14 @@ pub fn setup_globe_view(
     mut holo_materials: ResMut<Assets<terra_atlas_bevy::holographic_material::HolographicMaterial>>,
     asset_server: Res<AssetServer>,
     dungeon_cameras: Query<Entity, (With<Camera2d>, Without<OrbitalCamera>)>,
+    hud_texts: Query<Entity, With<crate::systems::rendering::HudText>>,
 ) {
     // Hide the 2D dungeon camera
     for entity in dungeon_cameras.iter() {
+        commands.entity(entity).insert(Visibility::Hidden);
+    }
+    // Hide the dungeon HUD
+    for entity in hud_texts.iter() {
         commands.entity(entity).insert(Visibility::Hidden);
     }
 
@@ -913,12 +918,17 @@ pub fn cleanup_globe_view(
     mut commands: Commands,
     atlas_entities: Query<Entity, With<AtlasEntity>>,
     hidden_cameras: Query<Entity, With<Camera2d>>,
+    hidden_huds: Query<Entity, With<crate::systems::rendering::HudText>>,
 ) {
     for entity in atlas_entities.iter() {
         commands.entity(entity).despawn();
     }
 
     for entity in hidden_cameras.iter() {
+        commands.entity(entity).insert(Visibility::Visible);
+    }
+    // Restore dungeon HUD
+    for entity in hidden_huds.iter() {
         commands.entity(entity).insert(Visibility::Visible);
     }
 
