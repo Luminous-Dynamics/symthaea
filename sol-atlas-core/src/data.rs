@@ -164,6 +164,11 @@ pub fn load_all(
     }
 }
 
+/// Parse simplified shipping lane routes (Vec of Vec of [lon, lat]).
+pub fn parse_shipping_lanes(json: &str) -> Vec<Vec<[f64; 2]>> {
+    serde_json::from_str(json).unwrap_or_default()
+}
+
 /// Parse GeoJSON natural events from USGS, NASA EONET, FIRMS, and volcano data.
 fn parse_natural_events(
     earthquakes: &str,

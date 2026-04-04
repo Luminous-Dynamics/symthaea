@@ -47,6 +47,10 @@ pub struct CityIndicator {
     pub load: f32,
 }
 
+/// HUD element showing timeline year + Turchin cycle phase.
+#[derive(Component)]
+pub struct TimelineHud;
+
 /// Marker pulse — makes data markers breathe with sinusoidal scale modulation.
 #[derive(Component)]
 pub struct MarkerPulse {
@@ -299,6 +303,21 @@ pub fn setup_globe_view(
             left: Val::Px(28.0),
             ..default()
         },
+        AtlasEntity,
+    ));
+
+    // Timeline year + Turchin cycle phase HUD
+    commands.spawn((
+        Text::new("Year 0 | Growth"),
+        TextFont { font_size: 13.0, ..default() },
+        TextColor(Color::srgba(0.4, 0.7, 0.5, 0.5)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(46.0),
+            left: Val::Px(28.0),
+            ..default()
+        },
+        TimelineHud,
         AtlasEntity,
     ));
 
@@ -837,6 +856,22 @@ pub fn draw_arcs_system(
         }
     }
 
+    // ═══ SHIPPING LANES ═════════════════════════════════════════════
+    // Global maritime trade routes — blue, very faint background layer
+    let lanes = sol_atlas_bevy::data::load_shipping_lanes();
+    let lane_color = Color::linear_rgba(0.15, 0.3, 0.6, 0.08);
+    for route in &lanes {
+        for w in route.windows(2) {
+            let a = geo::lat_lon_to_xyz(w[0][1], w[0][0], 1.002);
+            let b = geo::lat_lon_to_xyz(w[1][1], w[1][0], 1.002);
+            gizmos.line(
+                Vec3::new(a[0], a[1], a[2]),
+                Vec3::new(b[0], b[1], b[2]),
+                lane_color,
+            );
+        }
+    }
+
     // ═══ SPACE-TIME GRAVITY WELL GRID ══════════════════════════════
     // Radial + concentric grid that dips into a funnel beneath the globe.
     // y = base - k / (r² + ε) — space-time curvature visualization.
@@ -942,6 +977,21 @@ pub fn temporal_4d_system(
         } else {
             Visibility::Hidden
         };
+    }
+}
+
+/// Update the timeline HUD with current year + Turchin cycle phase.
+pub fn timeline_hud_system(
+    timeline: Res<TimelineState>,
+    mut texts: Query<(&mut Text, &mut TextColor), With<TimelineHud>>,
+) {
+    let year = timeline.year;
+    let phase = sol_atlas_core::simulation::secular_phase_at_year(year);
+    let c = phase.color();
+
+    for (mut text, mut color) in texts.iter_mut() {
+        *text = Text::new(format!("Year {} | {}", year, phase.label()));
+        *color = TextColor(Color::linear_rgba(c[0], c[1], c[2], 0.6));
     }
 }
 

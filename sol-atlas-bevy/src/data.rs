@@ -30,6 +30,13 @@ const STORMS_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/nasa-eonet.json");
 const VOLCANOES_JSON: &str =
     include_str!("../../sol-atlas-leptos/assets/data/volcanoes.json");
+const SHIPPING_LANES_JSON: &str =
+    include_str!("../../sol-atlas-leptos/assets/data/shipping-lanes-simplified.json");
+
+/// Load simplified shipping lane routes (Vec of Vec of [lon, lat]).
+pub fn load_shipping_lanes() -> Vec<Vec<[f64; 2]>> {
+    sol_atlas_core::data::parse_shipping_lanes(SHIPPING_LANES_JSON)
+}
 
 /// Load all static datasets at compile time.
 pub fn load_all() -> LoadedData {
