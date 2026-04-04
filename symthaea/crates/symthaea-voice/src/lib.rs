@@ -80,10 +80,12 @@ fn speak_kokoro(text: &str, prosody: &VoiceProsody, sample_rate: u32) -> Vec<f32
 
         if let Ok(mut guard) = engine_lock.lock() {
             if let Some(ref mut engine) = *guard {
-                // LIQUID KOKORO: consciousness → speech rate
-                // Confused/low Ψ = slow (0.75x), confident/high Ψ = faster (1.1x)
-                let speed = 0.75 + prosody.consciousness * 0.35; // 0.75 to 1.10
+                // LIQUID KOKORO: consciousness → speech rate + voice character
+                // Speed: confused/low Ψ = slow (0.75x), confident/high Ψ = faster (1.1x)
+                let speed = 0.75 + prosody.consciousness * 0.35;
                 engine.speed = Some(speed);
+                // Voice blend: valence + arousal shift voice embedding
+                engine.voice_blend = Some((prosody.valence, prosody.arousal));
 
                 if let Some(mut audio) = engine.synthesize(text, None) {
                     // Vocal chain: normalize → presence EQ → compress

@@ -42,6 +42,9 @@ pub struct KokoroEngine {
     config: KokoroConfig,
     /// Consciousness-driven speed (set before each synthesize call).
     pub speed: Option<f32>,
+    /// Consciousness-driven voice blend (interpolate between voice embeddings).
+    /// (valence, arousal) → position in voice space.
+    pub voice_blend: Option<(f32, f32)>,
 }
 
 impl KokoroEngine {
@@ -82,7 +85,7 @@ impl KokoroEngine {
         };
 
         info!("Kokoro loaded: {} voices", voices.len());
-        Some(Self { session, voices, config, speed: None })
+        Some(Self { session, voices, config, speed: None, voice_blend: None })
     }
 
     #[cfg(not(feature = "kokoro"))]
@@ -103,12 +106,32 @@ impl KokoroEngine {
         phoneme_ids.extend(&raw_ids);
         phoneme_ids.push(0); // end pad
 
-        // Voice indexing: voices[token_count] not voices[voice_id]
+        // Voice indexing: voices[token_count] for base voice
         let token_count = phoneme_ids.len().min(self.voices.len().saturating_sub(1));
-        let voice_embed = self.voices.get(token_count)
+        let base_voice = self.voices.get(token_count)
             .or_else(|| self.voices.last())
             .or_else(|| self.voices.first())?;
-        info!("Voice index: {} (token count), embed dim: {}", token_count, voice_embed.len());
+
+        // LIQUID KOKORO v2: blend voice embeddings from consciousness state
+        let voice_embed = if let Some((valence, arousal)) = self.voice_blend {
+            // Map (valence, arousal) to a secondary voice index
+            // High valence = warmer voice (higher index), low = cooler
+            // High arousal = brighter voice
+            let blend_idx = ((0.5 + valence * 0.3 + arousal * 0.2) * self.voices.len() as f32)
+                .clamp(0.0, self.voices.len() as f32 - 1.0) as usize;
+            let blend_voice = self.voices.get(blend_idx).unwrap_or(base_voice);
+
+            // Interpolate: 70% base (token-indexed) + 30% consciousness-blended
+            let t = 0.3;
+            let blended: Vec<f32> = base_voice.iter().zip(blend_voice.iter())
+                .map(|(&a, &b)| a * (1.0 - t) + b * t)
+                .collect();
+            info!("Voice blend: base={}, blend={} (v={:.2} a={:.2})", token_count, blend_idx, valence, arousal);
+            blended
+        } else {
+            info!("Voice index: {} (token count)", token_count);
+            base_voice.clone()
+        };
 
         let seq_len = phoneme_ids.len();
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
@@ -116,8 +139,9 @@ impl KokoroEngine {
         let ids_tensor = ort::value::Tensor::from_array(
             (vec![1i64, seq_len as i64], input_ids)
         ).ok()?;
+        let embed_len = voice_embed.len();
         let style_tensor = ort::value::Tensor::from_array(
-            (vec![1i64, voice_embed.len() as i64], voice_embed.clone())
+            (vec![1i64, embed_len as i64], voice_embed)
         ).ok()?;
         // LIQUID KOKORO: consciousness drives speech rate
         // High arousal/confidence = faster (1.1x), low/confused = slower (0.75x)
