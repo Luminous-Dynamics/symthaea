@@ -1,14 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Symtropy: consciousness-driven survival game.
+//! Symtropy Engine — consciousness-first technology platform.
+//!
+//! Experiences:
+//! - The Room That Remembers You (consciousness survival horror)
+//! - Sol Atlas (civilizational planetary instrument)
 //!
 //! Run:
 //! ```sh
 //! export LD_LIBRARY_PATH="$(cat /tmp/bevy_ld_library_path.txt)"
-//! RUST_LOG=warn,symtropy=info ./target/debug/symtropy
+//! RUST_LOG=warn,symtropy=info ./target/release/symtropy
 //! ```
 
 mod components;
+pub mod experience;
 mod plugin;
 mod resources;
 mod systems;
@@ -57,7 +62,7 @@ fn main() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: "Symtropy: The Room That Remembers You".into(),
+                        title: "Symtropy Engine".into(),
                         resolution: bevy::window::WindowResolution::new(1280, 720),
                         present_mode: bevy::window::PresentMode::AutoVsync,
                         ..default()

@@ -22,6 +22,7 @@ impl Plugin for SymtropyPlugin {
             .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)))
             .init_resource::<crate::resources::DungeonSeed>()
             .init_resource::<systems::minimap::ExploredTiles>()
+            .init_resource::<crate::experience::ExperienceRegistry>()
             .init_resource::<systems::harmonies::LocalHarmonyState>()
             .init_resource::<systems::scavenge::CollectedPrimitives>()
             .init_resource::<systems::audio::AudioState>()
@@ -46,7 +47,10 @@ impl Plugin for SymtropyPlugin {
             ).chain().run_if(in_state(GamePhase::Playing)))
             .add_systems(Startup, systems::audio::setup_audio)
             .add_systems(OnEnter(GamePhase::MainMenu), systems::menu::setup_menu)
-            .add_systems(Update, systems::menu::menu_input_system.run_if(in_state(GamePhase::MainMenu)))
+            .add_systems(Update, (
+                systems::menu::menu_input_system,
+                systems::menu::nexus_background_system,
+            ).run_if(in_state(GamePhase::MainMenu)))
             .add_systems(OnExit(GamePhase::MainMenu), systems::menu::cleanup_menu)
             .add_systems(OnEnter(GamePhase::Loading), (
                 systems::menu::setup_loading, systems::rendering::setup_world,

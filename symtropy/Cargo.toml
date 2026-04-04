@@ -13,6 +13,7 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_text", "bevy_ui", "bevy_ui_render",
     "bevy_winit", "bevy_color", "bevy_state",
     "bevy_log", "bevy_post_process", "bevy_shader",
+    "bevy_gizmos", "bevy_gizmos_render",
     "multi_threaded", "x11",
     "default_font", "png",
 ] }
