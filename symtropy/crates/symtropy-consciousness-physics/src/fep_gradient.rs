@@ -212,6 +212,27 @@ impl LearnedFepWeights {
         self.exploration = (self.exploration + grads[3]).clamp(0.01, 20.0);
     }
 
+    /// Update weights using a windowed reward signal (from AgentMemory).
+    ///
+    /// The windowed reward averages energy trajectory over ~100 ticks,
+    /// providing a much stronger gradient signal than per-tick deltas.
+    /// This is the recommended update method for experiments with memory.
+    pub fn update_windowed(&mut self, windowed_reward: f64, contributions: [f64; 4]) {
+        if windowed_reward.abs() < 1e-4 { return; } // no signal
+
+        let lr = self.learning_rate * 5.0; // stronger signal = can use higher LR
+        let beta = 0.9;
+        let grads: [f64; 4] = std::array::from_fn(|i| {
+            let grad = windowed_reward * contributions[i];
+            self.momentum[i] = beta * self.momentum[i] + (1.0 - beta) * grad;
+            lr * self.momentum[i]
+        });
+        self.cooperation = (self.cooperation + grads[0]).clamp(0.01, 20.0);
+        self.energy_well = (self.energy_well + grads[1]).clamp(0.01, 20.0);
+        self.danger = (self.danger + grads[2]).clamp(0.01, 20.0);
+        self.exploration = (self.exploration + grads[3]).clamp(0.01, 20.0);
+    }
+
     /// Summary of learned weight drift from defaults.
     pub fn drift_from_default(&self) -> f64 {
         let d = Self::default();

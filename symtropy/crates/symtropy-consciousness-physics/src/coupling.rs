@@ -22,6 +22,92 @@ use crate::thermodynamics::{ThermodynamicConstants, ThermodynamicLedger};
 use symtropy_physics::body::BodyHandle;
 use symtropy_physics::world::PhysicsCallback;
 
+/// Persistent agent memory for temporal state tracking.
+///
+/// Gives agents something beyond single-tick perception: remembered well
+/// locations, partner history, and hunger urgency. This is NOT learning
+/// (no weight updates) — it's episodic memory that the FEP gradient can use.
+#[derive(Debug, Clone)]
+pub struct AgentMemory {
+    /// Known energy well positions (discovered when within range).
+    pub known_wells: Vec<SVector<f64, 2>>,
+    /// Resonance history with specific agents: (handle_bits, cumulative_resonance, encounters).
+    pub partner_history: Vec<(u64, f64, u32)>,
+    /// Ticks since last positive energy regeneration.
+    pub ticks_since_regen: u64,
+    /// Rolling energy average over last 100 ticks (for reward signal).
+    pub energy_window: Vec<f64>,
+    /// Maximum partner history entries.
+    pub max_partners: usize,
+}
+
+impl Default for AgentMemory {
+    fn default() -> Self {
+        Self {
+            known_wells: Vec::new(),
+            partner_history: Vec::new(),
+            ticks_since_regen: 0,
+            energy_window: Vec::with_capacity(100),
+            max_partners: 20,
+        }
+    }
+}
+
+impl AgentMemory {
+    /// Record an energy observation for the rolling window.
+    pub fn record_energy(&mut self, energy_fraction: f64) {
+        self.energy_window.push(energy_fraction);
+        if self.energy_window.len() > 100 {
+            self.energy_window.remove(0);
+        }
+    }
+
+    /// Windowed reward: average energy change over window.
+    /// Positive = gaining energy on average. Negative = losing.
+    pub fn windowed_reward(&self) -> f64 {
+        if self.energy_window.len() < 2 { return 0.0; }
+        let n = self.energy_window.len();
+        let first_half: f64 = self.energy_window[..n/2].iter().sum::<f64>() / (n/2) as f64;
+        let second_half: f64 = self.energy_window[n/2..].iter().sum::<f64>() / (n - n/2) as f64;
+        second_half - first_half
+    }
+
+    /// Record a discovered well position (deduplicated by proximity).
+    pub fn discover_well(&mut self, pos: &SVector<f64, 2>) {
+        let dominated = self.known_wells.iter().any(|w| (w - pos).norm() < 10.0);
+        if !dominated {
+            self.known_wells.push(*pos);
+        }
+    }
+
+    /// Record a cooperation event with another agent.
+    pub fn record_partner(&mut self, handle: symtropy_physics::BodyHandle, resonance: f64) {
+        let bits = handle.0 as u64;
+        if let Some(entry) = self.partner_history.iter_mut().find(|(h, _, _)| *h == bits) {
+            entry.1 += resonance;
+            entry.2 += 1;
+        } else {
+            if self.partner_history.len() >= self.max_partners {
+                // Evict least-encountered partner
+                if let Some(min_idx) = self.partner_history.iter().enumerate()
+                    .min_by_key(|(_, (_, _, c))| *c).map(|(i, _)| i) {
+                    self.partner_history.swap_remove(min_idx);
+                }
+            }
+            self.partner_history.push((bits, resonance, 1));
+        }
+    }
+
+    /// Mean resonance with known partners.
+    pub fn mean_partner_resonance(&self) -> f64 {
+        if self.partner_history.is_empty() { return 0.0; }
+        let total: f64 = self.partner_history.iter()
+            .map(|(_, res, count)| if *count > 0 { res / *count as f64 } else { 0.0 })
+            .sum();
+        total / self.partner_history.len() as f64
+    }
+}
+
 /// Consciousness state for a single entity in the physics world.
 pub struct EntityConsciousness {
     /// The Master Consciousness Equation engine for this entity.
@@ -45,6 +131,8 @@ pub struct EntityConsciousness {
     pub motor_precision: f64,
     /// Prediction error decay rate per tick.
     pub prediction_decay: f64,
+    /// Persistent agent memory (well locations, partner history, energy window).
+    pub memory: AgentMemory,
 }
 
 impl EntityConsciousness {
@@ -59,6 +147,7 @@ impl EntityConsciousness {
             prediction_error: 0.0,
             motor_precision: 1.0,
             prediction_decay: 0.05, // ~20 ticks to recover
+            memory: AgentMemory::default(),
         }
     }
 
