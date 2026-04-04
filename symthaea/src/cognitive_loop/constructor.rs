@@ -1049,6 +1049,7 @@ impl CognitiveLoopService {
             neuromod: super::neuromod_manager::NeuromodManager::default(),
             // somatic_bridge, pain_tx, thermal_bridge, thermal_tx moved to sensorimotor_built
             subsystem_collector: super::subsystem_trait::OutputCollector::new(),
+            subsystem_health: super::subsystem_trait::SubsystemHealthTracker::new(),
             last_snapshot: None,
 
             // ── Unified Engines (additive wiring — old fields remain) ────────

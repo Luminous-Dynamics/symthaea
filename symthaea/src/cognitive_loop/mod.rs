@@ -621,6 +621,10 @@ pub struct CognitiveLoopService {
     /// Currently in dual-write bridge mode alongside direct mutations.
     subsystem_collector: subsystem_trait::OutputCollector,
 
+    /// Tracks consecutive panics per subsystem and disables repeat offenders.
+    /// Subsystems that panic 3 times in a row are skipped for the session.
+    subsystem_health: subsystem_trait::SubsystemHealthTracker,
+
     /// Last cycle snapshot (Phase 2.3) for telemetry and debugging.
     /// Built at the start of each cycle (Phase A: OBSERVE).
     last_snapshot: Option<subsystem_trait::CycleSnapshot>,

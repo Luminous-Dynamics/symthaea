@@ -739,6 +739,132 @@ impl CycleSnapshot {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PANIC ISOLATION — Subsystem health tracking and catch_unwind boundary
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Maximum consecutive panics before a subsystem is disabled for the session.
+const SUBSYSTEM_PANIC_DISABLE_THRESHOLD: u32 = 3;
+
+/// Tracks consecutive panic counts per subsystem and disables repeat offenders.
+///
+/// When a subsystem panics `SUBSYSTEM_PANIC_DISABLE_THRESHOLD` times in a row,
+/// it is marked as faulted and skipped for the remainder of the session.
+/// A successful `process()` call resets the panic counter to zero.
+#[derive(Debug, Clone)]
+pub struct SubsystemHealthTracker {
+    /// Map from subsystem name to consecutive panic count.
+    consecutive_panics: std::collections::HashMap<&'static str, u32>,
+    /// Set of subsystems that have been permanently disabled this session.
+    faulted: std::collections::HashSet<&'static str>,
+}
+
+impl SubsystemHealthTracker {
+    /// Create a new tracker with no recorded panics.
+    pub fn new() -> Self {
+        Self {
+            consecutive_panics: std::collections::HashMap::new(),
+            faulted: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Returns true if the subsystem has been disabled due to repeated panics.
+    #[inline]
+    pub fn is_faulted(&self, name: &str) -> bool {
+        self.faulted.contains(name)
+    }
+
+    /// Record a successful process() call — resets the panic counter.
+    pub fn record_success(&mut self, name: &'static str) {
+        if self.consecutive_panics.contains_key(name) {
+            self.consecutive_panics.remove(name);
+        }
+    }
+
+    /// Record a panic — increments the counter and may disable the subsystem.
+    pub fn record_panic(&mut self, name: &'static str) {
+        let count = self.consecutive_panics.entry(name).or_insert(0);
+        *count += 1;
+        if *count >= SUBSYSTEM_PANIC_DISABLE_THRESHOLD {
+            self.faulted.insert(name);
+            tracing::error!(
+                subsystem = name,
+                consecutive_panics = *count,
+                "Subsystem disabled — exceeded {} consecutive panics",
+                SUBSYSTEM_PANIC_DISABLE_THRESHOLD,
+            );
+        }
+    }
+
+    /// Number of currently faulted subsystems.
+    pub fn faulted_count(&self) -> usize {
+        self.faulted.len()
+    }
+
+    /// Names of all faulted subsystems.
+    pub fn faulted_names(&self) -> impl Iterator<Item = &&'static str> {
+        self.faulted.iter()
+    }
+}
+
+impl Default for SubsystemHealthTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Run a subsystem's `process()` method with panic isolation.
+///
+/// Wraps the call in `catch_unwind` so that a panicking sub-crate cannot crash
+/// the entire cognitive loop. On panic, returns `SubsystemOutput::NEUTRAL` and
+/// records the failure in the health tracker.
+///
+/// If the subsystem has been faulted (too many consecutive panics), the call is
+/// skipped entirely and `None` is returned.
+pub fn safe_process(
+    subsystem: &mut dyn CognitiveSubsystem,
+    snapshot: &CycleSnapshot,
+    health: &mut SubsystemHealthTracker,
+) -> Option<SubsystemOutput> {
+    let name = subsystem.name();
+
+    if health.is_faulted(name) {
+        return None;
+    }
+
+    // SAFETY: CognitiveSubsystem implementations contain mutable state that is
+    // not UnwindSafe. We use AssertUnwindSafe because:
+    // 1. On panic, we return NEUTRAL (no partial output propagates).
+    // 2. The subsystem may be in an inconsistent state, but the health tracker
+    //    will disable it after repeated panics, preventing cascading corruption.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        subsystem.process(snapshot)
+    }));
+
+    match result {
+        Ok(output) => {
+            health.record_success(name);
+            Some(output)
+        }
+        Err(payload) => {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                (*s).to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic payload".to_string()
+            };
+            tracing::error!(
+                subsystem = name,
+                panic_message = %msg,
+                "Subsystem panicked — returning NEUTRAL output",
+            );
+            health.record_panic(name);
+            Some(SubsystemOutput::NEUTRAL)
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1042,5 +1168,131 @@ mod tests {
             assert!(subsystem.should_run(cycle, 1));
             assert!(subsystem.should_run(cycle, 2));
         }
+    }
+
+    // ── Panic Isolation Tests ──────────────────────────────────────────────
+
+    /// SubsystemHealthTracker starts clean.
+    #[test]
+    fn test_health_tracker_initial_state() {
+        let tracker = SubsystemHealthTracker::new();
+        assert_eq!(tracker.faulted_count(), 0);
+        assert!(!tracker.is_faulted("anything"));
+    }
+
+    /// Successful calls reset the panic counter.
+    #[test]
+    fn test_health_tracker_success_resets_counter() {
+        let mut tracker = SubsystemHealthTracker::new();
+        tracker.record_panic("test_subsystem");
+        tracker.record_panic("test_subsystem");
+        // Two panics, not yet faulted
+        assert!(!tracker.is_faulted("test_subsystem"));
+        // Success resets
+        tracker.record_success("test_subsystem");
+        // Two more panics shouldn't fault (counter was reset)
+        tracker.record_panic("test_subsystem");
+        tracker.record_panic("test_subsystem");
+        assert!(!tracker.is_faulted("test_subsystem"));
+    }
+
+    /// Three consecutive panics disable the subsystem.
+    #[test]
+    fn test_health_tracker_faults_after_threshold() {
+        let mut tracker = SubsystemHealthTracker::new();
+        tracker.record_panic("flaky");
+        assert!(!tracker.is_faulted("flaky"));
+        tracker.record_panic("flaky");
+        assert!(!tracker.is_faulted("flaky"));
+        tracker.record_panic("flaky");
+        assert!(tracker.is_faulted("flaky"));
+        assert_eq!(tracker.faulted_count(), 1);
+    }
+
+    /// Multiple subsystems track independently.
+    #[test]
+    fn test_health_tracker_independent_subsystems() {
+        let mut tracker = SubsystemHealthTracker::new();
+        tracker.record_panic("alpha");
+        tracker.record_panic("alpha");
+        tracker.record_panic("alpha");
+        assert!(tracker.is_faulted("alpha"));
+        assert!(!tracker.is_faulted("beta"));
+        assert_eq!(tracker.faulted_count(), 1);
+    }
+
+    /// safe_process catches panics and returns NEUTRAL.
+    #[test]
+    fn test_safe_process_catches_panic() {
+        struct PanickingSubsystem;
+        impl CognitiveSubsystem for PanickingSubsystem {
+            fn name(&self) -> &'static str {
+                "panicker"
+            }
+            fn interval(&self) -> u32 {
+                1
+            }
+            fn process(&mut self, _: &CycleSnapshot) -> SubsystemOutput {
+                panic!("subsystem exploded");
+            }
+        }
+
+        let mut sub = PanickingSubsystem;
+        let mut health = SubsystemHealthTracker::new();
+        let snapshot = CycleSnapshot::default();
+
+        let result = safe_process(&mut sub, &snapshot, &mut health);
+        assert!(result.is_some());
+        assert!(result.unwrap().is_neutral());
+        assert!(!health.is_faulted("panicker")); // 1 panic, not yet faulted
+    }
+
+    /// safe_process skips faulted subsystems.
+    #[test]
+    fn test_safe_process_skips_faulted() {
+        struct PanickingSubsystem;
+        impl CognitiveSubsystem for PanickingSubsystem {
+            fn name(&self) -> &'static str {
+                "panicker"
+            }
+            fn interval(&self) -> u32 {
+                1
+            }
+            fn process(&mut self, _: &CycleSnapshot) -> SubsystemOutput {
+                panic!("subsystem exploded");
+            }
+        }
+
+        let mut sub = PanickingSubsystem;
+        let mut health = SubsystemHealthTracker::new();
+        let snapshot = CycleSnapshot::default();
+
+        // Trigger 3 panics to fault the subsystem
+        for _ in 0..3 {
+            let _ = safe_process(&mut sub, &snapshot, &mut health);
+        }
+        assert!(health.is_faulted("panicker"));
+
+        // Now safe_process should return None (skipped)
+        let result = safe_process(&mut sub, &snapshot, &mut health);
+        assert!(result.is_none());
+    }
+
+    /// safe_process passes through normal output on success.
+    #[test]
+    fn test_safe_process_passes_output() {
+        let mut sub = MockSubsystem { fire_count: 0 };
+        let mut health = SubsystemHealthTracker::new();
+        let snapshot = CycleSnapshot {
+            prediction_error: 1.0,
+            ..CycleSnapshot::default()
+        };
+
+        let result = safe_process(&mut sub, &snapshot, &mut health);
+        assert!(result.is_some());
+        let output = result.unwrap();
+        assert!((output.confidence_delta - 0.01).abs() < 1e-10);
+        assert_eq!(sub.fire_count, 1);
+        assert!(!health.is_faulted("mock"));
     }
 }

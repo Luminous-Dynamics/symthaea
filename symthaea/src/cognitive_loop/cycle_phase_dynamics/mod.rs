@@ -404,6 +404,35 @@ impl CognitiveLoopService {
         {
             use super::subsystem_trait::CognitiveSubsystem;
 
+            // Macro for panic-isolated subsystem execution.
+            // Inlines catch_unwind to enable split borrows: the subsystem manager field,
+            // `self.subsystem_health`, and `self.subsystem_collector` are all separate
+            // fields of CognitiveLoopService, so the borrow checker accepts this.
+            macro_rules! run_subsystem {
+                ($mgr:expr, $name:literal, $snapshot:expr) => {
+                    if !self.subsystem_health.is_faulted($name) {
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            $mgr.process($snapshot)
+                        }));
+                        match result {
+                            Ok(output) => {
+                                self.subsystem_health.record_success($name);
+                                self.subsystem_collector.record($name, output);
+                            }
+                            Err(payload) => {
+                                let msg = super::cycle::format_panic_payload(payload);
+                                tracing::error!(
+                                    subsystem = $name,
+                                    panic_message = %msg,
+                                    "Subsystem panicked — returning NEUTRAL output",
+                                );
+                                self.subsystem_health.record_panic($name);
+                            }
+                        }
+                    }
+                };
+            }
+
             // Pre-encode input text for glyph projection (before snapshot borrow).
             // Uses 3-channel TextHdcEncoder for semantically meaningful modality coordinates
             // instead of the coarse BinaryHV→±1 conversion from the snapshot.
@@ -415,27 +444,19 @@ impl CognitiveLoopService {
                 let cycle_num = snapshot.cycle_number;
 
                 if self.drive_manager.should_run(cycle_num, urgency_u8) {
-                    let drive_output = self.drive_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("drive_manager", drive_output);
+                    run_subsystem!(self.drive_manager, "drive_manager", snapshot);
                 }
 
                 if self.memory_manager.should_run(cycle_num, urgency_u8) {
-                    let memory_output = self.memory_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("memory_manager", memory_output);
+                    run_subsystem!(self.memory_manager, "memory_manager", snapshot);
                 }
 
                 if self.learning_manager.should_run(cycle_num, urgency_u8) {
-                    let learning_output = self.learning_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("learning_manager", learning_output);
+                    run_subsystem!(self.learning_manager, "learning_manager", snapshot);
                 }
 
                 if self.perception_manager.should_run(cycle_num, urgency_u8) {
-                    let perception_output = self.perception_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("perception_manager", perception_output);
+                    run_subsystem!(self.perception_manager, "perception_manager", snapshot);
                 }
 
                 // ── Drain swarm event channel (non-blocking) ──────────
@@ -544,9 +565,7 @@ impl CognitiveLoopService {
 
                 // ── Swarm Manager (interval 41, co-prime) ─────────────
                 if self.swarm_manager.should_run(cycle_num, urgency_u8) {
-                    let swarm_output = self.swarm_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("swarm_manager", swarm_output);
+                    run_subsystem!(self.swarm_manager, "swarm_manager", snapshot);
                 }
 
                 // ── Muse Manager (interval 1, every cycle) ──────────
@@ -554,7 +573,6 @@ impl CognitiveLoopService {
                 // allostatic sonification and peer distress resonance.
                 #[cfg(feature = "muse")]
                 {
-                    use super::subsystem_trait::CognitiveSubsystem;
                     self.muse_manager.inject_neuromod(
                         self.neuromod.bath.dopamine.effective(),
                         self.neuromod.bath.serotonin.effective(),
@@ -582,9 +600,7 @@ impl CognitiveLoopService {
                     self.muse_manager.inject_safety(safety_u8);
 
                     if self.muse_manager.should_run(cycle_num, urgency_u8) {
-                        let muse_output = self.muse_manager.process(snapshot);
-                        self.subsystem_collector
-                            .record("muse_manager", muse_output);
+                        run_subsystem!(self.muse_manager, "muse_manager", snapshot);
                     }
                 }
 
@@ -593,11 +609,8 @@ impl CognitiveLoopService {
                 // analyzer, HFE, physics bridge. Inputs set by cycle_consciousness,
                 // integration, monitors, and cycle phases.
                 {
-                    use super::subsystem_trait::CognitiveSubsystem;
                     if self.thermodynamic_mgr.should_run(cycle_num, urgency_u8) {
-                        let thermo_output = self.thermodynamic_mgr.process(snapshot);
-                        self.subsystem_collector
-                            .record("thermodynamic_manager", thermo_output);
+                        run_subsystem!(self.thermodynamic_mgr, "thermodynamic_manager", snapshot);
                     }
                 }
 
@@ -645,8 +658,7 @@ impl CognitiveLoopService {
                 // ── Soul Manager (interval 43, co-prime) ──────────────
                 if let Some(ref mut soul_mgr) = self.soul_manager {
                     if soul_mgr.should_run(cycle_num, urgency_u8) {
-                        let soul_output = soul_mgr.process(snapshot);
-                        self.subsystem_collector.record("soul_manager", soul_output);
+                        run_subsystem!(soul_mgr, "soul_manager", snapshot);
                     }
                 }
 
@@ -694,9 +706,7 @@ impl CognitiveLoopService {
                     }
 
                     if self.spectrum_manager.should_run(cycle_num, urgency_u8) {
-                        let spectrum_output = self.spectrum_manager.process(snapshot);
-                        self.subsystem_collector
-                            .record("spectrum_manager", spectrum_output);
+                        run_subsystem!(self.spectrum_manager, "spectrum_manager", snapshot);
 
                         // Cross-coupling: Spectrum → Swarm connectivity modifier
                         let connectivity_penalty = match net_health {
@@ -722,8 +732,7 @@ impl CognitiveLoopService {
                         .set_tau_factor(self.substrate_manager.tau_factor as f64);
 
                     if self.cpg_manager.should_run(cycle_num, urgency_u8) {
-                        let cpg_output = self.cpg_manager.process(snapshot);
-                        self.subsystem_collector.record("cpg_manager", cpg_output);
+                        run_subsystem!(self.cpg_manager, "cpg_manager", snapshot);
                     }
                 }
 
@@ -735,9 +744,7 @@ impl CognitiveLoopService {
                     self.spectral_manager
                         .record_state(&snapshot.compressed_state);
                     if self.spectral_manager.should_run(cycle_num, urgency_u8) {
-                        let spectral_output = self.spectral_manager.process(snapshot);
-                        self.subsystem_collector
-                            .record("spectral_twin", spectral_output);
+                        run_subsystem!(self.spectral_manager, "spectral_twin", snapshot);
                     }
                 }
 
@@ -746,9 +753,7 @@ impl CognitiveLoopService {
                 if self.config.enable_therapeutic
                     && self.therapeutic_manager.should_run(cycle_num, urgency_u8)
                 {
-                    let therapeutic_output = self.therapeutic_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("therapeutic_manager", therapeutic_output);
+                    run_subsystem!(self.therapeutic_manager, "therapeutic_manager", snapshot);
 
                     // ── Bidirectional bridge: neuromod bath → RDoC profile ──
                     // Reads actual transmitter levels and adjusts RDoC domains via EMA.
@@ -808,17 +813,13 @@ impl CognitiveLoopService {
                 // ── Fabrication Manager (interval 47, co-prime) ─────────
                 #[cfg(feature = "advanced-manufacturing")]
                 if self.fabrication_manager.should_run(cycle_num, urgency_u8) {
-                    let fabrication_output = self.fabrication_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("fabrication_manager", fabrication_output);
+                    run_subsystem!(self.fabrication_manager, "fabrication_manager", snapshot);
                 }
 
                 // ── Language Manager (interval 61, co-prime) ────────────
                 #[cfg(feature = "ssm_language")]
                 if self.language_manager.should_run(cycle_num, urgency_u8) {
-                    let language_output = self.language_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("language_manager", language_output);
+                    run_subsystem!(self.language_manager, "language_manager", snapshot);
                 }
 
                 // ── Neuroevolution Manager (interval 71, co-prime) ─────
@@ -831,35 +832,25 @@ impl CognitiveLoopService {
                             self.neuroevolution_manager.inject_mutations(suggestions);
                         }
                     }
-                    let neuro_output = self.neuroevolution_manager.process(snapshot);
-                    if neuro_output.lr_modulation != 1.0 {
-                        self.subsystem_collector
-                            .record("neuroevolution", neuro_output);
-                    }
+                    run_subsystem!(self.neuroevolution_manager, "neuroevolution", snapshot);
                 }
 
                 // ── Hypervisor Manager (interval 71, co-prime) ──────
                 #[cfg(feature = "hypervisor")]
                 {
-                    let hyper_output = self.hypervisor_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("hypervisor", hyper_output);
+                    run_subsystem!(self.hypervisor_manager, "hypervisor", snapshot);
                 }
 
                 // ── Vision Manager (interval 17, co-prime) ─────────
                 #[cfg(feature = "vision-manifold")]
                 if self.vision_manager.should_run(cycle_num, urgency_u8) {
-                    let vision_output = self.vision_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("vision_manager", vision_output);
+                    run_subsystem!(self.vision_manager, "vision_manager", snapshot);
                 }
 
                 // ── Reasoning Manager (interval 73, co-prime) ────────
                 #[cfg(feature = "reasoning_engine")]
                 if self.reasoning_manager.should_run(cycle_num, urgency_u8) {
-                    let reasoning_output = self.reasoning_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("reasoning_manager", reasoning_output);
+                    run_subsystem!(self.reasoning_manager, "reasoning_manager", snapshot);
                 }
 
                 // ── Governance Manager (interval 37, co-prime) ──────────
@@ -914,9 +905,7 @@ impl CognitiveLoopService {
                         self.governance_mgr.set_local_epistemic_mesh(mesh);
                     }
 
-                    let governance_output = self.governance_mgr.process(snapshot);
-                    self.subsystem_collector
-                        .record("governance_manager", governance_output);
+                    run_subsystem!(self.governance_mgr, "governance_manager", snapshot);
 
                     // Cross-coupling: Governance → Spectrum preferred tier
                     #[cfg(feature = "mesh")]
@@ -931,9 +920,7 @@ impl CognitiveLoopService {
                 // Science: Jung (1959) — archetypal symbolic fields; Graves (1970) — spiral dynamics.
                 #[cfg(feature = "glyph_codex")]
                 if self.glyph_manager.should_run(cycle_num, urgency_u8) {
-                    let glyph_output = self.glyph_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("glyph_manager", glyph_output);
+                    run_subsystem!(self.glyph_manager, "glyph_manager", snapshot);
                 }
 
                 // ── Sovereign Inoculation Managers ──────────────────────────
@@ -942,8 +929,7 @@ impl CognitiveLoopService {
 
                 #[cfg(feature = "mesh")]
                 if self.time_manager.should_run(cycle_num, urgency_u8) {
-                    let time_output = self.time_manager.process(snapshot);
-                    self.subsystem_collector.record("time_manager", time_output);
+                    run_subsystem!(self.time_manager, "time_manager", snapshot);
                     // Emit time beacon to mesh peers via CLS→Mind outbound channel.
                     let beacon = self.time_manager.create_beacon();
                     let hv = beacon.encode();
@@ -972,23 +958,17 @@ impl CognitiveLoopService {
 
                 #[cfg(feature = "mesh-trust")]
                 if self.trust_manager.should_run(cycle_num, urgency_u8) {
-                    let trust_output = self.trust_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("trust_manager", trust_output);
+                    run_subsystem!(self.trust_manager, "trust_manager", snapshot);
                 }
 
                 #[cfg(feature = "social-fabric")]
                 if self.social_fabric_manager.should_run(cycle_num, urgency_u8) {
-                    let fabric_output = self.social_fabric_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("social_fabric_manager", fabric_output);
+                    run_subsystem!(self.social_fabric_manager, "social_fabric_manager", snapshot);
                 }
 
                 #[cfg(feature = "survival")]
                 if self.survival_manager.should_run(cycle_num, urgency_u8) {
-                    let survival_output = self.survival_manager.process(snapshot);
-                    self.subsystem_collector
-                        .record("survival_manager", survival_output);
+                    run_subsystem!(self.survival_manager, "survival_manager", snapshot);
                 }
 
                 // ── Knowledge Manager: per-cycle extraction + neuromod coupling ──
