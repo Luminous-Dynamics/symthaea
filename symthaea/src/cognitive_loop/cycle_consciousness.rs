@@ -1379,7 +1379,9 @@ mod tests {
 
     #[test]
     fn lattice_phase_no_lattice_returns_zeros() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         let primitives: Vec<String> = vec![];
         let mut timings = super::super::ModuleTimings::default();
         let (height, width, join) = s.compute_lattice_phase(&primitives, &mut timings);
@@ -1405,7 +1407,9 @@ mod tests {
 
     #[test]
     fn fiduciary_harmonics_no_field_returns_zeros() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         let mut timings = super::super::ModuleTimings::default();
         let (coherence, love, interferences) =
             s.compute_fiduciary_harmonics_phase(0.5, 0.2, 0.3, &mut timings);
@@ -1418,7 +1422,9 @@ mod tests {
 
     #[test]
     fn dissipative_phase_no_module_returns_zeros() {
-        let mut s = make_service();
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
+        let mut s = super::super::CognitiveLoopService::new(config).unwrap();
         let mut timings = super::super::ModuleTimings::default();
         let (health, regime, entropy_rate) =
             s.compute_dissipative_phase(0.2, 0.5, 0.3, &mut timings);

@@ -750,10 +750,13 @@ fn test_config_validate_research_warns_without_did() {
 fn test_config_validate_detects_missing_deps() {
     let config = CognitiveLoopConfig {
         enable_temporal_consciousness: true,
+        enable_narrative_self: false,
+        enable_predictive_self: false,
         // narrative_self and predictive_self both false
         enable_embodied_cognition: true,
         // virtual_body defaults to true, so no warning for that
         enable_cross_modal_binding: true,
+        enable_affective_bridge: false,
         // affective_bridge false
         ..Default::default()
     };

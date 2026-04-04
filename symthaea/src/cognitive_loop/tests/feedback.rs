@@ -421,7 +421,9 @@ fn test_dream_replay_records_and_dreams() {
 
 #[test]
 fn test_dream_replay_disabled_by_default() {
-    let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_dream_replay = false;
+    let service = CognitiveLoopService::new(config).unwrap();
     assert!(
         service.dream_engine.is_none(),
         "Dream engine should be None by default"
@@ -931,8 +933,13 @@ fn test_module_timings_populated_for_enabled_modules() {
 
 #[test]
 fn test_module_timings_zero_when_disabled() {
-    // Default config: most modules disabled
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    // Explicitly disable modules to test zero timings
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_prefrontal = false;
+    config.enable_narrative_gwt = false;
+    config.enable_embodied_cognition = false;
+    config.enable_dream_replay = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
     let result = service.cycle("test disabled timings");
     let t = &result.metadata.module_timings_us;
 

@@ -1270,7 +1270,9 @@ mod tests {
 
     #[test]
     fn soul_alignment_zero_when_disabled() {
-        let mut s = make_service();
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_soul_alignment = false;
+        let mut s = CognitiveLoopService::new(config).unwrap();
         let r = s.cycle("test without soul");
         assert_eq!(r.metadata.ethics.soul_alignment, 0.0);
         assert!(s.ethics_values.soul.is_none());

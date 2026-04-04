@@ -82,7 +82,9 @@ fn social_manager_reset_restores_defaults() {
 
 #[test]
 fn social_manager_phi_dyad_disabled_by_default() {
-    let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = false;
+    let service = CognitiveLoopService::new(config).unwrap();
     // Default config doesn't enable primitive consciousness, so phi_dyad is None
     assert!(service.behavior.social_mgr.phi_dyad.is_none());
     assert!(service.behavior.social_mgr.partner_model.is_none());

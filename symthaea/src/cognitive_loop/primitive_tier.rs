@@ -386,8 +386,8 @@ mod tests {
 
     #[test]
     fn test_disabled_primitive_tier() {
-        let config = CognitiveLoopConfig::default();
-        // Default config has enable_primitive_consciousness = false
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_primitive_consciousness = false;
         let tier = PrimitiveTierManager::new(&config, 64);
         assert!(tier.primitive_processor.is_none());
         assert!(tier.temporal_analyzer.is_none());
