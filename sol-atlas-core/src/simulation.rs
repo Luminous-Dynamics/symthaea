@@ -180,3 +180,89 @@ pub fn colonies_at_year(year: u32) -> Vec<ColonyState> {
 
     colonies
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tech_milestones_ordered() {
+        let milestones = tech_milestones();
+        assert!(milestones.len() >= 8);
+        for w in milestones.windows(2) {
+            assert!(w[0].year <= w[1].year, "Milestones not ordered: {} > {}", w[0].year, w[1].year);
+        }
+    }
+
+    #[test]
+    fn secular_phases_cycle() {
+        assert_eq!(secular_phase_at_year(0), SecularPhase::Growth);
+        assert_eq!(secular_phase_at_year(40), SecularPhase::Stagflation);
+        assert_eq!(secular_phase_at_year(60), SecularPhase::Crisis);
+        assert_eq!(secular_phase_at_year(75), SecularPhase::Depression);
+        // Second cycle
+        assert_eq!(secular_phase_at_year(80), SecularPhase::Growth);
+        assert_eq!(secular_phase_at_year(120), SecularPhase::Stagflation);
+    }
+
+    #[test]
+    fn grid_stress_evolves() {
+        let stress_0 = evolve_grid_stress(0);
+        let stress_200 = evolve_grid_stress(200);
+        assert_eq!(stress_0.len(), 16);
+        assert_eq!(stress_200.len(), 16);
+        // Delhi should be more stressed at year 200 (fossil decline)
+        let delhi_0 = stress_0.iter().find(|s| s.name == "Delhi").unwrap();
+        let delhi_200 = stress_200.iter().find(|s| s.name == "Delhi").unwrap();
+        assert!(delhi_200.allostatic_load >= delhi_0.allostatic_load * 0.8,
+            "Delhi stress should not dramatically decrease");
+    }
+
+    #[test]
+    fn population_projections() {
+        let africa_now = regional_population_at_year("Sub-Saharan Africa", 1200.0, 0);
+        let africa_100 = regional_population_at_year("Sub-Saharan Africa", 1200.0, 100);
+        assert!((africa_now - 1200.0).abs() < 0.01);
+        assert!(africa_100 > africa_now, "Africa should grow");
+
+        let europe_now = regional_population_at_year("Europe", 450.0, 0);
+        let europe_100 = regional_population_at_year("Europe", 450.0, 100);
+        assert!(europe_100 < europe_now, "Europe should shrink (negative growth)");
+    }
+
+    #[test]
+    fn colonies_appear_at_milestones() {
+        let c_0 = colonies_at_year(0);
+        assert!(c_0.is_empty());
+
+        let c_35 = colonies_at_year(35);
+        assert_eq!(c_35.len(), 1);
+        assert_eq!(c_35[0].name, "Luna Base");
+
+        let c_50 = colonies_at_year(50);
+        assert_eq!(c_50.len(), 2); // Luna + Mars
+
+        let c_100 = colonies_at_year(100);
+        assert_eq!(c_100.len(), 3); // Luna + Mars + Europa
+
+        let c_200 = colonies_at_year(200);
+        assert_eq!(c_200.len(), 4); // All four
+        assert!(c_200.iter().any(|c| c.name == "Titan Harvest"));
+    }
+
+    #[test]
+    fn colony_populations_grow() {
+        let mars_50 = colonies_at_year(50).into_iter().find(|c| c.body == "Mars").unwrap();
+        let mars_150 = colonies_at_year(150).into_iter().find(|c| c.body == "Mars").unwrap();
+        assert!(mars_150.population > mars_50.population);
+        assert!(mars_150.self_sufficiency > mars_50.self_sufficiency);
+    }
+
+    #[test]
+    fn secular_phase_colors() {
+        let g = SecularPhase::Growth.color();
+        assert!(g[1] > g[0], "Growth should be greenish");
+        let c = SecularPhase::Crisis.color();
+        assert!(c[0] > c[1], "Crisis should be reddish");
+    }
+}
