@@ -1,0 +1,45 @@
+# Chapter 10: Technology and the Shrinking of Range
+
+*In which the internet helps and algorithms hurt, and we learn that connection is not the same as proximity.*
+
+---
+
+## Five Eras
+
+We modeled the evolution of communication technology as changes to the FEP gradient's parameters across five eras (Finding 12-13), each representing a different topology of social interaction:
+
+**Pre-Internet (1970s)**: Small harmony range (25 units), high resonance regen, no wells beyond local. Agents can only interact with those physically nearby, but those interactions are rich. This models the neighborhood: you know your neighbors, you don't know the world.
+
+**Early Internet (1990s)**: Medium range (40 units), moderate regen. Agents can sense more partners but each connection is weaker. Email and early web: broader reach, shallower engagement.
+
+**Social Media (2010s)**: Large range (60 units), lower regen per interaction. Agents see many potential partners but gain little from each. Facebook and Twitter: vast networks, thin connections.
+
+**Algorithm Era (2020s)**: Very large range (80 units), very low regen, with "filter bubble" effect — agents only perceive partners with resonance above 0.6 (low-resonance agents are hidden by the algorithm). The algorithm maximizes the appearance of connection while reducing actual cooperative diversity.
+
+**Post-Algorithm (future)**: Maximum range (100 units), minimal regen, no filtering. Pure information: agents see everything and everyone but benefit from almost nobody.
+
+## The Results
+
+Pre-internet agents — with the smallest range but the highest per-interaction benefit — produced the most cooperation. Algorithm-era agents produced the least.
+
+The mechanism is the range-regen tradeoff identified in Chapter 6. Social range and resonance regeneration rate interact synergistically (Finding 35, +3.32 agents). Increasing range while decreasing regen moves along the *wrong* diagonal of the interaction surface — you lose more from weakened connections than you gain from broader reach.
+
+The algorithm-era filter bubble compounds this: by hiding low-resonance agents, the algorithm reduces the probability of serendipitous encounters with partners who might have moderate (but positive) resonance. The agents who remain visible are the high-resonance matches — but the algorithm can't increase the resonance *benefit*, only the visibility. The result is a smaller effective population with the same weak connections.
+
+## Connection Is Not Proximity
+
+The deepest insight from this experiment is not about any specific technology era. It is about the distinction between *connection* (the ability to perceive others) and *proximity* (the ability to benefit from others).
+
+In the engine, perception range (how far an agent can see) is different from harmony range (how close agents must be to resonate). Increasing perception range allows agents to detect distant partners and navigate toward them. But the benefit only occurs within harmony range — the physical distance at which resonance regenerates energy.
+
+Technology, in our model, increases perception range but does not increase harmony range. You can see more people, but you still need to be *near* them to cooperate. And "near" is defined by physics, not by fiber optics.
+
+The pre-internet era had the smallest perception range but agents were already within harmony range of their neighbors (because the arena was small relative to social range). Everyone they could see, they could cooperate with. Connection and proximity were identical.
+
+The algorithm era has the largest perception range, but agents are distributed across a vast arena. They can see partners at 80 units but can only cooperate at 40. They spend energy traveling to perceived partners, arrive, cooperate briefly, then see a "better" match at 80 units and travel again. The restlessness of infinite choice degrades the sustained proximity that cooperation requires.
+
+This maps directly to Turkle's *Alone Together* (2011): technology that increases connection while decreasing proximity produces loneliness. Our engine produces the same pattern from thermodynamics: agents with maximal perception and minimal benefit are the loneliest — and the most likely to die.
+
+---
+
+*Next: Chapter 11 — Learning and the Paradox of Optimal Defaults*
