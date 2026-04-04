@@ -54,3 +54,33 @@ impl Default for ExperienceRegistry {
         Self { experiences, selected: 0 }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registry_has_room() {
+        let reg = ExperienceRegistry::default();
+        assert!(!reg.experiences.is_empty());
+        assert_eq!(reg.experiences[0].id, "the-room");
+        assert!(reg.experiences[0].available);
+    }
+
+    #[test]
+    fn registry_selection_bounds() {
+        let reg = ExperienceRegistry::default();
+        assert_eq!(reg.selected, 0);
+        assert!(reg.selected < reg.experiences.len());
+    }
+
+    #[test]
+    fn descriptors_have_names() {
+        let reg = ExperienceRegistry::default();
+        for exp in &reg.experiences {
+            assert!(!exp.name.is_empty());
+            assert!(!exp.subtitle.is_empty());
+            assert!(!exp.id.is_empty());
+        }
+    }
+}
