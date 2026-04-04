@@ -632,6 +632,9 @@ pub enum PhysicsDomain {
     ModifiedGravity,
     InformationTheory,
     Biophysics,
+    Acoustics,
+    PlasmaPhysics,
+    Mathematics,
 }
 
 /// A fully described physics equation with all metadata.

@@ -107,9 +107,25 @@ impl Default for PhysicsCatalog {
 // EQUATION BUILDERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Lightweight equation builder for equations that use a simple name+description encoding.
+///
+/// Creates an equation with a single constant-name AST node. The HDC encoding
+/// captures the equation's name, domain, and dimensional signature without needing
+/// a full AST tree. This is useful for filling out the catalog rapidly.
+fn simple_eq(name: &str, domain: PhysicsDomain, description: &str, dimensions: DimensionalSignature) -> PhysicsEquation {
+    PhysicsEquation {
+        name: name.to_string(),
+        domain,
+        ast: make_equals(make_const(name), make_const(description)),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions,
+        tensor: None,
+    }
+}
+
 /// Build all landmark equations for the catalog.
 fn build_all_equations() -> Vec<PhysicsEquation> {
-    let mut eqs = Vec::with_capacity(48);
+    let mut eqs = Vec::with_capacity(160);
 
     // Electromagnetism
     eqs.push(maxwell_gauss_law());
@@ -237,6 +253,80 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(bayes_theorem());
     eqs.push(arrhenius_equation());
     eqs.push(hubble_law());
+
+    // ── Phase 1B: Expand to 150 ──
+    // Classical Mechanics
+    eqs.push(simple_eq("Simple Harmonic Oscillator", PhysicsDomain::ClassicalMechanics, "x = A cos(ωt + φ)", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Angular Momentum", PhysicsDomain::ClassicalMechanics, "L = Iω", DimensionalSignature::ACTION));
+    eqs.push(simple_eq("Torque", PhysicsDomain::ClassicalMechanics, "τ = r × F", DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Work-Energy Theorem", PhysicsDomain::ClassicalMechanics, "W = ΔKE", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Moment of Inertia", PhysicsDomain::ClassicalMechanics, "I = Σ mᵢrᵢ²", DimensionalSignature { mass: 1, length: 2, time: 0, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Electromagnetism
+    eqs.push(simple_eq("Biot-Savart Law", PhysicsDomain::Electromagnetism, "dB = (μ₀/4π)(Idl × r̂)/r²", DimensionalSignature::MAGNETIC_FIELD));
+    eqs.push(simple_eq("Larmor Radiation Formula", PhysicsDomain::Electromagnetism, "P = q²a²/(6πε₀c³)", DimensionalSignature { mass: 1, length: 2, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Poynting Vector", PhysicsDomain::Electromagnetism, "S = (1/μ₀)(E × B)", DimensionalSignature { mass: 1, length: 0, time: -3, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Magnetic Dipole Moment", PhysicsDomain::Electromagnetism, "m = NIA", DimensionalSignature { mass: 0, length: 2, time: 0, current: 1, temperature: 0, amount: 0, luminous: 0 }));
+    // Thermodynamics
+    eqs.push(simple_eq("Helmholtz Free Energy", PhysicsDomain::Thermodynamics, "F = U - TS", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Entropy of Mixing", PhysicsDomain::Thermodynamics, "ΔS_mix = -nR Σ xᵢ ln xᵢ", DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: -1, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Equipartition Theorem", PhysicsDomain::Thermodynamics, "⟨E⟩ = (f/2)kT", DimensionalSignature::ENERGY));
+    eqs.push(simple_eq("Carnot Efficiency", PhysicsDomain::Thermodynamics, "η = 1 - T_cold/T_hot", DimensionalSignature::DIMENSIONLESS));
+    // Quantum Mechanics
+    eqs.push(simple_eq("Pauli Exclusion Principle", PhysicsDomain::QuantumMechanics, "ψ(1,2) = -ψ(2,1)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("WKB Approximation", PhysicsDomain::QuantumMechanics, "ψ ≈ exp(±i∫p dx/ℏ)/√p", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Born Approximation", PhysicsDomain::QuantumMechanics, "f(θ) = -(m/2πℏ²)∫V(r')exp(iq·r')d³r'", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Time-Independent Perturbation", PhysicsDomain::QuantumMechanics, "E_n^(1) = ⟨n⁰|V|n⁰⟩", DimensionalSignature::ENERGY));
+    // Nuclear/Particle
+    eqs.push(simple_eq("Bethe-Bloch Energy Loss", PhysicsDomain::NuclearPhysics, "-dE/dx = Kz²Z/A·(1/β²)[ln(2meβ²γ²/I) - β²]", DimensionalSignature { mass: 1, length: -1, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Gamow Tunneling Factor", PhysicsDomain::NuclearPhysics, "T = exp(-2π η)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Nuclear Magnetic Resonance", PhysicsDomain::NuclearPhysics, "ω₀ = γB₀", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Fluid Dynamics
+    eqs.push(simple_eq("Reynolds Number", PhysicsDomain::FluidDynamics, "Re = ρvL/μ", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Stokes Drag", PhysicsDomain::FluidDynamics, "F = 6πμRv", DimensionalSignature::FORCE));
+    eqs.push(simple_eq("Poiseuille Flow", PhysicsDomain::FluidDynamics, "Q = πR⁴ΔP/(8μL)", DimensionalSignature { mass: 0, length: 3, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Optics
+    eqs.push(simple_eq("Brewster Angle", PhysicsDomain::Optics, "tan(θ_B) = n₂/n₁", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Diffraction Grating", PhysicsDomain::Optics, "d sin(θ) = mλ", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Abbe Diffraction Limit", PhysicsDomain::Optics, "d = λ/(2n sin α)", DimensionalSignature::LENGTH));
+    // Cosmology
+    eqs.push(simple_eq("Hubble Parameter Evolution", PhysicsDomain::Cosmology, "H² = H₀²[Ω_r/a⁴ + Ω_m/a³ + Ω_k/a² + Ω_Λ]", DimensionalSignature { mass: 0, length: 0, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("CMB Temperature Redshift", PhysicsDomain::Cosmology, "T(z) = T₀(1+z)", DimensionalSignature { mass: 0, length: 0, time: 0, current: 0, temperature: 1, amount: 0, luminous: 0 }));
+    // Acoustics (new domain)
+    eqs.push(simple_eq("Speed of Sound", PhysicsDomain::Acoustics, "v = √(γP/ρ) = √(γRT/M)", DimensionalSignature::VELOCITY));
+    eqs.push(simple_eq("Doppler Effect", PhysicsDomain::Acoustics, "f' = f(v ± v_obs)/(v ∓ v_src)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Sound Intensity Level", PhysicsDomain::Acoustics, "β = 10 log₁₀(I/I₀) dB", DimensionalSignature::DIMENSIONLESS));
+    // Plasma Physics (new domain)
+    eqs.push(simple_eq("Debye Length", PhysicsDomain::PlasmaPhysics, "λ_D = √(ε₀kT/(ne²))", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Plasma Frequency", PhysicsDomain::PlasmaPhysics, "ω_p = √(ne²/(mε₀))", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("MHD Force Balance", PhysicsDomain::PlasmaPhysics, "J × B = ∇P", DimensionalSignature { mass: 1, length: -2, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Information Theory (additional)
+    eqs.push(simple_eq("Shannon-Hartley Channel Capacity", PhysicsDomain::InformationTheory, "C = B log₂(1 + S/N)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Data Processing Inequality", PhysicsDomain::InformationTheory, "I(X;Z) ≤ I(X;Y) for X→Y→Z", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Rate-Distortion Function", PhysicsDomain::InformationTheory, "R(D) = min I(X;X̂) s.t. E[d(X,X̂)] ≤ D", DimensionalSignature::DIMENSIONLESS));
+    // General Relativity (additional)
+    eqs.push(simple_eq("Geodesic Equation", PhysicsDomain::GeneralRelativity, "d²xᵘ/dτ² + Γᵘᵥₛ(dxᵥ/dτ)(dxˢ/dτ) = 0", DimensionalSignature::ACCELERATION));
+    eqs.push(simple_eq("Raychaudhuri Equation", PhysicsDomain::GeneralRelativity, "dθ/dτ = -θ²/3 - σ² + ω² - R_μν uᵘuᵛ", DimensionalSignature { mass: 0, length: 0, time: -2, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Gravitational Wave Strain", PhysicsDomain::GeneralRelativity, "h = 4GM_c^(5/3)(πf)^(2/3)/(c⁴d)", DimensionalSignature::DIMENSIONLESS));
+    // Mathematics (new domain)
+    eqs.push(simple_eq("Euler Identity", PhysicsDomain::Mathematics, "e^(iπ) + 1 = 0", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Fourier Transform", PhysicsDomain::Mathematics, "F(ω) = ∫f(t)e^(-iωt)dt", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Laplace Transform", PhysicsDomain::Mathematics, "F(s) = ∫₀^∞ f(t)e^(-st)dt", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Cauchy-Schwarz Inequality", PhysicsDomain::Mathematics, "|⟨u,v⟩|² ≤ ⟨u,u⟩⟨v,v⟩", DimensionalSignature::DIMENSIONLESS));
+    // Condensed Matter (additional)
+    eqs.push(simple_eq("Hall Effect", PhysicsDomain::CondensedMatter, "V_H = IB/(nqt)", DimensionalSignature { mass: 1, length: 2, time: -3, current: -1, temperature: 0, amount: 0, luminous: 0 }));
+    eqs.push(simple_eq("Bragg Diffraction", PhysicsDomain::CondensedMatter, "2d sin(θ) = nλ", DimensionalSignature::LENGTH));
+    eqs.push(simple_eq("Debye Model Heat Capacity", PhysicsDomain::CondensedMatter, "C_V = 9Nk(T/Θ_D)³∫₀^(Θ_D/T) x⁴eˣ/(eˣ-1)²dx", DimensionalSignature { mass: 1, length: 2, time: -2, current: 0, temperature: -1, amount: 0, luminous: 0 }));
+    // Biophysics (additional)
+    eqs.push(simple_eq("Michaelis-Menten Kinetics", PhysicsDomain::Biophysics, "v = V_max[S]/(K_m + [S])", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 1, luminous: 0 }));
+    eqs.push(simple_eq("Hill Equation", PhysicsDomain::Biophysics, "θ = [L]^n/(K_d^n + [L]^n)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Nernst Equation", PhysicsDomain::Biophysics, "E = E° - (RT/nF)ln(Q)", DimensionalSignature { mass: 1, length: 2, time: -3, current: -1, temperature: 0, amount: 0, luminous: 0 }));
+    // Chemical
+    eqs.push(simple_eq("Henderson-Hasselbalch", PhysicsDomain::Thermodynamics, "pH = pK_a + log₁₀([A⁻]/[HA])", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Logistic Growth", PhysicsDomain::Biophysics, "dN/dt = rN(1 - N/K)", DimensionalSignature { mass: 0, length: 0, time: -1, current: 0, temperature: 0, amount: 0, luminous: 0 }));
+    // Statistical Mechanics (additional)
+    eqs.push(simple_eq("Fermi-Dirac Distribution", PhysicsDomain::StatisticalMechanics, "f(E) = 1/(exp((E-μ)/kT) + 1)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Bose-Einstein Distribution", PhysicsDomain::StatisticalMechanics, "n(E) = 1/(exp((E-μ)/kT) - 1)", DimensionalSignature::DIMENSIONLESS));
+    eqs.push(simple_eq("Saha Ionization Equation", PhysicsDomain::StatisticalMechanics, "nᵢnₑ/n₀ = (2πmₑkT/h²)^(3/2) exp(-χ/kT)", DimensionalSignature::DIMENSIONLESS));
 
     eqs
 }
@@ -2710,8 +2800,8 @@ mod tests {
     fn catalog_builds_successfully() {
         let catalog = PhysicsCatalog::new();
         assert!(
-            catalog.len() >= 90,
-            "Expected >= 90 entries, got {}",
+            catalog.len() >= 148,
+            "Expected >= 148 entries, got {}",
             catalog.len()
         );
     }
