@@ -26,6 +26,12 @@ pub(super) use parallel::{
     EpisodicLearningContext,
 };
 
+// Re-export consciousness metrics parallel branch items (Phase "consciousness metrics").
+pub(in crate::cognitive_loop) use parallel::{
+    parallel_consciousness_branch_a, parallel_consciousness_branch_b,
+    ConsciousnessMetricsBranchA, ConsciousnessMetricsBranchB, DeferredFeedback,
+};
+
 // Re-export Phase 7 result structs so cycle.rs can destructure them
 pub(super) use cycle_phases::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 
