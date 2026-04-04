@@ -98,6 +98,74 @@ pub fn validate_frame(stats: &FrameStats) -> Vec<String> {
     issues
 }
 
+/// Simple HDC-inspired frame fingerprint — encodes spatial color distribution
+/// as a fixed-size vector for fast similarity comparison.
+/// Not full 16,384D BinaryHV (requires symthaea-core dep), but captures the
+/// same concept: perceptual similarity without pixel-level comparison.
+pub struct FrameFingerprint {
+    /// 64 bins: 4x4 spatial grid × 4 color channels (R, G, B, brightness)
+    pub bins: [f32; 64],
+}
+
+impl FrameFingerprint {
+    /// Encode a frame into a 64-bin fingerprint.
+    pub fn from_pixels(pixels: &[u8], width: u32, height: u32) -> Self {
+        let mut bins = [0.0f32; 64];
+        let total = (width * height) as f32;
+        if total == 0.0 || pixels.len() < (total as usize * 4) {
+            return Self { bins };
+        }
+
+        // 4x4 spatial grid
+        let gw = width / 4;
+        let gh = height / 4;
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = ((y * width + x) as usize) * 4;
+                if idx + 3 >= pixels.len() { continue; }
+                let r = pixels[idx] as f32 / 255.0;
+                let g = pixels[idx + 1] as f32 / 255.0;
+                let b = pixels[idx + 2] as f32 / 255.0;
+
+                let gx = (x / gw).min(3) as usize;
+                let gy = (y / gh).min(3) as usize;
+                let grid_idx = (gy * 4 + gx) * 4;
+
+                bins[grid_idx] += r;
+                bins[grid_idx + 1] += g;
+                bins[grid_idx + 2] += b;
+                bins[grid_idx + 3] += (r + g + b) / 3.0;
+            }
+        }
+
+        // Normalize by cell pixel count
+        let cell_count = (gw * gh) as f32;
+        if cell_count > 0.0 {
+            for bin in bins.iter_mut() {
+                *bin /= cell_count;
+            }
+        }
+
+        Self { bins }
+    }
+
+    /// Cosine similarity between two fingerprints (-1 to 1).
+    pub fn similarity(&self, other: &Self) -> f32 {
+        let mut dot = 0.0f32;
+        let mut mag_a = 0.0f32;
+        let mut mag_b = 0.0f32;
+        for i in 0..64 {
+            dot += self.bins[i] * other.bins[i];
+            mag_a += self.bins[i] * self.bins[i];
+            mag_b += other.bins[i] * other.bins[i];
+        }
+        let denom = mag_a.sqrt() * mag_b.sqrt();
+        if denom < 1e-10 { return 0.0; }
+        dot / denom
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,5 +204,43 @@ mod tests {
         let stats = compute_frame_stats(&pixels, 100, 100);
         let issues = validate_frame(&stats);
         assert!(issues.iter().any(|i| i.contains("Overexposed")));
+    }
+
+    #[test]
+    fn fingerprint_self_similarity() {
+        let mut pixels = vec![0u8; 100 * 100 * 4];
+        for i in 0..3000 { pixels[i * 4 + 1] = 80; pixels[i * 4 + 2] = 90; }
+        let fp = FrameFingerprint::from_pixels(&pixels, 100, 100);
+        assert!((fp.similarity(&fp) - 1.0).abs() < 0.001, "Self-similarity should be 1.0");
+    }
+
+    #[test]
+    fn fingerprint_different_frames() {
+        // Teal frame
+        let mut teal = vec![0u8; 100 * 100 * 4];
+        for i in 0..5000 { teal[i * 4 + 1] = 80; teal[i * 4 + 2] = 90; }
+        // Red frame
+        let mut red = vec![0u8; 100 * 100 * 4];
+        for i in 0..5000 { red[i * 4] = 200; }
+
+        let fp_teal = FrameFingerprint::from_pixels(&teal, 100, 100);
+        let fp_red = FrameFingerprint::from_pixels(&red, 100, 100);
+        let sim = fp_teal.similarity(&fp_red);
+        assert!(sim < 0.8, "Different color frames should have low similarity: {}", sim);
+    }
+
+    #[test]
+    fn fingerprint_similar_frames() {
+        // Two teal frames with slight variation
+        let mut frame_a = vec![0u8; 100 * 100 * 4];
+        let mut frame_b = vec![0u8; 100 * 100 * 4];
+        for i in 0..5000 {
+            frame_a[i * 4 + 1] = 80; frame_a[i * 4 + 2] = 90;
+            frame_b[i * 4 + 1] = 78; frame_b[i * 4 + 2] = 92; // slight variation
+        }
+        let fp_a = FrameFingerprint::from_pixels(&frame_a, 100, 100);
+        let fp_b = FrameFingerprint::from_pixels(&frame_b, 100, 100);
+        let sim = fp_a.similarity(&fp_b);
+        assert!(sim > 0.95, "Similar frames should have high similarity: {}", sim);
     }
 }
