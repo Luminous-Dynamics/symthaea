@@ -266,6 +266,15 @@ pub fn setup_globe_view(
             max_samples: 8,
             ..default()
         },
+        // [7] Depth of field — cinematic lens, background blurs
+        bevy::post_process::dof::DepthOfField {
+            mode: bevy::post_process::dof::DepthOfFieldMode::Bokeh,
+            focal_distance: 4.2,  // focus on globe surface
+            sensor_height: 0.01866, // Super 35 cinema format
+            max_circle_of_confusion_diameter: 40.0,
+            max_depth: 50.0,
+            ..default()
+        },
         Transform::from_xyz(0.0, 0.0, 4.2).looking_at(Vec3::ZERO, Vec3::Y),
         OrbitalCamera,
         AtlasEntity,
