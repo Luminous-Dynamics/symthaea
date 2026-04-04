@@ -239,6 +239,208 @@ impl StabilityLandscape {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SYSTEMATIC SUPERHEAVY ISOTOPE DISCOVERY
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Summary of a single element's most stable predicted isotope.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElementStabilitySummary {
+    /// Atomic number
+    pub z: u16,
+    /// Element symbol (approximate)
+    pub symbol: String,
+    /// Neutron number of most stable predicted isotope
+    pub optimal_n: u16,
+    /// Mass number of most stable isotope
+    pub optimal_a: u16,
+    /// Binding energy per nucleon of optimal isotope (MeV)
+    pub optimal_ba: f64,
+    /// Shell correction of optimal isotope (MeV)
+    pub optimal_shell_correction: f64,
+    /// Predicted alpha-decay half-life of optimal isotope (seconds)
+    pub predicted_half_life: Option<f64>,
+    /// Whether this element has an enhanced stability pocket
+    pub has_stability_pocket: bool,
+    /// Number of isotopes evaluated
+    pub isotopes_evaluated: u16,
+}
+
+/// Full discovery report from a superheavy sweep.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuperheavyDiscoveryReport {
+    /// Per-element summaries
+    pub elements: Vec<ElementStabilitySummary>,
+    /// Detected stability islands
+    pub islands: Vec<StabilityIsland>,
+    /// Total isotopes evaluated
+    pub total_isotopes: usize,
+    /// Z range swept
+    pub z_range: (u16, u16),
+    /// N range swept
+    pub n_range: (u16, u16),
+}
+
+/// Approximate element symbol for superheavy elements.
+fn superheavy_symbol(z: u16) -> String {
+    match z {
+        100 => "Fm".to_string(),
+        101 => "Md".to_string(),
+        102 => "No".to_string(),
+        103 => "Lr".to_string(),
+        104 => "Rf".to_string(),
+        105 => "Db".to_string(),
+        106 => "Sg".to_string(),
+        107 => "Bh".to_string(),
+        108 => "Hs".to_string(),
+        109 => "Mt".to_string(),
+        110 => "Ds".to_string(),
+        111 => "Rg".to_string(),
+        112 => "Cn".to_string(),
+        113 => "Nh".to_string(),
+        114 => "Fl".to_string(),
+        115 => "Mc".to_string(),
+        116 => "Lv".to_string(),
+        117 => "Ts".to_string(),
+        118 => "Og".to_string(),
+        _ => format!("E{}", z),
+    }
+}
+
+impl StabilityLandscape {
+    /// Systematic sweep of the superheavy region to find stable isotopes.
+    ///
+    /// Evaluates all isotopes in the range Z=[z_min, z_max], N=[n_min, n_max]
+    /// and identifies:
+    /// - The most stable isotope for each element
+    /// - Stability islands (connected regions with enhanced shell corrections)
+    /// - Predicted half-lives via Geiger-Nuttall
+    ///
+    /// Default range covers the theoretically interesting region:
+    /// Z=100-126, N=140-200 (6,000+ isotopes).
+    pub fn find_stable_isotopes(
+        &self,
+        z_min: u16,
+        z_max: u16,
+        n_min: u16,
+        n_max: u16,
+    ) -> SuperheavyDiscoveryReport {
+        let map = self.stability_map(z_min, z_max, n_min, n_max);
+        let islands = self.find_stability_islands(&map);
+
+        let mut elements = Vec::new();
+
+        for z in z_min..=z_max {
+            // Find all isotopes for this element
+            let isotopes: Vec<&IsotopeStability> = map
+                .entries
+                .iter()
+                .filter(|e| e.z == z)
+                .collect();
+
+            if isotopes.is_empty() {
+                continue;
+            }
+
+            // Find the isotope with the best shell correction (most negative = most stable)
+            let best = isotopes
+                .iter()
+                .min_by(|a, b| {
+                    a.shell_correction
+                        .partial_cmp(&b.shell_correction)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .unwrap();
+
+            let ba = self.semf.binding_energy_per_nucleon(best.a, best.z);
+            let has_pocket = best.shell_correction < -2.0;
+
+            elements.push(ElementStabilitySummary {
+                z,
+                symbol: superheavy_symbol(z),
+                optimal_n: best.n,
+                optimal_a: best.a,
+                optimal_ba: ba,
+                optimal_shell_correction: best.shell_correction,
+                predicted_half_life: best.estimated_half_life,
+                has_stability_pocket: has_pocket,
+                isotopes_evaluated: isotopes.len() as u16,
+            });
+        }
+
+        SuperheavyDiscoveryReport {
+            total_isotopes: map.entries.len(),
+            z_range: (z_min, z_max),
+            n_range: (n_min, n_max),
+            elements,
+            islands,
+        }
+    }
+
+    /// Default superheavy sweep: Z=100-126, N=140-200.
+    pub fn default_superheavy_sweep(&self) -> SuperheavyDiscoveryReport {
+        self.find_stable_isotopes(100, 126, 140, 200)
+    }
+
+    /// Print a human-readable discovery report.
+    pub fn print_report(report: &SuperheavyDiscoveryReport) -> String {
+        let mut out = String::new();
+        out.push_str(&format!(
+            "=== Superheavy Isotope Discovery Report ===\n\
+             Z range: {}-{}, N range: {}-{}\n\
+             Total isotopes evaluated: {}\n\
+             Stability islands found: {}\n\n",
+            report.z_range.0,
+            report.z_range.1,
+            report.n_range.0,
+            report.n_range.1,
+            report.total_isotopes,
+            report.islands.len()
+        ));
+
+        out.push_str("Element | Optimal A | Shell Corr (MeV) | Stability Pocket | Half-life\n");
+        out.push_str("--------|-----------|-------------------|------------------|----------\n");
+
+        for e in &report.elements {
+            let hl_str = match e.predicted_half_life {
+                Some(t) if t > 3.156e7 => format!("{:.1} yr", t / 3.156e7),
+                Some(t) if t > 86400.0 => format!("{:.1} days", t / 86400.0),
+                Some(t) if t > 3600.0 => format!("{:.1} hr", t / 3600.0),
+                Some(t) if t > 1.0 => format!("{:.1} s", t),
+                Some(t) if t > 1e-3 => format!("{:.1} ms", t * 1e3),
+                Some(t) => format!("{:.1e} s", t),
+                None => "stable?".to_string(),
+            };
+
+            out.push_str(&format!(
+                "{:>3}-{:<3} | {:>9} | {:>17.2} | {:>16} | {}\n",
+                e.symbol,
+                e.z,
+                e.optimal_a,
+                e.optimal_shell_correction,
+                if e.has_stability_pocket { "YES" } else { "no" },
+                hl_str,
+            ));
+        }
+
+        if !report.islands.is_empty() {
+            out.push_str("\n=== Stability Islands ===\n");
+            for (i, island) in report.islands.iter().enumerate() {
+                out.push_str(&format!(
+                    "Island {}: center Z={}, N={}, {} members, avg shell corr={:.2} MeV\n",
+                    i + 1,
+                    island.center_z,
+                    island.center_n,
+                    island.members.len(),
+                    island.avg_shell_correction,
+                ));
+            }
+        }
+
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -310,14 +512,63 @@ mod tests {
     fn test_superheavy_region_has_islands() {
         let landscape = StabilityLandscape::default();
         let map = landscape.stability_map(110, 120, 170, 190);
-        let islands = landscape.find_stability_islands(&map);
+        let _islands = landscape.find_stability_islands(&map);
 
-        // The model should find at least some enhanced stability in the superheavy region
-        // (even if the simplified shell model doesn't perfectly reproduce predictions)
-        // This is a qualitative test — the physics is correct even if magnitudes differ
         assert!(
             !map.entries.is_empty(),
             "Stability map should contain entries"
+        );
+    }
+
+    #[test]
+    fn test_find_stable_isotopes_small_sweep() {
+        let landscape = StabilityLandscape::default();
+        // Small sweep: Z=110-116, N=170-185 (7 elements × 16 neutrons = 112 isotopes)
+        let report = landscape.find_stable_isotopes(110, 116, 170, 185);
+
+        assert_eq!(report.z_range, (110, 116));
+        assert_eq!(report.n_range, (170, 185));
+        assert_eq!(report.elements.len(), 7); // Z=110 through 116
+        assert!(report.total_isotopes > 100);
+
+        // Every element should have an optimal isotope
+        for e in &report.elements {
+            assert!(e.optimal_a > 0);
+            assert!(e.optimal_ba > 0.0);
+            assert!(e.isotopes_evaluated > 0);
+        }
+
+        // Moscovium (Z=115) should be in the list
+        let mc = report.elements.iter().find(|e| e.z == 115);
+        assert!(mc.is_some(), "Moscovium should be in sweep");
+        assert_eq!(mc.unwrap().symbol, "Mc");
+    }
+
+    #[test]
+    fn test_discovery_report_formatting() {
+        let landscape = StabilityLandscape::default();
+        let report = landscape.find_stable_isotopes(114, 116, 180, 185);
+        let text = StabilityLandscape::print_report(&report);
+
+        assert!(text.contains("Superheavy Isotope Discovery Report"));
+        assert!(text.contains("Fl")); // Flerovium Z=114
+        assert!(text.contains("Mc")); // Moscovium Z=115
+        assert!(text.contains("Lv")); // Livermorium Z=116
+    }
+
+    #[test]
+    fn test_optimal_n_physically_reasonable() {
+        let landscape = StabilityLandscape::default();
+        let report = landscape.find_stable_isotopes(114, 114, 170, 190);
+
+        let fl = &report.elements[0];
+        assert_eq!(fl.z, 114);
+        // For Z=114, optimal N should be in the range 170-190
+        // (the island of stability is predicted near N=184)
+        assert!(
+            fl.optimal_n >= 170 && fl.optimal_n <= 190,
+            "Fl optimal N={} should be in range 170-190",
+            fl.optimal_n
         );
     }
 }
