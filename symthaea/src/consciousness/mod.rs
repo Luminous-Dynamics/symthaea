@@ -178,12 +178,14 @@ pub use symthaea_dream as dream;
 pub use symthaea_enactive as enactive_cognition;
 pub use symthaea_factor_graph as factor_graph;
 pub use symthaea_fep as fep_active_inference;
+#[cfg(feature = "field-dynamics")]
 pub use symthaea_field_dynamics as consciousness_field_dynamics;
 /// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
 /// analysis, and Hodge decomposition of higher-order neural interaction signals
 pub use symthaea_hodge as hodge_laplacian;
 pub use symthaea_narrative_self as narrative_self;
 pub use symthaea_phi_search as phi_architecture_search;
+#[cfg(feature = "sensorimotor")]
 pub use symthaea_sensorimotor as sensorimotor_contingencies;
 
 // ============================================================================
