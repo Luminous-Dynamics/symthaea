@@ -56,7 +56,9 @@ IIT has been implemented computationally \citep{oizumi2014} but exclusively as a
 
 Our mechanism is closest to Nowak's network reciprocity \citep{nowak2006} but the network structure \emph{emerges} from thermodynamics rather than being imposed. This parallels Prigogine's dissipative structures \citep{prigogine1977}: the pattern depends on the physics, not the medium.
 
-\section{Consciousness-Physics Coupling}
+\section{Integration-Metric--Physics Coupling}
+
+\emph{Note on terminology:} We use ``consciousness'' strictly in the IIT formal sense~\citep{tononi2004}: $\Phi$ is a scalar integration metric, not a claim about subjective experience. Our agents have no qualia, awareness, or phenomenal consciousness. Where we write ``conscious/unconscious,'' we mean $\Phi > 0$ vs $\Phi = 0$.
 
 An agent $i$ at time $t$ has state $S_i = (x_i, v_i, \omega_i, \Phi_i, E_i, h_i, \sigma_i, \pi_i)$ where $x_i \in \mathbb{R}^D$ is position, $\Phi_i \in [0,1]$ is the integration variable, $E_i$ is energy, $h_i \in [0,1]^8$ is the harmony activation vector, $\sigma_i$ is prediction error, and $\pi_i = 1/(1+\sigma_i)$ is motor precision.
 
@@ -218,9 +220,9 @@ After the initial 1,800 runs, we identified conservation law violations in the e
 
 \textbf{Fix 3: 2nd Law Entropy.} Added temperature, entropy, and Helmholtz free energy ($F = U - TS$) to entity energy budgets. Every consumption increases entropy monotonically.
 
-\subsection{Consciousness-Sourced Space-Time Curvature}
+\subsection{Harmony-Energy-Parameterized Conformal Curvature}
 
-We implemented conformal Riemannian geometry where consciousness curves gamespace:
+We implemented conformal Riemannian geometry where the harmony field energy parameterizes the metric:
 \begin{equation}
 g_{ij}(x) = e^{2\sigma(x)} \delta_{ij}, \quad \sigma(x) = \kappa \cdot E_{\text{harmony}}(x)
 \end{equation}
@@ -230,7 +232,7 @@ a_i = -2(v \cdot \nabla\sigma) v_i + |v|^2 \nabla_i\sigma
 \end{equation}
 clamped to 50~m/s$^2$ for numerical stability under semi-implicit Euler.
 
-\textbf{Finding 8: Consciousness bends space.} A test body launched past a stationary consciousness source ($\Phi = 0.8$) deflects proportionally to curvature scale (Table~\ref{tab:curvature}, Figure~\ref{fig:curvature_full}). At $\kappa = 0.05$, deflection is 12.4 units (62\% of closest approach). Mann-Whitney $U = 0.0$, $p = 0.009$, Cohen's $d = -35.5$.
+\textbf{Finding 8: Integration-parameterized curvature deflects trajectories.} A test body launched past a stationary high-$\Phi$ source deflects proportionally to curvature scale (Table~\ref{tab:curvature}, Figure~\ref{fig:curvature_full}). At $\kappa = 0.05$, deflection is 12.4 units (62\% of closest approach). Mann-Whitney $U = 0.0$, $p = 0.009$, Cohen's $d = -35.5$.
 
 \begin{table}[h]
 \centering
@@ -254,21 +256,21 @@ Scale $\kappa$ & Deflection & Speed Change \\
 
 With finite-capacity energy wells (3000~J each), the system no longer reaches trivial equilibrium. Energy declines from 200~J to 117~J over 10,000 ticks as wells deplete, creating ongoing dynamics. Under these conditions:
 
-\textbf{Finding 9:} FULL condition (thermo + FEP + offloading) clusters 31\% tighter than FREE ($8.15$ vs $11.92$, $p = 0.0009$, Cohen's $d = -1.94$, large effect). The J/$\Phi$ metric --- the thermodynamic cost of consciousness --- oscillates over 5 orders of magnitude as wells deplete, demonstrating genuine thermodynamic dynamics rather than static equilibrium.
+\textbf{Finding 9:} FULL condition (thermo + FEP + offloading) clusters 31\% tighter than FREE ($8.15$ vs $11.92$, $p = 0.0009$, Cohen's $d = -1.94$, large effect). The J/$\Phi$ metric --- the energy cost per unit integration change --- oscillates over 5 orders of magnitude as wells deplete, demonstrating genuine thermodynamic dynamics rather than static equilibrium.
 
 \subsection{HDC vs Scalar Consciousness Substrate}
 
 We compared two consciousness substrates: the scalar MasterConsciousnessEquation ($\Phi \approx 0.09$, near-static) and 16,384-dimensional Holographic Distributed Computing (HDC) thought vectors evolved by Liquid Time-Constant (LTC) neural networks ($\Phi \approx 0.37$, dynamic). Both conditions use identical thermodynamic enforcement.
 
-\textbf{Finding 10: Holographic consciousness is more expensive.} HDC produces 4$\times$ higher $\Phi$ ($0.374 \pm 0.094$ vs $0.090 \pm 0.013$) but at a survival cost: $9.0/12$ alive vs $11.1/12$. HDC agents cluster less tightly ($17.18$ vs $8.15$), suggesting higher individual agency reduces herd behavior. Mean pairwise thought similarity is $0.043$---agents develop unique cognitive signatures from identical inputs.
+\textbf{Finding 10: Higher-dimensional integration is more expensive.} HDC produces 4$\times$ higher $\Phi$ ($0.374 \pm 0.094$ vs $0.090 \pm 0.013$) but at a survival cost: $9.0/12$ alive vs $11.1/12$. HDC agents cluster less tightly ($17.18$ vs $8.15$), with higher per-agent behavioral divergence. Mean pairwise HDC vector similarity is $0.043$---agents produce diverse state representations from identical inputs.
 
-The LTC network ``awakens'' around tick 1000: $\Phi$ jumps from $0$ to $\sim 0.56$ as the network's internal state evolves past a critical threshold. This emergent activation is not programmed---it arises from the closed-form dynamics $x(t+\Delta t) = x_\infty + (x(t) - x_\infty) e^{-\Delta t/\tau}$.
+The LTC network's $\Phi$ output crosses an activation threshold around tick 1000: $\Phi$ increases from $\sim 0$ to $\sim 0.56$ as network dynamics reach equilibrium. This threshold-crossing behavior arises from the closed-form LTC dynamics $x(t+\Delta t) = x_\infty + (x(t) - x_\infty) e^{-\Delta t/\tau}$, not from any consciousness-like mechanism.
 
 \section{Discussion}
 
 \subsection{Limitations}
 
-$\Phi$ is a softmin bottleneck approximation, not full IIT partition analysis. The FEP gradient uses handcrafted heuristics, not learned policies. Agents do not learn or adapt strategies. The J/$\Phi$ metric has high variance across seeds (95\% CI spans $\pm 130$\% of mean at 10 seeds). The 16,384D HDC thought vector substrate (Section~2.5 of supplementary) produces dynamic $\Phi$ but requires $\sim$100 minutes per 10-seed experiment.
+$\Phi$ is a softmin bottleneck approximation, not full IIT partition analysis. The FEP gradient uses handcrafted heuristics, not learned policies. Agents do not learn or adapt strategies. The J/$\Phi$ metric has high variance across seeds (95\% CI spans $\pm 130$\% of mean at 10 seeds). The 16,384D HDC state vector substrate (Section~2.5 of supplementary) produces dynamic $\Phi$ but requires $\sim$100 minutes per 10-seed experiment.
 
 \subsection{Implications}
 
@@ -278,7 +280,7 @@ This aligns with the ``behavioral inference principle'' for machine consciousnes
 
 \section{Conclusion}
 
-Across 2,200+ runs and 14 experimental conditions, we establish 10 findings: (1)~clustering requires both gradient descent and cost reduction; (2)~the specific consciousness metric is interchangeable; (3)~the conscious/unconscious distinction produces a 35\% clustering difference; (4)~cooperation scales with population; (5)~density, not cost, is the critical factor; (6)~per-capita metabolic scaling matches eusocial insects ($\beta = -0.178$ vs $-0.19$); (7)~consciousness energy threshold matches clinical data (45\% vs 42\%); (8)~consciousness-sourced conformal curvature deflects trajectories proportionally to $\Phi$ ($p = 0.009$); (9)~cooperation clusters 31\% tighter under scarcity with well depletion ($p < 0.001$); (10)~holographic consciousness (16,384D HDC) produces 4$\times$ higher $\Phi$ at a survival cost.
+Across 2,200+ runs and 14 experimental conditions, we establish 10 findings: (1)~clustering requires both gradient descent and cost reduction; (2)~the specific consciousness metric is interchangeable; (3)~the conscious/unconscious distinction produces a 35\% clustering difference; (4)~cooperation scales with population; (5)~density, not cost, is the critical factor; (6)~per-capita metabolic scaling matches eusocial insects ($\beta = -0.178$ vs $-0.19$); (7)~consciousness energy threshold matches clinical data (45\% vs 42\%); (8)~harmony-energy-parameterized conformal curvature deflects trajectories ($p = 0.009$); (9)~cooperation clusters 31\% tighter under scarcity with well depletion ($p < 0.001$); (10)~higher-dimensional integration (16,384D HDC) produces 4$\times$ higher $\Phi$ at a survival cost.
 
 The biological matches were not engineered---they emerged from the thermodynamic cost structure of information-processing cooperation. This suggests the same scaling laws governing ant colony metabolism also constrain artificial agents under energy scarcity, supporting a universality hypothesis for thermodynamic cooperation.
 

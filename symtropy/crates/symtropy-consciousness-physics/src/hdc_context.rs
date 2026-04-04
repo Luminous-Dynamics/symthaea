@@ -1,16 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! HDC Consciousness Context — 16,384D holographic thought vectors for NPCs.
+//! HDC Integration Context — 16,384D state vectors for agent integration dynamics.
 //!
-//! Replaces the scalar MasterConsciousnessEquation with genuine cognitive
-//! dynamics: each NPC carries a high-dimensional thought vector evolved by
-//! a unified HDC-LTC neural network. Phi becomes an emergent property of
-//! thought-harmony resonance, not a hand-tuned equation.
+//! Replaces the scalar MasterConsciousnessEquation with LTC-driven state
+//! dynamics: each agent carries a high-dimensional state vector evolved by
+//! a unified HDC-LTC neural network. Φ becomes a norm-based integration
+//! metric derived from network activity, not a hand-tuned equation.
+//!
+//! Note: "consciousness" is used in the IIT formal sense (Tononi 2004) —
+//! an integration metric, not a claim about subjective experience.
 //!
 //! # Architecture
 //!
 //! ```text
-//! 7 scalar consciousness components
+//! 7 scalar integration components
 //!   ↓ encode as weighted basis HVs
 //! input_hv (16,384D)
 //!   ↓ HdcLtcUnifiedNetwork::evolve_closed_form(dt)
@@ -37,14 +40,14 @@ const NUM_COMPONENTS: usize = 7;
 /// Number of harmonies.
 const NUM_HARMONIES: usize = 8;
 
-/// HDC dimension for thought vectors.
+/// HDC dimension for state vectors.
 const HDC_DIM: usize = 16_384;
 
-/// Holographic consciousness context for a single entity.
+/// HDC integration context for a single entity.
 ///
-/// Carries a 16,384D thought vector evolved by a multi-layer LTC network.
-/// The thought vector's similarity with the harmony superposition produces
-/// an emergent Phi value.
+/// Carries a 16,384D state vector evolved by a multi-layer LTC network.
+/// The state vector's norm serves as an integration metric (Φ) — higher
+/// norm indicates more active information integration across network layers.
 pub struct HdcConsciousnessContext {
     /// Current thought hypervector (output of encoder network).
     pub thought_hv: ContinuousHV,
@@ -124,11 +127,11 @@ impl HdcConsciousnessContext {
         // Evolve the encoder network with closed-form LTC dynamics.
         self.encoder.evolve_closed_form(dt, &input_hv);
 
-        // Extract thought vector from network output.
+        // Extract state vector from network output.
         self.thought_hv = self.encoder.output();
     }
 
-    /// Extract emergent Phi from the thought vector.
+    /// Extract integration metric (Φ) from the HDC state vector.
     ///
     /// Phi measures how much the LTC network has INTEGRATED its inputs into
     /// a coherent internal representation. This is computed as:
@@ -197,10 +200,10 @@ pub fn inputs_from_state(
     ]
 }
 
-/// Compute inter-agent thought-space resonance (HDC-B).
+/// Compute inter-agent HDC vector similarity.
 ///
-/// Returns cosine similarity between two thought vectors.
-/// Replaces scalar harmony resonance with semantic thought alignment.
+/// Returns cosine similarity between two state vectors.
+/// Complements scalar harmony resonance with high-dimensional state alignment.
 pub fn thought_resonance(
     thought_a: &ContinuousHV,
     thought_b: &ContinuousHV,

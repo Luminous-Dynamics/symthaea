@@ -1,7 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Consciousness field: the central coupling between consciousness and physics.
+//! Integration field: the central coupling between Φ (integration metric) and physics.
+//! Uses "consciousness" in the IIT formal sense (Tononi 2004) — not a claim about experience.
 //!
 //! Each entity in the physics world can have an associated `EntityConsciousness`.
 //! The `ConsciousnessField` aggregates all entities and provides modulation

@@ -1,9 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Consciousness-sourced space-time curvature.
+//! Harmony-energy-parameterized conformal curvature.
 //!
-//! Implements conformal Riemannian geometry where consciousness (harmony field
-//! energy) curves gamespace — the analog of mass curving spacetime in GR.
+//! Implements conformal Riemannian geometry where the harmony field energy
+//! parameterizes the metric tensor — analogous to mass-energy curving
+//! spacetime in GR, but with harmony energy as the source term.
 //!
 //! # Conformal Metric
 //!
