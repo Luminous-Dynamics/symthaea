@@ -1374,7 +1374,7 @@ mod tests {
         assert!(get_allowed_zomes(CrossClusterRole::Legacy, CrossClusterRole::Music).is_empty());
         assert!(get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Legacy).is_empty());
         assert!(get_allowed_zomes(CrossClusterRole::Climate, CrossClusterRole::Hearth).is_empty());
-        assert!(get_allowed_zomes(CrossClusterRole::Edunet, CrossClusterRole::Finance).is_empty());
+        assert!(get_allowed_zomes(CrossClusterRole::Lunar, CrossClusterRole::Music).is_empty());
         assert!(get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Personal).is_empty());
         assert!(get_allowed_zomes(CrossClusterRole::Finance, CrossClusterRole::Hearth).is_empty());
     }
@@ -1514,6 +1514,7 @@ mod tests {
         // 45 registered directional routes:
         //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
-        assert_eq!(count, 45, "Expected 45 registered cross-cluster routes");
+        //   + 2 additional routes added for Health↔Identity and EduNet
+        assert_eq!(count, 47, "Expected 47 registered cross-cluster routes");
     }
 }
